@@ -21,7 +21,7 @@ const RADIUS = 160
 const PAD = 44
 const CX = RADIUS + PAD
 const FIRST_CY = RADIUS + PAD
-const CIRCLE_COUNT = 4
+const CIRCLE_COUNT = 3
 const SPACING = RADIUS
 const VIEWBOX_WIDTH = RADIUS * 2 + PAD * 2
 const VIEWBOX_HEIGHT =
@@ -47,7 +47,16 @@ function capsulePath(
   ].join(' ')
 }
 
-/** Path centerline x-offset — a calm vertical meander like the poster. */
+/** Skewed sine — sharpens wave crests into the poster's zig-zag turns. */
+function zig(t: number, freq: number, phase: number): number {
+  const angle = t * Math.PI * freq + phase
+  return Math.sin(angle + 0.9 * Math.sin(angle * 2))
+}
+
+/**
+ * Path centerline x-offset — big meander with sharp switchbacks like the
+ * ref plate; amplitude swells through the middle and relaxes at the ends.
+ */
 function pathX(
   y: number,
   y0: number,
@@ -56,19 +65,20 @@ function pathX(
   phase = 0
 ): number {
   const t = (y - y0) / Math.max(height, 1)
+  const swell = 0.72 + 0.42 * Math.sin(t * Math.PI * 1.2 + 0.3)
   return (
     cx +
-    Math.sin(t * Math.PI * 2.6 + phase) * 30 +
-    Math.sin(t * Math.PI * 4.9 + phase * 1.3) * 13 +
-    Math.sin(t * Math.PI * 8.3 + phase * 0.7) * 6 +
-    Math.cos(t * Math.PI * 1.4 + phase) * 10
+    Math.sin(t * Math.PI * 1.1 + 0.3 + phase) * 30 +
+    zig(t, 3.1, phase) * 30 * swell +
+    zig(t, 6.3, phase * 1.5 + 1.2) * 11 * swell +
+    Math.cos(t * Math.PI * 0.7 + phase) * 12
   )
 }
 
-/** Ribbon half-thickness — widest through the middle, quiet at the bottom. */
+/** Ribbon half-thickness — full at the bottom, thinning toward the top. */
 function pathHalfWidth(t: number): number {
-  const body = 30 + Math.sin(t * Math.PI * 2.8) * 9
-  const taper = t > 0.74 ? 1 - ((t - 0.74) / 0.26) * 0.75 : 1
+  const body = 28 + Math.sin(t * Math.PI * 2.2 + 0.6) * 9
+  const taper = t < 0.26 ? 1 - ((0.26 - t) / 0.26) * 0.6 : 1
   return Math.max(8, body * taper)
 }
 
@@ -89,6 +99,42 @@ function buildRibbonPath(
     const y = y0 + height * t
     const x = pathX(y, y0, height, cx, phase)
     const half = pathHalfWidth(t) * widthScale
+    left.push(`${i === 0 ? 'M' : 'L'} ${(x - half).toFixed(2)} ${y.toFixed(2)}`)
+    right.push(`L ${(x + half).toFixed(2)} ${y.toFixed(2)}`)
+  }
+
+  return `${left.join(' ')} ${right.reverse().join(' ')} Z`
+}
+
+/**
+ * Localized organic blob — a wavy patch that fades in and out (gaussian
+ * envelope) so bare sand shows between patches, like the poster matrices.
+ */
+function buildBlobPath(
+  y0: number,
+  y1: number,
+  bx: number,
+  centerT: number,
+  spreadT: number,
+  maxHalf: number,
+  phase = 0,
+  samples = 48
+): string {
+  const height = y1 - y0
+  const tStart = Math.max(0, centerT - spreadT * 1.9)
+  const tEnd = Math.min(1, centerT + spreadT * 1.9)
+  const left: string[] = []
+  const right: string[] = []
+
+  for (let i = 0; i <= samples; i += 1) {
+    const t = tStart + ((tEnd - tStart) * i) / samples
+    const y = y0 + height * t
+    const env = Math.exp(-(((t - centerT) / spreadT) ** 2))
+    const half = maxHalf * env
+    const x =
+      bx +
+      Math.sin(t * Math.PI * 3.1 + phase) * 16 +
+      Math.sin(t * Math.PI * 6.4 + phase * 1.7) * 7
     left.push(`${i === 0 ? 'M' : 'L'} ${(x - half).toFixed(2)} ${y.toFixed(2)}`)
     right.push(`L ${(x + half).toFixed(2)} ${y.toFixed(2)}`)
   }
@@ -152,18 +198,44 @@ export function MirageBackground({ className = '' }: MirageBackgroundProps) {
       top,
       bottom,
       height: bottom - top,
-      // Sand matrices — light + dark patches flanking the path (like the ref).
-      duneSoft: buildRibbonPath(y0, y1, CX - 30, 48, 2.4, 2.2),
-      charcoalRight: buildRibbonPath(y0, y1, CX + 104, 48, 4.9, 1.25),
-      charcoalLeft: buildRibbonPath(y0, y1, CX - 112, 48, 1.7, 1.1),
-      olive: buildRibbonPath(y0, y1, CX + 66, 44, 3.5, 0.95),
-      // The gold path — dark rim, gradient body, hot core, ink edges.
-      goldRim: buildRibbonPath(y0, y1, CX, 84, 0, 1.18),
-      gold: buildRibbonPath(y0, y1, CX, 84, 0, 1),
-      goldCore: buildRibbonPath(y0, y1, CX, 72, 0.07, 0.44),
-      edgeLeft: buildEdgeStroke(y0, y1, CX, 72, 0, -1),
-      edgeRight: buildEdgeStroke(y0, y1, CX, 72, 0, 1),
-      streak: buildEdgeStroke(y0, y1, CX, 72, 0.18, -0.35)
+      // Localized matrices — blobs with bare sand between them (ref spacing).
+      blobs: [
+        { cls: 'olive', d: buildBlobPath(y0, y1, CX - 82, 0.1, 0.07, 52, 2.1) },
+        {
+          cls: 'charcoal',
+          d: buildBlobPath(y0, y1, CX + 94, 0.15, 0.06, 46, 4.2)
+        },
+        {
+          cls: 'dune',
+          d: buildBlobPath(y0, y1, CX - 98, 0.31, 0.08, 54, 1.2)
+        },
+        {
+          cls: 'charcoal',
+          d: buildBlobPath(y0, y1, CX + 96, 0.5, 0.09, 64, 0.7)
+        },
+        {
+          cls: 'olive',
+          d: buildBlobPath(y0, y1, CX - 106, 0.61, 0.06, 40, 3.3)
+        },
+        {
+          cls: 'dune',
+          d: buildBlobPath(y0, y1, CX - 62, 0.73, 0.07, 56, 2.8)
+        },
+        {
+          cls: 'charcoal',
+          d: buildBlobPath(y0, y1, CX + 74, 0.84, 0.07, 48, 5.0)
+        }
+      ],
+      // The gold path — dark rim, gradient body, braided strands, ink edges.
+      goldRim: buildRibbonPath(y0, y1, CX, 96, 0, 1.18),
+      gold: buildRibbonPath(y0, y1, CX, 96, 0, 1),
+      strandOrange: buildRibbonPath(y0, y1, CX + 6, 88, 0.34, 0.34),
+      strandPale: buildRibbonPath(y0, y1, CX - 8, 88, -0.3, 0.3),
+      goldCore: buildRibbonPath(y0, y1, CX, 88, 0.07, 0.4),
+      edgeLeft: buildEdgeStroke(y0, y1, CX, 88, 0, -1),
+      edgeRight: buildEdgeStroke(y0, y1, CX, 88, 0, 1),
+      streak: buildEdgeStroke(y0, y1, CX, 88, 0.18, -0.35),
+      streakB: buildEdgeStroke(y0, y1, CX + 4, 88, 0.42, 0.28)
     }
   }, [circles])
 
@@ -266,28 +338,27 @@ export function MirageBackground({ className = '' }: MirageBackgroundProps) {
               />
 
               <g filter={`url(#${id}-marble)`}>
-                <path
-                  className="mirage-pattern__dune"
-                  d={form.duneSoft}
-                />
-                <path
-                  className="mirage-pattern__patch mirage-pattern__patch--olive"
-                  d={form.olive}
-                />
-                <path
-                  className="mirage-pattern__patch mirage-pattern__patch--charcoal"
-                  d={form.charcoalLeft}
-                />
-                <path
-                  className="mirage-pattern__patch mirage-pattern__patch--charcoal"
-                  d={form.charcoalRight}
-                />
+                {form.blobs.map((blob, index) => (
+                  <path
+                    key={`blob-${index}`}
+                    className={`mirage-pattern__patch mirage-pattern__patch--${blob.cls}`}
+                    d={blob.d}
+                  />
+                ))}
 
                 <path className="mirage-pattern__gold-rim" d={form.goldRim} />
                 <path
                   className="mirage-pattern__gold"
                   d={form.gold}
                   fill={`url(#${id}-gold)`}
+                />
+                <path
+                  className="mirage-pattern__strand mirage-pattern__strand--orange"
+                  d={form.strandOrange}
+                />
+                <path
+                  className="mirage-pattern__strand mirage-pattern__strand--pale"
+                  d={form.strandPale}
                 />
                 <path
                   className="mirage-pattern__gold-core"
@@ -306,6 +377,11 @@ export function MirageBackground({ className = '' }: MirageBackgroundProps) {
                 <path
                   className="mirage-pattern__ink mirage-pattern__ink--fine"
                   d={form.streak}
+                  fill="none"
+                />
+                <path
+                  className="mirage-pattern__ink mirage-pattern__ink--fine"
+                  d={form.streakB}
                   fill="none"
                 />
               </g>

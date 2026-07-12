@@ -7,28 +7,63 @@
   background: transparent;
 }
 
-/* Vertical plate — sized by viewport height, centered behind the card. */
+/* Vertical plate — oversized so the stack fills the whole screen. */
 .mirage-background__svg {
   position: absolute;
   top: 50%;
   left: 50%;
-  height: min(104vh, 1040px);
+  height: 140vh;
+  min-height: 100vh;
   width: auto;
   overflow: visible;
   transform: translate(-50%, -50%);
   opacity: 1;
 }
 
-/* Readability vignette behind the login card. */
+/* Readability vignette behind the login card — tight, card-sized only. */
 .mirage-background__overlay {
   position: absolute;
   inset: 0;
   background: radial-gradient(
-    ellipse 40% 52% at 50% 52%,
-    rgba(245, 245, 245, 0.88) 0%,
-    rgba(245, 245, 245, 0.5) 48%,
-    rgba(245, 245, 245, 0.1) 78%,
+    ellipse 26% 34% at 50% 56%,
+    rgba(245, 245, 245, 0.75) 0%,
+    rgba(245, 245, 245, 0.35) 55%,
     transparent 100%
+  );
+}
+
+/* Dissolving ceiling — pattern fully hidden above the logo. */
+.mirage-background::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 38%;
+  background: linear-gradient(
+    to bottom,
+    #f5f5f5 0%,
+    #f5f5f5 58%,
+    rgba(245, 245, 245, 0.6) 80%,
+    rgba(245, 245, 245, 0) 100%
+  );
+}
+
+/* Clean floor — no pattern behind the tagline / footer and below. */
+.mirage-background::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 26%;
+  background: linear-gradient(
+    to bottom,
+    rgba(245, 245, 245, 0) 0%,
+    rgba(245, 245, 245, 0.75) 55%,
+    #f5f5f5 100%
   );
 }
 
@@ -43,22 +78,22 @@
 
 /* Poster palette — warm sand, olive/charcoal matrices, hot gold path. */
 .mirage-pattern__sand {
-  fill: #d5c19c;
+  fill: #d9c8a4;
 }
 
-.mirage-pattern__dune {
-  fill: #e2d2ac;
-  opacity: 0.7;
+.mirage-pattern__patch--dune {
+  fill: #e9dcb8;
+  opacity: 0.8;
 }
 
 .mirage-pattern__patch--olive {
   fill: #857c62;
-  opacity: 0.5;
+  opacity: 0.55;
 }
 
 .mirage-pattern__patch--charcoal {
   fill: #4a3e2e;
-  opacity: 0.62;
+  opacity: 0.65;
 }
 
 .mirage-pattern__gold-rim {
@@ -70,9 +105,19 @@
   opacity: 0.98;
 }
 
+.mirage-pattern__strand--orange {
+  fill: #d97e26;
+  opacity: 0.7;
+}
+
+.mirage-pattern__strand--pale {
+  fill: #f6d98e;
+  opacity: 0.75;
+}
+
 .mirage-pattern__gold-core {
   fill: #f8dc84;
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
 .mirage-pattern__ink {
@@ -142,7 +187,7 @@
 
 @media (max-width: 640px) {
   .mirage-background__svg {
-    height: 96vh;
+    height: 120vh;
   }
 
   .mirage-background__overlay {
@@ -181,10 +226,9 @@
 
 .dark .mirage-background__overlay {
   background: radial-gradient(
-    ellipse 40% 52% at 50% 52%,
-    rgba(10, 10, 12, 0.85) 0%,
-    rgba(10, 10, 12, 0.5) 48%,
-    rgba(10, 10, 12, 0.1) 78%,
+    ellipse 26% 34% at 50% 56%,
+    rgba(10, 10, 10, 0.72) 0%,
+    rgba(10, 10, 10, 0.32) 55%,
     transparent 100%
   );
 }
@@ -193,4 +237,23 @@
 .dark .mirage-form__circle,
 .dark .mirage-form__chord {
   stroke: rgba(255, 252, 245, 0.8);
+}
+
+.dark .mirage-background::before {
+  background: linear-gradient(
+    to bottom,
+    #0a0a0a 0%,
+    #0a0a0a 58%,
+    rgba(10, 10, 10, 0.6) 80%,
+    rgba(10, 10, 10, 0) 100%
+  );
+}
+
+.dark .mirage-background::after {
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 10, 10, 0) 0%,
+    rgba(10, 10, 10, 0.75) 55%,
+    #0a0a0a 100%
+  );
 }
