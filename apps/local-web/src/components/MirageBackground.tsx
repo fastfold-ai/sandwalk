@@ -323,9 +323,31 @@ export function MirageBackground({ className = '' }: MirageBackgroundProps) {
               />
             ))}
           </clipPath>
+
+          {/*
+            The fill lives only inside the MIDDLE circle — its own outline
+            is the cut, so the boundary is a real contour line (like the
+            poster, where some circles are filled and others are empty).
+            Wireframe is unaffected.
+          */}
+          <mask id={`${id}-holes`}>
+            <rect
+              x="-20"
+              y="-20"
+              width={VIEWBOX_WIDTH + 40}
+              height={VIEWBOX_HEIGHT + 40}
+              fill="#000000"
+            />
+            <circle
+              cx={circles[1].cx}
+              cy={circles[1].cy}
+              r={circles[1].radius}
+              fill="#ffffff"
+            />
+          </mask>
         </defs>
 
-        <g className="mirage-background__fills">
+        <g className="mirage-background__fills" mask={`url(#${id}-holes)`}>
           <g clipPath={`url(#${id}-stack)`}>
             <g className="mirage-pattern">
               <rect

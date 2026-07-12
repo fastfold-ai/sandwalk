@@ -103,8 +103,8 @@ export function LoginView({
 
       <div className="relative z-10 flex w-full max-w-[380px] flex-col items-center">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <AuraIconPulse className="h-14 w-14 text-black dark:text-white" />
-          <h1 className="text-[28px] font-bold tracking-tight text-black dark:text-white">
+          <AuraIconPulse className="h-14 w-14 text-black [filter:drop-shadow(0_0_10px_rgba(245,245,245,0.95))_drop-shadow(0_0_22px_rgba(245,245,245,0.9))] dark:text-white dark:[filter:drop-shadow(0_0_10px_rgba(10,10,10,0.95))_drop-shadow(0_0_22px_rgba(10,10,10,0.9))]" />
+          <h1 className="text-[28px] font-bold tracking-tight text-black [text-shadow:0_1px_8px_rgba(245,245,245,0.95),0_0_20px_rgba(245,245,245,0.9)] dark:text-white dark:[text-shadow:0_1px_8px_rgba(10,10,10,0.95),0_0_20px_rgba(10,10,10,0.9)]">
             Sandwalk
           </h1>
         </div>
@@ -250,10 +250,10 @@ export function LoginView({
         </form>
 
         <div className="mt-10 flex flex-col items-center gap-2.5">
-          <p className="text-center text-sm text-neutral-400">
+          <p className="text-center text-sm font-medium text-neutral-700 [text-shadow:0_1px_6px_rgba(245,245,245,0.95),0_0_14px_rgba(245,245,245,0.85)] dark:text-neutral-200 dark:[text-shadow:0_1px_6px_rgba(10,10,10,0.95),0_0_14px_rgba(10,10,10,0.85)]">
             A thinking path for open science
           </p>
-          <p className="flex items-center gap-1.5 text-[11px] text-neutral-400">
+          <p className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
             <span>by</span>
             <img
               src="/logo_fastfold_black.svg"

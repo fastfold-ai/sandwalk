@@ -12,7 +12,8 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  height: 140vh;
+  /* Scales with BOTH viewport axes — always oversizes the screen. */
+  height: max(200vh, 120vw);
   min-height: 100vh;
   width: auto;
   overflow: visible;
@@ -32,7 +33,7 @@
   );
 }
 
-/* Dissolving ceiling — pattern fully hidden above the logo. */
+/* Soft haze at the top — gentle, keeps the pattern readable beneath. */
 .mirage-background::before {
   content: '';
   position: absolute;
@@ -43,9 +44,8 @@
   height: 38%;
   background: linear-gradient(
     to bottom,
-    #f5f5f5 0%,
-    #f5f5f5 58%,
-    rgba(245, 245, 245, 0.6) 80%,
+    rgba(245, 245, 245, 0.95) 0%,
+    rgba(245, 245, 245, 0.6) 50%,
     rgba(245, 245, 245, 0) 100%
   );
 }
@@ -146,7 +146,8 @@
 .mirage-form__circle,
 .mirage-form__chord {
   fill: none;
-  stroke: rgba(255, 252, 245, 0.95);
+  /* Warm taupe — visible on the pale page bg AND on the sand fill. */
+  stroke: rgba(138, 114, 82, 0.55);
   stroke-width: 1.6;
   vector-effect: non-scaling-stroke;
   stroke-linecap: round;
@@ -155,7 +156,7 @@
 
 .mirage-form__chord {
   stroke-width: 1.35;
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
 @keyframes mirage-form-enter {
@@ -186,10 +187,6 @@
 }
 
 @media (max-width: 640px) {
-  .mirage-background__svg {
-    height: 120vh;
-  }
-
   .mirage-background__overlay {
     background: radial-gradient(
       ellipse 70% 56% at 50% 52%,
@@ -236,15 +233,14 @@
 .dark .mirage-form__capsule,
 .dark .mirage-form__circle,
 .dark .mirage-form__chord {
-  stroke: rgba(255, 252, 245, 0.8);
+  stroke: rgba(214, 196, 164, 0.6);
 }
 
 .dark .mirage-background::before {
   background: linear-gradient(
     to bottom,
-    #0a0a0a 0%,
-    #0a0a0a 58%,
-    rgba(10, 10, 10, 0.6) 80%,
+    rgba(10, 10, 10, 0.95) 0%,
+    rgba(10, 10, 10, 0.6) 50%,
     rgba(10, 10, 10, 0) 100%
   );
 }
