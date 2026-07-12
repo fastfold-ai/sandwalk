@@ -989,205 +989,6 @@ wheels = [
 ]
 
 [[package]]
-name = "fastfold-agent-cli"
-version = "0.0.70"
-source = { editable = "." }
-dependencies = [
-    { name = "anthropic" },
-    { name = "deepagents" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "langchain" },
-    { name = "langchain-anthropic" },
-    { name = "langchain-mcp-adapters" },
-    { name = "langchain-openai" },
-    { name = "langgraph" },
-    { name = "markdown" },
-    { name = "mcp" },
-    { name = "nbformat" },
-    { name = "numpy" },
-    { name = "openai" },
-    { name = "pandas" },
-    { name = "prompt-toolkit" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "python-multipart" },
-    { name = "questionary" },
-    { name = "rich" },
-    { name = "scipy" },
-    { name = "termaid" },
-    { name = "typer" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "anndata" },
-    { name = "biopython" },
-    { name = "celltypist" },
-    { name = "cellxgene-census" },
-    { name = "fair-esm" },
-    { name = "rdkit" },
-    { name = "scanpy", version = "1.11.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "scanpy", version = "1.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "scikit-learn" },
-    { name = "seaborn" },
-    { name = "tiledbsoma" },
-    { name = "torch" },
-    { name = "transformers" },
-]
-analysis = [
-    { name = "scikit-learn" },
-    { name = "seaborn" },
-]
-api = [
-    { name = "duckdb" },
-]
-biology = [
-    { name = "biopython" },
-]
-chemistry = [
-    { name = "rdkit" },
-]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-]
-ml = [
-    { name = "fair-esm" },
-    { name = "torch" },
-    { name = "transformers" },
-]
-notebook = [
-    { name = "nbconvert" },
-]
-singlecell = [
-    { name = "anndata" },
-    { name = "celltypist" },
-    { name = "cellxgene-census" },
-    { name = "scanpy", version = "1.11.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "scanpy", version = "1.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "tiledbsoma" },
-]
-win-build = [
-    { name = "biopython" },
-    { name = "fair-esm" },
-    { name = "rdkit" },
-    { name = "scikit-learn" },
-    { name = "seaborn" },
-    { name = "torch" },
-    { name = "transformers" },
-]
-
-[package.dev-dependencies]
-full = [
-    { name = "anndata" },
-    { name = "biopython" },
-    { name = "celltypist" },
-    { name = "cellxgene-census" },
-    { name = "duckdb" },
-    { name = "fastapi" },
-    { name = "nbconvert" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "rdkit" },
-    { name = "ruff" },
-    { name = "scanpy", version = "1.11.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "scanpy", version = "1.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "scikit-learn" },
-    { name = "seaborn" },
-    { name = "tiledbsoma" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anndata", marker = "extra == 'all'", specifier = ">=0.10" },
-    { name = "anndata", marker = "extra == 'singlecell'", specifier = ">=0.10" },
-    { name = "anthropic", specifier = ">=0.74.0" },
-    { name = "biopython", marker = "extra == 'all'", specifier = ">=1.81" },
-    { name = "biopython", marker = "extra == 'biology'", specifier = ">=1.81" },
-    { name = "biopython", marker = "extra == 'win-build'", specifier = ">=1.81" },
-    { name = "celltypist", marker = "extra == 'all'", specifier = ">=1.6" },
-    { name = "celltypist", marker = "extra == 'singlecell'", specifier = ">=1.6" },
-    { name = "cellxgene-census", marker = "extra == 'all'", specifier = ">=1.0" },
-    { name = "cellxgene-census", marker = "extra == 'singlecell'", specifier = ">=1.0" },
-    { name = "deepagents", specifier = ">=0.3.0" },
-    { name = "duckdb", marker = "extra == 'api'", specifier = ">=1.0" },
-    { name = "fair-esm", marker = "extra == 'all'", specifier = ">=2.0" },
-    { name = "fair-esm", marker = "extra == 'ml'", specifier = ">=2.0" },
-    { name = "fair-esm", marker = "extra == 'win-build'", specifier = ">=2.0" },
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "langchain", specifier = ">=1.3.9" },
-    { name = "langchain-anthropic", specifier = ">=1.4.6" },
-    { name = "langchain-mcp-adapters", specifier = ">=0.3.0" },
-    { name = "langchain-openai", specifier = ">=1.3.2" },
-    { name = "langgraph", specifier = ">=1.2.5" },
-    { name = "markdown", specifier = ">=3.5" },
-    { name = "mcp", specifier = ">=1.28.1" },
-    { name = "nbconvert", marker = "extra == 'notebook'", specifier = ">=7.0" },
-    { name = "nbformat", specifier = ">=5.7" },
-    { name = "numpy", specifier = ">=1.24" },
-    { name = "openai", specifier = ">=1.0" },
-    { name = "pandas", specifier = ">=2.0" },
-    { name = "prompt-toolkit", specifier = ">=3.0" },
-    { name = "pydantic", specifier = ">=2.8" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
-    { name = "python-dotenv", specifier = ">=1.0" },
-    { name = "python-multipart", specifier = ">=0.0.20" },
-    { name = "questionary", specifier = ">=2.1.1" },
-    { name = "rdkit", marker = "extra == 'all'", specifier = ">=2023.3" },
-    { name = "rdkit", marker = "extra == 'chemistry'", specifier = ">=2023.3" },
-    { name = "rdkit", marker = "extra == 'win-build'", specifier = ">=2023.3" },
-    { name = "rich", specifier = ">=13.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
-    { name = "scanpy", marker = "extra == 'all'", specifier = ">=1.9" },
-    { name = "scanpy", marker = "extra == 'singlecell'", specifier = ">=1.9" },
-    { name = "scikit-learn", marker = "extra == 'all'", specifier = ">=1.3" },
-    { name = "scikit-learn", marker = "extra == 'analysis'", specifier = ">=1.3" },
-    { name = "scikit-learn", marker = "extra == 'win-build'", specifier = ">=1.3" },
-    { name = "scipy", specifier = ">=1.10" },
-    { name = "seaborn", marker = "extra == 'all'", specifier = ">=0.13" },
-    { name = "seaborn", marker = "extra == 'analysis'", specifier = ">=0.13" },
-    { name = "seaborn", marker = "extra == 'win-build'", specifier = ">=0.13" },
-    { name = "termaid", specifier = ">=0.7.1" },
-    { name = "tiledbsoma", marker = "extra == 'all'", specifier = ">=1.0" },
-    { name = "tiledbsoma", marker = "extra == 'singlecell'", specifier = ">=1.0" },
-    { name = "torch", marker = "extra == 'all'", specifier = ">=2.0" },
-    { name = "torch", marker = "extra == 'ml'", specifier = ">=2.0" },
-    { name = "torch", marker = "extra == 'win-build'", specifier = ">=2.0" },
-    { name = "transformers", marker = "extra == 'all'", specifier = ">=4.40" },
-    { name = "transformers", marker = "extra == 'ml'", specifier = ">=4.40" },
-    { name = "transformers", marker = "extra == 'win-build'", specifier = ">=4.40" },
-    { name = "typer", specifier = ">=0.12" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },
-]
-provides-extras = ["notebook", "chemistry", "biology", "singlecell", "ml", "analysis", "api", "win-build", "all", "dev"]
-
-[package.metadata.requires-dev]
-full = [
-    { name = "anndata", specifier = ">=0.10" },
-    { name = "biopython", specifier = ">=1.81" },
-    { name = "celltypist", specifier = ">=1.6" },
-    { name = "cellxgene-census", specifier = ">=1.0" },
-    { name = "duckdb", specifier = ">=1.0" },
-    { name = "fastapi", specifier = ">=0.100" },
-    { name = "nbconvert", specifier = ">=7.0" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-cov", specifier = ">=5.0" },
-    { name = "rdkit", specifier = ">=2023.3" },
-    { name = "ruff", specifier = ">=0.5" },
-    { name = "scanpy", specifier = ">=1.9" },
-    { name = "scikit-learn", specifier = ">=1.3" },
-    { name = "seaborn", specifier = ">=0.13" },
-    { name = "tiledbsoma", specifier = ">=1.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.20" },
-]
-
-[[package]]
 name = "fastjsonschema"
 version = "2.21.2"
 source = { registry = "https://pypi.org/simple" }
@@ -4157,6 +3958,205 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4a/d8/0c8a7dc9b41dcac53c4cbf9df2b9c83e0e0097203de8b37a712b345c0be5/safetensors-0.7.0-cp38-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:b0f6d66c1c538d5a94a73aa9ddca8ccc4227e6c9ff555322ea40bdd142391dd4", size = 677368, upload-time = "2025-11-19T15:18:41.627Z" },
     { url = "https://files.pythonhosted.org/packages/05/e5/cb4b713c8a93469e3c5be7c3f8d77d307e65fe89673e731f5c2bfd0a9237/safetensors-0.7.0-cp38-abi3-win32.whl", hash = "sha256:c74af94bf3ac15ac4d0f2a7c7b4663a15f8c2ab15ed0fc7531ca61d0835eccba", size = 326423, upload-time = "2025-11-19T15:18:45.74Z" },
     { url = "https://files.pythonhosted.org/packages/5d/e6/ec8471c8072382cb91233ba7267fd931219753bb43814cbc71757bfd4dab/safetensors-0.7.0-cp38-abi3-win_amd64.whl", hash = "sha256:d1239932053f56f3456f32eb9625590cc7582e905021f94636202a864d470755", size = 341380, upload-time = "2025-11-19T15:18:44.427Z" },
+]
+
+[[package]]
+name = "sandwalk"
+version = "0.0.1"
+source = { editable = "." }
+dependencies = [
+    { name = "anthropic" },
+    { name = "deepagents" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "langchain" },
+    { name = "langchain-anthropic" },
+    { name = "langchain-mcp-adapters" },
+    { name = "langchain-openai" },
+    { name = "langgraph" },
+    { name = "markdown" },
+    { name = "mcp" },
+    { name = "nbformat" },
+    { name = "numpy" },
+    { name = "openai" },
+    { name = "pandas" },
+    { name = "prompt-toolkit" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "python-multipart" },
+    { name = "questionary" },
+    { name = "rich" },
+    { name = "scipy" },
+    { name = "termaid" },
+    { name = "typer" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "anndata" },
+    { name = "biopython" },
+    { name = "celltypist" },
+    { name = "cellxgene-census" },
+    { name = "fair-esm" },
+    { name = "rdkit" },
+    { name = "scanpy", version = "1.11.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scanpy", version = "1.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "scikit-learn" },
+    { name = "seaborn" },
+    { name = "tiledbsoma" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+analysis = [
+    { name = "scikit-learn" },
+    { name = "seaborn" },
+]
+api = [
+    { name = "duckdb" },
+]
+biology = [
+    { name = "biopython" },
+]
+chemistry = [
+    { name = "rdkit" },
+]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+]
+ml = [
+    { name = "fair-esm" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+notebook = [
+    { name = "nbconvert" },
+]
+singlecell = [
+    { name = "anndata" },
+    { name = "celltypist" },
+    { name = "cellxgene-census" },
+    { name = "scanpy", version = "1.11.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scanpy", version = "1.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "tiledbsoma" },
+]
+win-build = [
+    { name = "biopython" },
+    { name = "fair-esm" },
+    { name = "rdkit" },
+    { name = "scikit-learn" },
+    { name = "seaborn" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+
+[package.dev-dependencies]
+full = [
+    { name = "anndata" },
+    { name = "biopython" },
+    { name = "celltypist" },
+    { name = "cellxgene-census" },
+    { name = "duckdb" },
+    { name = "fastapi" },
+    { name = "nbconvert" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "rdkit" },
+    { name = "ruff" },
+    { name = "scanpy", version = "1.11.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scanpy", version = "1.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "scikit-learn" },
+    { name = "seaborn" },
+    { name = "tiledbsoma" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anndata", marker = "extra == 'all'", specifier = ">=0.10" },
+    { name = "anndata", marker = "extra == 'singlecell'", specifier = ">=0.10" },
+    { name = "anthropic", specifier = ">=0.74.0" },
+    { name = "biopython", marker = "extra == 'all'", specifier = ">=1.81" },
+    { name = "biopython", marker = "extra == 'biology'", specifier = ">=1.81" },
+    { name = "biopython", marker = "extra == 'win-build'", specifier = ">=1.81" },
+    { name = "celltypist", marker = "extra == 'all'", specifier = ">=1.6" },
+    { name = "celltypist", marker = "extra == 'singlecell'", specifier = ">=1.6" },
+    { name = "cellxgene-census", marker = "extra == 'all'", specifier = ">=1.0" },
+    { name = "cellxgene-census", marker = "extra == 'singlecell'", specifier = ">=1.0" },
+    { name = "deepagents", specifier = ">=0.3.0" },
+    { name = "duckdb", marker = "extra == 'api'", specifier = ">=1.0" },
+    { name = "fair-esm", marker = "extra == 'all'", specifier = ">=2.0" },
+    { name = "fair-esm", marker = "extra == 'ml'", specifier = ">=2.0" },
+    { name = "fair-esm", marker = "extra == 'win-build'", specifier = ">=2.0" },
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "langchain", specifier = ">=1.3.9" },
+    { name = "langchain-anthropic", specifier = ">=1.4.6" },
+    { name = "langchain-mcp-adapters", specifier = ">=0.3.0" },
+    { name = "langchain-openai", specifier = ">=1.3.2" },
+    { name = "langgraph", specifier = ">=1.2.5" },
+    { name = "markdown", specifier = ">=3.5" },
+    { name = "mcp", specifier = ">=1.28.1" },
+    { name = "nbconvert", marker = "extra == 'notebook'", specifier = ">=7.0" },
+    { name = "nbformat", specifier = ">=5.7" },
+    { name = "numpy", specifier = ">=1.24" },
+    { name = "openai", specifier = ">=1.0" },
+    { name = "pandas", specifier = ">=2.0" },
+    { name = "prompt-toolkit", specifier = ">=3.0" },
+    { name = "pydantic", specifier = ">=2.8" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
+    { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "python-multipart", specifier = ">=0.0.20" },
+    { name = "questionary", specifier = ">=2.1.1" },
+    { name = "rdkit", marker = "extra == 'all'", specifier = ">=2023.3" },
+    { name = "rdkit", marker = "extra == 'chemistry'", specifier = ">=2023.3" },
+    { name = "rdkit", marker = "extra == 'win-build'", specifier = ">=2023.3" },
+    { name = "rich", specifier = ">=13.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
+    { name = "scanpy", marker = "extra == 'all'", specifier = ">=1.9" },
+    { name = "scanpy", marker = "extra == 'singlecell'", specifier = ">=1.9" },
+    { name = "scikit-learn", marker = "extra == 'all'", specifier = ">=1.3" },
+    { name = "scikit-learn", marker = "extra == 'analysis'", specifier = ">=1.3" },
+    { name = "scikit-learn", marker = "extra == 'win-build'", specifier = ">=1.3" },
+    { name = "scipy", specifier = ">=1.10" },
+    { name = "seaborn", marker = "extra == 'all'", specifier = ">=0.13" },
+    { name = "seaborn", marker = "extra == 'analysis'", specifier = ">=0.13" },
+    { name = "seaborn", marker = "extra == 'win-build'", specifier = ">=0.13" },
+    { name = "termaid", specifier = ">=0.7.1" },
+    { name = "tiledbsoma", marker = "extra == 'all'", specifier = ">=1.0" },
+    { name = "tiledbsoma", marker = "extra == 'singlecell'", specifier = ">=1.0" },
+    { name = "torch", marker = "extra == 'all'", specifier = ">=2.0" },
+    { name = "torch", marker = "extra == 'ml'", specifier = ">=2.0" },
+    { name = "torch", marker = "extra == 'win-build'", specifier = ">=2.0" },
+    { name = "transformers", marker = "extra == 'all'", specifier = ">=4.40" },
+    { name = "transformers", marker = "extra == 'ml'", specifier = ">=4.40" },
+    { name = "transformers", marker = "extra == 'win-build'", specifier = ">=4.40" },
+    { name = "typer", specifier = ">=0.12" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },
+]
+provides-extras = ["notebook", "chemistry", "biology", "singlecell", "ml", "analysis", "api", "win-build", "all", "dev"]
+
+[package.metadata.requires-dev]
+full = [
+    { name = "anndata", specifier = ">=0.10" },
+    { name = "biopython", specifier = ">=1.81" },
+    { name = "celltypist", specifier = ">=1.6" },
+    { name = "cellxgene-census", specifier = ">=1.0" },
+    { name = "duckdb", specifier = ">=1.0" },
+    { name = "fastapi", specifier = ">=0.100" },
+    { name = "nbconvert", specifier = ">=7.0" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-cov", specifier = ">=5.0" },
+    { name = "rdkit", specifier = ">=2023.3" },
+    { name = "ruff", specifier = ">=0.5" },
+    { name = "scanpy", specifier = ">=1.9" },
+    { name = "scikit-learn", specifier = ">=1.3" },
+    { name = "seaborn", specifier = ">=0.13" },
+    { name = "tiledbsoma", specifier = ">=1.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.20" },
 ]
 
 [[package]]

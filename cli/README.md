@@ -1,12 +1,13 @@
-# CLI notes
+# CLI (`sandwalk`)
 
-This directory is the Python agent package (formerly `fastfold-agent-cli`).
+Python package for the Sandwalk agent and local server.
 
 ```bash
 cd cli
 uv sync
-uv run fastfold serve
+uv run sandwalk serve
+uv run sandwalk --version
 uv run pytest tests/ -q
 ```
 
-See the repo root [README.md](../README.md) for the full monorepo workflow.
+Package name: `sandwalk` · version: see repo root `VERSION` / `pyproject.toml`.

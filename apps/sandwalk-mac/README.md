@@ -1,17 +1,13 @@
 # Sandwalk macOS menubar (v1)
 
-Menubar app that owns `fastfold serve` (Start / Stop / health) and opens the
+Menubar app that owns `sandwalk serve` (Start / Stop / health) and opens the
 web dashboard in the browser.
 
 ## Run (from monorepo root)
 
 ```bash
-# Web UI (optional for Open Dashboard)
 pnpm install && pnpm dev
-
-# Menubar
-cd apps/sandwalk-mac
-swift run
+cd apps/sandwalk-mac && swift run
 ```
 
 Auto-discovers the Python package at `../../cli`. Override with

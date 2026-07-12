@@ -1,5 +1,5 @@
-import type { LocalAgentClient } from '@fastfold/agent-local-client'
-import type { WorkspaceFile } from '@fastfold/agent-ui-core'
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { WorkspaceFile } from '@sandwalk/agent-ui-core'
 import { Icon } from '@iconify/react'
 import { useEffect, useState } from 'react'
 

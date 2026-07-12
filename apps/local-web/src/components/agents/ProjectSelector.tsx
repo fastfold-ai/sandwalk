@@ -1,4 +1,4 @@
-import type { AgentProject } from '@fastfold/agent-ui-core'
+import type { AgentProject } from '@sandwalk/agent-ui-core'
 import { Check, ChevronDown, Plus, Settings } from 'lucide-react'
 import { useMemo, useState } from 'react'
 

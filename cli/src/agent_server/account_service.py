@@ -15,7 +15,7 @@ from agent_server.models import AccountAbout, AccountOrganization, AccountSummar
 
 _DEFAULT_CLOUD_BASE = "https://api.fastfold.ai"
 _BILLING_URL = "https://cloud.fastfold.ai/billing"
-_PYPI_URL = "https://pypi.org/pypi/fastfold-agent-cli/json"
+_PYPI_URL = "https://pypi.org/pypi/sandwalk/json"
 
 
 def _cloud_base_url() -> str:
@@ -225,5 +225,5 @@ class AccountService:
             channel="default",
             latest_version=latest,
             up_to_date=up_to_date,
-            licenses_url="https://github.com/fastfold-ai/fastfold-agent-cli/blob/main/LICENSE",
+            licenses_url="https://github.com/fastfold-ai/sandwalk/blob/main/LICENSE",
         )

@@ -1,4 +1,4 @@
-import { LocalAgentClient } from '@fastfold/agent-local-client'
+import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentCatalogSkill,
   AgentCatalogSkillAudit,
@@ -20,7 +20,7 @@ import type {
   McpServer,
   RuntimeSettings,
   WorkspaceFile
-} from '@fastfold/agent-ui-core'
+} from '@sandwalk/agent-ui-core'
 import {
   Archive,
   ArrowLeft,

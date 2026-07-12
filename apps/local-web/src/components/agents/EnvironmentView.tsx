@@ -3,7 +3,7 @@ import type {
   EnvironmentPackageGroup,
   EnvironmentPackageMutationResult,
   EnvironmentReport,
-} from '@fastfold/agent-ui-core'
+} from '@sandwalk/agent-ui-core'
 import { ChevronDown, Lock, Package, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'

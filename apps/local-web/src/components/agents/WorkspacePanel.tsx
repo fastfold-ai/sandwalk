@@ -1,8 +1,8 @@
-import type { LocalAgentClient } from '@fastfold/agent-local-client'
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   WorkspaceFile,
   WorkspaceFileContent
-} from '@fastfold/agent-ui-core'
+} from '@sandwalk/agent-ui-core'
 import { Icon } from '@iconify/react'
 import Editor from '@monaco-editor/react'
 import {

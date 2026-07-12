@@ -4,7 +4,7 @@ import type {
   IntegrationSummary,
   ModelProfile,
   UpsertModelProfileInput
-} from '@fastfold/agent-ui-core'
+} from '@sandwalk/agent-ui-core'
 import {
   ChevronDown,
   Eye,

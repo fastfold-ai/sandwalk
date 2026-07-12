@@ -1,4 +1,4 @@
-import type { AgentMessage, AgentTodo } from '@fastfold/agent-ui-core'
+import type { AgentMessage, AgentTodo } from '@sandwalk/agent-ui-core'
 
 import type { TranscriptTool } from './ToolCard'
 import { formatToolExecutionTime } from './ToolCard'

@@ -1,4 +1,4 @@
-import type { AccountSummary } from '@fastfold/agent-ui-core'
+import type { AccountSummary } from '@sandwalk/agent-ui-core'
 import {
   ExternalLink,
   Loader2,

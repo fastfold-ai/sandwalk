@@ -1,5 +1,5 @@
 {
-  "name": "@fastfold/agent-local-client",
+  "name": "@sandwalk/agent-local-client",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
@@ -12,7 +12,7 @@
     "lint": "oxlint src"
   },
   "dependencies": {
-    "@fastfold/agent-ui-core": "workspace:*"
+    "@sandwalk/agent-ui-core": "workspace:*"
   },
   "devDependencies": {
     "oxlint": "^1.71.0",

@@ -1,5 +1,5 @@
-import type { LocalAgentClient } from '@fastfold/agent-local-client'
-import type { AgentSession, WorkspaceFile } from '@fastfold/agent-ui-core'
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { AgentSession, WorkspaceFile } from '@sandwalk/agent-ui-core'
 import { Icon } from '@iconify/react'
 import { Command as CommandPrimitive } from 'cmdk'
 import {

@@ -1,4 +1,4 @@
-import type { AgentTodo } from '@fastfold/agent-ui-core'
+import type { AgentTodo } from '@sandwalk/agent-ui-core'
 import { Check, Loader2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'

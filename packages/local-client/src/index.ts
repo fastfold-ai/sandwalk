@@ -49,7 +49,7 @@ import type {
   WorkspaceFile,
   WorkspaceFileContent,
   PtySessionInfo,
-} from '@fastfold/agent-ui-core'
+} from '@sandwalk/agent-ui-core'
 
 export type LocalAgentClientOptions = {
   baseUrl: string

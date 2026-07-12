@@ -67,7 +67,7 @@ CORE_PACKAGE_NAMES: frozenset[str] = frozenset(
         "requests",
         "urllib3",
         "charset-normalizer",
-        "fastfold-agent-cli",
+        "sandwalk",
     }
 )
 

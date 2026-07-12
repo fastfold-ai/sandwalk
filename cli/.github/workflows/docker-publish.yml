@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: fastfold/fastfold-agent-cli
+  IMAGE: fastfold/sandwalk
 
 jobs:
   publish:
@@ -55,7 +55,7 @@ jobs:
             ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
           labels: |
             org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            org.opencontainers.image.source=https://github.com/fastfold-ai/fastfold-agent-cli
+            org.opencontainers.image.source=https://github.com/fastfold-ai/sandwalk
 
       - name: Smoke test published amd64 image
         run: |

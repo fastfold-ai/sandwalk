@@ -1,4 +1,4 @@
-import type { AgentSkill } from '@fastfold/agent-ui-core'
+import type { AgentSkill } from '@sandwalk/agent-ui-core'
 
 function cleanSkillDescription(value: string | null | undefined) {
   const text = String(value || '')

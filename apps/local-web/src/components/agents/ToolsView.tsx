@@ -4,7 +4,7 @@ import type {
   ToolBatchResult,
   ToolCatalog,
   ToolSummary
-} from '@fastfold/agent-ui-core'
+} from '@sandwalk/agent-ui-core'
 import {
   Check,
   Database,

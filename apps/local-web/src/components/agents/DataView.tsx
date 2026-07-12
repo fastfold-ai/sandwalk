@@ -1,7 +1,7 @@
 import type {
   DatasetInstallResult,
   DatasetSummary
-} from '@fastfold/agent-ui-core'
+} from '@sandwalk/agent-ui-core'
 import { CheckCircle2, Download, Loader2, RefreshCw, Search } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 

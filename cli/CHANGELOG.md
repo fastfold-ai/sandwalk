@@ -1,11 +1,16 @@
 # Changelog
 
-All notable changes to `fastfold-agent-cli` are documented here.
+All notable changes to `sandwalk` are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.0.1] - 2026-07-12
+
+- Rename package and CLI entrypoint to `sandwalk` (monorepo).
+
 
 ### Added
 

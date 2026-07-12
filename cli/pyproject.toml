@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fastfold-agent-cli"
-version = "0.0.70"
-description = "Fastfold CLI — An autonomous agent for drug discovery research"
+name = "sandwalk"
+version = "0.0.1"
+description = "Sandwalk — open science agents for drug discovery research"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
@@ -101,6 +101,8 @@ full = [
 ]
 
 [project.scripts]
+sandwalk = "cli:entry"
+# Compat alias during transition from fastfold-agent-cli installs.
 fastfold = "cli:entry"
 
 # Note: skills are portable and self-contained. Their scripts are invoked

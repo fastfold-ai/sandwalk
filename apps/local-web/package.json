@@ -1,7 +1,7 @@
 {
-  "name": "@fastfold/agent-local-web",
+  "name": "@sandwalk/agent-local-web",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@assistant-ui/react": "0.14.20",
-    "@fastfold/agent-local-client": "workspace:*",
-    "@fastfold/agent-ui-core": "workspace:*",
+    "@sandwalk/agent-local-client": "workspace:*",
+    "@sandwalk/agent-ui-core": "workspace:*",
     "@iconify-json/vscode-icons": "1.2.33",
     "@iconify/react": "6.0.2",
     "@monaco-editor/react": "^4.7.0",

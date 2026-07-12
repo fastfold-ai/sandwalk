@@ -61,7 +61,7 @@ SLASH_COMMANDS = {
     "/keys": "Show API key status (/keys profile | /keys set-compatible | /keys set-boltz)",
     "/mcp": "List and manage MCP servers (/mcp connect|enable|validate|add|remove)",
     "/model-manager": "Manage OpenAI-compatible profiles (add/edit/delete)",
-    "/upgrade": "Upgrade fastfold-agent-cli via uv",
+    "/upgrade": "Upgrade sandwalk via uv",
     "/doctor": "Run readiness diagnostics and fix hints",
     "/usage": "Show session token/cost usage",
     "/tasks": "Show background task watcher status (/tasks refresh for live probe)",
@@ -5050,7 +5050,7 @@ class InteractiveTerminal:
         )
         self.console.print(Panel(
             LeftMarkdown(help_text),
-            title="fastfold Help",
+            title="Sandwalk Help",
             border_style="cyan",
         ))
 

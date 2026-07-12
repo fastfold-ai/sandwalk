@@ -1,4 +1,4 @@
-import type { AgentSession } from '@fastfold/agent-ui-core'
+import type { AgentSession } from '@sandwalk/agent-ui-core'
 import {
   Archive,
   CircleX,

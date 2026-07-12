@@ -13,10 +13,10 @@ importers:
       '@assistant-ui/react':
         specifier: 0.14.20
         version: 0.14.20(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@fastfold/agent-local-client':
+      '@sandwalk/agent-local-client':
         specifier: workspace:*
         version: link:../../packages/local-client
-      '@fastfold/agent-ui-core':
+      '@sandwalk/agent-ui-core':
         specifier: workspace:*
         version: link:../../packages/agent-ui-core
       '@iconify-json/vscode-icons':
@@ -188,7 +188,7 @@ importers:
 
   packages/local-client:
     dependencies:
-      '@fastfold/agent-ui-core':
+      '@sandwalk/agent-ui-core':
         specifier: workspace:*
         version: link:../agent-ui-core
     devDependencies:

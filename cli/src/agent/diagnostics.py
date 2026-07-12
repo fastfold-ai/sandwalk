@@ -162,7 +162,7 @@ def _redact_obj(value: Any, *, key: str = "") -> Any:
 
 def _system_info(version: str) -> dict[str, Any]:
     return {
-        "service": "fastfold-agent-cli",
+        "service": "sandwalk",
         "version": version,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "platform": platform.system().lower(),

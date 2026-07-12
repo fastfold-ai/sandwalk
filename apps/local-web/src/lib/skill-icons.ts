@@ -1,4 +1,4 @@
-import type { AgentSkill } from '@fastfold/agent-ui-core'
+import type { AgentSkill } from '@sandwalk/agent-ui-core'
 
 const SKILL_ICON_BY_NAME: Record<string, string> = {
   boltz: '/pipelines/boltzgen.svg',

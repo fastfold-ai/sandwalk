@@ -1,5 +1,5 @@
 {
-  "name": "@fastfold/agent-ui-core",
+  "name": "@sandwalk/agent-ui-core",
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,

@@ -1,4 +1,4 @@
-import type { AgentProject } from '@fastfold/agent-ui-core'
+import type { AgentProject } from '@sandwalk/agent-ui-core'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'

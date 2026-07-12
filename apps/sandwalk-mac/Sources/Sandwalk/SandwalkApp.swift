@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Menubar host for Sandwalk.
-/// Native settings window comes later; this app owns Start/Stop of `fastfold serve`.
+/// Native settings window comes later; this app owns Start/Stop of `sandwalk serve`.
 @main
 struct SandwalkApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate

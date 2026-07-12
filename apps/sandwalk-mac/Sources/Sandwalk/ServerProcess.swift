@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-/// Owns the `fastfold serve` child process.
+/// Owns the `sandwalk serve` child process.
 final class ServerProcess: @unchecked Sendable {
     enum State: Equatable, Sendable {
         case stopped

@@ -1,7 +1,7 @@
 import '@xterm/xterm/css/xterm.css'
 
-import type { LocalAgentClient } from '@fastfold/agent-local-client'
-import type { PtySessionInfo } from '@fastfold/agent-ui-core'
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { PtySessionInfo } from '@sandwalk/agent-ui-core'
 import { FitAddon } from '@xterm/addon-fit'
 import { type ITheme,Terminal as XTerm } from '@xterm/xterm'
 import {

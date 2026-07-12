@@ -2,7 +2,7 @@ import type {
   ServerCacheInfo,
   ServerLifecycleResult,
   ServerStatusReport
-} from '@fastfold/agent-ui-core'
+} from '@sandwalk/agent-ui-core'
 import { Activity, Loader2, Play, Square } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'

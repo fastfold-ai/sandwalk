@@ -3,7 +3,7 @@ import type {
   AgentSkillDetail,
   RuntimeSettings,
   WorkspaceFile
-} from '@fastfold/agent-ui-core'
+} from '@sandwalk/agent-ui-core'
 import { Icon } from '@iconify/react'
 import {
   ArrowUp,

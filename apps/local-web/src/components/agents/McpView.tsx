@@ -2,7 +2,7 @@ import type {
   ConnectMcpResult,
   McpCatalogEntry,
   McpServer,
-} from '@fastfold/agent-ui-core'
+} from '@sandwalk/agent-ui-core'
 import {
   ChevronDown,
   ExternalLink,

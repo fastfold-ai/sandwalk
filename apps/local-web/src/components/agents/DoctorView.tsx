@@ -1,4 +1,4 @@
-import type { DoctorCheckResult, DoctorReport } from '@fastfold/agent-ui-core'
+import type { DoctorCheckResult, DoctorReport } from '@sandwalk/agent-ui-core'
 import {
   AlertTriangle,
   CheckCircle2,

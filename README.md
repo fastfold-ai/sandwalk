@@ -3,17 +3,19 @@
 Local science agents for drug discovery — agent server, web dashboard, and
 macOS menubar supervisor in one repo.
 
+**Version:** 0.0.1
+
 ## Layout
 
 ```
 sandwalk/
 ├── apps/
 │   ├── local-web/       # React dashboard (browser)
-│   └── sandwalk-mac/    # macOS menubar (owns fastfold serve)
+│   └── sandwalk-mac/    # macOS menubar (owns sandwalk serve)
 ├── packages/
 │   ├── agent-ui-core/   # shared TS types / client contracts
 │   └── local-client/    # HTTP/SSE client for the agent server
-└── cli/                 # Python agent + `fastfold serve` (FastAPI)
+└── cli/                 # Python package `sandwalk` (`sandwalk serve`)
 ```
 
 ## Development
@@ -23,7 +25,7 @@ sandwalk/
 cd apps/sandwalk-mac && swift run
 
 # Or Terminal 1 — server only
-cd cli && uv sync && uv run fastfold serve
+cd cli && uv sync && uv run sandwalk serve
 
 # Terminal 2 — web dashboard
 pnpm install
@@ -33,8 +35,13 @@ pnpm dev
 - Dashboard: http://127.0.0.1:8969  
 - Agent API: http://127.0.0.1:8787  
 
-Menubar **Open Web Dashboard** opens the Vite app. Production will serve the
-built UI from the agent server (same process) in a later step.
+```bash
+sandwalk "your research question"
+sandwalk serve
+sandwalk --version
+```
+
+`fastfold` remains a temporary CLI alias for the same entrypoint.
 
 ## Environment (menubar)
 
@@ -45,8 +52,3 @@ built UI from the agent server (same process) in a later step.
 | `SANDWALK_DASHBOARD_URL` | `http://127.0.0.1:8969` | Dashboard URL |
 | `SANDWALK_AUTO_START` | `1` | Start server on launch |
 | `SANDWALK_AGENT_CLI` | auto (`./cli`) | Path to Python package root |
-
-## Status
-
-Migrated from `fastfold-agent-cli` + `fastfold-agent-ui`. The CLI package name
-and `fastfold` entrypoint remain for compatibility while we unify branding.

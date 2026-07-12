@@ -1,12 +1,12 @@
 import Foundation
 
-/// Resolves how to spawn `fastfold serve` (dev-friendly; bundled Python later).
+/// Resolves how to spawn `sandwalk serve` (dev-friendly; bundled Python later).
 ///
 /// Resolution order:
 /// 1. `SANDWALK_SERVE_BIN` — absolute path to an executable (args: serve --host --port)
-/// 2. `fastfold` on PATH
-/// 3. `<agentCliRoot>/.venv/bin/fastfold`
-/// 4. `uv run --directory <agentCliRoot> fastfold serve …`
+/// 2. `<agentCliRoot>/.venv/bin/sandwalk` (or legacy `fastfold`)
+/// 3. `uv run --directory <agentCliRoot> sandwalk serve …`
+/// 4. `sandwalk` / `fastfold` on PATH
 struct ServeRuntime {
     let executable: URL
     let argumentsPrefix: [String]
@@ -16,7 +16,7 @@ struct ServeRuntime {
         case notFound
 
         var errorDescription: String? {
-            "Could not find fastfold. Set SANDWALK_SERVE_BIN, install fastfold on PATH, or set SANDWALK_AGENT_CLI to the agent-cli checkout."
+            "Could not find sandwalk. Set SANDWALK_SERVE_BIN, install the CLI, or set SANDWALK_AGENT_CLI to the monorepo cli/ directory."
         }
     }
 
@@ -31,27 +31,28 @@ struct ServeRuntime {
             }
         }
 
-        // Prefer the agent-cli checkout (venv or uv) over a global `fastfold`
-        // shim, which may be an older install that does not expose `serve`.
+        // Prefer the monorepo cli checkout (venv or uv) over a global shim.
         if let root = config.agentCliRoot {
-            let venvBin = root.appendingPathComponent(".venv/bin/fastfold")
-            if fm.isExecutableFile(atPath: venvBin.path) {
-                return ServeRuntime(
-                    executable: venvBin,
-                    argumentsPrefix: [],
-                    workingDirectory: root
-                )
+            for name in ["sandwalk", "fastfold"] {
+                let venvBin = root.appendingPathComponent(".venv/bin/\(name)")
+                if fm.isExecutableFile(atPath: venvBin.path) {
+                    return ServeRuntime(
+                        executable: venvBin,
+                        argumentsPrefix: [],
+                        workingDirectory: root
+                    )
+                }
             }
             if let uv = which("uv") {
                 return ServeRuntime(
                     executable: URL(fileURLWithPath: uv),
-                    argumentsPrefix: ["run", "--directory", root.path, "fastfold"],
+                    argumentsPrefix: ["run", "--directory", root.path, "sandwalk"],
                     workingDirectory: root
                 )
             }
         }
 
-        if let path = which("fastfold") {
+        if let path = which("sandwalk") ?? which("fastfold") {
             return ServeRuntime(
                 executable: URL(fileURLWithPath: path),
                 argumentsPrefix: [],

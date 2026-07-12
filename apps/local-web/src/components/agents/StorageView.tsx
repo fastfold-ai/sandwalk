@@ -1,4 +1,4 @@
-import type { StorageCategory, StorageReport } from '@fastfold/agent-ui-core'
+import type { StorageCategory, StorageReport } from '@sandwalk/agent-ui-core'
 import { ChevronDown, HardDrive, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 

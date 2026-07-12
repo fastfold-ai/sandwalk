@@ -3,8 +3,8 @@ Fastfold Agent CLI entry point.
 
 Usage:
     fastfold                              # Interactive mode
-    fastfold "your question"              # Single query
-    fastfold --smiles "CCO" "Profile"     # With compound context
+    sandwalk "your question"              # Single query
+    sandwalk --smiles "CCO" "Profile"     # With compound context
     fastfold config set key value         # Configuration
     fastfold data pull depmap             # Data management
 """
@@ -49,14 +49,14 @@ BANNER = """
 """
 
 app = typer.Typer(
-    name="fastfold",
+    name="sandwalk",
     help=(
-        "Fastfold Agent CLI — Where scientists and AI agents work together doing real science.\n\n"
+        "Sandwalk — open science agents for drug discovery.\n\n"
         "Common usage:\n"
-        '  fastfold "your research question"\n'
-        '  fastfold --smiles "CCO" "Profile this compound"\n'
-        "  fastfold config show\n"
-        "  fastfold tool list"
+        '  sandwalk "your research question"\n'
+        '  sandwalk --smiles "CCO" "Profile this compound"\n'
+        "  sandwalk config show\n"
+        "  sandwalk tool list"
     ),
     no_args_is_help=False,
 )
@@ -92,7 +92,7 @@ SETUP_PROVIDER_ORDER = (
 )
 UV_INSTALL_FLAVORS = frozenset({"all", "win_build"})
 UV_UPGRADE_PYTHON_VERSION = "3.11"
-PYPI_PROJECT_JSON_URL = "https://pypi.org/pypi/fastfold-agent-cli/json"
+PYPI_PROJECT_JSON_URL = "https://pypi.org/pypi/sandwalk/json"
 _SEMVER_TRIPLET_PATTERN = re.compile(r"^\s*v?(\d+)\.(\d+)\.(\d+)")
 _UPGRADE_CACHE_PATH = Path.home() / ".fastfold-cli" / "cache" / "upgrade-version.json"
 _UPGRADE_CACHE_MAX_AGE_S = 60 * 60 * 6
@@ -274,7 +274,7 @@ def resolve_upgrade_flavor(cfg=None, persist: bool = True) -> str:
 
 def build_upgrade_command(flavor: str) -> list[str]:
     normalized = _normalize_upgrade_flavor(flavor) or _default_upgrade_flavor()
-    package_ref = f"fastfold-agent-cli[{normalized}]"
+    package_ref = f"sandwalk[{normalized}]"
     return ["uv", "tool", "install", package_ref, "--python", UV_UPGRADE_PYTHON_VERSION, "--upgrade"]
 
 
@@ -592,7 +592,7 @@ def execute_upgrade(
     ui = console_obj or console
     flavor = resolve_upgrade_flavor(cfg=cfg, persist=True)
     cmd = build_upgrade_command(flavor)
-    ui.print("\n[bold cyan]Upgrading fastfold-agent-cli[/bold cyan]")
+    ui.print("\n[bold cyan]Upgrading sandwalk[/bold cyan]")
     ui.print(f"[dim]Flavor:[/dim] {flavor}")
     ui.print(f"[dim]$ {' '.join(cmd)}[/dim]")
 
@@ -655,7 +655,7 @@ def execute_upgrade(
 
 # ─── Config subcommand ────────────────────────────────────────
 
-config_app = typer.Typer(help="Manage fastfold configuration")
+config_app = typer.Typer(help="Manage Sandwalk configuration")
 app.add_typer(config_app, name="config")
 
 agent_app = typer.Typer(help="Fork and import shared cloud sessions")
@@ -986,7 +986,7 @@ def upgrade_cmd(
         help="Skip the post-upgrade Fastfold skills prompt",
     ),
 ):
-    """Upgrade fastfold-agent-cli with uv tool install --upgrade."""
+    """Upgrade sandwalk with uv tool install --upgrade."""
     from agent.config import Config
 
     cfg = Config.load()
@@ -1037,7 +1037,7 @@ def agent_fork_cmd(
 
         headers = {
             "Accept": "application/json",
-            "User-Agent": f"fastfold-agent-cli/{__version__}",
+            "User-Agent": f"sandwalk/{__version__}",
         }
         if resolved_key:
             headers["X-Fastfold-Api-Key"] = resolved_key
@@ -4694,13 +4694,13 @@ def run_cmd(
     version: bool = typer.Option(False, "--version", "-V", help="Show version"),
 ):
     """
-    Fastfold Agent CLI — Where scientists and AI agents work together doing real science.
+    Sandwalk — open science agents for drug discovery.
 
     Run without arguments for interactive mode.
     Pass a question for single-query mode.
     """
     if version:
-        console.print(f"fastfold v{__version__}")
+        console.print(f"sandwalk v{__version__}")
         raise typer.Exit()
 
     query = " ".join(query_parts).strip() if query_parts else None
@@ -4943,7 +4943,7 @@ def print_banner(cfg=None):
 
     logo_text = Text.from_markup(BANNER.strip("\n"))
     meta_lines = [
-        f"[bold white]Fastfold Agent CLI[/] [dim]v{__version__}[/]",
+        f"[bold white]Sandwalk[/] [dim]v{__version__}[/]",
     ]
     if status_line:
         meta_lines.append(f"[dim]{status_line}[/dim]")
@@ -5078,8 +5078,8 @@ def entry():
 
     # Route plain invocations to hidden `run` command so:
     #   fastfold                       -> interactive mode
-    #   fastfold "question"            -> single-query mode
-    #   fastfold --smiles ... "q"      -> single-query with context
+    #   sandwalk "question"            -> single-query mode
+    #   sandwalk --smiles ... "q"      -> single-query with context
     # while preserving explicit subcommands like `fastfold config ...`.
     # Backward-compat: allow old `fastfold run <subcommand> ...` invocations by
     # unwrapping the legacy `run` prefix when the remainder is a real subcommand.
@@ -5089,7 +5089,7 @@ def entry():
     if not argv or argv[0] not in subcommands:
         argv = ["run", *argv]
 
-    app(args=argv, prog_name="fastfold")
+    app(args=argv, prog_name="sandwalk")
 
 
 if __name__ == "__main__":

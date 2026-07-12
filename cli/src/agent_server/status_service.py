@@ -244,7 +244,7 @@ def _build_restart_command() -> list[str] | None:
     ]
     uds = (os.environ.get("FASTFOLD_SERVE_UDS") or "").strip()
 
-    binary = shutil.which("fastfold")
+    binary = shutil.which("sandwalk") or shutil.which("fastfold")
     if binary:
         cmd = [binary, "serve"]
     else:
