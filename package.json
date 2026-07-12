@@ -1,0 +1,15 @@
+{
+  "name": "sandwalk",
+  "private": true,
+  "version": "0.0.1",
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "dev": "pnpm --filter @fastfold/agent-local-web dev",
+    "dev:web": "pnpm --filter @fastfold/agent-local-web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "format": "pnpm --filter @fastfold/agent-local-web format",
+    "format:check": "pnpm --filter @fastfold/agent-local-web format:check",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

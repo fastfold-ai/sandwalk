@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main, skills-refactor]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests & coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package + test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,all,api]"
+
+      - name: Syntax and import health
+        run: |
+          python -m compileall -q src
+          python -c "import agent, api, cli, data, kb, models, reports, skills, tools, ui; from _version import __version__; print(__version__)"
+
+      - name: CLI health checks
+        run: |
+          fastfold --version
+          fastfold skills list
+          fastfold tool list | head -20
+          python -c "from agent.config import Config; Config.load()"
+
+      - name: Run unit/regression suite with coverage
+        run: |
+          pytest tests/ -q \
+            -m "not data_smoke and not integration" \
+            --cov=agent --cov=api --cov=cli --cov=data --cov=kb --cov=models \
+            --cov=reports --cov=skills --cov=tools --cov=ui \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=80
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 14
+
+      - name: Run knowledge benchmark release gate
+        run: fastfold knowledge benchmark --strict --min-pass-rate 0.9
+
+      - name: Verify wheel builds and installs
+        run: |
+          pip install build
+          python -m build --outdir dist/
+          pip install dist/*.whl
+          fastfold --version
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker compose build
+
+      - name: Smoke test CLI in container
+        run: |
+          docker compose run --rm -T fastfold --version
+          docker compose run --rm -T fastfold skills list
+          docker compose run --rm -T fastfold tool list | head -20
+
+  data-smoke:
+    name: Live data source smoke
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package + test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Run live data source smoke checks
+        env:
+          RUN_DATA_SMOKE: "1"
+          DATA_SMOKE_STRICT: "1"
+        run: pytest tests/test_api_smoke.py -q

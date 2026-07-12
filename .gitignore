@@ -1,0 +1,37 @@
+node_modules/
+dist/
+build/
+.DS_Store
+*.tsbuildinfo
+.env
+.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+exports/
+outputs/
+
+# Swift
+apps/sandwalk-mac/.build/
+apps/sandwalk-mac/.swiftpm/
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.claude/worktrees/

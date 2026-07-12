@@ -1,0 +1,16 @@
+services:
+  fastfold:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # API keys are optional — omit .env entirely, or add keys when you need them.
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - fastfold-cli:/root/.fastfold-cli
+    stdin_open: true
+    tty: true
+
+volumes:
+  fastfold-cli:

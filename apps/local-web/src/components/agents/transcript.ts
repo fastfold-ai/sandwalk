@@ -1,0 +1,116 @@
+import type { AgentMessage, AgentTodo } from '@fastfold/agent-ui-core'
+
+import type { TranscriptTool } from './ToolCard'
+import { formatToolExecutionTime } from './ToolCard'
+
+export function splitAssistantThought(content: string): {
+  thought: string | null
+  answer: string
+} {
+  const raw = content.trim()
+  if (!raw) return { thought: null, answer: content }
+  const sections = raw.split(/\n\s*\n/)
+  if (sections.length < 2) return { thought: null, answer: raw }
+  const first = sections[0]?.trim() ?? ''
+  const hasThoughtPrefix =
+    /^(i['’]ll|i will|let me|first|to start|starting|i am going to|i'm going to|we['’]ll|let's|lets)\b/i.test(
+      first
+    )
+  if (!hasThoughtPrefix) return { thought: null, answer: raw }
+  const remainder = sections.slice(1).join('\n\n').trim()
+  return { thought: first, answer: remainder || raw }
+}
+
+export type TranscriptEntry =
+  | { kind: 'message'; message: AgentMessage; content: string }
+  | { kind: 'thought'; message: AgentMessage; thought: string }
+  | { kind: 'tool'; tool: TranscriptTool }
+  | { kind: 'todos'; messageId: string; todos: AgentTodo[] }
+
+export function buildConversationTimeline({
+  messages,
+  tools,
+  todosByRunId,
+  runIdByMessageId,
+  activeRunId = null
+}: {
+  messages: AgentMessage[]
+  tools: TranscriptTool[]
+  todosByRunId: Record<string, AgentTodo[]>
+  runIdByMessageId: Record<string, string>
+  activeRunId?: string | null
+}): TranscriptEntry[] {
+  const timeline: TranscriptEntry[] = []
+  const usedToolIds = new Set<string>()
+
+  for (const message of messages) {
+    if (message.role === 'user' || message.role === 'system') {
+      timeline.push({ kind: 'message', message, content: message.content })
+      continue
+    }
+
+    const runId = runIdByMessageId[message.id] || null
+    const turnTools = tools.filter(tool => {
+      if (tool.messageId === message.id) return true
+      if (runId && tool.runId === runId) return true
+      return false
+    })
+    turnTools.forEach(tool => usedToolIds.add(tool.id))
+
+    const split = splitAssistantThought(message.content)
+    if (split.thought) {
+      timeline.push({
+        kind: 'thought',
+        message,
+        thought: split.thought
+      })
+    }
+
+    for (const tool of turnTools) {
+      timeline.push({ kind: 'tool', tool })
+    }
+
+    const answer = split.thought ? split.answer : message.content
+    if (answer.trim() || turnTools.length === 0) {
+      timeline.push({
+        kind: 'message',
+        message,
+        content: answer
+      })
+    }
+
+    const todos = runId ? todosByRunId[runId] : undefined
+    if (todos && todos.length > 0) {
+      timeline.push({
+        kind: 'todos',
+        messageId: message.id,
+        todos
+      })
+    }
+  }
+
+  const orphanTools = tools.filter(tool => {
+    if (usedToolIds.has(tool.id)) return false
+    if (activeRunId && tool.runId === activeRunId) return false
+    return true
+  })
+  for (const tool of orphanTools) {
+    timeline.push({ kind: 'tool', tool })
+  }
+
+  return timeline
+}
+
+export function thoughtDurationForTools(tools: TranscriptTool[]) {
+  if (tools.length === 0) return null
+  const startedAt = [...tools]
+    .map(tool => tool.startedAt)
+    .sort((a, b) => Date.parse(a) - Date.parse(b))[0]
+  const endedAt = [...tools]
+    .map(tool => tool.endedAt || tool.startedAt)
+    .sort((a, b) => Date.parse(a) - Date.parse(b))
+    .at(-1)
+  return formatToolExecutionTime(startedAt, endedAt)
+}
+
+export const TOOL_RUN_VISIBLE_COUNT = 1
