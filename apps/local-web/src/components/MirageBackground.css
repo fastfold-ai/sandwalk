@@ -1,0 +1,196 @@
+.mirage-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: transparent;
+}
+
+/* Vertical plate — sized by viewport height, centered behind the card. */
+.mirage-background__svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: min(104vh, 1040px);
+  width: auto;
+  overflow: visible;
+  transform: translate(-50%, -50%);
+  opacity: 1;
+}
+
+/* Readability vignette behind the login card. */
+.mirage-background__overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 40% 52% at 50% 52%,
+    rgba(245, 245, 245, 0.88) 0%,
+    rgba(245, 245, 245, 0.5) 48%,
+    rgba(245, 245, 245, 0.1) 78%,
+    transparent 100%
+  );
+}
+
+.mirage-background__fills {
+  opacity: 0;
+  transform-origin: center;
+  animation:
+    mirage-fills-enter 1100ms cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    mirage-path-breathe 26s ease-in-out 1100ms infinite alternate;
+  will-change: transform, opacity;
+}
+
+/* Poster palette — warm sand, olive/charcoal matrices, hot gold path. */
+.mirage-pattern__sand {
+  fill: #d5c19c;
+}
+
+.mirage-pattern__dune {
+  fill: #e2d2ac;
+  opacity: 0.7;
+}
+
+.mirage-pattern__patch--olive {
+  fill: #857c62;
+  opacity: 0.5;
+}
+
+.mirage-pattern__patch--charcoal {
+  fill: #4a3e2e;
+  opacity: 0.62;
+}
+
+.mirage-pattern__gold-rim {
+  fill: #8a5a20;
+  opacity: 0.7;
+}
+
+.mirage-pattern__gold {
+  opacity: 0.98;
+}
+
+.mirage-pattern__gold-core {
+  fill: #f8dc84;
+  opacity: 0.9;
+}
+
+.mirage-pattern__ink {
+  stroke: #3a2b18;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.mirage-pattern__ink--fine {
+  stroke: #b0782a;
+  stroke-width: 1.3;
+  opacity: 0.55;
+}
+
+/* Poster wireframe — thin off-white lines like the Mirage plate. */
+.mirage-form {
+  opacity: 0;
+  animation: mirage-form-enter 1100ms cubic-bezier(0.16, 1, 0.3, 1) 80ms forwards;
+  pointer-events: none;
+}
+
+.mirage-form__capsule,
+.mirage-form__circle,
+.mirage-form__chord {
+  fill: none;
+  stroke: rgba(255, 252, 245, 0.95);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mirage-form__chord {
+  stroke-width: 1.35;
+  opacity: 0.9;
+}
+
+@keyframes mirage-form-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mirage-fills-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mirage-path-breathe {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(0, -2px) scale(1.008);
+  }
+}
+
+@media (max-width: 640px) {
+  .mirage-background__svg {
+    height: 96vh;
+  }
+
+  .mirage-background__overlay {
+    background: radial-gradient(
+      ellipse 70% 56% at 50% 52%,
+      rgba(245, 245, 245, 0.92) 0%,
+      rgba(245, 245, 245, 0.58) 50%,
+      rgba(245, 245, 245, 0.14) 80%,
+      transparent 100%
+    );
+  }
+
+  .mirage-form__capsule,
+  .mirage-form__circle,
+  .mirage-form__chord {
+    stroke-width: 1.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mirage-background__fills {
+    opacity: 1;
+    animation: none;
+    transform: none;
+  }
+
+  .mirage-form {
+    opacity: 1;
+    animation: none;
+  }
+}
+
+.dark .mirage-background__svg {
+  opacity: 0.85;
+}
+
+.dark .mirage-background__overlay {
+  background: radial-gradient(
+    ellipse 40% 52% at 50% 52%,
+    rgba(10, 10, 12, 0.85) 0%,
+    rgba(10, 10, 12, 0.5) 48%,
+    rgba(10, 10, 12, 0.1) 78%,
+    transparent 100%
+  );
+}
+
+.dark .mirage-form__capsule,
+.dark .mirage-form__circle,
+.dark .mirage-form__chord {
+  stroke: rgba(255, 252, 245, 0.8);
+}

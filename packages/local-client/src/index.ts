@@ -84,6 +84,7 @@ export class LocalAgentClient
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(`${this.baseUrl}/v1${path}`, {
       ...init,
+      credentials: 'include',
       headers: this.headers(init.headers),
     })
     if (!response.ok) {
@@ -96,6 +97,32 @@ export class LocalAgentClient
     const text = await response.text()
     if (!text) return undefined as T
     return JSON.parse(text) as T
+  }
+
+  authStatus(signal?: AbortSignal): Promise<{
+    authEnabled: boolean
+    apiKeyConfigured: boolean
+  }> {
+    return this.request('/auth/status', { signal })
+  }
+
+  async login(
+    apiKey: string,
+    options?: { remember?: boolean; signal?: AbortSignal },
+  ): Promise<{ ok: boolean; authEnabled?: boolean }> {
+    return this.request('/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        apiKey,
+        remember: Boolean(options?.remember),
+      }),
+      signal: options?.signal,
+    })
+  }
+
+  logout(signal?: AbortSignal): Promise<{ ok: boolean }> {
+    return this.request('/auth/logout', { method: 'POST', signal })
   }
 
   health(signal?: AbortSignal): Promise<BackendHealth> {
@@ -418,6 +445,7 @@ export class LocalAgentClient
     const response = await fetch(
       `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/events${suffix}`,
       {
+        credentials: 'include',
         headers: this.headers({ accept: 'text/event-stream' }),
         signal: options.signal,
       },

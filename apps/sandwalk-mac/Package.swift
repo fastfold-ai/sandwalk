@@ -10,7 +10,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Sandwalk",
-            path: "Sources/Sandwalk"
+            path: "Sources/Sandwalk",
+            resources: [
+                .process("Resources"),
+            ]
         ),
     ]
 )

@@ -2,22 +2,20 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var server: ServerProcess?
+    private var supervisor: SandwalkSupervisor?
     private var menubar: MenubarController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Menubar-only: hide Dock icon.
         NSApp.setActivationPolicy(.accessory)
 
         let config = AppConfig.load()
-        let server = ServerProcess(config: config)
-        self.server = server
+        let supervisor = SandwalkSupervisor(config: config)
+        self.supervisor = supervisor
         self.menubar = MenubarController(
-            server: server,
-            config: config,
+            supervisor: supervisor,
             requestQuit: { [weak self] in
                 Task { @MainActor in
-                    await self?.server?.stop()
+                    await self?.supervisor?.stopAll()
                     NSApp.terminate(nil)
                 }
             }
@@ -25,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if config.autoStartOnLaunch {
             do {
-                _ = try server.start()
+                try supervisor.startAll()
             } catch {
                 NSLog("Sandwalk: auto-start failed — \(error.localizedDescription)")
             }
@@ -33,8 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Best-effort sync stop; async stop already used on Quit menu.
-        server?.reapSync(timeout: 5)
+        supervisor?.reapSync()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

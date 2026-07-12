@@ -1,15 +1,20 @@
 import SwiftUI
 
 /// Menubar host for Sandwalk.
-/// Native settings window comes later; this app owns Start/Stop of `sandwalk serve`.
+/// Owns Start/Stop for the agent API and web dashboard together.
 @main
 struct SandwalkApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // No primary window yet — menubar is the product surface for v1.
         Settings {
-            EmptyView()
+            TabView {
+                SecuritySettingsView()
+                    .tabItem {
+                        Label("Security", systemImage: "lock.fill")
+                    }
+            }
+            .frame(minWidth: 560, minHeight: 360)
         }
     }
 }

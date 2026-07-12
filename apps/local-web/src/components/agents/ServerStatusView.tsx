@@ -1,13 +1,16 @@
-import type {
-  ServerCacheInfo,
-  ServerLifecycleResult,
-  ServerStatusReport
-} from '@sandwalk/agent-ui-core'
-import { Activity, Loader2, Play, Square } from 'lucide-react'
+import type { ServerCacheInfo, ServerStatusReport } from '@sandwalk/agent-ui-core'
+import {
+  Check,
+  CircleHelp,
+  Copy,
+  Loader2,
+  Terminal
+} from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
 import { SettingsBlockSkeleton } from '@/components/agents/PageSkeletons'
+import { SandwalkMark } from '@/components/SandwalkMark'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,8 +22,32 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+
+const MANAGE_COMMANDS = [
+  {
+    id: 'serve',
+    title: 'Start the server',
+    command: 'sandwalk serve',
+    description: 'Runs the local API (default http://127.0.0.1:8787).'
+  },
+  {
+    id: 'status',
+    title: 'Check auth / settings',
+    command: 'sandwalk auth status',
+    description: 'Shows whether API-key auth is enabled on this machine.'
+  }
+] as const
 
 function formatBytes(bytes: number): string {
   const value = Math.max(0, bytes)
@@ -120,31 +147,48 @@ function MetaRow({
   )
 }
 
+function CommandRow({
+  command,
+  copied,
+  onCopy
+}: {
+  command: string
+  copied: boolean
+  onCopy: () => void
+}) {
+  return (
+    <div className="border-border/80 bg-muted/35 flex items-center gap-2 rounded-lg border p-2.5">
+      <Terminal className="text-muted-foreground size-4 shrink-0" />
+      <code className="min-w-0 flex-1 truncate font-mono text-[13px]">
+        {command}
+      </code>
+      <button
+        type="button"
+        className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-md transition-colors"
+        onClick={onCopy}
+        aria-label={`Copy ${command}`}
+        title="Copy command"
+      >
+        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+      </button>
+    </div>
+  )
+}
+
 export function ServerStatusView({
   onLoad,
-  onStop,
-  onRestart,
-  onClearCache,
-  onAfterStop,
-  onAfterRestart
+  onClearCache
 }: {
   onLoad: (signal?: AbortSignal) => Promise<ServerStatusReport>
-  onStop: (signal?: AbortSignal) => Promise<ServerLifecycleResult>
-  onRestart: (signal?: AbortSignal) => Promise<ServerLifecycleResult>
   onClearCache: (signal?: AbortSignal) => Promise<ServerCacheInfo>
-  onAfterStop?: () => void
-  onAfterRestart?: () => Promise<void>
 }) {
   const [report, setReport] = useState<ServerStatusReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [stopping, setStopping] = useState(false)
-  const [restarting, setRestarting] = useState(false)
   const [clearing, setClearing] = useState(false)
-  const [lifecycleNote, setLifecycleNote] = useState<string | null>(null)
-  const [confirm, setConfirm] = useState<'stop' | 'start' | 'clear-cache' | null>(
-    null
-  )
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -154,7 +198,6 @@ export function ServerStatusView({
         const next = await onLoad(signal)
         if (signal?.aborted) return
         setReport(next)
-        setLifecycleNote(null)
       } catch (err) {
         if (signal?.aborted) return
         setError(err instanceof Error ? err.message : String(err))
@@ -171,46 +214,18 @@ export function ServerStatusView({
     return () => controller.abort()
   }, [load])
 
-  const runConfirmed = async () => {
-    if (!confirm) return
-    const action = confirm
-    setConfirm(null)
-    setError(null)
+  const copyCommand = (id: string, command: string) => {
+    void navigator.clipboard.writeText(command)
+    setCopiedId(id)
+    window.setTimeout(() => {
+      setCopiedId(current => (current === id ? null : current))
+    }, 2000)
+  }
 
-    if (action === 'stop') {
-      setStopping(true)
-      try {
-        const result = await onStop()
-        setLifecycleNote(result.message || 'Server is shutting down.')
-        toast.success(result.message || 'Server stopped')
-        onAfterStop?.()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err))
-      } finally {
-        setStopping(false)
-      }
-      return
-    }
-
-    if (action === 'start') {
-      setRestarting(true)
-      try {
-        const result = await onRestart()
-        setLifecycleNote(result.message || 'Server is starting…')
-        toast.message(result.message || 'Starting server…')
-        if (onAfterRestart) {
-          await onAfterRestart()
-          await load()
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err))
-      } finally {
-        setRestarting(false)
-      }
-      return
-    }
-
+  const clearCache = async () => {
+    setConfirmClear(false)
     setClearing(true)
+    setError(null)
     try {
       const cache = await onClearCache()
       setReport(current => (current ? { ...current, cache } : current))
@@ -223,7 +238,6 @@ export function ServerStatusView({
   }
 
   const running = report?.status === 'running'
-  const busy = stopping || restarting
 
   return (
     <ScrollArea className="flex-1">
@@ -252,7 +266,7 @@ export function ServerStatusView({
           <>
             <section className="bg-muted/50 flex flex-wrap items-center gap-4 rounded-2xl border px-4 py-4">
               <div className="bg-background text-foreground grid size-11 shrink-0 place-items-center rounded-xl border shadow-sm">
-                <Activity className="size-5" strokeWidth={1.75} />
+                <SandwalkMark className="h-6 w-6" />
               </div>
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -262,63 +276,114 @@ export function ServerStatusView({
                   <span
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
-                      busy
-                        ? 'bg-muted text-muted-foreground'
-                        : running
-                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                          : 'bg-destructive/15 text-destructive'
+                      running
+                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-destructive/15 text-destructive'
                     )}
                   >
-                    {busy ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      <span
-                        className={cn(
-                          'size-1.5 rounded-full',
-                          running ? 'bg-emerald-500' : 'bg-destructive'
-                        )}
-                      />
-                    )}
-                    {busy
-                      ? stopping
-                        ? 'Stopping…'
-                        : 'Starting…'
-                      : running
-                        ? 'Running'
-                        : 'Stopped'}
+                    <span
+                      className={cn(
+                        'size-1.5 rounded-full',
+                        running ? 'bg-emerald-500' : 'bg-destructive'
+                      )}
+                    />
+                    {running ? 'Running' : 'Stopped'}
                   </span>
                 </div>
                 <p className="text-muted-foreground text-sm">
-                  {lifecycleNote || report.message || 'Server is running'}
+                  {report.message ||
+                    (running
+                      ? `Listening on ${report.host}:${report.port}`
+                      : 'Server is not running')}
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() => setConfirm(running ? 'stop' : 'start')}
-                className={cn(
-                  'shrink-0',
-                  running &&
-                    'text-destructive hover:bg-destructive/10 hover:text-destructive'
-                )}
+
+              <Dialog
+                open={helpOpen}
+                onOpenChange={open => {
+                  setHelpOpen(open)
+                  if (!open) setCopiedId(null)
+                }}
               >
-                {busy ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : running ? (
-                  <Square className="size-3.5" />
-                ) : (
-                  <Play className="size-3.5" />
-                )}
-                {busy
-                  ? stopping
-                    ? 'Stopping…'
-                    : 'Starting…'
-                  : running
-                    ? 'Stop'
-                    : 'Start'}
-              </Button>
+                <DialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground shrink-0"
+                  >
+                    <CircleHelp className="size-3.5" />
+                    Help
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[min(90vh,40rem)] max-w-2xl overflow-hidden rounded-2xl p-0 sm:rounded-2xl">
+                  <DialogHeader className="space-y-2 px-6 pt-6 pb-2 text-left">
+                    <DialogTitle>Manage Sandwalk on this machine</DialogTitle>
+                    <DialogDescription>
+                      Start, stop, and restart from the Mac menubar app or the
+                      CLI — not from this dashboard.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <ScrollArea className="h-[min(50vh,24rem)] px-6">
+                    <div className="space-y-4 py-2 pr-3">
+                      <div className="bg-muted/40 rounded-xl border px-3.5 py-3">
+                        <p className="text-sm font-semibold">Mac app</p>
+                        <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                          Use the Sandwalk menubar icon →{' '}
+                          <span className="text-foreground font-medium">
+                            Start
+                          </span>
+                          ,{' '}
+                          <span className="text-foreground font-medium">
+                            Stop
+                          </span>
+                          , or{' '}
+                          <span className="text-foreground font-medium">
+                            Restart
+                          </span>
+                          . That supervises both the API and this web UI
+                          together.
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="mb-3 text-sm font-semibold">CLI</p>
+                        <div className="space-y-3.5">
+                          {MANAGE_COMMANDS.map(item => (
+                            <div key={item.id}>
+                              <p className="text-muted-foreground mb-1.5 text-xs font-medium">
+                                {item.title}
+                              </p>
+                              <CommandRow
+                                command={item.command}
+                                copied={copiedId === item.id}
+                                onCopy={() =>
+                                  copyCommand(item.id, item.command)
+                                }
+                              />
+                              <p className="text-muted-foreground mt-1.5 text-xs">
+                                {item.description}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+                          To stop a CLI-started server, interrupt the terminal
+                          with Ctrl+C, or quit / stop from the menubar if it is
+                          supervising the process.
+                        </p>
+                      </div>
+                    </div>
+                  </ScrollArea>
+
+                  <DialogFooter className="px-6 pt-2 pb-5 sm:justify-end">
+                    <Button type="button" onClick={() => setHelpOpen(false)}>
+                      Got it
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </section>
 
             <section>
@@ -404,8 +469,8 @@ export function ServerStatusView({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    disabled={clearing || busy}
-                    onClick={() => setConfirm('clear-cache')}
+                    disabled={clearing}
+                    onClick={() => setConfirmClear(true)}
                     className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   >
                     {clearing ? (
@@ -421,61 +486,31 @@ export function ServerStatusView({
       </div>
 
       <AlertDialog
-        open={confirm !== null}
+        open={confirmClear}
         onOpenChange={open => {
-          if (!open) setConfirm(null)
+          if (!open) setConfirmClear(false)
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirm === 'stop'
-                ? 'Stop Sandwalk?'
-                : confirm === 'start'
-                  ? 'Start Sandwalk?'
-                  : 'Clear runtime cache?'}
-            </AlertDialogTitle>
+            <AlertDialogTitle>Clear runtime cache?</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm === 'stop' ? (
-                <>
-                  The dashboard will disconnect until you start Sandwalk again
-                  with <code className="font-mono">fastfold serve</code>.
-                </>
-              ) : confirm === 'start' ? (
-                <>
-                  Sandwalk will restart on this machine. Active agent runs may
-                  be interrupted briefly.
-                </>
-              ) : (
-                <>
-                  Clears files under{' '}
-                  <code className="font-mono">~/.fastfold-cli/cache</code>.
-                  Datasets and sessions are not deleted.
-                </>
-              )}
+              Clears files under{' '}
+              <code className="font-mono">~/.fastfold-cli/cache</code>. Datasets
+              and sessions are not deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy || clearing}>
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={clearing}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              disabled={busy || clearing}
-              className={
-                confirm === 'stop' || confirm === 'clear-cache'
-                  ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                  : undefined
-              }
+              disabled={clearing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={event => {
                 event.preventDefault()
-                void runConfirmed()
+                void clearCache()
               }}
             >
-              {confirm === 'stop'
-                ? 'Stop'
-                : confirm === 'start'
-                  ? 'Start'
-                  : 'Clear cache'}
+              Clear cache
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

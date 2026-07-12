@@ -37,7 +37,8 @@ def test_store_persists_sessions_messages_and_events(tmp_path: Path):
     assert reopened.list_events(session.id, after_sequence=event.sequence) == []
 
 
-def test_agent_server_health_and_session_contract(tmp_path: Path):
+def test_agent_server_health_and_session_contract(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
     app = create_app(store_path=tmp_path / "agent.db")
 
     with TestClient(app) as client:
@@ -118,16 +119,41 @@ def test_agent_server_health_and_session_contract(tmp_path: Path):
         assert client.get(f"/v1/sessions/{session['id']}").status_code == 404
 
 
-def test_agent_server_api_key_protects_v1_routes(tmp_path: Path):
+def test_agent_server_api_key_protects_v1_routes(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
     app = create_app(store_path=tmp_path / "agent.db", api_key="test-secret")
 
     with TestClient(app) as client:
-        assert client.get("/v1/health").status_code == 401
+        # Health stays public for connect probes.
+        assert client.get("/v1/health").status_code == 200
+        assert client.get("/v1/sessions").status_code == 401
         response = client.get(
-            "/v1/health",
+            "/v1/sessions",
             headers={"authorization": "Bearer test-secret"},
         )
         assert response.status_code == 200
+
+
+def test_auth_login_cookie_grants_access(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
+    from agent_server.auth_settings import AuthSettings, save_settings
+
+    save_settings(
+        AuthSettings(api_key="cookie-secret", auth_enabled=True, secret_key="unit-secret-key")
+    )
+    app = create_app(store_path=tmp_path / "agent.db")
+
+    with TestClient(app) as client:
+        assert client.get("/v1/sessions").status_code == 401
+        login = client.post(
+            "/v1/auth/login",
+            json={"apiKey": "cookie-secret", "remember": True},
+        )
+        assert login.status_code == 200
+        assert client.get("/v1/sessions").status_code == 200
+        status = client.get("/v1/auth/status").json()
+        assert status["authEnabled"] is True
+        assert status["apiKeyConfigured"] is True
 
 
 def test_workspace_service_confines_paths_and_detects_conflicts(tmp_path: Path):
@@ -156,7 +182,8 @@ def test_workspace_service_confines_paths_and_detects_conflicts(tmp_path: Path):
         workspace.read("../outside.txt")
 
 
-def test_agent_server_workspace_file_contract(tmp_path: Path):
+def test_agent_server_workspace_file_contract(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     app = create_app(store_path=tmp_path / "agent.db")

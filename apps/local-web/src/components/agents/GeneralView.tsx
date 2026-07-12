@@ -315,7 +315,7 @@ export function GeneralView({
           <h3 className="text-base font-semibold">About</h3>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 space-y-1">
-              <div className="text-sm font-medium">FastFold Agent</div>
+              <div className="text-sm font-medium">Sandwalk</div>
               <div className="text-muted-foreground space-y-0.5 text-sm">
                 <div>
                   Backend runtime:{' '}

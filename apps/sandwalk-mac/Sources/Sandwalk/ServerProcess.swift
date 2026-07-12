@@ -39,6 +39,8 @@ final class ServerProcess: @unchecked Sendable {
     private(set) var state: State = .stopped
 
     private var process: Process?
+    /// Listener we did not spawn (orphan / external) but are supervising.
+    private var adoptedPid: Int32?
     private var logHandle: FileHandle?
     private var healthTask: Task<Void, Never>?
     private var expectingExit = false
@@ -62,6 +64,13 @@ final class ServerProcess: @unchecked Sendable {
         case .stopped, .failed:
             break
         }
+        if tryAdoptHealthyListener() {
+            return .alreadyRunning
+        }
+        // Stale binder on the port would make a fresh spawn exit(1).
+        if PortSupport.listenerPid(port: config.port) != nil {
+            PortSupport.freePort(config.port)
+        }
         try doStart()
         return .started
     }
@@ -71,25 +80,24 @@ final class ServerProcess: @unchecked Sendable {
         cancelHealthLoop()
         update(.stopping)
 
-        guard let proc = process, proc.isRunning else {
-            process = nil
-            closeLog()
-            update(.stopped)
-            return
+        if let proc = process, proc.isRunning {
+            let pid = proc.processIdentifier
+            kill(pid, SIGTERM)
+            let deadline = Date().addingTimeInterval(stopGraceSeconds)
+            while Date() < deadline {
+                if !proc.isRunning { break }
+                try? await Task.sleep(for: .milliseconds(150))
+            }
+            if proc.isRunning {
+                kill(pid, SIGKILL)
+            }
+        } else if let pid = adoptedPid ?? PortSupport.listenerPid(port: config.port) {
+            PortSupport.killProcessTree(pid: pid)
+            PortSupport.freePort(config.port)
         }
 
-        let pid = proc.processIdentifier
-        kill(pid, SIGTERM)
-
-        let deadline = Date().addingTimeInterval(stopGraceSeconds)
-        while Date() < deadline {
-            if !proc.isRunning { break }
-            try? await Task.sleep(for: .milliseconds(150))
-        }
-        if proc.isRunning {
-            kill(pid, SIGKILL)
-        }
         process = nil
+        adoptedPid = nil
         closeLog()
         update(.stopped)
     }
@@ -98,25 +106,40 @@ final class ServerProcess: @unchecked Sendable {
     func reapSync(timeout: TimeInterval = 5) {
         expectingExit = true
         cancelHealthLoop()
-        guard let proc = process, proc.isRunning else {
-            process = nil
-            closeLog()
-            update(.stopped)
-            return
-        }
-        let pid = proc.processIdentifier
-        kill(pid, SIGTERM)
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if kill(pid, 0) != 0 { break }
-            usleep(100_000)
-        }
-        if kill(pid, 0) == 0 {
-            kill(pid, SIGKILL)
+        if let proc = process, proc.isRunning {
+            let pid = proc.processIdentifier
+            kill(pid, SIGTERM)
+            let deadline = Date().addingTimeInterval(timeout)
+            while Date() < deadline {
+                if kill(pid, 0) != 0 { break }
+                usleep(100_000)
+            }
+            if kill(pid, 0) == 0 {
+                kill(pid, SIGKILL)
+            }
+        } else if let pid = adoptedPid ?? PortSupport.listenerPid(port: config.port) {
+            PortSupport.killProcessTree(pid: pid)
+            PortSupport.freePort(config.port)
         }
         process = nil
+        adoptedPid = nil
         closeLog()
         update(.stopped)
+    }
+
+    /// If something healthy is already on our port, supervise it instead of spawning.
+    @discardableResult
+    private func tryAdoptHealthyListener() -> Bool {
+        let healthy = PortSupport.probeHTTPSync(url: config.healthURL) { $0 == 200 }
+        guard healthy else { return false }
+        let pid = PortSupport.listenerPid(port: config.port) ?? 0
+        adoptedPid = pid == 0 ? nil : pid
+        process = nil
+        consecutiveFailures = 0
+        expectingExit = false
+        update(.running(pid: pid))
+        startHealthLoop()
+        return true
     }
 
     enum StartError: Error, LocalizedError {
@@ -215,12 +238,25 @@ final class ServerProcess: @unchecked Sendable {
         let ok = await probeHealth()
         if ok {
             consecutiveFailures = 0
-            let pid = process?.processIdentifier ?? 0
+            let pid = process?.processIdentifier ?? adoptedPid
+                ?? PortSupport.listenerPid(port: config.port) ?? 0
             if case .starting = state {
+                update(.running(pid: pid))
+            } else if case .running = state, process == nil, adoptedPid == nil, pid != 0 {
+                adoptedPid = pid
                 update(.running(pid: pid))
             }
         } else {
             consecutiveFailures += 1
+            if process == nil, adoptedPid != nil || PortSupport.listenerPid(port: config.port) == nil {
+                // Adopted listener disappeared.
+                if consecutiveFailures >= maxHealthFailures {
+                    adoptedPid = nil
+                    update(.failed(message: "API stopped responding on \(config.healthURL.absoluteString)"))
+                    cancelHealthLoop()
+                }
+                return
+            }
             if case .starting = state, consecutiveFailures >= maxHealthFailures {
                 // Keep waiting a bit longer during cold start — uv can be slow.
                 if consecutiveFailures >= maxHealthFailures * 3 {

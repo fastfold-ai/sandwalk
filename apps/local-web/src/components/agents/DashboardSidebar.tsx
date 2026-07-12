@@ -1,6 +1,6 @@
 import {
-  ArrowLeft,
   Activity,
+  ArrowLeft,
   Box,
   Boxes,
   Database,
@@ -14,6 +14,7 @@ import {
   Stethoscope,
   Wrench
 } from 'lucide-react'
+import type { ComponentType } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
@@ -39,7 +40,7 @@ type NavItem = {
   id: DashboardSection
   label: string
   path: string
-  icon: typeof LayoutDashboard
+  icon: ComponentType<{ className?: string }>
 }
 
 const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [

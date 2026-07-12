@@ -18,22 +18,31 @@ sandwalk/
 └── cli/                 # Python package `sandwalk` (`sandwalk serve`)
 ```
 
-## Development
+## Development (recommended: menubar)
+
+On macOS, the menubar app starts and stops **API + web UI together** (oMLX-style
+unified control — two child processes for now; one process later when the
+server serves the built UI).
 
 ```bash
-# Terminal 1 — menubar owns the agent server (macOS)
+pnpm install                 # once
 cd apps/sandwalk-mac && swift run
-
-# Or Terminal 1 — server only
-cd cli && uv sync && uv run sandwalk serve
-
-# Terminal 2 — web dashboard
-pnpm install
-pnpm dev
 ```
 
-- Dashboard: http://127.0.0.1:8969  
 - Agent API: http://127.0.0.1:8787  
+- Dashboard: http://127.0.0.1:8969  
+
+Do not also run `pnpm dev` while the menubar is running (port conflict on 8969).
+
+### Manual (no menubar)
+
+```bash
+# Terminal 1 — API
+cd cli && uv sync && uv run sandwalk serve
+
+# Terminal 2 — web
+pnpm install && pnpm dev
+```
 
 ```bash
 sandwalk "your research question"
@@ -47,8 +56,10 @@ sandwalk --version
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `SANDWALK_HOST` | `127.0.0.1` | Bind host |
-| `SANDWALK_PORT` | `8787` | Bind port |
-| `SANDWALK_DASHBOARD_URL` | `http://127.0.0.1:8969` | Dashboard URL |
-| `SANDWALK_AUTO_START` | `1` | Start server on launch |
+| `SANDWALK_HOST` | `127.0.0.1` | API bind host |
+| `SANDWALK_PORT` | `8787` | API bind port |
+| `SANDWALK_DASHBOARD_HOST` / `PORT` | `127.0.0.1` / `8969` | Web UI bind |
+| `SANDWALK_DASHBOARD_URL` | — | Override dashboard host/port |
+| `SANDWALK_AUTO_START` | `1` | Start API + web on launch |
+| `SANDWALK_REPO_ROOT` | auto | Monorepo root |
 | `SANDWALK_AGENT_CLI` | auto (`./cli`) | Path to Python package root |

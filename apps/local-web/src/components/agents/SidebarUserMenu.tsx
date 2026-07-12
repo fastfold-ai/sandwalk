@@ -50,10 +50,17 @@ function openExternal(url: string) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-export function SidebarUserMenu({ userName }: { userName: string | null }) {
+export function SidebarUserMenu({
+  userName,
+  onLogout
+}: {
+  userName: string | null
+  onLogout?: () => void | Promise<void>
+}) {
   const navigate = useNavigate()
   const displayName = userName?.trim() || 'Local user'
   const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme())
+  const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
     applyTheme(theme)
@@ -183,9 +190,17 @@ export function SidebarUserMenu({ userName }: { userName: string | null }) {
 
         <DropdownMenuItem
           className="flex cursor-pointer items-center justify-between px-2.5 py-1.5 text-sm"
-          onClick={() => navigate('/')}
+          disabled={loggingOut}
+          onClick={() => {
+            if (!onLogout) {
+              navigate('/')
+              return
+            }
+            setLoggingOut(true)
+            void Promise.resolve(onLogout()).finally(() => setLoggingOut(false))
+          }}
         >
-          <span>Log out</span>
+          <span>{loggingOut ? 'Signing out…' : 'Log out'}</span>
           <LogOut className="text-muted-foreground size-4" />
         </DropdownMenuItem>
       </DropdownMenuContent>

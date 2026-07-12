@@ -104,6 +104,23 @@ from agent_server.models import (
     WorkspaceFileList,
     WorkspaceMutationResponse,
     WriteWorkspaceFileRequest,
+    AuthStatusResponse,
+    AuthLoginRequest,
+    AuthSettingsResponse,
+    UpdateAuthSettingsRequest,
+)
+from agent_server.auth_settings import (
+    AUTH_EXEMPT_PATHS,
+    SESSION_COOKIE,
+    AuthSettingsError,
+    create_session_token,
+    ensure_api_key,
+    key_matches,
+    load_settings,
+    request_is_authenticated,
+    resolve_effective_api_key,
+    save_settings,
+    validate_api_key,
 )
 from agent_server.pty_manager import PtyManager
 from agent_server.service import AgentService, SessionBusyError
@@ -172,6 +189,20 @@ def create_app(
     mcp_service = McpService(store, public_base_url=public_base)
     backend_id = str(uuid.uuid5(uuid.NAMESPACE_URL, str(store.path.resolve())))
 
+    # Persisted auth settings; CLI/env --api-key overrides the effective key.
+    auth_settings = load_settings(create_if_missing=False)
+    if not auth_settings.secret_key:
+        auth_settings.secret_key = secrets.token_urlsafe(32)
+    effective_api_key = resolve_effective_api_key(
+        cli_api_key=api_key,
+        settings=auth_settings,
+    )
+    # When caller passes an explicit key (tests / --api-key), always enforce it.
+    enforce_auth = bool((api_key or "").strip()) or bool(
+        auth_settings.auth_enabled and effective_api_key
+    )
+    runtime_api_key = effective_api_key if enforce_auth else None
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         yield
@@ -185,6 +216,8 @@ def create_app(
     )
     app.state.store = store
     app.state.agent_service = service
+    app.state.auth_settings = auth_settings
+    app.state.runtime_api_key = runtime_api_key
 
     def session_workspace(session_id: str) -> WorkspaceService:
         session = store.get_session(session_id)
@@ -214,34 +247,150 @@ def create_app(
         TrustedHostMiddleware,
         allowed_hosts=allowed_hosts or ["127.0.0.1", "localhost", "testserver"],
     )
+
+    def _reload_auth_state() -> None:
+        current = load_settings()
+        app.state.auth_settings = current
+        override = (api_key or "").strip() or None
+        key = resolve_effective_api_key(cli_api_key=override, settings=current)
+        enforce = bool(override) or bool(current.auth_enabled and key)
+        app.state.runtime_api_key = key if enforce else None
+
+    def _current_api_key() -> str | None:
+        return getattr(app.state, "runtime_api_key", None)
+
+    def _current_secret() -> str:
+        settings = getattr(app.state, "auth_settings", None) or load_settings()
+        return settings.secret_key or ""
+
+    @app.middleware("http")
+    async def require_api_key(request: Request, call_next):
+        path = request.url.path
+        key = _current_api_key()
+        if key and path.startswith("/v1/") and path not in AUTH_EXEMPT_PATHS:
+            ok = request_is_authenticated(
+                headers=request.headers,
+                cookies=request.cookies,
+                api_key=key,
+                secret_key=_current_secret(),
+            )
+            if not ok:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Missing or invalid backend API key."},
+                )
+        return await call_next(request)
+
+    # CORS must be outermost so early 401s from require_api_key still get
+    # Access-Control-* headers (otherwise the browser surfaces "Failed to fetch").
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins or DEFAULT_LOCAL_ORIGINS,
-        allow_credentials=False,
+        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+        allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["authorization", "content-type", "last-event-id"],
+        allow_headers=["authorization", "content-type", "last-event-id", "x-api-key", "cookie"],
     )
 
-    if api_key:
+    @app.get("/v1/auth/status", response_model=AuthStatusResponse)
+    async def auth_status() -> AuthStatusResponse:
+        settings = load_settings()
+        app.state.auth_settings = settings
+        return AuthStatusResponse(
+            auth_enabled=bool(settings.auth_enabled),
+            api_key_configured=settings.api_key_configured,
+        )
 
-        @app.middleware("http")
-        async def require_api_key(request: Request, call_next):
-            if request.url.path.startswith("/v1/"):
-                authorization = request.headers.get("authorization", "")
-                scheme, _, candidate = authorization.partition(" ")
-                valid = (
-                    scheme.lower() == "bearer"
-                    and bool(candidate)
-                    and secrets.compare_digest(candidate, api_key)
-                )
-                if not valid:
-                    from fastapi.responses import JSONResponse
+    @app.post("/v1/auth/login")
+    async def auth_login(payload: AuthLoginRequest) -> JSONResponse:
+        settings = load_settings()
+        app.state.auth_settings = settings
+        expected = settings.api_key
+        if not expected or not key_matches(payload.api_key.strip(), expected):
+            raise HTTPException(status_code=401, detail="Invalid API key.")
+        token, max_age = create_session_token(
+            secret_key=settings.secret_key,
+            remember=payload.remember,
+        )
+        response = JSONResponse(
+            content={"ok": True, "authEnabled": settings.auth_enabled}
+        )
+        response.set_cookie(
+            key=SESSION_COOKIE,
+            value=token,
+            max_age=max_age,
+            httponly=True,
+            samesite="lax",
+            path="/",
+        )
+        return response
 
-                    return JSONResponse(
-                        status_code=401,
-                        content={"detail": "Missing or invalid backend API key."},
-                    )
-            return await call_next(request)
+    @app.post("/v1/auth/logout")
+    async def auth_logout() -> JSONResponse:
+        response = JSONResponse(content={"ok": True})
+        response.delete_cookie(
+            SESSION_COOKIE,
+            path="/",
+            httponly=True,
+            samesite="lax",
+        )
+        return response
+
+    @app.get("/v1/auth/settings", response_model=AuthSettingsResponse)
+    async def get_auth_settings(request: Request) -> AuthSettingsResponse:
+        settings = load_settings()
+        app.state.auth_settings = settings
+        key = _current_api_key()
+        if key:
+            ok = request_is_authenticated(
+                headers=request.headers,
+                cookies=request.cookies,
+                api_key=key,
+                secret_key=settings.secret_key,
+            )
+            if not ok:
+                raise HTTPException(status_code=401, detail="Missing or invalid backend API key.")
+        return AuthSettingsResponse(
+            auth_enabled=settings.auth_enabled,
+            api_key=settings.api_key,
+            api_key_configured=settings.api_key_configured,
+        )
+
+    @app.patch("/v1/auth/settings", response_model=AuthSettingsResponse)
+    async def patch_auth_settings(
+        request: Request,
+        payload: UpdateAuthSettingsRequest,
+    ) -> AuthSettingsResponse:
+        settings = load_settings()
+        key = _current_api_key()
+        if key:
+            ok = request_is_authenticated(
+                headers=request.headers,
+                cookies=request.cookies,
+                api_key=key,
+                secret_key=settings.secret_key,
+            )
+            if not ok:
+                raise HTTPException(status_code=401, detail="Missing or invalid backend API key.")
+        if payload.api_key is not None:
+            try:
+                settings.api_key = validate_api_key(payload.api_key)
+            except AuthSettingsError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if payload.auth_enabled is not None:
+            settings.auth_enabled = bool(payload.auth_enabled)
+            if settings.auth_enabled and not settings.api_key:
+                settings = ensure_api_key(settings)
+        if not settings.secret_key:
+            settings = ensure_api_key(settings)
+        save_settings(settings)
+        _reload_auth_state()
+        settings = load_settings()
+        return AuthSettingsResponse(
+            auth_enabled=settings.auth_enabled,
+            api_key=settings.api_key,
+            api_key_configured=settings.api_key_configured,
+        )
 
     @app.get("/v1/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
@@ -1367,16 +1516,26 @@ def create_app(
         session_id: str,
         pty_id: str,
     ) -> None:
-        if api_key:
+        if _current_api_key():
             authorization = websocket.headers.get("authorization", "")
             scheme, _, candidate = authorization.partition(" ")
             query_token = websocket.query_params.get("token", "")
-            valid = (
+            cookie_token = ""
+            try:
+                cookie_token = websocket.cookies.get(SESSION_COOKIE, "") or ""
+            except Exception:
+                cookie_token = ""
+            key = _current_api_key() or ""
+            valid = request_is_authenticated(
+                headers={"authorization": authorization, "x-api-key": websocket.headers.get("x-api-key", "")},
+                cookies={SESSION_COOKIE: cookie_token},
+                api_key=key,
+                secret_key=_current_secret(),
+                query_token=query_token,
+            ) or (
                 scheme.lower() == "bearer"
                 and bool(candidate)
-                and secrets.compare_digest(candidate, api_key)
-            ) or (
-                bool(query_token) and secrets.compare_digest(query_token, api_key)
+                and key_matches(candidate, key)
             )
             if not valid:
                 await websocket.close(code=4401)

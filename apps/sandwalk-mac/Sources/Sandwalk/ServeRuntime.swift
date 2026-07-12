@@ -70,6 +70,10 @@ struct ServeRuntime {
     func makeEnvironment() -> [String: String] {
         var env = ProcessInfo.processInfo.environment
         env["SANDWALK_SUPERVISED"] = "menubar"
+        // Pin to Application Support so CLI `sandwalk auth` and serve share one
+        // file. Ignore stale shell overrides (e.g. /tmp from local tests).
+        env["SANDWALK_SETTINGS_PATH"] = AuthSettingsStore.settingsFileURL().path
+        env.removeValue(forKey: "SANDWALK_HOME")
         return env
     }
 

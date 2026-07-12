@@ -31,11 +31,11 @@ export function skillIcon(
 export function featuredSkillIcon(
   skill: Pick<AgentSkill, 'name' | 'iconSrc'>
 ): string {
-  return skillIcon(skill) || '/ff_simbol_color.svg'
+  return skillIcon(skill) || '/aura_icon.svg'
 }
 
 export function composerSkillIcon(
   skill: Pick<AgentSkill, 'name' | 'iconSrc' | 'author' | 'source'>
 ): string | null {
-  return skillIcon(skill) || (isFeaturedSkill(skill) ? '/ff_simbol_color.svg' : null)
+  return skillIcon(skill) || (isFeaturedSkill(skill) ? '/aura_icon.svg' : null)
 }

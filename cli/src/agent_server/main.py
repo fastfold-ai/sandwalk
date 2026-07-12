@@ -41,8 +41,17 @@ def run_server(
         raise ValueError("Unix-socket mode cannot be combined with --public.")
     if not is_loopback and not public:
         raise ValueError("Non-loopback binding requires --public.")
-    if public and not key:
-        raise ValueError("Public mode requires --api-key or FASTFOLD_SERVER_API_KEY.")
+
+    # Load persisted auth; public mode can use settings key when CLI key omitted.
+    from agent_server.auth_settings import load_settings, resolve_effective_api_key
+
+    persisted = load_settings()
+    effective = resolve_effective_api_key(cli_api_key=key, settings=persisted)
+    if public and not effective:
+        raise ValueError(
+            "Public mode requires --api-key, FASTFOLD_SERVER_API_KEY, "
+            "or `sandwalk auth enable` with a configured key."
+        )
     if public and not origins:
         raise ValueError("Public mode requires at least one --allowed-origin.")
     if public and not hosts:

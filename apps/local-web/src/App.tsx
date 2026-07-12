@@ -65,6 +65,7 @@ import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { Composer } from '@/components/agents/Composer'
+import { LoginView } from '@/components/agents/LoginView'
 import {
   composerToMessage,
   fileChipToken
@@ -78,6 +79,7 @@ import { EnvironmentView } from '@/components/agents/EnvironmentView'
 import { GeneralView } from '@/components/agents/GeneralView'
 import { McpView } from '@/components/agents/McpView'
 import { ModelsView } from '@/components/agents/ModelsView'
+import { SandwalkMark } from '@/components/SandwalkMark'
 import { ServerStatusView } from '@/components/agents/ServerStatusView'
 import { StorageView } from '@/components/agents/StorageView'
 import { ToolsView } from '@/components/agents/ToolsView'
@@ -97,6 +99,7 @@ import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
 import { TodoListInline } from '@/components/agents/TodoListInline'
 import { ToolCard, type TranscriptTool } from '@/components/agents/ToolCard'
+import { toast } from 'sonner'
 import {
   CardGridSkeleton,
   ChatPageSkeleton,
@@ -184,6 +187,28 @@ const PROJECT_SCOPE_STORAGE_KEY = 'fastfold.project-scope-id'
 const LAST_SESSION_BY_SCOPE_KEY = 'fastfold.last-session-by-scope'
 const RECENT_PROJECT_IDS_STORAGE_KEY = 'fastfold.recent-project-ids'
 const SIDEBAR_SECTIONS_COLLAPSED_KEY = 'fastfold.sidebar-sections-collapsed'
+
+/** Relative in-app path only (blocks open redirects). */
+function sanitizeAuthReturnTo(path: string | null | undefined): string | null {
+  if (!path) return null
+  const trimmed = path.trim()
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return null
+  if (trimmed === '/' || trimmed === '/login' || trimmed.startsWith('/login?')) {
+    return null
+  }
+  return trimmed
+}
+
+function loginPathWithNext(returnTo: string | null): string {
+  const safe = sanitizeAuthReturnTo(returnTo)
+  if (!safe) return '/'
+  return `/?next=${encodeURIComponent(safe)}`
+}
+
+function nextFromSearch(search: string): string | null {
+  const raw = new URLSearchParams(search).get('next')
+  return sanitizeAuthReturnTo(raw)
+}
 
 function projectTabsKey(projectId: string | null | undefined) {
   return projectId || ALL_PROJECTS_TABS_KEY
@@ -914,6 +939,10 @@ export default function App() {
     [backendApiKey, backendUrl]
   )
   const [health, setHealth] = useState<BackendHealth | null>(null)
+  const [needsAuthLogin, setNeedsAuthLogin] = useState(false)
+  const needsAuthLoginRef = useRef(false)
+  const [authBootstrapped, setAuthBootstrapped] = useState(false)
+  const [authLoggingIn, setAuthLoggingIn] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [connectionLimitDismissed, setConnectionLimitDismissed] =
@@ -1358,29 +1387,68 @@ export default function App() {
     [client]
   )
 
-  const waitForServerRestart = useCallback(async () => {
-    const deadline = Date.now() + 45_000
-    while (Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, 800))
-      try {
-        const nextHealth = await client.health()
-        setHealth(nextHealth)
-        return
-      } catch {
-        // Server still coming back up.
-      }
-    }
-    setHealth(null)
-    throw new Error('Server did not come back after restart. Run `fastfold serve`.')
-  }, [client])
-
   const connect = useCallback(async () => {
     setConnecting(true)
     setError(null)
+    const goToLogin = () => {
+      const alreadyNext = nextFromSearch(location.search)
+      const deepLink =
+        location.pathname === '/'
+          ? null
+          : sanitizeAuthReturnTo(
+              `${location.pathname}${location.search}${location.hash}`
+            )
+      needsAuthLoginRef.current = true
+      setHealth(null)
+      setNeedsAuthLogin(true)
+      const target = loginPathWithNext(alreadyNext || deepLink)
+      if (`${location.pathname}${location.search}` !== target) {
+        navigate(target, { replace: true })
+      }
+    }
+    const looksLikeAuthFailure = (message: string) =>
+      message.includes('401') ||
+      /failed to fetch|networkerror|load failed|network request failed/i.test(
+        message
+      )
+
     try {
+      // If we already decided login is required (e.g. logout), do not remount
+      // the shell from a stale reconnect.
+      if (needsAuthLoginRef.current) {
+        return
+      }
       const nextHealth = await client.health()
-      setHealth(nextHealth)
+      if (needsAuthLoginRef.current) return
       localStorage.setItem('fastfold.backend.url', backendUrl)
+
+      let authEnabled = false
+      try {
+        const status = await client.authStatus()
+        authEnabled = Boolean(status.authEnabled)
+      } catch {
+        authEnabled = false
+      }
+      if (needsAuthLoginRef.current) return
+
+      if (authEnabled) {
+        try {
+          await client.getRuntimeSettings()
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : ''
+          if (looksLikeAuthFailure(message)) {
+            goToLogin()
+            return
+          }
+          throw cause
+        }
+      }
+      if (needsAuthLoginRef.current) return
+
+      // Only mount the app shell after auth is confirmed.
+      needsAuthLoginRef.current = false
+      setNeedsAuthLogin(false)
+      setHealth(nextHealth)
       const [, , , , , , settings] = await Promise.all([
         loadSessions(),
         loadProjects(),
@@ -1391,12 +1459,32 @@ export default function App() {
         client.getRuntimeSettings(),
         loadModelOptions()
       ])
+      if (needsAuthLoginRef.current) return
       setRuntimeSettings(settings)
+      const returnTo = nextFromSearch(location.search)
+      if (returnTo) {
+        navigate(returnTo, { replace: true })
+      }
     } catch (cause) {
+      if (needsAuthLoginRef.current) return
+      const message =
+        cause instanceof Error ? cause.message : 'Unable to connect'
+      // Health succeeded path already handled; if auth is on and later
+      // batch calls fail with opaque network/401 errors, prefer login UI.
+      try {
+        const status = await client.authStatus()
+        if (status.authEnabled && looksLikeAuthFailure(message)) {
+          goToLogin()
+          return
+        }
+      } catch {
+        // ignore — fall through to connect error UI
+      }
       setHealth(null)
-      setError(cause instanceof Error ? cause.message : 'Unable to connect')
+      setError(message)
     } finally {
       setConnecting(false)
+      setAuthBootstrapped(true)
     }
   }, [
     backendUrl,
@@ -1407,10 +1495,72 @@ export default function App() {
     loadModelOptions,
     loadProjects,
     loadSessions,
-    loadSkills
+    loadSkills,
+    location.hash,
+    location.pathname,
+    location.search,
+    navigate
   ])
 
+  const submitAuthLogin = useCallback(
+    async (apiKey: string, remember: boolean) => {
+      setAuthLoggingIn(true)
+      try {
+        await client.login(apiKey, { remember })
+        setBackendApiKey('')
+        needsAuthLoginRef.current = false
+        // Keep login UI until connect() confirms the session.
+        await connect()
+      } catch (cause) {
+        needsAuthLoginRef.current = true
+        const raw = cause instanceof Error ? cause.message : 'Invalid API key'
+        let message = 'Invalid API key'
+        try {
+          const jsonMatch = raw.match(/\{.*\}/s)
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]) as { detail?: string }
+            if (parsed.detail) message = parsed.detail
+          } else if (/invalid api key/i.test(raw)) {
+            message = 'Invalid API key'
+          } else if (raw && !raw.startsWith('FastFold Agent API')) {
+            message = raw
+          }
+        } catch {
+          // keep friendly default
+        }
+        toast.error(message)
+      } finally {
+        setAuthLoggingIn(false)
+      }
+    },
+    [client, connect]
+  )
+
+  const logoutSession = useCallback(async () => {
+    // Gate the UI immediately so a reconnect effect cannot remount the app
+    // before the logout request finishes / cookie is cleared.
+    needsAuthLoginRef.current = true
+    setNeedsAuthLogin(true)
+    setHealth(null)
+    setAuthBootstrapped(true)
+    setBackendApiKey('')
+    setRuntimeSettings(null)
+    if (location.pathname !== '/' || location.search) {
+      navigate('/', { replace: true })
+    }
+    try {
+      await client.logout()
+    } catch {
+      // Cookie clear may have failed; UI is already on login.
+    }
+  }, [client, location.pathname, location.search, navigate])
+
   useEffect(() => {
+    // Legacy /login URL → root (login renders under / when unauthenticated).
+    if (location.pathname === '/login') {
+      navigate('/', { replace: true })
+      return
+    }
     if (location.pathname === '/agents/home') {
       navigate('/', { replace: true })
       return
@@ -1448,7 +1598,7 @@ export default function App() {
   ])
 
   useEffect(() => {
-    const base = 'Fastfold Open Agent'
+    const base = 'Sandwalk'
     if (session?.title) {
       document.title = `${session.title} · ${base}`
       return
@@ -1529,8 +1679,9 @@ export default function App() {
   ])
 
   useEffect(() => {
+    if (needsAuthLogin) return
     void connect()
-  }, [connect])
+  }, [connect, needsAuthLogin])
 
   useEffect(() => {
     if (isDashboardModels || !health) return
@@ -2437,7 +2588,7 @@ export default function App() {
       .map(
         message =>
           `## ${
-            message.role === 'assistant' ? 'FastFold Agent' : message.role
+            message.role === 'assistant' ? 'Sandwalk' : message.role
           }\n\n${message.content}`
       )
       .join('\n\n---\n\n')
@@ -2557,6 +2708,23 @@ export default function App() {
     ? tools.filter(tool => tool.runId === activeRunId && !tool.messageId)
     : []
 
+  if (!authBootstrapped && !needsAuthLogin) {
+    return (
+      <main className="grid min-h-full place-items-center bg-[#f5f5f5] dark:bg-neutral-950">
+        <AuraIconPulse className="text-muted-foreground/50 h-12 w-12" />
+      </main>
+    )
+  }
+
+  if (needsAuthLogin) {
+    return (
+      <LoginView
+        submitting={authLoggingIn || connecting}
+        onSubmit={submitAuthLogin}
+      />
+    )
+  }
+
   if (!health) {
     return (
       <main className="bg-background grid h-full place-items-center p-6">
@@ -2568,11 +2736,11 @@ export default function App() {
           }}
         >
           <div className="mb-6 flex items-center gap-3">
-            <div className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-lg text-sm font-semibold">
-              FF
+            <div className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-lg">
+              <SandwalkMark className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="font-semibold">Fastfold Open Agent</h1>
+              <h1 className="font-semibold">Sandwalk</h1>
               <p className="text-muted-foreground text-sm">
                 Connect to an agent backend
               </p>
@@ -2642,11 +2810,7 @@ export default function App() {
                 aria-label="Home"
                 title="Home"
               >
-                <img
-                  src="/ff_simbol_color.svg"
-                  alt="FastFold"
-                  className="size-5"
-                />
+                <SandwalkMark className="h-5 w-5" />
               </button>
               <ProjectSelector
                 projects={projects}
@@ -2887,7 +3051,10 @@ export default function App() {
             </div>
           </ScrollArea>
           <div className="shrink-0 p-2">
-            <SidebarUserMenu userName={health?.userName ?? null} />
+            <SidebarUserMenu
+              userName={health?.userName ?? null}
+              onLogout={logoutSession}
+            />
           </div>
             </>
           )}
@@ -2970,13 +3137,7 @@ export default function App() {
           ) : isDashboardStatus ? (
             <ServerStatusView
               onLoad={loadServerStatus}
-              onStop={signal => client.stopServer(signal)}
-              onRestart={signal => client.restartServer(signal)}
               onClearCache={signal => client.clearRuntimeCache(signal)}
-              onAfterStop={() => {
-                window.setTimeout(() => setHealth(null), 600)
-              }}
-              onAfterRestart={waitForServerRestart}
             />
           ) : isDashboardGeneral ? (
             <GeneralView
