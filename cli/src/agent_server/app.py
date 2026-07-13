@@ -97,11 +97,14 @@ from agent_server.models import (
     PtySessionInfo,
     PtySessionList,
     RuntimeSettings,
+    SandboxProbeReport,
+    SandboxSettings,
     SendMessageRequest,
     ServerCacheInfo,
     ServerLifecycleResult,
     ServerStatusReport,
     SessionList,
+    SessionSandboxStatus,
     SkillBatchActionRequest,
     SkillBatchActionResponse,
     SkillDetail,
@@ -124,6 +127,7 @@ from agent_server.models import (
     UpdateProjectRequest,
     UpdatePtyRequest,
     UpdateRuntimeSettingsRequest,
+    UpdateSandboxSettingsRequest,
     UpdateSessionRequest,
     UpdateSkillRequest,
     UpdateSpecialistRequest,
@@ -140,6 +144,8 @@ from agent_server.models_service import ModelsService
 from agent_server.pty_manager import PtyManager
 from agent_server.service import AgentService, SessionBusyError
 from agent_server.settings_service import SettingsService
+from agent_server.sandbox_settings_service import SandboxSettingsService
+from agent_server.sandbox_events import sandbox_event_bus
 from agent_server.skills_service import SkillsService
 from agent_server.specialists_service import SpecialistsService
 from agent_server.store import AgentStore
@@ -184,6 +190,7 @@ def create_app(
     specialists_service = SpecialistsService(store)
     integrations_service = IntegrationsService()
     settings_service = SettingsService()
+    sandbox_settings_service = SandboxSettingsService()
     account_service = AccountService(integrations=integrations_service)
     models_service = ModelsService()
     datasets_service = DatasetsService()
@@ -221,6 +228,7 @@ def create_app(
             sync_process_env_from_config()
         except Exception:
             pass
+        sandbox_event_bus.bind_loop(asyncio.get_running_loop())
         yield
         await pty_manager.shutdown()
         await service.shutdown()
@@ -878,6 +886,23 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.get("/v1/settings/sandbox", response_model=SandboxSettings)
+    async def get_sandbox_settings() -> SandboxSettings:
+        return await asyncio.to_thread(sandbox_settings_service.get)
+
+    @app.patch("/v1/settings/sandbox", response_model=SandboxSettings)
+    async def update_sandbox_settings(
+        payload: UpdateSandboxSettingsRequest,
+    ) -> SandboxSettings:
+        try:
+            return await asyncio.to_thread(sandbox_settings_service.update, payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/v1/settings/sandbox/probe", response_model=SandboxProbeReport)
+    async def probe_sandbox_settings() -> SandboxProbeReport:
+        return await asyncio.to_thread(sandbox_settings_service.probe)
+
     @app.get("/v1/account", response_model=AccountSummary)
     async def get_account(check_updates: bool = Query(default=False)) -> AccountSummary:
         return await asyncio.to_thread(
@@ -1284,6 +1309,7 @@ def create_app(
                 workspace_path=payload.workspace_path,
                 project_id=payload.project_id,
                 specialist_id=payload.specialist_id,
+                sandbox_backend=payload.sandbox_backend,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1305,6 +1331,9 @@ def create_app(
         update_specialist = (
             payload.specialist_id is not None or payload.clear_specialist_id
         )
+        update_sandbox = (
+            payload.sandbox_backend is not None or payload.clear_sandbox_backend
+        )
         try:
             return await asyncio.to_thread(
                 service.update_session,
@@ -1318,11 +1347,175 @@ def create_app(
                 if payload.clear_specialist_id
                 else payload.specialist_id,
                 update_specialist_id=update_specialist,
+                sandbox_backend=None
+                if payload.clear_sandbox_backend
+                else payload.sandbox_backend,
+                update_sandbox_backend=update_sandbox,
             )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Session not found.") from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get(
+        "/v1/sessions/{session_id}/sandbox",
+        response_model=SessionSandboxStatus,
+    )
+    async def get_session_sandbox(session_id: str) -> SessionSandboxStatus:
+        from agent_server.session_sandbox_service import SessionSandboxService
+
+        try:
+            return await asyncio.to_thread(
+                SessionSandboxService(store).status, session_id
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Session not found.") from exc
+
+    @app.post(
+        "/v1/sessions/{session_id}/sandbox/start",
+        response_model=SessionSandboxStatus,
+    )
+    async def start_session_sandbox(session_id: str) -> SessionSandboxStatus:
+        from agent_server.session_sandbox_service import SessionSandboxService
+
+        try:
+            return await asyncio.to_thread(
+                SessionSandboxService(store).start, session_id
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Session not found.") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post(
+        "/v1/sessions/{session_id}/sandbox/stop",
+        response_model=SessionSandboxStatus,
+    )
+    async def stop_session_sandbox(session_id: str) -> SessionSandboxStatus:
+        from agent_server.session_sandbox_service import SessionSandboxService
+
+        try:
+            return await asyncio.to_thread(
+                SessionSandboxService(store).stop, session_id
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Session not found.") from exc
+
+    @app.post(
+        "/v1/sessions/{session_id}/sandbox/restart",
+        response_model=SessionSandboxStatus,
+    )
+    async def restart_session_sandbox(session_id: str) -> SessionSandboxStatus:
+        from agent_server.session_sandbox_service import SessionSandboxService
+
+        try:
+            return await asyncio.to_thread(
+                SessionSandboxService(store).restart, session_id
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Session not found.") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    async def _authenticate_websocket(websocket: WebSocket) -> bool:
+        if not _current_api_key():
+            return True
+        authorization = websocket.headers.get("authorization", "")
+        scheme, _, candidate = authorization.partition(" ")
+        query_token = websocket.query_params.get("token", "")
+        cookie_token = ""
+        try:
+            cookie_token = websocket.cookies.get(SESSION_COOKIE, "") or ""
+        except Exception:
+            cookie_token = ""
+        key = _current_api_key() or ""
+        return request_is_authenticated(
+            headers={
+                "authorization": authorization,
+                "x-api-key": websocket.headers.get("x-api-key", ""),
+            },
+            cookies={SESSION_COOKIE: cookie_token},
+            api_key=key,
+            secret_key=_current_secret(),
+            query_token=query_token,
+        ) or (
+            scheme.lower() == "bearer"
+            and bool(candidate)
+            and key_matches(candidate, key)
+        )
+
+    @app.websocket("/v1/sessions/{session_id}/sandbox/stream")
+    async def stream_session_sandbox(
+        websocket: WebSocket,
+        session_id: str,
+    ) -> None:
+        from agent_server.session_sandbox_service import SessionSandboxService
+
+        # Accept first so auth/session failures close cleanly (close-before-accept
+        # surfaces as a browser 403 and triggers reconnect storms).
+        await websocket.accept()
+        if not await _authenticate_websocket(websocket):
+            await websocket.close(code=4401)
+            return
+        try:
+            session = await asyncio.to_thread(store.get_session, session_id)
+        except Exception:
+            await websocket.close(code=1011)
+            return
+        if session is None:
+            await websocket.close(code=4404)
+            return
+        try:
+            initial = await asyncio.to_thread(
+                SessionSandboxService(store).status, session_id
+            )
+            await websocket.send_json(
+                {
+                    **initial.model_dump(mode="json", by_alias=True),
+                    "type": "sandbox_status",
+                    "ready": initial.status == "running",
+                }
+            )
+        except Exception:
+            await websocket.close(code=1011)
+            return
+
+        async def _pump_events() -> None:
+            async for event in sandbox_event_bus.subscribe(session_id):
+                await websocket.send_json(event)
+
+        async def _watch_client() -> None:
+            while True:
+                message = await websocket.receive()
+                if message.get("type") == "websocket.disconnect":
+                    return
+
+        pump = asyncio.create_task(_pump_events())
+        watch = asyncio.create_task(_watch_client())
+        try:
+            done, pending = await asyncio.wait(
+                {pump, watch},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+            for task in done:
+                exc = task.exception()
+                if exc is not None and not isinstance(exc, asyncio.CancelledError):
+                    raise exc
+        except Exception:
+            pass
+        finally:
+            if not websocket.client_state.name == "DISCONNECTED":
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
 
     @app.post("/v1/sessions/{session_id}/title/auto", response_model=AgentSession)
     async def auto_title_session(
@@ -1444,7 +1637,7 @@ def create_app(
     ):
         workspace = session_workspace(session_id)
         try:
-            return await asyncio.to_thread(
+            content = await asyncio.to_thread(
                 workspace.write,
                 payload.path,
                 content=payload.content,
@@ -1461,6 +1654,22 @@ def create_app(
             )
         except Exception as exc:
             raise _workspace_http_error(exc) from exc
+        try:
+            from agent.sandbox_backend import push_paths_for_session
+
+            await asyncio.to_thread(
+                push_paths_for_session,
+                session_id,
+                workspace.root,
+                [payload.path],
+            )
+        except Exception as sync_exc:  # noqa: BLE001
+            import logging
+
+            logging.getLogger("agent_server").warning(
+                "Modal push after write failed: %s", sync_exc
+            )
+        return content
 
     @app.get("/v1/sessions/{session_id}/files/download")
     async def download_workspace_file(
@@ -1491,9 +1700,26 @@ def create_app(
             raise HTTPException(status_code=413, detail="File exceeds the 40MB limit.")
         relative_path = str(Path(relative_dir) / (file.filename or "upload.bin"))
         try:
-            return await asyncio.to_thread(workspace.upload, relative_path, data)
+            content = await asyncio.to_thread(workspace.upload, relative_path, data)
         except Exception as exc:
             raise _workspace_http_error(exc) from exc
+        try:
+            from agent.sandbox_backend import push_paths_for_session
+
+            await asyncio.to_thread(
+                push_paths_for_session,
+                session_id,
+                workspace.root,
+                [relative_path],
+            )
+        except Exception as sync_exc:  # noqa: BLE001
+            # Upload already succeeded locally; Modal push is best-effort.
+            import logging
+
+            logging.getLogger("agent_server").warning(
+                "Modal push after upload failed: %s", sync_exc
+            )
+        return content
 
     @app.post(
         "/v1/sessions/{session_id}/files/folders",

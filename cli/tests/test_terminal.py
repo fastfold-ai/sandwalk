@@ -120,6 +120,32 @@ class TestTerminalMethods:
         assert "gemma4:e2b-mlx" in str(toolbar)
         assert "Unsloth" in str(toolbar)
 
+    def test_bottom_toolbar_shows_sandbox_next_to_specialist(self, terminal):
+        def _cfg_get(key, default=None):
+            values = {
+                "llm.provider": "openai",
+                "llm.openai_base_url": "http://localhost:8888/v1",
+                "agent.plan_preview": False,
+            }
+            return values.get(key, default)
+
+        terminal.session.config.get.side_effect = _cfg_get
+        terminal.session.current_model = "gpt-4-mini"
+        terminal.session.verbose = False
+        terminal._show_interrupt_hint = False
+        terminal._worker_thread = None
+        terminal._queued_queries = []
+        terminal._cli_specialist_label = "Protein Designer"
+        terminal._cli_sandbox_label = "Built-in"
+        toolbar = str(terminal._bottom_toolbar())
+        assert "Protein Designer" in toolbar
+        assert "Built-in" not in toolbar
+
+        terminal._cli_sandbox_label = "Modal"
+        toolbar = str(terminal._bottom_toolbar())
+        assert "Modal" in toolbar
+        assert "Protein Designer" in toolbar
+
     def test_switch_model_header_shows_compatible_backend_next_to_model(self, terminal):
         def _cfg_get(key, default=None):
             values = {

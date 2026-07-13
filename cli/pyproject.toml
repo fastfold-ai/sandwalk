@@ -37,6 +37,10 @@ dependencies = [
     "python-multipart>=0.0.20",
     "langchain-mcp-adapters>=0.3.0",
     "mcp>=1.28.1",
+    # Modal sandbox backend (Agent → Sandbox). Kept as a default so Mac/app
+    # installs work without a separate ``pip install -e '.[modal]'`` step.
+    "langchain-modal>=0.0.1",
+    "modal>=0.73",
 ]
 
 [project.optional-dependencies]
@@ -53,6 +57,8 @@ singlecell = [
 ml = ["torch>=2.0", "transformers>=4.40", "fair-esm>=2.0"]
 analysis = ["seaborn>=0.13", "scikit-learn>=1.3"]
 api = ["duckdb>=1.0"]
+# Kept for older docs/install commands; packages are now in core dependencies.
+modal = ["langchain-modal>=0.0.1", "modal>=0.73"]
 # Same extras as ``all`` minus Census/Single Cell (``scanpy``, ``cellxgene-census``, ``tiledbsoma``)—
 # omit those on native Windows (no usable ``tiledbsoma`` wheels). Prefer WSL2 + Ubuntu + ``[all]`` instead.
 win_build = [
@@ -201,6 +207,7 @@ markers = [
     "e2e_matrix: optional live multi-prompt end-to-end matrix (set RUN_E2E_MATRIX=1)",
     "data_smoke: optional live public data-source smoke tests (set RUN_DATA_SMOKE=1)",
     "integration: interactive terminal tests requiring pexpect and a TTY",
+    "modal_e2e: live Modal sandbox E2E (set MODAL_TOKEN_ID and MODAL_TOKEN_SECRET)",
 ]
 
 [tool.coverage.run]
@@ -236,4 +243,6 @@ exclude_lines = [
 
 [tool.uv]
 package = true
-default-groups = ["full"]
+# Only ``dev`` is defined under [dependency-groups]; ``full`` was a stale name
+# that made ``uv run …`` fail validation.
+default-groups = ["dev"]

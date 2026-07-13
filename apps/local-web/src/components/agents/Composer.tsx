@@ -3,6 +3,7 @@ import type {
   AgentSkill,
   AgentSkillDetail,
   RuntimeSettings,
+  SessionSandboxStatus,
   Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
@@ -11,6 +12,7 @@ import {
   Check,
   ChevronDown,
   CornerDownLeft,
+  Loader,
   Plus,
   Sparkles,
   Square,
@@ -36,6 +38,7 @@ import {
 import {
   specialistColorClass,
   SpecialistGlyph} from '@/components/agents/SpecialistsView'
+import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -72,6 +75,54 @@ function formatTokenCount(tokens: number): string {
   return `${Math.max(0, Math.round(tokens))}`
 }
 
+function ModalGlyph({ className }: { className?: string }) {
+  const icon = INTEGRATION_ICONS.modal
+  return (
+    <img
+      src={icon.src}
+      alt=""
+      className={cn('size-3.5 shrink-0 rounded-sm object-contain', className)}
+    />
+  )
+}
+
+export type SandboxActionPhase =
+  | 'idle'
+  | 'starting'
+  | 'stopping'
+  | 'restarting'
+
+function sandboxStatusLabel(
+  status: SessionSandboxStatus | null | undefined,
+  phase: SandboxActionPhase = 'idle'
+) {
+  if (phase === 'starting' || status?.status === 'starting') return 'Starting'
+  if (phase === 'stopping' || status?.status === 'stopping') return 'Stopping'
+  if (phase === 'restarting') return 'Restarting'
+  if (!status) return 'Sandbox'
+  if (status.backend !== 'modal') return 'Built-in'
+  if (status.status === 'running') return 'Running'
+  if (status.status === 'unavailable') return 'Unavailable'
+  return 'Stopped'
+}
+
+function sandboxStatusDotClass(
+  status: SessionSandboxStatus | null | undefined,
+  phase: SandboxActionPhase = 'idle'
+) {
+  if (
+    phase !== 'idle' ||
+    status?.status === 'starting' ||
+    status?.status === 'stopping'
+  ) {
+    return 'bg-muted-foreground/50'
+  }
+  if (!status || status.backend !== 'modal') return 'bg-muted-foreground/40'
+  if (status.status === 'running') return 'bg-emerald-500'
+  if (status.status === 'unavailable') return 'bg-amber-500'
+  return 'bg-muted-foreground/50'
+}
+
 export function Composer({
   value,
   running,
@@ -82,6 +133,8 @@ export function Composer({
   modelOptions,
   specialists = [],
   selectedSpecialistId = null,
+  sandboxStatus = null,
+  sandboxPhase = 'idle',
   showAura = true,
   onChange,
   onSkillChipsChange,
@@ -95,7 +148,11 @@ export function Composer({
   tokenUsage,
   onModelSelect,
   onSpecialistSelect,
-  onCreateSpecialist
+  onCreateSpecialist,
+  onSandboxBackendSelect,
+  onSandboxStart,
+  onSandboxStop,
+  onSandboxRestart
 }: {
   value: string
   running: boolean
@@ -113,6 +170,8 @@ export function Composer({
   }>
   specialists?: Specialist[]
   selectedSpecialistId?: string | null
+  sandboxStatus?: SessionSandboxStatus | null
+  sandboxPhase?: SandboxActionPhase
   showAura?: boolean
   onChange: (value: string) => void
   onSkillChipsChange: (skills: string[]) => void
@@ -131,6 +190,12 @@ export function Composer({
   ) => Promise<void>
   onSpecialistSelect?: (specialistId: string | null) => void | Promise<void>
   onCreateSpecialist?: () => void
+  onSandboxBackendSelect?: (
+    backend: 'builtin' | 'modal'
+  ) => void | Promise<void>
+  onSandboxStart?: () => void | Promise<void>
+  onSandboxStop?: () => void | Promise<void>
+  onSandboxRestart?: () => void | Promise<void>
 }) {
   const uploadRef = useRef<HTMLInputElement | null>(null)
   const textInputRefs = useRef<Map<number, HTMLInputElement>>(new Map())
@@ -148,6 +213,7 @@ export function Composer({
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
   const [specialistPickerOpen, setSpecialistPickerOpen] = useState(false)
+  const [sandboxPickerOpen, setSandboxPickerOpen] = useState(false)
   const previewCacheRef = useRef<Map<string, string>>(new Map())
   const skillItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const fileItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
@@ -1127,7 +1193,7 @@ export function Composer({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="border-border/70 bg-muted/40 hover:bg-muted inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
                 >
                   <span className="font-medium">{selectedModel.label}</span>
                   {selectedModel.speed ? (
@@ -1204,7 +1270,7 @@ export function Composer({
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="border-border/70 bg-muted/40 hover:bg-muted inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
+                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
                   >
                     {selectedSpecialist ? (
                       <span
@@ -1297,6 +1363,190 @@ export function Composer({
                         Create new…
                       </button>
                     </div>
+                  ) : null}
+                </PopoverContent>
+              </Popover>
+            ) : null}
+            {onSandboxBackendSelect ? (
+              <Popover
+                open={sandboxPickerOpen}
+                onOpenChange={setSandboxPickerOpen}
+              >
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
+                    aria-label="Sandbox backend"
+                  >
+                    {sandboxPhase !== 'idle' ||
+                    sandboxStatus?.status === 'starting' ||
+                    sandboxStatus?.status === 'stopping' ? (
+                      <Loader className="text-muted-foreground size-3.5 shrink-0 animate-spin" />
+                    ) : sandboxStatus?.backend === 'modal' ? (
+                      <>
+                        <ModalGlyph />
+                        <span
+                          className={cn(
+                            'size-1.5 rounded-full',
+                            sandboxStatusDotClass(sandboxStatus, sandboxPhase)
+                          )}
+                        />
+                      </>
+                    ) : (
+                      <span
+                        className={cn(
+                          'size-1.5 rounded-full',
+                          sandboxStatusDotClass(sandboxStatus, sandboxPhase)
+                        )}
+                      />
+                    )}
+                    <span className="font-medium">
+                      {sandboxStatusLabel(sandboxStatus, sandboxPhase)}
+                    </span>
+                    <ChevronDown className="text-muted-foreground size-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  side="top"
+                  className="w-72 overflow-hidden p-0"
+                >
+                  <div className="text-muted-foreground border-b px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
+                    Sandbox
+                  </div>
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm disabled:opacity-50"
+                      disabled={sandboxPhase !== 'idle'}
+                      onClick={() => {
+                        setSandboxPickerOpen(false)
+                        void onSandboxBackendSelect('builtin')
+                      }}
+                    >
+                      <span className="bg-muted-foreground/40 size-2.5 rounded-full" />
+                      <span className="truncate">Built-in</span>
+                      {sandboxStatus?.backend !== 'modal' &&
+                      sandboxPhase === 'idle' ? (
+                        <Check className="text-foreground ml-auto size-4 shrink-0" />
+                      ) : null}
+                    </button>
+                    <button
+                      type="button"
+                      className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm disabled:opacity-50"
+                      disabled={sandboxPhase !== 'idle'}
+                      onClick={() => {
+                        setSandboxPickerOpen(false)
+                        void onSandboxBackendSelect('modal')
+                      }}
+                    >
+                      <ModalGlyph />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate">Modal</div>
+                        {sandboxStatus?.modalConfigured === false ? (
+                          <div className="text-muted-foreground truncate text-[11px]">
+                            Configure tokens in Integrations
+                          </div>
+                        ) : null}
+                      </div>
+                      {sandboxStatus?.backend === 'modal' ||
+                      sandboxPhase !== 'idle' ? (
+                        <Check className="text-foreground ml-auto size-4 shrink-0" />
+                      ) : null}
+                    </button>
+                  </div>
+                  {sandboxStatus?.backend === 'modal' ||
+                  sandboxPhase !== 'idle' ? (
+                    <>
+                      <div className="border-t py-1">
+                        <button
+                          type="button"
+                          className="hover:bg-muted flex w-full items-center px-3 py-1.5 text-left text-sm disabled:opacity-50"
+                          disabled={
+                            sandboxPhase !== 'idle' ||
+                            sandboxStatus?.status === 'running' ||
+                            sandboxStatus?.status === 'unavailable'
+                          }
+                          onClick={() => {
+                            setSandboxPickerOpen(false)
+                            void onSandboxStart?.()
+                          }}
+                        >
+                          {sandboxPhase === 'starting'
+                            ? 'Starting…'
+                            : 'Start sandbox'}
+                        </button>
+                        <button
+                          type="button"
+                          className="hover:bg-muted flex w-full items-center px-3 py-1.5 text-left text-sm disabled:opacity-50"
+                          disabled={
+                            sandboxPhase !== 'idle' ||
+                            sandboxStatus?.status !== 'running'
+                          }
+                          onClick={() => {
+                            setSandboxPickerOpen(false)
+                            void onSandboxStop?.()
+                          }}
+                        >
+                          {sandboxPhase === 'stopping'
+                            ? 'Stopping…'
+                            : 'Stop sandbox'}
+                        </button>
+                        <button
+                          type="button"
+                          className="hover:bg-muted flex w-full items-center px-3 py-1.5 text-left text-sm disabled:opacity-50"
+                          disabled={
+                            sandboxPhase !== 'idle' ||
+                            sandboxStatus?.status === 'unavailable'
+                          }
+                          onClick={() => {
+                            setSandboxPickerOpen(false)
+                            void onSandboxRestart?.()
+                          }}
+                        >
+                          {sandboxPhase === 'restarting'
+                            ? 'Restarting…'
+                            : 'Restart sandbox'}
+                        </button>
+                      </div>
+                      {sandboxStatus ? (
+                        <div className="text-muted-foreground space-y-1.5 border-t px-3 py-2.5 text-xs">
+                          <div className="flex items-center justify-between gap-3">
+                            <span>Mode</span>
+                            <span className="text-foreground font-medium uppercase">
+                              {sandboxStatus.computeType || 'cpu'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span>Compute</span>
+                            <span className="text-foreground font-medium">
+                              {sandboxStatus.computeType === 'gpu'
+                                ? sandboxStatus.gpuClass
+                                : `${sandboxStatus.cpuCores} CPU · ${sandboxStatus.ramGb} GB RAM`}
+                            </span>
+                          </div>
+                          <div className="space-y-0.5">
+                            <div>Base image</div>
+                            <div className="text-foreground font-mono text-[11px]">
+                              {sandboxStatus.cpuImage || 'debian_slim'}
+                            </div>
+                          </div>
+                          {sandboxPhase !== 'idle' ? (
+                            <div className="text-[11px] leading-snug">
+                              {sandboxPhase === 'starting'
+                                ? 'Starting Modal sandbox…'
+                                : sandboxPhase === 'stopping'
+                                  ? 'Stopping Modal sandbox…'
+                                  : 'Restarting Modal sandbox…'}
+                            </div>
+                          ) : sandboxStatus.detail ? (
+                            <div className="text-[11px] leading-snug">
+                              {sandboxStatus.detail}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </>
                   ) : null}
                 </PopoverContent>
               </Popover>

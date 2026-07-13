@@ -43,19 +43,49 @@ final class ServerProcess: @unchecked Sendable {
     private var adoptedPid: Int32?
     private var logHandle: FileHandle?
     private var healthTask: Task<Void, Never>?
+    private var recoveryTask: Task<Void, Never>?
     private var expectingExit = false
     private var consecutiveFailures = 0
+    private var consecutiveRecoveries = 0
 
-    private let healthInterval: TimeInterval = 2
+    /// Fast probes while starting; configured interval once running.
+    private let startupHealthInterval: TimeInterval = 2
     private let maxHealthFailures = 5
     private let stopGraceSeconds: TimeInterval = 8
+    private let maxAutoRecoveries = 8
 
     init(config: AppConfig) {
         self.config = config
     }
 
     func reconfigure(config: AppConfig) {
+        let intervalChanged =
+            self.config.healthCheckIntervalSeconds != config.healthCheckIntervalSeconds
         self.config = config
+        if intervalChanged, case .running = state {
+            startHealthLoop()
+        }
+    }
+
+    /// Restart the health loop after an interval change (running / starting only).
+    func refreshHealthLoop() {
+        switch state {
+        case .running, .starting:
+            startHealthLoop()
+        default:
+            break
+        }
+    }
+
+    private var healthSleepInterval: TimeInterval {
+        switch state {
+        case .starting:
+            return startupHealthInterval
+        default:
+            return TimeInterval(
+                AppConfig.clampHealthCheckInterval(config.healthCheckIntervalSeconds)
+            )
+        }
     }
 
     @discardableResult
@@ -69,6 +99,7 @@ final class ServerProcess: @unchecked Sendable {
             break
         }
         if tryAdoptHealthyListener() {
+            consecutiveRecoveries = 0
             return .alreadyRunning
         }
         // Stale binder on the port would make a fresh spawn exit(1).
@@ -76,11 +107,13 @@ final class ServerProcess: @unchecked Sendable {
             PortSupport.freePort(config.port)
         }
         try doStart()
+        consecutiveRecoveries = 0
         return .started
     }
 
     func stop() async {
         expectingExit = true
+        cancelRecovery()
         cancelHealthLoop()
         update(.stopping)
 
@@ -103,12 +136,14 @@ final class ServerProcess: @unchecked Sendable {
         process = nil
         adoptedPid = nil
         closeLog()
+        consecutiveRecoveries = 0
         update(.stopped)
     }
 
     /// Synchronous stop for app termination / signal paths.
     func reapSync(timeout: TimeInterval = 5) {
         expectingExit = true
+        cancelRecovery()
         cancelHealthLoop()
         if let proc = process, proc.isRunning {
             let pid = proc.processIdentifier
@@ -128,6 +163,7 @@ final class ServerProcess: @unchecked Sendable {
         process = nil
         adoptedPid = nil
         closeLog()
+        consecutiveRecoveries = 0
         update(.stopped)
     }
 
@@ -208,7 +244,11 @@ final class ServerProcess: @unchecked Sendable {
         if wasExpecting {
             update(.stopped)
         } else {
+            // External kill / crash — recover by adopting a replacement listener
+            // or respawning. Staying in .failed leaves the menubar "partially
+            // running" whenever tools restart the API out-of-band.
             update(.failed(message: "Exited with code \(code)"))
+            scheduleRecovery(reason: "process-exit")
         }
     }
 
@@ -220,7 +260,7 @@ final class ServerProcess: @unchecked Sendable {
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.tickHealth()
-                try? await Task.sleep(for: .seconds(self.healthInterval))
+                try? await Task.sleep(for: .seconds(self.healthSleepInterval))
             }
         }
     }
@@ -228,6 +268,48 @@ final class ServerProcess: @unchecked Sendable {
     private func cancelHealthLoop() {
         healthTask?.cancel()
         healthTask = nil
+    }
+
+    private func cancelRecovery() {
+        recoveryTask?.cancel()
+        recoveryTask = nil
+    }
+
+    /// After an unexpected API death, adopt a healthy listener on our port or respawn.
+    private func scheduleRecovery(reason: String) {
+        cancelRecovery()
+        recoveryTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            // Brief pause so a replacement `sandwalk serve` can bind first.
+            try? await Task.sleep(for: .milliseconds(900))
+            guard !Task.isCancelled else { return }
+            switch self.state {
+            case .failed, .stopped:
+                break
+            default:
+                return
+            }
+            if self.tryAdoptHealthyListener() {
+                self.consecutiveRecoveries = 0
+                NSLog("Sandwalk: API recovered by adopting listener (%@)", reason)
+                return
+            }
+            if self.consecutiveRecoveries >= self.maxAutoRecoveries {
+                NSLog("Sandwalk: API recovery gave up after %d attempts (%@)", self.maxAutoRecoveries, reason)
+                return
+            }
+            self.consecutiveRecoveries += 1
+            do {
+                try self.doStart()
+                NSLog("Sandwalk: API respawned after %@ (attempt %d)", reason, self.consecutiveRecoveries)
+            } catch {
+                NSLog("Sandwalk: API respawn failed (%@): %@", reason, error.localizedDescription)
+                // Try again with backoff.
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                self.scheduleRecovery(reason: "retry")
+            }
+        }
     }
 
     @MainActor
@@ -242,6 +324,7 @@ final class ServerProcess: @unchecked Sendable {
         let ok = await probeHealth()
         if ok {
             consecutiveFailures = 0
+            consecutiveRecoveries = 0
             let pid = process?.processIdentifier ?? adoptedPid
                 ?? PortSupport.listenerPid(port: config.port) ?? 0
             if case .starting = state {
@@ -249,6 +332,12 @@ final class ServerProcess: @unchecked Sendable {
             } else if case .running = state, process == nil, adoptedPid == nil, pid != 0 {
                 adoptedPid = pid
                 update(.running(pid: pid))
+            } else if case .running = state, let adopted = adoptedPid, adopted != 0 {
+                // Child was replaced out-of-band — track the live listener.
+                if let live = PortSupport.listenerPid(port: config.port), live != adopted {
+                    adoptedPid = live
+                    update(.running(pid: live))
+                }
             }
         } else {
             consecutiveFailures += 1
@@ -258,7 +347,17 @@ final class ServerProcess: @unchecked Sendable {
                     adoptedPid = nil
                     update(.failed(message: "API stopped responding on \(config.healthURL.absoluteString)"))
                     cancelHealthLoop()
+                    scheduleRecovery(reason: "health-lost")
                 }
+                return
+            }
+            // Supervised child still listed as running but health is down —
+            // if the PID is gone, recover instead of waiting forever.
+            if let proc = process, !proc.isRunning {
+                process = nil
+                update(.failed(message: "API process ended while unhealthy"))
+                cancelHealthLoop()
+                scheduleRecovery(reason: "stale-child")
                 return
             }
             if case .starting = state, consecutiveFailures >= maxHealthFailures {
@@ -267,12 +366,18 @@ final class ServerProcess: @unchecked Sendable {
                     update(.failed(message: "Health check timed out on \(config.healthURL.absoluteString)"))
                     expectingExit = true
                     process?.terminate()
+                    scheduleRecovery(reason: "start-timeout")
                 }
             }
         }
     }
 
     private func probeHealth() async -> Bool {
+        if let code = await Task.detached(priority: .utility, operation: {
+            PortSupport.curlStatusPublic(url: self.config.healthURL, timeout: 2)
+        }).value {
+            return code == 200
+        }
         var request = URLRequest(url: config.healthURL)
         request.timeoutInterval = 2
         request.httpMethod = "GET"

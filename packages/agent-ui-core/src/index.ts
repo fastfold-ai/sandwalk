@@ -178,6 +178,7 @@ export type AgentSession = {
   organizeLabel: 'pinned' | 'archive' | null
   projectId: string | null
   specialistId: string | null
+  sandboxBackend?: 'builtin' | 'modal' | null
   workspacePath: string | null
   lastMessageAt: string | null
   createdAt: string
@@ -368,6 +369,50 @@ export type RuntimeSettings = {
   toolHealthSuppressSeconds: number
 }
 
+export type SandboxSettings = {
+  backend: 'builtin' | 'modal' | string
+  modalApp: string
+  cpuImage: string
+  gpuImage: string
+  pipPackages: string
+  computeType: 'cpu' | 'gpu' | string
+  gpuClass: string
+  cpuCores: number
+  ramGb: number
+  idleTtlSeconds: number
+  modalConfigured: boolean
+}
+
+export type SandboxProbeStep = {
+  name: string
+  ok: boolean
+  detail: string
+}
+
+export type SandboxProbeReport = {
+  ok: boolean
+  skipped: boolean
+  steps: SandboxProbeStep[]
+}
+
+export type SessionSandboxStatus = {
+  sessionId: string
+  backend: 'builtin' | 'modal' | string
+  sessionBackend: 'builtin' | 'modal' | null
+  globalBackend: 'builtin' | 'modal' | string
+  status: 'ready' | 'running' | 'stopped' | 'unavailable' | 'starting' | 'stopping' | string
+  providerSandboxName: string | null
+  modalConfigured: boolean
+  computeType: string
+  gpuClass: string
+  cpuCores: number
+  ramGb: number
+  cpuImage: string
+  detail: string | null
+  type?: 'sandbox_status'
+  ready?: boolean
+}
+
 export type AccountUser = {
   id: string | null
   email: string | null
@@ -456,6 +501,12 @@ export interface SettingsProvider {
     changes: Partial<RuntimeSettings>,
     signal?: AbortSignal,
   ): Promise<RuntimeSettings>
+  getSandboxSettings?(signal?: AbortSignal): Promise<SandboxSettings>
+  updateSandboxSettings?(
+    changes: Partial<SandboxSettings>,
+    signal?: AbortSignal,
+  ): Promise<SandboxSettings>
+  probeSandboxSettings?(signal?: AbortSignal): Promise<SandboxProbeReport>
   getAccount?(
     options?: { checkUpdates?: boolean; signal?: AbortSignal },
   ): Promise<AccountSummary>
@@ -935,6 +986,7 @@ export interface AgentClient {
       workspacePath?: string | null
       projectId?: string | null
       specialistId?: string | null
+      sandboxBackend?: 'builtin' | 'modal' | null
     },
     signal?: AbortSignal,
   ): Promise<AgentSession>
@@ -945,9 +997,27 @@ export interface AgentClient {
       organizeLabel?: 'pinned' | 'archive' | null
       projectId?: string | null
       specialistId?: string | null
+      sandboxBackend?: 'builtin' | 'modal' | null
     },
     signal?: AbortSignal,
   ): Promise<AgentSession>
+  getSessionSandbox?(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<SessionSandboxStatus>
+  sandboxStreamUrl?(sessionId: string): string
+  startSessionSandbox?(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<SessionSandboxStatus>
+  stopSessionSandbox?(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<SessionSandboxStatus>
+  restartSessionSandbox?(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<SessionSandboxStatus>
   autoTitleSession(
     sessionId: string,
     input?: { force?: boolean },

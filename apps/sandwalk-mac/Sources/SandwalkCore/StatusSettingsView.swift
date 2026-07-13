@@ -13,13 +13,36 @@ struct StatusSettingsView: View {
     @State private var errorMessage: String?
     @State private var statusMessage: String?
     @State private var hardwareTimer: Timer?
+    @State private var healthIntervalDraft = AppConfig.defaultHealthCheckIntervalSeconds
 
     @Environment(\.sandwalkTheme) private var theme
 
+    private static let healthIntervalChoices = [15, 30, 60, 120, 180, 300]
+
+    private var healthIntervalSublabel: String {
+        "Default 1 min · applies without restart"
+    }
+
+    private static func labelForHealthInterval(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(seconds)s" }
+        if seconds % 60 == 0 {
+            let minutes = seconds / 60
+            return minutes == 1 ? "1 min" : "\(minutes) min"
+        }
+        return "\(seconds)s"
+    }
+
     private var apiLikelyUp: Bool {
         switch overall {
-        case .running, .partial: return true
-        default: return false
+        case .running:
+            return true
+        case .partial(let api, _):
+            // Partial with API down must not pretend the API is up — that leaves
+            // Status stuck spinning on /v1/status and re-fetching on every
+            // supervisor notify (crash-loop feedback).
+            return api
+        default:
+            return false
         }
     }
 
@@ -37,6 +60,29 @@ struct StatusSettingsView: View {
                     SettingsRow(label: "Fetching /v1/status…", isLast: true) {
                         ProgressView()
                             .controlSize(.small)
+                    }
+                }
+            }
+
+            SettingsSectionHeader(
+                "HEALTH CHECKS",
+                subtitle: "Probe interval while services are running. Start still uses a fast probe."
+            )
+            SettingsListGroup {
+                SettingsRow(
+                    label: "Interval",
+                    sublabel: healthIntervalSublabel,
+                    isLast: true
+                ) {
+                    Picker("", selection: $healthIntervalDraft) {
+                        ForEach(Self.healthIntervalChoices, id: \.self) { seconds in
+                            Text(Self.labelForHealthInterval(seconds)).tag(seconds)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(minWidth: 110)
+                    .onChange(of: healthIntervalDraft) { _, newValue in
+                        Task { await applyHealthInterval(newValue) }
                     }
                 }
             }
@@ -361,8 +407,34 @@ struct StatusSettingsView: View {
     private func refresh() {
         overall = SandwalkRuntime.supervisor?.overall ?? .stopped
         config = SandwalkRuntime.config
+        healthIntervalDraft = AppConfig.clampHealthCheckInterval(
+            config.healthCheckIntervalSeconds
+        )
         if !apiLikelyUp {
             report = nil
+        }
+    }
+
+    @MainActor
+    private func applyHealthInterval(_ seconds: Int) async {
+        let clamped = AppConfig.clampHealthCheckInterval(seconds)
+        guard clamped != config.healthCheckIntervalSeconds else { return }
+        do {
+            if let supervisor = SandwalkRuntime.supervisor {
+                try supervisor.applyHealthCheckInterval(clamped)
+                config = supervisor.config
+            } else {
+                var next = config
+                next.healthCheckIntervalSeconds = clamped
+                try next.saveNetworkSettings()
+                config = next
+            }
+            healthIntervalDraft = clamped
+            statusMessage = "Health check interval set to \(Self.labelForHealthInterval(clamped))."
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+            healthIntervalDraft = config.healthCheckIntervalSeconds
         }
     }
 

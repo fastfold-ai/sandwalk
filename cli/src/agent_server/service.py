@@ -191,6 +191,7 @@ class AgentService:
         workspace_path: str | None,
         project_id: str | None = None,
         specialist_id: str | None = None,
+        sandbox_backend: str | None = None,
     ) -> AgentSession:
         normalized_workspace: str | None = None
         if workspace_path:
@@ -203,6 +204,7 @@ class AgentService:
             workspace_path=normalized_workspace,
             project_id=project_id,
             specialist_id=specialist_id,
+            sandbox_backend=sandbox_backend,
         )
         if normalized_workspace is None:
             workspace = default_workspace_path(session.id)
@@ -228,7 +230,18 @@ class AgentService:
         update_project_id: bool = False,
         specialist_id: str | None = None,
         update_specialist_id: bool = False,
+        sandbox_backend: str | None = None,
+        update_sandbox_backend: bool = False,
     ) -> AgentSession:
+        if update_sandbox_backend and sandbox_backend == "modal":
+            from agent_server.sandbox_settings_service import SandboxSettingsService
+
+            settings = SandboxSettingsService.get()
+            if not settings.modal_configured:
+                raise ValueError(
+                    "Modal sandbox requires compute.modal_token_id and "
+                    "compute.modal_token_secret (Integrations → Modal)."
+                )
         session = self.store.update_session(
             session_id,
             title=title,
@@ -238,6 +251,8 @@ class AgentService:
             update_project_id=update_project_id,
             specialist_id=specialist_id,
             update_specialist_id=update_specialist_id,
+            sandbox_backend=sandbox_backend,
+            update_sandbox_backend=update_sandbox_backend,
         )
         if session is None:
             raise KeyError(session_id)
@@ -419,6 +434,8 @@ class AgentService:
                 project_context,
                 specialist_instructions,
                 allowed_skill_names,
+                session_id,
+                current.sandbox_backend if current else None,
             )
             assistant_message = self.store.add_message(
                 session_id=session_id,
@@ -498,12 +515,15 @@ class AgentService:
         project_context: str | None = None,
         specialist_instructions: str | None = None,
         allowed_skill_names: list[str] | None = None,
+        session_id: str | None = None,
+        sandbox_backend: str | None = None,
     ) -> str:
         """Temporary adapter until AgentRunner is split into AgentRuntime."""
         from agent.config import Config
         from agent.runner import AgentRunner
         from agent.session import Session
         from agent.trajectory import Trajectory
+        from agent_server.session_sandbox_service import effective_session_sandbox_backend
 
         config = Config.load()
         if workspace_path:
@@ -513,7 +533,7 @@ class AgentService:
             output_dir.mkdir(parents=True, exist_ok=True)
             config.set("sandbox.output_dir", str(output_dir))
         session = Session(config=config, verbose=False, mode="batch")
-        trajectory = Trajectory(session_id=None)
+        trajectory = Trajectory(session_id=session_id)
         pending_user: str | None = None
         for message in history:
             if message.role == "user":
@@ -523,6 +543,12 @@ class AgentService:
                 pending_user = None
         runner = AgentRunner(session, trajectory=trajectory, headless=True)
         context: dict = {"workspace_path": workspace_path} if workspace_path else {}
+        if session_id:
+            context["session_id"] = session_id
+        effective_backend = effective_session_sandbox_backend(
+            sandbox_backend, config=config
+        )
+        context["sandbox_backend"] = effective_backend
         if mcp_servers:
             context["mcp_servers"] = mcp_servers
         if project_context:

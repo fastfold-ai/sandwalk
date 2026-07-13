@@ -57,6 +57,7 @@ _CATEGORY_BY_NAME: dict[str, str] = {
     "api_connectivity": "network",
     "boltz_cli": "tooling",
     "python_runtime": "runtime",
+    "sandbox_backend": "runtime",
     "npx": "tooling",
     "node": "tooling",
     "git": "tooling",
@@ -415,6 +416,7 @@ def run_checks(config: Config | None = None, session=None) -> list[DoctorCheck]:
     checks.append(_check_skills_loaded())
     checks.extend(_check_environment(cfg))
     checks.extend(_check_mcp_servers(cfg))
+    checks.append(_check_sandbox_backend(cfg))
 
     return [_normalize_check(check) for check in checks]
 
@@ -541,6 +543,52 @@ def _check_python_runtime() -> DoctorCheck:
         name="python_runtime",
         status="ok",
         detail=detail,
+        category="runtime",
+    )
+
+
+def _check_sandbox_backend(cfg: Config) -> DoctorCheck:
+    backend = str(cfg.get("sandbox.backend") or "builtin").strip().lower()
+    if backend == "builtin":
+        return DoctorCheck(
+            name="sandbox_backend",
+            status="ok",
+            detail="builtin (local FilesystemBackend)",
+            category="runtime",
+        )
+    if backend != "modal":
+        return DoctorCheck(
+            name="sandbox_backend",
+            status="warn",
+            detail=f"Unknown sandbox.backend={backend!r}; expected builtin|modal",
+            category="runtime",
+            fix="sandwalk config set sandbox.backend builtin",
+        )
+    from agent.sandbox_probe import modal_tokens_present
+    from agent.sandbox_deps import ensure_modal_deps
+
+    present, detail = modal_tokens_present(cfg)
+    if not present:
+        return DoctorCheck(
+            name="sandbox_backend",
+            status="error",
+            detail=f"modal selected but {detail}",
+            category="runtime",
+            fix="Set Modal tokens under Integrations → Modal",
+        )
+    deps_ok, deps_detail = ensure_modal_deps(auto_install=True)
+    if not deps_ok:
+        return DoctorCheck(
+            name="sandbox_backend",
+            status="error",
+            detail=f"modal selected but deps unavailable: {deps_detail}",
+            category="runtime",
+            fix="pip install langchain-modal modal  (or pip install -e '.[modal]')",
+        )
+    return DoctorCheck(
+        name="sandbox_backend",
+        status="ok",
+        detail=f"modal ({detail}; {deps_detail})",
         category="runtime",
     )
 

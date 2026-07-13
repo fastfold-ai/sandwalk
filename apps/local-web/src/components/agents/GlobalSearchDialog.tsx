@@ -144,6 +144,13 @@ const DASHBOARD_COMMANDS = [
     icon: Cpu
   },
   {
+    id: 'agent_sandbox',
+    label: 'Agent Sandbox',
+    path: '/dashboard/agent/sandbox',
+    value: 'command agent sandbox modal builtin workspace',
+    icon: Boxes
+  },
+  {
     id: 'models',
     label: 'Models',
     path: '/dashboard/models',

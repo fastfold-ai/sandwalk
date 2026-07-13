@@ -6,6 +6,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
     case security
     case logs
     case runtime
+    case sandbox
     case models
     case tools
     case datasets
@@ -23,6 +24,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .runtime: return "Runtime"
+        case .sandbox: return "Sandbox"
         case .models: return "Models"
         case .tools: return "Tools"
         case .datasets: return "Datasets"
@@ -44,6 +46,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .runtime: return "cpu"
+        case .sandbox: return "shippingbox"
         case .models: return "cube"
         case .tools: return "wrench"
         case .datasets: return "externaldrive"

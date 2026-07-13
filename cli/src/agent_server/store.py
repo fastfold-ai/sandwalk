@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import logging
+import shutil
 import sqlite3
+import subprocess
 import threading
 import uuid
 from datetime import UTC, datetime
@@ -22,6 +25,8 @@ from agent_server.models import (
     Specialist,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
@@ -34,6 +39,7 @@ class AgentStore:
         self.path = (path or (CONFIG_DIR / "agent-server.db")).expanduser()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._write_lock = threading.RLock()
+        self._ensure_healthy_database()
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -41,7 +47,107 @@ class AgentStore:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA journal_mode = WAL")
+        # NORMAL is durable enough with WAL and much less likely to leave a
+        # torn page if the process is force-killed mid-write than OFF.
+        connection.execute("PRAGMA synchronous = NORMAL")
+        connection.execute("PRAGMA busy_timeout = 30000")
         return connection
+
+    def _ensure_healthy_database(self) -> None:
+        """Repair a malformed DB so serve does not crash-loop on startup."""
+        if not self.path.exists():
+            return
+        try:
+            with sqlite3.connect(self.path, timeout=5) as connection:
+                row = connection.execute("PRAGMA integrity_check").fetchone()
+                if row and str(row[0]) == "ok":
+                    return
+                detail = str(row[0]) if row else "integrity_check failed"
+        except sqlite3.DatabaseError as exc:
+            detail = str(exc)
+        self._repair_database(reason=detail)
+
+    def _sidecar(self, base: Path, suffix: str) -> Path:
+        return Path(f"{base}{suffix}")
+
+    def _quarantine_database(self, *, stamp: str) -> Path:
+        backup = self.path.with_name(f"{self.path.name}.corrupt-{stamp}")
+        for suffix in ("", "-wal", "-shm"):
+            src = self._sidecar(self.path, suffix)
+            if not src.exists():
+                continue
+            dest = self._sidecar(backup, suffix)
+            try:
+                if dest.exists():
+                    dest.unlink()
+                shutil.move(str(src), str(dest))
+            except OSError as exc:
+                logger.warning("Failed to quarantine %s: %s", src, exc)
+        return backup
+
+    def _integrity_ok(self, path: Path) -> bool:
+        try:
+            with sqlite3.connect(path, timeout=5) as connection:
+                row = connection.execute("PRAGMA integrity_check").fetchone()
+                return bool(row and str(row[0]) == "ok")
+        except sqlite3.DatabaseError:
+            return False
+
+    def _repair_database(self, *, reason: str) -> None:
+        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        backup = self._quarantine_database(stamp=stamp)
+        logger.error(
+            "Agent store database is corrupt (%s); quarantined to %s and recovering",
+            reason,
+            backup,
+        )
+
+        # Prefer a previously recovered sibling when present.
+        sibling = Path(f"{self.path}.recovered")
+        if sibling.exists() and self._integrity_ok(sibling):
+            try:
+                shutil.copy2(sibling, self.path)
+                if self._integrity_ok(self.path):
+                    logger.error("Restored agent store from %s", sibling)
+                    return
+            except OSError as exc:
+                logger.warning("Failed to restore %s: %s", sibling, exc)
+
+        # sqlite3 .recover dumps a rebuild script (best-effort).
+        try:
+            recover_sql = subprocess.check_output(
+                ["sqlite3", str(backup), ".recover"],
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=120,
+            )
+            if self.path.exists():
+                self.path.unlink()
+            with sqlite3.connect(self.path) as connection:
+                connection.executescript(recover_sql)
+            if self._integrity_ok(self.path):
+                try:
+                    shutil.copy2(self.path, sibling)
+                except OSError:
+                    pass
+                logger.error("Recovered agent store via sqlite3 .recover")
+                return
+        except (OSError, subprocess.SubprocessError, sqlite3.Error) as exc:
+            logger.warning("sqlite3 .recover failed: %s", exc)
+
+        # Last resort: empty DB so the API can boot (schema created in _initialize).
+        for suffix in ("", "-wal", "-shm"):
+            path = self._sidecar(self.path, suffix)
+            if path.exists():
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+        logger.error(
+            "Could not recover agent store data; starting with a fresh database "
+            "(corrupt backup kept at %s)",
+            backup,
+        )
 
     def _initialize(self) -> None:
         with self._connect() as connection:
@@ -145,6 +251,8 @@ class AgentStore:
                 connection.execute("ALTER TABLE sessions ADD COLUMN project_id TEXT")
             if "specialist_id" not in columns:
                 connection.execute("ALTER TABLE sessions ADD COLUMN specialist_id TEXT")
+            if "sandbox_backend" not in columns:
+                connection.execute("ALTER TABLE sessions ADD COLUMN sandbox_backend TEXT")
             specialist_columns = {
                 row["name"]
                 for row in connection.execute("PRAGMA table_info(specialists)").fetchall()
@@ -221,6 +329,12 @@ class AgentStore:
     @staticmethod
     def _session(row: sqlite3.Row) -> AgentSession:
         keys = set(row.keys())
+        raw_backend = row["sandbox_backend"] if "sandbox_backend" in keys else None
+        sandbox_backend = None
+        if raw_backend is not None:
+            normalized = str(raw_backend).strip().lower()
+            if normalized in {"builtin", "modal"}:
+                sandbox_backend = normalized
         return AgentSession(
             id=row["id"],
             title=row["title"],
@@ -228,6 +342,7 @@ class AgentStore:
             organize_label=row["organize_label"],
             project_id=row["project_id"] if "project_id" in keys else None,
             specialist_id=row["specialist_id"] if "specialist_id" in keys else None,
+            sandbox_backend=sandbox_backend,
             workspace_path=row["workspace_path"],
             last_message_at=(
                 datetime.fromisoformat(row["last_message_at"])
@@ -300,6 +415,7 @@ class AgentStore:
         workspace_path: str | None,
         project_id: str | None = None,
         specialist_id: str | None = None,
+        sandbox_backend: str | None = None,
     ) -> AgentSession:
         return self.ensure_session(
             str(uuid.uuid4()),
@@ -307,6 +423,7 @@ class AgentStore:
             workspace_path=workspace_path,
             project_id=project_id,
             specialist_id=specialist_id,
+            sandbox_backend=sandbox_backend,
         )
 
     def ensure_session(
@@ -317,6 +434,7 @@ class AgentStore:
         workspace_path: str | None = None,
         project_id: str | None = None,
         specialist_id: str | None = None,
+        sandbox_backend: str | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> AgentSession:
@@ -333,6 +451,12 @@ class AgentStore:
             raise ValueError(f"Project not found: {project_id}")
         if specialist_id is not None and self.get_specialist(specialist_id) is None:
             raise ValueError(f"Specialist not found: {specialist_id}")
+        normalized_backend = None
+        if sandbox_backend is not None:
+            candidate = str(sandbox_backend).strip().lower()
+            if candidate not in {"builtin", "modal"}:
+                raise ValueError("sandbox_backend must be 'builtin' or 'modal'")
+            normalized_backend = candidate
 
         now = utc_now()
         created = created_at or now
@@ -344,6 +468,7 @@ class AgentStore:
             organize_label=None,
             project_id=project_id,
             specialist_id=specialist_id,
+            sandbox_backend=normalized_backend,
             workspace_path=workspace_path,
             last_message_at=None,
             created_at=created,
@@ -354,9 +479,9 @@ class AgentStore:
                 """
                 INSERT INTO sessions(
                     id, title, status, organize_label, project_id, specialist_id,
-                    workspace_path, last_message_at, created_at, updated_at
+                    sandbox_backend, workspace_path, last_message_at, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session.id,
@@ -365,6 +490,7 @@ class AgentStore:
                     session.organize_label,
                     session.project_id,
                     session.specialist_id,
+                    session.sandbox_backend,
                     session.workspace_path,
                     None,
                     session.created_at.isoformat(),
@@ -427,6 +553,8 @@ class AgentStore:
         update_project_id: bool = False,
         specialist_id: str | None = None,
         update_specialist_id: bool = False,
+        sandbox_backend: str | None = None,
+        update_sandbox_backend: bool = False,
     ) -> AgentSession | None:
         current = self.get_session(session_id)
         if current is None:
@@ -447,13 +575,22 @@ class AgentStore:
             if specialist_id is not None and self.get_specialist(specialist_id) is None:
                 raise ValueError(f"Specialist not found: {specialist_id}")
             next_specialist_id = specialist_id
+        next_sandbox_backend = current.sandbox_backend
+        if update_sandbox_backend:
+            if sandbox_backend is not None:
+                candidate = str(sandbox_backend).strip().lower()
+                if candidate not in {"builtin", "modal"}:
+                    raise ValueError("sandbox_backend must be 'builtin' or 'modal'")
+                next_sandbox_backend = candidate
+            else:
+                next_sandbox_backend = None
         now = utc_now()
         with self._write_lock, self._connect() as connection:
             connection.execute(
                 """
                 UPDATE sessions
                 SET title = ?, organize_label = ?, project_id = ?, specialist_id = ?,
-                    updated_at = ?
+                    sandbox_backend = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -461,6 +598,7 @@ class AgentStore:
                     next_label,
                     next_project_id,
                     next_specialist_id,
+                    next_sandbox_backend,
                     now.isoformat(),
                     session_id,
                 ),

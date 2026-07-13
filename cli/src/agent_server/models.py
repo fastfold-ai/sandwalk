@@ -195,6 +195,9 @@ class DeleteSpecialistResponse(ApiModel):
     deleted: bool = True
 
 
+SandboxBackendChoice = Literal["builtin", "modal"]
+
+
 class AgentSession(ApiModel):
     id: str
     title: str
@@ -202,6 +205,7 @@ class AgentSession(ApiModel):
     organize_label: OrganizeLabel | None = None
     project_id: str | None = None
     specialist_id: str | None = None
+    sandbox_backend: SandboxBackendChoice | None = None
     workspace_path: str | None = None
     last_message_at: datetime | None = None
     created_at: datetime
@@ -213,6 +217,7 @@ class CreateSessionRequest(ApiModel):
     workspace_path: str | None = None
     project_id: str | None = None
     specialist_id: str | None = None
+    sandbox_backend: SandboxBackendChoice | None = None
 
 
 class UpdateSessionRequest(ApiModel):
@@ -223,9 +228,30 @@ class UpdateSessionRequest(ApiModel):
     clear_project_id: bool = False
     specialist_id: str | None = None
     clear_specialist_id: bool = False
+    sandbox_backend: SandboxBackendChoice | None = None
+    clear_sandbox_backend: bool = False
+
 
 class AutoTitleSessionRequest(ApiModel):
     force: bool = False
+
+
+class SessionSandboxStatus(ApiModel):
+    session_id: str
+    backend: SandboxBackendChoice
+    session_backend: SandboxBackendChoice | None = None
+    global_backend: SandboxBackendChoice = "builtin"
+    status: Literal[
+        "ready", "running", "stopped", "unavailable", "starting", "stopping"
+    ] = "ready"
+    provider_sandbox_name: str | None = None
+    modal_configured: bool = False
+    compute_type: str = "cpu"
+    gpu_class: str = "T4"
+    cpu_cores: float = 1.0
+    ram_gb: float = 4.0
+    cpu_image: str = "debian_slim"
+    detail: str | None = None
 
 
 MessageRole = Literal["user", "assistant", "system"]
@@ -528,6 +554,45 @@ class UpdateRuntimeSettingsRequest(ApiModel):
     tool_health_enabled: bool | None = None
     tool_health_fail_threshold: int | None = None
     tool_health_suppress_seconds: int | None = None
+
+
+class SandboxSettings(ApiModel):
+    backend: str = "builtin"
+    modal_app: str = "sandwalk"
+    cpu_image: str = "debian_slim"
+    gpu_image: str = "debian_slim"
+    pip_packages: str = "pandas,numpy,matplotlib,scipy,pillow"
+    compute_type: str = "cpu"
+    gpu_class: str = "T4"
+    cpu_cores: float = 1.0
+    ram_gb: float = 4.0
+    idle_ttl_seconds: int = 600
+    modal_configured: bool = False
+
+
+class UpdateSandboxSettingsRequest(ApiModel):
+    backend: str | None = None
+    modal_app: str | None = None
+    cpu_image: str | None = None
+    gpu_image: str | None = None
+    pip_packages: str | None = None
+    compute_type: str | None = None
+    gpu_class: str | None = None
+    cpu_cores: float | None = None
+    ram_gb: float | None = None
+    idle_ttl_seconds: int | None = None
+
+
+class SandboxProbeStep(ApiModel):
+    name: str
+    ok: bool
+    detail: str
+
+
+class SandboxProbeReport(ApiModel):
+    ok: bool
+    skipped: bool = False
+    steps: list[SandboxProbeStep] = Field(default_factory=list)
 
 
 class AccountUser(ApiModel):

@@ -334,3 +334,33 @@ struct RuntimeSettingsDTO: Codable, Hashable {
         toolHealthSuppressSeconds: 900
     )
 }
+
+// MARK: - Sandbox settings
+
+struct SandboxSettingsDTO: Codable, Hashable {
+    var backend: String
+    var modalApp: String
+    var cpuImage: String
+    var gpuImage: String
+    var pipPackages: String
+    var computeType: String
+    var gpuClass: String
+    var cpuCores: Double
+    var ramGb: Double
+    var idleTtlSeconds: Int
+    var modalConfigured: Bool
+
+    static let defaults = SandboxSettingsDTO(
+        backend: "builtin",
+        modalApp: "sandwalk",
+        cpuImage: "debian_slim",
+        gpuImage: "debian_slim",
+        pipPackages: "pandas,numpy,matplotlib,scipy,pillow",
+        computeType: "cpu",
+        gpuClass: "T4",
+        cpuCores: 1.0,
+        ramGb: 4.0,
+        idleTtlSeconds: 600,
+        modalConfigured: false
+    )
+}

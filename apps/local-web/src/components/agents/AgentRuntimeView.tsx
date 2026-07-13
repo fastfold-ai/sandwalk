@@ -2,6 +2,7 @@ import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
 import { Check, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
+import { BusyConfirmOverlay } from '@/components/BusyConfirmOverlay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -146,6 +147,11 @@ export function AgentRuntimeView({
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [overlay, setOverlay] = useState<{
+    phase: 'working' | 'done'
+    message: string
+    description?: string
+  } | null>(null)
 
   useEffect(() => {
     setDraft(settingsToDraft(runtimeSettings))
@@ -160,6 +166,11 @@ export function AgentRuntimeView({
   const save = async () => {
     setSaving(true)
     setError(null)
+    setOverlay({
+      phase: 'working',
+      message: 'Saving runtime…',
+      description: 'Applying LangGraph and tool-calling limits.'
+    })
     try {
       const next = await onUpdateRuntimeSettings({
         recursionLimit: clampInt(draft.recursionLimit, 25, 2000, 120),
@@ -195,7 +206,15 @@ export function AgentRuntimeView({
         )
       })
       setDraft(settingsToDraft(next))
+      setOverlay({
+        phase: 'done',
+        message: 'Runtime saved',
+        description: 'New sessions use these limits.'
+      })
+      await new Promise(resolve => setTimeout(resolve, 900))
+      setOverlay(null)
     } catch (err) {
+      setOverlay(null)
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)
@@ -204,24 +223,19 @@ export function AgentRuntimeView({
 
   return (
     <ScrollArea className="flex-1">
+      <BusyConfirmOverlay
+        open={Boolean(overlay)}
+        phase={overlay?.phase || 'working'}
+        message={overlay?.message || ''}
+        description={overlay?.description}
+      />
       <div className="mx-auto max-w-3xl space-y-10 px-8 py-10">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold">Runtime</h2>
-            <p className="text-muted-foreground mt-2 text-sm">
-              LangGraph loop limits, tool calling, traces, and health overrides
-              for agent runs.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!connected || saving || !dirty}
-            onClick={() => void save()}
-          >
-            {saving ? <Loader2 className="animate-spin" /> : <Check />}
-            Save
-          </Button>
+        <div>
+          <h2 className="text-2xl font-semibold">Runtime</h2>
+          <p className="text-muted-foreground mt-2 text-sm">
+            LangGraph loop limits, tool calling, traces, and health overrides
+            for agent runs.
+          </p>
         </div>
 
         {error ? (
@@ -479,6 +493,17 @@ export function AgentRuntimeView({
           </code>
           .
         </p>
+
+        <div className="flex justify-end pt-2">
+          <Button
+            size="sm"
+            disabled={!connected || saving || !dirty}
+            onClick={() => void save()}
+          >
+            {saving ? <Loader2 className="animate-spin" /> : <Check />}
+            Save
+          </Button>
+        </div>
       </div>
     </ScrollArea>
   )

@@ -10,6 +10,8 @@ import type {
   McpCatalogEntry,
   McpServer,
   RuntimeSettings,
+  SandboxSettings,
+  SessionSandboxStatus,
   Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
@@ -48,7 +50,10 @@ import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
-import { Composer } from '@/components/agents/Composer'
+import {
+  Composer,
+  type SandboxActionPhase
+} from '@/components/agents/Composer'
 import {
   composerToMessage,
   fileChipToken
@@ -150,8 +155,9 @@ import {
   writeProjectScopeId,
   writeRecentProjectIds
 } from '@/lib/app-storage'
+import { AppErrorBoundary } from '@/components/AppErrorBoundary'
+import { ErrorPage } from '@/components/ErrorPage'
 import {
-  formatConnectError,
   loginPathWithNext,
   nextFromSearch,
   sanitizeAuthReturnTo
@@ -181,6 +187,11 @@ import { cn } from '@/lib/utils'
 const AgentRuntimeView = lazy(() =>
   import('@/components/agents/AgentRuntimeView').then(m => ({
     default: m.AgentRuntimeView
+  }))
+)
+const AgentSandboxView = lazy(() =>
+  import('@/components/agents/AgentSandboxView').then(m => ({
+    default: m.AgentSandboxView
   }))
 )
 const DashboardOverviewView = lazy(() =>
@@ -258,13 +269,16 @@ export default function App() {
     () => localStorage.getItem('fastfold.backend.url') || DEFAULT_BACKEND_URL
   )
   const [backendApiKey, setBackendApiKey] = useState('')
+  // Kept after login so WebSocket URLs can pass ?token= (cookies are not always
+  // attached cross-port). Cleared on logout. Login input itself is cleared.
+  const [clientApiKey, setClientApiKey] = useState<string | undefined>()
   const client = useMemo(
     () =>
       new LocalAgentClient({
         baseUrl: backendUrl,
-        apiKey: backendApiKey || undefined
+        apiKey: clientApiKey || backendApiKey || undefined
       }),
-    [backendApiKey, backendUrl]
+    [backendApiKey, backendUrl, clientApiKey]
   )
   const [health, setHealth] = useState<BackendHealth | null>(null)
   const [cloudUserName, setCloudUserName] = useState<string | null>(null)
@@ -274,6 +288,7 @@ export default function App() {
   const [authLoggingIn, setAuthLoggingIn] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorStack, setErrorStack] = useState<string | null>(null)
   const [connectionLimitDismissed, setConnectionLimitDismissed] =
     useState(false)
   const [sessions, setSessions] = useState<AgentSession[]>([])
@@ -309,6 +324,13 @@ export default function App() {
   const [specialistsLoading, setSpecialistsLoading] = useState(false)
   const [runtimeSettings, setRuntimeSettings] =
     useState<RuntimeSettings | null>(null)
+  const [sandboxSettings, setSandboxSettings] =
+    useState<SandboxSettings | null>(null)
+  const [sessionSandboxStatus, setSessionSandboxStatus] =
+    useState<SessionSandboxStatus | null>(null)
+  const [sessionSandboxPhase, setSessionSandboxPhase] =
+    useState<SandboxActionPhase>('idle')
+  const sandboxActionSessionRef = useRef<string | null>(null)
   const [modelOptions, setModelOptions] = useState<ComposerModelOption[]>([])
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
   const [pendingOpenPath, setPendingOpenPath] = useState<string | null>(null)
@@ -484,29 +506,31 @@ export default function App() {
     : location.pathname.startsWith('/dashboard/general') ||
         location.pathname.startsWith('/dashboard/settings')
       ? 'general'
-      : location.pathname.startsWith('/dashboard/agent')
-        ? 'agent_runtime'
-        : location.pathname.startsWith('/dashboard/models')
-          ? 'models'
-          : location.pathname.startsWith('/dashboard/datasets')
-            ? 'datasets'
-            : location.pathname.startsWith('/dashboard/tools')
-              ? 'tools'
-              : location.pathname.startsWith('/dashboard/doctor')
-                ? 'doctor'
-                : location.pathname.startsWith('/dashboard/storage')
-                  ? 'storage'
-                  : location.pathname.startsWith('/dashboard/environment')
-                    ? 'environment'
-                    : location.pathname.startsWith('/dashboard/skills')
-                      ? 'skills'
-                      : location.pathname.startsWith('/dashboard/specialists')
-                        ? 'specialists'
-                        : location.pathname.startsWith('/dashboard/integrations')
-                          ? 'integrations'
-                          : location.pathname.startsWith('/dashboard/mcp')
-                            ? 'mcp'
-                            : 'overview'
+      : location.pathname.startsWith('/dashboard/agent/sandbox')
+        ? 'agent_sandbox'
+        : location.pathname.startsWith('/dashboard/agent')
+          ? 'agent_runtime'
+          : location.pathname.startsWith('/dashboard/models')
+            ? 'models'
+            : location.pathname.startsWith('/dashboard/datasets')
+              ? 'datasets'
+              : location.pathname.startsWith('/dashboard/tools')
+                ? 'tools'
+                : location.pathname.startsWith('/dashboard/doctor')
+                  ? 'doctor'
+                  : location.pathname.startsWith('/dashboard/storage')
+                    ? 'storage'
+                    : location.pathname.startsWith('/dashboard/environment')
+                      ? 'environment'
+                      : location.pathname.startsWith('/dashboard/skills')
+                        ? 'skills'
+                        : location.pathname.startsWith('/dashboard/specialists')
+                          ? 'specialists'
+                          : location.pathname.startsWith('/dashboard/integrations')
+                            ? 'integrations'
+                            : location.pathname.startsWith('/dashboard/mcp')
+                              ? 'mcp'
+                              : 'overview'
   const isSkills =
     dashboardSection === 'skills' ||
     location.pathname === '/agents/skills' ||
@@ -530,6 +554,7 @@ export default function App() {
   const isDashboardStatus = dashboardSection === 'status'
   const isDashboardGeneral = dashboardSection === 'general'
   const isDashboardAgentRuntime = dashboardSection === 'agent_runtime'
+  const isDashboardAgentSandbox = dashboardSection === 'agent_sandbox'
   const isDashboardModels = dashboardSection === 'models'
   const isDashboardData = dashboardSection === 'datasets'
   const isDashboardTools = dashboardSection === 'tools'
@@ -551,6 +576,7 @@ export default function App() {
       isDashboardStatus ||
       isDashboardGeneral ||
       isDashboardAgentRuntime ||
+      isDashboardAgentSandbox ||
       isDashboardStorage ||
       isDashboardEnvironment
     ) {
@@ -855,6 +881,7 @@ export default function App() {
   const connect = useCallback(async () => {
     setConnecting(true)
     setError(null)
+    setErrorStack(null)
     const goToLogin = () => {
       const alreadyNext = nextFromSearch(location.search)
       const deepLink =
@@ -928,7 +955,7 @@ export default function App() {
       needsAuthLoginRef.current = false
       setNeedsAuthLogin(false)
       setHealth(nextHealth)
-      const [, , , , , , , settings] = await Promise.all([
+      const [, , , , , , , settings, sandbox] = await Promise.all([
         loadSessions(),
         loadProjects(),
         loadSkills(),
@@ -937,10 +964,13 @@ export default function App() {
         loadMcpCatalog(),
         loadSpecialists(),
         client.getRuntimeSettings(),
+        // Older backends may not have /settings/sandbox yet — don't block connect.
+        client.getSandboxSettings().catch(() => null),
         loadModelOptions()
       ])
       if (needsAuthLoginRef.current) return
       setRuntimeSettings(settings)
+      setSandboxSettings(sandbox)
       const returnTo = nextFromSearch(location.search)
       if (returnTo) {
         navigate(returnTo, { replace: true })
@@ -949,6 +979,11 @@ export default function App() {
       if (needsAuthLoginRef.current) return
       const message =
         cause instanceof Error ? cause.message : 'Unable to connect'
+      const isLocalBackend = /127\.0\.0\.1|localhost/i.test(backendUrl)
+      const isNetworkFailure =
+        /failed to fetch|networkerror|load failed|network request failed/i.test(
+          message
+        )
       // Health succeeded path already handled; if auth is on and later
       // batch calls fail with opaque network/401 errors, prefer login UI.
       try {
@@ -958,10 +993,19 @@ export default function App() {
           return
         }
       } catch {
-        // ignore — fall through to connect error UI
+        // Local Mac dashboard: once the API is back, auto-retry reaches login.
+        // Prefer login UI over the remote "Connect to backend" form when we
+        // already know this is a local Sandwalk with auth enabled in settings.
+        if (isLocalBackend && isNetworkFailure) {
+          setHealth(null)
+          setError(message)
+          setErrorStack(cause instanceof Error ? cause.stack || null : null)
+          return
+        }
       }
       setHealth(null)
       setError(message)
+      setErrorStack(cause instanceof Error ? cause.stack || null : null)
     } finally {
       setConnecting(false)
       setAuthBootstrapped(true)
@@ -988,6 +1032,7 @@ export default function App() {
       setAuthLoggingIn(true)
       try {
         await client.login(apiKey, { remember })
+        setClientApiKey(apiKey.trim())
         setBackendApiKey('')
         needsAuthLoginRef.current = false
         // Keep login UI until connect() confirms the session.
@@ -1025,6 +1070,7 @@ export default function App() {
     setHealth(null)
     setAuthBootstrapped(true)
     setBackendApiKey('')
+    setClientApiKey(undefined)
     setRuntimeSettings(null)
     if (location.pathname !== '/' || location.search) {
       navigate('/', { replace: true })
@@ -1169,6 +1215,25 @@ export default function App() {
     void connect()
   }, [connect, needsAuthLogin])
 
+  // Local dashboard: when the API is temporarily down (Mac "partially running"),
+  // keep retrying until health succeeds — then auth routes to LoginView.
+  useEffect(() => {
+    if (needsAuthLogin || health || connecting) return
+    if (!error) return
+    if (!/127\.0\.0\.1|localhost/i.test(backendUrl)) return
+    if (
+      !/failed to fetch|networkerror|load failed|network request failed/i.test(
+        error
+      )
+    ) {
+      return
+    }
+    const timer = window.setInterval(() => {
+      void connect()
+    }, 5000)
+    return () => window.clearInterval(timer)
+  }, [backendUrl, connect, connecting, error, health, needsAuthLogin])
+
   useEffect(() => {
     if (isDashboardModels || !health) return
     void loadModelOptions()
@@ -1278,6 +1343,122 @@ export default function App() {
       cancelled = true
     }
   }, [client, sessionId, workspaceVersion])
+
+  useEffect(() => {
+    if (!sessionId || !health) {
+      setSessionSandboxStatus(null)
+      setSessionSandboxPhase('idle')
+      sandboxActionSessionRef.current = null
+      return
+    }
+    if (sandboxActionSessionRef.current !== sessionId) {
+      setSessionSandboxPhase('idle')
+    }
+    let cancelled = false
+    let socket: WebSocket | null = null
+    let reconnectTimer: number | null = null
+    let reconnectDelayMs = 1000
+    let hardFailures = 0
+
+    const applyStatus = (status: SessionSandboxStatus) => {
+      if (cancelled) return
+      setSessionSandboxStatus(status)
+      if (status.status === 'starting') {
+        setSessionSandboxPhase('starting')
+        sandboxActionSessionRef.current = sessionId
+      } else if (status.status === 'stopping') {
+        setSessionSandboxPhase('stopping')
+        sandboxActionSessionRef.current = sessionId
+      } else if (status.status === 'running') {
+        if (sandboxActionSessionRef.current === sessionId) {
+          sandboxActionSessionRef.current = null
+        }
+        setSessionSandboxPhase('idle')
+      } else if (
+        (status.status === 'stopped' ||
+          status.status === 'unavailable' ||
+          status.status === 'ready') &&
+        sandboxActionSessionRef.current !== sessionId
+      ) {
+        setSessionSandboxPhase('idle')
+      }
+    }
+
+    const refresh = () => {
+      void client
+        .getSessionSandbox(sessionId)
+        .then(status => {
+          if (!cancelled) applyStatus(status)
+        })
+        .catch(() => {
+          if (!cancelled) setSessionSandboxStatus(null)
+        })
+    }
+
+    const connect = () => {
+      if (cancelled) return
+      try {
+        socket?.close()
+      } catch {
+        // ignore
+      }
+      const ws = new WebSocket(client.sandboxStreamUrl(sessionId))
+      socket = ws
+      ws.onopen = () => {
+        reconnectDelayMs = 1000
+        hardFailures = 0
+        refresh()
+      }
+      ws.onmessage = event => {
+        try {
+          const payload = JSON.parse(String(event.data)) as SessionSandboxStatus & {
+            type?: string
+          }
+          if (payload?.sessionId) applyStatus(payload)
+        } catch {
+          // ignore malformed frames
+        }
+      }
+      ws.onclose = event => {
+        if (cancelled) return
+        // 1006 = abnormal close (refused / failed handshake). Back off harder
+        // so a down API does not reconnect-storm the console.
+        if (event.code === 1006 || event.code === 4401 || event.code === 1011) {
+          hardFailures += 1
+          reconnectDelayMs = Math.min(
+            Math.max(reconnectDelayMs, 2000) * 2,
+            hardFailures >= 5 ? 30000 : 15000
+          )
+        }
+        reconnectTimer = window.setTimeout(() => {
+          reconnectTimer = null
+          connect()
+        }, reconnectDelayMs)
+        if (!(event.code === 1006 || event.code === 4401 || event.code === 1011)) {
+          reconnectDelayMs = Math.min(reconnectDelayMs * 2, 8000)
+        }
+      }
+      ws.onerror = () => {
+        try {
+          ws.close()
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    refresh()
+    connect()
+    return () => {
+      cancelled = true
+      if (reconnectTimer != null) window.clearTimeout(reconnectTimer)
+      try {
+        socket?.close()
+      } catch {
+        // ignore
+      }
+    }
+  }, [client, health, sessionId, session?.sandboxBackend])
 
   useEffect(() => {
     try {
@@ -1685,9 +1866,13 @@ export default function App() {
       try {
         const id = projectId ?? activeProjectId ?? null
         const scopeKey = projectTabsKey(id)
+        const preferModal =
+          sandboxSettings?.backend === 'modal' &&
+          sandboxSettings.modalConfigured
         const created = await client.createSession({
           title: 'Untitled session',
-          projectId: id || undefined
+          projectId: id || undefined,
+          sandboxBackend: preferModal ? 'modal' : undefined
         })
         if (id) {
           setProjectScopeId(id)
@@ -1716,6 +1901,41 @@ export default function App() {
         await loadSessions()
         if (id) await loadProjects()
         navigate(`/agents/${created.id}`)
+        if (preferModal) {
+          // Match Modal cloud UX: auto-start in the background.
+          sandboxActionSessionRef.current = created.id
+          setSessionSandboxPhase('starting')
+          void client
+            .startSessionSandbox(created.id)
+            .then(status => {
+              if (sessionIdRef.current === created.id) {
+                setSessionSandboxStatus(status)
+              }
+            })
+            .catch(async cause => {
+              setError(
+                cause instanceof Error
+                  ? cause.message
+                  : 'Unable to start sandbox'
+              )
+              try {
+                const status = await client.getSessionSandbox(created.id)
+                if (sessionIdRef.current === created.id) {
+                  setSessionSandboxStatus(status)
+                }
+              } catch {
+                // ignore refresh failure
+              }
+            })
+            .finally(() => {
+              if (sandboxActionSessionRef.current === created.id) {
+                sandboxActionSessionRef.current = null
+              }
+              if (sessionIdRef.current === created.id) {
+                setSessionSandboxPhase('idle')
+              }
+            })
+        }
       } catch (cause) {
         setError(
           cause instanceof Error ? cause.message : 'Unable to create agent'
@@ -1731,7 +1951,9 @@ export default function App() {
       loadSessions,
       navigate,
       patchChat,
-      patchOpenTabs
+      patchOpenTabs,
+      sandboxSettings?.backend,
+      sandboxSettings?.modalConfigured
     ]
   )
 
@@ -1895,6 +2117,214 @@ export default function App() {
   const selectSessionSpecialist = async (specialistId: string | null) => {
     if (!session) return
     await updateSession(session, { specialistId })
+  }
+
+  const refreshSessionSandbox = useCallback(
+    async (targetSessionId?: string | null) => {
+      const id = targetSessionId ?? sessionId
+      if (!id) {
+        setSessionSandboxStatus(null)
+        return null
+      }
+      try {
+        const status = await client.getSessionSandbox(id)
+        if ((targetSessionId ?? sessionIdRef.current) === id) {
+          setSessionSandboxStatus(status)
+          if (status.status === 'starting') {
+            setSessionSandboxPhase('starting')
+            sandboxActionSessionRef.current = id
+          } else if (status.status === 'stopping') {
+            setSessionSandboxPhase('stopping')
+            sandboxActionSessionRef.current = id
+          } else if (status.status === 'running') {
+            if (sandboxActionSessionRef.current === id) {
+              sandboxActionSessionRef.current = null
+            }
+            setSessionSandboxPhase('idle')
+          } else if (
+            (status.status === 'stopped' ||
+              status.status === 'unavailable' ||
+              status.status === 'ready') &&
+            sandboxActionSessionRef.current !== id
+          ) {
+            setSessionSandboxPhase('idle')
+          }
+        }
+        return status
+      } catch {
+        if ((targetSessionId ?? sessionIdRef.current) === id) {
+          setSessionSandboxStatus(null)
+        }
+        return null
+      }
+    },
+    [client, sessionId]
+  )
+
+  // Safety-net poll while provisioning, matching cloud agent-ide behavior.
+  useEffect(() => {
+    if (!sessionId || !health) return
+    const pending =
+      sessionSandboxPhase !== 'idle' ||
+      sessionSandboxStatus?.status === 'starting' ||
+      sessionSandboxStatus?.status === 'stopping'
+    if (!pending) return
+    const timer = window.setInterval(() => {
+      void refreshSessionSandbox(sessionId)
+    }, 2500)
+    return () => window.clearInterval(timer)
+  }, [
+    health,
+    refreshSessionSandbox,
+    sessionId,
+    sessionSandboxPhase,
+    sessionSandboxStatus?.status
+  ])
+
+  const selectSessionSandboxBackend = async (
+    backend: 'builtin' | 'modal'
+  ) => {
+    if (!session) return
+    const targetId = session.id
+    try {
+      if (backend === 'builtin' && sessionSandboxStatus?.status === 'running') {
+        sandboxActionSessionRef.current = targetId
+        setSessionSandboxPhase('stopping')
+        try {
+          await client.stopSessionSandbox(targetId)
+        } catch {
+          // Best-effort stop when leaving Modal for this chat.
+        } finally {
+          if (sandboxActionSessionRef.current === targetId) {
+            sandboxActionSessionRef.current = null
+          }
+          if (sessionIdRef.current === targetId) {
+            setSessionSandboxPhase('idle')
+          }
+        }
+      }
+      await client.updateSession(targetId, { sandboxBackend: backend })
+      await Promise.all([loadSessions(), loadProjects()])
+      const status = await refreshSessionSandbox(targetId)
+      if (
+        backend === 'modal' &&
+        status?.modalConfigured !== false &&
+        status?.status !== 'running'
+      ) {
+        sandboxActionSessionRef.current = targetId
+        setSessionSandboxPhase('starting')
+        void client
+          .startSessionSandbox(targetId)
+          .then(next => {
+            if (sessionIdRef.current === targetId) {
+              setSessionSandboxStatus(next)
+            }
+          })
+          .catch(cause => {
+            setError(
+              cause instanceof Error
+                ? cause.message
+                : 'Unable to start sandbox'
+            )
+            void refreshSessionSandbox(targetId)
+          })
+          .finally(() => {
+            if (sandboxActionSessionRef.current === targetId) {
+              sandboxActionSessionRef.current = null
+            }
+            if (sessionIdRef.current === targetId) {
+              setSessionSandboxPhase('idle')
+            }
+          })
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Unable to update sandbox backend'
+      )
+      await refreshSessionSandbox(targetId)
+      setSessionSandboxPhase('idle')
+      sandboxActionSessionRef.current = null
+    }
+  }
+
+  const startSessionSandbox = async () => {
+    if (!sessionId) return
+    const targetId = sessionId
+    if (sessionSandboxPhase !== 'idle') return
+    sandboxActionSessionRef.current = targetId
+    setSessionSandboxPhase('starting')
+    try {
+      const status = await client.startSessionSandbox(targetId)
+      if (sessionIdRef.current === targetId) {
+        setSessionSandboxStatus(status)
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to start sandbox'
+      )
+      await refreshSessionSandbox(targetId)
+    } finally {
+      if (sandboxActionSessionRef.current === targetId) {
+        sandboxActionSessionRef.current = null
+      }
+      if (sessionIdRef.current === targetId) {
+        setSessionSandboxPhase('idle')
+      }
+    }
+  }
+
+  const stopSessionSandbox = async () => {
+    if (!sessionId) return
+    const targetId = sessionId
+    if (sessionSandboxPhase !== 'idle') return
+    sandboxActionSessionRef.current = targetId
+    setSessionSandboxPhase('stopping')
+    try {
+      const status = await client.stopSessionSandbox(targetId)
+      if (sessionIdRef.current === targetId) {
+        setSessionSandboxStatus(status)
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to stop sandbox'
+      )
+      await refreshSessionSandbox(targetId)
+    } finally {
+      if (sandboxActionSessionRef.current === targetId) {
+        sandboxActionSessionRef.current = null
+      }
+      if (sessionIdRef.current === targetId) {
+        setSessionSandboxPhase('idle')
+      }
+    }
+  }
+
+  const restartSessionSandbox = async () => {
+    if (!sessionId) return
+    const targetId = sessionId
+    if (sessionSandboxPhase !== 'idle') return
+    sandboxActionSessionRef.current = targetId
+    setSessionSandboxPhase('restarting')
+    try {
+      const status = await client.restartSessionSandbox(targetId)
+      if (sessionIdRef.current === targetId) {
+        setSessionSandboxStatus(status)
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to restart sandbox'
+      )
+      await refreshSessionSandbox(targetId)
+    } finally {
+      if (sandboxActionSessionRef.current === targetId) {
+        sandboxActionSessionRef.current = null
+      }
+      if (sessionIdRef.current === targetId) {
+        setSessionSandboxPhase('idle')
+      }
+    }
   }
 
   const createProject = async (input: {
@@ -2398,7 +2828,57 @@ export default function App() {
   }
 
   if (!health) {
-    const connectError = error ? formatConnectError(error) : null
+    const isLocalBackend = /127\.0\.0\.1|localhost/i.test(backendUrl)
+    const isNetworkFailure =
+      Boolean(error) &&
+      /failed to fetch|networkerror|load failed|network request failed/i.test(
+        error
+      )
+
+    // Local Mac / Vite dashboard: don't show the remote "Connect to backend"
+    // form. Wait for the API, then connect() sends you to Login when auth is on.
+    if (isLocalBackend) {
+      return (
+        <main className="bg-background grid h-full place-items-center p-6">
+          <div className="bg-card w-full max-w-md space-y-4 rounded-xl border p-6 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-lg">
+                <SandwalkMark className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="font-semibold">Sandwalk</h1>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  {connecting || isNetworkFailure
+                    ? 'Waiting for the local agent API…'
+                    : 'Connecting…'}
+                </p>
+              </div>
+              {(connecting || isNetworkFailure) && (
+                <Loader2 className="text-muted-foreground size-5 animate-spin" />
+              )}
+            </div>
+            {error && isNetworkFailure ? (
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                The agent server on {backendUrl} is not reachable. In the menu
+                bar, use Restart (⌘R), or wait — this page retries
+                automatically, then opens login.
+              </p>
+            ) : error ? (
+              <ErrorPage className="text-left" variant="inline" error={error} />
+            ) : null}
+            <Button
+              className="w-full"
+              disabled={connecting}
+              onClick={() => void connect()}
+            >
+              {connecting ? <Loader2 className="animate-spin" /> : null}
+              Retry
+            </Button>
+          </div>
+        </main>
+      )
+    }
+
     return (
       <main className="bg-background grid h-full place-items-center p-6">
         <form
@@ -2430,18 +2910,16 @@ export default function App() {
             onChange={event => setBackendApiKey(event.target.value)}
             placeholder="Backend API key (remote servers only)"
           />
-          {connectError ? (
-            <div
-              role="alert"
-              className="border-destructive/30 bg-destructive/10 mt-3 rounded-lg border px-3 py-2.5"
-            >
-              <p className="text-destructive text-sm font-medium">
-                {connectError.title}
-              </p>
-              <p className="text-destructive/90 mt-1 text-xs leading-relaxed">
-                {connectError.detail}
-              </p>
-            </div>
+          {error ? (
+            <ErrorPage
+              className="mt-3"
+              variant="inline"
+              error={
+                errorStack
+                  ? Object.assign(new Error(error), { stack: errorStack })
+                  : error
+              }
+            />
           ) : null}
           <Button className="mt-4 w-full" disabled={connecting}>
             {connecting ? <Loader2 className="animate-spin" /> : null}
@@ -2947,6 +3425,7 @@ export default function App() {
           isDashboardStatus ||
           isDashboardGeneral ||
           isDashboardAgentRuntime ||
+          isDashboardAgentSandbox ||
           isDashboardModels ||
           isDashboardData ||
           isDashboardTools ||
@@ -2963,6 +3442,10 @@ export default function App() {
               fallback={
                 <DashboardPageSkeleton kind={dashboardSkeletonKind} />
               }
+            >
+            <AppErrorBoundary
+              variant="panel"
+              resetKeys={[dashboardSection, location.pathname]}
             >
             {isDashboardOverview ? (
             <DashboardOverviewView sessions={sessions}>
@@ -3139,6 +3622,37 @@ export default function App() {
                 const next = await client.updateRuntimeSettings(changes)
                 setRuntimeSettings(next)
                 return next
+              }}
+            />
+          ) : isDashboardAgentSandbox ? (
+            <AgentSandboxView
+              connected={Boolean(health)}
+              sandboxSettings={sandboxSettings}
+              modalIntegration={
+                integrations.find(item => item.key === 'modal') || null
+              }
+              onLoadSandboxSettings={async () => {
+                const next = await client.getSandboxSettings()
+                setSandboxSettings(next)
+                return next
+              }}
+              onUpdateSandboxSettings={async changes => {
+                const next = await client.updateSandboxSettings(changes)
+                setSandboxSettings(next)
+                return next
+              }}
+              onProbeSandbox={() => client.probeSandboxSettings()}
+              onSaveModalIntegration={async values => {
+                const next = await client.updateIntegration('modal', values)
+                await loadIntegrations()
+                return next
+              }}
+              onRemoveModalIntegration={async () => {
+                await client.removeIntegration('modal')
+                await loadIntegrations()
+              }}
+              onRefreshIntegrations={async () => {
+                await loadIntegrations()
               }}
             />
           ) : isDashboardModels ? (
@@ -3457,6 +3971,7 @@ export default function App() {
               onDeleteProject={project => void deleteProject(project)}
             />
             ) : null}
+            </AppErrorBoundary>
             </Suspense>
           ) : (
             <ResizablePanelGroup
@@ -3727,6 +4242,8 @@ export default function App() {
                           modelOptions={modelOptions}
                           specialists={specialists}
                           selectedSpecialistId={session?.specialistId ?? null}
+                          sandboxStatus={sessionSandboxStatus}
+                          sandboxPhase={sessionSandboxPhase}
                           showAura={false}
                           onChange={setComposer}
                           onSkillChipsChange={setComposerSkills}
@@ -3755,6 +4272,10 @@ export default function App() {
                           onCreateSpecialist={() =>
                             navigate('/dashboard/specialists/new')
                           }
+                          onSandboxBackendSelect={selectSessionSandboxBackend}
+                          onSandboxStart={() => void startSessionSandbox()}
+                          onSandboxStop={() => void stopSessionSandbox()}
+                          onSandboxRestart={() => void restartSessionSandbox()}
                           onModelSelect={async (provider, model, profileId) => {
                             if (profileId) {
                               try {
@@ -4180,6 +4701,8 @@ export default function App() {
                           modelOptions={modelOptions}
                           specialists={specialists}
                           selectedSpecialistId={session?.specialistId ?? null}
+                          sandboxStatus={sessionSandboxStatus}
+                          sandboxPhase={sessionSandboxPhase}
                           showAura={false}
                           onChange={setComposer}
                           onSkillChipsChange={setComposerSkills}
@@ -4208,6 +4731,10 @@ export default function App() {
                           onCreateSpecialist={() =>
                             navigate('/dashboard/specialists/new')
                           }
+                          onSandboxBackendSelect={selectSessionSandboxBackend}
+                          onSandboxStart={() => void startSessionSandbox()}
+                          onSandboxStop={() => void stopSessionSandbox()}
+                          onSandboxRestart={() => void restartSessionSandbox()}
                           onModelSelect={async (provider, model, profileId) => {
                             if (profileId) {
                               try {

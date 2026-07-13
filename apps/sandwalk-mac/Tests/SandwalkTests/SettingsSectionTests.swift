@@ -24,6 +24,10 @@ final class SettingsSectionTests: XCTestCase {
             SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/runtime")!),
             .runtime
         )
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/sandbox")!),
+            .sandbox
+        )
         XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://settings")!))
         XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/")!))
     }
@@ -31,6 +35,8 @@ final class SettingsSectionTests: XCTestCase {
     func testRuntimeSectionMetadata() {
         XCTAssertEqual(SettingsSection.runtime.title, "Runtime")
         XCTAssertEqual(SettingsSection.runtime.symbol, "cpu")
+        XCTAssertEqual(SettingsSection.sandbox.title, "Sandbox")
+        XCTAssertEqual(SettingsSection.sandbox.symbol, "shippingbox")
     }
 
     func testFromDeepLinkSectionAsHost() {

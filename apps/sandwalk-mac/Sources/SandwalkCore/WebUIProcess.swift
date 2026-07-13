@@ -41,7 +41,7 @@ final class WebUIProcess: @unchecked Sendable {
     private var expectingExit = false
     private var consecutiveFailures = 0
 
-    private let healthInterval: TimeInterval = 2
+    private let startupHealthInterval: TimeInterval = 2
     private let maxHealthFailures = 45 // Vite cold start can be slow
     private let stopGraceSeconds: TimeInterval = 8
 
@@ -50,7 +50,32 @@ final class WebUIProcess: @unchecked Sendable {
     }
 
     func reconfigure(config: AppConfig) {
+        let intervalChanged =
+            self.config.healthCheckIntervalSeconds != config.healthCheckIntervalSeconds
         self.config = config
+        if intervalChanged, case .running = state {
+            startHealthLoop()
+        }
+    }
+
+    func refreshHealthLoop() {
+        switch state {
+        case .running, .starting:
+            startHealthLoop()
+        default:
+            break
+        }
+    }
+
+    private var healthSleepInterval: TimeInterval {
+        switch state {
+        case .starting:
+            return startupHealthInterval
+        default:
+            return TimeInterval(
+                AppConfig.clampHealthCheckInterval(config.healthCheckIntervalSeconds)
+            )
+        }
     }
 
     func start() throws {
@@ -222,7 +247,7 @@ final class WebUIProcess: @unchecked Sendable {
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.tickHealth()
-                try? await Task.sleep(for: .seconds(self.healthInterval))
+                try? await Task.sleep(for: .seconds(self.healthSleepInterval))
             }
         }
     }

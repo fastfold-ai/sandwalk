@@ -291,6 +291,18 @@ DEFAULTS = {
     "sandbox.timeout": 30,
     "sandbox.output_dir": str(Path.cwd() / "outputs"),
     "sandbox.max_retries": 2,
+    # Deepagents filesystem/execute backend: "builtin" (local FilesystemBackend)
+    # or "modal" (langchain-modal ModalSandbox). Domain tools stay on the host.
+    "sandbox.backend": "builtin",
+    "sandbox.modal_app": "sandwalk",
+    "sandbox.cpu_image": "debian_slim",
+    "sandbox.gpu_image": "debian_slim",
+    "sandbox.pip_packages": "pandas,numpy,matplotlib,scipy,pillow",
+    "sandbox.compute_type": "cpu",
+    "sandbox.gpu_class": "T4",
+    "sandbox.cpu_cores": 1.0,
+    "sandbox.ram_gb": 4.0,
+    "sandbox.idle_ttl_seconds": 600,
 
     "agent.max_iterations": 3,
     # Tool-calling strategy for the deepagents runtime: "ptc" (Programmatic Tool
@@ -843,6 +855,22 @@ def _validate_config(config_dict: dict) -> list[str]:
     _check_positive_int("agent.skills.index_snippet_chars", "skills index snippet chars")
     _check_min("agent.synthesis_max_tokens", 512, "synthesis max tokens")
     _check_min("sandbox.timeout", 1, "sandbox timeout")
+
+    backend = str(config_dict.get("sandbox.backend") or "builtin").strip().lower()
+    if backend not in {"builtin", "modal"}:
+        warnings.append(
+            "Invalid sandbox.backend (expected 'builtin' or 'modal'): "
+            f"{config_dict.get('sandbox.backend')!r}"
+        )
+    compute_type = str(config_dict.get("sandbox.compute_type") or "cpu").strip().lower()
+    if compute_type not in {"cpu", "gpu"}:
+        warnings.append(
+            "Invalid sandbox.compute_type (expected 'cpu' or 'gpu'): "
+            f"{config_dict.get('sandbox.compute_type')!r}"
+        )
+    _check_min("sandbox.idle_ttl_seconds", 60, "sandbox idle TTL")
+    _check_min("sandbox.cpu_cores", 0.25, "sandbox CPU cores")
+    _check_min("sandbox.ram_gb", 0.5, "sandbox RAM GB")
 
     # --- Interdependency checks ---
     profile = config_dict.get("agent.profile")

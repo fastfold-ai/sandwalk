@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Box,
   Boxes,
+  Container,
   Cpu,
   Database,
   GitBranch,
@@ -29,6 +30,7 @@ export type DashboardSection =
   | 'status'
   | 'general'
   | 'agent_runtime'
+  | 'agent_sandbox'
   | 'models'
   | 'datasets'
   | 'tools'
@@ -84,6 +86,12 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
         label: 'Runtime',
         path: '/dashboard/agent/runtime',
         icon: Cpu
+      },
+      {
+        id: 'agent_sandbox',
+        label: 'Sandbox',
+        path: '/dashboard/agent/sandbox',
+        icon: Container
       }
     ]
   },

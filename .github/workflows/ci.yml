@@ -55,7 +55,7 @@ jobs:
           # Scoped omit list in pyproject.toml (REPL/CLI entry + agent_server glue)
           # mirrors local-web / Mac unit-testable coverage gates.
           pytest tests/ -q \
-            -m "not data_smoke and not integration" \
+            -m "not data_smoke and not integration and not modal_e2e" \
             --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models \
             --cov=reports --cov=skills --cov=tools --cov=ui \
             --cov-report=term-missing:skip-covered \

@@ -33,7 +33,8 @@ final class AppConfigTests: XCTestCase {
         bindHost: String = "127.0.0.1",
         port: Int = 8787,
         dashboardHost: String = "127.0.0.1",
-        dashboardPort: Int = 8969
+        dashboardPort: Int = 8969,
+        healthCheckIntervalSeconds: Int = AppConfig.defaultHealthCheckIntervalSeconds
     ) -> AppConfig {
         AppConfig(
             bindHost: bindHost,
@@ -41,6 +42,7 @@ final class AppConfigTests: XCTestCase {
             dashboardHost: dashboardHost,
             dashboardPort: dashboardPort,
             autoStartOnLaunch: true,
+            healthCheckIntervalSeconds: healthCheckIntervalSeconds,
             agentCliRoot: nil,
             repoRoot: nil
         )
@@ -93,6 +95,13 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(AppConfig.defaultPort, 8787)
         XCTAssertEqual(AppConfig.defaultDashboardHost, "127.0.0.1")
         XCTAssertEqual(AppConfig.defaultDashboardPort, 8969)
+        XCTAssertEqual(AppConfig.defaultHealthCheckIntervalSeconds, 60)
+    }
+
+    func testClampHealthCheckInterval() {
+        XCTAssertEqual(AppConfig.clampHealthCheckInterval(1), 5)
+        XCTAssertEqual(AppConfig.clampHealthCheckInterval(60), 60)
+        XCTAssertEqual(AppConfig.clampHealthCheckInterval(999), 300)
     }
 
     func testWebHealthURLMatchesDashboardURL() {
@@ -190,6 +199,10 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(network.dashboardHost, "127.0.0.1")
         XCTAssertEqual(network.dashboardPort, 9200)
         XCTAssertEqual(network.autoStartOnLaunch, false)
+        XCTAssertEqual(
+            network.healthCheckIntervalSeconds,
+            AppConfig.defaultHealthCheckIntervalSeconds
+        )
 
         let auth = AuthSettingsStore.load()
         XCTAssertEqual(auth.apiKey, "sk-sandwalk-test")
@@ -206,6 +219,10 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(loaded.dashboardHost, AppConfig.defaultDashboardHost)
         XCTAssertEqual(loaded.dashboardPort, AppConfig.defaultDashboardPort)
         XCTAssertEqual(loaded.autoStartOnLaunch, true)
+        XCTAssertEqual(
+            loaded.healthCheckIntervalSeconds,
+            AppConfig.defaultHealthCheckIntervalSeconds
+        )
     }
 
     func testServerSettingsStoreLoadReturnsEmptyWhenMissingFile() {

@@ -58,6 +58,7 @@ SLASH_COMMANDS = {
     "/skills-upgrade": "Sync the Fastfold catalog and update installed skills",
     "/skills-remove": "Remove a globally-installed skill",
     "/specialist": "Set/list specialists (/specialist <slug> | use|clear|list|show)",
+    "/sandbox": "Sandbox backend (/sandbox builtin|modal|toggle|status)",
     "/model": "Switch LLM model/provider interactively",
     "/settings": "Configure UI and agent preferences",
     "/config": "Show active runtime configuration",
@@ -596,7 +597,9 @@ class InteractiveTerminal:
         self._show_interrupt_hint = False
         self._verbose_hint = None
         self._cli_specialist_label: str | None = None
+        self._cli_sandbox_label: str = "Built-in"
         self._refresh_cli_specialist_label()
+        self._refresh_cli_sandbox_label()
         self._last_response = None  # Last synthesis text for /copy
         self._suggestions = list(DEFAULT_SUGGESTIONS)
         random.shuffle(self._suggestions)
@@ -1175,6 +1178,16 @@ class InteractiveTerminal:
         except Exception:
             self._cli_specialist_label = None
 
+    def _refresh_cli_sandbox_label(self) -> None:
+        """Cache sandbox backend label for the bottom toolbar."""
+        try:
+            from agent.sandbox_manage import sandbox_toolbar_label
+
+            # Always read from disk so /sandbox updates apply immediately.
+            self._cli_sandbox_label = sandbox_toolbar_label()
+        except Exception:
+            self._cli_sandbox_label = "Built-in"
+
     def _model_display_name(self, model_id: str = None) -> str:
         """Get a short display name for a model ID."""
         model_id = model_id or self.session.current_model
@@ -1618,8 +1631,18 @@ class InteractiveTerminal:
                 f' <style fg="#555555" bg="default">·</style> '
                 f'<style fg="#bd93f9" bg="default">{_html_escape(label)}</style>'
             )
+        from html import escape as _html_escape
+
+        sandbox_label = getattr(self, "_cli_sandbox_label", None) or "Built-in"
+        # Built-in is the default — only surface Modal in the toolbar.
+        sandbox = ""
+        if sandbox_label.lower() == "modal":
+            sandbox = (
+                f' <style fg="#555555" bg="default">·</style> '
+                f'<style fg="#ffb86c" bg="default">{_html_escape(sandbox_label)}</style>'
+            )
         return HTML(
-            f'<style fg="#8be9fd" bg="default">{model}</style>{specialist}{verbose}{plan}'
+            f'<style fg="#8be9fd" bg="default">{model}</style>{specialist}{sandbox}{verbose}{plan}'
             '<style fg="#555555" bg="default"> · ? for commands · Ctrl+O verbose</style>'
         )
 
@@ -1769,6 +1792,10 @@ class InteractiveTerminal:
                 continue
             if cmd_head in ("specialist", "/specialist"):
                 self._handle_specialist_command(query)
+                self._advance_suggestion()
+                continue
+            if cmd_head in ("sandbox", "/sandbox"):
+                self._handle_sandbox_command(query)
                 self._advance_suggestion()
                 continue
             if cmd_head in ("data", "/data"):
@@ -1954,6 +1981,15 @@ class InteractiveTerminal:
                 run_context = apply_specialist_to_context(run_context, active)
         except Exception:  # noqa: BLE001
             pass
+
+        # Prefer the CLI-selected sandbox backend for this run.
+        try:
+            from agent.sandbox_manage import get_sandbox_backend
+
+            run_context["sandbox_backend"] = get_sandbox_backend()
+            self._refresh_cli_sandbox_label()
+        except Exception:  # noqa: BLE001
+            run_context.setdefault("sandbox_backend", "builtin")
 
         # Extract @mentions and inject into context
         cleaned_query, mention_tools, mention_datasets, mention_workflows = extract_mentions(query)
@@ -3794,6 +3830,14 @@ class InteractiveTerminal:
             parts = parts[1:]
         handle_specialist_argv(parts or ["list"], self.console)
         self._refresh_cli_specialist_label()
+
+    def _handle_sandbox_command(self, query: str) -> None:
+        """Handle /sandbox — toggle Built-in vs Modal backend."""
+        from agent.sandbox_manage import handle_sandbox_argv
+
+        parts = query.strip().split()
+        handle_sandbox_argv(parts or ["status"], self.console)
+        self._refresh_cli_sandbox_label()
 
     def _handle_keys_command(self, query: str) -> None:
         """Handle /keys with optional compatible-profile actions."""

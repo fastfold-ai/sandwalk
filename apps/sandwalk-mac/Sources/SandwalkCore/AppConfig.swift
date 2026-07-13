@@ -7,6 +7,9 @@ struct AppConfig: Equatable, Sendable {
     var dashboardHost: String
     var dashboardPort: Int
     var autoStartOnLaunch: Bool
+    /// How often the menubar probes `/v1/health` while the API is running.
+    /// Cold-start still uses a short interval so Start stays responsive.
+    var healthCheckIntervalSeconds: Int
     /// Monorepo `cli/` directory (Python package).
     var agentCliRoot: URL?
     /// Monorepo root (contains `apps/`, `cli/`, `package.json`).
@@ -16,6 +19,16 @@ struct AppConfig: Equatable, Sendable {
     static let defaultPort = 8787
     static let defaultDashboardHost = "127.0.0.1"
     static let defaultDashboardPort = 8969
+    static let defaultHealthCheckIntervalSeconds = 60
+    static let minHealthCheckIntervalSeconds = 5
+    static let maxHealthCheckIntervalSeconds = 300
+
+    static func clampHealthCheckInterval(_ seconds: Int) -> Int {
+        min(
+            max(seconds, minHealthCheckIntervalSeconds),
+            maxHealthCheckIntervalSeconds
+        )
+    }
 
     var dashboardURL: URL {
         URL(string: "http://\(dashboardConnectableHost):\(dashboardPort)/")!
@@ -100,6 +113,14 @@ struct AppConfig: Equatable, Sendable {
             }
             return saved.autoStartOnLaunch ?? true
         }()
+        let healthInterval: Int = {
+            if let raw = env["SANDWALK_HEALTH_INTERVAL"], let value = Int(raw) {
+                return clampHealthCheckInterval(value)
+            }
+            return clampHealthCheckInterval(
+                saved.healthCheckIntervalSeconds ?? defaultHealthCheckIntervalSeconds
+            )
+        }()
         let repoRoot = env["SANDWALK_REPO_ROOT"].map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
         } ?? discoverRepoRoot()
@@ -114,6 +135,7 @@ struct AppConfig: Equatable, Sendable {
             dashboardHost: dashHost,
             dashboardPort: dashPort,
             autoStartOnLaunch: autoStart,
+            healthCheckIntervalSeconds: healthInterval,
             agentCliRoot: cliRoot,
             repoRoot: repoRoot
         )
@@ -127,7 +149,8 @@ struct AppConfig: Equatable, Sendable {
                 port: port,
                 dashboardHost: dashboardHost,
                 dashboardPort: dashboardPort,
-                autoStartOnLaunch: autoStartOnLaunch
+                autoStartOnLaunch: autoStartOnLaunch,
+                healthCheckIntervalSeconds: healthCheckIntervalSeconds
             )
         )
     }
@@ -198,6 +221,7 @@ struct ServerNetworkSettings: Equatable, Sendable {
     var dashboardHost: String?
     var dashboardPort: Int?
     var autoStartOnLaunch: Bool?
+    var healthCheckIntervalSeconds: Int?
 }
 
 enum ServerSettingsStore {
@@ -219,7 +243,8 @@ enum ServerSettingsStore {
             port: server["port"] as? Int,
             dashboardHost: server["dashboard_host"] as? String,
             dashboardPort: server["dashboard_port"] as? Int,
-            autoStartOnLaunch: server["auto_start"] as? Bool
+            autoStartOnLaunch: server["auto_start"] as? Bool,
+            healthCheckIntervalSeconds: server["health_check_interval_seconds"] as? Int
         )
     }
 
@@ -241,6 +266,9 @@ enum ServerSettingsStore {
             "dashboard_host": settings.dashboardHost ?? AppConfig.defaultDashboardHost,
             "dashboard_port": settings.dashboardPort ?? AppConfig.defaultDashboardPort,
             "auto_start": settings.autoStartOnLaunch ?? true,
+            "health_check_interval_seconds": AppConfig.clampHealthCheckInterval(
+                settings.healthCheckIntervalSeconds ?? AppConfig.defaultHealthCheckIntervalSeconds
+            ),
         ]
         let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: url, options: .atomic)

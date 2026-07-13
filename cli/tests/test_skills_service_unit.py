@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from urllib.error import HTTPError
 
 from agent_server.skills_service import SkillsService
 
@@ -228,6 +229,78 @@ def test_skills_sh_token_missing(monkeypatch):
         lambda: MagicMock(get=lambda key, default=None: default),
     )
     monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+    monkeypatch.setattr(
+        "agent_server.skills_service.SkillsService._refresh_vercel_oidc_token",
+        classmethod(lambda cls: (_ for _ in ()).throw(RuntimeError("no vercel"))),
+    )
     svc = SkillsService()
     with pytest.raises(RuntimeError, match="Vercel"):
         svc._skills_sh_token()
+
+
+def test_skills_sh_token_refreshes_expired_jwt(monkeypatch):
+    import base64
+    import json
+    import time
+
+    payload = base64.urlsafe_b64encode(
+        json.dumps({"exp": int(time.time()) - 60}).encode()
+    ).decode().rstrip("=")
+    expired = f"aaa.{payload}.bbb"
+    monkeypatch.setattr(
+        "agent_server.skills_service.Config.load",
+        lambda: MagicMock(get=lambda key, default=None: expired if key == "api.vercel_oidc_token" else default),
+    )
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+    monkeypatch.setattr(
+        "agent_server.skills_service.SkillsService._refresh_vercel_oidc_token",
+        classmethod(lambda cls: "fresh-token"),
+    )
+    assert SkillsService._skills_sh_token() == "fresh-token"
+
+
+def test_skills_sh_request_retries_after_401(monkeypatch):
+    svc = SkillsService()
+    calls = {"n": 0}
+
+    class FakeHTTPError(HTTPError):
+        def __init__(self):
+            super().__init__(
+                url="https://skills.sh/x",
+                code=401,
+                msg="Unauthorized",
+                hdrs=None,
+                fp=None,
+            )
+
+        def read(self):
+            return b'{"error":"authentication_required"}'
+
+    def fake_urlopen(request, timeout=8):  # noqa: ARG001
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise FakeHTTPError()
+
+        class Resp:
+            def read(self):
+                return b'{"data":[]}'
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        return Resp()
+
+    monkeypatch.setattr(
+        "agent_server.skills_service.SkillsService._skills_sh_token",
+        classmethod(lambda cls, force_refresh=False: "tok"),
+    )
+    monkeypatch.setattr("agent_server.skills_service.urlopen", fake_urlopen)
+    payload = svc._skills_sh_request_json(
+        "https://skills.sh/api/v1/skills/search?q=fold",
+        operation="skills.sh search",
+    )
+    assert payload == {"data": []}
+    assert calls["n"] == 2

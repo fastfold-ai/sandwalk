@@ -47,11 +47,11 @@ Working directory: `cli/`
 cd cli
 uv sync --extra dev --extra all --extra api   # or: python -m venv .venv && pip install -e ".[dev,all,api]"
 .venv/bin/python -m pytest tests/ -q \
-  -m "not data_smoke and not integration"
+  -m "not data_smoke and not integration and not modal_e2e"
 
 # With coverage (matches CI)
 .venv/bin/python -m pytest tests/ -q \
-  -m "not data_smoke and not integration" \
+  -m "not data_smoke and not integration and not modal_e2e" \
   --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models \
   --cov=reports --cov=skills --cov=tools --cov=ui \
   --cov-report=term-missing:skip-covered \
@@ -67,6 +67,18 @@ uv sync --extra dev --extra all --extra api   # or: python -m venv .venv && pip 
 .venv/bin/coverage xml -o coverage-agent-cli.xml --omit='*/agent_server/*'
 .venv/bin/coverage xml -o coverage-agent-server.xml --include='*/agent_server/*' \
   --omit='*/agent_server/pty_manager.py,*/agent_server/app.py,*/agent_server/main.py,*/agent_server/mcp_service.py,*/agent_server/service.py,*/agent_server/default_specialists.py'
+```
+
+### Modal sandbox E2E
+
+Live Modal verification is **opt-in** (creates a short-lived sandbox):
+
+```bash
+export MODAL_TOKEN_ID=...
+export MODAL_TOKEN_SECRET=...
+pip install -e ".[modal]"   # from cli/
+sandwalk sandbox probe
+.venv/bin/python -m pytest tests/test_modal_sandbox_e2e.py -m modal_e2e -v
 ```
 
 **What counts toward 80%:** statement coverage with an omit list in

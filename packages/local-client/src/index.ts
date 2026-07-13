@@ -40,6 +40,9 @@ import type {
   StorageReport,
   ModelsProvider,
   RuntimeSettings,
+  SandboxProbeReport,
+  SandboxSettings,
+  SessionSandboxStatus,
   SettingsProvider,
   SkillProvider,
   ToolBatchAction,
@@ -83,14 +86,17 @@ export class LocalAgentClient
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await fetch(`${this.baseUrl}/v1${path}`, {
+    const url = `${this.baseUrl}/v1${path}`
+    const response = await fetch(url, {
       ...init,
       credentials: 'include',
       headers: this.headers(init.headers),
     })
     if (!response.ok) {
       const detail = await response.text()
-      throw new Error(`FastFold Agent API ${response.status}: ${detail || response.statusText}`)
+      throw new Error(
+        `FastFold Agent API ${response.status}: ${detail || response.statusText} [${init.method || 'GET'} ${url}]`,
+      )
     }
     if (response.status === 204) {
       return undefined as T
@@ -207,6 +213,7 @@ export class LocalAgentClient
   ): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`${this.baseUrl}/v1/doctor/diagnostics`, {
       method: 'POST',
+      credentials: 'include',
       headers: this.headers({ 'content-type': 'application/json' }),
       body: JSON.stringify({ uiDiagnostics: uiDiagnostics ?? null }),
       signal,
@@ -406,6 +413,7 @@ export class LocalAgentClient
       workspacePath?: string | null
       projectId?: string | null
       specialistId?: string | null
+      sandboxBackend?: 'builtin' | 'modal' | null
     },
     signal?: AbortSignal,
   ): Promise<AgentSession> {
@@ -416,6 +424,7 @@ export class LocalAgentClient
         workspace_path: input.workspacePath,
         project_id: input.projectId,
         specialist_id: input.specialistId,
+        sandbox_backend: input.sandboxBackend,
       }),
       headers: { 'content-type': 'application/json' },
       signal,
@@ -429,6 +438,7 @@ export class LocalAgentClient
       organizeLabel?: 'pinned' | 'archive' | null
       projectId?: string | null
       specialistId?: string | null
+      sandboxBackend?: 'builtin' | 'modal' | null
     },
     signal?: AbortSignal,
   ): Promise<AgentSession> {
@@ -442,10 +452,61 @@ export class LocalAgentClient
         clear_project_id: input.projectId === null,
         specialist_id: input.specialistId ?? undefined,
         clear_specialist_id: input.specialistId === null,
+        sandbox_backend: input.sandboxBackend ?? undefined,
+        clear_sandbox_backend: input.sandboxBackend === null,
       }),
       headers: { 'content-type': 'application/json' },
       signal,
     })
+  }
+
+  getSessionSandbox(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<SessionSandboxStatus> {
+    return this.request<SessionSandboxStatus>(
+      `/sessions/${encodeURIComponent(sessionId)}/sandbox`,
+      { signal },
+    )
+  }
+
+  sandboxStreamUrl(sessionId: string): string {
+    const base = this.baseUrl.replace(/^http/, 'ws')
+    const url = new URL(
+      `${base}/v1/sessions/${encodeURIComponent(sessionId)}/sandbox/stream`,
+    )
+    if (this.apiKey) url.searchParams.set('token', this.apiKey)
+    return url.toString()
+  }
+
+  startSessionSandbox(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<SessionSandboxStatus> {
+    return this.request<SessionSandboxStatus>(
+      `/sessions/${encodeURIComponent(sessionId)}/sandbox/start`,
+      { method: 'POST', signal },
+    )
+  }
+
+  stopSessionSandbox(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<SessionSandboxStatus> {
+    return this.request<SessionSandboxStatus>(
+      `/sessions/${encodeURIComponent(sessionId)}/sandbox/stop`,
+      { method: 'POST', signal },
+    )
+  }
+
+  restartSessionSandbox(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<SessionSandboxStatus> {
+    return this.request<SessionSandboxStatus>(
+      `/sessions/${encodeURIComponent(sessionId)}/sandbox/restart`,
+      { method: 'POST', signal },
+    )
   }
 
   autoTitleSession(
@@ -614,6 +675,7 @@ export class LocalAgentClient
       `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/files/content`,
       {
         method: 'PUT',
+        credentials: 'include',
         body: JSON.stringify({
           path: input.path,
           content: input.content,
@@ -647,6 +709,7 @@ export class LocalAgentClient
       `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/files/upload`,
       {
         method: 'POST',
+        credentials: 'include',
         body: form,
         headers: this.headers(),
         signal,
@@ -798,6 +861,7 @@ export class LocalAgentClient
     form.append('file', file)
     const response = await fetch(`${this.baseUrl}/v1/skills/upload`, {
       method: 'POST',
+      credentials: 'include',
       body: form,
       headers: this.headers(),
       signal,
@@ -917,6 +981,40 @@ export class LocalAgentClient
         tool_health_suppress_seconds: changes.toolHealthSuppressSeconds,
       }),
       headers: { 'content-type': 'application/json' },
+      signal,
+    })
+  }
+
+  getSandboxSettings(signal?: AbortSignal): Promise<SandboxSettings> {
+    return this.request<SandboxSettings>('/settings/sandbox', { signal })
+  }
+
+  updateSandboxSettings(
+    changes: Partial<SandboxSettings>,
+    signal?: AbortSignal,
+  ): Promise<SandboxSettings> {
+    return this.request<SandboxSettings>('/settings/sandbox', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        backend: changes.backend,
+        modal_app: changes.modalApp,
+        cpu_image: changes.cpuImage,
+        gpu_image: changes.gpuImage,
+        pip_packages: changes.pipPackages,
+        compute_type: changes.computeType,
+        gpu_class: changes.gpuClass,
+        cpu_cores: changes.cpuCores,
+        ram_gb: changes.ramGb,
+        idle_ttl_seconds: changes.idleTtlSeconds,
+      }),
+      headers: { 'content-type': 'application/json' },
+      signal,
+    })
+  }
+
+  probeSandboxSettings(signal?: AbortSignal): Promise<SandboxProbeReport> {
+    return this.request<SandboxProbeReport>('/settings/sandbox/probe', {
+      method: 'POST',
       signal,
     })
   }

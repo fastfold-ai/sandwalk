@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 
 import App from './App.tsx'
+import { AppErrorBoundary } from './components/AppErrorBoundary.tsx'
 import { Toaster } from './components/ui/sonner.tsx'
 import { applyPalette, applyTheme, getStoredPalette, getStoredTheme, watchSystemTheme } from './lib/theme.ts'
 
@@ -15,7 +16,9 @@ watchSystemTheme()
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <AppErrorBoundary>
+        <App />
+      </AppErrorBoundary>
       <Toaster richColors closeButton position="top-center" />
     </BrowserRouter>
   </StrictMode>

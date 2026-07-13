@@ -736,7 +736,6 @@ class AgentRunner:
 
         try:
             from deepagents import create_deep_agent
-            from deepagents.backends import FilesystemBackend
 
             from agent.deepagents_runtime import (
                 build_chat_model,
@@ -773,6 +772,7 @@ class AgentRunner:
             self._active_spinner = thinking_status
 
         try:
+            sandbox_handle = None
             # ----- Model -----
             try:
                 model = build_chat_model(config)
@@ -908,12 +908,30 @@ class AgentRunner:
             workspace_root = str(ctx.get("workspace_path") or "").strip()
             if not workspace_root:
                 workspace_root = str(Path.cwd().resolve())
-            backend = FilesystemBackend(root_dir=workspace_root, virtual_mode=False)
+            session_id = str(
+                ctx.get("session_id")
+                or getattr(self.trajectory, "session_id", "")
+                or ""
+            ).strip() or None
+            backend_override = str(ctx.get("sandbox_backend") or "").strip().lower() or None
+            if backend_override not in {"builtin", "modal"}:
+                backend_override = None
+            from agent.sandbox_backend import resolve_deepagents_backend
+
+            sandbox_handle = resolve_deepagents_backend(
+                config,
+                session_id=session_id,
+                workspace_root=workspace_root,
+                skill_source_dirs=skills_sources,
+                backend_override=backend_override,
+            )
+            backend = sandbox_handle.backend
+            agent_skills = sandbox_handle.skills_sources or None
             agent = create_deep_agent(
                 model=model,
                 tools=tools,
                 system_prompt=system_prompt,
-                skills=skills_sources or None,
+                skills=agent_skills,
                 backend=backend,
             )
 
@@ -956,6 +974,11 @@ class AgentRunner:
                 tool_detail_limit=int(config.get("agent.tool_trace_detail_limit", 8)),
             )
             thinking_status = None  # consumed by process_events
+            if sandbox_handle is not None and sandbox_handle.kind == "modal":
+                try:
+                    sandbox_handle.pull()
+                except Exception as pull_exc:  # noqa: BLE001
+                    logger.warning("Modal workspace pull failed: %s", pull_exc)
         except Exception as e:  # noqa: BLE001
             duration = time.time() - t0
             if thinking_status is not None:

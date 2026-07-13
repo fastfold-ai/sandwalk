@@ -213,6 +213,16 @@ enum SandwalkAPIClient {
         try await patch("/v1/settings/runtime", body: changes)
     }
 
+    // MARK: - Sandbox settings
+
+    static func getSandboxSettings() async throws -> SandboxSettingsDTO {
+        try await get("/v1/settings/sandbox")
+    }
+
+    static func updateSandboxSettings(_ changes: [String: Any]) async throws -> SandboxSettingsDTO {
+        try await patch("/v1/settings/sandbox", body: changes)
+    }
+
     // MARK: - Doctor / Storage / Environment
 
     static func runDoctor() async throws -> DoctorReportDTO {
