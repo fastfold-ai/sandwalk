@@ -15,6 +15,7 @@ import {
   getStoredPalette,
   getStoredTheme,
   PALETTE_CHANGE_EVENT,
+  previewPalette,
   THEME_CHANGE_EVENT,
   THEME_PALETTES,
   type ThemeMode,
@@ -53,13 +54,19 @@ export function ThemeToggle() {
   const activePalette =
     THEME_PALETTES.find(item => item.id === palette) ?? THEME_PALETTES[0]
 
+  const restorePalette = () => previewPalette(getStoredPalette())
+
   return (
     <div
       className="fixed right-4 bottom-4 z-50 flex items-center gap-0.5 rounded-lg p-1"
       role="group"
       aria-label="Theme"
     >
-      <DropdownMenu>
+      <DropdownMenu
+        onOpenChange={open => {
+          if (!open) restorePalette()
+        }}
+      >
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -86,6 +93,8 @@ export function ThemeToggle() {
           side="top"
           sideOffset={10}
           className="bg-card w-64 rounded-xl border p-1.5 shadow-xl"
+          onPointerLeave={restorePalette}
+          onCloseAutoFocus={restorePalette}
         >
           <DropdownMenuLabel className="text-muted-foreground px-2 py-1.5 text-xs font-medium">
             Color palette
@@ -97,6 +106,8 @@ export function ThemeToggle() {
               <DropdownMenuItem
                 key={item.id}
                 className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2.5 py-2"
+                onPointerEnter={() => previewPalette(item.id)}
+                onFocus={() => previewPalette(item.id)}
                 onClick={() => applyPalette(item.id)}
               >
                 <span className="mt-0.5 flex shrink-0 items-center gap-0.5">

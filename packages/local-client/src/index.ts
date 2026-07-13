@@ -478,6 +478,14 @@ export class LocalAgentClient
     return result.data
   }
 
+  async listEventHistory(sessionId: string, signal?: AbortSignal): Promise<AgentEvent[]> {
+    const result = await this.request<{ data: AgentEvent[] }>(
+      `/sessions/${encodeURIComponent(sessionId)}/events/history`,
+      { signal },
+    )
+    return result.data
+  }
+
   async getMessageFeedback(
     sessionId: string,
     signal?: AbortSignal,
@@ -896,6 +904,16 @@ export class LocalAgentClient
         openai_base_url: changes.openaiBaseUrl,
         agent_profile: changes.agentProfile,
         tool_mode: changes.toolMode,
+        recursion_limit: changes.recursionLimit,
+        max_sdk_turns: changes.maxSdkTurns,
+        group_tool_traces: changes.groupToolTraces,
+        tool_trace_detail_limit: changes.toolTraceDetailLimit,
+        background_watch_timeout_s: changes.backgroundWatchTimeoutS,
+        interrupt_drain_timeout_s: changes.interruptDrainTimeoutS,
+        parallel_max_threads: changes.parallelMaxThreads,
+        tool_health_enabled: changes.toolHealthEnabled,
+        tool_health_fail_threshold: changes.toolHealthFailThreshold,
+        tool_health_suppress_seconds: changes.toolHealthSuppressSeconds,
       }),
       headers: { 'content-type': 'application/json' },
       signal,

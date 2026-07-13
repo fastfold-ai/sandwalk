@@ -266,6 +266,10 @@ class MessageList(ApiModel):
     feedback: dict[str, Literal["up", "down"]] = Field(default_factory=dict)
 
 
+class EventList(ApiModel):
+    data: list[EventEnvelope]
+
+
 class DeleteSessionResponse(ApiModel):
     deleted: bool = True
 
@@ -495,6 +499,16 @@ class RuntimeSettings(ApiModel):
     openai_base_url: str | None = None
     agent_profile: str
     tool_mode: str
+    recursion_limit: int = 120
+    max_sdk_turns: int = 30
+    group_tool_traces: bool = True
+    tool_trace_detail_limit: int = 1
+    background_watch_timeout_s: int = 7200
+    interrupt_drain_timeout_s: int = 10
+    parallel_max_threads: int = 5
+    tool_health_enabled: bool = True
+    tool_health_fail_threshold: int = 2
+    tool_health_suppress_seconds: int = 900
 
 
 class UpdateRuntimeSettingsRequest(ApiModel):
@@ -503,6 +517,16 @@ class UpdateRuntimeSettingsRequest(ApiModel):
     openai_base_url: str | None = None
     agent_profile: str | None = None
     tool_mode: str | None = None
+    recursion_limit: int | None = None
+    max_sdk_turns: int | None = None
+    group_tool_traces: bool | None = None
+    tool_trace_detail_limit: int | None = None
+    background_watch_timeout_s: int | None = None
+    interrupt_drain_timeout_s: int | None = None
+    parallel_max_threads: int | None = None
+    tool_health_enabled: bool | None = None
+    tool_health_fail_threshold: int | None = None
+    tool_health_suppress_seconds: int | None = None
 
 
 class AccountUser(ApiModel):

@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Box,
   Boxes,
+  Cpu,
   Database,
   HardDrive,
   LayoutDashboard,
@@ -27,6 +28,7 @@ export type DashboardSection =
   | 'overview'
   | 'status'
   | 'general'
+  | 'agent_runtime'
   | 'models'
   | 'datasets'
   | 'tools'
@@ -71,6 +73,17 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
         label: 'General',
         path: '/dashboard/general',
         icon: Settings2
+      }
+    ]
+  },
+  {
+    label: 'Agent',
+    items: [
+      {
+        id: 'agent_runtime',
+        label: 'Runtime',
+        path: '/dashboard/agent/runtime',
+        icon: Cpu
       }
     ]
   },

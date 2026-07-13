@@ -34,6 +34,7 @@ htmlcov/
 .pytest_cache/
 exports/
 outputs/
+artifacts/
 *.faa
 *.mafft
 *.clipkit.treefile

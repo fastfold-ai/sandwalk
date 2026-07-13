@@ -1,11 +1,5 @@
 import type { AccountSummary } from '@sandwalk/agent-ui-core'
-import {
-  Check,
-  ExternalLink,
-  Loader2,
-  LogOut,
-  RefreshCw
-} from 'lucide-react'
+import { Check, ExternalLink, Loader2, LogOut, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -30,6 +24,7 @@ import {
   applyPalette,
   getStoredPalette,
   PALETTE_CHANGE_EVENT,
+  previewPalette,
   THEME_PALETTES,
   type ThemePaletteId
 } from '@/lib/theme'
@@ -273,6 +268,10 @@ export function GeneralView({
                   key={item.id}
                   type="button"
                   onClick={() => applyPalette(item.id)}
+                  onPointerEnter={() => previewPalette(item.id)}
+                  onPointerLeave={() => previewPalette(getStoredPalette())}
+                  onFocus={() => previewPalette(item.id)}
+                  onBlur={() => previewPalette(getStoredPalette())}
                   className={cn(
                     'bg-card hover:bg-muted/40 relative flex flex-col gap-3 rounded-xl border p-4 text-left transition-colors',
                     selected

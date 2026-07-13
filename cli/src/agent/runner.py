@@ -107,6 +107,15 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             "Try again shortly, or switch models/providers with `/model`.",
         )
 
+    if "recursion" in low and "limit" in low:
+        return (
+            "Agent step limit reached",
+            "This run used too many tool steps for the current recursion limit.\n"
+            "Raise it, then retry:\n"
+            "  • sandwalk config set agent.recursion_limit 200\n"
+            "  • or Dashboard → Agent → Runtime in the Mac/web app",
+        )
+
     # Keep OpenAI-compatible failures concise (including custom providers like
     # Ollama/LM Studio/proxy gateways) instead of printing deep tracebacks.
     if (
@@ -824,11 +833,43 @@ class AgentRunner:
                 exclude_categories=exclude_cats,
                 project_context=ctx.get("project_context"),
                 specialist_instructions=ctx.get("specialist_instructions"),
+                workspace_path=ctx.get("workspace_path"),
             )
 
             # ----- User prompt -----
             user_prompt = query
             context_parts = []
+            workspace_path = str(ctx.get("workspace_path") or "").strip()
+            if not workspace_path and self.trajectory is not None:
+                session_id = str(
+                    getattr(self.trajectory, "session_id", "") or ""
+                ).strip()
+                if session_id:
+                    try:
+                        from agent_server.service import resolve_session_workspace
+                        from agent_server.store import AgentStore
+
+                        workspace_path = str(
+                            resolve_session_workspace(
+                                session_id, store=AgentStore(), persist=True
+                            )
+                        )
+                        ctx = {**ctx, "workspace_path": workspace_path}
+                    except Exception:
+                        workspace_path = ""
+            if workspace_path:
+                # Align shell/skill subprocesses with the UI file tree.
+                os.environ["SANDWALK_SESSION_WORKSPACE"] = workspace_path
+                Path(workspace_path).joinpath("artifacts").mkdir(
+                    parents=True, exist_ok=True
+                )
+                Path(workspace_path).joinpath("outputs").mkdir(
+                    parents=True, exist_ok=True
+                )
+                context_parts.append(
+                    "Session workspace (save ALL downloads/writes here — use this "
+                    f"absolute path): {workspace_path}"
+                )
             if ctx.get("compound_smiles"):
                 context_parts.append(f"Compound SMILES: {ctx['compound_smiles']}")
             if ctx.get("target"):
@@ -861,7 +902,11 @@ class AgentRunner:
                 )
             else:
                 skills_sources = skill_source_dirs()
-            workspace_root = str(ctx.get("workspace_path") or "/").strip() or "/"
+            # Never root filesystem tools at "/" — relative paths like
+            # ./artifacts/... would resolve to /artifacts/... and fail.
+            workspace_root = str(ctx.get("workspace_path") or "").strip()
+            if not workspace_root:
+                workspace_root = str(Path.cwd().resolve())
             backend = FilesystemBackend(root_dir=workspace_root, virtual_mode=False)
             agent = create_deep_agent(
                 model=model,
@@ -877,8 +922,15 @@ class AgentRunner:
             )
             trace_events: list[dict] | None = [] if self.trace_store is not None else None
 
-            max_turns = int(config.get("agent.max_sdk_turns", 30))
-            recursion_limit = max(25, max_turns * 2 + 10)
+            max_turns = int(config.get("agent.max_sdk_turns", 30) or 30)
+            raw_recursion = config.get("agent.recursion_limit")
+            if raw_recursion is None or str(raw_recursion).strip() == "":
+                recursion_limit = max(25, max_turns * 2 + 10)
+            else:
+                try:
+                    recursion_limit = max(25, int(raw_recursion))
+                except (TypeError, ValueError):
+                    recursion_limit = max(25, max_turns * 2 + 10)
             model_name = config.get("llm.model") or (
                 "claude-sonnet-4-5-20250929" if provider == "anthropic" else "gpt-4o"
             )

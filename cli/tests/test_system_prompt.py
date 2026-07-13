@@ -42,6 +42,23 @@ class TestSystemPrompt:
         assert "L1000 data available" in prompt
         assert "prior question" in prompt
 
+    @patch("agent.system_prompt._load_installed_skills", return_value="")
+    def test_build_includes_session_workspace(self, mock_skills):
+        session = type("Session", (), {"config": type("Cfg", (), {
+            "get": lambda self, key, default=None: default,
+        })()})()
+        prompt = build_system_prompt(
+            session,
+            include_skills=False,
+            runtime="deepagents",
+            workspace_path="/tmp/sandwalk-session-ws",
+        )
+        assert "/tmp/sandwalk-session-ws" in prompt
+        assert "Session workspace" in prompt or "Session Workspace" in prompt
+        assert "absolute" in prompt.lower()
+        assert "download" in prompt.lower() or "write" in prompt.lower()
+        assert "do not" in prompt.lower() or "Do not" in prompt
+
     def test_load_installed_skills_uses_configured_budgets(self):
         config = type("Cfg", (), {
             "get": lambda self, key, default=None: {

@@ -69,6 +69,22 @@ def run_server(
 
     from agent_server.app import create_app
 
+    # Match CLI Session: expose ~/.fastfold-cli config credentials to process env
+    # so shell/skill subprocesses and PTYs see the same keys as interactive CLI.
+    try:
+        from agent.config import sync_process_env_from_config
+
+        applied = sync_process_env_from_config()
+        if applied:
+            import logging
+
+            logging.getLogger("agent_server").info(
+                "Synced %d credential(s) from config into process env",
+                len(applied),
+            )
+    except Exception:
+        pass
+
     # Persist bind options so Status → Restart can re-launch the same server.
     os.environ["FASTFOLD_SERVE_HOST"] = host
     os.environ["FASTFOLD_SERVE_PORT"] = str(port)

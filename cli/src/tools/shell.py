@@ -4,12 +4,26 @@ Shell execution tool for ct.
 Run shell commands from within ct research workflows with safety restrictions.
 """
 
+import os
 import re
 import shlex
 import subprocess
 from pathlib import Path
 
 from tools import registry
+
+# Expand $VAR / ${VAR} in argv when shell=False (subprocess does not).
+_ENV_VAR_PATTERN = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
+
+
+def _expand_env_refs(token: str) -> str:
+    """Replace ``$VAR`` / ``${VAR}`` with values from ``os.environ`` (empty if unset)."""
+
+    def _replace(match: re.Match[str]) -> str:
+        name = match.group(1) or match.group(2)
+        return os.environ.get(name, "")
+
+    return _ENV_VAR_PATTERN.sub(_replace, token)
 
 # Commands/patterns that are never allowed
 _BLOCKED_PATTERNS = (
@@ -130,8 +144,10 @@ def _is_blocked(command: str) -> str | None:
     usage_guide=(
         "Use to run a single shell command: scripts, data processing, git, pip, etc. "
         "Set working_dir to run from a directory (e.g. a skill folder) instead of "
-        "'cd ... &&'. Dangerous commands and shell operators (multi-command chaining, "
-        "redirection) are blocked for safety."
+        "'cd ... &&'. Environment variables like $FASTFOLD_API_KEY are expanded. "
+        "Dangerous commands and shell operators (multi-command chaining, "
+        "redirection) are blocked for safety. Prefer printenv NAME to check whether "
+        "a credential is set (do not print secret values into the chat)."
     ),
 )
 def shell_run(command: str, working_dir: str = None, timeout: int = 30, **kwargs) -> dict:
@@ -158,17 +174,29 @@ def shell_run(command: str, working_dir: str = None, timeout: int = 30, **kwargs
                 "exit_code": -1,
             }
         cwd = candidate
+    else:
+        # Prefer the chat session workspace (UI file tree) when set by the agent server.
+        session_ws = str(os.environ.get("SANDWALK_SESSION_WORKSPACE") or "").strip()
+        if session_ws:
+            candidate = Path(session_ws).expanduser()
+            if candidate.is_dir():
+                cwd = candidate
 
     # Cap timeout
     timeout = min(max(timeout, 1), 300)
 
-    # Use shell=True for pipe commands, shell=False otherwise
+    # Use shell=True for pipe commands, shell=False otherwise.
+    # Without a shell, `$VAR` is not expanded — expand from os.environ so
+    # checks like `echo $FASTFOLD_API_KEY` / skill scripts see real values.
     use_shell = "|" in command
     if use_shell:
         run_args = command
     else:
         try:
-            run_args = shlex.split(command, posix=True)
+            run_args = [
+                _expand_env_refs(token)
+                for token in shlex.split(command, posix=True)
+            ]
         except ValueError as e:
             return {
                 "summary": f"Invalid command syntax: {e}",

@@ -5088,6 +5088,21 @@ def run_query(
 
     if use_sdk:
         from agent.runner import AgentRunner
+        from agent_server.service import resolve_session_workspace
+        from agent_server.store import AgentStore
+
+        # One-shot CLI runs still need a session workspace so fold downloads
+        # do not expand empty $SANDWALK_SESSION_WORKSPACE to /artifacts/...
+        if not str(context.get("workspace_path") or "").strip():
+            oneshot_id = str(uuid4())[:8]
+            context = {
+                **context,
+                "workspace_path": str(
+                    resolve_session_workspace(
+                        oneshot_id, store=AgentStore(), persist=True
+                    )
+                ),
+            }
 
         agent = AgentRunner(session)
         result = agent.run(query, context)

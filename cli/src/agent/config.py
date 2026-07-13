@@ -281,6 +281,14 @@ DEFAULTS = {
     # Trailing window: how many most-recent tool calls keep full detail before
     # older ones collapse to compact named lines. 1 = only the last call full.
     "agent.tool_trace_detail_limit": 1,
+    # Max model↔tool loop iterations for the deepagents (LangGraph) runtime.
+    # When the agent hits this limit you get GRAPH_RECURSION_LIMIT; raise it for
+    # long fold/download workflows. Override via CLI:
+    #   sandwalk config set agent.recursion_limit 200
+    # or Dashboard → Agent → Runtime in the Mac/web app.
+    "agent.recursion_limit": 120,
+    # Soft cap used when deriving recursion_limit if agent.recursion_limit is unset.
+    "agent.max_sdk_turns": 30,
     "agent.enable_experimental_tools": False,
     "skills.allow_agent_install": False,
     "agent.observer_model": None,
@@ -609,6 +617,127 @@ API_KEYS = {
         "free": True,
     },
 }
+
+# Extra config → process-env mirrors (tools/skills that read env, not only API_KEYS).
+_EXTRA_ENV_FROM_CONFIG: dict[str, str] = {
+    "OPENAI_BASE_URL": "llm.openai_base_url",
+    "CT_DATA_DIR": "data.base",
+    "CT_LLM_PROVIDER": "llm.provider",
+    "CT_LLM_MODEL": "llm.model",
+    "CT_DATA_ENDPOINT": "api.data_endpoint",
+    "CLUE_API_KEY": "api.clue_key",
+}
+
+
+def _config_secret_for_env(config: "Config", config_key: str) -> str:
+    """Resolve a config value for export into ``os.environ`` (no env read-back)."""
+    if config_key == "llm.anthropic_api_key":
+        return str(
+            config._normalized_secret(
+                config.get("llm.anthropic_api_key") or config.get("llm.api_key")
+            )
+            or ""
+        ).strip()
+    if config_key == "llm.openai_api_key":
+        profiles = config.get("llm.openai_profiles") or {}
+        cloud = profiles.get("openai_cloud") if isinstance(profiles, dict) else None
+        cloud_key = (cloud or {}).get("api_key") if isinstance(cloud, dict) else None
+        return str(
+            config._normalized_secret(config.get("llm.openai_api_key") or cloud_key) or ""
+        ).strip()
+    if config_key == "llm.openai_compatible_api_key":
+        profiles = config.get("llm.openai_profiles") or {}
+        active_id = str(config.get("llm.openai_active_profile") or "").strip()
+        active = profiles.get(active_id) if isinstance(profiles, dict) else None
+        profile_key = (active or {}).get("api_key") if isinstance(active, dict) else None
+        return str(
+            config._normalized_secret(
+                config.get("llm.openai_compatible_api_key") or profile_key
+            )
+            or ""
+        ).strip()
+    if config_key == "llm.openai_base_url":
+        # Prefer profile / config URL without reading OPENAI_BASE_URL (avoid loops).
+        profile = None
+        try:
+            profile = config.get_openai_profile()
+        except Exception:
+            profile = None
+        backend = str((profile or {}).get("backend") or "").strip().lower()
+        if backend and backend != "openai":
+            profile_url = config._normalize_openai_base_url((profile or {}).get("base_url"))
+            if profile_url:
+                return str(profile_url).strip()
+        value = config._normalize_openai_base_url(config.get("llm.openai_base_url"))
+        if value and not config._is_openai_managed_base_url(value):
+            return str(value).strip()
+        return ""
+    return str(config.get(config_key) or "").strip()
+
+
+def sync_process_env_from_config(
+    config: "Config | None" = None,
+    *,
+    only_missing: bool = True,
+    config_keys: list[str] | None = None,
+) -> list[str]:
+    """Mirror configured credentials into ``os.environ`` for subprocess tools/skills.
+
+    Matches CLI ``Session`` behavior so the web agent-server (Mac app / local-web)
+    exposes the same keys that an interactive CLI session would. Existing process
+    env values win when ``only_missing`` is True (default).
+
+    Returns the list of environment variable names that were written.
+    """
+    cfg = config or Config.load()
+    allowed = set(config_keys) if config_keys is not None else None
+    applied: list[str] = []
+
+    for config_key, info in API_KEYS.items():
+        if allowed is not None and config_key not in allowed:
+            continue
+        env_name = str(info.get("env_var") or "").strip()
+        if not env_name:
+            continue
+        value = _config_secret_for_env(cfg, config_key)
+        if not value:
+            continue
+        if only_missing and str(os.environ.get(env_name) or "").strip():
+            continue
+        os.environ[env_name] = value
+        applied.append(env_name)
+
+    for env_name, config_key in _EXTRA_ENV_FROM_CONFIG.items():
+        if allowed is not None and config_key not in allowed:
+            continue
+        value = _config_secret_for_env(cfg, config_key)
+        if not value:
+            continue
+        if only_missing and str(os.environ.get(env_name) or "").strip():
+            continue
+        os.environ[env_name] = value
+        applied.append(env_name)
+
+    return applied
+
+
+def unset_process_env_for_config_keys(config_keys: list[str]) -> list[str]:
+    """Remove process env vars that map to the given config keys (integration remove)."""
+    removed: list[str] = []
+    env_by_config = {
+        config_key: str(info.get("env_var") or "").strip()
+        for config_key, info in API_KEYS.items()
+    }
+    for env_name, config_key in _EXTRA_ENV_FROM_CONFIG.items():
+        env_by_config.setdefault(config_key, env_name)
+    for config_key in config_keys:
+        env_name = env_by_config.get(config_key)
+        if not env_name:
+            continue
+        if env_name in os.environ:
+            os.environ.pop(env_name, None)
+            removed.append(env_name)
+    return removed
 
 
 def _validate_config(config_dict: dict) -> list[str]:

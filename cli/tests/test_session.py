@@ -128,6 +128,20 @@ class TestSessionBasics:
         assert os.environ.get("BOLTZ_API_KEY") == "sk_bc_env_wins"
         assert os.environ.get("FASTFOLD_API_KEY") == "sk_ff_env_wins"
 
+    def test_sync_process_env_exports_extras(self, monkeypatch):
+        from agent.config import sync_process_env_from_config
+
+        monkeypatch.delenv("CT_DATA_DIR", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        cfg = Config(data={
+            "data.base": "/tmp/sandwalk-data-test",
+            "llm.openai_base_url": "http://127.0.0.1:11434/v1",
+        })
+        applied = sync_process_env_from_config(cfg)
+        assert "CT_DATA_DIR" in applied
+        assert os.environ.get("CT_DATA_DIR") == "/tmp/sandwalk-data-test"
+        assert os.environ.get("OPENAI_BASE_URL") == "http://127.0.0.1:11434/v1"
+
 
 class TestToolHealth:
     def test_transient_failures_trigger_suppression(self):

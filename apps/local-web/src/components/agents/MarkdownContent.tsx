@@ -1,10 +1,13 @@
-import { renderMermaidSVG } from 'beautiful-mermaid'
 import { Check, Copy, Maximize2, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
 
+import {
+  looksLikeMermaid,
+  MermaidDiagram
+} from '@/components/agents/MermaidDiagram'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -12,13 +15,86 @@ function isDarkMode() {
   return document.documentElement.classList.contains('dark')
 }
 
-function CodeBlock({ language, code }: { language: string; code: string }) {
+/**
+ * Fence bare Mermaid diagrams so react-markdown treats them as code blocks.
+ * Skips content already inside ``` fences.
+ */
+export function ensureMermaidFences(markdown: string): string {
+  const lines = markdown.split('\n')
+  const out: string[] = []
+  let inFence = false
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+    const fenceMatch = line.match(/^(\s*)(`{3,}|~{3,})(.*)$/)
+    if (fenceMatch) {
+      inFence = !inFence
+      out.push(line)
+      i += 1
+      continue
+    }
+
+    if (
+      !inFence &&
+      looksLikeMermaid(line) &&
+      (i === 0 || lines[i - 1].trim() === '')
+    ) {
+      const block: string[] = [line]
+      i += 1
+      while (i < lines.length) {
+        const next = lines[i]
+        if (next.match(/^(\s*)(`{3,}|~{3,})/)) break
+        if (next.trim() === '' && i + 1 < lines.length) {
+          const peek = lines[i + 1]
+          // Blank line ends the diagram unless the next line looks like
+          // continuation (edge/node syntax or indented).
+          if (
+            peek.trim() === '' ||
+            (!/^\s/.test(peek) &&
+              !/^(--|==>|-->|-\\.->|subgraph|end|style|classDef|linkStyle|%%)/i.test(
+                peek.trim()
+              ) &&
+              !/^[A-Za-z0-9_]+\s*(\[|\(|\{|>|-->)/.test(peek.trim()))
+          ) {
+            break
+          }
+        }
+        block.push(next)
+        i += 1
+      }
+      out.push('```mermaid')
+      out.push(...block)
+      out.push('```')
+      continue
+    }
+
+    out.push(line)
+    i += 1
+  }
+
+  return out.join('\n')
+}
+
+function CodeBlock({
+  language,
+  code,
+  streaming
+}: {
+  language: string
+  code: string
+  streaming?: boolean
+}) {
   const [html, setHtml] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [dark, setDark] = useState(() =>
     typeof document !== 'undefined' ? isDarkMode() : true
   )
+
+  const isMermaid =
+    language.toLowerCase() === 'mermaid' ||
+    (!language && looksLikeMermaid(code))
 
   useEffect(() => {
     const sync = () => setDark(isDarkMode())
@@ -32,7 +108,7 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   }, [])
 
   useEffect(() => {
-    if (!language || language === 'mermaid') return
+    if (!language || isMermaid) return
     let active = true
     void import('shiki').then(({ codeToHtml }) =>
       codeToHtml(code, {
@@ -45,27 +121,16 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
     return () => {
       active = false
     }
-  }, [code, language, dark])
+  }, [code, dark, isMermaid, language])
 
-  if (language === 'mermaid') {
-    try {
-      const svg = renderMermaidSVG(code, {
-        bg: 'hsl(var(--background))',
-        fg: 'hsl(var(--foreground))',
-        muted: 'hsl(var(--muted-foreground))',
-        border: 'hsl(var(--border))',
-        accent: 'hsl(var(--foreground))',
-        transparent: true
-      })
-      return (
-        <div
-          className="bg-background my-3 overflow-auto rounded-lg border p-3 [&_svg]:mx-auto [&_svg]:max-w-full"
-          dangerouslySetInnerHTML={{ __html: svg }}
-        />
-      )
-    } catch {
-      // Fall back to the source block while a streamed diagram is incomplete.
-    }
+  if (isMermaid) {
+    return (
+      <MermaidDiagram
+        code={code}
+        streamAware={Boolean(streaming)}
+        ready={!streaming}
+      />
+    )
   }
 
   const content = (
@@ -138,12 +203,17 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
 
 export function MarkdownContent({
   content,
-  className
+  className,
+  streaming = false
 }: {
   content: string
   className?: string
+  /** When true, Mermaid waits until the message finishes streaming. */
+  streaming?: boolean
 }) {
   const navigate = useNavigate()
+  const prepared = useMemo(() => ensureMermaidFences(content), [content])
+
   return (
     <div
       className={cn(
@@ -278,7 +348,13 @@ export function MarkdownContent({
                 </code>
               )
             }
-            return <CodeBlock language={language} code={code} />
+            return (
+              <CodeBlock
+                language={language}
+                code={code}
+                streaming={streaming}
+              />
+            )
           },
           pre({ children }) {
             return <>{children}</>
@@ -311,7 +387,7 @@ export function MarkdownContent({
           }
         }}
       >
-        {content}
+        {prepared}
       </ReactMarkdown>
     </div>
   )

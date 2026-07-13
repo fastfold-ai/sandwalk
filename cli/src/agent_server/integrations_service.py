@@ -9,7 +9,13 @@ import tempfile
 import threading
 from pathlib import Path
 
-from agent.config import API_KEYS, CONFIG_DIR, Config
+from agent.config import (
+    API_KEYS,
+    CONFIG_DIR,
+    Config,
+    sync_process_env_from_config,
+    unset_process_env_for_config_keys,
+)
 from agent_server.models import (
     IntegrationField,
     IntegrationProvider,
@@ -197,7 +203,10 @@ class IntegrationsService:
             config = Config.load()
             for env_name, value in normalized.items():
                 config.set(by_env[env_name], value)
+                # Force into process env so web runs/PTY match CLI immediately.
+                os.environ[env_name] = value
             config.save()
+            sync_process_env_from_config(config)
         return self._provider(key, entries)
 
     def remove(self, key: str) -> IntegrationProvider:
@@ -206,9 +215,11 @@ class IntegrationsService:
             raise KeyError(key)
         with self._lock:
             config = Config.load()
+            removed_keys = [config_key for config_key, _ in entries]
             for config_key, _ in entries:
                 config.unset(config_key)
             config.save()
+            unset_process_env_for_config_keys(removed_keys)
         return self._provider(key, entries)
 
     def validate(self, key: str) -> ValidateIntegrationResponse:
@@ -306,6 +317,8 @@ class IntegrationsService:
             config = Config.load()
             config.set("api.vercel_oidc_token", token)
             config.save()
+            os.environ["VERCEL_OIDC_TOKEN"] = token
+            sync_process_env_from_config(config)
         return self._provider(key, entries)
 
     def setup(self, key: str, _working_directory: str | None = None) -> IntegrationSetupResponse:
@@ -339,6 +352,8 @@ class IntegrationsService:
                 config = Config.load()
                 config.set("api.vercel_oidc_token", env_token)
                 config.save()
+                os.environ["VERCEL_OIDC_TOKEN"] = env_token
+                sync_process_env_from_config(config)
             steps.append(
                 IntegrationSetupStep(
                     id="save-token",
@@ -429,6 +444,8 @@ class IntegrationsService:
             config = Config.load()
             config.set("api.vercel_oidc_token", token)
             config.save()
+            os.environ["VERCEL_OIDC_TOKEN"] = token
+            sync_process_env_from_config(config)
         steps.append(
             IntegrationSetupStep(
                 id="save-token",

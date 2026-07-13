@@ -77,6 +77,22 @@ synthesis at the end.
 - Never run task-id recovery loops (TaskOutput retries, filesystem scans,
   shell-history scans) for prior tasks unless the current user request is
   specifically about that task.
+
+## Session workspace (non-negotiable when provided)
+When a **Session workspace** path is listed below (or in `SANDWALK_SESSION_WORKSPACE`):
+- That directory is the chat's file tree in the UI. Keep **all** downloads,
+  artifacts, zips, plots, exports, and generated/written files **inside it**
+  (prefer ``artifacts/`` or ``outputs/`` subfolders).
+- For any download / save / write / export action: use the **absolute** Session
+  workspace path from Context immediately. Do **not** ask which directory to
+  use, and do **not** browse ``/``, ``$HOME``, ``/tmp``, or other project trees.
+- Prefer literal absolute paths
+  (e.g. ``<workspace>/artifacts/<name>/...``) over
+  ``$SANDWALK_SESSION_WORKSPACE/...`` so an unset variable cannot expand to
+  ``/artifacts/...``. Relative paths like ``./artifacts/...`` are fine only when
+  the shell cwd is already the session workspace.
+- You may read installed skill directories (e.g. ``~/.fastfold-cli/skills/...``)
+  to run scripts; never treat those as the download or write destination.
 """
 
 
@@ -127,6 +143,7 @@ def build_system_prompt(
     exclude_categories: set[str] | None = None,
     project_context: str | None = None,
     specialist_instructions: str | None = None,
+    workspace_path: str | None = None,
 ) -> str:
     """Build the unified system prompt for the agent runner.
 
@@ -148,6 +165,7 @@ def build_system_prompt(
             catalog matches the tools actually available.
         specialist_instructions: Optional specialist profile text appended after
             project context.
+        workspace_path: Per-session workspace directory shown in the UI file tree.
 
     Returns:
         The complete system prompt string.
@@ -156,6 +174,19 @@ def build_system_prompt(
 
     # 1. Identity
     parts.append(_IDENTITY)
+
+    workspace = str(workspace_path or "").strip()
+    if workspace:
+        parts.append("\n## Session Workspace\n")
+        parts.append(
+            f"- **Path:** `{workspace}`\n"
+            "- This is the dedicated folder for **this chat** (Files panel / file tree).\n"
+            "- Save **all** downloads, writes, exports, plots, and generated files under "
+            f"this path (prefer `{workspace}/artifacts/` or `{workspace}/outputs/`).\n"
+            "- Use this **absolute** path in tool commands. Do not ask where to save; "
+            "do not browse `/`, `$HOME`, or `/tmp`. Prefer the literal path over "
+            "`$SANDWALK_SESSION_WORKSPACE/...` (an empty var expands to `/artifacts/...`).\n"
+        )
 
     if project_context and str(project_context).strip():
         parts.append("\n## Project Context\n")
@@ -217,10 +248,13 @@ def build_system_prompt(
             "\n## Skills & Filesystem\n"
             "Installed skills are listed in the Skills System section below. Read a "
             "skill's full SKILL.md with `read_file(path, limit=1000)` before following "
-            "it. To run a skill's bundled scripts, prefer the `shell_run` tool or "
-            "`run_python` with the absolute script path shown in the skill listing; the "
-            "filesystem tools (`read_file`, `ls`, `glob`, `grep`) operate on the real "
-            "local disk.\n"
+            "it. To run a skill's bundled scripts, prefer the `shell_run` tool "
+            "(``python3`` + absolute script path from the skill listing).\n"
+            "Filesystem tools (`read_file`, `ls`, `glob`, `grep`) may read skill "
+            "directories and the **session workspace**. Do not use them to roam "
+            "the whole machine (`/`, `$HOME`, `/tmp`, unrelated repos) looking for "
+            "artifacts — downloads belong in the session workspace so the UI file "
+            "tree stays in sync.\n"
         )
 
     # 4. Workflow guides (compact — key sequences for common tasks)

@@ -7,6 +7,7 @@ import {
   Activity,
   Box,
   Boxes,
+  Cpu,
   Database,
   Hash,
   HardDrive,
@@ -134,6 +135,13 @@ const DASHBOARD_COMMANDS = [
     path: '/dashboard/general',
     value: 'command general settings',
     icon: Settings2
+  },
+  {
+    id: 'agent_runtime',
+    label: 'Agent Runtime',
+    path: '/dashboard/agent/runtime',
+    value: 'command agent runtime recursion langgraph tool mode',
+    icon: Cpu
   },
   {
     id: 'models',

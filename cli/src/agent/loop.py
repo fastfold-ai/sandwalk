@@ -67,8 +67,116 @@ class AgentLoop:
             return
         title = (self.trajectory.title or "").strip() or "New research session"
         self.store.ensure_session(session_id, title=title)
+        # Always materialize a session workspace so CLI shell/skills get
+        # SANDWALK_SESSION_WORKSPACE (same path the local UI file tree uses).
+        try:
+            from agent_server.service import resolve_session_workspace
 
-    def _persist_turn_to_store(self, query: str, answer: str) -> None:
+            resolve_session_workspace(session_id, store=self.store, persist=True)
+        except Exception:
+            logger.exception(
+                "Failed to ensure CLI session workspace",
+                extra={"session_id": session_id},
+            )
+
+    def ensure_workspace_path(self) -> str | None:
+        """Return the absolute session workspace path, creating it if needed."""
+        session_id = str(self.trajectory.session_id or "").strip()
+        if not session_id:
+            return None
+        try:
+            from agent_server.service import resolve_session_workspace
+
+            return str(
+                resolve_session_workspace(session_id, store=self.store, persist=True)
+            )
+        except Exception:
+            logger.exception(
+                "Failed to resolve CLI session workspace",
+                extra={"session_id": session_id},
+            )
+            return None
+
+    def _emit_store_progress(
+        self,
+        *,
+        session_id: str,
+        run_id: str,
+        event: str = "activity",
+        progress_callback=None,
+        **payload,
+    ) -> None:
+        """Forward progress to the terminal and dual-write tool events for the UI."""
+        if progress_callback is not None:
+            try:
+                progress_callback(event, **payload)
+            except TypeError:
+                # Legacy callbacks may only accept a status string.
+                text = payload.get("text") or payload.get("activity") or event
+                try:
+                    progress_callback(str(text))
+                except Exception:
+                    pass
+            except Exception:
+                logger.debug("CLI progress callback failed", exc_info=True)
+
+        event_type = {
+            "stream": "assistant.delta",
+            "tool_start": "tool.started",
+            "tool_end": "tool.completed",
+            "usage": "run.usage",
+            "activity": "run.progress",
+        }.get(event)
+        if event_type is None:
+            return
+        if event == "stream":
+            event_payload = {"delta": str(payload.get("delta") or "")}
+        elif event == "tool_start":
+            event_payload = {
+                "name": str(payload.get("name") or "tool"),
+                "arguments": payload.get("arguments") or {},
+                "toolCallId": str(payload.get("tool_call_id") or ""),
+            }
+        elif event == "tool_end":
+            event_payload = {
+                "name": str(payload.get("name") or "tool"),
+                "output": payload.get("output"),
+                "isError": bool(payload.get("is_error")),
+                "durationSeconds": float(payload.get("duration_s") or 0.0),
+                "toolCallId": str(payload.get("tool_call_id") or ""),
+            }
+        elif event == "usage":
+            event_payload = {
+                "inputTokens": payload.get("input_tokens"),
+                "outputTokens": payload.get("output_tokens"),
+                "cacheReadInputTokens": payload.get("cache_read_input_tokens"),
+            }
+        else:
+            event_payload = {
+                "text": str(payload.get("text") or payload.get("activity") or "")
+            }
+        try:
+            self.store.append_event(
+                session_id=session_id,
+                run_id=run_id,
+                event_type=event_type,
+                payload=event_payload,
+            )
+        except Exception:
+            logger.debug(
+                "Failed to dual-write CLI progress event",
+                exc_info=True,
+                extra={"session_id": session_id, "event": event},
+            )
+
+    def _persist_turn_to_store(
+        self,
+        query: str,
+        answer: str,
+        *,
+        run_id: str | None = None,
+        user_message_id: str | None = None,
+    ) -> None:
         session_id = str(self.trajectory.session_id or "").strip()
         if not session_id:
             return
@@ -77,29 +185,126 @@ class AgentLoop:
         if self.trajectory.title:
             self.store.update_session(session_id, title=self.trajectory.title)
         now = datetime.now(UTC)
-        self.store.add_message(
-            session_id=session_id,
-            role="user",
-            content=query,
-            created_at=now,
-        )
-        self.store.add_message(
+        if not user_message_id:
+            self.store.add_message(
+                session_id=session_id,
+                role="user",
+                content=query,
+                created_at=now,
+            )
+        assistant_message = self.store.add_message(
             session_id=session_id,
             role="assistant",
             content=answer,
             created_at=datetime.fromtimestamp(now.timestamp() + 0.001, tz=UTC),
         )
+        if run_id:
+            self.store.append_event(
+                session_id=session_id,
+                run_id=run_id,
+                event_type="assistant.message",
+                payload={
+                    "message": assistant_message.model_dump(
+                        mode="json", by_alias=True
+                    )
+                },
+            )
+            self.store.append_event(
+                session_id=session_id,
+                run_id=run_id,
+                event_type="run.completed",
+                payload={"messageId": assistant_message.id},
+            )
         self.store.set_session_status(session_id, "idle")
 
     def run(self, query: str, context: dict | None = None,
             progress_callback=None):
         """Execute a query and record it in the trajectory."""
-        result = self._runner.run(query, context, progress_callback=progress_callback)
+        run_context = dict(context or {})
+        if not str(run_context.get("workspace_path") or "").strip():
+            workspace = self.ensure_workspace_path()
+            if workspace:
+                run_context["workspace_path"] = workspace
+
+        session_id = str(self.trajectory.session_id or "").strip()
+        run_id = str(uuid.uuid4())
+        user_message_id: str | None = None
+        if session_id:
+            try:
+                title = (
+                    (self.trajectory.title or "").strip()
+                    or query.strip()[:80]
+                    or "New research session"
+                )
+                self.store.ensure_session(session_id, title=title)
+                user_message = self.store.add_message(
+                    session_id=session_id,
+                    role="user",
+                    content=query,
+                )
+                user_message_id = user_message.id
+                self.store.set_session_status(session_id, "running")
+                self.store.append_event(
+                    session_id=session_id,
+                    run_id=run_id,
+                    event_type="run.started",
+                    payload={"messageId": user_message.id},
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to mark CLI run started in shared AgentStore",
+                    extra={"session_id": session_id},
+                )
+
+        def store_progress(event="activity", **payload):
+            if not session_id:
+                if progress_callback is not None:
+                    try:
+                        progress_callback(event, **payload)
+                    except Exception:
+                        pass
+                return
+            self._emit_store_progress(
+                session_id=session_id,
+                run_id=run_id,
+                event=event,
+                progress_callback=progress_callback,
+                **payload,
+            )
+
+        try:
+            result = self._runner.run(
+                query, run_context, progress_callback=store_progress
+            )
+        except Exception:
+            if session_id:
+                try:
+                    self.store.set_session_status(session_id, "failed")
+                    self.store.append_event(
+                        session_id=session_id,
+                        run_id=run_id,
+                        event_type="run.failed",
+                        payload={"reason": "CLI run raised"},
+                    )
+                except Exception:
+                    pass
+            raise
 
         # Check for clarification request in result
         if result and result.raw_results:
             clar_data = result.raw_results.get("clarification")
             if isinstance(clar_data, dict) and clar_data.get("clarification_needed"):
+                if session_id:
+                    try:
+                        self.store.set_session_status(session_id, "idle")
+                        self.store.append_event(
+                            session_id=session_id,
+                            run_id=run_id,
+                            event_type="run.interrupted",
+                            payload={"reason": "clarification_needed"},
+                        )
+                    except Exception:
+                        pass
                 raise ClarificationNeeded(Clarification(
                     question=clar_data.get("question", "Could you clarify?"),
                     missing=clar_data.get("missing", []),
@@ -122,7 +327,12 @@ class AgentLoop:
             self.trajectory.model = self.session.current_model
             self.trajectory.save()
             try:
-                self._persist_turn_to_store(query, result.summary or "")
+                self._persist_turn_to_store(
+                    query,
+                    result.summary or "",
+                    run_id=run_id if session_id else None,
+                    user_message_id=user_message_id,
+                )
             except Exception:
                 logger.exception(
                     "Failed to dual-write CLI turn into shared AgentStore",

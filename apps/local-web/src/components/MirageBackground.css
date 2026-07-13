@@ -69,11 +69,7 @@
 
 .mirage-background__fills {
   opacity: 0;
-  transform-origin: center;
-  animation:
-    mirage-fills-enter 1100ms cubic-bezier(0.16, 1, 0.3, 1) forwards,
-    mirage-path-breathe 26s ease-in-out 1100ms infinite alternate;
-  will-change: transform, opacity;
+  animation: mirage-fills-enter 1100ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Poster palette — warm sand, olive/charcoal matrices, hot gold path. */
@@ -176,15 +172,6 @@
   }
 }
 
-@keyframes mirage-path-breathe {
-  from {
-    transform: translate(0, 0) scale(1);
-  }
-  to {
-    transform: translate(0, -2px) scale(1.008);
-  }
-}
-
 @media (max-width: 640px) {
   .mirage-background__overlay {
     background: radial-gradient(
@@ -207,7 +194,6 @@
   .mirage-background__fills {
     opacity: 1;
     animation: none;
-    transform: none;
   }
 
   .mirage-form {

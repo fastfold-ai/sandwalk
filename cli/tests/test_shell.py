@@ -1,8 +1,9 @@
 """Tests for shell.run tool."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-from tools.shell import shell_run, _is_blocked
+import os
+from unittest.mock import MagicMock, patch
+
+from tools.shell import _expand_env_refs, _is_blocked, shell_run
 
 
 class TestIsBlocked:
@@ -72,3 +73,41 @@ class TestShellRun:
         result = shell_run(command="echo 'line1\nline2\nline3'")
         assert result["exit_code"] == 0
         assert "line1" in result["stdout"]
+
+    def test_env_var_expansion(self, monkeypatch):
+        monkeypatch.setenv("SANDWALK_SHELL_TEST_KEY", "secret-value")
+        result = shell_run(command="echo $SANDWALK_SHELL_TEST_KEY")
+        assert result["exit_code"] == 0
+        assert "secret-value" in result["stdout"]
+        assert "$SANDWALK_SHELL_TEST_KEY" not in result["stdout"]
+
+    def test_env_var_brace_expansion(self, monkeypatch):
+        monkeypatch.setenv("SANDWALK_SHELL_TEST_KEY", "braced")
+        result = shell_run(command="echo ${SANDWALK_SHELL_TEST_KEY}")
+        assert result["exit_code"] == 0
+        assert "braced" in result["stdout"]
+
+    def test_unset_env_var_expands_empty(self, monkeypatch):
+        monkeypatch.delenv("SANDWALK_SHELL_MISSING_KEY", raising=False)
+        result = shell_run(command="echo before-$SANDWALK_SHELL_MISSING_KEY-after")
+        assert result["exit_code"] == 0
+        assert "before--after" in result["stdout"].replace("\n", "")
+
+    def test_defaults_cwd_to_session_workspace(self, tmp_path, monkeypatch):
+        workspace = tmp_path / "session_ws"
+        workspace.mkdir()
+        monkeypatch.setenv("SANDWALK_SESSION_WORKSPACE", str(workspace))
+        result = shell_run(command="pwd")
+        assert result["exit_code"] == 0
+        assert str(workspace.resolve()) in result["stdout"]
+
+
+class TestExpandEnvRefs:
+    def test_expand_known(self, monkeypatch):
+        monkeypatch.setenv("FOO", "bar")
+        assert _expand_env_refs("$FOO") == "bar"
+        assert _expand_env_refs("${FOO}") == "bar"
+
+    def test_expand_unknown_empty(self, monkeypatch):
+        monkeypatch.delenv("NO_SUCH_SHELL_VAR_XYZ", raising=False)
+        assert _expand_env_refs("$NO_SUCH_SHELL_VAR_XYZ") == ""

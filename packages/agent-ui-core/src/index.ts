@@ -356,6 +356,16 @@ export type RuntimeSettings = {
   openaiBaseUrl: string | null
   agentProfile: string
   toolMode: string
+  recursionLimit: number
+  maxSdkTurns: number
+  groupToolTraces: boolean
+  toolTraceDetailLimit: number
+  backgroundWatchTimeoutS: number
+  interruptDrainTimeoutS: number
+  parallelMaxThreads: number
+  toolHealthEnabled: boolean
+  toolHealthFailThreshold: number
+  toolHealthSuppressSeconds: number
 }
 
 export type AccountUser = {
@@ -945,6 +955,7 @@ export interface AgentClient {
   ): Promise<AgentSession>
   deleteSession(sessionId: string, signal?: AbortSignal): Promise<void>
   listMessages(sessionId: string, signal?: AbortSignal): Promise<AgentMessage[]>
+  listEventHistory(sessionId: string, signal?: AbortSignal): Promise<AgentEvent[]>
   setMessageFeedback(
     sessionId: string,
     messageId: string,

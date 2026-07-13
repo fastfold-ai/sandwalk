@@ -113,6 +113,28 @@ def test_agent_server_health_and_session_contract(tmp_path: Path, monkeypatch):
         assert messages.status_code == 200
         assert messages.json() == {"data": [], "feedback": {}}
 
+        # Persist a tool event and export via one-shot history endpoint.
+        from agent_server.store import AgentStore
+
+        store = AgentStore(tmp_path / "agent.db")
+        store.append_event(
+            session_id=session["id"],
+            run_id="run-1",
+            event_type="tool.started",
+            payload={
+                "name": "shell.run",
+                "arguments": {"command": "echo hi"},
+                "toolCallId": "tool-1",
+            },
+        )
+        history = client.get(f"/v1/sessions/{session['id']}/events/history")
+        assert history.status_code == 200
+        body = history.json()
+        tool_events = [item for item in body["data"] if item["type"] == "tool.started"]
+        assert len(tool_events) == 1
+        assert tool_events[0]["payload"]["name"] == "shell.run"
+        assert tool_events[0]["payload"]["arguments"] == {"command": "echo hi"}
+
         deleted = client.delete(f"/v1/sessions/{session['id']}")
         assert deleted.status_code == 200
         assert deleted.json() == {"deleted": True}

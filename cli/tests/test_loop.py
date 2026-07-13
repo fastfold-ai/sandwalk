@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from agent.loop import AgentLoop  # type: ignore[import-untyped]
+from agent_server.service import resolve_session_workspace
 from agent_server.store import AgentStore
 
 
@@ -39,3 +40,72 @@ def test_resume_empty_id_raises_not_found(tmp_path: Path):
     store = AgentStore(tmp_path / "agent.db")
     with pytest.raises(FileNotFoundError):
         AgentLoop.resume(session, "   ", store=store)
+
+
+def test_resolve_session_workspace_creates_artifacts(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "agent_server.service.CONFIG_DIR", tmp_path / "cfg"
+    )
+    store = AgentStore(tmp_path / "agent.db")
+    workspace = resolve_session_workspace("sess001", store=store, persist=True)
+    assert workspace.exists()
+    assert (workspace / "artifacts").is_dir()
+    assert (workspace / "outputs").is_dir()
+    session = store.get_session("sess001")
+    assert session is not None
+    assert Path(session.workspace_path) == workspace
+
+
+def test_agent_loop_injects_workspace_into_run_context(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "agent_server.service.CONFIG_DIR", tmp_path / "cfg"
+    )
+    session = _mock_session()
+    store = AgentStore(tmp_path / "agent.db")
+    loop = AgentLoop(session, store=store, session_id="cliws01")
+
+    captured = {}
+
+    def fake_run(query, context, progress_callback=None):
+        captured["context"] = dict(context or {})
+        if progress_callback:
+            progress_callback(
+                "tool_start",
+                name="shell.run",
+                arguments={"command": "pwd"},
+                tool_call_id="tool-1",
+            )
+            progress_callback(
+                "tool_end",
+                name="shell.run",
+                output="ok",
+                is_error=False,
+                duration_s=0.1,
+                tool_call_id="tool-1",
+            )
+        result = MagicMock()
+        result.summary = "ok"
+        result.plan = None
+        result.raw_results = None
+        return result
+
+    loop._runner.run = fake_run  # type: ignore[method-assign]
+    loop.run("download all", {})
+
+    ws = captured["context"].get("workspace_path")
+    assert ws
+    assert Path(ws).is_dir()
+    assert (Path(ws) / "artifacts").is_dir()
+    assert "cliws01" in ws
+
+    events = store.list_events("cliws01")
+    types = [event.type for event in events]
+    assert "run.started" in types
+    assert "tool.started" in types
+    assert "tool.completed" in types
+    assert "assistant.message" in types
+    assert "run.completed" in types
+    messages = store.list_messages("cliws01")
+    assert len(messages) == 2
+    assert messages[0].role == "user"
+    assert messages[1].role == "assistant"

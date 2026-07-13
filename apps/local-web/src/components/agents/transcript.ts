@@ -1,4 +1,4 @@
-import type { AgentMessage, AgentTodo } from '@sandwalk/agent-ui-core'
+import type { AgentEvent, AgentMessage, AgentTodo } from '@sandwalk/agent-ui-core'
 
 import type { TranscriptTool } from './ToolCard'
 import { formatToolExecutionTime } from './ToolCard'
@@ -114,3 +114,195 @@ export function thoughtDurationForTools(tools: TranscriptTool[]) {
 }
 
 export const TOOL_RUN_VISIBLE_COUNT = 1
+
+const SECRET_KEY =
+  /(api[_-]?key|token|password|secret|authorization|bearer|credential)/i
+
+function redactSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactSecrets)
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [key, nested] of Object.entries(
+      value as Record<string, unknown>
+    )) {
+      out[key] = SECRET_KEY.test(key) ? '[redacted]' : redactSecrets(nested)
+    }
+    return out
+  }
+  if (typeof value === 'string' && value.length > 24 && SECRET_KEY.test(value)) {
+    return '[redacted]'
+  }
+  return value
+}
+
+function formatPayloadBlock(value: unknown): string {
+  if (value == null) return ''
+  const safe = redactSecrets(value)
+  if (typeof safe === 'string') return safe
+  try {
+    return JSON.stringify(safe, null, 2)
+  } catch {
+    return String(safe)
+  }
+}
+
+function fence(language: string, body: string): string {
+  const safe = body.replace(/\n```/g, '\n``\u200b`')
+  return `\`\`\`${language}\n${safe}\n\`\`\``
+}
+
+export function toolsFromEvents(events: AgentEvent[]): {
+  tools: TranscriptTool[]
+  todosByRunId: Record<string, AgentTodo[]>
+  runIdByMessageId: Record<string, string>
+} {
+  const toolsById = new Map<string, TranscriptTool>()
+  const todosByRunId: Record<string, AgentTodo[]> = {}
+  const runIdByMessageId: Record<string, string> = {}
+
+  for (const event of events) {
+    if (event.type === 'run.started' && event.runId && event.payload.messageId) {
+      runIdByMessageId[event.payload.messageId] = event.runId
+    }
+    if (
+      event.type === 'assistant.message' &&
+      event.runId &&
+      event.payload.message?.id
+    ) {
+      runIdByMessageId[event.payload.message.id] = event.runId
+    }
+    if (event.type === 'tool.started') {
+      const id = event.payload.toolCallId || event.id
+      toolsById.set(id, {
+        id,
+        runId: event.runId,
+        messageId: null,
+        name: event.payload.name,
+        status: 'pending',
+        args: event.payload.arguments,
+        startedAt: event.timestamp
+      })
+    } else if (event.type === 'tool.completed') {
+      const id = event.payload.toolCallId || event.id
+      const existing = toolsById.get(id)
+      toolsById.set(id, {
+        id,
+        runId: existing?.runId ?? event.runId,
+        messageId: existing?.messageId ?? null,
+        name: event.payload.name || existing?.name || 'tool',
+        status: event.payload.isError ? 'error' : 'completed',
+        args: existing?.args,
+        result: event.payload.output,
+        startedAt: existing?.startedAt || event.timestamp,
+        endedAt: event.timestamp,
+        durationSeconds: event.payload.durationSeconds
+      })
+    } else if (event.type === 'todos.updated' && event.runId) {
+      todosByRunId[event.runId] = event.payload.todos
+    }
+  }
+
+  return {
+    tools: [...toolsById.values()],
+    todosByRunId,
+    runIdByMessageId
+  }
+}
+
+function formatToolMarkdown(tool: TranscriptTool): string {
+  const timing =
+    formatToolExecutionTime(
+      tool.startedAt,
+      tool.endedAt,
+      tool.durationSeconds
+    ) || null
+  const meta = [tool.status, timing].filter(Boolean).join(', ')
+  const lines = [`#### \`${tool.name}\`${meta ? ` (${meta})` : ''}`]
+  const argsText = formatPayloadBlock(tool.args)
+  if (argsText.trim()) {
+    lines.push('', '**Arguments**', '', fence('json', argsText))
+  }
+  const resultText = formatPayloadBlock(tool.result)
+  if (resultText.trim()) {
+    lines.push('', '**Output**', '', fence('json', resultText))
+  }
+  return lines.join('\n')
+}
+
+/** Build a markdown export that includes full tool arguments/outputs. */
+export function formatSessionExportMarkdown({
+  title,
+  messages,
+  events
+}: {
+  title?: string
+  messages: AgentMessage[]
+  events: AgentEvent[]
+}): string {
+  const { tools, todosByRunId, runIdByMessageId } = toolsFromEvents(events)
+  const timeline = buildConversationTimeline({
+    messages,
+    tools,
+    todosByRunId,
+    runIdByMessageId
+  })
+
+  const blocks: string[] = []
+  if (title?.trim()) {
+    blocks.push(`# ${title.trim()}`, '')
+  }
+
+  let current: string[] = []
+  const flush = () => {
+    if (current.length === 0) return
+    blocks.push(current.join('\n\n'))
+    current = []
+  }
+
+  for (const entry of timeline) {
+    if (entry.kind === 'message') {
+      const role =
+        entry.message.role === 'assistant'
+          ? 'Sandwalk'
+          : entry.message.role === 'system'
+            ? 'system'
+            : 'user'
+      if (entry.message.role !== 'assistant' || current.length === 0) {
+        flush()
+        current.push(`## ${role}`, entry.content.trim() || '_(empty)_')
+      } else {
+        current.push('### Response', entry.content.trim() || '_(empty)_')
+      }
+      continue
+    }
+
+    if (entry.kind === 'thought') {
+      if (current.length === 0) current.push('## Sandwalk')
+      current.push('### Thought', entry.thought.trim())
+      continue
+    }
+
+    if (entry.kind === 'tool') {
+      if (current.length === 0) current.push('## Sandwalk')
+      if (!current.some(line => line === '### Tools')) {
+        current.push('### Tools')
+      }
+      current.push(formatToolMarkdown(entry.tool))
+      continue
+    }
+
+    if (entry.kind === 'todos') {
+      if (current.length === 0) current.push('## Sandwalk')
+      const items = entry.todos
+        .map(
+          todo =>
+            `- [${todo.status === 'completed' ? 'x' : ' '}] ${todo.content}`
+        )
+        .join('\n')
+      current.push('### Todos', items)
+    }
+  }
+  flush()
+
+  return `${blocks.join('\n\n---\n\n')}\n`
+}

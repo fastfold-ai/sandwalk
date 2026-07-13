@@ -81,6 +81,7 @@ import { DashboardOverviewView } from '@/components/agents/DashboardOverviewView
 import { DataView } from '@/components/agents/DataView'
 import { DoctorView } from '@/components/agents/DoctorView'
 import { EnvironmentView } from '@/components/agents/EnvironmentView'
+import { AgentRuntimeView } from '@/components/agents/AgentRuntimeView'
 import { GeneralView } from '@/components/agents/GeneralView'
 import { McpView } from '@/components/agents/McpView'
 import { ModelsView } from '@/components/agents/ModelsView'
@@ -113,6 +114,7 @@ import {
 } from '@/components/agents/PageSkeletons'
 import {
   buildConversationTimeline,
+  formatSessionExportMarkdown,
   thoughtDurationForTools,
   TOOL_RUN_VISIBLE_COUNT
 } from '@/components/agents/transcript'
@@ -1233,27 +1235,29 @@ export default function App() {
     : location.pathname.startsWith('/dashboard/general') ||
         location.pathname.startsWith('/dashboard/settings')
       ? 'general'
-      : location.pathname.startsWith('/dashboard/models')
-        ? 'models'
-        : location.pathname.startsWith('/dashboard/datasets')
-          ? 'datasets'
-          : location.pathname.startsWith('/dashboard/tools')
-            ? 'tools'
-            : location.pathname.startsWith('/dashboard/doctor')
-              ? 'doctor'
-              : location.pathname.startsWith('/dashboard/storage')
-                ? 'storage'
-                : location.pathname.startsWith('/dashboard/environment')
-                  ? 'environment'
-                  : location.pathname.startsWith('/dashboard/skills')
-                    ? 'skills'
-                    : location.pathname.startsWith('/dashboard/specialists')
-                      ? 'specialists'
-                      : location.pathname.startsWith('/dashboard/integrations')
-                        ? 'integrations'
-                        : location.pathname.startsWith('/dashboard/mcp')
-                          ? 'mcp'
-                          : 'overview'
+      : location.pathname.startsWith('/dashboard/agent')
+        ? 'agent_runtime'
+        : location.pathname.startsWith('/dashboard/models')
+          ? 'models'
+          : location.pathname.startsWith('/dashboard/datasets')
+            ? 'datasets'
+            : location.pathname.startsWith('/dashboard/tools')
+              ? 'tools'
+              : location.pathname.startsWith('/dashboard/doctor')
+                ? 'doctor'
+                : location.pathname.startsWith('/dashboard/storage')
+                  ? 'storage'
+                  : location.pathname.startsWith('/dashboard/environment')
+                    ? 'environment'
+                    : location.pathname.startsWith('/dashboard/skills')
+                      ? 'skills'
+                      : location.pathname.startsWith('/dashboard/specialists')
+                        ? 'specialists'
+                        : location.pathname.startsWith('/dashboard/integrations')
+                          ? 'integrations'
+                          : location.pathname.startsWith('/dashboard/mcp')
+                            ? 'mcp'
+                            : 'overview'
   const isSkills =
     dashboardSection === 'skills' ||
     location.pathname === '/agents/skills' ||
@@ -1276,6 +1280,7 @@ export default function App() {
     Boolean(legacyIntegrationRoute)
   const isDashboardStatus = dashboardSection === 'status'
   const isDashboardGeneral = dashboardSection === 'general'
+  const isDashboardAgentRuntime = dashboardSection === 'agent_runtime'
   const isDashboardModels = dashboardSection === 'models'
   const isDashboardData = dashboardSection === 'datasets'
   const isDashboardTools = dashboardSection === 'tools'
@@ -2812,15 +2817,15 @@ export default function App() {
   }
 
   const exportTranscript = async (target: AgentSession) => {
-    const transcript = await client.listMessages(target.id)
-    const markdown = transcript
-      .map(
-        message =>
-          `## ${
-            message.role === 'assistant' ? 'Sandwalk' : message.role
-          }\n\n${message.content}`
-      )
-      .join('\n\n---\n\n')
+    const [messages, events] = await Promise.all([
+      client.listMessages(target.id),
+      client.listEventHistory(target.id).catch(() => [] as AgentEvent[])
+    ])
+    const markdown = formatSessionExportMarkdown({
+      title: target.title,
+      messages,
+      events
+    })
     const url = URL.createObjectURL(
       new Blob([markdown], { type: 'text/markdown' })
     )
@@ -3819,6 +3824,16 @@ export default function App() {
               onLoadAccount={loadAccountForUi}
               onLogoutAccount={logoutAccount}
             />
+          ) : isDashboardAgentRuntime ? (
+            <AgentRuntimeView
+              connected={Boolean(health)}
+              runtimeSettings={runtimeSettings}
+              onUpdateRuntimeSettings={async changes => {
+                const next = await client.updateRuntimeSettings(changes)
+                setRuntimeSettings(next)
+                return next
+              }}
+            />
           ) : isDashboardModels ? (
             <ModelsView
               integrations={integrations}
@@ -4696,6 +4711,9 @@ export default function App() {
                                         {entry.content.trim() ? (
                                           <MarkdownContent
                                             content={entry.content}
+                                            streaming={
+                                              hideActionsWhileStreaming
+                                            }
                                             className="max-w-full [&_*]:max-w-full [&_pre]:w-full [&_pre]:max-w-full [&_pre_code]:whitespace-pre-wrap [&_table]:w-full [&_table]:table-auto"
                                           />
                                         ) : null}
@@ -4826,6 +4844,7 @@ export default function App() {
                               <div className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150">
                                 <MarkdownContent
                                   content={liveDelta}
+                                  streaming
                                   className="max-w-full [&_*]:max-w-full"
                                 />
                               </div>

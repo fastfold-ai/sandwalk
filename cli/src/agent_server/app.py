@@ -64,6 +64,7 @@ from agent_server.models import (
     MessageList,
     MessageFeedbackRequest,
     MessageFeedbackResponse,
+    EventList,
     McpServer,
     McpServerList,
     McpCatalogList,
@@ -212,6 +213,14 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        # Re-sync on startup in case config changed while the process was idle,
+        # or tests construct the app without going through run_server().
+        try:
+            from agent.config import sync_process_env_from_config
+
+            sync_process_env_from_config()
+        except Exception:
+            pass
         yield
         await pty_manager.shutdown()
         await service.shutdown()
@@ -1630,6 +1639,14 @@ def create_app(
             return
         await websocket.accept()
         await pty_manager.attach(session_id, pty_id, websocket)
+
+    @app.get("/v1/sessions/{session_id}/events/history", response_model=EventList)
+    async def list_event_history(session_id: str) -> EventList:
+        """One-shot replay of persisted session events (for export / debugging)."""
+        if await asyncio.to_thread(store.get_session, session_id) is None:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        events = await asyncio.to_thread(store.list_events, session_id, after_sequence=0)
+        return EventList(data=events)
 
     @app.get("/v1/sessions/{session_id}/events")
     async def stream_events(
