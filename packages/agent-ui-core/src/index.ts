@@ -40,6 +40,11 @@ export type ServerSystemInfo = {
   ramTotalBytes: number
   thermalState: string | null
   loadAverage: number[] | null
+  chipName?: string | null
+  gpuCores?: number | null
+  gpuUtilizationPercent?: number | null
+  gpuMemoryUsedBytes?: number | null
+  gpuMemoryTotalBytes?: number | null
 }
 
 export type ServerCacheInfo = {

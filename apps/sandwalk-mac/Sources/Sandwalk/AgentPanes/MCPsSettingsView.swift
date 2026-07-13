@@ -13,29 +13,77 @@ struct MCPsSettingsView: View {
     @State private var connectKey = ""
     @State private var connectingId: String?
 
-    var filteredServers: [McpServerDTO] {
+    /// Custom / hand-added servers only — catalog-backed ones live under Suggested.
+    private var customServers: [McpServerDTO] {
+        let customs = servers.filter { server in
+            let cid = server.catalogId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return cid.isEmpty
+        }
         let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return servers }
-        return servers.filter { $0.name.lowercased().contains(q) || $0.id.lowercased().contains(q) }
+        guard !q.isEmpty else { return customs }
+        return customs.filter {
+            $0.name.lowercased().contains(q) || $0.id.lowercased().contains(q)
+        }
+    }
+
+    private var filteredCatalog: [McpCatalogEntryDTO] {
+        let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return catalog }
+        return catalog.filter {
+            $0.name.lowercased().contains(q)
+                || $0.description.lowercased().contains(q)
+        }
     }
 
     var body: some View {
         AgentAPIGate {
             VStack(alignment: .leading, spacing: 0) {
+                WebUIManagementCallout(topic: "MCPs", path: "mcp")
+
                 AgentSearchField(text: $search)
-                SettingsSectionHeader("SERVERS", subtitle: "\(filteredServers.count) configured")
+
+                SettingsSectionHeader(
+                    "SUGGESTED",
+                    subtitle: "\(filteredCatalog.count) catalog providers — connect here"
+                )
                 SettingsListGroup {
-                    if filteredServers.isEmpty {
-                        SettingsRow(label: busy ? "Loading…" : "No MCP servers", isLast: true) {
+                    if filteredCatalog.isEmpty {
+                        SettingsRow(
+                            label: busy ? "Loading…" : "No catalog entries",
+                            isLast: true
+                        ) { EmptyView() }
+                    } else {
+                        ForEach(Array(filteredCatalog.enumerated()), id: \.element.id) { index, entry in
+                            SettingsRow(
+                                label: entry.name,
+                                sublabel: catalogSublabel(entry),
+                                isLast: index == filteredCatalog.count - 1
+                            ) {
+                                catalogTrailing(entry)
+                            }
+                        }
+                    }
+                }
+
+                SettingsSectionHeader(
+                    "CUSTOM",
+                    subtitle: "\(customServers.count) stdio / hand-configured servers"
+                )
+                SettingsListGroup {
+                    if customServers.isEmpty {
+                        SettingsRow(
+                            label: busy ? "Loading…" : "No custom MCP servers",
+                            isLast: true
+                        ) {
                             Button("Add") { showAdd = true }
                                 .buttonStyle(.sandwalk(.normal))
                         }
                     } else {
-                        ForEach(Array(filteredServers.enumerated()), id: \.element.id) { index, server in
+                        ForEach(Array(customServers.enumerated()), id: \.element.id) { index, server in
                             SettingsRow(
                                 label: server.name,
                                 sublabel: "\(server.transport)\(server.enabled ? "" : " · disabled")",
-                                isLast: index == filteredServers.count - 1
+                                isLast: index == customServers.count - 1
                             ) {
                                 HStack(spacing: 6) {
                                     Toggle("", isOn: Binding(
@@ -73,47 +121,6 @@ struct MCPsSettingsView: View {
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 8)
-
-                SettingsSectionHeader("CATALOG", subtitle: "API-key connect (OAuth deferred)")
-                SettingsListGroup {
-                    let entries = catalog.filter { entry in
-                        let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                        guard !q.isEmpty else { return true }
-                        return entry.name.lowercased().contains(q)
-                    }
-                    if entries.isEmpty {
-                        SettingsRow(label: "No catalog entries", isLast: true) { EmptyView() }
-                    } else {
-                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                            SettingsRow(
-                                label: entry.name,
-                                sublabel: entry.connected == true
-                                    ? "Connected"
-                                    : (entry.description),
-                                isLast: index == entries.count - 1
-                            ) {
-                                if entry.connected == true {
-                                    Button("Disconnect") {
-                                        Task { await disconnect(entry) }
-                                    }
-                                    .buttonStyle(.sandwalk(.destructive))
-                                    .disabled(busy)
-                                } else if entry.preferredAuth == "oauth" || entry.authMode == "oauth" {
-                                    Text("OAuth")
-                                        .font(.sandwalk(11))
-                                        .foregroundStyle(.secondary)
-                                } else {
-                                    Button("Connect") {
-                                        connectingId = entry.id
-                                        connectKey = ""
-                                    }
-                                    .buttonStyle(.sandwalk(.normal))
-                                    .disabled(busy)
-                                }
-                            }
-                        }
-                    }
-                }
 
                 if let status {
                     Text(status)
@@ -162,6 +169,36 @@ struct MCPsSettingsView: View {
                 .padding(20)
                 .frame(width: 360)
             }
+        }
+    }
+
+    private func catalogSublabel(_ entry: McpCatalogEntryDTO) -> String {
+        if entry.connected == true {
+            return "Connected"
+        }
+        let desc = entry.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        return desc.isEmpty ? "Not connected" : desc
+    }
+
+    @ViewBuilder
+    private func catalogTrailing(_ entry: McpCatalogEntryDTO) -> some View {
+        if entry.connected == true {
+            Button("Disconnect") {
+                Task { await disconnect(entry) }
+            }
+            .buttonStyle(.sandwalk(.destructive))
+            .disabled(busy)
+        } else if entry.preferredAuth == "oauth" || entry.authMode == "oauth" {
+            Text("OAuth in Web UI")
+                .font(.sandwalk(11))
+                .foregroundStyle(.secondary)
+        } else {
+            Button("Connect") {
+                connectingId = entry.id
+                connectKey = ""
+            }
+            .buttonStyle(.sandwalk(.normal))
+            .disabled(busy)
         }
     }
 

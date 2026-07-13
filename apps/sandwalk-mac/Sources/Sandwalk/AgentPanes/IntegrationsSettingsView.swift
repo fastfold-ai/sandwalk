@@ -22,6 +22,8 @@ struct IntegrationsSettingsView: View {
     var body: some View {
         AgentAPIGate {
             VStack(alignment: .leading, spacing: 0) {
+                WebUIManagementCallout(topic: "integrations", path: "integrations")
+
                 AgentSearchField(text: $search)
                 SettingsSectionHeader("INTEGRATIONS", subtitle: "\(filtered.count) providers")
                 SettingsListGroup {

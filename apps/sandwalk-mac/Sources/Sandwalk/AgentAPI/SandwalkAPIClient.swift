@@ -206,6 +206,16 @@ enum SandwalkAPIClient {
         try await post("/v1/environment/packages/uninstall", body: ["name": name])
     }
 
+    // MARK: - Server status
+
+    static func serverStatus() async throws -> ServerStatusReportDTO {
+        try await get("/v1/status")
+    }
+
+    static func clearRuntimeCache() async throws -> ServerCacheInfoDTO {
+        try await post("/v1/storage/cache/clear", body: [:])
+    }
+
     // MARK: - HTTP
 
     private static func get<T: Decodable>(_ path: String, query: [URLQueryItem] = []) async throws -> T {

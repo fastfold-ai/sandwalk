@@ -69,13 +69,13 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
         label: 'General',
         path: '/dashboard/general',
         icon: Settings2
-      },
-      { id: 'models', label: 'Models', path: '/dashboard/models', icon: Box }
+      }
     ]
   },
   {
-    label: 'Tools & Integrations',
+    label: 'Capabilities',
     items: [
+      { id: 'models', label: 'Models', path: '/dashboard/models', icon: Box },
       { id: 'tools', label: 'Tools', path: '/dashboard/tools', icon: Wrench },
       {
         id: 'datasets',

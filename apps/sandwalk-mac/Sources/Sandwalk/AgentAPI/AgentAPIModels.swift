@@ -158,6 +158,46 @@ struct ConnectMcpDTO: Codable {
     let message: String?
 }
 
+// MARK: - Server status
+
+struct ServerSystemInfoDTO: Codable, Hashable {
+    let label: String
+    let platform: String
+    let arch: String
+    let osVersion: String
+    let pythonVersion: String
+    let ramUsedBytes: Int64
+    let ramTotalBytes: Int64
+    let thermalState: String?
+    let loadAverage: [Double]?
+    let chipName: String?
+    let gpuCores: Int?
+    let gpuUtilizationPercent: Double?
+    let gpuMemoryUsedBytes: Int64?
+    let gpuMemoryTotalBytes: Int64?
+}
+
+struct ServerCacheInfoDTO: Codable, Hashable {
+    let fileCount: Int
+    let totalBytes: Int64
+    let path: String
+}
+
+struct ServerStatusReportDTO: Codable, Hashable {
+    let status: String
+    let service: String
+    let version: String
+    let message: String?
+    let host: String?
+    let port: Int?
+    let pid: Int
+    let startedAt: String
+    let uptimeSeconds: Double
+    let system: ServerSystemInfoDTO
+    let cache: ServerCacheInfoDTO
+    let checkedAt: String
+}
+
 // MARK: - Doctor / Storage / Environment
 
 struct DoctorCheckDTO: Codable, Identifiable, Hashable {

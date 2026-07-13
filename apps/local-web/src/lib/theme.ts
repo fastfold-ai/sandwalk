@@ -78,8 +78,27 @@ export function resolveDark(mode: ThemeMode = getStoredTheme()) {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+/** Dark browser chrome needs a light Aura mark; light chrome needs dark. */
+export function syncFavicon(dark: boolean = resolveDark()) {
+  const href = dark ? '/favicon-light.svg' : '/favicon.svg'
+  let link = document.querySelector<HTMLLinkElement>(
+    'link[data-sandwalk-favicon]'
+  )
+  if (!link) {
+    link = document.createElement('link')
+    link.rel = 'icon'
+    link.type = 'image/svg+xml'
+    link.dataset.sandwalkFavicon = '1'
+    document.head.appendChild(link)
+  }
+  // Force a reload so Safari / Chrome pick up the swap.
+  link.href = `${href}?v=${dark ? 'light' : 'dark'}`
+}
+
 export function applyTheme(mode: ThemeMode) {
-  document.documentElement.classList.toggle('dark', resolveDark(mode))
+  const dark = resolveDark(mode)
+  document.documentElement.classList.toggle('dark', dark)
+  syncFavicon(dark)
   try {
     localStorage.setItem(THEME_STORAGE_KEY, mode)
   } catch {

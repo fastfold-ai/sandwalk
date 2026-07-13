@@ -75,6 +75,15 @@ function formatUptime(seconds: number): string {
   return `${secs}s`
 }
 
+function formatGpuLabel(chipName?: string | null, gpuCores?: number | null): string | null {
+  const chip = chipName?.trim()
+  const cores = gpuCores != null && gpuCores > 0 ? gpuCores : null
+  if (chip && cores != null) return `${chip} · ${cores} cores`
+  if (chip) return chip
+  if (cores != null) return `${cores} cores`
+  return null
+}
+
 function MemoryBar({ used, total }: { used: number; total: number }) {
   const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0
   return (
@@ -238,6 +247,7 @@ export function ServerStatusView({
   }
 
   const running = report?.status === 'running'
+  const gpuLabel = formatGpuLabel(report?.system.chipName, report?.system.gpuCores)
 
   return (
     <ScrollArea className="flex-1">
@@ -389,6 +399,11 @@ export function ServerStatusView({
             <section>
               <SectionLabel subtitle={report.system.label}>System</SectionLabel>
               <div className="bg-background rounded-2xl border px-4">
+                {gpuLabel ? (
+                  <MetaRow label="GPU">
+                    <span>{gpuLabel}</span>
+                  </MetaRow>
+                ) : null}
                 <MetaRow label="System RAM" stretch>
                   <MemoryBar
                     used={report.system.ramUsedBytes}

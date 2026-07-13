@@ -119,7 +119,7 @@ final class MenubarController: NSObject, NSMenuDelegate {
         menu.addItem(newAgentItem)
 
         dashboardItem = NSMenuItem(
-            title: "Go to the Dashboard",
+            title: "Open Web Dashboard",
             action: #selector(openDashboard),
             keyEquivalent: "o"
         )

@@ -23,6 +23,8 @@ struct ModelsSettingsView: View {
     var body: some View {
         AgentAPIGate {
             VStack(alignment: .leading, spacing: 0) {
+                WebUIManagementCallout(topic: "models", path: "models")
+
                 AgentSearchField(text: $search)
                 SettingsSectionHeader("MODELS", subtitle: "\(filtered.count) shown")
                 SettingsListGroup {

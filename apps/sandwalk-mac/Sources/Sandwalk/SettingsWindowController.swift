@@ -18,6 +18,7 @@ struct SettingsRootView: View {
                 Section {
                     SidebarRow(section: .status)
                     SidebarRow(section: .network)
+                    SidebarRow(section: .security)
                     SidebarRow(section: .logs)
                 } header: {
                     Text("Server")
@@ -25,16 +26,13 @@ struct SettingsRootView: View {
 
                 Section {
                     SidebarRow(section: .models)
-                }
-
-                Section {
                     SidebarRow(section: .tools)
                     SidebarRow(section: .datasets)
                     SidebarRow(section: .skills)
                     SidebarRow(section: .integrations)
                     SidebarRow(section: .mcps)
                 } header: {
-                    Text("Tools & Integrations")
+                    Text("Capabilities")
                 }
 
                 Section {
@@ -46,7 +44,6 @@ struct SettingsRootView: View {
                 }
 
                 Section {
-                    SidebarRow(section: .security)
                     SidebarRow(section: .about)
                 } header: {
                     Text("General")

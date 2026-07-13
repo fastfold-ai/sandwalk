@@ -19,6 +19,8 @@ struct SkillsSettingsView: View {
     var body: some View {
         AgentAPIGate {
             VStack(alignment: .leading, spacing: 0) {
+                WebUIManagementCallout(topic: "skills", path: "skills")
+
                 SettingsSectionHeader("INSTALL", subtitle: "GitHub / skills.sh source string")
                 SettingsListGroup {
                     SettingsRow(label: "Source", sublabel: "e.g. owner/repo or skills URL", isLast: true) {

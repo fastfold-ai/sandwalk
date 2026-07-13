@@ -27,18 +27,112 @@ _STARTED_AT = time.time()
 _STARTED_AT_ISO = datetime.now(timezone.utc).isoformat()
 
 
-def _format_platform_label() -> str:
+def _format_platform_label(*, chip_name: str | None = None) -> str:
     system = platform.system()
     release = platform.mac_ver()[0] if system == "Darwin" else platform.release()
     machine = platform.machine().lower()
     if system == "Darwin":
-        chip = "Apple Silicon" if machine in {"arm64", "aarch64"} else "Intel"
+        chip = chip_name or (
+            "Apple Silicon" if machine in {"arm64", "aarch64"} else "Intel"
+        )
         os_label = f"macOS {release}" if release else "macOS"
         return f"{chip} · {os_label}"
     if system == "Linux":
         arch = "ARM64" if machine in {"arm64", "aarch64"} else machine.upper()
         return f"Linux · {arch}"
     return f"{system} · {platform.machine()}"
+
+
+def _chip_name() -> str | None:
+    if platform.system() != "Darwin":
+        return None
+    try:
+        result = subprocess.run(
+            ["sysctl", "-n", "machdep.cpu.brand_string"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        value = result.stdout.strip()
+        return value or None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def _gpu_core_count_from_profiler() -> int | None:
+    if platform.system() != "Darwin":
+        return None
+    try:
+        result = subprocess.run(
+            ["system_profiler", "SPDisplaysDataType"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+        if result.returncode != 0:
+            return None
+        for line in result.stdout.splitlines():
+            if "Total Number of Cores" in line:
+                match = re.search(r"(\d+)", line)
+                if match:
+                    return int(match.group(1))
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+    return None
+
+
+def _gpu_metrics_darwin() -> dict[str, int | float | None]:
+    """Read Apple GPU utilization / memory / core count via ioreg (no sudo)."""
+    metrics: dict[str, int | float | None] = {
+        "gpu_cores": None,
+        "gpu_utilization_percent": None,
+        "gpu_memory_used_bytes": None,
+        "gpu_memory_total_bytes": None,
+    }
+    if platform.system() != "Darwin":
+        return metrics
+    try:
+        import plistlib
+
+        result = subprocess.run(
+            ["ioreg", "-a", "-r", "-d", "1", "-c", "IOAccelerator"],
+            check=False,
+            capture_output=True,
+            timeout=3,
+        )
+        if result.returncode != 0 or not result.stdout:
+            metrics["gpu_cores"] = _gpu_core_count_from_profiler()
+            return metrics
+        payload = plistlib.loads(result.stdout)
+        item = payload[0] if isinstance(payload, list) and payload else payload
+        if not isinstance(item, dict):
+            metrics["gpu_cores"] = _gpu_core_count_from_profiler()
+            return metrics
+
+        cores = item.get("gpu-core-count")
+        if isinstance(cores, int) and cores > 0:
+            metrics["gpu_cores"] = cores
+        else:
+            metrics["gpu_cores"] = _gpu_core_count_from_profiler()
+
+        stats = item.get("PerformanceStatistics")
+        if isinstance(stats, dict):
+            util = stats.get("Device Utilization %")
+            if isinstance(util, (int, float)):
+                metrics["gpu_utilization_percent"] = float(
+                    max(0.0, min(100.0, util))
+                )
+            used = stats.get("In use system memory")
+            if isinstance(used, int) and used >= 0:
+                metrics["gpu_memory_used_bytes"] = used
+            allocated = stats.get("Alloc system memory")
+            if isinstance(allocated, int) and allocated > 0:
+                metrics["gpu_memory_total_bytes"] = allocated
+    except (OSError, ValueError, subprocess.TimeoutExpired, Exception):
+        metrics["gpu_cores"] = _gpu_core_count_from_profiler()
+    return metrics
 
 
 def _ram_bytes() -> tuple[int, int]:
@@ -160,6 +254,8 @@ def _cache_info() -> ServerCacheInfo:
 
 def get_status_report(*, version: str, service: str = "Sandwalk") -> ServerStatusReport:
     used, total = _ram_bytes()
+    chip_name = _chip_name()
+    gpu = _gpu_metrics_darwin()
     host = os.environ.get("FASTFOLD_SERVE_HOST") or None
     port_raw = os.environ.get("FASTFOLD_SERVE_PORT")
     port: int | None = None
@@ -174,6 +270,10 @@ def get_status_report(*, version: str, service: str = "Sandwalk") -> ServerStatu
     elif host:
         bind = host
 
+    gpu_mem_total = gpu.get("gpu_memory_total_bytes")
+    if not isinstance(gpu_mem_total, int) or gpu_mem_total <= 0:
+        gpu_mem_total = total if total > 0 else None
+
     return ServerStatusReport(
         status="running",
         service=service,
@@ -185,7 +285,7 @@ def get_status_report(*, version: str, service: str = "Sandwalk") -> ServerStatu
         started_at=_STARTED_AT_ISO,
         uptime_seconds=max(0.0, time.time() - _STARTED_AT),
         system=ServerSystemInfo(
-            label=_format_platform_label(),
+            label=_format_platform_label(chip_name=chip_name),
             platform=platform.system(),
             arch=platform.machine(),
             os_version=(
@@ -198,6 +298,21 @@ def get_status_report(*, version: str, service: str = "Sandwalk") -> ServerStatu
             ram_total_bytes=total,
             thermal_state=_thermal_state(),
             load_average=_load_average(),
+            chip_name=chip_name,
+            gpu_cores=gpu.get("gpu_cores") if isinstance(gpu.get("gpu_cores"), int) else None,
+            gpu_utilization_percent=(
+                float(gpu["gpu_utilization_percent"])
+                if isinstance(gpu.get("gpu_utilization_percent"), (int, float))
+                else None
+            ),
+            gpu_memory_used_bytes=(
+                int(gpu["gpu_memory_used_bytes"])
+                if isinstance(gpu.get("gpu_memory_used_bytes"), int)
+                else None
+            ),
+            gpu_memory_total_bytes=(
+                int(gpu_mem_total) if isinstance(gpu_mem_total, int) else None
+            ),
         ),
         cache=_cache_info(),
         checked_at=datetime.now(timezone.utc).isoformat(),

@@ -48,6 +48,11 @@ class ServerSystemInfo(ApiModel):
     ram_total_bytes: int = 0
     thermal_state: str | None = None
     load_average: list[float] | None = None
+    chip_name: str | None = None
+    gpu_cores: int | None = None
+    gpu_utilization_percent: float | None = None
+    gpu_memory_used_bytes: int | None = None
+    gpu_memory_total_bytes: int | None = None
 
 
 class ServerCacheInfo(ApiModel):

@@ -26,6 +26,13 @@ struct AppConfig: Equatable, Sendable {
         dashboardURL.appendingPathComponent("dashboard")
     }
 
+    /// Deep link into a dashboard page (e.g. `skills`, `integrations`, `mcp`).
+    func dashboardPageURL(_ path: String) -> URL {
+        let trimmed = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !trimmed.isEmpty else { return dashboardHomeURL }
+        return dashboardHomeURL.appendingPathComponent(trimmed)
+    }
+
     var apiBaseURL: URL {
         URL(string: "http://\(connectableHost):\(port)")!
     }

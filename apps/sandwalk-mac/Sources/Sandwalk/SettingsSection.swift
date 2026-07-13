@@ -3,6 +3,7 @@ import Foundation
 enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
     case status
     case network
+    case security
     case logs
     case models
     case tools
@@ -13,7 +14,6 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
     case doctor
     case storage
     case environment
-    case security
     case about
 
     var id: String { rawValue }
