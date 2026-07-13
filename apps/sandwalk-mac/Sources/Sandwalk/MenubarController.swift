@@ -6,6 +6,7 @@ import QuartzCore
 final class MenubarController: NSObject, NSMenuDelegate {
     private let supervisor: SandwalkSupervisor
     private let requestQuit: () -> Void
+    private let openSettingsHandler: () -> Void
 
     private let statusItem: NSStatusItem
     private let menu = NSMenu()
@@ -31,10 +32,12 @@ final class MenubarController: NSObject, NSMenuDelegate {
 
     init(
         supervisor: SandwalkSupervisor,
-        requestQuit: @escaping () -> Void
+        requestQuit: @escaping () -> Void,
+        openSettings: @escaping () -> Void
     ) {
         self.supervisor = supervisor
         self.requestQuit = requestQuit
+        self.openSettingsHandler = openSettings
         self.statusItem = NSStatusBar.system.statusItem(withLength: SandwalkIcon.pointSize + 6)
         super.init()
 
@@ -481,13 +484,7 @@ final class MenubarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func openSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.setActivationPolicy(.regular)
-        if #available(macOS 14.0, *) {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        } else {
-            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-        }
+        openSettingsHandler()
     }
 
     @objc private func quitApp() {

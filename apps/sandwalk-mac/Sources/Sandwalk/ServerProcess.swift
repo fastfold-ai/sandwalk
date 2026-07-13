@@ -54,6 +54,10 @@ final class ServerProcess: @unchecked Sendable {
         self.config = config
     }
 
+    func reconfigure(config: AppConfig) {
+        self.config = config
+    }
+
     @discardableResult
     func start() throws -> StartResult {
         switch state {

@@ -27,8 +27,8 @@
   inset: 0;
   background: radial-gradient(
     ellipse 26% 34% at 50% 56%,
-    rgba(245, 245, 245, 0.75) 0%,
-    rgba(245, 245, 245, 0.35) 55%,
+    hsl(var(--background) / 0.75) 0%,
+    hsl(var(--background) / 0.35) 55%,
     transparent 100%
   );
 }
@@ -44,9 +44,9 @@
   height: 38%;
   background: linear-gradient(
     to bottom,
-    rgba(245, 245, 245, 0.95) 0%,
-    rgba(245, 245, 245, 0.6) 50%,
-    rgba(245, 245, 245, 0) 100%
+    hsl(var(--background) / 0.95) 0%,
+    hsl(var(--background) / 0.6) 50%,
+    hsl(var(--background) / 0) 100%
   );
 }
 
@@ -61,9 +61,9 @@
   height: 26%;
   background: linear-gradient(
     to bottom,
-    rgba(245, 245, 245, 0) 0%,
-    rgba(245, 245, 245, 0.75) 55%,
-    #f5f5f5 100%
+    hsl(var(--background) / 0) 0%,
+    hsl(var(--background) / 0.75) 55%,
+    hsl(var(--background)) 100%
   );
 }
 
@@ -146,8 +146,7 @@
 .mirage-form__circle,
 .mirage-form__chord {
   fill: none;
-  /* Warm taupe — visible on the pale page bg AND on the sand fill. */
-  stroke: rgba(138, 114, 82, 0.55);
+  stroke: hsl(var(--muted-foreground) / 0.45);
   stroke-width: 1.6;
   vector-effect: non-scaling-stroke;
   stroke-linecap: round;
@@ -190,9 +189,9 @@
   .mirage-background__overlay {
     background: radial-gradient(
       ellipse 70% 56% at 50% 52%,
-      rgba(245, 245, 245, 0.92) 0%,
-      rgba(245, 245, 245, 0.58) 50%,
-      rgba(245, 245, 245, 0.14) 80%,
+      hsl(var(--background) / 0.92) 0%,
+      hsl(var(--background) / 0.58) 50%,
+      hsl(var(--background) / 0.14) 80%,
       transparent 100%
     );
   }
@@ -221,35 +220,8 @@
   opacity: 0.85;
 }
 
-.dark .mirage-background__overlay {
-  background: radial-gradient(
-    ellipse 26% 34% at 50% 56%,
-    rgba(10, 10, 10, 0.72) 0%,
-    rgba(10, 10, 10, 0.32) 55%,
-    transparent 100%
-  );
-}
-
 .dark .mirage-form__capsule,
 .dark .mirage-form__circle,
 .dark .mirage-form__chord {
-  stroke: rgba(214, 196, 164, 0.6);
-}
-
-.dark .mirage-background::before {
-  background: linear-gradient(
-    to bottom,
-    rgba(10, 10, 10, 0.95) 0%,
-    rgba(10, 10, 10, 0.6) 50%,
-    rgba(10, 10, 10, 0) 100%
-  );
-}
-
-.dark .mirage-background::after {
-  background: linear-gradient(
-    to bottom,
-    rgba(10, 10, 10, 0) 0%,
-    rgba(10, 10, 10, 0.75) 55%,
-    #0a0a0a 100%
-  );
+  stroke: hsl(var(--muted-foreground) / 0.55);
 }

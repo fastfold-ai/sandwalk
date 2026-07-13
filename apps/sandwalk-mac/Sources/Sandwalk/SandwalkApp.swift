@@ -7,14 +7,10 @@ struct SandwalkApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
+        // Settings live in SettingsWindowController (NSWindow) — SwiftUI's
+        // Settings scene + showSettingsWindow: is a no-op for accessory apps.
         Settings {
-            TabView {
-                SecuritySettingsView()
-                    .tabItem {
-                        Label("Security", systemImage: "lock.fill")
-                    }
-            }
-            .frame(minWidth: 560, minHeight: 360)
+            EmptyView()
         }
     }
 }

@@ -18,7 +18,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { applyTheme, getStoredTheme, type ThemeMode } from '@/lib/theme'
+import {
+  applyTheme,
+  getStoredTheme,
+  THEME_CHANGE_EVENT,
+  type ThemeMode
+} from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
 const DOCS_URL = 'https://docs.fastfold.ai'
@@ -66,13 +71,14 @@ export function SidebarUserMenu({
     applyTheme(theme)
   }, [theme])
 
+  // Stay in sync when the theme changes elsewhere (floating toggle).
   useEffect(() => {
-    if (theme !== 'system') return
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => applyTheme('system')
-    media.addEventListener('change', onChange)
-    return () => media.removeEventListener('change', onChange)
-  }, [theme])
+    const onChange = (event: Event) => {
+      setTheme((event as CustomEvent<ThemeMode>).detail)
+    }
+    window.addEventListener(THEME_CHANGE_EVENT, onChange)
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, onChange)
+  }, [])
 
   const initials = useMemo(() => userInitials(displayName), [displayName])
 
@@ -190,12 +196,9 @@ export function SidebarUserMenu({
 
         <DropdownMenuItem
           className="flex cursor-pointer items-center justify-between px-2.5 py-1.5 text-sm"
-          disabled={loggingOut}
+          disabled={loggingOut || !onLogout}
           onClick={() => {
-            if (!onLogout) {
-              navigate('/')
-              return
-            }
+            if (!onLogout) return
             setLoggingOut(true)
             void Promise.resolve(onLogout()).finally(() => setLoggingOut(false))
           }}

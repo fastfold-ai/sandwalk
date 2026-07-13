@@ -49,6 +49,10 @@ final class WebUIProcess: @unchecked Sendable {
         self.config = config
     }
 
+    func reconfigure(config: AppConfig) {
+        self.config = config
+    }
+
     func start() throws {
         switch state {
         case .running, .starting:
@@ -141,7 +145,7 @@ final class WebUIProcess: @unchecked Sendable {
             switch self {
             case .busy: return "Web UI is busy stopping."
             case .missingRepo: return "Sandwalk repo root not found (need package.json + cli/)."
-            case .missingPnpm: return "pnpm not found on PATH."
+            case .missingPnpm: return "pnpm not found. Install pnpm or ensure it is on PATH (Homebrew / ~/Library/pnpm/bin)."
             case .spawnFailed(let message): return message
             }
         }
@@ -151,7 +155,7 @@ final class WebUIProcess: @unchecked Sendable {
         guard let repoRoot = config.repoRoot else {
             throw StartError.missingRepo
         }
-        guard let pnpm = which("pnpm") else {
+        guard let pnpm = PathSupport.which("pnpm") else {
             throw StartError.missingPnpm
         }
 
@@ -174,9 +178,9 @@ final class WebUIProcess: @unchecked Sendable {
             "--port", String(config.dashboardPort),
         ]
         proc.currentDirectoryURL = repoRoot
-        var env = ProcessInfo.processInfo.environment
-        env["SANDWALK_SUPERVISED"] = "menubar"
-        proc.environment = env
+        proc.environment = PathSupport.processEnvironment(merging: [
+            "SANDWALK_SUPERVISED": "menubar",
+        ])
         proc.standardOutput = handle
         proc.standardError = handle
         proc.terminationHandler = { [weak self] term in
@@ -291,26 +295,5 @@ final class WebUIProcess: @unchecked Sendable {
     private func closeLog() {
         try? logHandle?.close()
         logHandle = nil
-    }
-
-    private func which(_ name: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = [name]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            return nil
-        }
-        guard process.terminationStatus == 0 else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let path = String(data: data, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let path, !path.isEmpty else { return nil }
-        return path
     }
 }

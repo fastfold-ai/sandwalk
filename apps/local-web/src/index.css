@@ -106,6 +106,177 @@
   }
 }
 
+/* ── Color palettes (data-palette on <html>) ─────────────────────────────── */
+/* Each palette overrides tokens for both light (:root) and dark (.dark).    */
+
+:root[data-palette='mirage'] {
+  --background: 20 30% 97%;
+  --foreground: 15 25% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 15 25% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 15 25% 12%;
+  --primary: 5 79% 57%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 20 25% 94%;
+  --secondary-foreground: 15 25% 16%;
+  --muted: 20 20% 94%;
+  --muted-foreground: 15 10% 42%;
+  --accent: 8 55% 95%;
+  --accent-foreground: 5 70% 38%;
+  --border: 18 18% 88%;
+  --input: 18 18% 88%;
+  --ring: 5 79% 57%;
+  --sidebar-background: 20 28% 97.5%;
+  --sidebar-foreground: 15 18% 28%;
+  --sidebar-primary: 5 79% 57%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 8 45% 94%;
+  --sidebar-accent-foreground: 5 70% 35%;
+  --sidebar-border: 18 16% 90%;
+  --sidebar-ring: 5 79% 57%;
+}
+
+.dark[data-palette='mirage'] {
+  --background: 15 18% 8%;
+  --foreground: 30 20% 96%;
+  --card: 15 16% 11%;
+  --card-foreground: 30 20% 96%;
+  --popover: 15 16% 11%;
+  --popover-foreground: 30 20% 96%;
+  --primary: 5 82% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 15 12% 16%;
+  --secondary-foreground: 30 15% 92%;
+  --muted: 15 12% 16%;
+  --muted-foreground: 30 10% 62%;
+  --accent: 8 35% 16%;
+  --accent-foreground: 5 90% 72%;
+  --border: 15 12% 18%;
+  --input: 15 12% 18%;
+  --ring: 5 82% 58%;
+  --sidebar-background: 15 16% 9%;
+  --sidebar-foreground: 30 12% 92%;
+  --sidebar-primary: 5 82% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 8 28% 15%;
+  --sidebar-accent-foreground: 5 90% 72%;
+  --sidebar-border: 15 12% 16%;
+  --sidebar-ring: 5 82% 58%;
+}
+
+:root[data-palette='mahal'] {
+  --background: 36 40% 96%;
+  --foreground: 24 48% 16%;
+  --card: 40 45% 99%;
+  --card-foreground: 24 48% 16%;
+  --popover: 40 45% 99%;
+  --popover-foreground: 24 48% 16%;
+  --primary: 25 40% 40%;
+  --primary-foreground: 40 72% 92%;
+  --secondary: 36 28% 92%;
+  --secondary-foreground: 24 40% 22%;
+  --muted: 36 24% 92%;
+  --muted-foreground: 28 18% 40%;
+  --accent: 40 55% 92%;
+  --accent-foreground: 32 55% 28%;
+  --border: 34 22% 86%;
+  --input: 34 22% 86%;
+  --ring: 40 71% 59%;
+  --sidebar-background: 36 36% 96.5%;
+  --sidebar-foreground: 24 35% 26%;
+  --sidebar-primary: 25 40% 40%;
+  --sidebar-primary-foreground: 40 72% 92%;
+  --sidebar-accent: 40 45% 92%;
+  --sidebar-accent-foreground: 32 50% 28%;
+  --sidebar-border: 34 20% 88%;
+  --sidebar-ring: 40 71% 59%;
+}
+
+.dark[data-palette='mahal'] {
+  --background: 24 48% 12%;
+  --foreground: 40 72% 88%;
+  --card: 24 42% 15%;
+  --card-foreground: 40 72% 88%;
+  --popover: 24 42% 15%;
+  --popover-foreground: 40 72% 88%;
+  --primary: 40 71% 59%;
+  --primary-foreground: 24 48% 14%;
+  --secondary: 24 30% 20%;
+  --secondary-foreground: 40 50% 85%;
+  --muted: 24 28% 19%;
+  --muted-foreground: 40 25% 62%;
+  --accent: 28 35% 20%;
+  --accent-foreground: 40 71% 68%;
+  --border: 24 28% 22%;
+  --input: 24 28% 22%;
+  --ring: 40 71% 59%;
+  --sidebar-background: 24 45% 13%;
+  --sidebar-foreground: 40 55% 88%;
+  --sidebar-primary: 40 71% 59%;
+  --sidebar-primary-foreground: 24 48% 14%;
+  --sidebar-accent: 28 32% 18%;
+  --sidebar-accent-foreground: 40 71% 68%;
+  --sidebar-border: 24 28% 20%;
+  --sidebar-ring: 40 71% 59%;
+}
+
+:root[data-palette='darwin'] {
+  --background: 140 20% 97%;
+  --foreground: 155 35% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 155 35% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 155 35% 12%;
+  --primary: 152 40% 30%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 140 18% 93%;
+  --secondary-foreground: 155 30% 18%;
+  --muted: 140 14% 93%;
+  --muted-foreground: 150 10% 40%;
+  --accent: 145 35% 93%;
+  --accent-foreground: 152 45% 26%;
+  --border: 140 12% 87%;
+  --input: 140 12% 87%;
+  --ring: 152 40% 36%;
+  --sidebar-background: 140 18% 97.5%;
+  --sidebar-foreground: 155 22% 26%;
+  --sidebar-primary: 152 40% 30%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 145 30% 93%;
+  --sidebar-accent-foreground: 152 45% 26%;
+  --sidebar-border: 140 12% 89%;
+  --sidebar-ring: 152 40% 36%;
+}
+
+.dark[data-palette='darwin'] {
+  --background: 155 28% 8%;
+  --foreground: 140 20% 96%;
+  --card: 155 24% 11%;
+  --card-foreground: 140 20% 96%;
+  --popover: 155 24% 11%;
+  --popover-foreground: 140 20% 96%;
+  --primary: 148 40% 55%;
+  --primary-foreground: 155 40% 10%;
+  --secondary: 155 18% 16%;
+  --secondary-foreground: 140 15% 92%;
+  --muted: 155 16% 16%;
+  --muted-foreground: 145 12% 62%;
+  --accent: 152 25% 16%;
+  --accent-foreground: 148 50% 68%;
+  --border: 155 16% 18%;
+  --input: 155 16% 18%;
+  --ring: 148 40% 55%;
+  --sidebar-background: 155 26% 9%;
+  --sidebar-foreground: 140 15% 93%;
+  --sidebar-primary: 148 40% 55%;
+  --sidebar-primary-foreground: 155 40% 10%;
+  --sidebar-accent: 152 22% 15%;
+  --sidebar-accent-foreground: 148 50% 68%;
+  --sidebar-border: 155 16% 16%;
+  --sidebar-ring: 148 40% 55%;
+}
+
 .chat-scrollbar {
   scrollbar-gutter: stable;
   scrollbar-width: thin;

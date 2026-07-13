@@ -6,9 +6,11 @@ import { BrowserRouter } from 'react-router-dom'
 
 import App from './App.tsx'
 import { Toaster } from './components/ui/sonner.tsx'
-import { applyTheme, getStoredTheme } from './lib/theme.ts'
+import { applyTheme, applyPalette, getStoredTheme, getStoredPalette, watchSystemTheme } from './lib/theme.ts'
 
 applyTheme(getStoredTheme())
+applyPalette(getStoredPalette())
+watchSystemTheme()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

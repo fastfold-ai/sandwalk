@@ -2795,6 +2795,7 @@ export default function App() {
               active={dashboardSection}
               userName={health?.userName ?? null}
               onCollapse={() => setSidebarCollapsed(true)}
+              onLogout={logoutSession}
             />
           ) : (
             <>

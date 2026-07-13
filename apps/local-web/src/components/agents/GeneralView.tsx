@@ -1,5 +1,6 @@
 import type { AccountSummary } from '@sandwalk/agent-ui-core'
 import {
+  Check,
   ExternalLink,
   Loader2,
   LogOut,
@@ -12,6 +13,13 @@ import { SettingsBlockSkeleton } from '@/components/agents/PageSkeletons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  applyPalette,
+  getStoredPalette,
+  PALETTE_CHANGE_EVENT,
+  THEME_PALETTES,
+  type ThemePaletteId
+} from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
 function formatCheckedAt(date: Date | null) {
@@ -58,6 +66,15 @@ export function GeneralView({
   const [draftBackendUrl, setDraftBackendUrl] = useState(backendUrl)
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [palette, setPalette] = useState<ThemePaletteId>(() => getStoredPalette())
+
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      setPalette((event as CustomEvent<ThemePaletteId>).detail)
+    }
+    window.addEventListener(PALETTE_CHANGE_EVENT, onChange)
+    return () => window.removeEventListener(PALETTE_CHANGE_EVENT, onChange)
+  }, [])
 
   const backendDirty =
     normalizeBackendUrl(draftBackendUrl) !== normalizeBackendUrl(backendUrl)
@@ -157,7 +174,7 @@ export function GeneralView({
         <div>
           <h2 className="text-2xl font-semibold">General</h2>
           <p className="text-muted-foreground mt-2 text-sm">
-            Account, local backend connection, and app details.
+            Account, themes, local backend connection, and app details.
           </p>
         </div>
 
@@ -308,6 +325,58 @@ export function GeneralView({
                 {backendDirty ? 'Save & connect' : 'Recheck'}
               </Button>
             </div>
+          </div>
+        </section>
+
+        <section className="space-y-4 border-b pb-8">
+          <div>
+            <h3 className="text-base font-semibold">Themes</h3>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Color palettes for light and dark mode. Mode (light / dark /
+              system) still lives in the user menu.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {THEME_PALETTES.map(item => {
+              const selected = palette === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => applyPalette(item.id)}
+                  className={cn(
+                    'bg-card hover:bg-muted/40 relative flex flex-col gap-3 rounded-xl border p-4 text-left transition-colors',
+                    selected
+                      ? 'border-primary ring-primary/20 ring-2'
+                      : 'border-border'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold">{item.name}</div>
+                      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                        {item.description}
+                      </p>
+                    </div>
+                    {selected ? (
+                      <span className="bg-primary text-primary-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-full">
+                        <Check className="size-3.5" />
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {item.swatches.map(color => (
+                      <span
+                        key={color}
+                        className="border-border size-7 rounded-md border shadow-sm"
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </section>
 

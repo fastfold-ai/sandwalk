@@ -18,7 +18,7 @@ struct AppConfig: Equatable, Sendable {
     static let defaultDashboardPort = 8969
 
     var dashboardURL: URL {
-        URL(string: "http://\(dashboardHost):\(dashboardPort)/")!
+        URL(string: "http://\(dashboardConnectableHost):\(dashboardPort)/")!
     }
 
     /// Settings / overview surface (`/dashboard`).
@@ -50,21 +50,49 @@ struct AppConfig: Equatable, Sendable {
         dashboardURL
     }
 
+    /// Host used in browser / HTTP client URLs when bound to all interfaces.
     var connectableHost: String {
         bindHost == "0.0.0.0" ? "127.0.0.1" : bindHost
     }
 
+    var dashboardConnectableHost: String {
+        dashboardHost == "0.0.0.0" ? "127.0.0.1" : dashboardHost
+    }
+
+    var apiExposesRemote: Bool { bindHost == "0.0.0.0" }
+    var dashboardExposesRemote: Bool { dashboardHost == "0.0.0.0" }
+
+    /// Load: env overrides → settings.json → defaults.
     static func load() -> AppConfig {
         let env = ProcessInfo.processInfo.environment
-        let host = env["SANDWALK_HOST"] ?? defaultHost
-        let port = Int(env["SANDWALK_PORT"] ?? "") ?? defaultPort
-        var dashHost = env["SANDWALK_DASHBOARD_HOST"] ?? defaultDashboardHost
-        var dashPort = Int(env["SANDWALK_DASHBOARD_PORT"] ?? "") ?? defaultDashboardPort
+        let saved = ServerSettingsStore.load()
+
+        let host =
+            env["SANDWALK_HOST"]
+            ?? saved.bindHost
+            ?? defaultHost
+        let port =
+            Int(env["SANDWALK_PORT"] ?? "")
+            ?? saved.port
+            ?? defaultPort
+        var dashHost =
+            env["SANDWALK_DASHBOARD_HOST"]
+            ?? saved.dashboardHost
+            ?? defaultDashboardHost
+        var dashPort =
+            Int(env["SANDWALK_DASHBOARD_PORT"] ?? "")
+            ?? saved.dashboardPort
+            ?? defaultDashboardPort
         if let override = env["SANDWALK_DASHBOARD_URL"].flatMap(URL.init(string:)) {
             dashHost = override.host ?? dashHost
             dashPort = override.port ?? dashPort
         }
-        let autoStart = (env["SANDWALK_AUTO_START"] ?? "1") != "0"
+        let autoStart: Bool = {
+            if let raw = env["SANDWALK_AUTO_START"] {
+                return raw != "0"
+            }
+            return saved.autoStartOnLaunch ?? true
+        }()
         let repoRoot = env["SANDWALK_REPO_ROOT"].map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
         } ?? discoverRepoRoot()
@@ -81,6 +109,19 @@ struct AppConfig: Equatable, Sendable {
             autoStartOnLaunch: autoStart,
             agentCliRoot: cliRoot,
             repoRoot: repoRoot
+        )
+    }
+
+    /// Persist network bind settings (does not touch auth keys).
+    func saveNetworkSettings() throws {
+        try ServerSettingsStore.save(
+            ServerNetworkSettings(
+                bindHost: bindHost,
+                port: port,
+                dashboardHost: dashboardHost,
+                dashboardPort: dashboardPort,
+                autoStartOnLaunch: autoStartOnLaunch
+            )
         )
     }
 
@@ -140,5 +181,61 @@ struct AppConfig: Equatable, Sendable {
 
     var webLogURL: URL {
         supportDirectory.appendingPathComponent("logs/web.log")
+    }
+}
+
+/// Network slice of `settings.json` (alongside `auth`).
+struct ServerNetworkSettings: Equatable, Sendable {
+    var bindHost: String?
+    var port: Int?
+    var dashboardHost: String?
+    var dashboardPort: Int?
+    var autoStartOnLaunch: Bool?
+}
+
+enum ServerSettingsStore {
+    static func settingsFileURL() -> URL {
+        AuthSettingsStore.settingsFileURL()
+    }
+
+    static func load() -> ServerNetworkSettings {
+        let url = settingsFileURL()
+        guard
+            let data = try? Data(contentsOf: url),
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let server = root["server"] as? [String: Any]
+        else {
+            return ServerNetworkSettings()
+        }
+        return ServerNetworkSettings(
+            bindHost: server["host"] as? String,
+            port: server["port"] as? Int,
+            dashboardHost: server["dashboard_host"] as? String,
+            dashboardPort: server["dashboard_port"] as? Int,
+            autoStartOnLaunch: server["auto_start"] as? Bool
+        )
+    }
+
+    static func save(_ settings: ServerNetworkSettings) throws {
+        let url = settingsFileURL()
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        var root: [String: Any] = [:]
+        if let data = try? Data(contentsOf: url),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        {
+            root = existing
+        }
+        root["server"] = [
+            "host": settings.bindHost ?? AppConfig.defaultHost,
+            "port": settings.port ?? AppConfig.defaultPort,
+            "dashboard_host": settings.dashboardHost ?? AppConfig.defaultDashboardHost,
+            "dashboard_port": settings.dashboardPort ?? AppConfig.defaultDashboardPort,
+            "auto_start": settings.autoStartOnLaunch ?? true,
+        ]
+        let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: url, options: .atomic)
     }
 }

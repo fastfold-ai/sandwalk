@@ -126,11 +126,13 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
 export function DashboardSidebar({
   active,
   userName,
-  onCollapse
+  onCollapse,
+  onLogout
 }: {
   active: DashboardSection
   userName: string | null
   onCollapse: () => void
+  onLogout?: () => void | Promise<void>
 }) {
   const navigate = useNavigate()
 
@@ -193,7 +195,7 @@ export function DashboardSidebar({
       </ScrollArea>
 
       <div className="shrink-0 p-2">
-        <SidebarUserMenu userName={userName} />
+        <SidebarUserMenu userName={userName} onLogout={onLogout} />
       </div>
     </div>
   )

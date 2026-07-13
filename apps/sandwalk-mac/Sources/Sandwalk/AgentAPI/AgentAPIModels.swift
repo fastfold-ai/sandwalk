@@ -1,0 +1,236 @@
+import Foundation
+
+// MARK: - Models
+
+struct AgentModelDTO: Codable, Identifiable, Hashable {
+    let id: String
+    let label: String
+    let description: String?
+    let provider: String
+    let source: String
+    let profileId: String?
+    let enabled: Bool
+    let health: String?
+}
+
+struct ModelProfileDTO: Codable, Identifiable, Hashable {
+    let id: String
+    let label: String
+    let backend: String
+    let baseUrl: String?
+    let defaultModel: String?
+    let discovery: [String]?
+    let hasApiKey: Bool?
+    let apiKeyPreview: String?
+    let isCloud: Bool?
+    let isActive: Bool?
+    let isDefault: Bool?
+}
+
+struct ModelProfileProbeDTO: Codable {
+    let profileId: String?
+    let health: String?
+    let models: [String]?
+    let error: String?
+}
+
+// MARK: - Tools
+
+struct ToolSummaryDTO: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let category: String
+    let status: String?
+    let description: String
+    let requiresData: [String]?
+    let enabled: Bool
+}
+
+struct ToolCatalogDTO: Codable {
+    let data: [ToolSummaryDTO]
+    let count: Int?
+    let categories: [String]?
+}
+
+// MARK: - Datasets
+
+struct DatasetSummaryDTO: Codable, Identifiable, Hashable {
+    let id: String
+    let description: String
+    let status: String
+    let filesFound: Int?
+    let filesExpected: Int?
+    let sizeDisplay: String?
+    let autoDownload: Bool?
+    let path: String?
+    let note: String?
+}
+
+struct DatasetInstallDTO: Codable {
+    let ok: Bool?
+    let id: String?
+    let status: String?
+    let summary: String?
+}
+
+// MARK: - Skills
+
+struct AgentSkillDTO: Codable, Identifiable, Hashable {
+    var id: String { name }
+    let name: String
+    let description: String
+    let tags: [String]?
+    let source: String?
+    let author: String?
+    let version: String?
+    let enabled: Bool
+}
+
+// MARK: - Integrations
+
+struct IntegrationFieldDTO: Codable, Hashable {
+    let envVar: String
+    let label: String
+    let isSecret: Bool
+    let configured: Bool
+    let source: String?
+    let maskedPreview: String?
+}
+
+struct IntegrationSummaryDTO: Codable, Identifiable, Hashable {
+    var id: String { key }
+    let key: String
+    let name: String
+    let category: String
+    let description: String
+    let envVar: String?
+    let configured: Bool
+    let source: String?
+    let maskedPreview: String?
+    let setupUrl: String?
+    let free: Bool?
+    let fields: [IntegrationFieldDTO]?
+}
+
+struct ValidateDTO: Codable {
+    let ok: Bool
+    let message: String?
+}
+
+// MARK: - MCP
+
+struct McpServerDTO: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let transport: String
+    let command: String?
+    let args: [String]?
+    let url: String?
+    let enabled: Bool
+    let catalogId: String?
+    let description: String?
+}
+
+struct McpCatalogEntryDTO: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let description: String
+    let url: String?
+    let transport: String?
+    let authMode: String?
+    let preferredAuth: String?
+    let configured: Bool?
+    let enabled: Bool?
+    let connected: Bool?
+    let serverId: String?
+    let statusMessage: String?
+}
+
+struct ValidateMcpDTO: Codable {
+    let ok: Bool?
+    let message: String?
+    let toolCount: Int?
+}
+
+struct ConnectMcpDTO: Codable {
+    let ok: Bool?
+    let serverId: String?
+    let message: String?
+}
+
+// MARK: - Doctor / Storage / Environment
+
+struct DoctorCheckDTO: Codable, Identifiable, Hashable {
+    var id: String { "\(category)-\(name)" }
+    let name: String
+    let status: String
+    let detail: String
+    let category: String
+    let fix: String?
+}
+
+struct DoctorSummaryDTO: Codable {
+    let ok: Int
+    let warn: Int
+    let error: Int
+    let total: Int
+}
+
+struct DoctorReportDTO: Codable {
+    let ok: Bool
+    let checkedAt: String?
+    let summary: DoctorSummaryDTO
+    let checks: [DoctorCheckDTO]
+}
+
+struct StorageCategoryDTO: Codable, Identifiable, Hashable {
+    var id: String { label + String(bytes) }
+    let label: String
+    let color: String?
+    let bytes: Int64
+    let path: String?
+}
+
+struct StorageLocationDTO: Codable {
+    let path: String
+    let label: String?
+    let bytes: Int64?
+}
+
+struct StorageReportDTO: Codable {
+    let location: StorageLocationDTO?
+    let categories: [StorageCategoryDTO]
+    let totalBytes: Int64
+    let availableBytes: Int64?
+    let checkedAt: String?
+}
+
+struct EnvPackageDTO: Codable, Identifiable, Hashable {
+    var id: String { name }
+    let name: String
+    let version: String?
+    let installed: Bool
+    let removable: Bool
+}
+
+struct EnvGroupDTO: Codable, Identifiable, Hashable {
+    let id: String
+    let label: String
+    let description: String?
+    let packages: [EnvPackageDTO]
+}
+
+struct EnvironmentReportDTO: Codable {
+    let pythonPath: String?
+    let envPath: String?
+    let envBytes: Int64?
+    let groups: [EnvGroupDTO]
+    let checkedAt: String?
+}
+
+struct EnvMutationDTO: Codable {
+    let ok: Bool?
+    let message: String?
+    let name: String?
+    let installed: Bool?
+}

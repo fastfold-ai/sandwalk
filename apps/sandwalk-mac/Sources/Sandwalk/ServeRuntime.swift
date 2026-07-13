@@ -43,7 +43,7 @@ struct ServeRuntime {
                     )
                 }
             }
-            if let uv = which("uv") {
+            if let uv = PathSupport.which("uv") {
                 return ServeRuntime(
                     executable: URL(fileURLWithPath: uv),
                     argumentsPrefix: ["run", "--directory", root.path, "sandwalk"],
@@ -52,7 +52,7 @@ struct ServeRuntime {
             }
         }
 
-        if let path = which("sandwalk") ?? which("fastfold") {
+        if let path = PathSupport.which("sandwalk") ?? PathSupport.which("fastfold") {
             return ServeRuntime(
                 executable: URL(fileURLWithPath: path),
                 argumentsPrefix: [],
@@ -68,33 +68,12 @@ struct ServeRuntime {
     }
 
     func makeEnvironment() -> [String: String] {
-        var env = ProcessInfo.processInfo.environment
-        env["SANDWALK_SUPERVISED"] = "menubar"
-        // Pin to Application Support so CLI `sandwalk auth` and serve share one
-        // file. Ignore stale shell overrides (e.g. /tmp from local tests).
-        env["SANDWALK_SETTINGS_PATH"] = AuthSettingsStore.settingsFileURL().path
+        var env = PathSupport.processEnvironment(merging: [
+            "SANDWALK_SUPERVISED": "menubar",
+            "SANDWALK_SETTINGS_PATH": AuthSettingsStore.settingsFileURL().path,
+        ])
+        // Pin to Application Support; ignore stale shell overrides (e.g. /tmp).
         env.removeValue(forKey: "SANDWALK_HOME")
         return env
-    }
-
-    private static func which(_ name: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = [name]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            return nil
-        }
-        guard process.terminationStatus == 0 else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let path = String(data: data, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let path, !path.isEmpty else { return nil }
-        return path
     }
 }

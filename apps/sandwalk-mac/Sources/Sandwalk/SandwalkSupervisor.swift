@@ -34,8 +34,9 @@ final class SandwalkSupervisor {
     }
 
     static let stateDidChangeNotification = Notification.Name("SandwalkSupervisorStateDidChange")
+    static let configDidChangeNotification = Notification.Name("SandwalkSupervisorConfigDidChange")
 
-    let config: AppConfig
+    private(set) var config: AppConfig
     let api: ServerProcess
     let web: WebUIProcess
 
@@ -89,6 +90,30 @@ final class SandwalkSupervisor {
         await web.stop()
         await api.stop()
         recompute()
+    }
+
+    /// Persist network settings and restart API + web with the new binds.
+    func applyNetworkConfig(_ next: AppConfig) async throws {
+        var updated = next
+        // Preserve discovery paths from the running supervisor.
+        updated.agentCliRoot = config.agentCliRoot
+        updated.repoRoot = config.repoRoot
+        try updated.saveNetworkSettings()
+        config = updated
+        api.reconfigure(config: updated)
+        web.reconfigure(config: updated)
+        NotificationCenter.default.post(name: Self.configDidChangeNotification, object: self)
+
+        let shouldRestart = overall.isLive
+        if shouldRestart {
+            await stopAll()
+            try startAll()
+        }
+    }
+
+    func restartAll() async throws {
+        await stopAll()
+        try startAll()
     }
 
     func reapSync() {

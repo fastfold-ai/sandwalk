@@ -40,6 +40,17 @@ enum SandwalkIcon {
         return image
     }
 
+    /// Colorful app / Settings hero mark (not a template).
+    static func appLogo(pointSize: CGFloat = 52) -> NSImage {
+        makeBitmapImage(pointSize: pointSize) { rect in
+            drawAura(
+                in: rect,
+                colors: barColors,
+                opacities: Array(repeating: 1, count: barGeometry.count)
+            )
+        }
+    }
+
     /// Smooth traveling color wave for layer updates (no full blank frames).
     static func rasterCGImage(
         phase: TimeInterval,

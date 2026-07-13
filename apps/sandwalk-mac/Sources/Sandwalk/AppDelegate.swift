@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let config = AppConfig.load()
         let supervisor = SandwalkSupervisor(config: config)
         self.supervisor = supervisor
+        SandwalkRuntime.supervisor = supervisor
         self.menubar = MenubarController(
             supervisor: supervisor,
             requestQuit: { [weak self] in
@@ -18,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     await self?.supervisor?.stopAll()
                     NSApp.terminate(nil)
                 }
+            },
+            openSettings: {
+                SettingsWindowController.shared.show()
             }
         )
 
@@ -28,6 +32,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("Sandwalk: auto-start failed — \(error.localizedDescription)")
             }
         }
+
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("--open-settings")
+            || ProcessInfo.processInfo.environment["SANDWALK_OPEN_SETTINGS"] == "1"
+        {
+            DispatchQueue.main.async {
+                SettingsWindowController.shared.show()
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -36,5 +49,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    /// Dock / Launchpad click while already running → open Settings.
+    func applicationShouldHandleReopen(
+        _ sender: NSApplication,
+        hasVisibleWindows flag: Bool
+    ) -> Bool {
+        SettingsWindowController.shared.show()
+        return true
     }
 }
