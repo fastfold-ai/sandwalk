@@ -4,9 +4,9 @@ Report utility tools for decision-ready communication outputs.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from pathlib import Path
-import re
 
 from tools import registry
 

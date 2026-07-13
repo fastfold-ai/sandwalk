@@ -7,7 +7,40 @@ from unittest.mock import patch
 import pytest
 
 from agent import config as config_mod
-from agent.config import Config, _validate_config
+from agent.config import Config, _migrate_tree, _rewrite_legacy_config_paths, _validate_config
+
+
+def test_migrate_tree_copies_missing_files_only(tmp_path):
+    src = tmp_path / "legacy"
+    dest = tmp_path / "sandwalk"
+    (src / "nested").mkdir(parents=True)
+    (src / "nested" / "a.json").write_text('{"a": 1}')
+    (src / "b.txt").write_text("b")
+    dest.mkdir()
+    (dest / "b.txt").write_text("keep-me")
+
+    _migrate_tree(src, dest, label="test")
+
+    assert (dest / "nested" / "a.json").read_text() == '{"a": 1}'
+    assert (dest / "b.txt").read_text() == "keep-me"
+
+
+def test_rewrite_legacy_config_paths(monkeypatch, tmp_path):
+    legacy = tmp_path / ".fastfold-cli"
+    sandwalk = tmp_path / ".sandwalk"
+    monkeypatch.setattr(config_mod, "LEGACY_FASTFOLD_DIR", legacy)
+    monkeypatch.setattr(config_mod, "LEGACY_CT_DIR", tmp_path / ".ct")
+    monkeypatch.setattr(config_mod, "CONFIG_DIR", sandwalk)
+
+    data = {
+        "data.base": str(legacy / "data"),
+        "ops.base_dir": str(legacy / "ops"),
+        "llm.model": "claude-sonnet-4-5-20250929",
+    }
+    _rewrite_legacy_config_paths(data)
+    assert data["data.base"] == str(sandwalk / "data")
+    assert data["ops.base_dir"] == str(sandwalk / "ops")
+    assert data["llm.model"] == "claude-sonnet-4-5-20250929"
 
 
 def test_load_invalid_json_does_not_crash(monkeypatch, tmp_path):

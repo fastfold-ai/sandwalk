@@ -328,7 +328,7 @@ def variant_annotate(variant: str, **kwargs) -> dict:
     try:
         data = resp.json()
     except Exception:
-        return {"error": f"Ensembl VEP query failed: invalid JSON response", "summary": f"Ensembl VEP query failed: invalid JSON response"}
+        return {"error": "Ensembl VEP query failed: invalid JSON response", "summary": "Ensembl VEP query failed: invalid JSON response"}
     if not data or not isinstance(data, list):
         return {"error": f"No VEP results for variant {variant}", "summary": f"No VEP results for variant {variant}"}
     vep_result = data[0]
@@ -338,7 +338,7 @@ def variant_annotate(variant: str, **kwargs) -> dict:
     input_str = vep_result.get("input", variant)
     most_severe = vep_result.get("most_severe_consequence", "")
     allele_string = vep_result.get("allele_string", "")
-    strand = vep_result.get("strand")
+    _strand = vep_result.get("strand")
     assembly = vep_result.get("assembly_name", "")
     seq_region = vep_result.get("seq_region_name", "")
     start = vep_result.get("start")
@@ -495,15 +495,14 @@ def mendelian_randomization_lookup(gene: str, disease: str, **kwargs) -> dict:
         return {"error": f"Gene '{gene}' not found in Open Targets", "summary": f"Gene '{gene}' not found in Open Targets"}
     # Match by gene symbol (case-insensitive)
     ensembl_id = None
-    target_name = ""
     for hit in target_hits:
         if hit.get("name", "").upper() == gene.upper():
             ensembl_id = hit["id"]
-            target_name = hit.get("name", "")
+            _target_name = hit.get("name", "")
             break
     if not ensembl_id:
         ensembl_id = target_hits[0]["id"]
-        target_name = target_hits[0].get("name", "")
+        _target_name = target_hits[0].get("name", "")
 
     # Step 2: Resolve disease to EFO ID (if not already an EFO ID)
     if disease.upper().startswith("EFO_") or disease.upper().startswith("MONDO_") or disease.upper().startswith("HP_"):
@@ -687,8 +686,8 @@ def mendelian_randomization_lookup(gene: str, disease: str, **kwargs) -> dict:
     # Compute summary statistics
     all_evidence = gwas_evidence + other_genetic_evidence
     max_score = max((e["score"] for e in all_evidence if e["score"] is not None), default=None)
-    n_variants = len(set(e["variant_rsid"] for e in all_evidence if e["variant_rsid"]))
-    n_studies = len(set(e["study_id"] for e in all_evidence if e["study_id"]))
+    n_variants = len({e["variant_rsid"] for e in all_evidence if e["variant_rsid"]})
+    n_studies = len({e["study_id"] for e in all_evidence if e["study_id"]})
 
     # Build summary
     parts = []
@@ -984,7 +983,6 @@ def coloc(gene: str, study_id: str = None, **kwargs) -> dict:
     # Try primary symbol first, then common aliases (e.g., GBA1 -> GBA) if needed.
     gene_candidates = _gene_symbol_candidates(gene)
     ensembl_id = None
-    result_data = None
     target_data = None
     candidate_errors = []
     query_failures = []
@@ -1014,7 +1012,6 @@ def coloc(gene: str, study_id: str = None, **kwargs) -> dict:
             continue
 
         ensembl_id = ensembl_candidate
-        result_data = payload
         target_data = target_candidate
         break
 

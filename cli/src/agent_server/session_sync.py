@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from agent.trajectory import Trajectory
 from agent_server.store import AgentStore
@@ -18,11 +19,7 @@ class SyncResult:
     updated: int = 0
     skipped: int = 0
     failed: int = 0
-    details: list[str] | None = None
-
-    def __post_init__(self) -> None:
-        if self.details is None:
-            self.details = []
+    details: list[str] = field(default_factory=list)
 
 
 def _timestamp_to_datetime(value: object) -> datetime:
@@ -39,7 +36,7 @@ def _timestamp_to_datetime(value: object) -> datetime:
     return datetime.now(UTC)
 
 
-def messages_to_turns(messages) -> list[tuple[str, str]]:
+def messages_to_turns(messages: Any) -> list[tuple[str, str]]:
     """Pair store user/assistant messages into trajectory turns."""
     turns: list[tuple[str, str]] = []
     pending_user: str | None = None

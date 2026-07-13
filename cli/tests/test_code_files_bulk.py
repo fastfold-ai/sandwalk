@@ -102,7 +102,7 @@ class TestFilesHelpers:
             "data.base": str(tmp_path / "data"),
         }.get(key, default)
         paths = _allowed_paths(cfg)
-        assert any("fastfold-cli" in str(p) for p in paths)
+        assert any("sandwalk" in str(p) or "fastfold-cli" in str(p) for p in paths)
         assert tmp_path / "outputs" in paths or (tmp_path / "outputs").parent in paths
 
     def test_output_dir_from_config(self, tmp_path):

@@ -7,11 +7,10 @@ restriction analysis, and assembly helper templates.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 from tools import registry
-
 
 _DNA_ALPHABET = set("ACGTN")
 _STOP_CODONS = {"TAA", "TAG", "TGA"}

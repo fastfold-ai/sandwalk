@@ -5,23 +5,31 @@ Queries Parquet and CSV.gz files directly without loading into memory.
 Supports predicate pushdown for efficient filtering of large datasets.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any, cast
 
 import duckdb
 
-from api.config import DATA_ROOT, MAX_QUERY_ROWS, DEFAULT_QUERY_LIMIT
+from api.config import DATA_ROOT, DEFAULT_QUERY_LIMIT, MAX_QUERY_ROWS
 
 
 class QueryEngine:
     """DuckDB-based query engine for tabular data files."""
 
-    def __init__(self, data_root: Path = None):
+    def __init__(self, data_root: Path | None = None) -> None:
         self.data_root = data_root or DATA_ROOT
         self.conn = duckdb.connect(":memory:")
 
-    def query_parquet(self, file_pattern: str, filters: dict = None,
-                      columns: list = None, limit: int = None,
-                      order_by: str = None) -> list[dict]:
+    def query_parquet(
+        self,
+        file_pattern: str,
+        filters: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+        limit: int | None = None,
+        order_by: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Query Parquet or CSV.gz files with optional filtering.
 
         Args:
@@ -50,7 +58,7 @@ class QueryEngine:
 
         # Build WHERE clause
         where_parts = []
-        params = []
+        params: list[Any] = []
         if filters:
             for col, val in filters.items():
                 if isinstance(val, list):
@@ -72,7 +80,7 @@ class QueryEngine:
 
         try:
             result = self.conn.execute(query, params).fetchdf()
-            return result.to_dict("records")
+            return cast(list[dict[str, Any]], result.to_dict("records"))
         except duckdb.IOException as e:
             raise FileNotFoundError(f"Data files not found: {full_pattern}") from e
         except (duckdb.CatalogException, duckdb.BinderException) as e:
@@ -93,7 +101,7 @@ class QueryEngine:
         result = self.conn.execute(query)
         return [desc[0] for desc in result.description]
 
-    def count(self, file_pattern: str, filters: dict = None) -> int:
+    def count(self, file_pattern: str, filters: dict[str, Any] | None = None) -> int:
         """Count rows matching filters."""
         full_pattern = str(self.data_root / file_pattern)
 
@@ -103,7 +111,7 @@ class QueryEngine:
             source = f"read_csv_auto('{full_pattern}', union_by_name=true)"
 
         where_parts = []
-        params = []
+        params: list[Any] = []
         if filters:
             for col, val in filters.items():
                 if isinstance(val, list):

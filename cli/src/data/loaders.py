@@ -6,12 +6,13 @@ and supports both CSV and Parquet formats.
 Data paths are configured via fastfold config.
 """
 
-import pandas as pd
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
-from agent.config import Config
+import pandas as pd
 
+from agent.config import CONFIG_DIR, Config
 
 # Search order for data files (first match wins)
 _DATA_SEARCH_PATHS = [
@@ -29,10 +30,10 @@ def _data_path(key: str) -> Path:
     base = cfg.get("data.base")
     if base:
         return Path(base) / key
-    return Path.home() / ".fastfold-cli" / "data" / key
+    return CONFIG_DIR / "data" / key
 
 
-def _find_file(name: str, subdirs: list[str] = None) -> Path | None:
+def _find_file(name: str, subdirs: list[str] | None = None) -> Path | None:
     """Search for a file across configured paths and common locations."""
     subdirs = subdirs or [""]
     stem = Path(name).stem
@@ -47,8 +48,8 @@ def _find_file(name: str, subdirs: list[str] = None) -> Path | None:
     # 2. Check known data locations
     search_dirs.extend(_DATA_SEARCH_PATHS)
 
-    # 3. Check ~/.fastfold-cli/data
-    search_dirs.append(Path.home() / ".fastfold-cli" / "data")
+    # 3. Check ~/.sandwalk/data
+    search_dirs.append(CONFIG_DIR / "data")
 
     for base_dir in search_dirs:
         for sub in subdirs:
@@ -79,7 +80,7 @@ def _resolve_path(p: Path, filenames: list[str]) -> Path | None:
     return None
 
 
-def _read_tabular(path: Path, **kwargs) -> pd.DataFrame:
+def _read_tabular(path: Path, **kwargs: Any) -> pd.DataFrame:
     """Read a CSV or Parquet file based on extension."""
     if path.suffix == ".parquet":
         return pd.read_parquet(path, **{k: v for k, v in kwargs.items() if k != "index_col"})
@@ -95,7 +96,7 @@ def load_crispr() -> pd.DataFrame:
         raise FileNotFoundError(
             "DepMap CRISPR data not found. "
             "Run: fastfold data pull depmap\n"
-            "Or set: fastfold config set data.base /path/to/data"
+            "Or set: sandwalk config set data.base /path/to/data"
         )
     df = _read_tabular(path, index_col=0)
     # Clean column names: "TP53 (7157)" → "TP53"
@@ -136,7 +137,7 @@ def load_proteomics() -> pd.DataFrame:
 
     raise FileNotFoundError(
         "Proteomics data not found. "
-        "Set: fastfold config set data.proteomics /path/to/file"
+        "Set: sandwalk config set data.proteomics /path/to/file"
     )
 
 
@@ -186,7 +187,7 @@ def load_l1000() -> pd.DataFrame:
 
     raise FileNotFoundError(
         "L1000 data not found. "
-        "Set: fastfold config set data.l1000 /path/to/file"
+        "Set: sandwalk config set data.l1000 /path/to/file"
     )
 
 
@@ -209,7 +210,7 @@ def load_prism() -> pd.DataFrame:
     raise FileNotFoundError(
         "PRISM data not found. "
         "Run: fastfold data pull prism\n"
-        "Or set: fastfold config set data.prism /path/to/file"
+        "Or set: sandwalk config set data.prism /path/to/file"
     )
 
 
@@ -239,7 +240,7 @@ def load_mutations() -> pd.DataFrame:
     return df
 
 
-def load_msigdb(collection: str = "h") -> dict:
+def load_msigdb(collection: str = "h") -> dict[str, Any]:
     """Load MSigDB gene sets."""
     import json
     # Try both naming patterns: "h.all.v2024.1.Hs.json" and "c2.cp.kegg_legacy.v2024.1.Hs.json"
@@ -247,6 +248,9 @@ def load_msigdb(collection: str = "h") -> dict:
         path = _find_file(pattern, subdirs=["", "msigdb"])
         if path and path.exists():
             with open(path) as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+                return {"data": data}
 
     raise FileNotFoundError("MSigDB data not found. Run: fastfold data pull msigdb")

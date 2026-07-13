@@ -6,8 +6,8 @@ covering degradation, binding, viability, expression, structural, and screening 
 """
 
 import math
-from tools import registry
 
+from tools import registry
 
 # ---------------------------------------------------------------------------
 # Assay protocol templates (TPD / molecular-glue relevant)

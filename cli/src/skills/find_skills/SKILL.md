@@ -76,7 +76,7 @@ If the tool returns `blocked: true` (agent-initiated install disabled), tell the
 - **All Fastfold skills at once:** `fastfold skills add fastfold-ai/skills`
 - **Inside the interactive session:** `/skills-add <install source>`
 - **From the ecosystem (Node):** `npx skills add <owner>/<repo>` (optionally `--skill <name>`)
-- Or enable agent installs: `fastfold config set skills.allow_agent_install true`
+- Or enable agent installs: `sandwalk config set skills.allow_agent_install true`
 
 ### Confirm availability
 Installed skills are picked up on the next message (the system prompt reloads each turn) — no restart needed. Verify with `skills.manage(action="list")` or `fastfold skills list`.

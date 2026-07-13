@@ -10,7 +10,6 @@ from pathlib import Path
 
 from tools import registry
 
-
 REASON_SYSTEM_PROMPT = """\
 You are a drug discovery research expert embedded in fastfold-agent-cli, \
 an autonomous research agent.
@@ -294,7 +293,7 @@ def code(
         return {
             "summary": (
                 "claude.code is disabled by policy (opt-in). "
-                "Enable with: fastfold config set agent.enable_claude_code_tool true"
+                "Enable with: sandwalk config set agent.enable_claude_code_tool true"
             ),
             "error": "disabled_by_policy",
         }
@@ -320,7 +319,7 @@ def code(
     full_prompt = task
     if context_parts:
         full_prompt = (
-            f"Context from prior research steps:\n" + "\n".join(context_parts) + f"\n\nTask: {task}"
+            "Context from prior research steps:\n" + "\n".join(context_parts) + f"\n\nTask: {task}"
         )
 
     cmd = [

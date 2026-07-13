@@ -50,8 +50,8 @@ def embed(sequence: str, model: str = "esm2", **kwargs) -> dict:
 
     # Try local ESM-2
     try:
-        import torch
         import esm
+        import torch
 
         if model == "esm2_small":
             esm_model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()

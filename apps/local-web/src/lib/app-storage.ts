@@ -1,0 +1,168 @@
+export const SIDEBAR_COLLAPSED_STORAGE_KEY =
+  'agent-ide-v2-assistant-ui-base-sidebar-collapsed'
+export const FILES_PANEL_COLLAPSED_STORAGE_KEY =
+  'agent-ide-v2-assistant-ui-base-files-panel-collapsed'
+export const SHELL_PANELS_AUTO_SAVE_ID = 'fastfold.shell-panels'
+export const SESSION_PANELS_AUTO_SAVE_ID = 'fastfold.session-panels'
+export const TERMINAL_OPEN_STORAGE_KEY = 'fastfold.terminal-open'
+export const OPEN_SESSION_TABS_STORAGE_KEY = 'fastfold.open-session-tabs-by-project'
+export const OPEN_SESSION_TABS_LEGACY_KEY = 'fastfold.open-session-tabs'
+export const ALL_PROJECTS_TABS_KEY = '__all__'
+export const PROJECT_SCOPE_STORAGE_KEY = 'fastfold.project-scope-id'
+export const LAST_SESSION_BY_SCOPE_KEY = 'fastfold.last-session-by-scope'
+export const RECENT_PROJECT_IDS_STORAGE_KEY = 'fastfold.recent-project-ids'
+export const SIDEBAR_SECTIONS_COLLAPSED_KEY = 'fastfold.sidebar-sections-collapsed'
+
+export function projectTabsKey(projectId: string | null | undefined) {
+  return projectId || ALL_PROJECTS_TABS_KEY
+}
+
+export function readOpenTabsByProject(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(OPEN_SESSION_TABS_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const result: Record<string, string[]> = {}
+        for (const [key, value] of Object.entries(
+          parsed as Record<string, unknown>
+        )) {
+          if (!Array.isArray(value)) continue
+          result[key] = value.filter(
+            (id): id is string => typeof id === 'string' && id.length > 0
+          )
+        }
+        return result
+      }
+    }
+    const legacy = localStorage.getItem(OPEN_SESSION_TABS_LEGACY_KEY)
+    if (!legacy) return {}
+    const parsed = JSON.parse(legacy) as unknown
+    if (!Array.isArray(parsed)) return {}
+    const ids = parsed.filter(
+      (id): id is string => typeof id === 'string' && id.length > 0
+    )
+    return ids.length > 0 ? { [ALL_PROJECTS_TABS_KEY]: ids } : {}
+  } catch {
+    return {}
+  }
+}
+
+export function writeOpenTabsByProject(map: Record<string, string[]>) {
+  try {
+    localStorage.setItem(OPEN_SESSION_TABS_STORAGE_KEY, JSON.stringify(map))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function readProjectScopeId(): string | null {
+  try {
+    if (typeof window !== 'undefined') {
+      const projectMatch = window.location.pathname.match(
+        /^\/projects\/([^/]+)/
+      )
+      if (projectMatch?.[1]) return decodeURIComponent(projectMatch[1])
+      if (
+        window.location.pathname === '/' ||
+        window.location.pathname === '/agents/home'
+      ) {
+        return null
+      }
+    }
+    const raw = localStorage.getItem(PROJECT_SCOPE_STORAGE_KEY)
+    if (!raw || raw === ALL_PROJECTS_TABS_KEY) return null
+    return raw
+  } catch {
+    return null
+  }
+}
+
+export function writeProjectScopeId(projectId: string | null) {
+  try {
+    localStorage.setItem(
+      PROJECT_SCOPE_STORAGE_KEY,
+      projectId || ALL_PROJECTS_TABS_KEY
+    )
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function readLastSessionByScope(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(LAST_SESSION_BY_SCOPE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {}
+    }
+    const result: Record<string, string> = {}
+    for (const [key, value] of Object.entries(
+      parsed as Record<string, unknown>
+    )) {
+      if (typeof value === 'string' && value.length > 0) result[key] = value
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
+export function writeLastSessionByScope(map: Record<string, string>) {
+  try {
+    localStorage.setItem(LAST_SESSION_BY_SCOPE_KEY, JSON.stringify(map))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function readRecentProjectIds(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_PROJECT_IDS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (id): id is string => typeof id === 'string' && id.length > 0
+    )
+  } catch {
+    return []
+  }
+}
+
+export function writeRecentProjectIds(ids: string[]) {
+  try {
+    localStorage.setItem(RECENT_PROJECT_IDS_STORAGE_KEY, JSON.stringify(ids))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function readCollapsedSidebarSections(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_SECTIONS_COLLAPSED_KEY)
+    if (!raw) return { archive: true }
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { archive: true }
+    }
+    const next: Record<string, boolean> = { archive: true }
+    for (const [key, value] of Object.entries(
+      parsed as Record<string, unknown>
+    )) {
+      if (typeof value === 'boolean') next[key] = value
+    }
+    return next
+  } catch {
+    return { archive: true }
+  }
+}
+
+export function writeCollapsedSidebarSections(value: Record<string, boolean>) {
+  try {
+    localStorage.setItem(SIDEBAR_SECTIONS_COLLAPSED_KEY, JSON.stringify(value))
+  } catch {
+    // ignore storage failures
+  }
+}

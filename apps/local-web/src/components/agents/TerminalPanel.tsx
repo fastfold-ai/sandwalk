@@ -293,7 +293,7 @@ export function TerminalPanel({
         // Prefer Control (not Cmd) for terminal apps like nano: ^O ^X ^G ^W …
         if (event.ctrlKey && !event.metaKey && !event.altKey) {
           if (
-            (key.length === 1 && /[a-z0-9\[\];',./\\=-`]/.test(key)) ||
+            (key.length === 1 && /[a-z0-9[\];',./\\=-`]/.test(key)) ||
             [
               'backspace',
               'delete',

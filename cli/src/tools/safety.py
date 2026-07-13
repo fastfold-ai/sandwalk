@@ -6,10 +6,9 @@ and anti-target lists.
 """
 
 import pandas as pd
-import numpy as np
+
 from tools import registry
 from tools.http_client import request_json
-
 
 # UniProt accession → gene symbol mapping for safety-relevant proteins.
 # The proteomics matrix uses UniProt IDs as row index; all gene-symbol
@@ -221,13 +220,13 @@ def antitarget_profile(compound_id: str = "all", lfc_threshold: float = -0.5, **
 
         # Compute safety penalty score
         penalty = 0.0
-        for p in hits["teratogenic"]:
+        for _p in hits["teratogenic"]:
             penalty += 10.0  # highest risk
-        for p in hits["heme_tfs"]:
+        for _p in hits["heme_tfs"]:
             penalty += 5.0
-        for p in hits["tumor_suppressors"]:
+        for _p in hits["tumor_suppressors"]:
             penalty += 3.0
-        for p in hits["crbn_substrates"]:
+        for _p in hits["crbn_substrates"]:
             penalty += 2.0
 
         # Get LFC values for flagged proteins
@@ -807,7 +806,7 @@ def admet_predict(smiles: str, **kwargs) -> dict:
 
     try:
         from rdkit import Chem
-        from rdkit.Chem import Descriptors, Crippen, Lipinski, rdMolDescriptors
+        from rdkit.Chem import Crippen, Descriptors, Lipinski, rdMolDescriptors
     except ImportError:
         return {"error": "RDKit is required for ADMET prediction. Install with: pip install rdkit", "summary": "RDKit is required for ADMET prediction. Install with: pip install rdkit"}
     mol = Chem.MolFromSmiles(smiles)
@@ -1035,7 +1034,7 @@ def ddi_predict(smiles: str, comedication_smiles: str = None, **kwargs) -> dict:
 
     try:
         from rdkit import Chem
-        from rdkit.Chem import Descriptors, Crippen, rdMolDescriptors
+        from rdkit.Chem import Crippen, Descriptors, rdMolDescriptors
     except ImportError:
         return {"error": "RDKit is required for DDI prediction. Install with: pip install rdkit", "summary": "RDKit is required for DDI prediction. Install with: pip install rdkit"}
     mol = Chem.MolFromSmiles(smiles)
@@ -1044,10 +1043,10 @@ def ddi_predict(smiles: str, comedication_smiles: str = None, **kwargs) -> dict:
 
     mw = Descriptors.MolWt(mol)
     logp = Crippen.MolLogP(mol)
-    tpsa = Descriptors.TPSA(mol)
+    _tpsa = Descriptors.TPSA(mol)
     aromatic_rings = Descriptors.NumAromaticRings(mol)
     num_rings = Descriptors.RingCount(mol)
-    hba = Descriptors.NumHAcceptors(mol)
+    _hba = Descriptors.NumHAcceptors(mol)
 
     # --- Detect structural motifs associated with CYP inhibition ---
     motif_flags = {}
@@ -1212,7 +1211,7 @@ def ddi_predict(smiles: str, comedication_smiles: str = None, **kwargs) -> dict:
         if comol is not None:
             co_mw = Descriptors.MolWt(comol)
             co_logp = Crippen.MolLogP(comol)
-            co_aromatic = Descriptors.NumAromaticRings(comol)
+            _co_aromatic = Descriptors.NumAromaticRings(comol)
 
             # Check if comedication shares metabolic pathway features
             co_n_het = Chem.MolFromSmarts("[nR]")

@@ -6,8 +6,6 @@ shared across the planner, executor, runner, and UI layers.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
-
 
 # ---------------------------------------------------------------------------
 # Plan & Step
@@ -24,7 +22,7 @@ class Step:
     tool_args: dict = field(default_factory=dict)
     depends_on: list[int] = field(default_factory=list)
     status: str = "pending"  # pending, running, completed, failed
-    result: Optional[dict] = None
+    result: dict | None = None
 
 
 @dataclass

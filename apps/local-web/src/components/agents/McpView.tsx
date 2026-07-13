@@ -9,8 +9,8 @@ import {
   ExternalLink,
   KeyRound,
   Loader2,
-  Plus,
   Plug,
+  Plus,
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'

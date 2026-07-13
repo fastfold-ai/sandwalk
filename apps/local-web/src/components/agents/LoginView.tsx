@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { ArrowUpRight, Check, CircleHelp, Copy, Loader2, Terminal } from 'lucide-react'
+import { useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { MirageBackground } from '@/components/MirageBackground'

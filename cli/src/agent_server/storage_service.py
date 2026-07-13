@@ -1,4 +1,4 @@
-"""Measure on-disk usage under ~/.fastfold-cli for the Storage settings page."""
+"""Measure on-disk usage under ~/.sandwalk for the Storage settings page."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import site
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 
@@ -310,7 +310,7 @@ class StorageService:
             )
 
         # Agent sandbox interpreter (in-process run_python) — often outside
-        # ~/.fastfold-cli (venv / uv tool / conda). Still shown in Disk usage.
+        # ~/.sandwalk (venv / uv tool / conda). Still shown in Disk usage.
         python_env = _python_env_category()
         if python_env is not None:
             categories.append(python_env)
@@ -336,7 +336,7 @@ class StorageService:
                 )
             )
 
-        # Location total stays scoped to ~/.fastfold-cli; bar total includes env.
+        # Location total stays scoped to ~/.sandwalk; bar total includes env.
         home_bytes = sum(
             item.bytes for item in categories if item.id != "python_env"
         )
@@ -356,5 +356,5 @@ class StorageService:
             categories=categories,
             total_bytes=total_bytes,
             available_bytes=available_bytes,
-            checked_at=datetime.now(timezone.utc).isoformat(),
+            checked_at=datetime.now(UTC).isoformat(),
         )

@@ -18,7 +18,7 @@ from agent_server.models import UpdateToolRequest
 def isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import agent.config as config_mod
 
-    config_dir = tmp_path / ".fastfold-cli"
+    config_dir = tmp_path / ".sandwalk"
     config_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(config_mod, "CONFIG_DIR", config_dir)
     monkeypatch.setattr(config_mod, "CONFIG_FILE", config_dir / "config.json")

@@ -4,10 +4,13 @@ Schema drift monitor for external API/data integrations.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import json
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+
+from agent.config import CONFIG_DIR
 
 
 @dataclass
@@ -53,7 +56,7 @@ class SchemaMonitor:
         baseline_path: Path | None = None,
         monitors: dict[str, Callable[[], Any]] | None = None,
     ):
-        self.baseline_path = baseline_path or (Path.home() / ".fastfold-cli" / "knowledge" / "schema_baselines.json")
+        self.baseline_path = baseline_path or (CONFIG_DIR / "knowledge" / "schema_baselines.json")
         self.monitors = monitors or self._default_monitors()
         self._baseline = self._load_baseline()
 
@@ -81,7 +84,7 @@ class SchemaMonitor:
         data.setdefault("monitors", {})
         return data
 
-    def save_baseline(self):
+    def save_baseline(self) -> None:
         self.baseline_path.parent.mkdir(parents=True, exist_ok=True)
         self.baseline_path.write_text(
             json.dumps(self._baseline, ensure_ascii=True, indent=2),

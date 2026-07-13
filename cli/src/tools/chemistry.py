@@ -40,7 +40,7 @@ def descriptors(smiles: str, **kwargs) -> dict:
     """Compute molecular properties from SMILES."""
     smiles = _extract_smiles(smiles)
     from rdkit import Chem
-    from rdkit.Chem import Descriptors, AllChem, rdMolDescriptors
+    from rdkit.Chem import Descriptors, rdMolDescriptors
 
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
@@ -193,9 +193,9 @@ def pairwise_similarity(compounds: list = None, fingerprint: str = "morgan", **k
 def similarity_search(smiles: str, library_path: str = None, top_n: int = 10, **kwargs) -> dict:
     """Search for similar compounds using fingerprint similarity."""
     smiles = _extract_smiles(smiles)
+    import pandas as pd
     from rdkit import Chem, DataStructs
     from rdkit.Chem import AllChem
-    import pandas as pd
 
     query_mol = Chem.MolFromSmiles(smiles)
     if query_mol is None:
@@ -209,7 +209,7 @@ def similarity_search(smiles: str, library_path: str = None, top_n: int = 10, **
         return {"error": "No compound library specified", "summary": "No compound library specified"}
     smiles_col = next((c for c in lib.columns if c.lower() in ['smiles', 'canonical_smiles']), None)
     if smiles_col is None:
-        return {"error": f"No SMILES column found in library", "summary": f"No SMILES column found in library"}
+        return {"error": "No SMILES column found in library", "summary": "No SMILES column found in library"}
     results = []
     for _, row in lib.iterrows():
         mol = Chem.MolFromSmiles(row[smiles_col])
@@ -244,8 +244,7 @@ def sar_analyze(compounds_path: str, activity_col: str = "activity", **kwargs) -
     """Run SAR analysis on a compound set."""
     import pandas as pd
     from rdkit import Chem
-    from rdkit.Chem import AllChem, Descriptors
-    import numpy as np
+    from rdkit.Chem import Descriptors
 
     df = pd.read_csv(compounds_path)
     smiles_col = next((c for c in df.columns if c.lower() in ['smiles', 'canonical_smiles']), None)
@@ -307,8 +306,8 @@ def mmp_analysis(compounds_csv: str = None, activity_col: str = "activity", **kw
         from rdkit.Chem import BRICS, AllChem, Descriptors, rdMolDescriptors
     except ImportError:
         return {"error": "RDKit is required for MMP analysis. Install with: pip install rdkit", "summary": "RDKit is required for MMP analysis. Install with: pip install rdkit"}
-    import pandas as pd
     import numpy as np
+    import pandas as pd
 
     # Load or generate demo data
     if compounds_csv:
@@ -505,7 +504,7 @@ def scaffold_hop(smiles: str, **kwargs) -> dict:
     smiles = _extract_smiles(smiles)
     try:
         from rdkit import Chem
-        from rdkit.Chem import Descriptors, AllChem, rdMolDescriptors
+        from rdkit.Chem import AllChem, Descriptors, rdMolDescriptors
         from rdkit.Chem.Scaffolds import MurckoScaffold
     except ImportError:
         return {"error": "RDKit is required for scaffold hopping. Install with: pip install rdkit", "summary": "RDKit is required for scaffold hopping. Install with: pip install rdkit"}
@@ -519,7 +518,7 @@ def scaffold_hop(smiles: str, **kwargs) -> dict:
         scaffold_smi = Chem.MolToSmiles(scaffold_mol)
         generic_scaffold = MurckoScaffold.MakeScaffoldGeneric(scaffold_mol)
         generic_smi = Chem.MolToSmiles(generic_scaffold)
-    except Exception as e:
+    except Exception:
         scaffold_smi = "N/A"
         generic_smi = "N/A"
 
@@ -617,7 +616,7 @@ def scaffold_hop(smiles: str, **kwargs) -> dict:
         scaf_mol = Chem.MolFromSmiles(scaffold_smi)
         if scaf_mol:
             ring_info = scaf_mol.GetRingInfo()
-            n_rings = ring_info.NumRings()
+            _n_rings = ring_info.NumRings()
 
             # Common scaffold hops based on ring system
             ring_replacements = {
@@ -665,15 +664,15 @@ def scaffold_hop(smiles: str, **kwargs) -> dict:
 
     if fsp3 < 0.25:
         property_context["suggestions_for_improvement"].append(
-            "Low Fsp3 ({:.2f}) — consider sp3-rich scaffold hops (phenyl->cyclohexyl) to improve solubility".format(fsp3)
+            f"Low Fsp3 ({fsp3:.2f}) — consider sp3-rich scaffold hops (phenyl->cyclohexyl) to improve solubility"
         )
     if logp > 4:
         property_context["suggestions_for_improvement"].append(
-            "High LogP ({:.1f}) — add heteroatoms or polar groups to improve solubility".format(logp)
+            f"High LogP ({logp:.1f}) — add heteroatoms or polar groups to improve solubility"
         )
     if tpsa < 40:
         property_context["suggestions_for_improvement"].append(
-            "Low TPSA ({:.0f}) — may have poor solubility; consider adding H-bond acceptors".format(tpsa)
+            f"Low TPSA ({tpsa:.0f}) — may have poor solubility; consider adding H-bond acceptors"
         )
 
     # Summary
@@ -1058,7 +1057,7 @@ def _parse_ibm_rxn_results(smiles: str, data: dict) -> dict:
 def _retrosynthesis_heuristic(smiles: str, max_steps: int) -> dict:
     """Heuristic retrosynthesis using RDKit SMARTS-based disconnections."""
     from rdkit import Chem
-    from rdkit.Chem import AllChem, Descriptors, rdMolDescriptors
+    from rdkit.Chem import Descriptors, rdMolDescriptors
 
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
@@ -1146,7 +1145,7 @@ def _retrosynthesis_heuristic(smiles: str, max_steps: int) -> dict:
 
     # Sort routes by step count
     routes.sort(key=lambda r: r["n_steps"])
-    shortest = routes[0]["n_steps"] if routes else 0
+    _shortest = routes[0]["n_steps"] if routes else 0
 
     return {
         "summary": f"[HEURISTIC FALLBACK] Retrosynthesis for {formula} ({smiles}): {len(routes)} routes found "
@@ -1209,7 +1208,6 @@ def pharmacophore(smiles_list: list = None, method: str = "common_features", **k
     2D pharmacophore fingerprints for consensus scoring.
     """
     from rdkit import Chem, DataStructs
-    from rdkit.Chem import Descriptors
 
     if not smiles_list or len(smiles_list) < 2:
         return {
@@ -1298,7 +1296,7 @@ def pharmacophore(smiles_list: list = None, method: str = "common_features", **k
     pharm_fp_similarity = None
     if method in ("fingerprints", "both"):
         try:
-            from rdkit.Chem.Pharm2D import Gobbi_Pharm2D, Generate
+            from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 
             factory = Gobbi_Pharm2D.factory
             fps = []

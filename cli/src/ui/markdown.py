@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import html
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from rich import box
 from rich.markdown import Heading, Markdown

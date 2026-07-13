@@ -77,8 +77,10 @@ class TestDownloadsDir:
         assert d == tmp_path / "custom_downloads"
 
     def test_default_path(self, mock_config):
+        from tools import omics as omics_mod
+
         d = _downloads_dir()
-        assert d == Path.home() / ".fastfold-cli" / "downloads"
+        assert d == omics_mod.CONFIG_DIR / "downloads"
 
 
 class TestMaxDownloadMb:

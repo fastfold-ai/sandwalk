@@ -2,9 +2,10 @@
 Biomarker tools: mutation sensitivity, resistance profiling, dependency validation.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from scipy import stats
+
 from tools import registry
 
 
@@ -18,7 +19,7 @@ from tools import registry
 )
 def mutation_sensitivity(compound_id: str, gene: str = "all", **kwargs) -> dict:
     """Test mutation-sensitivity associations."""
-    from data.loaders import load_prism, load_mutations, load_model_metadata
+    from data.loaders import load_model_metadata, load_mutations, load_prism
     from tools._compound_resolver import resolve_compound
 
     compound_id = resolve_compound(compound_id, dataset="prism")
@@ -130,7 +131,7 @@ def mutation_sensitivity(compound_id: str, gene: str = "all", **kwargs) -> dict:
 )
 def resistance_profile(compound_id: str, **kwargs) -> dict:
     """Comprehensive resistance profiling for a compound."""
-    from data.loaders import load_prism, load_model_metadata
+    from data.loaders import load_model_metadata, load_prism
     from tools._compound_resolver import resolve_compound
 
     compound_id = resolve_compound(compound_id, dataset="prism")
@@ -215,7 +216,7 @@ def panel_select(
     Returns ranked list of biomarker genes with importance scores and
     cross-validation AUC.
     """
-    from data.loaders import load_prism, load_mutations, load_model_metadata
+    from data.loaders import load_model_metadata, load_mutations, load_prism
     from tools._compound_resolver import resolve_compound
 
     compound_id = resolve_compound(compound_id, dataset="prism")
@@ -329,8 +330,8 @@ def panel_select(
     # --- Cross-validation AUC using top features ---
     cv_auc = None
     if biomarkers:
-        from sklearn.model_selection import cross_val_score
         from sklearn.ensemble import RandomForestClassifier as RFC
+        from sklearn.model_selection import cross_val_score
 
         top_gene_idx = [feature_names.index(b["gene"]) for b in biomarkers if b["gene"] in feature_names]
         if len(top_gene_idx) >= 1:

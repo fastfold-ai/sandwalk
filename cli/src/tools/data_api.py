@@ -112,7 +112,6 @@ def depmap_search(gene: str, dataset: str = "crispr", **kwargs) -> dict:
     Tries local DepMap data first (via ct data loaders), then falls back to
     the Cell Model Passports API (public, no key required).
     """
-    import numpy as np
 
     valid_datasets = ("crispr", "expression", "mutations", "cn")
     if dataset not in valid_datasets:
@@ -316,11 +315,11 @@ def opentargets_search(query: str, entity_type: str = "target", **kwargs) -> dic
         if isinstance(e, httpx.TimeoutException):
             return {"error": f"Open Targets search timed out for '{query}'", "summary": f"Open Targets timed out for '{query}'"}
         if isinstance(e, httpx.HTTPError):
-            return {"error": f"Open Targets search failed: {e}", "summary": f"Open Targets search failed"}
-        return {"error": f"Open Targets search failed: {e}", "summary": f"Open Targets search failed"}
+            return {"error": f"Open Targets search failed: {e}", "summary": "Open Targets search failed"}
+        return {"error": f"Open Targets search failed: {e}", "summary": "Open Targets search failed"}
 
     hits = search_data.get("data", {}).get("search", {}).get("hits", [])
-    total = search_data.get("data", {}).get("search", {}).get("total", 0)
+    _total = search_data.get("data", {}).get("search", {}).get("total", 0)
 
     if not hits:
         return {
@@ -330,7 +329,7 @@ def opentargets_search(query: str, entity_type: str = "target", **kwargs) -> dic
 
     top_hit = hits[0]
     entity_id = top_hit["id"]
-    entity_name = top_hit.get("name", query)
+    _entity_name = top_hit.get("name", query)
 
     # Step 2: Fetch detailed profile
     if entity_type == "target":
@@ -438,10 +437,10 @@ def opentargets_search(query: str, entity_type: str = "target", **kwargs) -> dic
     except Exception as e:
         import httpx
         if isinstance(e, httpx.TimeoutException):
-            return {"error": f"Open Targets detail query timed out for {entity_id}", "summary": f"Open Targets detail timed out"}
+            return {"error": f"Open Targets detail query timed out for {entity_id}", "summary": "Open Targets detail timed out"}
         if isinstance(e, httpx.HTTPError):
-            return {"error": f"Open Targets detail query failed: {e}", "summary": f"Open Targets detail query failed"}
-        return {"error": f"Open Targets detail query failed: {e}", "summary": f"Open Targets detail query failed"}
+            return {"error": f"Open Targets detail query failed: {e}", "summary": "Open Targets detail query failed"}
+        return {"error": f"Open Targets detail query failed: {e}", "summary": "Open Targets detail query failed"}
 
     data_root = detail_data.get("data", {})
 
@@ -787,7 +786,7 @@ def uniprot_lookup(query: str, organism: str = "human", **kwargs) -> dict:
     non_human_hints = _query_has_non_human_hints(query)
 
     try:
-        if is_accession and not " " in query:
+        if is_accession and " " not in query:
             # Direct accession lookup
             resp = _http_get(
                 f"https://rest.uniprot.org/uniprotkb/{query}",
@@ -1168,7 +1167,7 @@ def pdb_search(query: str, method: str = None, max_results: int = 10, **kwargs) 
 
             struct_info = detail.get("struct", {})
             exptl = detail.get("exptl", [{}])[0] if detail.get("exptl") else {}
-            cell = detail.get("cell", {})
+            _cell = detail.get("cell", {})
             rcsb_info = detail.get("rcsb_entry_info", {})
 
             # Get resolution
@@ -1729,7 +1728,7 @@ def _chembl_target_activities(query: str, base: str, headers: dict) -> dict:
 
     stats = {}
     for activity_type, values in by_type.items():
-        sorted_vals = sorted(values)
+        _sorted_vals = sorted(values)
         stats[activity_type] = {
             "count": len(values),
             "min_nM": round(min(values), 2),
@@ -2032,7 +2031,7 @@ def drug_info(query: str, include: list = None, **kwargs) -> dict:
                 sections = record.get("Section", [])
 
                 for section in sections:
-                    heading = section.get("TOCHeading", "")
+                    _heading = section.get("TOCHeading", "")
                     for subsection in section.get("Section", []):
                         sub_heading = subsection.get("TOCHeading", "")
                         info_list = subsection.get("Information", [])

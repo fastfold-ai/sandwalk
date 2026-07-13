@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react'
 import type {
   AgentSkill,
   AgentSkillDetail,
@@ -5,7 +6,6 @@ import type {
   Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
-import { Icon } from '@iconify/react'
 import {
   ArrowUp,
   Check,
@@ -20,10 +20,6 @@ import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState }
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import {
-  SpecialistGlyph,
-  specialistColorClass
-} from '@/components/agents/SpecialistsView'
-import {
   fileChipToken,
   parseComposerParts,
   removeComposerChipAt,
@@ -37,6 +33,9 @@ import {
   extractSkillOverviewFromMarkdown,
   getSkillPromptExamples
 } from '@/components/agents/skill-examples'
+import {
+  specialistColorClass,
+  SpecialistGlyph} from '@/components/agents/SpecialistsView'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -77,8 +76,8 @@ export function Composer({
   value,
   running,
   skills,
-  skillChips,
-  fileChips = [],
+  skillChips: _skillChips,
+  fileChips: _fileChips = [],
   workspaceFiles = [],
   modelOptions,
   specialists = [],

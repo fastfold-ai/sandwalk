@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# fastfold-agent-cli — One-liner installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/fastfold-ai/fastfold-agent-cli/main/install.sh | bash
+# Sandwalk — One-liner installer
+# Usage: curl -fsSL https://raw.githubusercontent.com/fastfold-ai/sandwalk/main/cli/install.sh | bash
 set -euo pipefail
 
-PACKAGE="fastfold-agent-cli"
-REPO_URL="git+https://github.com/fastfold-ai/fastfold-agent-cli.git"
-MIN_PYTHON="3.10"
+PACKAGE="sandwalk"
+REPO_URL="git+https://github.com/fastfold-ai/sandwalk.git#subdirectory=cli"
+MIN_PYTHON="3.11"
 
 # ── Helpers ────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ PY_VERSION=$("$PYTHON" -c "import sys; print(f'{sys.version_info.major}.{sys.ver
 PY_MAJOR=$("$PYTHON" -c "import sys; print(sys.version_info.major)")
 PY_MINOR=$("$PYTHON" -c "import sys; print(sys.version_info.minor)")
 
-if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }; then
+if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 11 ]; }; then
     fail "Python ${MIN_PYTHON}+ required (found ${PY_VERSION})"
 fi
 ok "Found Python ${PY_VERSION}"
@@ -71,19 +71,19 @@ else
     fi
 fi
 
-# ── Verify fastfold is available ───────────────────────────────
+# ── Verify sandwalk is available ───────────────────────────────
 
-if ! command -v fastfold >/dev/null 2>&1; then
-    warn "'fastfold' not found on PATH. You may need to restart your shell."
-    warn "Then run: fastfold setup"
+if ! command -v sandwalk >/dev/null 2>&1; then
+    warn "'sandwalk' not found on PATH. You may need to restart your shell."
+    warn "Then run: sandwalk setup"
     exit 0
 fi
 
-ok "fastfold $(fastfold --version 2>/dev/null || echo '(installed)')"
+ok "sandwalk $(sandwalk --version 2>/dev/null || echo '(installed)')"
 
 # ── Run setup wizard ───────────────────────────────────────────
 
 info ""
 info "Running setup wizard..."
 info ""
-fastfold setup
+sandwalk setup

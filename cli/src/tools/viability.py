@@ -3,7 +3,7 @@ Viability tools: PRISM dose-response, IC50, tissue selectivity, therapeutic wind
 """
 
 import pandas as pd
-import numpy as np
+
 from tools import registry
 
 
@@ -104,7 +104,7 @@ def dose_response(compound_id: str, lfc_threshold: float = -0.5, **kwargs) -> di
 )
 def tissue_selectivity(compound_id: str, dose: float = None, lfc_threshold: float = -0.5, **kwargs) -> dict:
     """Profile tissue-level sensitivity for a compound."""
-    from data.loaders import load_prism, load_model_metadata
+    from data.loaders import load_model_metadata, load_prism
     from tools._compound_resolver import resolve_compound
 
     original_name = compound_id

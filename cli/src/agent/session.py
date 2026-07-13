@@ -2,35 +2,46 @@
 Session management: holds config, LLM clients, and shared state for a ct session.
 """
 
-import os
+from __future__ import annotations
+
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
 from rich.console import Console
 
 from agent.config import Config, sync_process_env_from_config
+
+if TYPE_CHECKING:
+    from models.llm import LLMClient
 
 
 class Session:
     """Manages state for a ct research session."""
 
-    def __init__(self, config: Config = None, verbose: bool = False, mode: str = "batch"):
+    def __init__(
+        self,
+        config: Config | None = None,
+        verbose: bool = False,
+        mode: str = "batch",
+    ) -> None:
         self.config = config or Config.load()
         self.verbose = verbose
         self.mode = mode  # "interactive" or "batch"
         self.console = Console()
-        self._llm = None
-        self._scratchpad = []
+        self._llm: LLMClient | None = None
+        self._scratchpad: list[Any] = []
         self._tool_health_failures: dict[str, list[float]] = {}
         self._tool_health_suppressed_until: dict[str, float] = {}
         sync_process_env_from_config(self.config)
 
-    def get_llm(self):
+    def get_llm(self) -> LLMClient:
         """Get or create the LLM client based on config."""
         if self._llm is None:
             self._llm = self._create_llm()
         return self._llm
 
-    def _create_llm(self):
+    def _create_llm(self) -> LLMClient:
         """Create LLM client from config."""
         from models.llm import LLMClient
 

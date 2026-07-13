@@ -6,7 +6,7 @@ import { BrowserRouter } from 'react-router-dom'
 
 import App from './App.tsx'
 import { Toaster } from './components/ui/sonner.tsx'
-import { applyTheme, applyPalette, getStoredTheme, getStoredPalette, watchSystemTheme } from './lib/theme.ts'
+import { applyPalette, applyTheme, getStoredPalette, getStoredTheme, watchSystemTheme } from './lib/theme.ts'
 
 applyTheme(getStoredTheme())
 applyPalette(getStoredPalette())

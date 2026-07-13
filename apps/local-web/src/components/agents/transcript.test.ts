@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 
 import type { TranscriptTool } from './ToolCard'
 import {
-  TOOL_RUN_VISIBLE_COUNT,
   buildConversationTimeline,
   formatSessionExportMarkdown,
   splitAssistantThought,
   thoughtDurationForTools,
+  TOOL_RUN_VISIBLE_COUNT,
   toolsFromEvents
 } from './transcript'
 

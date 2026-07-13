@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from agent.config import (
+    _UNSET,
     OPENAI_COMPATIBLE_PROVIDERS,
     OPENAI_PROFILE_BACKENDS,
     OPENAI_PROFILE_DEFAULTS,
     Config,
-    _UNSET,
 )
 from agent.model_catalog import cloud_catalog_models, format_discovered_model_label
 from agent.model_discovery import probe_compatible_profile
@@ -20,8 +20,8 @@ from agent_server.models import (
     ModelProfile,
     ModelProfileList,
     ModelProfileProbeResult,
-    UpsertModelProfileRequest,
     UpdateAgentModelRequest,
+    UpsertModelProfileRequest,
 )
 
 

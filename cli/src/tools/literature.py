@@ -20,7 +20,7 @@ def _normalize_pubmed_query(query: str) -> str:
     # Split on quoted phrases to preserve them
     parts = _re.split(r'(".*?")', query)
     normalized = []
-    for i, part in enumerate(parts):
+    for _i, part in enumerate(parts):
         if part.startswith('"'):
             # Quoted phrase — keep as-is
             normalized.append(part)
@@ -576,7 +576,7 @@ def _patent_search_lens(query: str, max_results: int, api_key: str) -> dict:
     dates = [p["publication_date"] for p in patents if p["publication_date"]]
     date_range = ""
     if dates:
-        years = sorted(set(d[:4] for d in dates if len(d) >= 4))
+        years = sorted({d[:4] for d in dates if len(d) >= 4})
         if years:
             date_range = f" ({years[0]}-{years[-1]})"
 
@@ -707,7 +707,7 @@ def _patent_search_epo(query: str, max_results: int) -> dict:
     dates = [p["publication_date"] for p in patents if p["publication_date"]]
     date_range = ""
     if dates:
-        years = sorted(set(d[:4] for d in dates if len(d) >= 4))
+        years = sorted({d[:4] for d in dates if len(d) >= 4})
         if years:
             date_range = f" ({years[0]}-{years[-1]})"
 

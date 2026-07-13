@@ -4,36 +4,38 @@ Interactive terminal for ct.
 Provides a REPL-style interface for continuous research sessions.
 """
 
+import json
+import os
 import random
 import re
 import shlex
 import shutil
 import subprocess
-import time
 import threading
-import json
-import os
-from collections import deque
-from dataclasses import dataclass
+import time
 import urllib.error
 import urllib.request
+from collections import deque
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse, urlunparse
-from typing import Any, Callable
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.markdown import Markdown as RichMarkdown
-from ui.markdown import LeftMarkdown, print_markdown_with_mermaid
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion
-from prompt_toolkit.document import Document
 from prompt_toolkit.filters import has_completions
-from prompt_toolkit.formatted_text import HTML, ANSI
+from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.styles import Style
-from pathlib import Path
+from rich.console import Console
+from rich.markdown import Markdown as RichMarkdown
+from rich.panel import Panel
+
+from agent.config import CONFIG_DIR
+from ui.markdown import LeftMarkdown, print_markdown_with_mermaid
 
 
 @dataclass
@@ -410,6 +412,7 @@ def render_plan_preview(plan, console=None):
         The rendered Text (for testing) or prints to console.
     """
     from rich.text import Text
+
     from ui.traces import format_args
 
     if console is None:
@@ -586,7 +589,7 @@ class InteractiveTerminal:
         from agent.session import Session
         self.session = Session(config=config, verbose=verbose, mode="interactive")
         self.console = Console()
-        self.history_file = Path.home() / ".fastfold-cli" / "history"
+        self.history_file = CONFIG_DIR / "history"
         self.history_file.parent.mkdir(parents=True, exist_ok=True)
         self._last_interrupt = 0.0
         self._show_exit_hint = False
@@ -708,7 +711,7 @@ class InteractiveTerminal:
         # Add tools from registry (lazy load)
         if include_tools:
             try:
-                from tools import registry, ensure_loaded
+                from tools import ensure_loaded, registry
 
                 ensure_loaded()
                 for tool in registry.list_tools():
@@ -1729,7 +1732,7 @@ class InteractiveTerminal:
                 self._advance_suggestion()
                 continue
             if cmd in ("tools", "/tools"):
-                from tools import registry, ensure_loaded, tool_load_errors
+                from tools import ensure_loaded, registry, tool_load_errors
                 ensure_loaded()
                 self.console.print(registry.list_tools_table())
                 errors = tool_load_errors()
@@ -1898,7 +1901,7 @@ class InteractiveTerminal:
             # "continue" — resume interrupted synthesis or continue conversation
             if cmd in ("continue", "go on", "keep going"):
                 if self.agent._last_plan is not None:
-                    self.console.print(f"  [cyan]Continuing synthesis...[/cyan]\n")
+                    self.console.print("  [cyan]Continuing synthesis...[/cyan]\n")
                     try:
                         result = self.agent.continue_synthesis()
                         self.console.print()
@@ -2571,7 +2574,7 @@ class InteractiveTerminal:
             else:
                 self.session.config.unset("llm.openai_base_url")
                 self.session.config.unset("llm.openai_compatible_backend")
-        self.session.config.save()  # Persist to ~/.fastfold-cli/config.json
+        self.session.config.save()  # Persist to ~/.sandwalk/config.json
         self.console.print(
             f"  [green]Switched to {display}[/green] ({model_id}) [dim]provider={selected_provider}[/dim]"
         )
@@ -3403,12 +3406,12 @@ class InteractiveTerminal:
 
     def _change_settings(self):
         """Interactive settings configuration menu."""
-        from agent.config import Config, AGENT_PROFILE_PRESETS
+        from agent.config import AGENT_PROFILE_PRESETS, Config
         from ui.status import SPINNERS
-        
+
         cfg = Config.load()
         self.session.config = cfg
-        
+
         while True:
             self.console.print("\n  [cyan]Settings Menu[/cyan]")
             self.console.print("  [1] UI Loading Spinner")
@@ -3417,38 +3420,38 @@ class InteractiveTerminal:
             self.console.print("  [4] OpenAI-compatible Profiles")
             self.console.print("  [0] Done")
             self.console.print("\n  Select option: ", end="")
-            
+
             import sys
             sys.stdout.flush()
-            
+
             try:
                 choice = self._getch()
             except KeyboardInterrupt:
                 self.console.print()
                 return
-                
+
             self.console.print(choice)
-            
+
             if choice == "0":
                 break
             elif choice == "1":
                 spinners = list(SPINNERS.keys())
                 current_spinner = cfg.get("ui.spinner", "dna_helix")
-                self.console.print(f"\n  [cyan]UI Loading Spinner[/cyan]")
+                self.console.print("\n  [cyan]UI Loading Spinner[/cyan]")
                 for i, spinner_id in enumerate(spinners, 1):
                     marker = " [green]*[/green]" if spinner_id == current_spinner else "  "
                     self.console.print(f"  {marker} [{i}] {spinner_id}")
                 self.console.print("\n  Select spinner: ", end="")
                 sys.stdout.flush()
-                
+
                 try:
                     s_choice = self._getch()
                 except KeyboardInterrupt:
                     self.console.print()
                     return
-                    
+
                 self.console.print(s_choice)
-                
+
                 if s_choice.isdigit() and 1 <= int(s_choice) <= len(spinners):
                     new_spinner = spinners[int(s_choice) - 1]
                     if new_spinner != current_spinner:
@@ -3461,21 +3464,21 @@ class InteractiveTerminal:
             elif choice == "2":
                 profiles = list(AGENT_PROFILE_PRESETS.keys())
                 current_profile = cfg.get("agent.profile", "research")
-                self.console.print(f"\n  [cyan]Agent Profile[/cyan]")
+                self.console.print("\n  [cyan]Agent Profile[/cyan]")
                 for i, profile_id in enumerate(profiles, 1):
                     marker = " [green]*[/green]" if profile_id == current_profile else "  "
                     self.console.print(f"  {marker} [{i}] {profile_id}")
                 self.console.print("\n  Select profile: ", end="")
                 sys.stdout.flush()
-                
+
                 try:
                     p_choice = self._getch()
                 except KeyboardInterrupt:
                     self.console.print()
                     return
-                    
+
                 self.console.print(p_choice)
-                
+
                 if p_choice.isdigit() and 1 <= int(p_choice) <= len(profiles):
                     new_profile = profiles[int(p_choice) - 1]
                     if new_profile != current_profile:
@@ -3484,30 +3487,30 @@ class InteractiveTerminal:
                         self.console.print(f"  [green]Profile updated to:[/green] {new_profile}")
                 else:
                     self.console.print("  [dim]Cancelled.[/dim]")
-                    
+
             elif choice == "3":
                 current_html = cfg.get("output.auto_publish_html_interactive", True)
-                self.console.print(f"\n  [cyan]Auto-publish HTML Reports[/cyan]")
+                self.console.print("\n  [cyan]Auto-publish HTML Reports[/cyan]")
                 self.console.print(f"  Current: [bold]{'Yes' if current_html else 'No'}[/bold]")
                 self.console.print("\n  Enable? (y/n): ", end="")
                 sys.stdout.flush()
-                
+
                 try:
                     h_choice = self._getch().lower()
                 except KeyboardInterrupt:
                     self.console.print()
                     return
-                    
+
                 self.console.print(h_choice)
-                
+
                 if h_choice == "y":
                     cfg.set("output.auto_publish_html_interactive", True)
                     cfg.save()
-                    self.console.print(f"  [green]Auto-publish HTML enabled.[/green]")
+                    self.console.print("  [green]Auto-publish HTML enabled.[/green]")
                 elif h_choice == "n":
                     cfg.set("output.auto_publish_html_interactive", False)
                     cfg.save()
-                    self.console.print(f"  [green]Auto-publish HTML disabled.[/green]")
+                    self.console.print("  [green]Auto-publish HTML disabled.[/green]")
                 else:
                     self.console.print("  [dim]Cancelled.[/dim]")
             elif choice == "4":
@@ -3983,9 +3986,11 @@ class InteractiveTerminal:
 
     def _handle_model_manager_command(self, query: str) -> None:
         """Show and manage OpenAI-compatible profiles (add/edit/delete)."""
-        from agent.config import Config
-        from rich.table import Table
         import sys
+
+        from rich.table import Table
+
+        from agent.config import Config
 
         cfg = Config.load()
         self.session.config = cfg
@@ -4266,9 +4271,9 @@ class InteractiveTerminal:
                 self.console.print(f"  [green]Copied to clipboard.[/green] [dim]{preview}...[/dim]")
             else:
                 # Fallback for non-macOS
-                self.console.print(f"  [yellow]Clipboard not available. Use /export instead.[/yellow]")
+                self.console.print("  [yellow]Clipboard not available. Use /export instead.[/yellow]")
         except (FileNotFoundError, subprocess.TimeoutExpired):
-            self.console.print(f"  [yellow]Clipboard not available. Use /export instead.[/yellow]")
+            self.console.print("  [yellow]Clipboard not available. Use /export instead.[/yellow]")
 
     def _truncate_for_export(self, text: str, max_chars: int = 800) -> str:
         """Trim long text fields for readable markdown export."""
@@ -4466,8 +4471,8 @@ class InteractiveTerminal:
             return {
                 "ok": False,
                 "message": (
-                    "Fastfold API key not configured. Run `fastfold setup` or "
-                    "`fastfold config set api.fastfold_cloud_key <key>`."
+                    "Fastfold API key not configured. Run `sandwalk setup` or "
+                    "`sandwalk config set api.fastfold_cloud_key <key>`."
                 ),
             }
 
@@ -4554,7 +4559,7 @@ class InteractiveTerminal:
             return
 
         try:
-            from reports.notebook import trace_to_notebook, save_notebook
+            from reports.notebook import save_notebook, trace_to_notebook
         except ImportError:
             self.console.print("  [red]nbformat required.[/red] pip install nbformat")
             return
@@ -4677,8 +4682,9 @@ class InteractiveTerminal:
 
     def _list_sessions(self):
         """Show recent saved sessions."""
-        from agent.trajectory import Trajectory
         from rich.table import Table
+
+        from agent.trajectory import Trajectory
 
         sessions = Trajectory.list_sessions()
         if not sessions:
@@ -5114,7 +5120,8 @@ class InteractiveTerminal:
     def _show_skills(self):
         """List currently loaded skills in interactive mode."""
         from rich.table import Table
-        from agent.skills import list_skills, display_author, display_updated, display_version
+
+        from agent.skills import display_author, display_updated, display_version, list_skills
         from agent.specialists_manage import get_active_specialist
 
         skills = list_skills()
@@ -5209,6 +5216,7 @@ class InteractiveTerminal:
     def _find_skills(self, query: str = ""):
         """Discover installable skills from the catalog."""
         from rich.table import Table
+
         from agent.skills import discover_skills
 
         with self.console.status("[green]Searching skill catalog...[/green]", spinner="dots"):
@@ -5230,7 +5238,7 @@ class InteractiveTerminal:
 
     def _upgrade_skills(self):
         """Sync the Fastfold catalog and update installed skills."""
-        from agent.skills import upgrade_skills, GLOBAL_SKILLS_DIR
+        from agent.skills import GLOBAL_SKILLS_DIR, upgrade_skills
 
         with self.console.status("[green]Syncing agent skills...[/green]", spinner="dots") as status:
             result = upgrade_skills(

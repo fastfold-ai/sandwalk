@@ -12,6 +12,10 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import {
+  listenSubtitle,
+  SandwalkServerCard
+} from '@/components/agents/SandwalkServerCard'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -28,10 +32,6 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip'
-import {
-  listenSubtitle,
-  SandwalkServerCard
-} from '@/components/agents/SandwalkServerCard'
 import {
   applyPalette,
   applyTheme,

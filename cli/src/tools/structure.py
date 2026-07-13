@@ -6,10 +6,12 @@ ternary_predict and batch_screen require the TernaryPred sister project
 work standalone.
 """
 
+import json
 import subprocess
 import sys
-import json
 from pathlib import Path
+
+from agent.config import CONFIG_DIR
 from tools import registry
 from tools.http_client import request
 
@@ -120,7 +122,7 @@ def batch_screen(compounds_csv: str, targets_csv: str, e3: str = "CRBN",
 )
 def alphafold_fetch(uniprot_id: str, **kwargs) -> dict:
     """Download AlphaFold structure for a protein."""
-    cache_dir = Path.home() / ".fastfold-cli" / "cache" / "alphafold"
+    cache_dir = CONFIG_DIR / "cache" / "alphafold"
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     output_path = cache_dir / f"AF-{uniprot_id}-F1-model_v4.pdb"
@@ -424,10 +426,10 @@ def dock(smiles: str, target_pdb: str, method: str = "vina",
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
     except subprocess.TimeoutExpired:
-        return {"error": f"{method} timed out after 300s", "summary": f"Docking timed out"}
+        return {"error": f"{method} timed out after 300s", "summary": "Docking timed out"}
 
     if proc.returncode != 0:
-        return {"error": f"{method} failed: {proc.stderr[:500]}", "summary": f"Docking failed"}
+        return {"error": f"{method} failed: {proc.stderr[:500]}", "summary": "Docking failed"}
 
     # Parse output for binding affinities
     poses = []
@@ -506,7 +508,7 @@ def md_simulate(pdb_path: str, duration_ns: float = 10.0,
     pdb = Path(pdb_path)
     if not pdb.exists():
         return {"error": f"PDB file not found: {pdb_path}",
-                "summary": f"MD simulation failed: PDB file not found"}
+                "summary": "MD simulation failed: PDB file not found"}
 
     # Estimate runtime: ~1 ns/hr on a single A100 for a typical protein
     estimated_hours = duration_ns * 1.0  # rough heuristic
@@ -701,7 +703,7 @@ def _geometric_pocket_detection(pdb_path: str, min_residues: int = 5,
 
     # Compute residue centres
     residues = []
-    for key, rc in residue_coords.items():
+    for _key, rc in residue_coords.items():
         rx = sum(rc["xs"]) / len(rc["xs"])
         ry = sum(rc["ys"]) / len(rc["ys"])
         rz = sum(rc["zs"]) / len(rc["zs"])

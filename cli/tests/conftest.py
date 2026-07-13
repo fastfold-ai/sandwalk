@@ -33,14 +33,14 @@ def _isolate_cli_config(tmp_path, monkeypatch):
     """Redirect the CLI config dir to a temp path for every test.
 
     Tests construct ``Config`` instances and exercise CLI flows that call
-    ``Config.save()``, which writes to the real ``~/.fastfold-cli/config.json``.
+    ``Config.save()``, which writes to the real ``~/.sandwalk/config.json``.
     Without this guard, running the suite outside a filesystem sandbox clobbers
     the user's actual API keys. Pointing the module-level path constants at a
     per-test temp dir makes config writes hermetic.
     """
     import agent.config as _cfg
 
-    cfg_dir = tmp_path / "fastfold-cli-config"
+    cfg_dir = tmp_path / "sandwalk-config"
     cfg_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(_cfg, "CONFIG_DIR", cfg_dir, raising=False)
     monkeypatch.setattr(_cfg, "CONFIG_FILE", cfg_dir / "config.json", raising=False)

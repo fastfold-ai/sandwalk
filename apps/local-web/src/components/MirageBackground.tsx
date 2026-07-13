@@ -1,6 +1,6 @@
-import { useId, useMemo } from 'react'
-
 import './MirageBackground.css'
+
+import { useId, useMemo } from 'react'
 
 type MirageBackgroundProps = {
   className?: string

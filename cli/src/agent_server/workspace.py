@@ -10,6 +10,7 @@ import shutil
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
 from agent_server.models import WorkspaceFile, WorkspaceFileContent
 
@@ -110,6 +111,7 @@ class WorkspaceService:
         data = path.read_bytes()
         mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         is_text = mime_type.startswith("text/") or path.suffix.lower() in TEXT_SUFFIXES
+        encoding: Literal["text", "base64"]
         if is_text:
             try:
                 content = data.decode("utf-8")

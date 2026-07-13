@@ -1,6 +1,7 @@
 """Drug repurposing tools: connectivity map queries, signature matching."""
 
 import numpy as np
+
 from tools import registry
 from tools.http_client import request_json
 

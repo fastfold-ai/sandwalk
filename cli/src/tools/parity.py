@@ -7,9 +7,9 @@ capabilities while staying implementation-original inside ct.
 
 from __future__ import annotations
 
-from datetime import date
 import re
 import xml.etree.ElementTree as ET
+from datetime import date
 
 from tools import registry
 from tools.http_client import request, request_json

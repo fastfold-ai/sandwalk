@@ -1,19 +1,22 @@
 """
-Configuration management for ct.
+Configuration management for Sandwalk.
 
-Config is stored at ~/.fastfold-cli/config.json and manages:
+Config is stored at ~/.sandwalk/config.json and manages:
 - LLM provider settings (Anthropic, OpenAI, local models)
 - Data directory paths (DepMap, PRISM, etc.)
 - Output preferences
 - Tool-specific settings
+
+Legacy locations ``~/.fastfold-cli`` and ``~/.ct`` are migrated once on import
+(copy-if-missing into ``~/.sandwalk``).
 """
 
 import json
-import os
 import logging
+import os
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -24,9 +27,13 @@ load_dotenv(Path(__file__).resolve().parents[3] / ".env")  # repo root
 
 from rich.table import Table  # noqa: E402
 
-CONFIG_DIR = Path.home() / ".fastfold-cli"
+CONFIG_DIR = Path.home() / ".sandwalk"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 CONFIG_BACKUP_FILE = CONFIG_DIR / "config.json.bak"
+# Previous install locations — kept for one-time migration and allowlists.
+LEGACY_FASTFOLD_DIR = Path.home() / ".fastfold-cli"
+LEGACY_CT_DIR = Path.home() / ".ct"
+LEGACY_CONFIG_DIRS = (LEGACY_FASTFOLD_DIR, LEGACY_CT_DIR)
 VALID_LLM_PROVIDERS = frozenset(
     {"anthropic", "openai", "xai", "google", "nvidia", "opencode"}
 )
@@ -136,28 +143,51 @@ OPENAI_PROFILE_DEFAULTS = {
 }
 _UNSET = object()
 
-_LEGACY_DIR = Path.home() / ".ct"
-
-
-def _migrate_legacy_config() -> None:
-    """One-time migration: copy ~/.ct/ → ~/.fastfold-cli/ for existing users."""
-    if not _LEGACY_DIR.exists():
+def _migrate_tree(src_root: Path, dest_root: Path, *, label: str) -> None:
+    """Copy files from *src_root* into *dest_root* when the destination is missing."""
+    if not src_root.exists():
         return
     import shutil
-    # Walk legacy tree and copy any file not already present in new location
-    for src in _LEGACY_DIR.rglob("*"):
+
+    for src in src_root.rglob("*"):
         if not src.is_file():
             continue
-        relative = src.relative_to(_LEGACY_DIR)
-        dest = CONFIG_DIR / relative
+        relative = src.relative_to(src_root)
+        dest = dest_root / relative
         if dest.exists():
             continue
         try:
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
-            logger.info("Migrated %s → %s", src, dest)
+            logger.info("Migrated %s %s → %s", label, src, dest)
         except Exception as exc:
-            logger.warning("Could not migrate %s: %s", src, exc)
+            logger.warning("Could not migrate %s %s: %s", label, src, exc)
+
+
+def _migrate_legacy_config() -> None:
+    """One-time migrations into ~/.sandwalk (copy-if-missing, never overwrite).
+
+    Chain:
+    1. ~/.ct → ~/.fastfold-cli (preserve intermediate for very old installs)
+    2. ~/.fastfold-cli → ~/.sandwalk
+    3. ~/.ct → ~/.sandwalk (users who never had ~/.fastfold-cli)
+    """
+    _migrate_tree(LEGACY_CT_DIR, LEGACY_FASTFOLD_DIR, label="ct→fastfold-cli")
+    _migrate_tree(LEGACY_FASTFOLD_DIR, CONFIG_DIR, label="fastfold-cli→sandwalk")
+    _migrate_tree(LEGACY_CT_DIR, CONFIG_DIR, label="ct→sandwalk")
+
+
+def _rewrite_legacy_config_paths(data: dict[str, Any]) -> None:
+    """Rewrite config string values that still point at legacy home dirs."""
+    old_roots = (str(LEGACY_CT_DIR), str(LEGACY_FASTFOLD_DIR))
+    new_root = str(CONFIG_DIR)
+    for key, val in list(data.items()):
+        if not isinstance(val, str):
+            continue
+        for old in old_roots:
+            if val == old or val.startswith(old + "/"):
+                data[key] = new_root + val[len(old):]
+                break
 
 
 _migrate_legacy_config()
@@ -341,7 +371,7 @@ DEFAULTS = {
 
     "enterprise.enforce_policy": False,
     "enterprise.audit_enabled": True,
-    "enterprise.audit_dir": str(Path.home() / ".fastfold-cli" / "audit"),
+    "enterprise.audit_dir": str(CONFIG_DIR / "audit"),
     "enterprise.blocked_tools": "",
     "enterprise.blocked_categories": "",
     "enterprise.require_tool_allowlist": False,
@@ -350,10 +380,10 @@ DEFAULTS = {
 
     "knowledge.enable_substrate": True,
     "knowledge.auto_ingest_evidence": True,
-    "knowledge.substrate_path": str(Path.home() / ".fastfold-cli" / "knowledge" / "substrate.json"),
+    "knowledge.substrate_path": str(CONFIG_DIR / "knowledge" / "substrate.json"),
     "knowledge.schema_monitor_enabled": False,
 
-    "ops.base_dir": str(Path.home() / ".fastfold-cli" / "ops"),
+    "ops.base_dir": str(CONFIG_DIR / "ops"),
     "install.uv_flavor": None,
 }
 
@@ -834,7 +864,7 @@ class Config:
     """ct configuration manager."""
 
     @staticmethod
-    def _normalize_openai_base_url(value: Any) -> Optional[str]:
+    def _normalize_openai_base_url(value: Any) -> str | None:
         """Normalize OpenAI-compatible base URLs for consistent comparisons."""
         text = Config._normalized_secret(value)
         if not text:
@@ -869,7 +899,7 @@ class Config:
         return aliases.get(text, text)
 
     @staticmethod
-    def infer_openai_compatible_backend(base_url: Optional[str], api_key: Optional[str] = None) -> str:
+    def infer_openai_compatible_backend(base_url: str | None, api_key: str | None = None) -> str:
         """Infer OpenAI-compatible backend type from endpoint and key hints."""
         endpoint = str(base_url or "").strip().lower()
         secret = str(api_key or "").strip().lower()
@@ -902,7 +932,7 @@ class Config:
         return "other"
 
     @staticmethod
-    def _infer_backend_from_model_name(model_id: Optional[str]) -> Optional[str]:
+    def _infer_backend_from_model_name(model_id: str | None) -> str | None:
         """Infer backend from model id hints when endpoint is unavailable."""
         model_name = str(model_id or "").strip().lower()
         if not model_name:
@@ -922,13 +952,13 @@ class Config:
         return None
 
     @staticmethod
-    def _looks_like_anthropic_model(model_id: Optional[str]) -> bool:
+    def _looks_like_anthropic_model(model_id: str | None) -> bool:
         """Best-effort check for Anthropic model identifiers."""
         value = str(model_id or "").strip().lower()
         return value.startswith("claude-")
 
     @staticmethod
-    def _looks_like_openai_cloud_model(model_id: Optional[str]) -> bool:
+    def _looks_like_openai_cloud_model(model_id: str | None) -> bool:
         """Best-effort check for OpenAI cloud model identifiers."""
         value = str(model_id or "").strip().lower()
         if not value:
@@ -1269,7 +1299,7 @@ class Config:
         _, _, default_profile_id = self._ensure_openai_profiles_data(self._data)
         return default_profile_id
 
-    def get_openai_profile(self, profile_id: Optional[str] = None) -> Optional[dict[str, Any]]:
+    def get_openai_profile(self, profile_id: str | None = None) -> dict[str, Any] | None:
         """Return an OpenAI profile by id (or active profile when omitted)."""
         profiles, active_profile_id, _ = self._ensure_openai_profiles_data(self._data)
         selected_profile_id = self._slugify_profile_id(profile_id or active_profile_id)
@@ -1299,13 +1329,13 @@ class Config:
     def upsert_openai_profile(
         self,
         *,
-        profile_id: Optional[str] = None,
-        label: Optional[str] = None,
-        backend: Optional[str] = None,
-        base_url: Optional[str] = None,
+        profile_id: str | None = None,
+        label: str | None = None,
+        backend: str | None = None,
+        base_url: str | None = None,
         api_key: Any = _UNSET,
-        default_model: Optional[str] = None,
-        discovery: Optional[list[str]] = None,
+        default_model: str | None = None,
+        discovery: list[str] | None = None,
         set_active: bool = False,
         set_default: bool = False,
     ) -> str:
@@ -1617,9 +1647,12 @@ class Config:
                 logger.warning("Failed to restore recovered config to %s: %s", CONFIG_FILE, exc)
 
         # Migrate legacy global output dir default to workspace-local output dir.
+        _rewrite_legacy_config_paths(data)
+
         legacy_output_dirs = {
-            str(Path.home() / ".fastfold-cli" / "outputs"),
-            str(Path.home() / ".ct" / "outputs"),
+            str(LEGACY_FASTFOLD_DIR / "outputs"),
+            str(LEGACY_CT_DIR / "outputs"),
+            str(CONFIG_DIR / "outputs"),
         }
         if data.get("sandbox.output_dir") in legacy_output_dirs:
             data["sandbox.output_dir"] = str(Path.cwd() / "outputs")
@@ -1676,7 +1709,7 @@ class Config:
         """Run schema validation on current config data. Returns list of issues."""
         return _validate_config(self._data)
 
-    def save(self):
+    def save(self) -> None:
         """Save config to disk."""
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         # Merge against latest on disk and apply only explicit mutations.
@@ -1864,7 +1897,7 @@ class Config:
         self._unset_keys.add(key)
 
     @staticmethod
-    def _normalized_secret(value: Any) -> Optional[str]:
+    def _normalized_secret(value: Any) -> str | None:
         """Normalize secret-like values; blank/whitespace becomes None."""
         if value is None:
             return None
@@ -1882,8 +1915,8 @@ class Config:
         config_key: str,
         value: Any,
         *,
-        openai_base_url: Optional[str] = None,
-    ) -> Optional[str]:
+        openai_base_url: str | None = None,
+    ) -> str | None:
         """Validate provider API keys; return issue message, else None."""
         normalized = cls._normalized_secret(value)
         if normalized is None:
@@ -1928,7 +1961,7 @@ class Config:
             return f"{normalized[:4]}...{normalized[-2:]}"
         return f"{normalized[:8]}...{normalized[-4:]}"
 
-    def llm_api_key(self, provider: Optional[str] = None) -> Optional[str]:
+    def llm_api_key(self, provider: str | None = None) -> str | None:
         """Get the best API key for the selected provider."""
         provider = (provider or self.get("llm.provider", "anthropic")).lower()
         if provider in OPENAI_COMPATIBLE_PROVIDERS:
@@ -1959,13 +1992,13 @@ class Config:
             self.get("llm.anthropic_api_key") or self.get("llm.api_key")
         )
 
-    def llm_provider_base_url(self, provider: Optional[str] = None) -> Optional[str]:
+    def llm_provider_base_url(self, provider: str | None = None) -> str | None:
         """Fixed base URL for first-party OpenAI-compatible providers (xai/google)."""
         provider = (provider or self.get("llm.provider", "anthropic")).lower()
         meta = OPENAI_COMPATIBLE_PROVIDERS.get(provider)
         return meta["base_url"] if meta else None
 
-    def llm_openai_base_url(self) -> Optional[str]:
+    def llm_openai_base_url(self) -> str | None:
         """Return normalized OpenAI-compatible base URL, if configured."""
         env_override = self._normalize_openai_base_url(os.environ.get("OPENAI_BASE_URL"))
         if env_override:
@@ -1986,7 +2019,7 @@ class Config:
         return value
 
     @staticmethod
-    def _is_local_openai_base_url(base_url: Optional[str]) -> bool:
+    def _is_local_openai_base_url(base_url: str | None) -> bool:
         """Heuristic: localhost OpenAI-compatible endpoints can skip API keys."""
         if not base_url:
             return False
@@ -1998,7 +2031,7 @@ class Config:
         return host in {"localhost", "127.0.0.1", "::1"}
 
     @staticmethod
-    def _is_openai_managed_base_url(base_url: Optional[str]) -> bool:
+    def _is_openai_managed_base_url(base_url: str | None) -> bool:
         """Return True when base URL points to OpenAI-managed API hosts."""
         if not base_url:
             return True
@@ -2012,7 +2045,7 @@ class Config:
         return host == "api.openai.com" or host.endswith(".openai.com")
 
     @staticmethod
-    def compatible_backend_install_url(backend: Optional[str]) -> str:
+    def compatible_backend_install_url(backend: str | None) -> str:
         """Return install/reference URL for a compatible backend template."""
         backend_type = str(backend or "").strip().lower()
         if backend_type in {"other", "custom"}:
@@ -2020,18 +2053,18 @@ class Config:
         defaults = OPENAI_PROFILE_DEFAULTS.get(backend_type, {})
         return str(defaults.get("install_url") or "")
 
-    def llm_preflight_issue(self) -> Optional[str]:
+    def llm_preflight_issue(self) -> str | None:
         """Return a human-readable LLM config issue, or None when ready."""
         provider_raw = self.get("llm.provider", "anthropic")
         provider = str(provider_raw or "").strip().lower()
         if not provider:
-            return "llm.provider is empty. Set it with: fastfold config set llm.provider anthropic"
+            return "llm.provider is empty. Set it with: sandwalk config set llm.provider anthropic"
 
         if provider not in VALID_LLM_PROVIDERS:
             valid = ", ".join(sorted(VALID_LLM_PROVIDERS))
             return (
                 f"Unsupported llm.provider '{provider}'. "
-                f"Valid providers: {valid}. Set it with: fastfold config set llm.provider <provider>"
+                f"Valid providers: {valid}. Set it with: sandwalk config set llm.provider <provider>"
             )
 
         provider_key = self.llm_api_key(provider)
@@ -2040,7 +2073,7 @@ class Config:
                 return (
                     "Configured OpenAI key appears to be an Anthropic key (starts with 'sk-ant-'). "
                     "Set a valid OpenAI key with:\n"
-                    "  fastfold config set llm.openai_api_key <key>"
+                    "  sandwalk config set llm.openai_api_key <key>"
                 )
             return None
 
@@ -2049,7 +2082,7 @@ class Config:
             return (
                 f"{meta['label']} API key not configured. Add it in Dashboard → "
                 f"Models → API Keys, set {meta['env_var']}, or run:\n"
-                f"  fastfold config set {meta['config_key']} <key>"
+                f"  sandwalk config set {meta['config_key']} <key>"
             )
 
         # Azure AI Foundry: Foundry-specific env vars are valid Anthropic auth
@@ -2071,12 +2104,12 @@ class Config:
                 return None
             return (
                 "OpenAI API key not configured. Set OPENAI_API_KEY or run:\n"
-                "  fastfold config set llm.openai_api_key <key>"
+                "  sandwalk config set llm.openai_api_key <key>"
             )
 
         return (
             "Anthropic API key not configured. Set ANTHROPIC_API_KEY or run:\n"
-            "  fastfold config set llm.anthropic_api_key <key>\n"
+            "  sandwalk config set llm.anthropic_api_key <key>\n"
             "Legacy fallback (still supported): llm.api_key\n"
             "For Azure AI Foundry: set ANTHROPIC_FOUNDRY_API_KEY and "
             "ANTHROPIC_FOUNDRY_RESOURCE"
@@ -2084,7 +2117,7 @@ class Config:
 
     def keys_table(self) -> Table:
         """Render API key status as a rich table."""
-        table = Table(title="API Keys", caption="Set: fastfold config set <key> <value>  |  Or: export ENV_VAR=<value>")
+        table = Table(title="API Keys", caption="Set: sandwalk config set <key> <value>  |  Or: export ENV_VAR=<value>")
         table.add_column("Service", style="bold")
         table.add_column("Status")
         table.add_column("Preview", style="magenta dim")

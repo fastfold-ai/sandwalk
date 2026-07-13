@@ -6,14 +6,12 @@ Supports automatic downloads for open-access datasets and guided
 instructions for datasets requiring portal authentication.
 """
 
-import gzip
-import hashlib
-import shutil
 from pathlib import Path
+from typing import Any
 
 import httpx
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, BarColumn, DownloadColumn, TransferSpeedColumn
+from rich.progress import BarColumn, DownloadColumn, Progress, SpinnerColumn, TransferSpeedColumn
 from rich.table import Table
 
 from agent.config import Config
@@ -23,7 +21,7 @@ console = Console()
 # Download timeout in seconds (large files like CRISPRGeneEffect ~700MB need more time)
 DOWNLOAD_TIMEOUT = 600
 
-DATASETS = {
+DATASETS: dict[str, dict[str, Any]] = {
     "depmap": {
         "description": "DepMap CRISPR gene dependencies, mutations, cell line metadata (24Q4)",
         "files": {
@@ -110,7 +108,7 @@ def _dataset_disk_size(path: Path, expected: set[str]) -> int:
     return total
 
 
-def _download_file(url: str, dest: Path, desc: str = None) -> bool:
+def _download_file(url: str, dest: Path, desc: str | None = None) -> bool:
     """Download a file with progress bar. Returns True on success."""
     desc = desc or dest.name
     try:
@@ -143,7 +141,7 @@ def _download_file(url: str, dest: Path, desc: str = None) -> bool:
         return False
 
 
-def download_dataset(name: str, output: Path = None):
+def download_dataset(name: str, output: Path | None = None) -> None:
     """Download a dataset."""
     if name == "--all" or name == "all":
         download_all(output)
@@ -175,13 +173,15 @@ def download_dataset(name: str, output: Path = None):
         if "note" in ds:
             console.print(f"  [yellow]{ds['note']}[/yellow]")
         console.print(f"  Source: {ds['source']}")
-        console.print(f"  Files needed:")
-        for fname in ds["files"]:
+        console.print("  Files needed:")
+        files = ds["files"]
+        assert isinstance(files, dict)
+        for fname in files:
             fpath = dest / fname
             status = "[green]found[/green]" if fpath.exists() else "[red]missing[/red]"
             console.print(f"    {fname} — {status}")
         console.print(f"\n  Download from {ds['source']} and place in {dest}/")
-        console.print(f"  Then run: [cyan]fastfold config set data.{name} {dest}[/cyan]")
+        console.print(f"  Then run: [cyan]sandwalk config set data.{name} {dest}[/cyan]")
         return
 
     # Automatic download
@@ -189,7 +189,9 @@ def download_dataset(name: str, output: Path = None):
     skipped = 0
     failed = 0
 
-    for fname, url in ds["files"].items():
+    files = ds["files"]
+    assert isinstance(files, dict)
+    for fname, url in files.items():
         fpath = dest / fname
         if fpath.exists():
             console.print(f"  [dim]{fname} — already exists, skipping[/dim]")
@@ -201,18 +203,17 @@ def download_dataset(name: str, output: Path = None):
             failed += 1
             continue
 
-        if _download_file(url, fpath, fname):
+        if _download_file(str(url), fpath, str(fname)):
             downloaded += 1
         else:
             failed += 1
 
     # Summary
-    total = len(ds["files"])
     console.print(f"\n  [green]{downloaded} downloaded[/green], {skipped} skipped, ", end="")
     if failed:
         console.print(f"[red]{failed} failed[/red]")
     else:
-        console.print(f"0 failed")
+        console.print("0 failed")
 
     # Auto-configure data path after successful download
     if downloaded > 0 or skipped > 0:
@@ -309,7 +310,7 @@ def _download_prism(dest: Path, cfg: Config) -> bool:
     return True
 
 
-def download_all(output: Path = None):
+def download_all(output: Path | None = None) -> None:
     """Download all auto-downloadable datasets."""
     auto_datasets = [name for name, ds in DATASETS.items() if ds.get("auto_download")]
     console.print(f"[cyan]Downloading {len(auto_datasets)} datasets: {', '.join(auto_datasets)}[/cyan]")
@@ -327,13 +328,13 @@ def dataset_catalog() -> Table:
 
     for name, ds in DATASETS.items():
         auto = "[green]yes[/green]" if ds.get("auto_download") else "[dim]manual[/dim]"
-        size = ds.get("size_hint", "-") or "-"
-        table.add_row(name, auto, size, ds.get("description", ""))
+        size = str(ds.get("size_hint") or "-")
+        table.add_row(name, auto, size, str(ds.get("description") or ""))
 
     return table
 
 
-def list_dataset_records() -> list[dict]:
+def list_dataset_records() -> list[dict[str, Any]]:
     """Return structured status records for every known dataset.
 
     Shared by the CLI status table and the web ``/v1/datasets`` API so both stay
@@ -342,13 +343,15 @@ def list_dataset_records() -> list[dict]:
     """
     cfg = Config.load()
     base = Path(cfg.get("data.base"))
-    records: list[dict] = []
+    records: list[dict[str, Any]] = []
 
     for name, ds in DATASETS.items():
         custom_path = cfg.get(f"data.{name}")
         path = Path(custom_path) if custom_path else base / name
 
-        expected = set(ds["files"].keys())
+        files = ds["files"]
+        assert isinstance(files, dict)
+        expected = set(files.keys())
         found: set[str] = set()
         if path.exists():
             existing = {f.name for f in path.iterdir() if f.is_file()}
@@ -368,7 +371,7 @@ def list_dataset_records() -> list[dict]:
             size_display = _format_size(disk_bytes)
             size_bytes: int | None = disk_bytes
         else:
-            size_display = ds.get("size_hint") or "-"
+            size_display = str(ds.get("size_hint") or "-")
             size_bytes = None
 
         records.append(
@@ -406,8 +409,10 @@ def dataset_status() -> Table:
         custom_path = cfg.get(f"data.{name}")
         path = Path(custom_path) if custom_path else base / name
 
-        expected = set(ds["files"].keys())
-        found = set()
+        files = ds["files"]
+        assert isinstance(files, dict)
+        expected = set(files.keys())
+        found: set[str] = set()
         if path.exists():
             existing = {f.name for f in path.iterdir() if f.is_file()}
             found = expected & existing
@@ -431,7 +436,7 @@ def dataset_status() -> Table:
         if disk_bytes > 0:
             size_str = _format_size(disk_bytes)
         else:
-            size_str = ds.get("size_hint") or "-"
+            size_str = str(ds.get("size_hint") or "-")
 
         auto = "[green]yes[/green]" if ds.get("auto_download") else "[dim]manual[/dim]"
         table.add_row(name, status, files_str, size_str, auto)

@@ -10,7 +10,9 @@ _MAX_RECURSION_LIMIT = 2000
 
 def _clamp_int(value: object, *, minimum: int, maximum: int, default: int) -> int:
     try:
-        return max(minimum, min(maximum, int(value)))  # type: ignore[arg-type]
+        if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+            return default
+        return max(minimum, min(maximum, int(value)))
     except (TypeError, ValueError):
         return default
 

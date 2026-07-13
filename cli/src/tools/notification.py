@@ -2,6 +2,9 @@
 Notification tools: email sending via SendGrid with dry-run support.
 """
 
+from datetime import UTC
+
+from agent.config import CONFIG_DIR
 from tools import registry
 from tools.http_client import request
 
@@ -31,7 +34,7 @@ def send_email(
     **kwargs,
 ) -> dict:
     """Send an email via SendGrid, or log it in dry-run mode."""
-    from datetime import datetime, timezone
+    from datetime import datetime
     from pathlib import Path
 
     from agent.config import Config
@@ -42,11 +45,11 @@ def send_email(
         from_email = config.get("notification.from_email", "ct@celltype.bio")
 
     # Ensure log directory exists
-    log_dir = Path.home() / ".fastfold-cli"
+    log_dir = CONFIG_DIR
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "sent_emails.log"
 
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
     sent = False
     error = None
 
@@ -54,7 +57,7 @@ def send_email(
         api_key = config.get("notification.sendgrid_api_key")
         if not api_key:
             return {
-                "summary": "SendGrid API key not configured. Set it with: fastfold config set notification.sendgrid_api_key <key>",
+                "summary": "SendGrid API key not configured. Set it with: sandwalk config set notification.sendgrid_api_key <key>",
                 "to": to,
                 "subject": subject,
                 "body": body,

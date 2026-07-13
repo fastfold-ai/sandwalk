@@ -22,7 +22,7 @@ from agent_server.models_service import ModelsService
 def isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import agent.config as config_mod
 
-    config_dir = tmp_path / ".fastfold-cli"
+    config_dir = tmp_path / ".sandwalk"
     config_dir.mkdir(parents=True, exist_ok=True)
     config_file = config_dir / "config.json"
     monkeypatch.setattr(config_mod, "CONFIG_DIR", config_dir)
@@ -51,7 +51,7 @@ def test_cloud_catalog_excludes_custom_entry():
 def test_catalog_defaults_migration(tmp_path, monkeypatch):
     import agent.config as config_mod
 
-    config_dir = tmp_path / ".fastfold-cli"
+    config_dir = tmp_path / ".sandwalk"
     config_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(config_mod, "CONFIG_DIR", config_dir)
     monkeypatch.setattr(config_mod, "CONFIG_FILE", config_dir / "config.json")

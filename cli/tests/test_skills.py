@@ -14,7 +14,7 @@ _REAL_FETCH_LATEST_RELEASE = skills_mod.fetch_latest_release
 
 @pytest.fixture(autouse=True)
 def _isolate_npx_dir(monkeypatch, tmp_path_factory):
-    """Point the npx install dir at an empty temp dir so tests never touch ~/.fastfold-cli."""
+    """Point the npx install dir at an empty temp dir so tests never touch ~/.sandwalk."""
     root = tmp_path_factory.mktemp("npx_root")
     monkeypatch.setattr(skills_mod, "NPX_INSTALL_ROOT", root)
     monkeypatch.setattr(skills_mod, "NPX_SKILLS_DIR", root / ".claude" / "skills")

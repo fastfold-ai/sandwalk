@@ -94,7 +94,7 @@ def manage(
                 "summary": (
                     "Skill install is disabled for the agent (installs third-party code). "
                     "Ask the user to run `fastfold skills add <source>` or `/skills-add <source>`, "
-                    "or enable it with `fastfold config set skills.allow_agent_install true`."
+                    "or enable it with `sandwalk config set skills.allow_agent_install true`."
                 ),
                 "ok": False,
                 "blocked": True,

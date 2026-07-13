@@ -1,25 +1,25 @@
 """
 Deployment readiness checks for fastfold.
 
-Used by `fastfold doctor`, interactive `/doctor`, and the local agent `/v1/doctor` API.
+Used by `sandwalk doctor`, interactive `/doctor`, and the local agent `/v1/doctor` API.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import logging
 import os
 import platform
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from rich.table import Table
 
-from agent.config import CONFIG_FILE, Config
+from agent.config import CONFIG_DIR, CONFIG_FILE, Config
 from tools import EXPERIMENTAL_CATEGORIES, ensure_loaded, tool_load_errors
 
 logger = logging.getLogger("doctor")
@@ -31,7 +31,7 @@ class DoctorCheck:
     status: str  # "ok" | "warn" | "error"
     detail: str
     category: str = "general"
-    fix: Optional[str] = None
+    fix: str | None = None
 
 
 _CATEGORY_BY_NAME: dict[str, str] = {
@@ -152,7 +152,7 @@ def run_checks(config: Config | None = None, session=None) -> list[DoctorCheck]:
         )
 
     # 4) Data base directory availability
-    data_base = Path(cfg.get("data.base", str(Path.home() / ".fastfold-cli" / "data")))
+    data_base = Path(cfg.get("data.base", str(CONFIG_DIR / "data")))
     try:
         data_base.mkdir(parents=True, exist_ok=True)
         checks.append(
@@ -307,7 +307,7 @@ def run_checks(config: Config | None = None, session=None) -> list[DoctorCheck]:
 
     # 11) Knowledge substrate path
     substrate_path = Path(
-        cfg.get("knowledge.substrate_path", str(Path.home() / ".fastfold-cli" / "knowledge" / "substrate.json"))
+        cfg.get("knowledge.substrate_path", str(CONFIG_DIR / "knowledge" / "substrate.json"))
     )
     try:
         substrate_path.parent.mkdir(parents=True, exist_ok=True)
@@ -329,7 +329,7 @@ def run_checks(config: Config | None = None, session=None) -> list[DoctorCheck]:
 
     # 12) Schema monitor readiness
     if cfg.get("knowledge.schema_monitor_enabled", False):
-        baseline = Path.home() / ".fastfold-cli" / "knowledge" / "schema_baselines.json"
+        baseline = CONFIG_DIR / "knowledge" / "schema_baselines.json"
         if baseline.exists():
             checks.append(
                 DoctorCheck(
@@ -464,7 +464,7 @@ def to_report(
     oks = sum(1 for c in resolved if c.status == "ok")
     return {
         "ok": errors == 0,
-        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checked_at": datetime.now(UTC).isoformat(),
         "summary": {
             "ok": oks,
             "warn": warns,
@@ -497,7 +497,7 @@ _KEY_DATASETS = {
 }
 
 
-def _tool_version(command: str, *args: str) -> Optional[str]:
+def _tool_version(command: str, *args: str) -> str | None:
     path = shutil.which(command)
     if not path:
         return None
@@ -712,7 +712,7 @@ def _check_mcp_servers(cfg: Config) -> list[DoctorCheck]:
                         status="warn",
                         detail=f"{entry.name} credentials saved but MCP is disabled",
                         category="mcp",
-                        fix=f"Enable on Dashboard → MCP, or Connect again",
+                        fix="Enable on Dashboard → MCP, or Connect again",
                     )
                 )
             continue
@@ -924,7 +924,7 @@ def _check_environment(cfg: Config) -> list[DoctorCheck]:
                 status="warn",
                 detail="Fastfold Cloud key not set",
                 category="environment",
-                fix="fastfold config set api.fastfold_cloud_key <key>",
+                fix="sandwalk config set api.fastfold_cloud_key <key>",
             )
         )
 
@@ -933,7 +933,7 @@ def _check_environment(cfg: Config) -> list[DoctorCheck]:
 
 def _check_data_availability(cfg: Config) -> DoctorCheck:
     """Check whether key datasets can be found on disk."""
-    data_base = Path(cfg.get("data.base", str(Path.home() / ".fastfold-cli" / "data")))
+    data_base = Path(cfg.get("data.base", str(CONFIG_DIR / "data")))
     search_dirs = [data_base]
     # Also check ct-data sister project
     ct_data = Path.home() / "Projects" / "CellType" / "ct-data"
@@ -982,8 +982,8 @@ def _check_data_availability(cfg: Config) -> DoctorCheck:
 
 
 def _check_downloads_dir() -> DoctorCheck:
-    """Verify ~/.fastfold-cli/downloads/ exists and is writable."""
-    downloads = Path.home() / ".fastfold-cli" / "downloads"
+    """Verify ~/.sandwalk/downloads/ exists and is writable."""
+    downloads = CONFIG_DIR / "downloads"
     try:
         downloads.mkdir(parents=True, exist_ok=True)
         return DoctorCheck(
@@ -1129,7 +1129,7 @@ def _check_model_providers(cfg: Config) -> list[DoctorCheck]:
             )
         ]
 
-    for prov, label, url, headers, _is_local in targets:
+    for _prov, label, url, headers, _is_local in targets:
         try:
             resp = httpx.get(
                 url,
@@ -1417,6 +1417,6 @@ def _check_boltz_cli(cfg: Config) -> DoctorCheck:
         status="warn",
         detail=(
             f"boltz-api found at {cli_path} ({version}) but BOLTZ_API_KEY is not configured. "
-            "Set with: fastfold config set api.boltz_api_key <key> or /keys set-boltz"
+            "Set with: sandwalk config set api.boltz_api_key <key> or /keys set-boltz"
         ),
     )

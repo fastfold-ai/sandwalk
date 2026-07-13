@@ -2,7 +2,7 @@
 
 Suggested remote MCP servers shipped in the FastFold agent dashboard (`/dashboard/mcp`) and CLI.
 
-Defaults are **off** until Connect succeeds. Credentials are stored in `~/.fastfold-cli/config.json` (same store as Integrations / `fastfold keys`).
+Defaults are **off** until Connect succeeds. Credentials are stored in `~/.sandwalk/config.json` (same store as Integrations / `fastfold keys`).
 
 Runtime uses [`langchain-mcp-adapters`](https://docs.langchain.com/oss/python/langchain/mcp) `MultiServerMCPClient` (stdio / SSE / streamable HTTP + auth headers).
 

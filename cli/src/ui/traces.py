@@ -5,13 +5,10 @@ Renders real-time trace panels showing tool name, arguments, results,
 and timing — used by both the SDK runner and legacy executor paths.
 """
 
-import time
 from rich.console import Console
-from rich.live import Live
 from rich.text import Text
 
 from ui.markdown import print_markdown_with_mermaid
-from ui.status import SPINNERS, apply_gradient
 
 
 def format_args(args: dict | None, max_value_len: int = 50) -> str:
@@ -73,7 +70,7 @@ class TraceRenderer:
         """Render a running tool indicator."""
         clean = name.replace("mcp__ct-tools__", "")
         args_str = format_args(args)
-        
+
         line = Text()
         line.append("  \u25b8 ", style="bold cyan")
         line.append(clean, style="cyan")
@@ -154,7 +151,7 @@ class TraceRenderer:
         """Render Claude's reasoning text between tool calls."""
         if not text or not text.strip():
             return
-        
+
         try:
             print_markdown_with_mermaid(
                 self.console,

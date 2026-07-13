@@ -1,9 +1,9 @@
 FROM python:3.11-slim
 
 ARG VERSION=dev
-LABEL org.opencontainers.image.title="fastfold-agent-cli" \
+LABEL org.opencontainers.image.title="sandwalk" \
       org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.source="https://github.com/fastfold-ai/fastfold-agent-cli"
+      org.opencontainers.image.source="https://github.com/fastfold-ai/sandwalk"
 
 WORKDIR /app
 
@@ -19,8 +19,8 @@ COPY src/ src/
 RUN pip install --no-cache-dir ".[all]"
 
 # Persistent config, sessions, skills, and downloaded datasets
-RUN mkdir -p /root/.fastfold-cli/data
+RUN mkdir -p /root/.sandwalk/data
 
-VOLUME /root/.fastfold-cli
+VOLUME /root/.sandwalk
 
-ENTRYPOINT ["fastfold"]
+ENTRYPOINT ["sandwalk"]

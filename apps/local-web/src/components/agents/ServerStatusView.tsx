@@ -1,6 +1,6 @@
 import type { ServerCacheInfo, ServerStatusReport } from '@sandwalk/agent-ui-core'
 import { Loader2 } from 'lucide-react'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { type ReactNode,useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { SettingsBlockSkeleton } from '@/components/agents/PageSkeletons'
@@ -335,7 +335,7 @@ export function ServerStatusView({
             <AlertDialogTitle>Clear runtime cache?</AlertDialogTitle>
             <AlertDialogDescription>
               Clears files under{' '}
-              <code className="font-mono">~/.fastfold-cli/cache</code>. Datasets
+              <code className="font-mono">~/.sandwalk/cache</code>. Datasets
               and sessions are not deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>

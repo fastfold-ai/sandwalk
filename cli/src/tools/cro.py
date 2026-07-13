@@ -9,8 +9,8 @@ or vendor APIs. Treat results as illustrative, not authoritative.
 
 import json
 from pathlib import Path
-from tools import registry
 
+from tools import registry
 
 # Module-level cache for CRO database
 _cro_db_cache = None
@@ -318,7 +318,7 @@ def draft_inquiry(cro_id: str, experiment_description: str,
     body_parts = [
         f"Dear {cro['name']} Team,",
         "",
-        f"I am writing to inquire about your services for the following study:",
+        "I am writing to inquire about your services for the following study:",
         "",
         f"**Experiment:** {experiment_description}",
     ]

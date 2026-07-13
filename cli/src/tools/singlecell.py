@@ -6,7 +6,6 @@ Requires scanpy for computation. Gracefully returns install instructions if miss
 
 from tools import registry
 
-
 # Canonical marker gene panels for common cell types
 MARKER_PANELS = {
     "T cells": ["CD3D", "CD3E", "CD3G", "CD2", "TRAC"],
@@ -448,7 +447,7 @@ def cell_type_annotate(data_path: str, reference: str = "immune", method: str = 
         except Exception as e:
             return {
                 "error": f"CellTypist annotation failed: {e}",
-                "summary": f"CellTypist error — try method='marker_based' instead",
+                "summary": "CellTypist error — try method='marker_based' instead",
             }
     else:
         # Marker-based annotation

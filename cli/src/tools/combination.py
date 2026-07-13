@@ -5,10 +5,10 @@ References crews-glue-discovery/scripts/synergy_prediction.py and metabolic_vuln
 for scoring logic.
 """
 
-import pandas as pd
 import numpy as np
-from tools import registry
+import pandas as pd
 
+from tools import registry
 
 # Metabolic pathway gene sets (from metabolic_vulnerability.py)
 METABOLIC_PATHWAYS = {
@@ -59,8 +59,9 @@ def synergy_predict(compound_id: str = "all", top_n: int = 20, **kwargs) -> dict
 
     Synergy score = |anti-correlation| x tissue_complementarity x potency_bonus
     """
-    from data.loaders import load_l1000, load_prism, load_model_metadata
     from sklearn.metrics.pairwise import cosine_similarity
+
+    from data.loaders import load_l1000, load_model_metadata, load_prism
     from tools._compound_resolver import resolve_compound
 
     if compound_id != "all":
@@ -103,7 +104,7 @@ def synergy_predict(compound_id: str = "all", top_n: int = 20, **kwargs) -> dict
     ANTICORR_THRESHOLD = -0.3
     results = []
 
-    for i, cpd1 in enumerate(query_compounds):
+    for _i, cpd1 in enumerate(query_compounds):
         idx1 = compounds.index(cpd1) if query_idx is None else query_idx
         for j in range(len(compounds)):
             if j <= idx1 and query_idx is None:
@@ -186,8 +187,9 @@ def synthetic_lethality(gene: str, top_n: int = 20, **kwargs) -> dict:
     Genes with strong negative correlation in DepMap CRISPR effect = when one is
     essential, the other is dispensable -> synthetic lethality.
     """
-    from data.loaders import load_crispr
     from scipy import stats
+
+    from data.loaders import load_crispr
 
     crispr = load_crispr()
 
@@ -264,9 +266,10 @@ def metabolic_vulnerability(compound_id: str = "all", pathway: str = "all", **kw
     Triangle: compound suppresses pathway (L1000) + pathway-dependent cells more
     sensitive (PRISM) = exploitable vulnerability.
     """
-    from data.loaders import load_l1000, load_crispr, load_prism, load_model_metadata
-    from tools._compound_resolver import resolve_compound
     from scipy import stats
+
+    from data.loaders import load_crispr, load_l1000, load_model_metadata, load_prism
+    from tools._compound_resolver import resolve_compound
 
     if compound_id != "all":
         compound_id = resolve_compound(compound_id, dataset="l1000")

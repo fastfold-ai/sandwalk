@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from agent_server.models import (
     DatasetInstallResponse,
     DatasetList,
@@ -10,12 +12,12 @@ from agent_server.models import (
 
 
 class DatasetsService:
-    def _records(self) -> list[dict]:
+    def _records(self) -> list[dict[str, Any]]:
         from data.downloader import list_dataset_records
 
         return list_dataset_records()
 
-    def _to_summary(self, record: dict) -> DatasetSummary:
+    def _to_summary(self, record: dict[str, Any]) -> DatasetSummary:
         return DatasetSummary(
             id=str(record["id"]),
             description=str(record.get("description") or ""),

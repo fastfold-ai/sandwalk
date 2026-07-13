@@ -1,16 +1,17 @@
+import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentSession, WorkspaceFile } from '@sandwalk/agent-ui-core'
-import { Icon } from '@iconify/react'
 import { Command as CommandPrimitive } from 'cmdk'
 import {
-  AtSign,
   Activity,
+  AtSign,
   Box,
   Boxes,
   Cpu,
   Database,
-  Hash,
+  GitBranch,
   HardDrive,
+  Hash,
   LayoutDashboard,
   MessageSquare,
   Network,
@@ -19,7 +20,6 @@ import {
   Settings2,
   Sparkles,
   Stethoscope,
-  GitBranch,
   Wrench,
   X,
   Zap

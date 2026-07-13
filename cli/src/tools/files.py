@@ -2,7 +2,7 @@
 File I/O tools for ct.
 
 Read files, write reports/CSV, edit/create/delete files, and search file contents.
-Restricted to safe directories (~/.fastfold-cli/, config-specified paths, and CWD).
+Restricted to safe directories (~/.sandwalk/, config-specified paths, and CWD).
 """
 
 import csv
@@ -11,12 +11,13 @@ import re
 import shutil
 from pathlib import Path
 
+from agent.config import CONFIG_DIR, LEGACY_CONFIG_DIRS
 from tools import registry
 
 
 def _allowed_paths(config=None) -> list[Path]:
     """Return list of directories the user is allowed to read from."""
-    allowed = [Path.home() / ".fastfold-cli", Path.home() / ".ct"]
+    allowed = [CONFIG_DIR, *LEGACY_CONFIG_DIRS]
 
     if config:
         for key in ("data.base", "data.depmap", "data.prism", "data.l1000",
@@ -149,7 +150,7 @@ def _resolve_cwd_path(path: str) -> tuple[Path | None, str | None]:
     parameters={"path": "Path to the file to read"},
     usage_guide=(
         "Use to read data files, prior reports, configuration files, or any file in the "
-        "current working directory. Also reads from ~/.fastfold-cli/ and configured data directories."
+        "current working directory. Also reads from ~/.sandwalk/ and configured data directories."
     ),
 )
 def read_file(path: str, _session=None, **kwargs) -> dict:
@@ -506,9 +507,9 @@ def extract_archive(
 ) -> dict:
     """Extract an archive file."""
     import fnmatch
+    import logging
     import tarfile
     import zipfile
-    import logging
     _log = logging.getLogger("tools.files")
     _log.debug("extract_archive: path=%r destination=%r pattern=%r kwargs=%r", path, destination, pattern, kwargs)
 

@@ -963,7 +963,7 @@ class AgentStore:
                     json.dumps(payload, separators=(",", ":"), default=str),
                 ),
             )
-            sequence = int(cursor.lastrowid)
+            sequence = int(cursor.lastrowid or 0)
         return EventEnvelope(
             id=event_id,
             session_id=session_id,
@@ -1022,7 +1022,7 @@ class AgentStore:
 
     def list_mcp_servers(self, *, enabled_only: bool = False) -> list[McpServer]:
         query = "SELECT * FROM mcp_servers"
-        params: tuple = ()
+        params: tuple[Any, ...] = ()
         if enabled_only:
             query += " WHERE enabled = ?"
             params = (1,)
@@ -1047,11 +1047,14 @@ class AgentStore:
         oauth_scopes: str | None = None,
         headers_helper_command: str | None = None,
     ) -> McpServer:
+        from typing import Literal, cast
+
         now = utc_now()
+        transport_lit = cast(Literal["stdio", "sse", "streamable_http"], transport)
         server = McpServer(
             id=str(uuid.uuid4()),
             name=name.strip(),
-            transport=transport,
+            transport=transport_lit,
             command=command.strip() if command else None,
             args=args,
             url=url.strip() if url else None,
@@ -1096,7 +1099,7 @@ class AgentStore:
             )
         return server
 
-    def update_mcp_server(self, server_id: str, **changes) -> McpServer | None:
+    def update_mcp_server(self, server_id: str, **changes: Any) -> McpServer | None:
         current = next(
             (server for server in self.list_mcp_servers() if server.id == server_id),
             None,

@@ -69,7 +69,7 @@ def run_server(
 
     from agent_server.app import create_app
 
-    # Match CLI Session: expose ~/.fastfold-cli config credentials to process env
+    # Match CLI Session: expose ~/.sandwalk config credentials to process env
     # so shell/skill subprocesses and PTYs see the same keys as interactive CLI.
     try:
         from agent.config import sync_process_env_from_config

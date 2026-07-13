@@ -48,12 +48,11 @@ def gene_expression(
         return err
 
     import cellxgene_census
-    import numpy as np
 
     try:
         with cellxgene_census.open_soma(census_version="stable") as census:
             # Build filter
-            value_filter = f"is_primary_data == True"
+            value_filter = "is_primary_data == True"
             if tissue:
                 value_filter += f" and tissue_general == '{tissue}'"
 

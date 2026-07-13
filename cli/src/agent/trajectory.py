@@ -9,9 +9,11 @@ Supports persistence to JSONL for session resume.
 import json
 import re
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
+
+from agent.config import CONFIG_DIR
 
 
 @dataclass
@@ -30,16 +32,16 @@ class Trajectory:
     def __init__(
         self,
         max_turns: int = 20,
-        session_id: Optional[str] = None,
-        title: Optional[str] = None,
+        session_id: str | None = None,
+        title: str | None = None,
     ):
         self.turns: list[Turn] = []
         self.max_turns = max_turns
-        self.session_id: Optional[str] = session_id
-        self.title: Optional[str] = title
+        self.session_id: str | None = session_id
+        self.title: str | None = title
         self.created_at = time.time()
         self.updated_at: float = self.created_at
-        self.model: Optional[str] = None
+        self.model: str | None = None
         self.usage_data: dict[str, Any] = {}
         self._uuid_pattern = re.compile(
             r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\b"
@@ -207,7 +209,7 @@ class Trajectory:
     @staticmethod
     def sessions_dir() -> Path:
         """Return the directory where sessions are stored."""
-        d = Path.home() / ".fastfold-cli" / "sessions"
+        d = CONFIG_DIR / "sessions"
         d.mkdir(parents=True, exist_ok=True)
         return d
 

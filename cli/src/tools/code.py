@@ -11,7 +11,6 @@ from pathlib import Path
 
 from tools import registry
 
-
 CODE_GEN_SYSTEM_PROMPT = """You are a Python code generator for fastfold-agent-cli, a drug discovery research agent.
 
 Write Python code to accomplish the user's analysis goal. The code will be executed in a sandbox.

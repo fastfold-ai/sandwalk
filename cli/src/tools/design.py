@@ -8,7 +8,6 @@ scoring.
 
 from tools import registry
 
-
 # Common medicinal chemistry transformations: (SMARTS_pattern, SMARTS_replacement, description)
 # Each entry: (name, smarts_from, list_of_replacements)
 _MEDCHEM_TRANSFORMS = [
@@ -155,7 +154,6 @@ def suggest_modifications(smiles: str, objective: str = "potency",
     # Apply each transformation
     for name, smarts_from, smarts_to, description in _MEDCHEM_TRANSFORMS:
         try:
-            rxn_smarts = f"[{smarts_from}]>>[{smarts_to}]"
             # Use ReplaceSubstructs instead of reaction for reliability
             pattern = Chem.MolFromSmarts(smarts_from)
             if pattern is None:

@@ -9,11 +9,12 @@ Builds the knowledge substrate from:
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
 import time
+from pathlib import Path
 from typing import Any
 
+from agent.config import CONFIG_DIR
 from kb.substrate import KnowledgeSubstrate
 
 
@@ -28,8 +29,8 @@ class KnowledgeIngestionPipeline:
         evidence_path: Path | None = None,
     ):
         self.substrate = substrate or KnowledgeSubstrate()
-        self.state_path = state_path or (Path.home() / ".fastfold-cli" / "knowledge" / "ingest_state.json")
-        self.evidence_path = evidence_path or (Path.home() / ".fastfold-cli" / "evidence" / "evidence.jsonl")
+        self.state_path = state_path or (CONFIG_DIR / "knowledge" / "ingest_state.json")
+        self.evidence_path = evidence_path or (CONFIG_DIR / "evidence" / "evidence.jsonl")
         self._state = self._load_state()
 
     def _default_state(self) -> dict[str, Any]:
@@ -53,7 +54,7 @@ class KnowledgeIngestionPipeline:
         data.setdefault("source_runs", {})
         return data
 
-    def save_state(self):
+    def save_state(self) -> None:
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self._state["updated_at"] = time.time()
         self.state_path.write_text(

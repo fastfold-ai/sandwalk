@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import html
-import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -13,7 +12,7 @@ def markdown_to_html(md_text: str) -> str:
     try:
         import markdown as md_lib
 
-        return md_lib.markdown(md_text, extensions=["tables", "fenced_code"])
+        return str(md_lib.markdown(md_text, extensions=["tables", "fenced_code"]))
     except ImportError:
         escaped = (
             md_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -37,7 +36,7 @@ def render_html_report(
 ) -> str:
     """Render a full HTML document with embedded CSS."""
     body_html = markdown_to_html(md_text)
-    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    generated_at = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     safe_title = html.escape(title)
     safe_query = html.escape(query) if query else ""
 

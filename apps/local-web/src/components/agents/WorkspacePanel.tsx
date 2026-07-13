@@ -1,10 +1,10 @@
+import { Icon } from '@iconify/react'
+import Editor from '@monaco-editor/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   WorkspaceFile,
   WorkspaceFileContent
 } from '@sandwalk/agent-ui-core'
-import { Icon } from '@iconify/react'
-import Editor from '@monaco-editor/react'
 import {
   Check,
   ChevronDown,

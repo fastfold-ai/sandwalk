@@ -10,9 +10,9 @@ A real implementation would query live provider APIs for current pricing.
 import json
 import time
 from pathlib import Path
+
 from tools import registry
 from tools.http_client import request_json
-
 
 # Module-level cache for provider data
 _providers_data = None
@@ -282,7 +282,7 @@ def submit_job(job_type: str, params: dict = None, provider: str | None = None, 
         return {
             "error": (
                 f"No API key configured for {provider_info['name']}. "
-                f"Set it with: fastfold config set {config_key} <your-key>\n"
+                f"Set it with: sandwalk config set {config_key} <your-key>\n"
                 f"Or: export {config_key.upper().replace('.', '_')}=<your-key>\n"
                 f"Sign up at: {provider_info.get('website', 'N/A')}\n"
                 f"Run 'fastfold keys' to see all API key status."
@@ -351,7 +351,7 @@ def job_status(job_id: str, provider: str | None = None, **kwargs) -> dict:
         return {
             "error": (
                 f"No API key configured for {provider_info['name']}. "
-                f"Set it with: fastfold config set {config_key} <your-key>\n"
+                f"Set it with: sandwalk config set {config_key} <your-key>\n"
                 f"Run 'fastfold keys' to see all API key status."
             ),
             "summary": f"Job status check failed: no API key for {provider_info['name']}",

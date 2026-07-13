@@ -32,6 +32,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,all,api]"
 
+      - name: Ruff lint
+        run: ruff check src
+
+      - name: Mypy (scoped strict packages)
+        run: mypy
+
       - name: Syntax and import health
         run: |
           python -m compileall -q src
@@ -130,8 +136,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm --filter @sandwalk/agent-local-web lint:check
+
       - name: Typecheck
         run: pnpm --filter @sandwalk/agent-local-web typecheck
+
+      - name: Production build
+        run: pnpm --filter @sandwalk/agent-local-web build
 
       - name: Unit tests + coverage
         run: pnpm --filter @sandwalk/agent-local-web test:coverage
@@ -202,6 +214,6 @@ jobs:
       - name: Smoke test CLI in container
         working-directory: cli
         run: |
-          docker compose run --rm -T fastfold --version
-          docker compose run --rm -T fastfold skills list
-          docker compose run --rm -T fastfold tool list | head -20
+          docker compose run --rm -T sandwalk --version
+          docker compose run --rm -T sandwalk skills list
+          docker compose run --rm -T sandwalk tool list | head -20

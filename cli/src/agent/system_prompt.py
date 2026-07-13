@@ -9,7 +9,6 @@ system prompt that Claude uses throughout the agentic loop.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 logger = logging.getLogger("system_prompt")
 
@@ -91,7 +90,7 @@ When a **Session workspace** path is listed below (or in `SANDWALK_SESSION_WORKS
   ``$SANDWALK_SESSION_WORKSPACE/...`` so an unset variable cannot expand to
   ``/artifacts/...``. Relative paths like ``./artifacts/...`` are fine only when
   the shell cwd is already the session workspace.
-- You may read installed skill directories (e.g. ``~/.fastfold-cli/skills/...``)
+- You may read installed skill directories (e.g. ``~/.sandwalk/skills/...``)
   to run scripts; never treat those as the download or write destination.
 """
 
@@ -281,7 +280,7 @@ def build_system_prompt(
 
     # 6. Bioinformatics code-gen hints (CRITICAL for BixBench performance)
     try:
-        from tools.code import BIOINFORMATICS_CODE_GEN_PROMPT, AGENTIC_CODE_ADDENDUM
+        from tools.code import AGENTIC_CODE_ADDENDUM, BIOINFORMATICS_CODE_GEN_PROMPT
 
         # Strip the template placeholders and include the raw hints
         hints = BIOINFORMATICS_CODE_GEN_PROMPT

@@ -6,7 +6,6 @@ Anthropic and OpenAI (including OpenAI-compatible endpoints) are supported.
 """
 
 import asyncio
-from contextlib import suppress
 import json
 import logging
 import os
@@ -18,6 +17,7 @@ import sys
 import threading
 import time
 import traceback
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -51,8 +51,8 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             "Authentication failed",
             "Your model provider rejected the API key (401 — invalid or missing).\n"
             "Set a valid key, then re-run your query:\n"
-            "  • fastfold config set llm.anthropic_api_key sk-ant-...\n"
-            "  • or run: fastfold setup",
+            "  • sandwalk config set llm.anthropic_api_key sk-ant-...\n"
+            "  • or run: sandwalk setup",
         )
 
     is_rate = (
@@ -78,7 +78,7 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             "Model or endpoint not found",
             "The configured provider returned 404 (model or endpoint not found).\n"
             "Verify `llm.model` and `llm.openai_base_url` for your selected profile,\n"
-            "then retry (you can update via `/model` or `fastfold setup`).",
+            "then retry (you can update via `/model` or `sandwalk setup`).",
         )
 
     is_conn = (
@@ -503,7 +503,7 @@ class AgentRunner:
                         return loop.run_until_complete(task)
                     remaining_s = interrupt_deadline_at - time.time()
                     if remaining_s <= 0:
-                        raise asyncio.TimeoutError
+                        raise TimeoutError
                     return loop.run_until_complete(
                         asyncio.wait_for(asyncio.shield(task), timeout=remaining_s)
                     )
@@ -527,7 +527,7 @@ class AgentRunner:
 
                     self._cancel_loop_tasks(loop)
                     raise
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # SDK interrupt was requested, but stream did not settle in time.
                     self._cancel_loop_tasks(loop)
                     raise KeyboardInterrupt
@@ -737,17 +737,18 @@ class AgentRunner:
         try:
             from deepagents import create_deep_agent
             from deepagents.backends import FilesystemBackend
+
             from agent.deepagents_runtime import (
                 build_chat_model,
-                create_external_mcp_tools,
                 create_ct_langchain_tools,
+                create_external_mcp_tools,
                 process_events,
                 skill_source_dirs,
                 skill_source_dirs_for_names,
             )
             from agent.system_prompt import build_system_prompt
-            from ui.traces import TraceRenderer
             from models.llm import MODEL_PRICING
+            from ui.traces import TraceRenderer
         except Exception as e:  # noqa: BLE001
             logger.error("deepagents runtime unavailable: %s\n%s", e, traceback.format_exc())
             return self._make_error_result(

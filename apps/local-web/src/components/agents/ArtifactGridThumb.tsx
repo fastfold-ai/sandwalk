@@ -1,6 +1,6 @@
+import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { WorkspaceFile } from '@sandwalk/agent-ui-core'
-import { Icon } from '@iconify/react'
 import { useEffect, useState } from 'react'
 
 import { getFileIcon } from '@/lib/file-icons'

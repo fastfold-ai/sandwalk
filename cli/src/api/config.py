@@ -10,13 +10,14 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 DATA_ROOT = Path(os.environ.get("CT_DATA_ROOT", "/data"))
 
 # Dataset registry: name → config
-DATASET_REGISTRY = {
+DATASET_REGISTRY: dict[str, dict[str, Any]] = {
     "perturbatlas": {
         "description": "PerturbAtlas: differential expression from 2,066 perturbation experiments",
         "path_pattern": "perturbatlas/Homo sapiens/*/degs.csv.gz",
@@ -40,11 +41,11 @@ MAX_QUERY_ROWS = 10000
 DEFAULT_QUERY_LIMIT = 100
 
 
-def discover_datasets() -> dict:
+def discover_datasets() -> dict[str, dict[str, Any]]:
     """Discover which datasets are actually available on disk."""
-    available = {}
+    available: dict[str, dict[str, Any]] = {}
     for name, config in DATASET_REGISTRY.items():
-        pattern = config["path_pattern"]
+        pattern = str(config["path_pattern"])
         # Check if any files match the pattern
         parts = pattern.split("*")
         base_dir = DATA_ROOT / parts[0].rstrip("/")
@@ -60,7 +61,7 @@ def discover_datasets() -> dict:
     return available
 
 
-def validate_schema(engine=None) -> dict[str, dict]:
+def validate_schema(engine: Any = None) -> dict[str, dict[str, Any]]:
     """Validate that on-disk files match expected schemas.
 
     Samples one file per dataset, reads column names via DuckDB,
@@ -71,9 +72,9 @@ def validate_schema(engine=None) -> dict[str, dict]:
         from api.engine import QueryEngine
         engine = QueryEngine()
 
-    results = {}
+    results: dict[str, dict[str, Any]] = {}
     for name, config in DATASET_REGISTRY.items():
-        pattern = config["path_pattern"]
+        pattern = str(config["path_pattern"])
         files = list(DATA_ROOT.glob(pattern))
 
         if not files:

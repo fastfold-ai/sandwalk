@@ -15,9 +15,9 @@ import re
 import socket
 import sys
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from agent.config import CONFIG_DIR, CONFIG_FILE, Config
 
@@ -40,7 +40,7 @@ _HOME = str(Path.home())
 
 
 def ensure_logging_configured() -> Path:
-    """Attach a rotating file handler under ~/.fastfold-cli/logs if missing.
+    """Attach a rotating file handler under ~/.sandwalk/logs if missing.
 
     Captures app + uvicorn loggers. Quiets noisy HTTP client libraries so doctor
     connectivity probes do not flood the diagnostics bundle.
@@ -164,7 +164,7 @@ def _system_info(version: str) -> dict[str, Any]:
     return {
         "service": "sandwalk",
         "version": version,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "platform": platform.system().lower(),
         "arch": platform.machine(),
         "os_release": platform.release(),
@@ -241,13 +241,13 @@ def _read_log_tail(path: Path) -> str:
 def build_diagnostics_zip(
     *,
     version: str,
-    doctor_report: Optional[dict[str, Any]] = None,
-    ui_diagnostics: Optional[dict[str, Any]] = None,
+    doctor_report: dict[str, Any] | None = None,
+    ui_diagnostics: dict[str, Any] | None = None,
 ) -> tuple[bytes, str]:
     """Return (zip_bytes, filename) for a diagnostics bundle."""
     ensure_logging_configured()
     cfg = Config.load()
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     root_name = f"fastfold-diagnostics-{stamp}"
     filename = f"{root_name}.zip"
 
@@ -272,7 +272,7 @@ def build_diagnostics_zip(
             "manifest.json",
             {
                 "format": "fastfold-diagnostics/v1",
-                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "generated_at": datetime.now(UTC).isoformat(),
                 "includes": [
                     "system-info.json",
                     "doctor-report.json",
@@ -297,7 +297,7 @@ def build_diagnostics_zip(
         if not log_files:
             zf.writestr(
                 f"{root_name}/logs/README.txt",
-                "No log files found yet under ~/.fastfold-cli/logs.\n"
+                "No log files found yet under ~/.sandwalk/logs.\n"
                 "Restart `fastfold serve` once to begin writing agent-server.log.\n",
             )
         for path in log_files:

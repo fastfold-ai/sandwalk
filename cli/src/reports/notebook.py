@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
 import nbformat
 from nbformat.v4 import new_code_cell, new_markdown_cell, new_notebook, new_output
 
 
-def _load_events(trace_path: Path) -> list[dict]:
-    events: list[dict] = []
+def _load_events(trace_path: Path) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
     text = trace_path.read_text(encoding="utf-8").strip()
     if not text:
         return events
@@ -32,18 +33,20 @@ def _tool_markdown(tool: str, result_text: str, is_error: bool) -> str:
     return f"### Tool: `{tool}`\n\n**{status}:**\n\n{result_text}\n"
 
 
-def _code_outputs(event: dict) -> list:
-    outputs = []
+def _code_outputs(event: dict[str, Any]) -> list[Any]:
+    outputs: list[Any] = []
     stdout = event.get("stdout") or ""
     if stdout:
         text = stdout if isinstance(stdout, list) else stdout.splitlines(keepends=True)
-        outputs.append(new_output(output_type="stream", name="stdout", text=text))
+        outputs.append(
+            new_output(output_type="stream", name="stdout", text=text)  # type: ignore[no-untyped-call]
+        )
 
     if event.get("is_error"):
         error = event.get("error") or event.get("result_text") or "Execution failed"
         lines = str(error).splitlines()
         outputs.append(
-            new_output(
+            new_output(  # type: ignore[no-untyped-call]
                 output_type="error",
                 ename="ExecutionError",
                 evalue=lines[-1] if lines else "Execution failed",
@@ -54,7 +57,11 @@ def _code_outputs(event: dict) -> list:
     for plot in event.get("plots_base64") or []:
         data = plot.get("data", "")
         mime = plot.get("mime", "image/png")
-        outputs.append(new_output(output_type="display_data", data={mime: data}, metadata={}))
+        outputs.append(
+            new_output(  # type: ignore[no-untyped-call]
+                output_type="display_data", data={mime: data}, metadata={}
+            )
+        )
 
     return outputs
 
@@ -67,26 +74,34 @@ def trace_to_notebook(trace_path: Path | str) -> nbformat.NotebookNode:
 
     events = _load_events(trace_path)
     if not events:
-        nb = new_notebook()
-        nb.cells.append(new_markdown_cell("No agent activity recorded in this trace."))
-        nb.metadata["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}
+        nb = cast(nbformat.NotebookNode, new_notebook())  # type: ignore[no-untyped-call]
+        nb.cells.append(new_markdown_cell("No agent activity recorded in this trace."))  # type: ignore[no-untyped-call]
+        nb.metadata["kernelspec"] = {
+            "name": "python3",
+            "display_name": "Python 3",
+            "language": "python",
+        }
         return nb
 
-    cells = []
+    cells: list[Any] = []
     query_index = 0
-    pending_code: dict[str, dict] = {}
+    pending_code: dict[str, dict[str, Any]] = {}
 
     for event in events:
         etype = event.get("type")
 
         if etype == "query_start":
             query_index += 1
-            cells.append(new_markdown_cell(_header_cell(event.get("query", ""), query_index=query_index)))
+            cells.append(
+                new_markdown_cell(  # type: ignore[no-untyped-call]
+                    _header_cell(event.get("query", ""), query_index=query_index)
+                )
+            )
 
         elif etype == "text":
             content = event.get("content", "").strip()
             if content:
-                cells.append(new_markdown_cell(content))
+                cells.append(new_markdown_cell(content))  # type: ignore[no-untyped-call]
 
         elif etype == "tool_start":
             tool_use_id = event.get("tool_use_id")
@@ -101,18 +116,24 @@ def trace_to_notebook(trace_path: Path | str) -> nbformat.NotebookNode:
 
             if tool in {"run_python", "run_r"} and code:
                 source = f"%%R\n{code}" if tool == "run_r" else code
-                cell = new_code_cell(source)
+                cell = new_code_cell(source)  # type: ignore[no-untyped-call]
                 cell.outputs = _code_outputs(event)
                 cells.append(cell)
             else:
                 cells.append(
-                    new_markdown_cell(
-                        _tool_markdown(tool, event.get("result_text", ""), bool(event.get("is_error")))
+                    new_markdown_cell(  # type: ignore[no-untyped-call]
+                        _tool_markdown(
+                            tool, event.get("result_text", ""), bool(event.get("is_error"))
+                        )
                     )
                 )
 
-    nb = new_notebook(cells=cells)
-    nb.metadata["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}
+    nb = cast(nbformat.NotebookNode, new_notebook(cells=cells))  # type: ignore[no-untyped-call]
+    nb.metadata["kernelspec"] = {
+        "name": "python3",
+        "display_name": "Python 3",
+        "language": "python",
+    }
     return nb
 
 
@@ -120,5 +141,5 @@ def save_notebook(nb: nbformat.NotebookNode, out_path: Path | str) -> Path:
     """Write a notebook to disk, creating parent directories as needed."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    nbformat.write(nb, str(out_path))
+    nbformat.write(nb, str(out_path))  # type: ignore[no-untyped-call]
     return out_path

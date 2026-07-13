@@ -95,8 +95,7 @@ class TestAlphaFoldFetch:
         mock_resp.text = "HEADER    SOME PDB DATA\nATOM   1  CA  ALA A   1       0.0  0.0  0.0\n"
         mock_get.return_value = (mock_resp, None)
 
-        cache_dir = tmp_path / ".fastfold-cli" / "cache" / "alphafold"
-        with patch("tools.structure.Path.home", return_value=tmp_path):
+        with patch("tools.structure.CONFIG_DIR", tmp_path / ".sandwalk"):
             result = alphafold_fetch("P04637")
 
         assert "summary" in result
@@ -108,12 +107,12 @@ class TestAlphaFoldFetch:
         from tools.structure import alphafold_fetch
 
         # Pre-create cached file
-        cache_dir = tmp_path / ".fastfold-cli" / "cache" / "alphafold"
+        cache_dir = tmp_path / ".sandwalk" / "cache" / "alphafold"
         cache_dir.mkdir(parents=True)
         cached_file = cache_dir / "AF-P04637-F1-model_v4.pdb"
         cached_file.write_text("HEADER CACHED PDB\n")
 
-        with patch("tools.structure.Path.home", return_value=tmp_path):
+        with patch("tools.structure.CONFIG_DIR", tmp_path / ".sandwalk"):
             result = alphafold_fetch("P04637")
 
         assert result["cached"] is True

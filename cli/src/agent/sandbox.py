@@ -6,21 +6,23 @@ and loaded datasets. Used by the code.execute tool.
 """
 
 import io
-import os
 import signal
 import sys
 import traceback
-from pathlib import Path
-from typing import Any, Optional
-
 
 # Suppress matplotlib warnings before import
 import warnings
+from pathlib import Path
+from typing import Any
+
+from agent.config import CONFIG_DIR
+
 warnings.filterwarnings("ignore", message="Unable to import Axes3D")
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 
 # Force non-interactive matplotlib backend before any import
 import matplotlib
+
 matplotlib.use("Agg")
 
 
@@ -74,7 +76,7 @@ def _make_safe_open(output_dir: Path, extra_read_dirs: list[Path] = None):
         path = Path(file).expanduser()
         resolved = path.resolve() if path.is_absolute() else (cwd_root / path).resolve()
 
-        downloads_root = (Path.home() / ".fastfold-cli" / "downloads").resolve()
+        downloads_root = (CONFIG_DIR / "downloads").resolve()
         tmp_root = Path("/tmp").resolve()
         can_read = (
             _is_within(resolved, cwd_root)
@@ -151,25 +153,25 @@ class Sandbox:
 
     def _setup_namespace(self):
         """Populate namespace with safe libraries and utilities."""
+        import collections
+        import csv
+        import datetime
+        import glob as glob_mod
+        import gzip
+        import io
+        import itertools
+        import json
+        import math
+        import os.path
+        import re
+        import struct
+        import tempfile
+        import urllib.request
+        import zipfile
+
+        import matplotlib.pyplot as plt
         import numpy as np
         import pandas as pd
-        import matplotlib.pyplot as plt
-        import json
-        import re
-        import math
-        import collections
-        import itertools
-        import datetime
-        import zipfile
-        import glob as glob_mod
-        import io
-        import tempfile
-        import struct
-        import csv
-        import gzip
-        import os
-        import os.path
-        import urllib.request
 
         # Build safe builtins dict
         if isinstance(__builtins__, dict):

@@ -133,7 +133,7 @@ def test_data_path_falls_back_to_default_when_base_missing(monkeypatch):
         classmethod(lambda cls: cfg),
     )
     path = loaders._data_path("depmap")
-    assert str(path).endswith(".fastfold-cli/data/depmap")
+    assert str(path).endswith(".sandwalk/data/depmap")
 
 
 def test_load_model_metadata_success_and_missing(mock_config, tmp_path, monkeypatch):

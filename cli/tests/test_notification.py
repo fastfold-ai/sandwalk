@@ -1,12 +1,13 @@
 """Tests for notification tools."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
 
 
 class TestSendEmail:
-    def test_dry_run(self, tmp_path):
+    def test_dry_run(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("tools.notification.CONFIG_DIR", tmp_path / ".sandwalk")
         with patch("agent.config.Config.load") as mock_load:
             config_inst = MagicMock()
             config_inst.get.side_effect = lambda k, d=None: {
@@ -15,14 +16,14 @@ class TestSendEmail:
             }.get(k, d)
             mock_load.return_value = config_inst
 
-            with patch("pathlib.Path.home", return_value=tmp_path):
-                from tools.notification import send_email
-                result = send_email(
-                    to="user@example.com",
-                    subject="Test Subject",
-                    body="Test body content",
-                    dry_run=True,
-                )
+            from tools.notification import send_email
+
+            result = send_email(
+                to="user@example.com",
+                subject="Test Subject",
+                body="Test body content",
+                dry_run=True,
+            )
 
         assert "summary" in result
         assert result["dry_run"] is True
@@ -31,47 +32,51 @@ class TestSendEmail:
         assert result["subject"] == "Test Subject"
         assert result["body"] == "Test body content"
 
-    def test_dry_run_logs(self, tmp_path):
+    def test_dry_run_logs(self, tmp_path, monkeypatch):
+        log_dir = tmp_path / ".sandwalk"
+        monkeypatch.setattr("tools.notification.CONFIG_DIR", log_dir)
         with patch("agent.config.Config.load") as mock_load:
             config_inst = MagicMock()
             config_inst.get.side_effect = lambda k, d=None: d
             mock_load.return_value = config_inst
 
-            with patch("pathlib.Path.home", return_value=tmp_path):
-                from tools.notification import send_email
-                send_email(
-                    to="user@example.com",
-                    subject="Test",
-                    body="Test body",
-                    dry_run=True,
-                )
+            from tools.notification import send_email
 
-            log_file = tmp_path / ".fastfold-cli" / "sent_emails.log"
-            assert log_file.exists()
-            content = log_file.read_text()
-            assert "DRY_RUN" in content
-            assert "user@example.com" in content
+            send_email(
+                to="user@example.com",
+                subject="Test",
+                body="Test body",
+                dry_run=True,
+            )
 
-    def test_missing_api_key(self, tmp_path):
+        log_file = log_dir / "sent_emails.log"
+        assert log_file.exists()
+        content = log_file.read_text()
+        assert "DRY_RUN" in content
+        assert "user@example.com" in content
+
+    def test_missing_api_key(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("tools.notification.CONFIG_DIR", tmp_path / ".sandwalk")
         with patch("agent.config.Config.load") as mock_load:
             config_inst = MagicMock()
             config_inst.get.side_effect = lambda k, d=None: None
             mock_load.return_value = config_inst
 
-            with patch("pathlib.Path.home", return_value=tmp_path):
-                from tools.notification import send_email
-                result = send_email(
-                    to="user@example.com",
-                    subject="Test",
-                    body="Test body",
-                    dry_run=False,
-                )
+            from tools.notification import send_email
+
+            result = send_email(
+                to="user@example.com",
+                subject="Test",
+                body="Test body",
+                dry_run=False,
+            )
 
         assert result["sent"] is False
         assert "api_key" in result.get("error", "")
 
     @patch("httpx.post")
-    def test_send_actual(self, mock_post, tmp_path):
+    def test_send_actual(self, mock_post, tmp_path, monkeypatch):
+        monkeypatch.setattr("tools.notification.CONFIG_DIR", tmp_path / ".sandwalk")
         mock_resp = MagicMock()
         mock_resp.status_code = 202
         mock_resp.raise_for_status.return_value = None
@@ -85,33 +90,34 @@ class TestSendEmail:
             }.get(k, d)
             mock_load.return_value = config_inst
 
-            with patch("pathlib.Path.home", return_value=tmp_path):
-                from tools.notification import send_email
-                result = send_email(
-                    to="user@example.com",
-                    subject="Test",
-                    body="Test body",
-                    dry_run=False,
-                )
+            from tools.notification import send_email
+
+            result = send_email(
+                to="user@example.com",
+                subject="Test",
+                body="Test body",
+                dry_run=False,
+            )
 
         assert result["sent"] is True
         assert "summary" in result
         mock_post.assert_called_once()
 
-    def test_custom_from_email(self, tmp_path):
+    def test_custom_from_email(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("tools.notification.CONFIG_DIR", tmp_path / ".sandwalk")
         with patch("agent.config.Config.load") as mock_load:
             config_inst = MagicMock()
             config_inst.get.side_effect = lambda k, d=None: d
             mock_load.return_value = config_inst
 
-            with patch("pathlib.Path.home", return_value=tmp_path):
-                from tools.notification import send_email
-                result = send_email(
-                    to="user@example.com",
-                    subject="Test",
-                    body="Body",
-                    from_email="custom@example.com",
-                    dry_run=True,
-                )
+            from tools.notification import send_email
+
+            result = send_email(
+                to="user@example.com",
+                subject="Test",
+                body="Body",
+                from_email="custom@example.com",
+                dry_run=True,
+            )
 
         assert result["from_email"] == "custom@example.com"

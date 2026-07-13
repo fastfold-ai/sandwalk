@@ -7,7 +7,6 @@ API-heavy tool modules.
 
 import time
 
-
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 

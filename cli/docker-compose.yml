@@ -1,5 +1,5 @@
 services:
-  fastfold:
+  sandwalk:
     build:
       context: .
       dockerfile: Dockerfile
@@ -8,9 +8,9 @@ services:
       - path: .env
         required: false
     volumes:
-      - fastfold-cli:/root/.fastfold-cli
+      - sandwalk-cli:/root/.sandwalk
     stdin_open: true
     tty: true
 
 volumes:
-  fastfold-cli:
+  sandwalk-cli:

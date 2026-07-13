@@ -6,7 +6,7 @@ import logging
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from agent_server.environment_catalog import (
     MANAGEABLE_GROUPS,
@@ -125,7 +125,7 @@ class EnvironmentService:
             env_bytes=env_bytes,
             groups=groups,
             core=core,
-            checked_at=datetime.now(timezone.utc).isoformat(),
+            checked_at=datetime.now(UTC).isoformat(),
         )
 
     def install(

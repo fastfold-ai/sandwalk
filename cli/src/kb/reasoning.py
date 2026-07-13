@@ -10,7 +10,6 @@ from typing import Any
 
 from kb.substrate import KBClaim, KBRelation, KnowledgeSubstrate
 
-
 SOURCE_WEIGHTS = {
     "pubmed": 0.9,
     "openalex": 0.85,
@@ -87,7 +86,7 @@ class EvidenceReasoner:
         min_claims: int = 2,
     ) -> list[dict[str, Any]]:
         """Find relations with mixed support and contradiction evidence."""
-        contradictions = []
+        contradictions: list[dict[str, Any]] = []
         for relation in self.substrate.list_relations():
             if entity_id and relation.subject_id != entity_id and relation.object_id != entity_id:
                 continue

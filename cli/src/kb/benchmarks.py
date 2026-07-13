@@ -4,11 +4,11 @@ Domain benchmark harness and release gating.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import json
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 from types import SimpleNamespace
+from typing import Any
 
 try:
     from agent.quality import evaluate_synthesis_quality
@@ -56,7 +56,7 @@ class BenchmarkSuite:
         self.cases = cases
 
     @classmethod
-    def load(cls, path: Path | None = None) -> "BenchmarkSuite":
+    def load(cls, path: Path | None = None) -> BenchmarkSuite:
         source = path or (Path.cwd() / "configs" / "pharma_benchmarks.json")
         if source.exists():
             data = json.loads(source.read_text(encoding="utf-8"))

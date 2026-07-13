@@ -5,9 +5,11 @@ Enterprise governance layer: policy enforcement + audit logging.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import time
+from pathlib import Path
 from typing import Any
+
+from agent.config import CONFIG_DIR
 
 
 def _parse_csv(value: str | None) -> set[str]:
@@ -19,12 +21,12 @@ def _parse_csv(value: str | None) -> set[str]:
 class GovernanceEngine:
     """Evaluates runtime policy and writes audit events."""
 
-    def __init__(self, session, *, session_id: str):
+    def __init__(self, session: Any, *, session_id: str) -> None:
         self.session = session
         self.session_id = session_id
         self.audit_enabled = bool(session.config.get("enterprise.audit_enabled", True))
         self.enforce_policy = bool(session.config.get("enterprise.enforce_policy", False))
-        audit_dir = Path(session.config.get("enterprise.audit_dir", str(Path.home() / ".fastfold-cli" / "audit")))
+        audit_dir = Path(session.config.get("enterprise.audit_dir", str(CONFIG_DIR / "audit")))
         self.audit_path = audit_dir / f"{session_id}.audit.jsonl"
 
     def check_tool(self, tool_name: str) -> tuple[bool, str]:
@@ -46,9 +48,9 @@ class GovernanceEngine:
             return False, f"Tool not in enterprise allowlist: {tool_name}"
         return True, ""
 
-    def apply_plan_policy(self, plan) -> dict[str, Any]:
+    def apply_plan_policy(self, plan: Any) -> dict[str, Any]:
         """Pre-flight policy validation for plan steps."""
-        blocked = []
+        blocked: list[dict[str, Any]] = []
         for step in getattr(plan, "steps", []):
             allowed, reason = self.check_tool(step.tool)
             if allowed:
@@ -60,7 +62,7 @@ class GovernanceEngine:
             self.audit_event("plan_policy_block", {"blocked_steps": blocked})
         return {"blocked_steps": blocked, "blocked_count": len(blocked)}
 
-    def query_start(self, *, query: str, context: dict[str, Any] | None = None):
+    def query_start(self, *, query: str, context: dict[str, Any] | None = None) -> None:
         self.audit_event(
             "query_start",
             {
@@ -70,7 +72,7 @@ class GovernanceEngine:
             },
         )
 
-    def query_end(self, *, duration_s: float, iterations: int, total_steps: int):
+    def query_end(self, *, duration_s: float, iterations: int, total_steps: int) -> None:
         max_cost = float(self.session.config.get("enterprise.max_cost_usd_per_query", 0.0) or 0.0)
         llm = self.session.get_llm()
         actual_cost = float(getattr(getattr(llm, "usage", None), "total_cost", 0.0) or 0.0)
@@ -87,7 +89,7 @@ class GovernanceEngine:
             },
         )
 
-    def audit_event(self, event_type: str, payload: dict[str, Any]):
+    def audit_event(self, event_type: str, payload: dict[str, Any]) -> None:
         """Append an audit event."""
         if not self.audit_enabled:
             return

@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 BUFFER_LIMIT = 2 * 1024 * 1024
 
 # Match terminal tab accent (Tailwind emerald-500 / #10B981); gray cwd basename.

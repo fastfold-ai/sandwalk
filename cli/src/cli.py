@@ -1,16 +1,16 @@
 """
-Fastfold Agent CLI entry point.
+Sandwalk CLI entry point.
 
 Usage:
-    fastfold                              # Interactive mode
+    sandwalk                              # Interactive mode
     sandwalk "your question"              # Single query
     sandwalk --smiles "CCO" "Profile"     # With compound context
-    fastfold config set key value         # Configuration
-    fastfold data pull depmap             # Data management
+    sandwalk config set key value         # Configuration
+    sandwalk data pull depmap             # Data management
 """
 
-import os
 import json
+import os
 import random
 import re
 import shutil
@@ -19,21 +19,21 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import quote, urlparse
 from uuid import uuid4
+
 import typer
-from typing import Optional
-from pathlib import Path
-from datetime import datetime, timezone
-from typer.models import OptionInfo
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from typer.models import OptionInfo
 
 from _version import __version__
+from agent.config import CONFIG_DIR
 from agent.session import Session
-from ui.terminal import InteractiveTerminal, SLASH_COMMANDS
-
+from ui.terminal import SLASH_COMMANDS, InteractiveTerminal
 
 # ─── Startup banner ─────────────────────────────────────────
 BANNER = """
@@ -94,7 +94,7 @@ UV_INSTALL_FLAVORS = frozenset({"all", "win_build"})
 UV_UPGRADE_PYTHON_VERSION = "3.11"
 PYPI_PROJECT_JSON_URL = "https://pypi.org/pypi/sandwalk/json"
 _SEMVER_TRIPLET_PATTERN = re.compile(r"^\s*v?(\d+)\.(\d+)\.(\d+)")
-_UPGRADE_CACHE_PATH = Path.home() / ".fastfold-cli" / "cache" / "upgrade-version.json"
+_UPGRADE_CACHE_PATH = CONFIG_DIR / "cache" / "upgrade-version.json"
 _UPGRADE_CACHE_MAX_AGE_S = 60 * 60 * 6
 _BANNER_TOOL_COUNT_HINT = 192
 
@@ -242,7 +242,7 @@ def _random_news_item_markup() -> str:
     )
 
 
-def _normalize_upgrade_flavor(value: object) -> Optional[str]:
+def _normalize_upgrade_flavor(value: object) -> str | None:
     normalized = str(value or "").strip().lower()
     return normalized if normalized in UV_INSTALL_FLAVORS else None
 
@@ -278,7 +278,7 @@ def build_upgrade_command(flavor: str) -> list[str]:
     return ["uv", "tool", "install", package_ref, "--python", UV_UPGRADE_PYTHON_VERSION, "--upgrade"]
 
 
-def _parse_semver_triplet(version: str) -> Optional[tuple[int, int, int]]:
+def _parse_semver_triplet(version: str) -> tuple[int, int, int] | None:
     match = _SEMVER_TRIPLET_PATTERN.match(str(version or "").strip())
     if not match:
         return None
@@ -293,7 +293,7 @@ def is_newer_version(latest: str, current: str) -> bool:
     return latest_triplet > current_triplet
 
 
-def fetch_pypi_latest_version(timeout_s: float = 2.5) -> Optional[str]:
+def fetch_pypi_latest_version(timeout_s: float = 2.5) -> str | None:
     req = urllib.request.Request(
         url=PYPI_PROJECT_JSON_URL,
         headers={"Accept": "application/json"},
@@ -319,14 +319,14 @@ def fetch_pypi_latest_version(timeout_s: float = 2.5) -> Optional[str]:
     return version or None
 
 
-def get_upgrade_available_version(current_version: str = __version__) -> Optional[str]:
+def get_upgrade_available_version(current_version: str = __version__) -> str | None:
     latest = fetch_pypi_latest_version()
     if not latest:
         return None
     return latest if is_newer_version(latest, current_version) else None
 
 
-def _get_cached_upgrade_available_version(current_version: str = __version__) -> Optional[str]:
+def _get_cached_upgrade_available_version(current_version: str = __version__) -> str | None:
     """Return cached upgrade notice if fresh; never performs network I/O."""
     try:
         if not _UPGRADE_CACHE_PATH.exists():
@@ -345,7 +345,7 @@ def _get_cached_upgrade_available_version(current_version: str = __version__) ->
     return latest if is_newer_version(latest, current_version) else None
 
 
-def _write_upgrade_cache(latest: Optional[str]) -> None:
+def _write_upgrade_cache(latest: str | None) -> None:
     """Persist latest seen PyPI version for non-blocking future boots."""
     try:
         _UPGRADE_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -384,7 +384,7 @@ def _parse_unix_timestamp(value: object) -> float:
         return time.time()
 
 
-def _resolve_agents_api_base_url(cli_value: Optional[str] = None) -> str:
+def _resolve_agents_api_base_url(cli_value: str | None = None) -> str:
     candidate = str(cli_value or os.environ.get("FASTFOLD_AGENTS_API_URL") or "").strip()
     if candidate:
         return candidate.rstrip("/")
@@ -430,7 +430,7 @@ def _agents_api_get_json(base_url: str, path: str, *, headers: dict[str, str], t
     return _agents_api_request_json(base_url, path, headers=headers, method="GET", timeout=timeout)
 
 
-def _safe_workspace_relative_path(raw_path: str) -> Optional[Path]:
+def _safe_workspace_relative_path(raw_path: str) -> Path | None:
     normalized = str(raw_path or "").strip().replace("\\", "/").lstrip("/")
     if not normalized:
         return None
@@ -490,7 +490,7 @@ def _get_loaded_tool_count_hint() -> int:
     return _BANNER_TOOL_COUNT_HINT
 
 
-def _get_cached_skills_update_safe() -> Optional[dict]:
+def _get_cached_skills_update_safe() -> dict | None:
     """Local-only cached skills-update check for the banner (never raises)."""
     try:
         from agent.skills import get_cached_skills_update
@@ -582,7 +582,7 @@ def _maybe_offer_fastfold_skills_install_after_upgrade(
 
 
 def execute_upgrade(
-    console_obj: Optional[Console] = None,
+    console_obj: Console | None = None,
     cfg=None,
     *,
     install_missing_skills: bool = False,
@@ -625,7 +625,7 @@ def execute_upgrade(
     )
     ui.print("[cyan]Running skills-upgrade...[/cyan]")
     try:
-        from agent.skills import upgrade_skills, GLOBAL_SKILLS_DIR
+        from agent.skills import GLOBAL_SKILLS_DIR, upgrade_skills
 
         with ui.status("[green]Syncing agent skills...[/green]", spinner="dots") as status:
             result = upgrade_skills(
@@ -887,17 +887,17 @@ def specialists_show_cmd(
 @specialists_app.command("create")
 def specialists_create_cmd(
     name: str = typer.Argument(..., help="Display name"),
-    slug: Optional[str] = typer.Option(None, "--slug", help="URL-safe slug"),
-    description: Optional[str] = typer.Option(None, "--description", "-d"),
-    instructions: Optional[str] = typer.Option(
+    slug: str | None = typer.Option(None, "--slug", help="URL-safe slug"),
+    description: str | None = typer.Option(None, "--description", "-d"),
+    instructions: str | None = typer.Option(
         None, "--instructions", "-i", help="Extra system-prompt text"
     ),
     color: str = typer.Option("ink", "--color"),
     icon: str = typer.Option("agent", "--icon"),
-    skill: Optional[list[str]] = typer.Option(
+    skill: list[str] | None = typer.Option(
         None, "--skill", "-s", help="Skill name (repeatable)"
     ),
-    mcp: Optional[list[str]] = typer.Option(
+    mcp: list[str] | None = typer.Option(
         None, "--mcp", help="MCP server id (repeatable)"
     ),
     use: bool = typer.Option(False, "--use", help="Activate for CLI runs"),
@@ -924,18 +924,18 @@ def specialists_create_cmd(
 @specialists_app.command("update")
 def specialists_update_cmd(
     ref: str = typer.Argument(..., help="Slug, name, or id"),
-    name: Optional[str] = typer.Option(None, "--name"),
-    slug: Optional[str] = typer.Option(None, "--slug"),
-    description: Optional[str] = typer.Option(None, "--description", "-d"),
+    name: str | None = typer.Option(None, "--name"),
+    slug: str | None = typer.Option(None, "--slug"),
+    description: str | None = typer.Option(None, "--description", "-d"),
     clear_description: bool = typer.Option(False, "--clear-description"),
-    instructions: Optional[str] = typer.Option(None, "--instructions", "-i"),
+    instructions: str | None = typer.Option(None, "--instructions", "-i"),
     clear_instructions: bool = typer.Option(False, "--clear-instructions"),
-    color: Optional[str] = typer.Option(None, "--color"),
-    icon: Optional[str] = typer.Option(None, "--icon"),
-    skill: Optional[list[str]] = typer.Option(
+    color: str | None = typer.Option(None, "--color"),
+    icon: str | None = typer.Option(None, "--icon"),
+    skill: list[str] | None = typer.Option(
         None, "--skill", "-s", help="Replace skill list (repeatable)"
     ),
-    mcp: Optional[list[str]] = typer.Option(
+    mcp: list[str] | None = typer.Option(
         None, "--mcp", help="Replace MCP id list (repeatable)"
     ),
 ):
@@ -1048,7 +1048,7 @@ def mcp_catalog_cmd():
 @mcp_app.command("connect")
 def mcp_connect_cmd(
     catalog_id: str = typer.Argument(..., help="Catalog id (tamarind|latch|neurosnap|linear)"),
-    api_key: Optional[str] = typer.Option(
+    api_key: str | None = typer.Option(
         None,
         "--api-key",
         help="API key (required for neurosnap/tamarind; optional for linear)",
@@ -1121,8 +1121,8 @@ def mcp_tools_cmd(ref: str = typer.Argument(..., help="Catalog id, server id, or
 @mcp_app.command("add")
 def mcp_add_cmd(
     name: str = typer.Argument(..., help="Server display name"),
-    url: Optional[str] = typer.Option(None, "--url", help="Remote MCP URL"),
-    command: Optional[str] = typer.Option(None, "--command", help="stdio command"),
+    url: str | None = typer.Option(None, "--url", help="Remote MCP URL"),
+    command: str | None = typer.Option(None, "--command", help="stdio command"),
     arg: list[str] = typer.Option(None, "--arg", help="stdio arg (repeatable)"),
     transport: str = typer.Option(
         "http",
@@ -1164,7 +1164,7 @@ def serve_cmd(
         "--public",
         help="Allow a non-loopback listener; requires API key, origins, and hosts",
     ),
-    api_key: Optional[str] = typer.Option(
+    api_key: str | None = typer.Option(
         None,
         "--api-key",
         envvar="FASTFOLD_SERVER_API_KEY",
@@ -1181,7 +1181,7 @@ def serve_cmd(
         "--allowed-host",
         help="Allowed Host header; repeat for multiple hosts",
     ),
-    uds: Optional[Path] = typer.Option(
+    uds: Path | None = typer.Option(
         None,
         "--uds",
         help="Serve over a user-scoped Unix domain socket instead of TCP",
@@ -1267,13 +1267,13 @@ def upgrade_cmd(
 @agent_app.command("fork")
 def agent_fork_cmd(
     share_id: str = typer.Argument(..., help="Shared chat ID or full /agents/share/<id> URL"),
-    agents_api_url: Optional[str] = typer.Option(
+    agents_api_url: str | None = typer.Option(
         None,
         "--agents-api-url",
         envvar="FASTFOLD_AGENTS_API_URL",
         help="Agents API base URL (defaults to FASTFOLD_AGENTS_API_URL or https://agents-api.fastfold.ai/v1)",
     ),
-    fastfold_api_key: Optional[str] = typer.Option(
+    fastfold_api_key: str | None = typer.Option(
         None,
         "--fastfold-api-key",
         envvar="FASTFOLD_API_KEY",
@@ -1363,7 +1363,7 @@ def agent_fork_cmd(
             trajectory.usage_data = {
                 "imported_from_share_id": resolved_share_id,
                 "imported_from_thread_id": str(thread.get("id") or "").strip(),
-                "imported_at": datetime.now(timezone.utc).isoformat(),
+                "imported_at": datetime.now(UTC).isoformat(),
                 "messages_count": len(messages),
                 "turns_count": len(turns),
             }
@@ -1482,43 +1482,43 @@ def agent_fork_cmd(
 
 @app.command("setup")
 def setup_cmd(
-    api_key: Optional[str] = typer.Option(
+    api_key: str | None = typer.Option(
         None, "--api-key", help="Anthropic API key (non-interactive mode)"
     ),
-    openai_api_key: Optional[str] = typer.Option(
+    openai_api_key: str | None = typer.Option(
         None, "--openai-api-key", help="OpenAI API key (non-interactive mode)"
     ),
-    openai_base_url: Optional[str] = typer.Option(
+    openai_base_url: str | None = typer.Option(
         None,
         "--openai-base-url",
         help="OpenAI-compatible base URL (e.g. http://localhost:11434/v1)",
     ),
-    openai_compatible_backend: Optional[str] = typer.Option(
+    openai_compatible_backend: str | None = typer.Option(
         None,
         "--openai-compatible-backend",
         help="Compatible backend type: ollama, unsloth, omlx, ds4, llama_cpp, lm_studio, or other",
     ),
-    profile_label: Optional[str] = typer.Option(
+    profile_label: str | None = typer.Option(
         None,
         "--profile-label",
         help="Label for the OpenAI-compatible profile to create/update",
     ),
-    profile_template: Optional[str] = typer.Option(
+    profile_template: str | None = typer.Option(
         None,
         "--profile-template",
         help="OpenAI-compatible template: ollama, unsloth, omlx, ds4, llama_cpp, lm_studio, or other",
     ),
-    profile_endpoint: Optional[str] = typer.Option(
+    profile_endpoint: str | None = typer.Option(
         None,
         "--profile-endpoint",
         help="Profile endpoint URL (alias of --openai-base-url for compatible setup)",
     ),
-    profile_key: Optional[str] = typer.Option(
+    profile_key: str | None = typer.Option(
         None,
         "--profile-key",
         help="API key for the selected OpenAI-compatible profile",
     ),
-    profile_default_model: Optional[str] = typer.Option(
+    profile_default_model: str | None = typer.Option(
         None,
         "--profile-default-model",
         help="Default model id to store in the selected compatible profile",
@@ -1528,22 +1528,22 @@ def setup_cmd(
         "--set-default-profile",
         help="Set the selected OpenAI-compatible profile as default",
     ),
-    fastfold_api_key: Optional[str] = typer.Option(
+    fastfold_api_key: str | None = typer.Option(
         None, "--fastfold-api-key", help="Fastfold AI Cloud API key (non-interactive mode)"
     ),
-    boltz_api_key: Optional[str] = typer.Option(
+    boltz_api_key: str | None = typer.Option(
         None, "--boltz-api-key", help="Boltz API key (non-interactive mode)"
     ),
-    provider: Optional[str] = typer.Option(
+    provider: str | None = typer.Option(
         None, "--provider", help="LLM provider(s): anthropic, openai, openai_compatible"
     ),
-    skills: Optional[str] = typer.Option(
+    skills: str | None = typer.Option(
         None, "--skills", help="Comma-separated skill names/sources to install non-interactively"
     ),
     skip_skills: bool = typer.Option(
         False, "--skip-skills", help="Skip the agent-skills install step"
     ),
-    datasets: Optional[str] = typer.Option(
+    datasets: str | None = typer.Option(
         None,
         "--datasets",
         help="Comma-separated datasets to download non-interactively (e.g. 'depmap,msigdb' or 'all')",
@@ -1630,11 +1630,11 @@ def setup_cmd(
     else:
         selected_providers = _prompt_setup_providers(default_provider)
 
-    resolved_openai_base_url: Optional[str] = None
-    resolved_openai_backend: Optional[str] = None
-    resolved_openai_compatible_model: Optional[str] = None
-    selected_compatible_profile_id: Optional[str] = None
-    selected_compatible_profile: Optional[dict] = None
+    resolved_openai_base_url: str | None = None
+    resolved_openai_backend: str | None = None
+    resolved_openai_compatible_model: str | None = None
+    selected_compatible_profile_id: str | None = None
+    selected_compatible_profile: dict | None = None
     resolved_compatible_profile_label = str(profile_label or "").strip() or None
     if "openai_compatible" in selected_providers:
         selected_compatible_profile_id = _find_compatible_profile_id_by_label(
@@ -1777,7 +1777,7 @@ def setup_cmd(
     boltz_key = _prompt_boltz_api_key(cfg, boltz_api_key)
 
     # Save
-    resolved_compatible_profile_id: Optional[str] = None
+    resolved_compatible_profile_id: str | None = None
     for prov, key in resolved_keys.items():
         if prov == "openai":
             cfg.set("llm.openai_api_key", key)
@@ -1878,14 +1878,14 @@ def setup_cmd(
         for p in selected_providers
     )
     console.print(
-        f"\n  [green]{provider_labels} API key(s) saved to ~/.fastfold-cli/config.json[/green]"
+        f"\n  [green]{provider_labels} API key(s) saved to ~/.sandwalk/config.json[/green]"
     )
     if cloud_key:
         console.print("  [green]Fastfold AI Cloud API key saved.[/green]")
     else:
         console.print(
             "  [yellow]Fastfold AI Cloud API key skipped.[/yellow] "
-            f"Set later with `fastfold config set api.fastfold_cloud_key <key>` "
+            f"Set later with `sandwalk config set api.fastfold_cloud_key <key>` "
             f"or visit {FASTFOLD_CLOUD_API_KEYS_URL}"
         )
     if boltz_key:
@@ -1893,7 +1893,7 @@ def setup_cmd(
     else:
         console.print(
             "  [yellow]Boltz API key skipped.[/yellow] "
-            "Set later with `fastfold config set api.boltz_api_key <key>` "
+            "Set later with `sandwalk config set api.boltz_api_key <key>` "
             f"or visit {BOLTZ_API_KEYS_URL}"
         )
 
@@ -1907,14 +1907,14 @@ def setup_cmd(
     # Quick health check
     console.print()
     console.print("  [cyan]Running health check...[/cyan]")
-    from agent.doctor import run_checks, to_table, has_errors
+    from agent.doctor import has_errors, run_checks, to_table
 
     checks = run_checks(cfg)
     console.print(to_table(checks))
 
     if has_errors(checks):
         console.print(
-            "\n  [yellow]Some issues detected.[/yellow] Run `fastfold doctor` for details."
+            "\n  [yellow]Some issues detected.[/yellow] Run `sandwalk doctor` for details."
         )
     else:
         console.print("\n  [green]All checks passed.[/green]")
@@ -1926,7 +1926,7 @@ def setup_cmd(
             "[bold green]You're all set![/bold green]\n\n"
             "  [cyan]fastfold[/cyan]                      Interactive mode\n"
             '  [cyan]fastfold "your question"[/cyan]      Single query\n'
-            "  [cyan]fastfold doctor[/cyan]               Full health check\n"
+            "  [cyan]sandwalk doctor[/cyan]               Full health check\n"
             "  [cyan]fastfold keys[/cyan]                 Optional API keys",
             title="[green]Quick Start[/green]",
             border_style="green",
@@ -2034,7 +2034,7 @@ def _prompt_openai_api_key_with_default(default_key: str = "ollama") -> str:
     return key or default_key
 
 
-def _is_openai_managed_base_url(base_url: Optional[str]) -> bool:
+def _is_openai_managed_base_url(base_url: str | None) -> bool:
     """Return True for OpenAI-managed hosts, False for compatible gateways."""
     value = str(base_url or "").strip()
     if not value:
@@ -2048,12 +2048,12 @@ def _is_openai_managed_base_url(base_url: Optional[str]) -> bool:
     return host == "api.openai.com" or host.endswith(".openai.com")
 
 
-def _normalize_openai_base_url(base_url: Optional[str]) -> Optional[str]:
+def _normalize_openai_base_url(base_url: str | None) -> str | None:
     value = str(base_url or "").strip().rstrip("/")
     return value or None
 
 
-def _normalize_compatible_backend_name(backend: Optional[str]) -> str:
+def _normalize_compatible_backend_name(backend: str | None) -> str:
     """Normalize backend aliases to canonical compatible backend ids."""
     value = str(backend or "").strip().lower()
     aliases = {
@@ -2079,7 +2079,7 @@ def _normalize_compatible_backend_name(backend: Optional[str]) -> str:
     return aliases.get(value, value)
 
 
-def _compatible_backend_display_name(backend: Optional[str]) -> str:
+def _compatible_backend_display_name(backend: str | None) -> str:
     """Return user-facing backend label."""
     backend_type = _normalize_compatible_backend_name(backend)
     if backend_type == "omlx":
@@ -2193,9 +2193,9 @@ def _prompt_openai_endpoint_mode(default_mode: str = "cloud") -> str:
 
 def _resolve_openai_base_url(
     cfg,
-    cli_base_url: Optional[str] = None,
-    force_mode: Optional[str] = None,
-) -> Optional[str]:
+    cli_base_url: str | None = None,
+    force_mode: str | None = None,
+) -> str | None:
     """Resolve OpenAI-compatible base URL from CLI/config/prompt.
 
     Returns None for OpenAI default endpoint to avoid redundant config writes.
@@ -2237,7 +2237,7 @@ def _resolve_openai_base_url(
     return chosen
 
 
-def _infer_openai_compatible_backend(base_url: Optional[str], key: Optional[str] = None) -> str:
+def _infer_openai_compatible_backend(base_url: str | None, key: str | None = None) -> str:
     """Infer compatible backend type from endpoint/key hints."""
     endpoint = str(base_url or "").strip().lower()
     secret = str(key or "").strip().lower()
@@ -2319,8 +2319,8 @@ def _prompt_openai_compatible_backend(default_backend: str = "ollama") -> str:
 
 def _resolve_openai_compatible_endpoint(
     cfg,
-    cli_base_url: Optional[str] = None,
-    cli_backend: Optional[str] = None,
+    cli_base_url: str | None = None,
+    cli_backend: str | None = None,
 ) -> tuple[str, str]:
     """Resolve compatible endpoint URL and backend type for setup."""
     existing = _normalize_openai_base_url(cfg.get("llm.openai_base_url"))
@@ -2367,7 +2367,7 @@ def _resolve_openai_compatible_endpoint(
     return chosen, selected_backend
 
 
-def _find_compatible_profile_id_by_label(cfg, label: Optional[str]) -> Optional[str]:
+def _find_compatible_profile_id_by_label(cfg, label: str | None) -> str | None:
     """Find compatible profile by id/label (case-insensitive)."""
     target = str(label or "").strip().lower()
     if not target:
@@ -2380,7 +2380,7 @@ def _find_compatible_profile_id_by_label(cfg, label: Optional[str]) -> Optional[
     return None
 
 
-def _prompt_setup_compatible_profile_id(cfg) -> Optional[str]:
+def _prompt_setup_compatible_profile_id(cfg) -> str | None:
     """Prompt to reuse an existing compatible profile or create new."""
     profiles = cfg.openai_profiles(include_cloud=False)
     if not profiles:
@@ -2527,7 +2527,7 @@ def _report_discovery_exception(endpoint: str, url: str, exc: Exception) -> None
     )
 
 
-def _fetch_openai_models_for_setup(base_url: str, api_key: Optional[str] = None) -> list[str]:
+def _fetch_openai_models_for_setup(base_url: str, api_key: str | None = None) -> list[str]:
     """Fetch model IDs from OpenAI-compatible /v1/models."""
     url = _openai_models_url_from_base(base_url)
     headers = {"Accept": "application/json"}
@@ -2560,7 +2560,7 @@ def _fetch_openai_models_for_setup(base_url: str, api_key: Optional[str] = None)
     return names
 
 
-def _fetch_ollama_tags_for_setup(base_url: str, api_key: Optional[str] = None) -> list[str]:
+def _fetch_ollama_tags_for_setup(base_url: str, api_key: str | None = None) -> list[str]:
     """Fetch model names from Ollama /api/tags."""
     url = _ollama_tags_url_from_base(base_url)
     headers = {"Accept": "application/json"}
@@ -2593,7 +2593,7 @@ def _fetch_ollama_tags_for_setup(base_url: str, api_key: Optional[str] = None) -
     return names
 
 
-def _fetch_compatible_models_for_setup(base_url: str, backend: str, api_key: Optional[str] = None) -> list[str]:
+def _fetch_compatible_models_for_setup(base_url: str, backend: str, api_key: str | None = None) -> list[str]:
     """Discover compatible models based on selected backend."""
     backend_type = _normalize_compatible_backend_name(backend)
     if backend_type in {"unsloth", "omlx", "ds4", "llama_cpp", "lm_studio"}:
@@ -2619,15 +2619,15 @@ def _prompt_compatible_model_for_setup(
     cfg,
     base_url: str,
     backend: str,
-    api_key: Optional[str] = None,
-) -> str | tuple[str, Optional[str]]:
+    api_key: str | None = None,
+) -> str | tuple[str, str | None]:
     """Prompt for compatible model selection in setup flow."""
     default_model = str(cfg.get("llm.model") or "").strip() or "llama3.1"
-    retry_key_override: Optional[str] = None
+    retry_key_override: str | None = None
     effective_key = str(api_key or "").strip() or None
     discovered = _fetch_compatible_models_for_setup(base_url, backend=backend, api_key=effective_key)
 
-    def _result_with_key(model_id: str) -> str | tuple[str, Optional[str]]:
+    def _result_with_key(model_id: str) -> str | tuple[str, str | None]:
         if retry_key_override:
             return model_id, retry_key_override
         return model_id
@@ -2821,7 +2821,7 @@ def _prompt_setup_providers(default_provider: str) -> list[str]:
             # Fall back to text input when terminal capabilities are limited.
             pass
 
-    # Plain-text fallback for `fastfold setup` when the interactive checklist
+    # Plain-text fallback for `sandwalk setup` when the interactive checklist
     # (questionary) cannot run — e.g. piped stdin, CI, or limited terminals.
     # Users type provider names or short codes: "anthropic,xai" or "a,x".
     alias_map = {
@@ -2895,9 +2895,9 @@ def _setup_provider_runtime_id(provider_id: str) -> str:
 def _resolve_provider_key(
     cfg,
     provider: str,
-    cli_key: Optional[str] = None,
-    openai_base_url: Optional[str] = None,
-    compatible_backend: Optional[str] = None,
+    cli_key: str | None = None,
+    openai_base_url: str | None = None,
+    compatible_backend: str | None = None,
 ) -> str:
     """Resolve provider key from cli arg, existing config, env var, or prompt."""
     provider = str(provider).strip().lower()
@@ -2916,7 +2916,8 @@ def _resolve_provider_key(
             backend = _infer_openai_compatible_backend(openai_base_url, existing_key)
         default_compat_key = "ollama" if (is_compat and backend == "ollama") else None
         if is_compat and not default_compat_key:
-            prompt_fn = lambda: _prompt_openai_compatible_api_key(backend=backend)
+            def prompt_fn():
+                return _prompt_openai_compatible_api_key(backend=backend)
     elif provider in ("xai", "google", "nvidia", "opencode"):
         from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
@@ -2926,7 +2927,8 @@ def _resolve_provider_key(
         label = meta["label"]
         config_key = meta["config_key"]
         signup_url = meta["signup_url"]
-        prompt_fn = lambda: _prompt_provider_api_key(label, signup_url)
+        def prompt_fn():
+            return _prompt_provider_api_key(label, signup_url)
         default_compat_key = None
     else:
         existing_key = cfg.llm_api_key("anthropic")
@@ -2985,7 +2987,7 @@ def _resolve_provider_key(
             masked = env_key[:7] + "..." + env_key[-4:] if len(env_key) > 11 else "***"
             console.print(f"  Found {env_var_name} in environment: [green]{masked}[/green]")
             try:
-                save_it = input("  Save to fastfold config? [Y/n] ").strip().lower()
+                save_it = input("  Save to sandwalk config? [Y/n] ").strip().lower()
             except (EOFError, KeyboardInterrupt):
                 console.print("\n  [dim]Setup cancelled.[/dim]")
                 raise typer.Exit()
@@ -3007,7 +3009,7 @@ def _resolve_provider_key(
         console.print(f"  [yellow]{issue}[/yellow]")
 
 
-def _prompt_fastfold_cloud_api_key(cfg, cli_value: Optional[str] = None) -> Optional[str]:
+def _prompt_fastfold_cloud_api_key(cfg, cli_value: str | None = None) -> str | None:
     """Prompt for Fastfold AI Cloud API key, allowing users to keep/skip."""
     existing = cfg.get("api.fastfold_cloud_key") or os.environ.get("FASTFOLD_API_KEY")
     if isinstance(cli_value, str) and cli_value:
@@ -3038,7 +3040,7 @@ def _prompt_fastfold_cloud_api_key(cfg, cli_value: Optional[str] = None) -> Opti
     return key or None
 
 
-def _prompt_boltz_api_key(cfg, cli_value: Optional[str] = None) -> Optional[str]:
+def _prompt_boltz_api_key(cfg, cli_value: str | None = None) -> str | None:
     """Prompt for Boltz API key, allowing users to keep/skip."""
     existing = cfg.get("api.boltz_api_key") or os.environ.get("BOLTZ_API_KEY")
     if isinstance(cli_value, str) and cli_value:
@@ -3069,7 +3071,7 @@ def _prompt_boltz_api_key(cfg, cli_value: Optional[str] = None) -> Optional[str]
     return key or None
 
 
-def _find_boltz_cli_path() -> Optional[Path]:
+def _find_boltz_cli_path() -> Path | None:
     """Return the first available boltz-api executable path."""
     candidates: list[str] = []
     in_path = shutil.which("boltz-api")
@@ -3172,7 +3174,7 @@ def _ensure_boltz_cli_installed_from_setup() -> bool:
     return True
 
 
-def _prompt_install_boltz_stack(boltz_key: Optional[str]) -> None:
+def _prompt_install_boltz_stack(boltz_key: str | None) -> None:
     """Offer Boltz skill + CLI installation when a Boltz key is configured."""
     if not boltz_key:
         return
@@ -3242,10 +3244,11 @@ def _install_skill_sources(sources: list[str]) -> None:
 
     When npx is available, sources targeting the same repo are batched into a single
     `npx skills add <repo> --skill A --skill B ...` call (installed into the
-    fastfold-owned ~/.fastfold-cli/.claude/skills).
+    fastfold-owned ~/.sandwalk/.claude/skills).
     """
     from collections import OrderedDict
-    from agent.skills import install_skill, npx_add, _npx_target, _npx_available
+
+    from agent.skills import _npx_available, _npx_target, install_skill, npx_add
 
     prefer = _npx_available()
     if not prefer:
@@ -3275,7 +3278,7 @@ def _install_skill_sources(sources: list[str]) -> None:
         "(grouped per repo; git fallback)...[/dim]"
     )
     # Group GitHub sources by npx target repo; keep local paths separate (git/local).
-    groups: "OrderedDict[str, dict]" = OrderedDict()
+    groups: OrderedDict[str, dict] = OrderedDict()
     fallback: list[str] = []
     for src in sources:
         s = src.strip()
@@ -3445,7 +3448,7 @@ def _select_suggested_sources() -> list[str]:
     return sources
 
 
-def _prompt_install_skills(skills_arg: Optional[str] = None, skip: bool = False) -> None:
+def _prompt_install_skills(skills_arg: str | None = None, skip: bool = False) -> None:
     """Setup step: install agent skills from the live Fastfold catalog or custom sources."""
     from agent.skills import discover_skills
 
@@ -3582,7 +3585,7 @@ def _select_datasets_from_catalog(catalog: list[tuple[str, dict]]) -> list[str]:
     return names
 
 
-def _prompt_install_datasets(datasets_arg: Optional[str] = None, skip: bool = False) -> None:
+def _prompt_install_datasets(datasets_arg: str | None = None, skip: bool = False) -> None:
     """Setup step: download local datasets (auto-downloadable, all preselected)."""
     from data.downloader import DATASETS, download_all, download_dataset
 
@@ -3643,7 +3646,7 @@ def doctor_cmd(
         "--json",
         help="Emit machine-readable JSON instead of a table",
     ),
-    export: Optional[Path] = typer.Option(
+    export: Path | None = typer.Option(
         None,
         "--export",
         help="Write a diagnostics zip (system info, doctor report, redacted config, logs)",
@@ -3651,7 +3654,7 @@ def doctor_cmd(
 ):
     """Run environment and configuration health checks."""
     from agent.config import Config
-    from agent.doctor import run_checks, to_table, to_report, has_errors
+    from agent.doctor import has_errors, run_checks, to_report, to_table
 
     cfg = Config.load()
     checks = run_checks(cfg, session=Session(config=cfg, mode="batch"))
@@ -3682,7 +3685,7 @@ def doctor_cmd(
     if has_errors(checks):
         if not json_output:
             console.print(
-                "\n[red]Blocking issues found.[/red] Fix errors above, then rerun `fastfold doctor`."
+                "\n[red]Blocking issues found.[/red] Fix errors above, then rerun `sandwalk doctor`."
             )
         raise typer.Exit(code=1)
 
@@ -3702,7 +3705,7 @@ def data_pull(
         help="Dataset to download, or 'all' for every auto-downloadable dataset "
         "(depmap, msigdb, string, prism, l1000, alphafold)"
     ),
-    output: Optional[Path] = typer.Option(None, help="Output directory"),
+    output: Path | None = typer.Option(None, help="Output directory"),
 ):
     """Download a dataset for local use (use 'all' to fetch everything auto-downloadable)."""
     from data.downloader import download_dataset
@@ -3712,7 +3715,7 @@ def data_pull(
 
 @data_app.command("pull-all")
 def data_pull_all(
-    output: Optional[Path] = typer.Option(None, help="Output directory"),
+    output: Path | None = typer.Option(None, help="Output directory"),
 ):
     """Download every auto-downloadable dataset (depmap, msigdb, string)."""
     from data.downloader import download_all
@@ -3745,7 +3748,7 @@ app.add_typer(tool_app, name="tool")
 @tool_app.command("list")
 def tool_list():
     """List all available tools."""
-    from tools import registry, ensure_loaded, tool_load_errors
+    from tools import ensure_loaded, registry, tool_load_errors
 
     ensure_loaded()
     console.print(registry.list_tools_table())
@@ -3769,7 +3772,8 @@ app.add_typer(skill_app, name="skill")  # back-compat alias
 def skill_list():
     """List all loaded agent skills."""
     from rich.table import Table
-    from agent.skills import list_skills, display_author, display_updated, display_version
+
+    from agent.skills import display_author, display_updated, display_version, list_skills
 
     skills = list_skills()
     if not skills:
@@ -3876,7 +3880,7 @@ def skill_upgrade(
     ),
 ):
     """Sync skills: refresh the Fastfold catalog (add new + update) and re-install tracked skills."""
-    from agent.skills import upgrade_skills, GLOBAL_SKILLS_DIR
+    from agent.skills import GLOBAL_SKILLS_DIR, upgrade_skills
 
     if catalog_only and no_catalog:
         console.print("  [red]--catalog-only and --no-catalog are mutually exclusive.[/red]")
@@ -3884,7 +3888,7 @@ def skill_upgrade(
 
     if catalog_only:
         # Catalog sync only.
-        from agent.skills import install_skill, DEFAULT_CATALOG
+        from agent.skills import DEFAULT_CATALOG, install_skill
 
         with console.status("[green]Syncing Fastfold catalog...[/green]", spinner="dots"):
             result = install_skill(DEFAULT_CATALOG.split("@", 1)[0])
@@ -3931,12 +3935,12 @@ def skill_remove(
 
 @skill_app.command("delete")
 def skill_delete(
-    name: Optional[str] = typer.Argument(None, help="Skill name to delete (omit when using --all)"),
+    name: str | None = typer.Argument(None, help="Skill name to delete (omit when using --all)"),
     all_skills: bool = typer.Option(False, "--all", help="Delete ALL user-installed skills"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt"),
 ):
     """Delete a skill, or all user-installed skills with --all (asks to confirm first)."""
-    from agent.skills import user_installed_skill_names, remove_all_skills, remove_skill
+    from agent.skills import remove_all_skills, remove_skill, user_installed_skill_names
 
     if not all_skills:
         if not name:
@@ -3976,10 +3980,11 @@ def skill_delete(
 
 @skill_app.command("find")
 def skill_find(
-    query: Optional[str] = typer.Argument(None, help="Optional search query"),
+    query: str | None = typer.Argument(None, help="Optional search query"),
 ):
     """Discover installable skills from the catalog."""
     from rich.table import Table
+
     from agent.skills import discover_skills
 
     with spinner("Searching skill catalog..."):
@@ -4054,7 +4059,7 @@ trace_app = typer.Typer(help="Inspect and diagnose execution traces")
 app.add_typer(trace_app, name="trace")
 
 
-def _latest_trace_path() -> Optional[Path]:
+def _latest_trace_path() -> Path | None:
     from agent.trace import TraceLogger
 
     traces_dir = TraceLogger.traces_dir()
@@ -4064,7 +4069,7 @@ def _latest_trace_path() -> Optional[Path]:
     return max(traces, key=lambda p: p.stat().st_mtime)
 
 
-def _resolve_trace_path(path: Optional[Path], session_id: Optional[str]) -> Optional[Path]:
+def _resolve_trace_path(path: Path | None, session_id: str | None) -> Path | None:
     from agent.trace import TraceLogger
 
     if path is not None and session_id is not None:
@@ -4078,7 +4083,7 @@ def _resolve_trace_path(path: Optional[Path], session_id: Optional[str]) -> Opti
     return _latest_trace_path()
 
 
-def _latest_report_path(output_base: Optional[str] = None) -> Optional[Path]:
+def _latest_report_path(output_base: str | None = None) -> Path | None:
     reports_dir = (
         Path(output_base) / "reports" if output_base else Path.cwd() / "outputs" / "reports"
     )
@@ -4130,7 +4135,7 @@ def _print_trace_diagnostics_table(diag: dict, title: str):
     console.print(table)
 
 
-def _run_step_command(label: str, cmd: list[str], env: Optional[dict] = None) -> bool:
+def _run_step_command(label: str, cmd: list[str], env: dict | None = None) -> bool:
     console.print(f"\n[bold cyan]{label}[/bold cyan]")
     console.print(f"[dim]$ {' '.join(cmd)}[/dim]")
     proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
@@ -4150,12 +4155,12 @@ def _run_step_command(label: str, cmd: list[str], env: Optional[dict] = None) ->
 
 @trace_app.command("diagnose")
 def trace_diagnose(
-    path: Optional[Path] = typer.Option(None, "--path", "-p", help="Path to a trace JSONL file"),
-    session_id: Optional[str] = typer.Option(
+    path: Path | None = typer.Option(None, "--path", "-p", help="Path to a trace JSONL file"),
+    session_id: str | None = typer.Option(
         None,
         "--session-id",
         "-s",
-        help="Session ID (looks up ~/.fastfold-cli/traces/<id>.trace.jsonl)",
+        help="Session ID (looks up ~/.sandwalk/traces/<id>.trace.jsonl)",
     ),
     as_json: bool = typer.Option(False, "--json", help="Print diagnostics as JSON"),
     show_queries: bool = typer.Option(
@@ -4170,7 +4175,7 @@ def trace_diagnose(
 
     trace_path = _resolve_trace_path(path, session_id)
     if trace_path is None:
-        console.print("[yellow]No trace files found in ~/.fastfold-cli/traces[/yellow]")
+        console.print("[yellow]No trace files found in ~/.sandwalk/traces[/yellow]")
         raise typer.Exit(code=2)
     if not trace_path.exists():
         console.print(f"[red]Trace file not found:[/red] {trace_path}")
@@ -4214,18 +4219,18 @@ def trace_diagnose(
 
 @trace_app.command("export")
 def trace_export(
-    path: Optional[Path] = typer.Option(None, "--path", "-p", help="Path to a trace JSONL file"),
-    session_id: Optional[str] = typer.Option(
+    path: Path | None = typer.Option(None, "--path", "-p", help="Path to a trace JSONL file"),
+    session_id: str | None = typer.Option(
         None,
         "--session-id",
         "-s",
-        help="Session ID (looks up ~/.fastfold-cli/traces/<id>.trace.jsonl)",
+        help="Session ID (looks up ~/.sandwalk/traces/<id>.trace.jsonl)",
     ),
-    report: Optional[Path] = typer.Option(
+    report: Path | None = typer.Option(
         None, "--report", "-r", help="Optional markdown report to include"
     ),
-    out_dir: Optional[Path] = typer.Option(
-        None, "--out-dir", help="Bundle output directory (default: ~/.fastfold-cli/exports)"
+    out_dir: Path | None = typer.Option(
+        None, "--out-dir", help="Bundle output directory (default: ~/.sandwalk/exports)"
     ),
     zip_bundle: bool = typer.Option(True, "--zip/--no-zip", help="Also produce a zip archive"),
 ):
@@ -4236,7 +4241,7 @@ def trace_export(
 
     trace_path = _resolve_trace_path(path, session_id)
     if trace_path is None:
-        console.print("[yellow]No trace files found in ~/.fastfold-cli/traces[/yellow]")
+        console.print("[yellow]No trace files found in ~/.sandwalk/traces[/yellow]")
         raise typer.Exit(code=2)
     if not trace_path.exists():
         console.print(f"[red]Trace file not found:[/red] {trace_path}")
@@ -4253,8 +4258,8 @@ def trace_export(
         console.print(f"[red]Report file not found:[/red] {resolved_report}")
         raise typer.Exit(code=2)
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    base = out_dir or (Path.home() / ".fastfold-cli" / "exports")
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    base = out_dir or (CONFIG_DIR / "exports")
     bundle_dir = base / f"ct_run_bundle_{trace.session_id or 'session'}_{ts}"
     bundle_dir.mkdir(parents=True, exist_ok=True)
 
@@ -4329,7 +4334,7 @@ def release_check_cmd(
     run_trace: bool = typer.Option(
         True, "--trace/--no-trace", help="Run strict diagnostics on latest trace"
     ),
-    trace_path: Optional[Path] = typer.Option(
+    trace_path: Path | None = typer.Option(
         None, "--trace-path", help="Trace path for diagnostics"
     ),
     trace_required: bool = typer.Option(
@@ -4347,7 +4352,7 @@ def release_check_cmd(
     matrix_max_failed: int = typer.Option(
         1, "--matrix-max-failed", help="Max failed prompts allowed in strict matrix mode"
     ),
-    require_profile: Optional[str] = typer.Option(
+    require_profile: str | None = typer.Option(
         None, "--require-profile", help="Require agent.profile to match (e.g. pharma)"
     ),
     pharma: bool = typer.Option(False, "--pharma", help="Enforce pharma deployment policy checks"),
@@ -4492,7 +4497,7 @@ def knowledge_ingest(
     source: str = typer.Argument(
         ..., help="Source: evidence_store | pubmed | openalex | opentargets"
     ),
-    query: Optional[str] = typer.Option(None, "--query", "-q", help="Query for API sources"),
+    query: str | None = typer.Option(None, "--query", "-q", help="Query for API sources"),
     max_results: int = typer.Option(10, "--max-results", help="Max records for API sources"),
     scan_limit: int = typer.Option(1000, "--scan-limit", help="Max local evidence rows to scan"),
 ):
@@ -4535,7 +4540,7 @@ def knowledge_search(
 @knowledge_app.command("related")
 def knowledge_related(
     entity_id: str = typer.Argument(..., help="Canonical entity id (e.g., gene:TP53)"),
-    predicate: Optional[str] = typer.Option(None, "--predicate", help="Filter predicate"),
+    predicate: str | None = typer.Option(None, "--predicate", help="Filter predicate"),
     limit: int = typer.Option(20, "--limit", help="Maximum relations"),
 ):
     """Show related entities for an entity."""
@@ -4562,8 +4567,8 @@ def knowledge_related(
 
 @knowledge_app.command("rank")
 def knowledge_rank(
-    entity_id: Optional[str] = typer.Option(None, "--entity-id", help="Entity id filter"),
-    predicate: Optional[str] = typer.Option(None, "--predicate", help="Predicate filter"),
+    entity_id: str | None = typer.Option(None, "--entity-id", help="Entity id filter"),
+    predicate: str | None = typer.Option(None, "--predicate", help="Predicate filter"),
     limit: int = typer.Option(20, "--limit", help="Maximum relations"),
 ):
     """Rank relations by evidence strength."""
@@ -4584,8 +4589,8 @@ def knowledge_rank(
 
 @knowledge_app.command("contradictions")
 def knowledge_contradictions(
-    entity_id: Optional[str] = typer.Option(None, "--entity-id", help="Entity id filter"),
-    predicate: Optional[str] = typer.Option(None, "--predicate", help="Predicate filter"),
+    entity_id: str | None = typer.Option(None, "--entity-id", help="Entity id filter"),
+    predicate: str | None = typer.Option(None, "--predicate", help="Predicate filter"),
 ):
     """Detect contradictory evidence clusters."""
     from kb.reasoning import EvidenceReasoner
@@ -4640,7 +4645,7 @@ def knowledge_schema_check():
 
 @knowledge_app.command("schema-update")
 def knowledge_schema_update(
-    monitor: Optional[str] = typer.Option(None, "--monitor", help="Single monitor to update"),
+    monitor: str | None = typer.Option(None, "--monitor", help="Single monitor to update"),
 ):
     """Update schema drift baselines from current responses."""
     from kb.schema_monitor import SchemaMonitor
@@ -4716,8 +4721,8 @@ def report_list():
 
 @report_app.command("publish")
 def report_publish(
-    path: Optional[Path] = typer.Option(None, "--path", "-p", help="Markdown report to convert"),
-    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Output HTML path"),
+    path: Path | None = typer.Option(None, "--path", "-p", help="Markdown report to convert"),
+    out: Path | None = typer.Option(None, "--out", "-o", help="Output HTML path"),
 ):
     """Convert a markdown report to a shareable HTML page."""
     from agent.config import Config
@@ -4740,7 +4745,7 @@ def report_publish(
 
 @report_app.command("show")
 def report_show(
-    path: Optional[Path] = typer.Option(None, "--path", "-p", help="HTML report to open"),
+    path: Path | None = typer.Option(None, "--path", "-p", help="HTML report to open"),
 ):
     """Open an HTML report in the default browser."""
     import webbrowser
@@ -4770,14 +4775,15 @@ def report_show(
 
 @report_app.command("notebook")
 def report_notebook(
-    session: Optional[str] = typer.Option(
+    session: str | None = typer.Option(
         None, "--session", "-s", help="Session ID (prefix or full). Default: most recent"
     ),
-    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Output notebook path"),
+    out: Path | None = typer.Option(None, "--out", "-o", help="Output notebook path"),
     html: bool = typer.Option(False, "--html", help="Also export as HTML"),
 ):
     """Export an agent trace as a Jupyter notebook (.ipynb)."""
     import re
+
     from agent.trace_store import TraceStore
 
     # Find trace file
@@ -4792,7 +4798,7 @@ def report_notebook(
 
     # Lazy import nbformat
     try:
-        from reports.notebook import trace_to_notebook, save_notebook
+        from reports.notebook import save_notebook, trace_to_notebook
     except ImportError:
         console.print("[red]nbformat is required. Install with:[/red] pip install nbformat")
         raise typer.Exit(code=2)
@@ -4872,10 +4878,10 @@ def case_study_list():
 @case_study_app.command("run")
 def case_study_run(
     case_id: str = typer.Argument(..., help="Case study ID (e.g., revlimid, gleevec)"),
-    threads: Optional[int] = typer.Option(
+    threads: int | None = typer.Option(
         None, "--threads", "-t", help="Number of parallel threads"
     ),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model to use"),
+    model: str | None = typer.Option(None, "--model", "-m", help="LLM model to use"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ):
     """Run a curated drug case study with multi-agent analysis."""
@@ -4917,7 +4923,7 @@ def case_study_run(
     )
     console.print()
 
-    result = run_case_study(session, case_id, n_threads=threads)
+    _result = run_case_study(session, case_id, n_threads=threads)
 
     # Auto-publish HTML
     md_path = _latest_report_path(cfg.get("sandbox.output_dir"))
@@ -4934,27 +4940,27 @@ def case_study_run(
 @app.command("run", hidden=True)
 def run_cmd(
     query_parts: list[str] = typer.Argument(None, help="Research question to investigate"),
-    smiles: Optional[str] = typer.Option(None, "--smiles", "-s", help="Compound SMILES string"),
-    target: Optional[str] = typer.Option(
+    smiles: str | None = typer.Option(None, "--smiles", "-s", help="Compound SMILES string"),
+    target: str | None = typer.Option(
         None, "--target", "-t", help="Target protein (UniProt ID or gene symbol)"
     ),
-    indication: Optional[str] = typer.Option(
+    indication: str | None = typer.Option(
         None, "--indication", "-i", help="Cancer type / indication"
     ),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None, "--output", "-o", help="Output directory for reports"
     ),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model to use"),
-    agents: Optional[int] = typer.Option(
+    model: str | None = typer.Option(None, "--model", "-m", help="LLM model to use"),
+    agents: int | None = typer.Option(
         None, "--agents", "-a", help="Run with N parallel research agents"
     ),
-    resume: Optional[str] = typer.Option(
+    resume: str | None = typer.Option(
         None, "--resume", "-r", help="Resume a previous session (ID or 'last')"
     ),
     continue_last: bool = typer.Option(
         False, "--continue", "-c", help="Continue the most recent session"
     ),
-    specialist: Optional[str] = typer.Option(
+    specialist: str | None = typer.Option(
         None,
         "--specialist",
         help="Specialist slug/name/id for this run (overrides CLI active specialist)",
@@ -5031,10 +5037,10 @@ def run_cmd(
 def run_query(
     query: str,
     context: dict,
-    output: Optional[Path],
-    model: Optional[str],
+    output: Path | None,
+    model: str | None,
     verbose: bool,
-    agents: Optional[int] = None,
+    agents: int | None = None,
 ):
     """Execute a single research query."""
     from agent.config import Config
@@ -5117,7 +5123,7 @@ def run_query(
             if e.clarification.suggestions:
                 console.print(f"  [dim]e.g. {', '.join(e.clarification.suggestions[:3])}[/dim]")
             console.print(
-                f"\n  [dim]Tip: provide context with --smiles, --target, or --indication flags.[/dim]"
+                "\n  [dim]Tip: provide context with --smiles, --target, or --indication flags.[/dim]"
             )
             return
 
@@ -5134,13 +5140,13 @@ def run_query(
 
 @app.command("bench")
 def bench(
-    question: Optional[str] = typer.Option(
+    question: str | None = typer.Option(
         None, "--question", "-q", help="Run a single question by ID"
     ),
     parallel: int = typer.Option(10, "--parallel", "-p", help="Number of parallel workers"),
     timeout: int = typer.Option(300, "--timeout", help="Timeout per question in seconds"),
     max_turns: int = typer.Option(15, "--max-turns", help="Max agentic loop turns"),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model override"),
+    model: str | None = typer.Option(None, "--model", "-m", help="LLM model override"),
     eval_model: str = typer.Option(
         "claude-sonnet-4-5-20250929", "--eval-model", help="Model for LLM-as-judge evaluation"
     ),
@@ -5154,12 +5160,13 @@ def bench(
     force: bool = typer.Option(
         False, "--force", "-f", help="Clear previous results and re-run everything"
     ),
-    max_questions: Optional[int] = typer.Option(
+    max_questions: int | None = typer.Option(
         None, "--max-questions", "-n", help="Limit to first N questions"
     ),
 ):
     """Run the BixBench-50 benchmark suite."""
     import shutil as _shutil
+
     from bench.runner import BenchRunner
 
     if force:
@@ -5227,10 +5234,11 @@ def bench(
 
 def print_banner(cfg=None):
     """Print the startup banner with molecule illustration."""
-    from agent.config import Config
     from rich.padding import Padding
     from rich.table import Table
     from rich.text import Text
+
+    from agent.config import Config
 
     cfg = cfg or Config.load()
     n_tools = _get_loaded_tool_count_hint()
@@ -5287,8 +5295,8 @@ def print_banner(cfg=None):
 
 def run_interactive(
     context: dict,
-    output: Optional[Path],
-    model: Optional[str],
+    output: Path | None,
+    model: str | None,
     verbose: bool,
     resume_id: str = None,
 ):
@@ -5345,7 +5353,7 @@ def run_interactive(
 def entry():
     """Package entry point."""
     # Dev ergonomics: when invoked from the repo root (or a subdir), prefer the
-    # live source file so `uv run fastfold ...` reflects local edits immediately.
+    # live source file so `uv run sandwalk ...` reflects local edits immediately.
     current_cli_path = Path(__file__).resolve()
     candidate_roots = [Path.cwd(), *Path.cwd().parents]
     for root in candidate_roots:
@@ -5396,7 +5404,7 @@ def entry():
     #   fastfold                       -> interactive mode
     #   sandwalk "question"            -> single-query mode
     #   sandwalk --smiles ... "q"      -> single-query with context
-    # while preserving explicit subcommands like `fastfold config ...`.
+    # while preserving explicit subcommands like `sandwalk config ...`.
     # Backward-compat: allow old `fastfold run <subcommand> ...` invocations by
     # unwrapping the legacy `run` prefix when the remainder is a real subcommand.
     if len(argv) >= 2 and argv[0] == "run" and argv[1] in subcommands:

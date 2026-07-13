@@ -17,6 +17,8 @@ import mimetypes
 import time
 from pathlib import Path
 
+from agent.config import CONFIG_DIR
+
 logger = logging.getLogger("trace_store")
 
 # Marker used by MCP handlers to embed structured metadata in tool results
@@ -28,7 +30,7 @@ _MAX_EMBED_BYTES = 10 * 1024 * 1024
 
 def _sessions_dir() -> Path:
     """Return the sessions directory, creating it if needed."""
-    d = Path.home() / ".fastfold-cli" / "sessions"
+    d = CONFIG_DIR / "sessions"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -104,7 +106,7 @@ class TraceStore:
         # ... pass events list to process_messages() ...
 
         store.add_events(events, query="my question", model="claude-sonnet-4-5")
-        store.flush()  # persist to ~/.fastfold-cli/sessions/abc-123.trace.jsonl
+        store.flush()  # persist to ~/.sandwalk/sessions/abc-123.trace.jsonl
     """
 
     def __init__(self, session_id: str):
@@ -185,7 +187,7 @@ class TraceStore:
             raise FileNotFoundError(f"Trace file not found: {path}")
 
         events = []
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line:

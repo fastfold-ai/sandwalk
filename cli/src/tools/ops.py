@@ -1,19 +1,20 @@
 """
 Research-ops productivity tools: notebook entries, todos, and workflow templates.
 
-These tools provide lightweight project memory in ~/.fastfold-cli/ops (or config override)
+These tools provide lightweight project memory in ~/.sandwalk/ops (or config override)
 without depending on external services.
 """
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
 import json
-from pathlib import Path
 import re
+from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from agent.config import CONFIG_DIR
 from tools import registry
 
 
@@ -23,7 +24,7 @@ def _ops_root(_session=None) -> Path:
     if _session is not None and getattr(_session, "config", None) is not None:
         base = _session.config.get("ops.base_dir")
 
-    root = Path(base).expanduser() if base else (Path.home() / ".fastfold-cli" / "ops")
+    root = Path(base).expanduser() if base else (CONFIG_DIR / "ops")
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -43,7 +44,7 @@ def _workflow_dir(_session=None) -> Path:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _parse_int(value: Any, default: int) -> int:
@@ -129,7 +130,7 @@ def _load_notebook_entries(_session=None) -> tuple[list[dict], int, str | None]:
     entries: list[dict] = []
     skipped = 0
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        with open(path, encoding="utf-8") as handle:
             for raw in handle:
                 raw = raw.strip()
                 if not raw:
@@ -307,7 +308,7 @@ def notebook_search(
 
     matches = []
     bad_lines = 0
-    with open(path, "r", encoding="utf-8") as handle:
+    with open(path, encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
             if not line:
@@ -1128,7 +1129,7 @@ def workflow_run(
 
     results = {}
     status_by_id = {step["id"]: "pending" for step in cleaned_steps}
-    step_index = {step["id"]: step for step in cleaned_steps}
+    _step_index = {step["id"]: step for step in cleaned_steps}
     loop_guard = len(cleaned_steps) * 4 + 8
     iterations = 0
     executed = []

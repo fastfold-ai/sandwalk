@@ -7,12 +7,17 @@ using DuckDB for efficient Parquet/CSV.gz querying.
 Run with: uvicorn api.app:app --host 0.0.0.0 --port 8000
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from api.config import discover_datasets, validate_schema, DATASET_REGISTRY, DEFAULT_QUERY_LIMIT
-from api.engine import QueryEngine
 from _version import __version__
+from api.config import DATASET_REGISTRY, DEFAULT_QUERY_LIMIT, discover_datasets, validate_schema
+from api.engine import QueryEngine
 
 app = FastAPI(
     title="ct Data API",
@@ -27,7 +32,7 @@ class QueryRequest(BaseModel):
     dataset: str = Field(..., description="Dataset name (e.g. 'perturbatlas', 'chembl')")
     gene: str | None = Field(None, description="Filter by gene symbol")
     compound: str | None = Field(None, description="Filter by compound name/ID")
-    filters: dict | None = Field(None, description="Additional column filters")
+    filters: dict[str, Any] | None = Field(None, description="Additional column filters")
     columns: list[str] | None = Field(None, description="Columns to return")
     limit: int = Field(DEFAULT_QUERY_LIMIT, ge=1, le=10000, description="Max rows")
     order_by: str | None = Field(None, description="Column to sort by")
@@ -36,11 +41,11 @@ class QueryRequest(BaseModel):
 class QueryResponse(BaseModel):
     dataset: str
     total_rows: int
-    data: list[dict]
+    data: list[dict[str, Any]]
 
 
 @app.get("/health")
-def health():
+def health() -> dict[str, Any]:
     """Health check — also reports available datasets."""
     available = discover_datasets()
     return {
@@ -51,13 +56,12 @@ def health():
 
 
 @app.get("/health/schema")
-def schema_health():
+def schema_health() -> JSONResponse:
     """Deep health check — validates file schemas match expectations."""
     results = validate_schema(engine)
     has_invalid = any(r["status"] == "invalid" for r in results.values())
 
     status_code = 503 if has_invalid else 200
-    from fastapi.responses import JSONResponse
     return JSONResponse(
         status_code=status_code,
         content={
@@ -68,10 +72,10 @@ def schema_health():
 
 
 @app.get("/datasets")
-def list_datasets():
+def list_datasets() -> list[dict[str, Any]]:
     """List available datasets with metadata."""
     available = discover_datasets()
-    result = []
+    result: list[dict[str, Any]] = []
     for name, info in available.items():
         registry_entry = DATASET_REGISTRY.get(name, {})
         result.append({
@@ -88,7 +92,7 @@ def list_datasets():
 
 
 @app.post("/query", response_model=QueryResponse)
-def query_dataset(req: QueryRequest):
+def query_dataset(req: QueryRequest) -> QueryResponse:
     """Run a filtered query against a dataset."""
     if req.dataset not in DATASET_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Unknown dataset: {req.dataset}")
@@ -96,7 +100,7 @@ def query_dataset(req: QueryRequest):
     ds_config = DATASET_REGISTRY[req.dataset]
 
     # Build filters
-    filters = dict(req.filters) if req.filters else {}
+    filters: dict[str, Any] = dict(req.filters) if req.filters else {}
     if req.gene:
         filters["gene"] = req.gene
     if req.compound:
@@ -110,7 +114,7 @@ def query_dataset(req: QueryRequest):
 
     try:
         data = engine.query_parquet(
-            file_pattern=ds_config["path_pattern"],
+            file_pattern=str(ds_config["path_pattern"]),
             filters=filters if filters else None,
             columns=req.columns,
             limit=req.limit,
@@ -131,7 +135,7 @@ def query_dataset(req: QueryRequest):
 
 
 @app.get("/datasets/{name}/gene/{gene}")
-def gene_summary(name: str, gene: str):
+def gene_summary(name: str, gene: str) -> dict[str, Any]:
     """Get a gene-level summary from a dataset."""
     if name not in DATASET_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Unknown dataset: {name}")
@@ -140,7 +144,7 @@ def gene_summary(name: str, gene: str):
 
     try:
         data = engine.query_parquet(
-            file_pattern=ds_config["path_pattern"],
+            file_pattern=str(ds_config["path_pattern"]),
             filters={"gene": gene},
             limit=1000,
         )
@@ -170,7 +174,7 @@ def gene_summary(name: str, gene: str):
 
 
 @app.get("/datasets/{name}/compound/{compound}")
-def compound_summary(name: str, compound: str):
+def compound_summary(name: str, compound: str) -> dict[str, Any]:
     """Get a compound-level summary from a dataset."""
     if name not in DATASET_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Unknown dataset: {name}")
@@ -178,7 +182,7 @@ def compound_summary(name: str, compound: str):
     ds_config = DATASET_REGISTRY[name]
 
     # Try common compound column names — use filterable from dataset config
-    filters = {}
+    filters: dict[str, Any] = {}
     filterable = ds_config.get("filterable", [])
     for col in ["compound", "molecule_chembl_id", "pert_name", "compound_name"]:
         if col in filterable:
@@ -189,7 +193,7 @@ def compound_summary(name: str, compound: str):
 
     try:
         data = engine.query_parquet(
-            file_pattern=ds_config["path_pattern"],
+            file_pattern=str(ds_config["path_pattern"]),
             filters=filters,
             limit=1000,
         )

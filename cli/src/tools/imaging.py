@@ -192,14 +192,13 @@ def morphology_similarity(smiles_a: str, smiles_b: str, **kwargs) -> dict:
     """
     try:
         from rdkit import Chem, DataStructs
-        from rdkit.Chem import AllChem, Descriptors, rdMolDescriptors, MACCSkeys
+        from rdkit.Chem import AllChem, Descriptors, MACCSkeys, rdMolDescriptors
     except ImportError:
         return {
             "error": "RDKit is required for morphology similarity. Install with: pip install rdkit",
             "summary": "RDKit not installed — needed for fingerprint-based similarity",
         }
 
-    import numpy as np
 
     mol_a = Chem.MolFromSmiles(smiles_a)
     mol_b = Chem.MolFromSmiles(smiles_b)

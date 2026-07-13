@@ -2,8 +2,9 @@
 Expression analysis tools: L1000 signatures, pathway enrichment, TF activity, immune scoring.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from tools import registry
 
 
@@ -162,8 +163,9 @@ def immune_score(compound_id: str = "all", **kwargs) -> dict:
 )
 def l1000_similarity(compound_id: str, mode: str = "similar", top_n: int = 20, **kwargs) -> dict:
     """Find transcriptionally similar or anti-correlated compounds."""
-    from data.loaders import load_l1000
     from sklearn.metrics.pairwise import cosine_similarity
+
+    from data.loaders import load_l1000
     from tools._compound_resolver import resolve_compound
 
     compound_id = resolve_compound(compound_id, dataset="l1000")
@@ -222,7 +224,7 @@ def _resolve_groups_by_lineage(
     As a fallback, split available compounds into two halves so the analysis
     can still proceed.
     """
-    all_ids = list(expr.index)
+    _all_ids = list(expr.index)
 
     # Try DepMap lineage mapping
     try:

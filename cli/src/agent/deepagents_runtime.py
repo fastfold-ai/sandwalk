@@ -25,7 +25,7 @@ import re
 import time
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger("deepagents_runtime")
 
@@ -140,7 +140,7 @@ def skill_source_dirs() -> list[str]:
     Ordered low -> high priority (later sources win on name collision), mirroring
     :func:`agent.skills.iter_skills`: bundled -> npx -> global.
     """
-    from agent.skills import BUNDLED_SKILLS_DIR, NPX_SKILLS_DIR, GLOBAL_SKILLS_DIR
+    from agent.skills import BUNDLED_SKILLS_DIR, GLOBAL_SKILLS_DIR, NPX_SKILLS_DIR
 
     sources: list[str] = []
     for path in (BUNDLED_SKILLS_DIR, NPX_SKILLS_DIR, GLOBAL_SKILLS_DIR):
@@ -286,7 +286,7 @@ def _args_schema_for(model_name: str, parameters: dict | None, *, required_code:
         key = str(pname)
         if not key.isidentifier() or key.startswith("_") or key == "code":
             continue
-        fields[key] = (Optional[str], Field(default=None, description=str(desc)))
+        fields[key] = (str | None, Field(default=None, description=str(desc)))
 
     config = ConfigDict(protected_namespaces=())
     try:
@@ -358,15 +358,16 @@ def _make_search_tools_tool(exclude_categories: set[str], exclude_tools: set[str
     """Build the on-demand ``search_tools`` StructuredTool used in PTC mode."""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, ConfigDict, Field
+
     from agent.ptc_tools import search_tools_text
 
     class SearchToolsArgs(BaseModel):
         model_config = ConfigDict(protected_namespaces=())
         query: str = Field(description="Keywords describing the tool you need")
-        category: Optional[str] = Field(
+        category: str | None = Field(
             default=None, description="Optional category to restrict the search"
         )
-        limit: Optional[int] = Field(default=12, description="Max results (default 12)")
+        limit: int | None = Field(default=12, description="Max results (default 12)")
 
     async def _coroutine(query: str, category: str | None = None, limit: int | None = 12):
         return search_tools_text(
@@ -418,12 +419,12 @@ def create_ct_langchain_tools(
     ``display_name_map`` maps the sanitized (provider-safe) tool name back to
     the original dotted name for trace rendering.
     """
-    from tools import registry, ensure_loaded, EXPERIMENTAL_CATEGORIES
     from agent.mcp_server import (
-        _make_tool_handler,
         _make_run_python_handler,
         _make_run_r_handler,
+        _make_tool_handler,
     )
+    from tools import EXPERIMENTAL_CATEGORIES, ensure_loaded, registry
 
     ensure_loaded()
     exclude_categories = exclude_categories or set()

@@ -6,11 +6,11 @@ Provides a consistent interface regardless of backend. CellType's own models
 falling back to API calls if served remotely.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, Generator
 import logging
 import os
 import time
+from collections.abc import Generator
+from dataclasses import dataclass, field
 
 logger = logging.getLogger("llm")
 
@@ -98,7 +98,7 @@ class UsageTracker:
         """Human-readable usage summary."""
         if not self.calls:
             return "No LLM calls made."
-        models_used = set(c["model"] for c in self.calls)
+        models_used = {c["model"] for c in self.calls}
         return (
             f"{len(self.calls)} LLM calls | "
             f"{self.total_input_tokens:,} in + {self.total_output_tokens:,} out tokens | "
@@ -235,13 +235,13 @@ class LLMClient:
         )
 
     def _call_anthropic(self, client, system, messages, temperature, max_tokens, tools=None):
-        kwargs = dict(
-            model=self.model,
-            system=system,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+        kwargs = {
+            "model": self.model,
+            "system": system,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
         if tools:
             kwargs["tools"] = tools
         response = client.messages.create(**kwargs)
@@ -289,8 +289,7 @@ class LLMClient:
             max_tokens=max_tokens,
         ) as stream:
             try:
-                for text in stream.text_stream:
-                    yield text
+                yield from stream.text_stream
             finally:
                 # Record usage even if stream is interrupted (Ctrl+C)
                 try:

@@ -14,12 +14,12 @@ describe('isFeaturedSkill', () => {
       isFeaturedSkill({ name: 'x', author: 'FastFold Team', source: 'user' })
     ).toBe(true)
     expect(
-      isFeaturedSkill({ name: 'x', author: null, source: 'bundled' })
+      isFeaturedSkill({ name: 'x', author: '', source: 'bundled' })
     ).toBe(true)
     expect(
       isFeaturedSkill({
         name: 'x',
-        author: null,
+        author: '',
         source: 'github:fastfold-ai/skills'
       })
     ).toBe(true)

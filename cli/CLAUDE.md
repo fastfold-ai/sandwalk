@@ -1,10 +1,11 @@
-# fastfold-agent-cli — Project Instructions
+# sandwalk — Project Instructions
 
 ## What This Is
 
-fastfold-agent-cli is an autonomous agent for drug discovery research — like Claude Code, but for biology.
-It takes natural language questions about compounds/targets/indications and executes
-multi-step research workflows using computational biology tools.
+Sandwalk is an autonomous agent for open science and drug discovery research —
+like Claude Code, but for biology. It takes natural language questions about
+compounds/targets/indications and executes multi-step research workflows using
+computational biology tools.
 
 ## Architecture
 
@@ -18,6 +19,7 @@ sandbox). Supports Anthropic and OpenAI (including OpenAI-compatible endpoints v
 ```
 src/
 ├── agent/          # Runner, MCP server, system prompt, config
+├── agent_server/   # Local FastAPI server for the web UI / Mac app
 ├── tools/          # All research tools (190+), registered via @registry.register()
 ├── data/           # Data loaders (DepMap, PRISM, L1000, proteomics)
 ├── models/         # LLM client abstraction
@@ -54,17 +56,23 @@ Rules:
 ## Commands
 
 ```bash
-fastfold --version              # Check version
-fastfold "your question"        # Single query
-fastfold                          # Interactive mode
-fastfold tool list                # List all tools
-fastfold config set key value     # Set config
-fastfold data pull depmap         # Download dataset
-pytest tests/ -v                  # Run tests
-pip install -e ".[dev]"           # Install for development
+sandwalk --version              # Check version
+sandwalk "your question"        # Single query
+sandwalk                        # Interactive mode
+sandwalk tool list              # List all tools
+sandwalk config set key value   # Set config
+sandwalk data pull depmap       # Download dataset
+pytest tests/ -v                # Run tests
+ruff check src                  # Lint
+mypy                            # Typecheck (scoped packages in pyproject.toml)
+pip install -e ".[dev]"         # Install for development
 ```
 
 ## Testing
 
 Tests use mocked data loaders — never require real datasets.
 Mock pattern: `@patch("tools.module.load_X")` to inject test DataFrames.
+
+## Linting
+
+Matches fastfold-cloud-backend: **ruff** (`E,W,F,I,B,C4,UP`) + **mypy** (strict, expanding package by package).

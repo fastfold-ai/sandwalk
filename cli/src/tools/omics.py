@@ -15,7 +15,9 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Any
 
+from agent.config import CONFIG_DIR
 from tools import registry
 from tools.http_client import request, request_json
 
@@ -36,7 +38,7 @@ def _downloads_dir() -> Path:
     if base:
         d = Path(base).expanduser()
     else:
-        d = Path.home() / ".fastfold-cli" / "downloads"
+        d = CONFIG_DIR / "downloads"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -73,7 +75,7 @@ def _stream_download(url: str, dest_path: Path, max_mb: int | None = None) -> tu
                 return None, (
                     f"File size ({int(content_length) // (1024*1024)} MB) "
                     f"exceeds limit ({max_mb} MB). "
-                    f"Increase with: fastfold config set data.max_download_mb <value>"
+                    f"Increase with: sandwalk config set data.max_download_mb <value>"
                 )
 
             downloaded = 0
@@ -84,7 +86,7 @@ def _stream_download(url: str, dest_path: Path, max_mb: int | None = None) -> tu
                         tmp_path.unlink(missing_ok=True)
                         return None, (
                             f"Download exceeded size limit ({max_mb} MB). "
-                            f"Increase with: fastfold config set data.max_download_mb <value>"
+                            f"Increase with: sandwalk config set data.max_download_mb <value>"
                         )
                     f.write(chunk)
 
@@ -897,7 +899,7 @@ def _inspect_tabular(filepath: Path, size_mb: float, sep: str = ",") -> dict:
         "size_mb": size_mb,
         "shape": [n_lines, len(columns)],
         "columns": columns[:30],
-        "dtypes": {k: v for k, v in list(dtypes.items())[:15]},
+        "dtypes": dict(list(dtypes.items())[:15]),
         "head_preview": df_head.head(3).to_dict(),
         "summary": (
             f"Tabular: {n_lines:,} rows x {len(columns)} columns ({size_mb} MB). "
@@ -958,7 +960,7 @@ def _inspect_matrix_gz(filepath: Path, size_mb: float) -> dict:
 # ===========================================================================
 
 
-def _load_tabular(path: str, **read_kwargs) -> "tuple[pd.DataFrame | None, str | None]":
+def _load_tabular(path: str, **read_kwargs) -> "tuple[Any | None, str | None]":
     """Load a tabular file, returning (df, error)."""
     import pandas as pd
 
@@ -1541,7 +1543,7 @@ def proteomics_enrich(
 
     # Flatten top hits
     top_summary = []
-    for lib, terms in all_results.items():
+    for _lib, terms in all_results.items():
         for t in terms[:3]:
             if t["adj_pvalue"] < 0.05:
                 top_summary.append(f"{t['term']} (q={t['adj_pvalue']:.2e})")
@@ -1581,7 +1583,6 @@ def proteomics_enrich(
 )
 def atac_peak_annotate(path: str, **kwargs) -> dict:
     """Annotate and summarize ATAC-seq peaks."""
-    import numpy as np
     import pandas as pd
 
     filepath = Path(path).expanduser()
@@ -2258,7 +2259,6 @@ def _check_muon():
     """Check if muon is available."""
     try:
         import muon
-        import mudata
 
         return muon
     except Exception as exc:
@@ -2717,8 +2717,8 @@ def deseq2(
     if _check_pydeseq2():
         try:
             from pydeseq2.dds import DeseqDataSet
-            from pydeseq2.ds import DeseqStats
             from pydeseq2.default_inference import DefaultInference
+            from pydeseq2.ds import DeseqStats
 
             inference = DefaultInference(n_cpus=1)
             # pyDESeq2 wants samples as rows, genes as columns
@@ -3194,8 +3194,8 @@ def methylation_cluster(
             logger.warning("scanpy fallback failed: %s", exc)
 
     # Last resort: sklearn KMeans
-    from sklearn.decomposition import PCA
     from sklearn.cluster import KMeans
+    from sklearn.decomposition import PCA
     from sklearn.preprocessing import StandardScaler
 
     X = adata.X

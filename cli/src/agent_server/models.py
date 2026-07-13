@@ -879,7 +879,7 @@ class StorageCategory(ApiModel):
     color: str
     bytes: int = 0
     path: str | None = None
-    children: list["StorageCategory"] = Field(default_factory=list)
+    children: list[StorageCategory] = Field(default_factory=list)
 
 
 class StorageReport(ApiModel):

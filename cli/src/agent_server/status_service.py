@@ -10,7 +10,7 @@ import signal
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent.config import CONFIG_DIR
@@ -24,7 +24,7 @@ from agent_server.storage_service import _path_size_bytes
 
 # Set when the process first imports this module (app boot).
 _STARTED_AT = time.time()
-_STARTED_AT_ISO = datetime.now(timezone.utc).isoformat()
+_STARTED_AT_ISO = datetime.now(UTC).isoformat()
 
 
 def _format_platform_label(*, chip_name: str | None = None) -> str:
@@ -299,15 +299,17 @@ def get_status_report(*, version: str, service: str = "Sandwalk") -> ServerStatu
             thermal_state=_thermal_state(),
             load_average=_load_average(),
             chip_name=chip_name,
-            gpu_cores=gpu.get("gpu_cores") if isinstance(gpu.get("gpu_cores"), int) else None,
+            gpu_cores=(
+                gpu_cores_raw if isinstance(gpu_cores_raw := gpu.get("gpu_cores"), int) else None
+            ),
             gpu_utilization_percent=(
-                float(gpu["gpu_utilization_percent"])
-                if isinstance(gpu.get("gpu_utilization_percent"), (int, float))
+                float(gpu_util_raw)
+                if isinstance(gpu_util_raw := gpu.get("gpu_utilization_percent"), (int, float))
                 else None
             ),
             gpu_memory_used_bytes=(
-                int(gpu["gpu_memory_used_bytes"])
-                if isinstance(gpu.get("gpu_memory_used_bytes"), int)
+                int(gpu_mem_used_raw)
+                if isinstance(gpu_mem_used_raw := gpu.get("gpu_memory_used_bytes"), int)
                 else None
             ),
             gpu_memory_total_bytes=(
@@ -315,7 +317,7 @@ def get_status_report(*, version: str, service: str = "Sandwalk") -> ServerStatu
             ),
         ),
         cache=_cache_info(),
-        checked_at=datetime.now(timezone.utc).isoformat(),
+        checked_at=datetime.now(UTC).isoformat(),
     )
 
 

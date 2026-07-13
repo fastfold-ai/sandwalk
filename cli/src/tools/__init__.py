@@ -5,12 +5,13 @@ Each tool is a Python function decorated with @tool that the agent can invoke.
 Tools are organized by category (target, structure, chemistry, etc.).
 """
 
-from dataclasses import dataclass, field
 import importlib
 import logging
-from typing import Callable, Optional
-from rich.table import Table
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Optional
 
+from rich.table import Table
 
 EXPERIMENTAL_CATEGORIES = frozenset({"compute", "cro"})
 _TOOL_MODULES = (
@@ -96,7 +97,7 @@ class ToolRegistry:
             return func
         return decorator
 
-    def get_tool(self, name: str) -> Optional[Tool]:
+    def get_tool(self, name: str) -> Tool | None:
         """Look up a tool by name."""
         return self._tools.get(name)
 
@@ -129,7 +130,7 @@ class ToolRegistry:
 
     def categories(self) -> list[str]:
         """List all tool categories."""
-        return sorted(set(t.category for t in self._tools.values()))
+        return sorted({t.category for t in self._tools.values()})
 
     def tool_descriptions_for_llm(
         self,

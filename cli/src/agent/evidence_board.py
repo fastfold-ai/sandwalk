@@ -8,7 +8,7 @@ optionally reference cross-thread discoveries.
 
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -33,7 +33,7 @@ class EvidenceBoard:
         self._lock = threading.Lock()
 
     def post(self, thread_id: int, step_id: Any, tool: str,
-             summary: str, data: Optional[dict] = None) -> None:
+             summary: str, data: dict | None = None) -> None:
         """Post a new evidence entry (thread-safe)."""
         entry = EvidenceEntry(
             thread_id=thread_id,

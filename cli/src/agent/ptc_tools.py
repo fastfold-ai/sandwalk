@@ -40,7 +40,7 @@ def _iter_domain_tools(
     exclude_tools: set[str] | None = None,
 ):
     """Yield registry tools, applying the same exclusions as the native path."""
-    from tools import registry, ensure_loaded, EXPERIMENTAL_CATEGORIES
+    from tools import EXPERIMENTAL_CATEGORIES, ensure_loaded, registry
 
     ensure_loaded()
     exclude_categories = exclude_categories or set()

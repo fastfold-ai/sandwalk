@@ -23,11 +23,11 @@ from agent.skills import (
     upgrade_skills,
 )
 from agent_server.models import (
+    CatalogSkill,
     CatalogSkillAudit,
     CatalogSkillAuditEntry,
     CatalogSkillDetail,
     CatalogSkillFile,
-    CatalogSkill,
     SkillBatchAction,
     SkillBatchActionFailure,
     SkillBatchActionResponse,

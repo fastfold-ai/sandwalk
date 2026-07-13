@@ -7,13 +7,14 @@ This is the foundational layer for cross-modal pharma knowledge accumulation.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import json
-from pathlib import Path
 import re
 import time
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
+from agent.config import CONFIG_DIR
 
 _GENE_RE = re.compile(r"^[A-Z][A-Z0-9-]{1,9}$")
 
@@ -67,7 +68,7 @@ class KnowledgeSubstrate:
     SCHEMA_VERSION = 1
 
     def __init__(self, path: Path | None = None):
-        self.path = path or (Path.home() / ".fastfold-cli" / "knowledge" / "substrate.json")
+        self.path = path or (CONFIG_DIR / "knowledge" / "substrate.json")
         self._data = self._load()
 
     @staticmethod
@@ -139,7 +140,7 @@ class KnowledgeSubstrate:
         payload.setdefault("relations", {})
         return payload
 
-    def save(self):
+    def save(self) -> None:
         """Persist substrate to disk."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._data["updated_at"] = time.time()

@@ -176,7 +176,7 @@ def ppi_analysis(gene: str, min_score: float = 0.4, network_depth: int = 1, **kw
         adjacency.setdefault(e["gene_b"], set()).add(e["gene_a"])
 
     clustering_coefficients = []
-    for node, neighbors in adjacency.items():
+    for _node, neighbors in adjacency.items():
         n = len(neighbors)
         if n < 2:
             clustering_coefficients.append(0.0)
@@ -329,7 +329,7 @@ def pathway_crosstalk(genes: str, **kwargs) -> dict:
     # Get identifiers mapping (which input genes map to which pathways)
     # Reactome returns this in the 'identifiers' section
     not_found = data.get("identifiersNotFound", 0)
-    found_ids = data.get("foundEntities", 0)
+    _found_ids = data.get("foundEntities", 0)
 
     # Step 2: For each significant pathway, get the participant genes
     # Use Reactome content service to get contained participants

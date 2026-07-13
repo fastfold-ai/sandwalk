@@ -7,6 +7,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from agent.config import CONFIG_DIR
+
 
 class TraceLogger:
     """Collect, persist, and analyze query trace events."""
@@ -17,7 +19,7 @@ class TraceLogger:
 
     @staticmethod
     def traces_dir() -> Path:
-        d = Path.home() / ".fastfold-cli" / "traces"
+        d = CONFIG_DIR / "traces"
         d.mkdir(parents=True, exist_ok=True)
         return d
 

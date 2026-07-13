@@ -7,7 +7,7 @@ optional ``scripts/``, ``references/``, ``assets/``).
 
 Skills are resolved from three tiers (highest priority first):
 
-1. **global**  — ``~/.fastfold-cli/skills/`` (where ``skill add`` installs).
+1. **global**  — ``~/.sandwalk/skills/`` (where ``skill add`` installs).
 2. **project** — ``<cwd>/.claude/skills/`` gated by ``<cwd>/skills-lock.json``
    (legacy/back-compat; read-only here).
 3. **bundled** — ``src/skills/`` shipped inside the package.
@@ -32,9 +32,8 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from agent.config import CONFIG_DIR
 
@@ -111,16 +110,16 @@ class SkillInfo:
     name: str
     description: str = ""
     tags: list[str] = field(default_factory=list)
-    path: Optional[Path] = None  # path to SKILL.md
+    path: Path | None = None  # path to SKILL.md
     source: str = ""  # tier: global | project | bundled | npx
     author: str = ""  # org/owner derived from the install source
     updated_at: str = ""  # ISO timestamp the skill was installed/updated
-    version: Optional[str] = None  # release tag (e.g. "v1.2.0") when known
+    version: str | None = None  # release tag (e.g. "v1.2.0") when known
     icon: str = ""  # optional icon path/URL from SKILL.md frontmatter
     enabled: bool = True
 
     @property
-    def directory(self) -> Optional[Path]:
+    def directory(self) -> Path | None:
         return self.path.parent if self.path else None
 
 
@@ -328,7 +327,7 @@ def _scan_project(project_root: Path) -> dict[str, SkillInfo]:
 
 
 def iter_skills(
-    project_root: Optional[Path] = None,
+    project_root: Path | None = None,
     *,
     enabled_only: bool = False,
 ) -> dict[str, SkillInfo]:
@@ -417,11 +416,11 @@ def _collapse_skills_by_name(skills: dict[str, SkillInfo]) -> dict[str, SkillInf
             chosen[identity] = (preferred_key, winner)
         else:
             chosen[identity] = (existing_key, existing_info)
-    return {key: info for key, info in chosen.values()}
+    return dict(chosen.values())
 
 
 def list_skills(
-    project_root: Optional[Path] = None,
+    project_root: Path | None = None,
     *,
     enabled_only: bool = False,
 ) -> list[SkillInfo]:
@@ -434,7 +433,7 @@ def _normalize_skill_lookup(value: str) -> str:
     return str(value or "").strip().lower().replace("_", "-")
 
 
-def _resolve_skill_key(name: str, skills: dict[str, SkillInfo]) -> Optional[str]:
+def _resolve_skill_key(name: str, skills: dict[str, SkillInfo]) -> str | None:
     # Exact directory key first.
     if name in skills:
         return name
@@ -459,13 +458,13 @@ def _resolve_skill_key(name: str, skills: dict[str, SkillInfo]) -> Optional[str]
     return None
 
 
-def skill_info(name: str, project_root: Optional[Path] = None) -> Optional[SkillInfo]:
+def skill_info(name: str, project_root: Path | None = None) -> SkillInfo | None:
     skills = iter_skills(project_root)
     key = _resolve_skill_key(name, skills)
     return skills.get(key) if key is not None else None
 
 
-def installed_skill_names(project_root: Optional[Path] = None) -> list[str]:
+def installed_skill_names(project_root: Path | None = None) -> list[str]:
     return sorted(iter_skills(project_root).keys())
 
 
@@ -602,8 +601,8 @@ def _score_skill_query_match(
     info: SkillInfo,
     query: str,
     *,
-    query_tokens: Optional[set[str]] = None,
-    skill_tokens: Optional[set[str]] = None,
+    query_tokens: set[str] | None = None,
+    skill_tokens: set[str] | None = None,
 ) -> int:
     query_lc = (query or "").lower().strip()
     if not query_lc:
@@ -710,7 +709,7 @@ def _format_selected_skill_section(
 
 
 def build_skills_prompt(
-    project_root: Optional[Path] = None,
+    project_root: Path | None = None,
     user_request: str | None = None,
     max_catalog_entries: int = 250,
     max_active_skills: int = 6,
@@ -815,7 +814,7 @@ def detect_source_type(source: str) -> str:
     return "name"
 
 
-def _parse_github(source: str) -> tuple[str, Optional[str], Optional[str]]:
+def _parse_github(source: str) -> tuple[str, str | None, str | None]:
     """Return (clone_url, ref, subpath) for a GitHub URL or shorthand."""
     s = source.strip()
 
@@ -828,8 +827,8 @@ def _parse_github(source: str) -> tuple[str, Optional[str], Optional[str]]:
 
     # Full URL, optionally with /tree/<ref>/<subpath>
     url = s
-    ref: Optional[str] = None
-    sub: Optional[str] = None
+    ref: str | None = None
+    sub: str | None = None
     tree = re.search(r"github\.com[:/](?P<owner>[\w.-]+)/(?P<repo>[\w.-]+?)(?:\.git)?(?:/tree/(?P<ref>[^/]+)(?:/(?P<sub>.+))?)?/?$", s)
     if tree:
         owner = tree.group("owner")
@@ -865,7 +864,7 @@ def _noninteractive_git_env() -> dict:
     return env
 
 
-def _git_clone(url: str, ref: Optional[str], dest: Path) -> Optional[str]:
+def _git_clone(url: str, ref: str | None, dest: Path) -> str | None:
     """Shallow clone ``url`` into ``dest``. Returns the commit SHA or None."""
     cmd = ["git", "clone", "--depth", "1"]
     if ref:
@@ -892,7 +891,7 @@ def _git_clone(url: str, ref: Optional[str], dest: Path) -> Optional[str]:
         return None
 
 
-def _resolve_skill_dirs(root: Path, subpath: Optional[str]) -> list[Path]:
+def _resolve_skill_dirs(root: Path, subpath: str | None) -> list[Path]:
     """Find skill directories (containing SKILL.md) within a cloned repo."""
     base = (root / subpath) if subpath else root
     if not base.exists():
@@ -1010,7 +1009,7 @@ def set_skill_enabled(
     name: str,
     enabled: bool,
     *,
-    project_root: Optional[Path] = None,
+    project_root: Path | None = None,
 ) -> dict:
     skills = iter_skills(project_root)
     key = _resolve_skill_key(name, skills)
@@ -1050,13 +1049,13 @@ def _record_install(
     dest: Path,
     name: str,
     source: str,
-    commit: Optional[str],
-    release: Optional[str] = None,
+    commit: str | None,
+    release: str | None = None,
 ) -> None:
     entry = {
         "source": source,
         "commit": commit,
-        "installed_at": datetime.now(timezone.utc).isoformat(),
+        "installed_at": datetime.now(UTC).isoformat(),
     }
     if release:
         entry["release"] = release
@@ -1068,7 +1067,7 @@ def _record_install(
         _write_manifest(dest, manifest)
 
 
-def _npx_target(source: str) -> tuple[str, Optional[str], bool]:
+def _npx_target(source: str) -> tuple[str, str | None, bool]:
     """Map a skill source to (npx_target, skill_name, whole_repo) for `npx skills add`.
 
     - ``owner/repo@subpath`` -> (``owner/repo``, ``<last path segment>``, False)
@@ -1085,7 +1084,7 @@ def _npx_target(source: str) -> tuple[str, Optional[str], bool]:
     return s, None, True
 
 
-def _run_npx_add(target: str, skill_names: Optional[list[str]] = None, whole: bool = False) -> None:
+def _run_npx_add(target: str, skill_names: list[str] | None = None, whole: bool = False) -> None:
     """Run `npx skills add` non-interactively, pinned to the fastfold-owned dir."""
     NPX_INSTALL_ROOT.mkdir(parents=True, exist_ok=True)
     cmd = ["npx", "-y", "skills", "add", target, "-a", "claude-code", "--copy", "-y"]
@@ -1105,7 +1104,7 @@ def _run_npx_add(target: str, skill_names: Optional[list[str]] = None, whole: bo
     )
 
 
-def npx_add(target: str, skill_names: Optional[list[str]] = None, whole: bool = False) -> dict:
+def npx_add(target: str, skill_names: list[str] | None = None, whole: bool = False) -> dict:
     """Install one or more skills from a single repo/URL via `npx skills add`."""
     if not _npx_available():
         return {"ok": False, "summary": "npx is not available.", "via": "npx"}
@@ -1152,7 +1151,7 @@ _UPDATE_CHECK_INTERVAL_S = 24 * 3600
 _SEMVER_TAG_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
 
-def _owner_repo_from_source(source: str) -> Optional[str]:
+def _owner_repo_from_source(source: str) -> str | None:
     """Extract ``owner/repo`` from a GitHub URL or shorthand (drops any @subpath)."""
     s = (source or "").strip()
     if not s:
@@ -1166,7 +1165,7 @@ def _owner_repo_from_source(source: str) -> Optional[str]:
     return None
 
 
-def _tag_tuple(tag: str) -> Optional[tuple[int, int, int]]:
+def _tag_tuple(tag: str) -> tuple[int, int, int] | None:
     m = _SEMVER_TAG_RE.search(str(tag or ""))
     return tuple(int(x) for x in m.groups()) if m else None
 
@@ -1182,7 +1181,7 @@ def _http_get_bytes(
     url: str,
     *,
     timeout: float = _CLONE_TIMEOUT_S,
-    headers: Optional[dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
 ) -> bytes:
     """Fetch HTTP(S) bytes with certifi-backed TLS (fixes Windows urllib SSL issues)."""
     import httpx
@@ -1194,7 +1193,7 @@ def _http_get_bytes(
         return resp.content
 
 
-def fetch_latest_release(owner_repo: str, *, timeout_s: float = 2.5) -> Optional[dict]:
+def fetch_latest_release(owner_repo: str, *, timeout_s: float = 2.5) -> dict | None:
     """Return ``{"tag", "published_at"}`` for a repo's latest GitHub Release.
 
     Best-effort and network-bound: returns None on any error or when the repo
@@ -1245,7 +1244,7 @@ def _write_update_cache(cache: dict) -> None:
         logger.debug("Could not write skills update cache: %s", exc)
 
 
-def _installed_catalog_release(catalog: str = DEFAULT_CATALOG) -> Optional[str]:
+def _installed_catalog_release(catalog: str = DEFAULT_CATALOG) -> str | None:
     """Return the release tag recorded for the installed Fastfold catalog, if any."""
     owner_repo = catalog.split("@", 1)[0]
     manifest = _read_manifest(GLOBAL_SKILLS_DIR)
@@ -1258,7 +1257,7 @@ def _installed_catalog_release(catalog: str = DEFAULT_CATALOG) -> Optional[str]:
     return None
 
 
-def get_cached_skills_update(catalog: str = DEFAULT_CATALOG) -> Optional[dict]:
+def get_cached_skills_update(catalog: str = DEFAULT_CATALOG) -> dict | None:
     """Local-only check (no network) for a newer catalog release.
 
     Returns ``{"installed", "latest", "published_at"}`` when the cached latest
@@ -1295,7 +1294,7 @@ def refresh_skills_update_cache(
         if checked:
             try:
                 last = datetime.fromisoformat(str(checked))
-                if (datetime.now(timezone.utc) - last).total_seconds() < _UPDATE_CHECK_INTERVAL_S:
+                if (datetime.now(UTC) - last).total_seconds() < _UPDATE_CHECK_INTERVAL_S:
                     return
             except Exception:  # noqa: BLE001
                 pass
@@ -1303,13 +1302,13 @@ def refresh_skills_update_cache(
     rel = fetch_latest_release(owner_repo, timeout_s=timeout_s)
     _write_update_cache(
         {
-            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "checked_at": datetime.now(UTC).isoformat(),
             "latest_release": (rel or {}).get("tag"),
             "latest_published_at": (rel or {}).get("published_at", ""),
         }
     )
 
-def _owner_repo_from_clone_url(url: str) -> Optional[str]:
+def _owner_repo_from_clone_url(url: str) -> str | None:
     m = re.search(r"github\.com/(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+?)(?:\.git)?$", url)
     if not m:
         return None
@@ -1323,7 +1322,7 @@ def _format_git_error(exc: subprocess.CalledProcessError) -> str:
     return detail or "git clone failed"
 
 
-def _download_github_archive(owner: str, repo: str, ref: Optional[str], extract_parent: Path) -> Path:
+def _download_github_archive(owner: str, repo: str, ref: str | None, extract_parent: Path) -> Path:
     """Download and extract a GitHub repo archive without git."""
     import io
     import zipfile
@@ -1352,11 +1351,11 @@ def _download_github_archive(owner: str, repo: str, ref: Optional[str], extract_
 
 def _install_from_repo_tree(
     repo_root: Path,
-    subpath: Optional[str],
+    subpath: str | None,
     dest: Path,
     source: str,
-    commit: Optional[str],
-    release_tag: Optional[str],
+    commit: str | None,
+    release_tag: str | None,
     via: str,
 ) -> dict:
     skill_dirs = _resolve_skill_dirs(repo_root, subpath)
@@ -1382,10 +1381,10 @@ def _install_from_repo_tree(
 def _install_github_source(
     source: str,
     url: str,
-    ref: Optional[str],
-    subpath: Optional[str],
+    ref: str | None,
+    subpath: str | None,
     dest: Path,
-    release_tag: Optional[str],
+    release_tag: str | None,
 ) -> dict:
     """Install a GitHub source via git clone, archive download, then optional npx."""
     errors: list[str] = []
@@ -1431,7 +1430,7 @@ def _install_github_source(
     return {"ok": False, "summary": summary, "via": "git"}
 
 
-def install_skill(source: str, *, dest: Optional[Path] = None, prefer_npx: bool = False) -> dict:
+def install_skill(source: str, *, dest: Path | None = None, prefer_npx: bool = False) -> dict:
     """Install a skill from a GitHub URL/shorthand, local path, or catalog name.
 
     By default uses a native ``git clone``, then GitHub archive download, then
@@ -1496,8 +1495,8 @@ def _copy_skill_dirs(
     skill_dirs: list[Path],
     dest: Path,
     source: str,
-    commit: Optional[str],
-    release: Optional[str] = None,
+    commit: str | None,
+    release: str | None = None,
 ) -> list[str]:
     installed: list[str] = []
     for sd in skill_dirs:
@@ -1529,7 +1528,7 @@ def _project_lock_sources(project_root: Path) -> list[str]:
     return sources
 
 
-def _clone_repo_once(url: str, ref: Optional[str], tmp_root: Path) -> tuple[Optional[Path], Optional[str], str]:
+def _clone_repo_once(url: str, ref: str | None, tmp_root: Path) -> tuple[Path | None, str | None, str]:
     """Clone ``url`` once (git, then archive fallback) into ``tmp_root``.
 
     Returns ``(repo_root, commit, via)``. ``repo_root`` is None when both
@@ -1562,8 +1561,8 @@ def _run_grouped_clones(
     group_owner_repo: dict,
     install_item: callable,
     *,
-    max_workers: Optional[int] = None,
-    notify: Optional[callable] = None,
+    max_workers: int | None = None,
+    notify: callable | None = None,
     label: str = "Updating skills",
     fetch_release: bool = True,
 ) -> tuple[list[str], list[tuple[str, str]]]:
@@ -1646,8 +1645,8 @@ def _sync_tracked_sources(
     tracked: list[tuple[str, str]],
     dest: Path,
     *,
-    max_workers: Optional[int] = None,
-    notify: Optional[callable] = None,
+    max_workers: int | None = None,
+    notify: callable | None = None,
     label: str = "Updating skills",
 ) -> tuple[list[str], list[tuple[str, str]]]:
     """Install many tracked skill sources efficiently.
@@ -1669,10 +1668,10 @@ def _sync_tracked_sources(
                 pass
 
     # Group GitHub sources by (clone_url, ref); keep non-GitHub sources separate.
-    groups: dict[tuple[str, Optional[str]], list[tuple[str, Optional[str]]]] = {}
-    group_owner_repo: dict[tuple[str, Optional[str]], Optional[str]] = {}
+    groups: dict[tuple[str, str | None], list[tuple[str, str | None]]] = {}
+    group_owner_repo: dict[tuple[str, str | None], str | None] = {}
     other_sources: list[str] = []
-    for name, source in tracked:
+    for _name, source in tracked:
         src_type = detect_source_type(source)
         if src_type in {"github", "shorthand"}:
             try:
@@ -1728,8 +1727,8 @@ def _copy_skill_to(skill_dir: Path, dest: Path, target_name: str) -> None:
 
 def update_npx_skills_via_git(
     *,
-    max_workers: Optional[int] = None,
-    notify: Optional[callable] = None,
+    max_workers: int | None = None,
+    notify: callable | None = None,
 ) -> dict:
     """Refresh npx-installed skills with grouped git clones (one clone per repo).
 
@@ -1753,8 +1752,8 @@ def update_npx_skills_via_git(
         return {"ok": False, "synced": 0, "failed": [], "summary": f"unreadable lock: {exc}"}
 
     entries = lock.get("skills") or {}
-    groups: dict[tuple[str, Optional[str]], list[tuple[str, Optional[str], str]]] = {}
-    group_owner_repo: dict[tuple[str, Optional[str]], Optional[str]] = {}
+    groups: dict[tuple[str, str | None], list[tuple[str, str | None, str]]] = {}
+    group_owner_repo: dict[tuple[str, str | None], str | None] = {}
     skipped: list[str] = []
     for name, meta in sorted(entries.items()):
         if not isinstance(meta, dict):
@@ -1818,8 +1817,8 @@ def upgrade_skills(
     include_catalog: bool = True,
     include_npx: bool = True,
     catalog: str = DEFAULT_CATALOG,
-    project_root: Optional[Path] = None,
-    progress: Optional[callable] = None,
+    project_root: Path | None = None,
+    progress: callable | None = None,
 ) -> dict:
     """Re-sync installed skills to their latest versions.
 
@@ -1920,7 +1919,7 @@ def upgrade_skills(
     }
 
 
-def user_installed_skill_names(project_root: Optional[Path] = None) -> list[str]:
+def user_installed_skill_names(project_root: Path | None = None) -> list[str]:
     """Return names of user-installed skills (global + project tiers; excludes bundled)."""
     if project_root is None:
         project_root = Path.cwd()
@@ -1930,7 +1929,7 @@ def user_installed_skill_names(project_root: Optional[Path] = None) -> list[str]
     return sorted(names)
 
 
-def remove_all_skills(*, project_root: Optional[Path] = None) -> dict:
+def remove_all_skills(*, project_root: Path | None = None) -> dict:
     """Remove ALL user-installed skills (global install dir + project lock-gated).
 
     Bundled skills (shipped in the package) are never touched.
@@ -1939,7 +1938,7 @@ def remove_all_skills(*, project_root: Optional[Path] = None) -> dict:
         project_root = Path.cwd()
     removed: list[str] = []
 
-    # 1) Global install dir (~/.fastfold-cli/skills).
+    # 1) Global install dir (~/.sandwalk/skills).
     if GLOBAL_SKILLS_DIR.exists():
         for child in sorted(GLOBAL_SKILLS_DIR.iterdir()):
             if child.is_dir() and (child / "SKILL.md").exists():
@@ -1950,7 +1949,7 @@ def remove_all_skills(*, project_root: Optional[Path] = None) -> dict:
                     logger.debug("Could not remove %s: %s", child, exc)
         _write_manifest(GLOBAL_SKILLS_DIR, {"version": 1, "skills": {}})
 
-    # 1b) npx-installed skills (fastfold-owned ~/.fastfold-cli/.claude/skills).
+    # 1b) npx-installed skills (fastfold-owned ~/.sandwalk/.claude/skills).
     if NPX_SKILLS_DIR.exists():
         for child in sorted(NPX_SKILLS_DIR.iterdir()):
             if child.is_dir() and (child / "SKILL.md").exists():
@@ -1993,7 +1992,7 @@ def remove_all_skills(*, project_root: Optional[Path] = None) -> dict:
     return {"ok": True, "removed": removed, "summary": f"Removed {len(removed)} skill(s)."}
 
 
-def remove_skill(name: str, *, dest: Optional[Path] = None) -> dict:
+def remove_skill(name: str, *, dest: Path | None = None) -> dict:
     """Remove a globally-installed skill by name."""
     dest = dest or GLOBAL_SKILLS_DIR
     resolved_name = name
@@ -2018,7 +2017,7 @@ def remove_skill(name: str, *, dest: Optional[Path] = None) -> dict:
 
 
 # ─── Discovery (catalog + ecosystem) ────────────────────────────────────────
-def discover_skills(query: Optional[str] = None, *, catalog: str = DEFAULT_CATALOG) -> list[dict]:
+def discover_skills(query: str | None = None, *, catalog: str = DEFAULT_CATALOG) -> list[dict]:
     """Discover skills from the catalog repo (shallow clone) filtered by query.
 
     Returns dicts with: name, description, tags, install_source.
@@ -2060,7 +2059,7 @@ def discover_skills(query: Optional[str] = None, *, catalog: str = DEFAULT_CATAL
     return results
 
 
-def _resolve_name_to_source(name: str, *, catalog: str = DEFAULT_CATALOG) -> Optional[str]:
+def _resolve_name_to_source(name: str, *, catalog: str = DEFAULT_CATALOG) -> str | None:
     for entry in discover_skills(name, catalog=catalog):
         if entry["name"] == name:
             return entry["install_source"]

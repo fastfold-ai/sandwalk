@@ -102,7 +102,8 @@ sandwalk --help
 
 ## Configuration
 
-Config and local data live under your user home (typically `~/.sandwalk` / Application Support on macOS). Use:
+Config and local data live under `~/.sandwalk/` (legacy `~/.fastfold-cli/` and
+`~/.ct/` are copied once on first run if present). Use:
 
 ```bash
 sandwalk config show
@@ -117,13 +118,21 @@ MIT — Copyright © 2026 Fastfold AI Labs. See [LICENSE](LICENSE).
 
 ## Contributing / from source
 
-This is a monorepo (`cli/`, `apps/local-web/`, `apps/sandwalk-mac/`). For day-to-day science work, prefer the install options above. To hack on the repo:
+This is a monorepo (`cli/`, `apps/local-web/`, `apps/sandwalk-mac/`). For day-to-day science work, prefer the install options above. To hack on the repo, see [CONTRIBUTING.md](CONTRIBUTING.md). Quick start:
 
 ```bash
 pnpm install
-cd cli && uv sync && uv run sandwalk serve
+cd cli && uv sync --extra dev && uv run sandwalk serve
 # another terminal: pnpm dev
 # or on macOS: cd apps/sandwalk-mac && swift run
+```
+
+### Lint
+
+```bash
+cd cli && uv run ruff check src && uv run mypy
+pnpm --filter @sandwalk/agent-local-web lint:check
+pnpm --filter @sandwalk/agent-local-web build
 ```
 
 ### Unit tests & coverage

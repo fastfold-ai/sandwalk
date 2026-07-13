@@ -5,9 +5,11 @@ References crews-glue-discovery/scripts/patient_population_sizing.py and tcga_st
 for data sources and scoring logic.
 """
 
-import pandas as pd
-import numpy as np
 import re
+
+import numpy as np
+import pandas as pd
+
 from tools import registry
 from tools.http_client import request, request_json
 
@@ -109,7 +111,7 @@ def indication_map(compound_id: str = "all", min_response_rate: float = 0.1, **k
     Uses cell line lineage annotations to group by cancer type and compute
     per-indication response rates (fraction of cell lines with LFC < -0.5).
     """
-    from data.loaders import load_prism, load_model_metadata
+    from data.loaders import load_model_metadata, load_prism
 
     prism = load_prism()
     model = load_model_metadata()
@@ -478,8 +480,8 @@ def trial_search(query: str, status: str = "", **kwargs) -> dict:
         ident = proto.get("identificationModule", {})
         status_mod = proto.get("statusModule", {})
         design = proto.get("designModule", {})
-        desc = proto.get("descriptionModule", {})
-        contacts = proto.get("contactsLocationsModule", {})
+        proto.get("descriptionModule", {})
+        proto.get("contactsLocationsModule", {})
         arms = proto.get("armsInterventionsModule", {})
         cond_mod = proto.get("conditionsModule", {})
         sponsor_mod = proto.get("sponsorCollaboratorsModule", {})

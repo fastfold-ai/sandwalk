@@ -6,14 +6,13 @@ Focused on pragmatic linting of SDTM-like tabular datasets and Define-XML files.
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 import pandas as pd
 
 from tools import registry
-
 
 _COLUMN_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _ISO8601_PARTIAL_RE = re.compile(

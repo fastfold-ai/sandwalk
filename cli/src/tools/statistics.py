@@ -1,6 +1,7 @@
 """Statistical analysis tools: survival, dose-response, biomarker panels."""
 
 import numpy as np
+
 from tools import registry
 
 
@@ -38,7 +39,6 @@ def dose_response_fit(doses: list = None, responses: list = None,
     dict with fitted parameters, IC50, R-squared, quality assessment.
     """
     from scipy.optimize import curve_fit
-    from scipy.stats import pearsonr
 
     if doses is None or responses is None:
         return {"error": "Both 'doses' and 'responses' lists are required", "summary": "Both 'doses' and 'responses' lists are required"}

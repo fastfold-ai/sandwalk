@@ -12,10 +12,8 @@ Usage:
 
 import random
 import time
-from typing import List
 
 from rich.live import Live
-from rich.markdown import Markdown
 from rich.text import Text
 
 # ---------------------------------------------------------------------------
@@ -23,7 +21,7 @@ from rich.text import Text
 # ---------------------------------------------------------------------------
 
 _BASE = "\u2881\u2822\u2814\u2848\u2814\u2822"  # ⢁⠢⠔⡈⠔⠢
-DNA_HELIX_FRAMES: List[str] = [_BASE[i:] + _BASE[:i] for i in range(len(_BASE))]
+DNA_HELIX_FRAMES: list[str] = [_BASE[i:] + _BASE[:i] for i in range(len(_BASE))]
 
 SPINNERS = {
     "benzene_breathing": {
@@ -38,15 +36,16 @@ SPINNERS = {
 
 import math
 
+
 def apply_gradient(text: str, elapsed_s: float = 0.0) -> Text:
     """Apply a #50fa7b (neon green) to #00e5ff (cyan) temporal gradient."""
     if not text:
         return Text("")
-    
+
     # #50fa7b (80, 250, 123) to #00e5ff (0, 229, 255)
     r1, g1, b1 = 80, 250, 123
     r2, g2, b2 = 0, 229, 255
-    
+
     # Cycle over 3 spinner loops (6 frames × 125ms × 3 = 2.25s)
     cycle_duration_s = 2.25
     t = (math.sin((elapsed_s % cycle_duration_s) * (2 * math.pi / cycle_duration_s)) + 1) / 2
@@ -54,7 +53,7 @@ def apply_gradient(text: str, elapsed_s: float = 0.0) -> Text:
     g = int(g1 + (g2 - g1) * t)
     b = int(b1 + (b2 - b1) * t)
     hex_color = f"#{r:02x}{g:02x}{b:02x}"
-    
+
     result = Text()
     result.append(text, style=hex_color)
     return result
@@ -139,7 +138,7 @@ class _ThinkingRenderable:
     def __init__(self, words, spinner_style="benzene_breathing"):
         self.words = words
         self.start_time = time.time()
-        
+
         # Load spinner configuration
         spinner_conf = SPINNERS.get(spinner_style, SPINNERS["benzene_breathing"])
         self.frames = spinner_conf["frames"]
@@ -147,7 +146,7 @@ class _ThinkingRenderable:
 
     def __rich_console__(self, console, options):
         elapsed = time.time() - self.start_time
-        
+
         # Determine current word (rotates every 3 seconds)
         word_idx = int(elapsed / 3) % len(self.words)
         word = self.words[word_idx]

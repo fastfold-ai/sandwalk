@@ -2,8 +2,9 @@
 Target discovery tools: neosubstrate scoring, degron prediction, co-essentiality.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from tools import registry
 from tools.http_client import request
 
