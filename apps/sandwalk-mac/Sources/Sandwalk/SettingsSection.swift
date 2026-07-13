@@ -9,6 +9,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
     case tools
     case datasets
     case skills
+    case specialists
     case integrations
     case mcps
     case doctor
@@ -24,6 +25,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
         case .tools: return "Tools"
         case .datasets: return "Datasets"
         case .skills: return "Skills"
+        case .specialists: return "Specialists"
         case .integrations: return "Integrations"
         case .mcps: return "MCPs"
         case .doctor: return "Doctor"
@@ -43,6 +45,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
         case .tools: return "wrench"
         case .datasets: return "externaldrive"
         case .skills: return "wand.and.stars"
+        case .specialists: return "arrow.triangle.branch"
         case .integrations: return "puzzlepiece.extension"
         case .mcps: return "point.3.connected.trianglepath.dotted"
         case .doctor: return "stethoscope"

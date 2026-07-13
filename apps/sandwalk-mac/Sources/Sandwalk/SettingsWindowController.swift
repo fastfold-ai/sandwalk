@@ -29,6 +29,7 @@ struct SettingsRootView: View {
                     SidebarRow(section: .tools)
                     SidebarRow(section: .datasets)
                     SidebarRow(section: .skills)
+                    SidebarRow(section: .specialists)
                     SidebarRow(section: .integrations)
                     SidebarRow(section: .mcps)
                 } header: {
@@ -117,6 +118,15 @@ private struct SettingsDetailScaffold: View {
                 }
                 .scrollContentBackground(.hidden)
                 .background(theme.windowBg)
+            case .specialists:
+                ScrollView {
+                    SpecialistsSettingsView()
+                        .frame(maxWidth: 720, alignment: .topLeading)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .padding(.bottom, 36)
+                }
+                .scrollContentBackground(.hidden)
+                .background(theme.windowBg)
             default:
                 ScrollView {
                     detailContent
@@ -138,6 +148,7 @@ private struct SettingsDetailScaffold: View {
         case .tools: ToolsSettingsView()
         case .datasets: DatasetsSettingsView()
         case .skills: SkillsSettingsView()
+        case .specialists: EmptyView()
         case .integrations: EmptyView()
         case .mcps: MCPsSettingsView()
         case .doctor: DoctorSettingsView()

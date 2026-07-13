@@ -180,6 +180,29 @@ enum SandwalkAPIClient {
         try await delete("/v1/mcp-servers/catalog/\(enc(id))/connect")
     }
 
+    // MARK: - Specialists
+
+    static func listSpecialists() async throws -> [SpecialistDTO] {
+        let wrap: DataList<SpecialistDTO> = try await get("/v1/specialists")
+        return wrap.data
+    }
+
+    static func getSpecialist(id: String) async throws -> SpecialistDTO {
+        try await get("/v1/specialists/\(enc(id))")
+    }
+
+    static func createSpecialist(_ body: [String: Any]) async throws -> SpecialistDTO {
+        try await post("/v1/specialists", body: body)
+    }
+
+    static func updateSpecialist(id: String, body: [String: Any]) async throws -> SpecialistDTO {
+        try await patch("/v1/specialists/\(enc(id))", body: body)
+    }
+
+    static func deleteSpecialist(id: String) async throws {
+        try await delete("/v1/specialists/\(enc(id))")
+    }
+
     // MARK: - Doctor / Storage / Environment
 
     static func runDoctor() async throws -> DoctorReportDTO {

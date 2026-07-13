@@ -158,6 +158,28 @@ struct ConnectMcpDTO: Codable {
     let message: String?
 }
 
+// MARK: - Specialists
+
+struct SpecialistDTO: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let slug: String
+    let description: String?
+    let instructions: String?
+    let color: String
+    let icon: String
+    let skillNames: [String]
+    let mcpServerIds: [String]
+    let mcpCatalogIds: [String]
+    let enabled: Bool
+    let createdAt: String?
+    let updatedAt: String?
+}
+
+struct DeleteSpecialistDTO: Codable {
+    let deleted: Bool?
+}
+
 // MARK: - Server status
 
 struct ServerSystemInfoDTO: Codable, Hashable {
