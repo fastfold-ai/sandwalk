@@ -18,8 +18,8 @@ final class MenubarController: NSObject, NSMenuDelegate {
     private var stopItem: NSMenuItem!
     private var restartItem: NSMenuItem!
 
-    /// Dynamic recent-agent rows (rebuilt on menu open).
-    private var recentSectionItems: [NSMenuItem] = []
+    /// Dynamic agent rows (pinned + recent; rebuilt on menu open).
+    private var agentsSectionItems: [NSMenuItem] = []
 
     /// Colorful Aura pulse while starting / stopping / restarting.
     private var pulseTimer: Timer?
@@ -100,11 +100,11 @@ final class MenubarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        // Placeholder — replaced in rebuildRecentSection().
+        // Placeholder — replaced in rebuildAgentsSection().
         let recentAnchor = NSMenuItem(title: "Recent Agents", action: nil, keyEquivalent: "")
         recentAnchor.isEnabled = false
         menu.addItem(recentAnchor)
-        recentSectionItems = [recentAnchor]
+        agentsSectionItems = [recentAnchor]
 
         menu.addItem(.separator())
 
@@ -187,7 +187,7 @@ final class MenubarController: NSObject, NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         refreshMenuState()
         Task { @MainActor in
-            await reloadRecentAgents()
+            await reloadAgentsMenu()
         }
     }
 
@@ -241,35 +241,56 @@ final class MenubarController: NSObject, NSMenuDelegate {
         updateStatusIcon(for: overall)
     }
 
-    private func reloadRecentAgents() async {
+    private func reloadAgentsMenu() async {
         let sessions: [AgentSessionSummary]
         if case .running = supervisor.api.state {
             sessions = await SessionsAPI.fetchRecent(config: supervisor.config)
         } else {
             sessions = []
         }
-        rebuildRecentSection(sessions: sessions)
+        let pinned = sessions.filter { $0.organizeLabel == "pinned" }
+        let recent = sessions.filter {
+            $0.organizeLabel != "pinned" && $0.organizeLabel != "archive"
+        }
+        rebuildAgentsSection(pinned: pinned, recent: recent)
     }
 
-    private func rebuildRecentSection(sessions: [AgentSessionSummary]) {
-        // Remove previous recent block.
-        for item in recentSectionItems {
+    private func rebuildAgentsSection(
+        pinned: [AgentSessionSummary],
+        recent: [AgentSessionSummary]
+    ) {
+        for item in agentsSectionItems {
             menu.removeItem(item)
         }
-        recentSectionItems.removeAll()
+        agentsSectionItems.removeAll()
 
         // Insert after status + first separator (index 2).
         var index = 2
         var built: [NSMenuItem] = []
 
-        let header = NSMenuItem(title: "Recent Agents", action: nil, keyEquivalent: "")
-        header.isEnabled = false
-        menu.insertItem(header, at: index)
-        built.append(header)
+        if !pinned.isEmpty {
+            let pinnedHeader = NSMenuItem(title: "Pinned Agents", action: nil, keyEquivalent: "")
+            pinnedHeader.isEnabled = false
+            menu.insertItem(pinnedHeader, at: index)
+            built.append(pinnedHeader)
+            index += 1
+
+            for session in pinned {
+                let item = sessionMenuItem(session, showPin: true)
+                menu.insertItem(item, at: index)
+                built.append(item)
+                index += 1
+            }
+        }
+
+        let recentHeader = NSMenuItem(title: "Recent Agents", action: nil, keyEquivalent: "")
+        recentHeader.isEnabled = false
+        menu.insertItem(recentHeader, at: index)
+        built.append(recentHeader)
         index += 1
 
-        let primary = Array(sessions.prefix(SessionsAPI.listLimit))
-        let overflow = Array(sessions.dropFirst(SessionsAPI.listLimit).prefix(SessionsAPI.viewMoreLimit))
+        let primary = Array(recent.prefix(SessionsAPI.listLimit))
+        let overflow = Array(recent.dropFirst(SessionsAPI.listLimit).prefix(SessionsAPI.viewMoreLimit))
 
         if primary.isEmpty {
             let empty = NSMenuItem(
@@ -285,7 +306,7 @@ final class MenubarController: NSObject, NSMenuDelegate {
             index += 1
         } else {
             for session in primary {
-                let item = sessionMenuItem(session)
+                let item = sessionMenuItem(session, showPin: false)
                 menu.insertItem(item, at: index)
                 built.append(item)
                 index += 1
@@ -301,17 +322,20 @@ final class MenubarController: NSObject, NSMenuDelegate {
             viewMore.isEnabled = true
             let submenu = NSMenu(title: "View More")
             for session in overflow {
-                submenu.addItem(sessionMenuItem(session))
+                submenu.addItem(sessionMenuItem(session, showPin: false))
             }
             viewMore.submenu = submenu
             menu.insertItem(viewMore, at: index)
             built.append(viewMore)
         }
 
-        recentSectionItems = built
+        agentsSectionItems = built
     }
 
-    private func sessionMenuItem(_ session: AgentSessionSummary) -> NSMenuItem {
+    private func sessionMenuItem(
+        _ session: AgentSessionSummary,
+        showPin: Bool
+    ) -> NSMenuItem {
         let item = NSMenuItem(
             title: session.title,
             action: #selector(openRecentSession(_:)),
@@ -319,7 +343,9 @@ final class MenubarController: NSObject, NSMenuDelegate {
         )
         item.target = self
         item.representedObject = session.id
-        item.image = nil
+        item.image = showPin
+            ? NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Pinned")
+            : nil
         item.isEnabled = true
         return item
     }

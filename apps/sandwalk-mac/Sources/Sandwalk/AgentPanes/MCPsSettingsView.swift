@@ -13,7 +13,7 @@ struct MCPsSettingsView: View {
     @State private var connectKey = ""
     @State private var connectingId: String?
 
-    /// Custom / hand-added servers only — catalog-backed ones live under Suggested.
+    /// Custom / hand-added servers only — catalog-backed ones live under Featured.
     private var customServers: [McpServerDTO] {
         let customs = servers.filter { server in
             let cid = server.catalogId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""

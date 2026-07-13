@@ -1,16 +1,13 @@
 import type { ServerCacheInfo, ServerStatusReport } from '@sandwalk/agent-ui-core'
-import {
-  Check,
-  CircleHelp,
-  Copy,
-  Loader2,
-  Terminal
-} from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
 import { SettingsBlockSkeleton } from '@/components/agents/PageSkeletons'
-import { SandwalkMark } from '@/components/SandwalkMark'
+import {
+  listenSubtitle,
+  SandwalkServerCard
+} from '@/components/agents/SandwalkServerCard'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,32 +19,8 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-
-const MANAGE_COMMANDS = [
-  {
-    id: 'serve',
-    title: 'Start the server',
-    command: 'sandwalk serve',
-    description: 'Runs the local API (default http://127.0.0.1:8787).'
-  },
-  {
-    id: 'status',
-    title: 'Check auth / settings',
-    command: 'sandwalk auth status',
-    description: 'Shows whether API-key auth is enabled on this machine.'
-  }
-] as const
 
 function formatBytes(bytes: number): string {
   const value = Math.max(0, bytes)
@@ -156,34 +129,6 @@ function MetaRow({
   )
 }
 
-function CommandRow({
-  command,
-  copied,
-  onCopy
-}: {
-  command: string
-  copied: boolean
-  onCopy: () => void
-}) {
-  return (
-    <div className="border-border/80 bg-muted/35 flex items-center gap-2 rounded-lg border p-2.5">
-      <Terminal className="text-muted-foreground size-4 shrink-0" />
-      <code className="min-w-0 flex-1 truncate font-mono text-[13px]">
-        {command}
-      </code>
-      <button
-        type="button"
-        className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-md transition-colors"
-        onClick={onCopy}
-        aria-label={`Copy ${command}`}
-        title="Copy command"
-      >
-        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      </button>
-    </div>
-  )
-}
-
 export function ServerStatusView({
   onLoad,
   onClearCache
@@ -196,8 +141,6 @@ export function ServerStatusView({
   const [error, setError] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
-  const [helpOpen, setHelpOpen] = useState(false)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -222,14 +165,6 @@ export function ServerStatusView({
     void load(controller.signal)
     return () => controller.abort()
   }, [load])
-
-  const copyCommand = (id: string, command: string) => {
-    void navigator.clipboard.writeText(command)
-    setCopiedId(id)
-    window.setTimeout(() => {
-      setCopiedId(current => (current === id ? null : current))
-    }, 2000)
-  }
 
   const clearCache = async () => {
     setConfirmClear(false)
@@ -274,127 +209,16 @@ export function ServerStatusView({
           </>
         ) : report ? (
           <>
-            <section className="bg-muted/50 flex flex-wrap items-center gap-4 rounded-2xl border px-4 py-4">
-              <div className="bg-background text-foreground grid size-11 shrink-0 place-items-center rounded-xl border shadow-sm">
-                <SandwalkMark className="h-6 w-6" />
-              </div>
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold tracking-tight">
-                    Sandwalk {report.version}
-                  </h3>
-                  <span
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
-                      running
-                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                        : 'bg-destructive/15 text-destructive'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'size-1.5 rounded-full',
-                        running ? 'bg-emerald-500' : 'bg-destructive'
-                      )}
-                    />
-                    {running ? 'Running' : 'Stopped'}
-                  </span>
-                </div>
-                <p className="text-muted-foreground text-sm">
-                  {report.message ||
-                    (running
-                      ? `Listening on ${report.host}:${report.port}`
-                      : 'Server is not running')}
-                </p>
-              </div>
-
-              <Dialog
-                open={helpOpen}
-                onOpenChange={open => {
-                  setHelpOpen(open)
-                  if (!open) setCopiedId(null)
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground shrink-0"
-                  >
-                    <CircleHelp className="size-3.5" />
-                    Help
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-h-[min(90vh,40rem)] max-w-2xl overflow-hidden rounded-2xl p-0 sm:rounded-2xl">
-                  <DialogHeader className="space-y-2 px-6 pt-6 pb-2 text-left">
-                    <DialogTitle>Manage Sandwalk on this machine</DialogTitle>
-                    <DialogDescription>
-                      Start, stop, and restart from the Mac menubar app or the
-                      CLI — not from this dashboard.
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <ScrollArea className="h-[min(50vh,24rem)] px-6">
-                    <div className="space-y-4 py-2 pr-3">
-                      <div className="bg-muted/40 rounded-xl border px-3.5 py-3">
-                        <p className="text-sm font-semibold">Mac app</p>
-                        <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
-                          Use the Sandwalk menubar icon →{' '}
-                          <span className="text-foreground font-medium">
-                            Start
-                          </span>
-                          ,{' '}
-                          <span className="text-foreground font-medium">
-                            Stop
-                          </span>
-                          , or{' '}
-                          <span className="text-foreground font-medium">
-                            Restart
-                          </span>
-                          . That supervises both the API and this web UI
-                          together.
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="mb-3 text-sm font-semibold">CLI</p>
-                        <div className="space-y-3.5">
-                          {MANAGE_COMMANDS.map(item => (
-                            <div key={item.id}>
-                              <p className="text-muted-foreground mb-1.5 text-xs font-medium">
-                                {item.title}
-                              </p>
-                              <CommandRow
-                                command={item.command}
-                                copied={copiedId === item.id}
-                                onCopy={() =>
-                                  copyCommand(item.id, item.command)
-                                }
-                              />
-                              <p className="text-muted-foreground mt-1.5 text-xs">
-                                {item.description}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
-                          To stop a CLI-started server, interrupt the terminal
-                          with Ctrl+C, or quit / stop from the menubar if it is
-                          supervising the process.
-                        </p>
-                      </div>
-                    </div>
-                  </ScrollArea>
-
-                  <DialogFooter className="px-6 pt-2 pb-5 sm:justify-end">
-                    <Button type="button" onClick={() => setHelpOpen(false)}>
-                      Got it
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </section>
+            <SandwalkServerCard
+              version={report.version}
+              running={running}
+              subtitle={listenSubtitle({
+                running,
+                host: report.host,
+                port: report.port,
+                message: report.message
+              })}
+            />
 
             <section>
               <SectionLabel subtitle={report.system.label}>System</SectionLabel>

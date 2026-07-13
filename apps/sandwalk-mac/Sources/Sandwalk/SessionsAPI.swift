@@ -1,16 +1,19 @@
 import Foundation
 
-/// Recent agent sessions from the local Sandwalk API.
+/// Agent session summary from the local Sandwalk API.
 struct AgentSessionSummary: Equatable, Sendable, Identifiable {
     let id: String
     let title: String
     let updatedAt: Date?
+    /// `"pinned"`, `"archive"`, or `nil`.
+    let organizeLabel: String?
 }
 
 enum SessionsAPI {
     static let listLimit = 5
     static let viewMoreLimit = 10
-    static let fetchLimit = listLimit + viewMoreLimit
+    /// Fetch enough rows so pinned agents aren't dropped when sorting by recency.
+    static let fetchLimit = 100
 
     static func fetchRecent(config: AppConfig, limit: Int = fetchLimit) async -> [AgentSessionSummary] {
         var request = URLRequest(url: config.sessionsAPIURL)
@@ -79,7 +82,13 @@ enum SessionsAPI {
             parseDate(item["updatedAt"] as? String)
             ?? parseDate(item["lastMessageAt"] as? String)
             ?? parseDate(item["createdAt"] as? String)
-        return AgentSessionSummary(id: id, title: display, updatedAt: updated)
+        let label = (item["organizeLabel"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return AgentSessionSummary(
+            id: id,
+            title: display,
+            updatedAt: updated,
+            organizeLabel: (label?.isEmpty == false) ? label : nil
+        )
     }
 
     private static func parseDate(_ raw: String?) -> Date? {

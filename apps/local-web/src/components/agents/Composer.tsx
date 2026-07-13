@@ -47,7 +47,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { getFileIcon } from '@/lib/file-icons'
-import { composerSkillIcon } from '@/lib/skill-icons'
+import { composerSkillIcon, skillIconInvertInDark } from '@/lib/skill-icons'
 import {
   compareSkillsBySearchRank,
   skillMatchesSearch
@@ -773,7 +773,10 @@ export function Composer({
                               <img
                                 src={iconSource}
                                 alt=""
-                                className="size-[18px] shrink-0 rounded object-contain"
+                                className={cn(
+                                  'size-[18px] shrink-0 rounded object-contain',
+                                  skillIconInvertInDark(skill) && 'dark:invert'
+                                )}
                               />
                             ) : (
                               <span className="bg-primary/10 text-primary inline-flex size-[18px] shrink-0 items-center justify-center rounded">

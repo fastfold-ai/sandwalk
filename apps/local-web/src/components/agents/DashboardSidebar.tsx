@@ -127,12 +127,20 @@ export function DashboardSidebar({
   active,
   userName,
   onCollapse,
-  onLogout
+  onLogout,
+  onRefreshUser,
+  backendVersion = null,
+  backendUrl = null,
+  connected = false
 }: {
   active: DashboardSection
   userName: string | null
   onCollapse: () => void
   onLogout?: () => void | Promise<void>
+  onRefreshUser?: () => void | Promise<void>
+  backendVersion?: string | null
+  backendUrl?: string | null
+  connected?: boolean
 }) {
   const navigate = useNavigate()
 
@@ -195,7 +203,14 @@ export function DashboardSidebar({
       </ScrollArea>
 
       <div className="shrink-0 p-2">
-        <SidebarUserMenu userName={userName} onLogout={onLogout} />
+        <SidebarUserMenu
+          userName={userName}
+          onLogout={onLogout}
+          onRefreshUser={onRefreshUser}
+          backendVersion={backendVersion}
+          backendUrl={backendUrl}
+          connected={connected}
+        />
       </div>
     </div>
   )

@@ -10,8 +10,21 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { SettingsBlockSkeleton } from '@/components/agents/PageSkeletons'
+import {
+  listenSubtitle,
+  SandwalkServerCard
+} from '@/components/agents/SandwalkServerCard'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   applyPalette,
@@ -32,24 +45,16 @@ function formatCheckedAt(date: Date | null) {
   return date.toLocaleTimeString()
 }
 
-function normalizeBackendUrl(value: string) {
-  return value.trim().replace(/\/+$/, '')
-}
-
 export function GeneralView({
   backendUrl,
   backendVersion,
   connected,
-  onCheckBackend,
-  onUpdateBackendUrl,
   onLoadAccount,
   onLogoutAccount
 }: {
   backendUrl: string
   backendVersion: string | null
   connected: boolean
-  onCheckBackend: () => Promise<boolean>
-  onUpdateBackendUrl: (url: string) => Promise<boolean>
   onLoadAccount: (options?: {
     checkUpdates?: boolean
     signal?: AbortSignal
@@ -61,9 +66,7 @@ export function GeneralView({
   const [loading, setLoading] = useState(true)
   const [checkingUpdates, setCheckingUpdates] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
-  const [backendOk, setBackendOk] = useState(connected)
-  const [checkingBackend, setCheckingBackend] = useState(false)
-  const [draftBackendUrl, setDraftBackendUrl] = useState(backendUrl)
+  const [confirmSignOut, setConfirmSignOut] = useState(false)
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [palette, setPalette] = useState<ThemePaletteId>(() => getStoredPalette())
@@ -75,13 +78,6 @@ export function GeneralView({
     window.addEventListener(PALETTE_CHANGE_EVENT, onChange)
     return () => window.removeEventListener(PALETTE_CHANGE_EVENT, onChange)
   }, [])
-
-  const backendDirty =
-    normalizeBackendUrl(draftBackendUrl) !== normalizeBackendUrl(backendUrl)
-
-  useEffect(() => {
-    setDraftBackendUrl(backendUrl)
-  }, [backendUrl])
 
   const loadAccount = useCallback(
     async (checkUpdates = false, signal?: AbortSignal) => {
@@ -115,41 +111,8 @@ export function GeneralView({
     return () => controller.abort()
   }, [loadAccount])
 
-  useEffect(() => {
-    setBackendOk(connected)
-  }, [connected])
-
-  const refreshBackend = async () => {
-    setCheckingBackend(true)
-    setError(null)
-    try {
-      if (backendDirty) {
-        const nextUrl = normalizeBackendUrl(draftBackendUrl)
-        if (!nextUrl) {
-          setError('Backend URL is required.')
-          setBackendOk(false)
-          return
-        }
-        setBackendOk(await onUpdateBackendUrl(nextUrl))
-        return
-      }
-      setBackendOk(await onCheckBackend())
-    } catch (err) {
-      setBackendOk(false)
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setCheckingBackend(false)
-    }
-  }
-
   const signOut = async () => {
-    if (
-      !window.confirm(
-        'Remove the FastFold Cloud API key from this local agent?'
-      )
-    ) {
-      return
-    }
+    setConfirmSignOut(false)
     setSigningOut(true)
     setError(null)
     try {
@@ -174,7 +137,7 @@ export function GeneralView({
         <div>
           <h2 className="text-2xl font-semibold">General</h2>
           <p className="text-muted-foreground mt-2 text-sm">
-            Account, themes, local backend connection, and app details.
+            Account, themes, local server, and app details.
           </p>
         </div>
 
@@ -184,19 +147,40 @@ export function GeneralView({
           </div>
         ) : null}
 
+        <SandwalkServerCard
+          version={backendVersion}
+          running={connected}
+          subtitle={listenSubtitle({
+            running: connected,
+            backendUrl
+          })}
+        />
+
         {loading && !account ? (
-          <section className="space-y-4 border-b pb-8">
+          <section className="space-y-4">
             <h3 className="text-base font-semibold">Account</h3>
             <SettingsBlockSkeleton />
           </section>
         ) : showCloudAccount ? (
           <>
-            <section className="space-y-4 border-b pb-8">
-              <h3 className="text-base font-semibold">Account</h3>
+            <section className="space-y-4">
+              <div>
+                <h3 className="text-base font-semibold">Account</h3>
+                <p className="text-muted-foreground mt-1 inline-flex flex-wrap items-center gap-1.5 text-sm">
+                  <span>Linked</span>
+                  <img
+                    src="/ff_simbol_color.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="size-3.5"
+                  />
+                  <span>Fastfold Cloud Account</span>
+                </p>
+              </div>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 space-y-1">
                   <div className="truncate text-sm font-medium">
-                    {email || account?.user?.username || 'FastFold account'}
+                    {email || account?.user?.username || 'Fastfold account'}
                   </div>
                   <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                     <span>{planLabel || 'Plan unknown'}</span>
@@ -220,7 +204,7 @@ export function GeneralView({
                   variant="outline"
                   size="sm"
                   disabled={signingOut}
-                  onClick={() => void signOut()}
+                  onClick={() => setConfirmSignOut(true)}
                 >
                   {signingOut ? (
                     <Loader2 className="animate-spin" />
@@ -233,7 +217,7 @@ export function GeneralView({
             </section>
 
             {(orgName || orgId) && (
-              <section className="space-y-4 border-b pb-8">
+              <section className="space-y-4">
                 <h3 className="text-base font-semibold">Organization</h3>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-muted-foreground min-w-0 truncate text-sm">
@@ -249,91 +233,36 @@ export function GeneralView({
             )}
           </>
         ) : (
-          <section className="space-y-3 border-b pb-8">
+          <section className="space-y-3">
             <h3 className="text-base font-semibold">Account</h3>
             <p className="text-muted-foreground text-sm">
-              Connect a FastFold Cloud API key in Integrations to show your
+              Connect a Fastfold Cloud API key in Integrations to show your
               account, plan, and organization here.
             </p>
             <Button
               variant="outline"
               size="sm"
+              className="gap-1.5"
               onClick={() => navigate('/dashboard/integrations/fastfold-cloud')}
             >
-              Open FastFold Cloud
+              <span>Link</span>
+              <img
+                src="/ff_simbol_color.svg"
+                alt=""
+                aria-hidden="true"
+                className="size-3.5"
+              />
+              <span>Fastfold Account</span>
             </Button>
           </section>
         )}
 
-        <section className="space-y-4 border-b pb-8">
-          <h3 className="text-base font-semibold">Connection</h3>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <label className="min-w-0 flex-1 space-y-1.5">
-              <span className="text-muted-foreground text-xs">Backend URL</span>
-              <Input
-                value={draftBackendUrl}
-                onChange={event => setDraftBackendUrl(event.target.value)}
-                placeholder="http://127.0.0.1:8787"
-                className="font-mono text-sm"
-                spellCheck={false}
-                onKeyDown={event => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    void refreshBackend()
-                  }
-                }}
-              />
-            </label>
-            <div className="flex shrink-0 items-center gap-2">
-              <span
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium',
-                  checkingBackend
-                    ? 'border-border text-muted-foreground'
-                    : backendOk
-                      ? 'border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
-                      : 'border-destructive/40 text-destructive'
-                )}
-              >
-                {checkingBackend ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <span
-                    className={cn(
-                      'size-2 rounded-full',
-                      backendOk ? 'bg-emerald-500' : 'bg-destructive'
-                    )}
-                  />
-                )}
-                {checkingBackend
-                  ? 'Checking…'
-                  : backendOk
-                    ? 'Connected'
-                    : 'Failed'}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={checkingBackend || !normalizeBackendUrl(draftBackendUrl)}
-                onClick={() => void refreshBackend()}
-              >
-                {checkingBackend ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <RefreshCw />
-                )}
-                {backendDirty ? 'Save & connect' : 'Recheck'}
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4 border-b pb-8">
+        <section className="space-y-4">
           <div>
             <h3 className="text-base font-semibold">Themes</h3>
             <p className="text-muted-foreground mt-1 text-sm">
-              Color palettes for light and dark mode. Mode (light / dark /
-              system) still lives in the user menu.
+              Color palettes for light and dark mode. Mode and palette also live
+              in the user menu under Theme.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -435,6 +364,36 @@ export function GeneralView({
           </div>
         </section>
       </div>
+
+      <AlertDialog
+        open={confirmSignOut}
+        onOpenChange={open => {
+          if (!open && !signingOut) setConfirmSignOut(false)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sign out of Fastfold Cloud?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Removes the FastFold Cloud API key from this local agent. You can
+              link an account again anytime from Integrations.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={signingOut}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={signingOut}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={event => {
+                event.preventDefault()
+                void signOut()
+              }}
+            >
+              {signingOut ? 'Signing out…' : 'Sign out'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ScrollArea>
   )
 }

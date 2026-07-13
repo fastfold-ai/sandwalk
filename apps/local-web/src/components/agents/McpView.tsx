@@ -4,6 +4,7 @@ import type {
   McpServer,
 } from '@sandwalk/agent-ui-core'
 import {
+  ArrowRight,
   ChevronDown,
   ExternalLink,
   KeyRound,
@@ -233,6 +234,8 @@ export function McpView({
   mcpServers,
   catalog,
   catalogLoading,
+  featuredOnly = false,
+  onShowAll,
   onRefresh,
   onConnectCatalog,
   onToggleCatalog,
@@ -243,6 +246,9 @@ export function McpView({
   mcpServers: McpServer[]
   catalog: McpCatalogEntry[]
   catalogLoading?: boolean
+  /** Overview: only the Featured catalog grid (same cards as MCP page). */
+  featuredOnly?: boolean
+  onShowAll?: () => void
   onRefresh: () => Promise<void>
   onConnectCatalog: (
     catalogId: string,
@@ -707,30 +713,66 @@ export function McpView({
     )
   }
 
+  const featuredSection = (
+    <section className={featuredOnly ? 'space-y-3' : 'space-y-2'}>
+      <div
+        className={cn(
+          'flex gap-2',
+          featuredOnly ? 'items-end justify-between' : 'items-center justify-between',
+        )}
+      >
+        {featuredOnly ? (
+          <div>
+            <h3 className="text-base font-semibold tracking-tight">MCPs</h3>
+            <p className="text-muted-foreground text-xs font-medium">
+              Featured ({catalog.length})
+            </p>
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-xs font-medium">
+            Featured ({catalog.length})
+          </p>
+        )}
+        {featuredOnly && onShowAll ? (
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
+            onClick={onShowAll}
+          >
+            Show all
+            <ArrowRight className="size-3.5" />
+          </button>
+        ) : null}
+      </div>
+      {catalogLoading && catalog.length === 0 ? (
+        <CardGridSkeleton cards={featuredOnly ? 2 : 4} columns={2} />
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {(featuredOnly ? catalog.slice(0, 2) : catalog).map(entry =>
+            renderCatalogCard(entry),
+          )}
+        </div>
+      )}
+    </section>
+  )
+
+  if (featuredOnly) {
+    return featuredSection
+  }
+
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto max-w-6xl px-8 py-8">
+      <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
         <div>
-          <h2 className="text-xl font-semibold">MCP servers</h2>
+          <h2 className="text-2xl font-semibold">MCP servers</h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            Connect suggested cloud MCPs (off by default). Credentials save under
+            Connect featured cloud MCPs (off by default). Credentials save under
             Integrations / keys. Add custom stdio, SSE, or HTTP servers below.
           </p>
         </div>
 
-        <div className="mt-6 space-y-6 pb-4">
-          <section className="space-y-2">
-            <p className="text-muted-foreground text-xs font-medium">
-              Suggested ({catalog.length})
-            </p>
-            {catalogLoading && catalog.length === 0 ? (
-              <CardGridSkeleton cards={4} columns={2} />
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {catalog.map(entry => renderCatalogCard(entry))}
-              </div>
-            )}
-          </section>
+        <div className="space-y-6 pb-4">
+          {featuredSection}
 
           <section className="space-y-2">
             <p className="text-muted-foreground text-xs font-medium">

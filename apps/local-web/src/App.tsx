@@ -19,11 +19,13 @@ import type {
   McpCatalogEntry,
   McpServer,
   RuntimeSettings,
-  WorkspaceFile
+  WorkspaceFile,
+  AccountSummary
 } from '@sandwalk/agent-ui-core'
 import {
   Archive,
   ArrowLeft,
+  ArrowRight,
   Box,
   CalendarDays,
   Check,
@@ -51,7 +53,8 @@ import {
   Trash2,
   Upload,
   UserRound,
-  Webhook
+  Webhook,
+  X
 } from 'lucide-react'
 import {
   useCallback,
@@ -73,6 +76,7 @@ import {
 import {
   type DashboardSection,
   DashboardSidebar} from '@/components/agents/DashboardSidebar'
+import { DashboardOverviewView } from '@/components/agents/DashboardOverviewView'
 import { DataView } from '@/components/agents/DataView'
 import { DoctorView } from '@/components/agents/DoctorView'
 import { EnvironmentView } from '@/components/agents/EnvironmentView'
@@ -93,7 +97,6 @@ import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { ProjectSettingsDialog } from '@/components/agents/ProjectSettingsDialog'
 import { ReasoningGhost } from '@/components/agents/ReasoningGhost'
-import { SessionActivityHeatmap } from '@/components/agents/SessionActivityHeatmap'
 import { SessionTabs } from '@/components/agents/SessionTabs'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
@@ -161,7 +164,8 @@ import { cn } from '@/lib/utils'
 import {
   featuredSkillIcon,
   isFeaturedSkill,
-  skillIcon
+  skillIcon,
+  skillIconInvertInDark
 } from '@/lib/skill-icons'
 import {
   compareSkillsBySearchRank,
@@ -572,6 +576,18 @@ function groupSessions(sessions: AgentSession[]) {
   ].filter(section => section.items.length > 0)
 }
 
+function visibleSessionIds(
+  sections: ReturnType<typeof groupSessions>,
+  collapsed: Record<string, boolean>
+): string[] {
+  const ids: string[] = []
+  for (const section of sections) {
+    if (collapsed[section.id]) continue
+    for (const item of section.items) ids.push(item.id)
+  }
+  return ids
+}
+
 function categorizeSkill(skill: AgentSkill) {
   const name = skill.name.toLowerCase()
   if (name === 'fold' || name === 'boltz-structure-and-binding')
@@ -923,6 +939,17 @@ type SkillsViewMode =
   | 'import_file'
   | 'trusted_sources'
 
+/** Prefer linked Fastfold Cloud name; otherwise null (caller may fall back to local). */
+function cloudAccountDisplayName(account: AccountSummary | null): string | null {
+  if (!account?.configured) return null
+  const username = account.user?.username?.trim()
+  if (username) return username
+  const email = account.user?.email?.trim()
+  if (!email) return null
+  const local = email.split('@')[0]?.trim()
+  return local || email
+}
+
 export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -939,6 +966,7 @@ export default function App() {
     [backendApiKey, backendUrl]
   )
   const [health, setHealth] = useState<BackendHealth | null>(null)
+  const [cloudUserName, setCloudUserName] = useState<string | null>(null)
   const [needsAuthLogin, setNeedsAuthLogin] = useState(false)
   const needsAuthLoginRef = useRef(false)
   const [authBootstrapped, setAuthBootstrapped] = useState(false)
@@ -1015,6 +1043,14 @@ export default function App() {
   const [renameTarget, setRenameTarget] = useState<AgentSession | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<AgentSession | null>(null)
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(
+    () => new Set()
+  )
+  const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(
+    null
+  )
+  const [batchBusy, setBatchBusy] = useState(false)
+  const [batchDeletePending, setBatchDeletePending] = useState(false)
   const [openTabsByProject, setOpenTabsByProject] = useState<
     Record<string, string[]>
   >(() => readOpenTabsByProject())
@@ -1281,6 +1317,28 @@ export default function App() {
     []
   )
 
+  const chatBySessionIdRef = useRef(chatBySessionId)
+  chatBySessionIdRef.current = chatBySessionId
+
+  const prefetchSessionMessages = useCallback(
+    async (id: string, signal?: AbortSignal) => {
+      if (chatBySessionIdRef.current[id]?.messagesLoaded) return
+      try {
+        const history = await client.listMessages(id, signal)
+        if (signal?.aborted) return
+        patchChat(id, prev => ({
+          ...prev,
+          messages: history,
+          messagesLoaded: true
+        }))
+      } catch (cause: unknown) {
+        if (signal?.aborted) return
+        if (cause instanceof Error && cause.name === 'AbortError') return
+      }
+    },
+    [client, patchChat]
+  )
+
   const loadSessions = useCallback(async () => {
     const nextSessions = await client.listSessions()
     setSessions(nextSessions)
@@ -1369,10 +1427,54 @@ export default function App() {
     [client]
   )
 
+  const refreshCloudUserName = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const account = await loadAccount({ signal })
+        if (signal?.aborted) return
+        setCloudUserName(cloudAccountDisplayName(account))
+      } catch {
+        if (!signal?.aborted) setCloudUserName(null)
+      }
+    },
+    [loadAccount]
+  )
+
+  const loadAccountForUi = useCallback(
+    async (options?: { checkUpdates?: boolean; signal?: AbortSignal }) => {
+      const account = await loadAccount(options)
+      if (!options?.signal?.aborted) {
+        setCloudUserName(cloudAccountDisplayName(account))
+      }
+      return account
+    },
+    [loadAccount]
+  )
+
   const logoutAccount = useCallback(
-    (signal?: AbortSignal) => client.logoutAccount(signal),
+    async (signal?: AbortSignal) => {
+      const account = await client.logoutAccount(signal)
+      if (!signal?.aborted) {
+        setCloudUserName(cloudAccountDisplayName(account))
+      }
+      return account
+    },
     [client]
   )
+
+  useEffect(() => {
+    if (!health) {
+      setCloudUserName(null)
+      return
+    }
+    const controller = new AbortController()
+    void refreshCloudUserName(controller.signal)
+    return () => controller.abort()
+  }, [health, refreshCloudUserName])
+
+  // Cloud account name when linked; otherwise Mac/local GECOS name from health.
+  const sidebarUserName =
+    cloudUserName?.trim() || health?.userName?.trim() || null
 
   const loadStorage = useCallback(
     (signal?: AbortSignal) => client.getStorage(signal),
@@ -1868,6 +1970,18 @@ export default function App() {
 
   useEffect(() => {
     if (!health || !sessionId) return
+    if (chatBySessionIdRef.current[sessionId]?.messagesLoaded) return
+
+    // Empty/new sessions: show the empty composer immediately, hydrate in background.
+    const meta = sessions.find(item => item.id === sessionId)
+    if (meta && !meta.lastMessageAt && meta.status === 'idle') {
+      patchChat(sessionId, prev =>
+        prev.messagesLoaded
+          ? prev
+          : { ...prev, messages: [], messagesLoaded: true }
+      )
+    }
+
     const controller = new AbortController()
     void client
       .listMessages(sessionId, controller.signal)
@@ -1886,7 +2000,19 @@ export default function App() {
         }
       })
     return () => controller.abort()
+    // Intentionally omit `sessions` — only re-hydrate when the active session changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, health, patchChat, sessionId])
+
+  const [showChatSkeleton, setShowChatSkeleton] = useState(false)
+  useEffect(() => {
+    if (messagesLoaded || runActive || !sessionId) {
+      setShowChatSkeleton(false)
+      return
+    }
+    const timer = window.setTimeout(() => setShowChatSkeleton(true), 180)
+    return () => window.clearTimeout(timer)
+  }, [messagesLoaded, runActive, sessionId])
 
   useEffect(() => {
     if (!health) {
@@ -2194,6 +2320,11 @@ export default function App() {
         patchOpenTabs(scopeKey, current =>
           current.includes(created.id) ? current : [...current, created.id]
         )
+        // Skip chat skeleton flash — new sessions start empty.
+        patchChat(created.id, {
+          messages: [],
+          messagesLoaded: true
+        })
         setLastSessionByScope(current => {
           const next = { ...current, [scopeKey]: created.id }
           writeLastSessionByScope(next)
@@ -2216,6 +2347,7 @@ export default function App() {
       loadProjects,
       loadSessions,
       navigate,
+      patchChat,
       patchOpenTabs
     ]
   )
@@ -2604,6 +2736,152 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
+  const clearSessionSelection = useCallback(() => {
+    setSelectedSessionIds(new Set())
+    setSelectionAnchorId(null)
+  }, [])
+
+  const selectedSessions = useMemo(
+    () => sessions.filter(item => selectedSessionIds.has(item.id)),
+    [sessions, selectedSessionIds]
+  )
+
+  useEffect(() => {
+    setSelectedSessionIds(current => {
+      if (current.size === 0) return current
+      const valid = new Set(sessions.map(item => item.id))
+      let changed = false
+      const next = new Set<string>()
+      for (const id of current) {
+        if (valid.has(id)) next.add(id)
+        else changed = true
+      }
+      return changed ? next : current
+    })
+  }, [sessions])
+
+  useEffect(() => {
+    if (selectedSessionIds.size === 0) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        clearSessionSelection()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [clearSessionSelection, selectedSessionIds.size])
+
+  const selectSessionRange = (orderedIds: string[], targetId: string) => {
+    const anchor = selectionAnchorId
+    if (!anchor) {
+      setSelectedSessionIds(new Set([targetId]))
+      setSelectionAnchorId(targetId)
+      return
+    }
+    const start = orderedIds.indexOf(anchor)
+    const end = orderedIds.indexOf(targetId)
+    if (start < 0 || end < 0) {
+      setSelectedSessionIds(new Set([targetId]))
+      setSelectionAnchorId(targetId)
+      return
+    }
+    const [lo, hi] = start < end ? [start, end] : [end, start]
+    setSelectedSessionIds(new Set(orderedIds.slice(lo, hi + 1)))
+  }
+
+  const toggleSessionSelected = (targetId: string) => {
+    setSelectedSessionIds(current => {
+      const next = new Set(current)
+      if (next.has(targetId)) next.delete(targetId)
+      else next.add(targetId)
+      return next
+    })
+    setSelectionAnchorId(targetId)
+  }
+
+  const batchArchiveSelected = async () => {
+    if (selectedSessions.length === 0 || batchBusy) return
+    setBatchBusy(true)
+    setError(null)
+    try {
+      await Promise.all(
+        selectedSessions.map(item =>
+          client.updateSession(item.id, { organizeLabel: 'archive' })
+        )
+      )
+      setCollapsedSidebarSections(current => ({
+        ...current,
+        archive: false
+      }))
+      clearSessionSelection()
+      await loadSessions()
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to archive sessions'
+      )
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const batchMoveSelected = async (projectId: string | null) => {
+    if (selectedSessions.length === 0 || batchBusy) return
+    setBatchBusy(true)
+    setError(null)
+    try {
+      await Promise.all(
+        selectedSessions.map(item =>
+          client.updateSession(item.id, { projectId })
+        )
+      )
+      clearSessionSelection()
+      await loadSessions()
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to move sessions'
+      )
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const batchExportSelected = async () => {
+    if (selectedSessions.length === 0 || batchBusy) return
+    setBatchBusy(true)
+    setError(null)
+    try {
+      for (const item of selectedSessions) {
+        await exportTranscript(item)
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to export sessions'
+      )
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const confirmBatchDelete = async () => {
+    if (selectedSessions.length === 0) return
+    setBatchDeletePending(false)
+    setBatchBusy(true)
+    setError(null)
+    const targets = [...selectedSessions]
+    clearSessionSelection()
+    try {
+      for (const target of targets) {
+        await deleteSession(target)
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to delete sessions'
+      )
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
   const setComposer = useCallback(
     (value: string | ((current: string) => string)) => {
       if (!sessionId) return
@@ -2651,6 +2929,10 @@ export default function App() {
     ? sessions.filter(item => item.projectId === activeProjectId)
     : sessions
   const sections = groupSessions(displayedSessions)
+  const orderedVisibleSessionIds = useMemo(
+    () => visibleSessionIds(sections, collapsedSidebarSections),
+    [sections, collapsedSidebarSections]
+  )
   const openTabs = openTabIds
     .map(id => sessions.find(item => item.id === id))
     .filter((item): item is AgentSession => Boolean(item))
@@ -2793,9 +3075,13 @@ export default function App() {
           {isDashboard ? (
             <DashboardSidebar
               active={dashboardSection}
-              userName={health?.userName ?? null}
+              userName={sidebarUserName}
               onCollapse={() => setSidebarCollapsed(true)}
               onLogout={logoutSession}
+              onRefreshUser={refreshCloudUserName}
+              backendVersion={health?.version ?? null}
+              backendUrl={backendUrl}
+              connected={Boolean(health)}
             />
           ) : (
             <>
@@ -2883,6 +3169,83 @@ export default function App() {
               Dashboard
             </button>
           </div>
+          {selectedSessionIds.size > 0 ? (
+            <div className="border-border/60 mx-2 mb-1 space-y-2 rounded-lg border bg-sidebar-accent/40 px-2.5 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-foreground text-[12px] font-medium">
+                  {selectedSessionIds.size} selected
+                </span>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-md"
+                  aria-label="Clear selection"
+                  disabled={batchBusy}
+                  onClick={clearSessionSelection}
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-[11px]"
+                  disabled={batchBusy}
+                  onClick={() => void batchArchiveSelected()}
+                >
+                  <Archive className="size-3" />
+                  Archive
+                </Button>
+                <ProjectPicker
+                  projects={projects}
+                  value={null}
+                  disabled={batchBusy}
+                  noneLabel="No project"
+                  trigger={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-[11px]"
+                      disabled={batchBusy}
+                    >
+                      <Folder className="size-3" />
+                      Move
+                    </Button>
+                  }
+                  onChange={projectId => {
+                    void batchMoveSelected(projectId)
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-[11px]"
+                  disabled={batchBusy}
+                  onClick={() => void batchExportSelected()}
+                >
+                  <Download className="size-3" />
+                  Export
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive h-7 px-2 text-[11px]"
+                  disabled={batchBusy}
+                  onClick={() => setBatchDeletePending(true)}
+                >
+                  <Trash2 className="size-3" />
+                  Delete
+                </Button>
+              </div>
+              <p className="text-muted-foreground text-[10px] leading-snug">
+                Shift+click range · ⌘/Ctrl+click toggle · Esc clears
+              </p>
+            </div>
+          ) : null}
           <ScrollArea className="flex-1">
             <div className="space-y-3 p-3">
               {sections.length === 0 ? (
@@ -2920,26 +3283,67 @@ export default function App() {
                     </button>
                     {!collapsed ? (
                       <ul className="space-y-0.5">
-                        {section.items.map(item => (
+                        {section.items.map(item => {
+                          const isSelected = selectedSessionIds.has(item.id)
+                          return (
                           <li key={item.id}>
                             <div
                               className={cn(
                                 'hover:bg-sidebar-accent/70 group grid grid-cols-[minmax(0,1fr)_2.75rem] items-center rounded px-1.5 py-1.5',
-                                item.id === sessionId && 'bg-sidebar-accent'
+                                item.id === sessionId && 'bg-sidebar-accent',
+                                isSelected &&
+                                  'bg-sidebar-accent ring-primary/30 ring-1'
                               )}
                             >
                               <button
                                 type="button"
                                 className="flex min-w-0 items-center gap-1.5 text-left"
-                                onClick={() => navigate(`/agents/${item.id}`)}
-                              >
-                                <SessionStatusIcon
-                                  status={
-                                    chatBySessionId[item.id]?.runActive
-                                      ? 'running'
-                                      : item.status
+                                onClick={event => {
+                                  if (event.shiftKey) {
+                                    event.preventDefault()
+                                    selectSessionRange(
+                                      orderedVisibleSessionIds,
+                                      item.id
+                                    )
+                                    return
                                   }
-                                />
+                                  if (event.metaKey || event.ctrlKey) {
+                                    event.preventDefault()
+                                    toggleSessionSelected(item.id)
+                                    return
+                                  }
+                                  if (selectedSessionIds.size > 0) {
+                                    clearSessionSelection()
+                                  }
+                                  setSelectionAnchorId(item.id)
+                                  openSessionTab(item.id)
+                                  void prefetchSessionMessages(item.id)
+                                  navigate(`/agents/${item.id}`)
+                                }}
+                              >
+                                {isSelected || selectedSessionIds.size > 0 ? (
+                                  <span
+                                    className={cn(
+                                      'grid size-3.5 shrink-0 place-items-center rounded-[4px] border',
+                                      isSelected
+                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        : 'border-muted-foreground/40'
+                                    )}
+                                    aria-hidden
+                                  >
+                                    {isSelected ? (
+                                      <Check className="size-2.5" strokeWidth={3} />
+                                    ) : null}
+                                  </span>
+                                ) : (
+                                  <SessionStatusIcon
+                                    status={
+                                      chatBySessionId[item.id]?.runActive
+                                        ? 'running'
+                                        : item.status
+                                    }
+                                  />
+                                )}
                                 {item.organizeLabel === 'pinned' ? (
                                   <Pin className="text-muted-foreground/70 size-3 shrink-0" />
                                 ) : null}
@@ -3042,7 +3446,8 @@ export default function App() {
                               </div>
                             </div>
                           </li>
-                        ))}
+                          )
+                        })}
                       </ul>
                     ) : null}
                   </div>
@@ -3053,8 +3458,12 @@ export default function App() {
           </ScrollArea>
           <div className="shrink-0 p-2">
             <SidebarUserMenu
-              userName={health?.userName ?? null}
+              userName={sidebarUserName}
               onLogout={logoutSession}
+              onRefreshUser={refreshCloudUserName}
+              backendVersion={health?.version ?? null}
+              backendUrl={backendUrl}
+              connected={Boolean(health)}
             />
           </div>
             </>
@@ -3134,7 +3543,159 @@ export default function App() {
           ) : null}
 
           {isDashboardOverview ? (
-            <DashboardOverviewView sessions={sessions} />
+            <DashboardOverviewView sessions={sessions}>
+              <SkillsView
+                featuredOnly
+                mode="list"
+                skills={skills}
+                loading={connecting && skills.length === 0}
+                detail={null}
+                catalogSkillRoute={null}
+                catalogSearchEnabled={catalogSearchEnabled}
+                onShowAll={() => navigate('/dashboard/skills')}
+                onOpen={name =>
+                  navigate(`/dashboard/skills/${encodeURIComponent(name)}`)
+                }
+                onOpenCatalogDetail={skill =>
+                  navigate(`/dashboard/skills/catalog/${skill.id}`)
+                }
+                onBack={() => navigate('/dashboard/skills')}
+                onOpenImportGithub={() =>
+                  navigate('/dashboard/skills/import/github')
+                }
+                onOpenImportFile={() =>
+                  navigate('/dashboard/skills/import/file')
+                }
+                onOpenTrustedSources={() =>
+                  navigate('/dashboard/skills/trusted/sources')
+                }
+                onOpenCatalogSetup={() =>
+                  navigate('/dashboard/integrations/vercel')
+                }
+                onInstall={async source => {
+                  const installed = await client.installSkill(source)
+                  await loadSkills()
+                  return installed
+                }}
+                onUpload={async file => {
+                  await client.installSkillFile(file)
+                  await loadSkills()
+                }}
+                onLoadSuggestedSources={signal =>
+                  client.listSkillSources(signal)
+                }
+                onSearchCatalog={(query, signal) =>
+                  client.searchSkillCatalog(query, 12, signal)
+                }
+                onGetCatalogDetail={(source, skill, signal) =>
+                  client.getCatalogSkillDetail(source, skill, signal)
+                }
+                onGetCatalogAudit={(source, skill, signal) =>
+                  client.getCatalogSkillAudit(source, skill, signal)
+                }
+                onBulkAction={async (action, names) => {
+                  const result = await client.bulkSkillAction(action, names)
+                  await loadSkills()
+                  return result
+                }}
+                onSetEnabled={async (name, enabled) => {
+                  await client.setSkillEnabled(name, enabled)
+                  await loadSkills()
+                }}
+                onRemove={async name => {
+                  await client.removeSkill(name)
+                  await loadSkills()
+                }}
+              />
+              <McpView
+                featuredOnly
+                mcpServers={mcpServers}
+                catalog={mcpCatalog}
+                catalogLoading={mcpCatalogLoading}
+                onShowAll={() => navigate('/dashboard/mcp')}
+                onRefresh={refreshMcp}
+                onConnectCatalog={async (catalogId, input) => {
+                  const result = await client.connectMcpCatalog(
+                    catalogId,
+                    input
+                  )
+                  await refreshMcp()
+                  await loadIntegrations()
+                  return result
+                }}
+                onToggleCatalog={async (entry, enabled) => {
+                  await client.setMcpCatalogEnabled(entry.id, enabled)
+                  await refreshMcp()
+                }}
+                onCreateMcp={async input => {
+                  await client.createMcpServer(input)
+                  await loadMcpServers()
+                }}
+                onDeleteMcp={async id => {
+                  await client.deleteMcpServer(id)
+                  await loadMcpServers()
+                }}
+                onToggleCustom={async (id, enabled) => {
+                  await client.updateMcpServer(id, { enabled })
+                  await loadMcpServers()
+                }}
+              />
+              <IntegrationsView
+                featuredOnly
+                terminalClient={client}
+                integrations={integrations}
+                loading={connecting && integrations.length === 0}
+                selectedKey={null}
+                values={{}}
+                onShowAll={() => navigate('/dashboard/integrations')}
+                onValueChange={() => {}}
+                onSelect={key => {
+                  if (!key) {
+                    navigate('/dashboard/integrations')
+                    return
+                  }
+                  const target = integrations.find(item => item.key === key)
+                  const segment = (target?.name || key)
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '')
+                  navigate(
+                    `/dashboard/integrations/${encodeURIComponent(segment || key)}`
+                  )
+                }}
+                onSave={async () => {}}
+                onValidate={async key => client.validateIntegration(key)}
+                onAutofill={async key => {
+                  await client.autofillIntegration(key)
+                  await loadIntegrations()
+                }}
+                onSetup={async key => {
+                  const result = await client.setupIntegration(key)
+                  await loadIntegrations()
+                  return result
+                }}
+                onOpenVercelTerminal={async () => {
+                  const existing = sessions.find(item =>
+                    String(item.workspacePath || '')
+                      .trim()
+                      .endsWith('/.fastfold-cli/vercel-integration')
+                  )
+                  if (existing) return existing.id
+                  const created = await client.createSession({
+                    title: 'Vercel integration setup',
+                    workspacePath: '~/.fastfold-cli/vercel-integration',
+                    projectId: activeProjectId || undefined
+                  })
+                  await loadSessions()
+                  return created.id
+                }}
+                onRemove={async key => {
+                  await client.removeIntegration(key)
+                  await loadIntegrations()
+                }}
+              />
+            </DashboardOverviewView>
           ) : isDashboardStatus ? (
             <ServerStatusView
               onLoad={loadServerStatus}
@@ -3145,63 +3706,7 @@ export default function App() {
               backendUrl={backendUrl}
               backendVersion={health?.version ?? null}
               connected={Boolean(health)}
-              onCheckBackend={async () => {
-                try {
-                  const nextHealth = await client.health()
-                  setHealth(nextHealth)
-                  return true
-                } catch {
-                  setHealth(null)
-                  return false
-                }
-              }}
-              onUpdateBackendUrl={async url => {
-                setBackendUrl(url)
-                localStorage.setItem('fastfold.backend.url', url)
-                const nextClient = new LocalAgentClient({
-                  baseUrl: url,
-                  apiKey: backendApiKey || undefined
-                })
-                try {
-                  const nextHealth = await nextClient.health()
-                  setHealth(nextHealth)
-                  const [
-                    nextSessions,
-                    nextProjects,
-                    nextSkills,
-                    nextIntegrations,
-                    nextMcpServers,
-                    nextMcpCatalog,
-                    settings,
-                    nextModels
-                  ] = await Promise.all([
-                    nextClient.listSessions(),
-                    nextClient.listProjects(),
-                    nextClient.listSkills(),
-                    nextClient.listIntegrations(),
-                    nextClient.listMcpServers(),
-                    nextClient.listMcpCatalog(),
-                    nextClient.getRuntimeSettings(),
-                    nextClient.listModels({
-                      enabledOnly: true,
-                      discover: true
-                    })
-                  ])
-                  setSessions(nextSessions)
-                  setProjects(nextProjects)
-                  setSkills(nextSkills)
-                  setIntegrations(nextIntegrations)
-                  setMcpServers(nextMcpServers)
-                  setMcpCatalog(nextMcpCatalog)
-                  setRuntimeSettings(settings)
-                  setModelOptions(toComposerModelOptions(nextModels))
-                  return true
-                } catch {
-                  setHealth(null)
-                  return false
-                }
-              }}
-              onLoadAccount={loadAccount}
+              onLoadAccount={loadAccountForUi}
               onLogoutAccount={logoutAccount}
             />
           ) : isDashboardModels ? (
@@ -3509,7 +4014,11 @@ export default function App() {
                   <SessionTabs
                     tabs={openTabs}
                     activeId={sessionId}
-                    onSelect={id => navigate(`/agents/${id}`)}
+                    onSelect={id => {
+                      openSessionTab(id)
+                      void prefetchSessionMessages(id)
+                      navigate(`/agents/${id}`)
+                    }}
                     onClose={closeSessionTab}
                     onCloseOthers={closeOtherSessionTabs}
                     onRename={openRenameDialog}
@@ -3706,11 +4215,15 @@ export default function App() {
                   )}
                 >
                   {!messagesLoaded && !runActive ? (
-                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                      <ChatPageSkeleton />
-                    </div>
+                    showChatSkeleton ? (
+                      <div className="animate-in fade-in flex min-h-0 flex-1 flex-col overflow-hidden duration-200">
+                        <ChatPageSkeleton />
+                      </div>
+                    ) : (
+                      <div className="flex min-h-0 flex-1 flex-col" />
+                    )
                   ) : messages.length === 0 && !runActive ? (
-                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 pb-20">
+                    <div className="animate-in fade-in flex min-h-0 flex-1 flex-col items-center justify-center px-5 pb-20 duration-200">
                       <AuraIconPulse className="text-muted-foreground/70 mb-6 h-12 w-12" />
                       <div className="bg-background w-full max-w-[44rem]">
                         <div className="mb-2 flex items-center px-1">
@@ -3786,7 +4299,7 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
-                    <>
+                    <div className="animate-in fade-in flex min-h-0 flex-1 flex-col duration-200">
                       <ScrollArea className="chat-scrollbar min-h-0 flex-1">
                         <div className="mx-auto flex w-full max-w-[44rem] flex-col px-5 py-6">
                           <div className="mb-4 flex min-w-0 flex-1 flex-col gap-y-2 empty:hidden">
@@ -4225,7 +4738,7 @@ export default function App() {
                           }}
                         />
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
                 {error ? (
@@ -4401,6 +4914,38 @@ export default function App() {
               onClick={() => void confirmDelete()}
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={batchDeletePending}
+        onOpenChange={open => {
+          if (!open && !batchBusy) setBatchDeletePending(false)
+        }}
+      >
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedSessionIds.size} chats?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the selected sessions and cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={batchBusy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={event => {
+                event.preventDefault()
+                void confirmBatchDelete()
+              }}
+            >
+              {batchBusy ? 'Deleting…' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -4872,6 +5417,8 @@ function SkillsView({
   catalogSkillRoute,
   catalogSearchEnabled,
   openCatalogSearchInitially = false,
+  featuredOnly = false,
+  onShowAll,
   onOpen,
   onOpenCatalogDetail,
   onBack,
@@ -4896,6 +5443,9 @@ function SkillsView({
   catalogSkillRoute: { id: string; source: string; skill: string } | null
   catalogSearchEnabled: boolean
   openCatalogSearchInitially?: boolean
+  /** Overview: only Featured skill cards (same as Skills page). */
+  featuredOnly?: boolean
+  onShowAll?: () => void
   onOpen: (name: string) => void
   onOpenCatalogDetail: (skill: AgentCatalogSkill) => void
   onBack: () => void
@@ -5321,6 +5871,7 @@ function SkillsView({
       ? featuredSkillIcon(detail)
       : skillIcon(detail)
     : null
+  const detailIconInvert = detail ? skillIconInvertInDark(detail) : false
   const detailVersionLabel = displaySkillVersion(detail?.version)
   const detailUpdatedLabel = formatSkillUpdatedLabel(detail?.updatedAt)
   useEffect(() => {
@@ -6087,7 +6638,10 @@ function SkillsView({
                   <img
                     src={detailIconSource}
                     alt=""
-                    className="size-9 rounded object-contain"
+                    className={cn(
+                      'size-9 rounded object-contain',
+                      detailIconInvert && 'dark:invert'
+                    )}
                   />
                 ) : (
                   <span className="bg-muted/30 text-muted-foreground grid size-9 shrink-0 place-items-center rounded">
@@ -6211,6 +6765,92 @@ function SkillsView({
       </ScrollArea>
     )
   }
+
+  if (featuredOnly) {
+    const featuredAll = skills.filter(skill => isFeaturedSkill(skill))
+    const featured = featuredAll.slice(0, 2)
+    return (
+      <>
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-2">
+            <div>
+              <h3 className="text-base font-semibold tracking-tight">Skills</h3>
+              <p className="text-muted-foreground text-xs font-medium">
+                Featured ({featuredAll.length})
+              </p>
+            </div>
+            {onShowAll ? (
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
+                onClick={onShowAll}
+              >
+                Show all
+                <ArrowRight className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
+          {loading && featuredAll.length === 0 ? (
+            <CardGridSkeleton cards={2} columns={2} />
+          ) : featured.length === 0 ? (
+            <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-sm">
+              No featured skills yet.
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {featured.map(skill => {
+                const iconSource = featuredSkillIcon(skill)
+                const metaText = skillMetaText(skill)
+                return (
+                  <div
+                    key={skill.name}
+                    className={cn(
+                      'bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors',
+                      !skill.enabled && 'opacity-60'
+                    )}
+                  >
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => onOpen(skill.name)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={iconSource}
+                          alt=""
+                          className={cn(
+                            'size-7 rounded object-contain',
+                            skillIconInvertInDark(skill) && 'dark:invert'
+                          )}
+                        />
+                        <span className="truncate text-sm font-medium">
+                          {skill.name}
+                        </span>
+                      </div>
+                      {metaText ? (
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                          {metaText}
+                        </p>
+                      ) : null}
+                      <p className="text-muted-foreground mt-1 line-clamp-2 text-sm">
+                        {skill.description}
+                      </p>
+                    </button>
+                    <div className="flex flex-col items-end gap-1 pt-0.5">
+                      {renderEnabledToggle(skill)}
+                      {renderRemoveButton(skill)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+        {renderRemoveDialog()}
+      </>
+    )
+  }
+
   return (
     <>
       <ScrollArea className="flex-1">
@@ -6451,7 +7091,10 @@ function SkillsView({
                                 <img
                                   src={iconSource}
                                   alt=""
-                                  className="size-7 rounded object-contain"
+                                  className={cn(
+                                    'size-7 rounded object-contain',
+                                    skillIconInvertInDark(skill) && 'dark:invert'
+                                  )}
                                 />
                                 <span className="truncate text-sm font-medium">
                                   {skill.name}
@@ -6466,7 +7109,7 @@ function SkillsView({
                                 {skill.description}
                               </p>
                             </button>
-                            <div className="flex items-center gap-1 pt-0.5">
+                            <div className="flex flex-col items-end gap-1 pt-0.5">
                               {renderEnabledToggle(skill)}
                               {renderRemoveButton(skill)}
                             </div>
@@ -6534,7 +7177,11 @@ function SkillsView({
                                   <img
                                     src={iconSource}
                                     alt=""
-                                    className="size-6 rounded object-contain"
+                                    className={cn(
+                                      'size-6 rounded object-contain',
+                                      skillIconInvertInDark(skill) &&
+                                        'dark:invert'
+                                    )}
                                   />
                                 ) : (
                                   <span className="bg-muted/30 text-muted-foreground grid size-6 shrink-0 place-items-center rounded">
@@ -6557,7 +7204,7 @@ function SkillsView({
                                 {skill.description}
                               </p>
                             </button>
-                            <div className="flex items-center gap-1 pt-0.5">
+                            <div className="flex flex-col items-end gap-1 pt-0.5">
                               {renderEnabledToggle(skill)}
                               {renderRemoveButton(skill)}
                             </div>
@@ -6718,6 +7365,8 @@ function IntegrationsView({
   loading = false,
   selectedKey,
   values,
+  featuredOnly = false,
+  onShowAll,
   onSelect,
   onValueChange,
   onSave,
@@ -6732,6 +7381,9 @@ function IntegrationsView({
   loading?: boolean
   selectedKey: string | null
   values: Record<string, string>
+  /** Overview: only Featured integration cards (same as Integrations page). */
+  featuredOnly?: boolean
+  onShowAll?: () => void
   onSelect: (key: string | null) => void
   onValueChange: (envName: string, value: string) => void
   onSave: () => Promise<void>
@@ -7165,6 +7817,46 @@ function IntegrationsView({
     )
   }
 
+  if (featuredOnly) {
+    const featuredAll = integrations.filter(item => isFeaturedIntegration(item))
+    const featured = featuredAll.slice(0, 2)
+    return (
+      <section className="space-y-3">
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <h3 className="text-base font-semibold tracking-tight">
+              Integrations
+            </h3>
+            <p className="text-muted-foreground text-xs font-medium">
+              Featured ({featuredAll.length})
+            </p>
+          </div>
+          {onShowAll ? (
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
+              onClick={onShowAll}
+            >
+              Show all
+              <ArrowRight className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+        {loading && featuredAll.length === 0 ? (
+          <CardGridSkeleton cards={2} columns={2} />
+        ) : featured.length === 0 ? (
+          <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-sm">
+            No featured integrations yet.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {featured.map(item => renderIntegrationCard(item))}
+          </div>
+        )}
+      </section>
+    )
+  }
+
   return (
     <ScrollArea className="flex-1">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 xl:flex-row">
@@ -7316,16 +8008,6 @@ function IntegrationsView({
             ))}
           </section>
         </aside>
-      </div>
-    </ScrollArea>
-  )
-}
-
-function DashboardOverviewView({ sessions }: { sessions: AgentSession[] }) {
-  return (
-    <ScrollArea className="flex-1">
-      <div className="mx-auto max-w-5xl px-6 py-8 sm:px-8 sm:py-10">
-        <SessionActivityHeatmap sessions={sessions} />
       </div>
     </ScrollArea>
   )

@@ -569,10 +569,10 @@ export function ModelsView({
 
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto max-w-3xl space-y-8 px-8 py-10">
+      <div className="mx-auto w-full max-w-7xl space-y-8 p-4 md:p-6">
         <div>
           <h2 className="text-2xl font-semibold">Models</h2>
-          <p className="text-muted-foreground mt-2 text-sm">
+          <p className="text-muted-foreground mt-1 text-sm">
             Choose which cloud and local models are available to the agent.
           </p>
         </div>

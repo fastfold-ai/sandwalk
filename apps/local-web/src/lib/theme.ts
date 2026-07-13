@@ -125,6 +125,15 @@ export function applyPalette(palette: ThemePaletteId) {
   )
 }
 
+/** DOM-only palette swap for hover preview — does not persist or emit. */
+export function previewPalette(palette: ThemePaletteId) {
+  if (palette === 'default') {
+    document.documentElement.removeAttribute('data-palette')
+  } else {
+    document.documentElement.setAttribute('data-palette', palette)
+  }
+}
+
 /** Follow OS light/dark changes live while the mode is "system". */
 export function watchSystemTheme(): () => void {
   const media = window.matchMedia('(prefers-color-scheme: dark)')
