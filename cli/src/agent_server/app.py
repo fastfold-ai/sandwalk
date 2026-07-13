@@ -309,12 +309,24 @@ def create_app(
     )
 
     @app.get("/v1/auth/status", response_model=AuthStatusResponse)
-    async def auth_status() -> AuthStatusResponse:
+    async def auth_status(request: Request) -> AuthStatusResponse:
         settings = load_settings()
         app.state.auth_settings = settings
+        key = _current_api_key()
+        authenticated = False
+        if not settings.auth_enabled:
+            authenticated = True
+        elif key:
+            authenticated = request_is_authenticated(
+                headers=request.headers,
+                cookies=request.cookies,
+                api_key=key,
+                secret_key=settings.secret_key,
+            )
         return AuthStatusResponse(
             auth_enabled=bool(settings.auth_enabled),
             api_key_configured=settings.api_key_configured,
+            authenticated=authenticated,
         )
 
     @app.post("/v1/auth/login")

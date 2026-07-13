@@ -85,6 +85,7 @@ class ServerLifecycleResult(ApiModel):
 class AuthStatusResponse(ApiModel):
     auth_enabled: bool = False
     api_key_configured: bool = False
+    authenticated: bool = False
 
 
 class AuthLoginRequest(ApiModel):

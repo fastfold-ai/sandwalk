@@ -92,4 +92,35 @@ final class AgentAPIModelsTests: XCTestCase {
         let again = try decoder.decode(DatasetSummaryDTO.self, from: encoded)
         XCTAssertEqual(again, dataset)
     }
+
+    func testRuntimeSettingsDTODecode() throws {
+        let json = """
+        {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5-20250929",
+          "openaiBaseUrl": null,
+          "agentProfile": "research",
+          "toolMode": "ptc",
+          "recursionLimit": 120,
+          "maxSdkTurns": 30,
+          "groupToolTraces": true,
+          "toolTraceDetailLimit": 1,
+          "backgroundWatchTimeoutS": 7200,
+          "interruptDrainTimeoutS": 10,
+          "parallelMaxThreads": 5,
+          "toolHealthEnabled": true,
+          "toolHealthFailThreshold": 2,
+          "toolHealthSuppressSeconds": 900
+        }
+        """.data(using: .utf8)!
+
+        let settings = try decoder.decode(RuntimeSettingsDTO.self, from: json)
+        XCTAssertEqual(settings.provider, "anthropic")
+        XCTAssertEqual(settings.toolMode, "ptc")
+        XCTAssertEqual(settings.recursionLimit, 120)
+        XCTAssertEqual(settings.parallelMaxThreads, 5)
+        XCTAssertTrue(settings.groupToolTraces)
+        XCTAssertTrue(settings.toolHealthEnabled)
+        XCTAssertNil(settings.openaiBaseUrl)
+    }
 }

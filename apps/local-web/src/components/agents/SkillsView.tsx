@@ -1110,7 +1110,7 @@ export function SkillsView({
             ) : null}
           </div>
           {catalogDetailLoading ? (
-            <DetailPageSkeleton />
+            <DetailPageSkeleton bare />
           ) : catalogDetailError ? (
             <p className="text-destructive text-sm">{catalogDetailError}</p>
           ) : (
@@ -1446,7 +1446,7 @@ export function SkillsView({
       <ScrollArea className="flex-1">
         <div className="mx-auto w-full max-w-3xl px-6 py-8 md:px-10">
           {renderSkillsBreadcrumb()}
-          <DetailPageSkeleton />
+          <DetailPageSkeleton bare />
         </div>
       </ScrollArea>
     )

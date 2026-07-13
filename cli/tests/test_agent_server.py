@@ -176,6 +176,12 @@ def test_auth_login_cookie_grants_access(tmp_path: Path, monkeypatch):
         status = client.get("/v1/auth/status").json()
         assert status["authEnabled"] is True
         assert status["apiKeyConfigured"] is True
+        assert status["authenticated"] is True
+
+        client.post("/v1/auth/logout")
+        status = client.get("/v1/auth/status").json()
+        assert status["authEnabled"] is True
+        assert status["authenticated"] is False
 
 
 def test_workspace_service_confines_paths_and_detects_conflicts(tmp_path: Path):

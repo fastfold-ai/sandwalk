@@ -66,6 +66,8 @@ import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { NewProjectDialog } from '@/components/agents/NewProjectDialog'
 import {
   ChatPageSkeleton,
+  DashboardPageSkeleton,
+  type DashboardSkeletonKind,
   DetailPageSkeleton
 } from '@/components/agents/PageSkeletons'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
@@ -541,6 +543,30 @@ export default function App() {
     location.pathname === '/' || location.pathname === '/agents/home'
   const isProjectHome = Boolean(routeProjectId)
   const isInspect = new URLSearchParams(location.search).get('inspect') === '1'
+  const dashboardSkeletonKind: DashboardSkeletonKind = (() => {
+    if (isHome || isProjectHome) return 'home'
+    if (isDashboardOverview) return 'overview'
+    if (isDashboardDoctor) return 'doctor'
+    if (
+      isDashboardStatus ||
+      isDashboardGeneral ||
+      isDashboardAgentRuntime ||
+      isDashboardStorage ||
+      isDashboardEnvironment
+    ) {
+      return 'settings'
+    }
+    if (isDashboardModels) return 'models'
+    if (isDashboardData || isDashboardTools) return 'list'
+    if (isDashboardSpecialists) {
+      return specialistsViewMode === 'list' ? 'list' : 'detail'
+    }
+    if (isDashboardMcp || isIntegrations) return 'cards'
+    if (isSkills) {
+      return skillsViewMode === 'list' ? 'cards' : 'detail'
+    }
+    return 'detail'
+  })()
   const sessionId =
     !isDashboard &&
     !isSkills &&
@@ -862,24 +888,38 @@ export default function App() {
       localStorage.setItem('fastfold.backend.url', backendUrl)
 
       let authEnabled = false
+      let authenticated: boolean | null = null
       try {
         const status = await client.authStatus()
         authEnabled = Boolean(status.authEnabled)
+        authenticated =
+          typeof status.authenticated === 'boolean'
+            ? status.authenticated
+            : null
       } catch {
         authEnabled = false
+        authenticated = null
       }
       if (needsAuthLoginRef.current) return
 
       if (authEnabled) {
-        try {
-          await client.getRuntimeSettings()
-        } catch (cause) {
-          const message = cause instanceof Error ? cause.message : ''
-          if (looksLikeAuthFailure(message)) {
-            goToLogin()
-            return
+        if (authenticated === false) {
+          // Auth on, no session — show login without probing protected routes.
+          goToLogin()
+          return
+        }
+        if (authenticated === null) {
+          // Legacy servers without `authenticated` — keep the old probe.
+          try {
+            await client.getRuntimeSettings()
+          } catch (cause) {
+            const message = cause instanceof Error ? cause.message : ''
+            if (looksLikeAuthFailure(message)) {
+              goToLogin()
+              return
+            }
+            throw cause
           }
-          throw cause
         }
       }
       if (needsAuthLoginRef.current) return
@@ -2919,7 +2959,11 @@ export default function App() {
           isDashboardSpecialists ||
           isHome ||
           isProjectHome ? (
-            <Suspense fallback={<DetailPageSkeleton />}>
+            <Suspense
+              fallback={
+                <DashboardPageSkeleton kind={dashboardSkeletonKind} />
+              }
+            >
             {isDashboardOverview ? (
             <DashboardOverviewView sessions={sessions}>
               <SkillsView

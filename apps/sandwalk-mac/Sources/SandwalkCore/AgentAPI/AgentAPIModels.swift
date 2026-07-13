@@ -296,3 +296,41 @@ struct EnvMutationDTO: Codable {
     let name: String?
     let installed: Bool?
 }
+
+// MARK: - Runtime settings
+
+struct RuntimeSettingsDTO: Codable, Hashable {
+    var provider: String
+    var model: String
+    var openaiBaseUrl: String?
+    var agentProfile: String
+    var toolMode: String
+    var recursionLimit: Int
+    var maxSdkTurns: Int
+    var groupToolTraces: Bool
+    var toolTraceDetailLimit: Int
+    var backgroundWatchTimeoutS: Int
+    var interruptDrainTimeoutS: Int
+    var parallelMaxThreads: Int
+    var toolHealthEnabled: Bool
+    var toolHealthFailThreshold: Int
+    var toolHealthSuppressSeconds: Int
+
+    static let defaults = RuntimeSettingsDTO(
+        provider: "anthropic",
+        model: "",
+        openaiBaseUrl: nil,
+        agentProfile: "research",
+        toolMode: "ptc",
+        recursionLimit: 120,
+        maxSdkTurns: 30,
+        groupToolTraces: true,
+        toolTraceDetailLimit: 1,
+        backgroundWatchTimeoutS: 7200,
+        interruptDrainTimeoutS: 10,
+        parallelMaxThreads: 5,
+        toolHealthEnabled: true,
+        toolHealthFailThreshold: 2,
+        toolHealthSuppressSeconds: 900
+    )
+}

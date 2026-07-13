@@ -25,6 +25,12 @@ struct SettingsRootView: View {
                 }
 
                 Section {
+                    SidebarRow(section: .runtime)
+                } header: {
+                    Text("Agent")
+                }
+
+                Section {
                     SidebarRow(section: .models)
                     SidebarRow(section: .tools)
                     SidebarRow(section: .datasets)
@@ -144,6 +150,7 @@ private struct SettingsDetailScaffold: View {
     @ViewBuilder
     private var detailContent: some View {
         switch section {
+        case .runtime: RuntimeSettingsView()
         case .models: ModelsSettingsView()
         case .tools: ToolsSettingsView()
         case .datasets: DatasetsSettingsView()

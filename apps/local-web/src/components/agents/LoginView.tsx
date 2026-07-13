@@ -109,30 +109,30 @@ export function LoginView({
   }
 
   return (
-    <main
+    <div
       className={cn(
-        'bg-background text-foreground relative isolate grid min-h-full place-items-center overflow-hidden p-6',
+        'bg-background text-foreground relative h-full min-h-full',
         className
       )}
     >
-      <MirageBackground />
-      <ThemeToggle />
+      <main className="relative isolate grid h-full min-h-full place-items-center overflow-hidden p-6">
+        <MirageBackground />
 
-      <div className="relative z-10 flex w-full max-w-[380px] flex-col items-center">
-        <div className="mb-8 flex flex-col items-center gap-3">
-          <AuraIconPulse className="text-foreground h-14 w-14 [filter:drop-shadow(0_0_10px_hsl(var(--background)/0.95))_drop-shadow(0_0_22px_hsl(var(--background)/0.9))]" />
-          <h1 className="text-foreground text-[28px] font-bold tracking-tight [text-shadow:0_1px_8px_hsl(var(--background)/0.95),0_0_20px_hsl(var(--background)/0.9)]">
-            Sandwalk
-          </h1>
-        </div>
+        <div className="relative z-10 flex w-full max-w-[380px] flex-col items-center">
+          <div className="mb-8 flex flex-col items-center gap-3">
+            <AuraIconPulse className="text-foreground h-14 w-14 [filter:drop-shadow(0_0_10px_hsl(var(--background)/0.95))_drop-shadow(0_0_22px_hsl(var(--background)/0.9))]" />
+            <h1 className="text-foreground text-[28px] font-bold tracking-tight [text-shadow:0_1px_8px_hsl(var(--background)/0.95),0_0_20px_hsl(var(--background)/0.9)]">
+              Sandwalk
+            </h1>
+          </div>
 
-        <form
-          className="bg-card border-border w-full rounded-2xl border px-8 py-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-none"
-          onSubmit={event => {
-            event.preventDefault()
-            void onSubmit(apiKey.trim(), remember)
-          }}
-        >
+          <form
+            className="bg-card border-border w-full rounded-2xl border px-8 py-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-none"
+            onSubmit={event => {
+              event.preventDefault()
+              void onSubmit(apiKey.trim(), remember)
+            }}
+          >
           <label
             htmlFor="sandwalk-api-key"
             className="text-muted-foreground mb-2 block text-[11px] font-medium tracking-[0.08em] uppercase"
@@ -288,7 +288,9 @@ export function LoginView({
             />
           </p>
         </div>
-      </div>
-    </main>
+        </div>
+      </main>
+      <ThemeToggle />
+    </div>
   )
 }

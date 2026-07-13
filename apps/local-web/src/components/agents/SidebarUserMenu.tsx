@@ -1,6 +1,5 @@
 import {
   BookOpen,
-  Check,
   ExternalLink,
   LogOut,
   Monitor,
@@ -8,13 +7,14 @@ import {
   Settings,
   Sun
 } from 'lucide-react'
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import {
   listenSubtitle,
   SandwalkServerCard
 } from '@/components/agents/SandwalkServerCard'
+import { ThemeAppearanceMenuContent } from '@/components/ThemeAppearanceMenu'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,14 +27,6 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@/components/ui/tooltip'
-import {
-  applyPalette,
-  applyTheme,
   getStoredPalette,
   getStoredTheme,
   PALETTE_CHANGE_EVENT,
@@ -44,7 +36,6 @@ import {
   type ThemeMode,
   type ThemePaletteId
 } from '@/lib/theme'
-import { cn } from '@/lib/utils'
 
 const DOCS_URL = 'https://docs.fastfold.ai'
 const CLOUD_URL = 'https://cloud.fastfold.ai'
@@ -111,40 +102,6 @@ export function SidebarUserMenu({
   const activePalette =
     THEME_PALETTES.find(item => item.id === palette) ?? THEME_PALETTES[0]
 
-  const ThemeButton = ({
-    mode,
-    label,
-    children
-  }: {
-    mode: ThemeMode
-    label: string
-    children: ReactNode
-  }) => (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          aria-pressed={theme === mode}
-          onClick={event => {
-            event.preventDefault()
-            event.stopPropagation()
-            applyTheme(mode)
-          }}
-          className={cn(
-            'bg-card hover:bg-muted inline-flex h-7 flex-1 items-center justify-center rounded-md border',
-            theme === mode ? 'border-foreground/20 bg-muted' : 'border-border'
-          )}
-        >
-          {children}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" className="text-xs">
-        {label}
-      </TooltipContent>
-    </Tooltip>
-  )
-
   const ModeIcon =
     theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
 
@@ -210,58 +167,15 @@ export function SidebarUserMenu({
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent
               sideOffset={8}
-              className="bg-card w-64 rounded-xl border p-1.5 shadow-xl"
+              collisionPadding={16}
+              className="bg-card max-h-[min(28rem,calc(100dvh-2rem))] w-64 overflow-y-auto rounded-xl border p-1.5 shadow-xl"
               onPointerLeave={() => previewPalette(getStoredPalette())}
             >
-              <TooltipProvider delayDuration={200}>
-                <div className="flex items-center gap-1.5 px-1.5 pb-1.5 pt-0.5">
-                  <ThemeButton mode="light" label="Light theme">
-                    <Sun className="size-3.5" />
-                  </ThemeButton>
-                  <ThemeButton mode="system" label="System theme">
-                    <Monitor className="size-3.5" />
-                  </ThemeButton>
-                  <ThemeButton mode="dark" label="Dark theme">
-                    <Moon className="size-3.5" />
-                  </ThemeButton>
-                </div>
-              </TooltipProvider>
-              <DropdownMenuSeparator className="my-1" />
-              {THEME_PALETTES.map(item => {
-                const selected = palette === item.id
-                return (
-                  <DropdownMenuItem
-                    key={item.id}
-                    className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2.5 py-2"
-                    onPointerEnter={() => previewPalette(item.id)}
-                    onFocus={() => previewPalette(item.id)}
-                    onClick={() => applyPalette(item.id)}
-                  >
-                    <span className="mt-0.5 flex shrink-0 items-center gap-0.5">
-                      {item.swatches.map(color => (
-                        <span
-                          key={color}
-                          className="border-border size-3 rounded-sm border"
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium leading-tight">
-                        {item.name}
-                      </span>
-                      <span className="text-muted-foreground mt-0.5 block text-[11px] leading-snug">
-                        {item.description}
-                      </span>
-                    </span>
-                    {selected ? (
-                      <Check className="text-foreground mt-0.5 size-3.5 shrink-0" />
-                    ) : (
-                      <span className="size-3.5 shrink-0" aria-hidden />
-                    )}
-                  </DropdownMenuItem>
-                )
-              })}
+              <ThemeAppearanceMenuContent
+                mode={theme}
+                palette={palette}
+                onPreviewPalette={previewPalette}
+              />
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         </DropdownMenuGroup>

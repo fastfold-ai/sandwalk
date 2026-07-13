@@ -103,6 +103,7 @@ export class LocalAgentClient
   authStatus(signal?: AbortSignal): Promise<{
     authEnabled: boolean
     apiKeyConfigured: boolean
+    authenticated?: boolean
   }> {
     return this.request('/auth/status', { signal })
   }

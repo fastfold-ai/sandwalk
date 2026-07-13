@@ -203,6 +203,16 @@ enum SandwalkAPIClient {
         try await delete("/v1/specialists/\(enc(id))")
     }
 
+    // MARK: - Runtime settings
+
+    static func getRuntimeSettings() async throws -> RuntimeSettingsDTO {
+        try await get("/v1/settings/runtime")
+    }
+
+    static func updateRuntimeSettings(_ changes: [String: Any]) async throws -> RuntimeSettingsDTO {
+        try await patch("/v1/settings/runtime", body: changes)
+    }
+
     // MARK: - Doctor / Storage / Environment
 
     static func runDoctor() async throws -> DoctorReportDTO {
