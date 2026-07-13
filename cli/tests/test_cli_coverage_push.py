@@ -569,7 +569,7 @@ class TestRunCommand:
     def test_run_version_flag(self):
         result = runner.invoke(app, ["run", "--version"])
         assert result.exit_code == 0
-        assert "fastfold v" in result.stdout
+        assert "sandwalk v" in result.stdout
 
     @patch("cli.run_query")
     def test_run_query_with_context_flags(self, mock_run_query):

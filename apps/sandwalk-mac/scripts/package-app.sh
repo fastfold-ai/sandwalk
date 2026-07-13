@@ -31,14 +31,14 @@ cp "${BIN}" "${APP_OUT}/Contents/MacOS/Sandwalk"
 chmod +x "${APP_OUT}/Contents/MacOS/Sandwalk"
 cp "${ROOT}/Resources/Info.plist" "${APP_OUT}/Contents/Info.plist"
 
-BUNDLE_SRC="$(dirname "${BIN}")/Sandwalk_Sandwalk.bundle"
+BUNDLE_SRC="$(dirname "${BIN}")/Sandwalk_SandwalkCore.bundle"
 if [[ -d "${BUNDLE_SRC}" ]]; then
   cp -R "${BUNDLE_SRC}" "${APP_OUT}/Contents/MacOS/"
 fi
 
 echo "==> Generating AppIcon.icns..."
 MASTER="${ROOT}/Resources/AppIcon-1024.png"
-MODULE_ICON="${ROOT}/Sources/Sandwalk/Resources/AppIcon-1024.png"
+MODULE_ICON="${ROOT}/Sources/SandwalkCore/Resources/AppIcon-1024.png"
 ICONSET="${BUILD_DIR}/AppIcon.iconset"
 rm -rf "${ICONSET}"
 mkdir -p "${ICONSET}" "${ROOT}/Resources" "$(dirname "${MODULE_ICON}")"

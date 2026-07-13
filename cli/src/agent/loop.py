@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from agent.runner import AgentRunner
 from agent.trace_store import TraceStore
 from agent.trajectory import Trajectory
-from agent_server.session_sync import import_trajectory
+from agent_server.session_sync import export_store_to_trajectory, import_trajectory
 from agent_server.store import AgentStore
 
 logger = logging.getLogger("loop")
@@ -417,7 +417,16 @@ class AgentLoop:
             session, trajectory=trajectory, trace_store=loop.trace_store,
         )
         loop._ensure_shared_session()
-        # Keep SQLite in sync when resuming a JSONL-only legacy session.
+        # Prefer shared SQLite when the session continued in the web UI (or any
+        # other surface that writes messages there) so CLI resume shows that
+        # history. Then backfill SQLite from JSONL when the store is behind.
+        try:
+            export_store_to_trajectory(agent_store, loop.trajectory)
+        except Exception:
+            logger.exception(
+                "Failed to sync shared store history into CLI trajectory",
+                extra={"session_id": loop.trajectory.session_id},
+            )
         try:
             import_trajectory(agent_store, loop.trajectory, force=False)
         except Exception:

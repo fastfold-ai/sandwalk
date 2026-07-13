@@ -1,3 +1,4 @@
+import SandwalkCore
 import SwiftUI
 
 /// Menubar host for Sandwalk.

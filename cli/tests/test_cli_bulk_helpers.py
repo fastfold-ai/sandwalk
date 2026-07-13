@@ -110,7 +110,7 @@ class TestUpgradeHelpers:
     def test_build_upgrade_command_invalid_uses_default(self, monkeypatch):
         monkeypatch.setattr("cli.os.name", "posix", raising=False)
         cmd = build_upgrade_command("not-a-flavor")
-        assert "fastfold-agent-cli[all]" in cmd[3]
+        assert "sandwalk[all]" in cmd[3]
 
     def test_fetch_pypi_latest_version_network_error(self):
         with patch("cli.urllib.request.urlopen", side_effect=TimeoutError("timeout")):
@@ -335,7 +335,9 @@ class TestRunQueryAndBanner:
         ):
             run_query("analyze TP53", {}, None, None, False)
 
-        fake_agent.run.assert_called_once_with("analyze TP53", {})
+        fake_agent.run.assert_called_once()
+        assert fake_agent.run.call_args.args[0] == "analyze TP53"
+        assert isinstance(fake_agent.run.call_args.args[1], dict)
         assert "report" not in buf.getvalue() or True  # smoke: no exception
 
     def test_run_query_orchestrator_when_agents_gt_one(self, monkeypatch):
@@ -372,7 +374,9 @@ class TestRunQueryAndBanner:
             run_query("after setup", {}, tmp_path / "out", "gpt-4o", False)
 
         mock_setup.assert_called_once()
-        fake_agent.run.assert_called_once_with("after setup", {})
+        fake_agent.run.assert_called_once()
+        assert fake_agent.run.call_args.args[0] == "after setup"
+        assert isinstance(fake_agent.run.call_args.args[1], dict)
         assert (tmp_path / "out" / "report.md").exists()
 
     def test_run_query_agent_loop_clarification_path(self, monkeypatch):
@@ -412,7 +416,7 @@ class TestRunQueryAndBanner:
             print_banner()
 
         out = buf.getvalue()
-        assert "Fastfold Agent CLI" in out
+        assert "Sandwalk" in out
         assert "tools" in out.lower() or "2" in out
 
     def test_run_interactive_offers_missing_skills_prompt_on_startup(

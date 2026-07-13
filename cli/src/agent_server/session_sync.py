@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -36,6 +37,62 @@ def _timestamp_to_datetime(value: object) -> datetime:
         except ValueError:
             pass
     return datetime.now(UTC)
+
+
+def messages_to_turns(messages) -> list[tuple[str, str]]:
+    """Pair store user/assistant messages into trajectory turns."""
+    turns: list[tuple[str, str]] = []
+    pending_user: str | None = None
+    for message in messages:
+        role = str(getattr(message, "role", "") or "").strip().lower()
+        content = str(getattr(message, "content", "") or "")
+        if role == "user":
+            pending_user = content
+        elif role == "assistant" and pending_user is not None:
+            turns.append((pending_user, content))
+            pending_user = None
+    return turns
+
+
+def export_store_to_trajectory(
+    store: AgentStore,
+    trajectory: Trajectory,
+) -> str:
+    """Pull newer UI/shared-store history into a CLI JSONL trajectory.
+
+    Returns one of: updated | skipped.
+    """
+    session_id = str(trajectory.session_id or "").strip()
+    if not session_id:
+        raise ValueError("Trajectory is missing session_id.")
+
+    existing = store.get_session(session_id)
+    if existing is None:
+        return "skipped"
+
+    store_turns = messages_to_turns(store.list_messages(session_id))
+    if len(store_turns) <= len(trajectory.turns):
+        return "skipped"
+
+    # Shared SQLite is the cross-surface source of truth when it is ahead of
+    # the CLI JSONL (e.g. session continued in the web UI).
+    trajectory.turns = []
+    # Avoid silently dropping UI history when it exceeds the default window.
+    if len(store_turns) > int(trajectory.max_turns or 0):
+        trajectory.max_turns = len(store_turns)
+    for query, answer in store_turns:
+        trajectory.add_turn(query, answer)
+
+    title = (existing.title or "").strip()
+    if title:
+        trajectory.title = title
+    trajectory.updated_at = time.time()
+    try:
+        trajectory.save()
+    except Exception:
+        # Resume can still use the in-memory turns even if JSONL write fails.
+        pass
+    return "updated"
 
 
 def import_trajectory(

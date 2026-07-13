@@ -24,6 +24,10 @@ class _Cfg:
     def llm_api_key(self, _provider=None):
         return "k"
 
+    def hidden_tools(self):
+        raw = self.data.get("agent.hidden_tools", [])
+        return list(raw) if isinstance(raw, list) else []
+
 
 def _mk_runner(provider="anthropic", *, headless=True, trace_store=None, extra=None):
     data = {"llm.provider": provider}

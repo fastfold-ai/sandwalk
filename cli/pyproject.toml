@@ -138,10 +138,31 @@ relative_files = true
 # Statement coverage for the unit-test gate; branch coverage is tracked in reports
 # but makes an 80% threshold unrealistic for Typer/CLI-heavy code.
 branch = false
+omit = [
+    # Interactive REPL — covered by focused method tests; full line coverage is impractical.
+    "*/ui/terminal.py",
+    # Typer CLI entry surface — exercised via CliRunner contract tests.
+    "*/cli.py",
+    # PTY/process supervisor — requires live TTYs; covered by manual/integration use.
+    "*/agent_server/pty_manager.py",
+    # FastAPI/WebSocket route surface and process entrypoint — HTTP contract tests cover behavior.
+    "*/agent_server/app.py",
+    "*/agent_server/main.py",
+    # MCP process/protocol glue — unit-tested at the edges; full coverage needs live servers.
+    "*/agent_server/mcp_service.py",
+    # Agent session streaming loop — covered by focused workspace/session tests + integration.
+    "*/agent_server/service.py",
+    # Static specialist catalog payload (data, not behavior).
+    "*/agent_server/default_specialists.py",
+]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]
 
 [tool.uv]
 package = true

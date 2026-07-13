@@ -1,8 +1,14 @@
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+from agent.loop import AgentLoop
 from agent.trajectory import Trajectory
-from agent_server.session_sync import import_trajectory, sync_jsonl_sessions
+from agent_server.session_sync import (
+    export_store_to_trajectory,
+    import_trajectory,
+    sync_jsonl_sessions,
+)
 from agent_server.store import AgentStore
 
 
@@ -67,3 +73,66 @@ def test_import_trajectory_preserves_timestamps(tmp_path: Path):
     messages = store.list_messages("cafebabe")
     assert messages[0].created_at == datetime.fromtimestamp(1_700_000_050, tz=UTC)
     assert messages[1].created_at == datetime.fromtimestamp(1_700_000_051, tz=UTC)
+
+
+def test_export_store_to_trajectory_pulls_ui_turns(tmp_path: Path, monkeypatch):
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    monkeypatch.setattr(Trajectory, "sessions_dir", staticmethod(lambda: sessions_dir))
+
+    store = AgentStore(tmp_path / "agent.db")
+    store.ensure_session("uiahead01", title="Cross surface")
+    store.add_message(session_id="uiahead01", role="user", content="cli first")
+    store.add_message(session_id="uiahead01", role="assistant", content="cli answer")
+    store.add_message(session_id="uiahead01", role="user", content="ui continued")
+    store.add_message(
+        session_id="uiahead01",
+        role="assistant",
+        content='Tell me which of the above you want, or say "nothing" to finish.',
+    )
+
+    trajectory = Trajectory(session_id="uiahead01", title="Cross surface")
+    trajectory.add_turn("cli first", "cli answer")
+    trajectory.save()
+    assert len(trajectory.turns) == 1
+
+    assert export_store_to_trajectory(store, trajectory) == "updated"
+    assert len(trajectory.turns) == 2
+    assert trajectory.turns[-1].query == "ui continued"
+    assert "nothing" in trajectory.turns[-1].answer
+
+    # Idempotent when already in sync.
+    assert export_store_to_trajectory(store, trajectory) == "skipped"
+
+
+def test_resume_pulls_ui_history_into_cli(tmp_path: Path, monkeypatch):
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    monkeypatch.setattr(Trajectory, "sessions_dir", staticmethod(lambda: sessions_dir))
+
+    store = AgentStore(tmp_path / "agent.db")
+    store.ensure_session("resume01", title="Resume me")
+    store.add_message(session_id="resume01", role="user", content="from cli")
+    store.add_message(session_id="resume01", role="assistant", content="cli reply")
+    store.add_message(session_id="resume01", role="user", content="from ui")
+    store.add_message(
+        session_id="resume01",
+        role="assistant",
+        content='Tell me which of the above you want, or say "nothing" to finish.',
+    )
+
+    # Stale JSONL with only the CLI turn.
+    traj = Trajectory(session_id="resume01", title="Resume me")
+    traj.add_turn("from cli", "cli reply")
+    traj.save()
+
+    session = MagicMock()
+    session.current_model = "claude-sonnet-4-5-20250929"
+    session.config.get.return_value = "anthropic"
+
+    with patch("agent.loop.AgentRunner"):
+        loop = AgentLoop.resume(session, "resume01", store=store)
+
+    assert len(loop.trajectory.turns) == 2
+    assert loop.trajectory.turns[-1].query == "from ui"
+    assert "nothing" in loop.trajectory.turns[-1].answer

@@ -45,6 +45,10 @@ def _isolate_cli_config(tmp_path, monkeypatch):
     monkeypatch.setattr(_cfg, "CONFIG_DIR", cfg_dir, raising=False)
     monkeypatch.setattr(_cfg, "CONFIG_FILE", cfg_dir / "config.json", raising=False)
     monkeypatch.setattr(_cfg, "CONFIG_BACKUP_FILE", cfg_dir / "config.json.bak", raising=False)
+    # Isolate agent-server auth settings so a developer machine with
+    # auth_enabled=true does not 401 TestClient suites.
+    settings_path = tmp_path / "sandwalk-auth-settings.json"
+    monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(settings_path))
     yield
 
 

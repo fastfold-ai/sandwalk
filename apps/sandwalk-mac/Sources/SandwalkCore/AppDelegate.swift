@@ -1,11 +1,15 @@
 import AppKit
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+public final class AppDelegate: NSObject, NSApplicationDelegate {
+    public override init() {
+        super.init()
+    }
+
     private var supervisor: SandwalkSupervisor?
     private var menubar: MenubarController?
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    public func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
         let config = AppConfig.load()
@@ -43,22 +47,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func application(_ application: NSApplication, open urls: [URL]) {
+    public func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             handleDeepLink(url)
         }
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
+    public func applicationWillTerminate(_ notification: Notification) {
         supervisor?.reapSync()
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
 
     /// Dock / Launchpad click while already running → open Settings.
-    func applicationShouldHandleReopen(
+    public func applicationShouldHandleReopen(
         _ sender: NSApplication,
         hasVisibleWindows flag: Bool
     ) -> Bool {

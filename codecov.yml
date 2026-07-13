@@ -1,0 +1,144 @@
+# Codecov for the Sandwalk monorepo.
+# Dashboard: https://app.codecov.io/gh/fastfold-ai/sandwalk
+#
+# Each CI job uploads its own report with a flag (one flag per upload).
+
+codecov:
+  require_ci_to_pass: false
+  notify:
+    wait_for_ci: false
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...95"
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 2%
+      agent-cli:
+        target: 80%
+        flags:
+          - agent-cli
+      agent-server:
+        target: 80%
+        flags:
+          - agent-server
+      local-web:
+        target: 80%
+        flags:
+          - local-web
+      mac-app:
+        target: 80%
+        flags:
+          - mac-app
+    patch:
+      default:
+        target: 70%
+        threshold: 5%
+
+comment:
+  layout: "header, diff, flags, components, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  show_carryforward_flags: true
+
+flag_management:
+  default_rules:
+    carryforward: true
+    statuses:
+      - type: project
+        target: 80%
+        threshold: 2%
+      - type: patch
+        target: 70%
+  individual_flags:
+    - name: agent-cli
+      paths:
+        - cli/src/agent/**
+        - cli/src/api/**
+        - cli/src/data/**
+        - cli/src/kb/**
+        - cli/src/models/**
+        - cli/src/reports/**
+        - cli/src/skills/**
+        - cli/src/tools/**
+        - cli/src/ui/**
+        - cli/src/cli.py
+      carryforward: true
+      statuses:
+        - type: project
+          target: 80%
+    - name: agent-server
+      paths:
+        - cli/src/agent_server/**
+      carryforward: true
+      statuses:
+        - type: project
+          target: 80%
+    - name: local-web
+      paths:
+        - apps/local-web/src/**
+      carryforward: true
+      statuses:
+        - type: project
+          target: 80%
+    - name: mac-app
+      paths:
+        - apps/sandwalk-mac/Sources/**
+      carryforward: true
+      statuses:
+        - type: project
+          target: 80%
+
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: 80%
+  individual_components:
+    - component_id: agent-cli
+      name: Agent CLI
+      paths:
+        - cli/src/agent/**
+        - cli/src/api/**
+        - cli/src/data/**
+        - cli/src/kb/**
+        - cli/src/models/**
+        - cli/src/reports/**
+        - cli/src/skills/**
+        - cli/src/tools/**
+        - cli/src/ui/**
+    - component_id: agent-server
+      name: Agent Server
+      paths:
+        - cli/src/agent_server/**
+    - component_id: local-web
+      name: Local Web UI
+      paths:
+        - apps/local-web/src/**
+    - component_id: mac-app
+      name: Mac App
+      paths:
+        - apps/sandwalk-mac/Sources/**
+
+# Coverage XML/LCOV from package dirs often use paths relative to that package.
+# Rewrite so Codecov matches monorepo paths used in flags/components above.
+fixes:
+  - "src/agent/::cli/src/agent/"
+  - "src/agent_server/::cli/src/agent_server/"
+  - "src/api/::cli/src/api/"
+  - "src/data/::cli/src/data/"
+  - "src/kb/::cli/src/kb/"
+  - "src/models/::cli/src/models/"
+  - "src/reports/::cli/src/reports/"
+  - "src/skills/::cli/src/skills/"
+  - "src/tools/::cli/src/tools/"
+  - "src/ui/::cli/src/ui/"
+  - "src/cli.py::cli/src/cli.py"
+  - "src/components/::apps/local-web/src/components/"
+  - "src/lib/::apps/local-web/src/lib/"
+  - "Sources/::apps/sandwalk-mac/Sources/"

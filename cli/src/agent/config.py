@@ -1430,6 +1430,10 @@ class Config:
         self.set("llm.hidden_models", sorted(hidden))
         self.set("llm.catalog_defaults_version", CATALOG_DEFAULTS_VERSION)
         try:
+            # load() clears dirty tracking before migration. If we save only the
+            # migration keys, in-memory env-loaded secrets would be dropped when
+            # save() replaces self._data with the merged disk payload.
+            self._dirty_keys.update(self._data.keys())
             self.save()
         except Exception as exc:  # pragma: no cover - best-effort persistence
             logger.warning("Failed to persist catalog defaults migration: %s", exc)

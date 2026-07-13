@@ -1,0 +1,64 @@
+import Foundation
+import XCTest
+@testable import SandwalkCore
+
+final class SettingsSectionTests: XCTestCase {
+    func testAllCasesHaveTitlesAndSymbols() {
+        for section in SettingsSection.allCases {
+            XCTAssertFalse(section.title.isEmpty, "\(section) title")
+            XCTAssertFalse(section.symbol.isEmpty, "\(section) symbol")
+            XCTAssertEqual(section.id, section.rawValue)
+        }
+    }
+
+    func testFromDeepLinkSettingsHost() {
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/security")!),
+            .security
+        )
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/models")!),
+            .models
+        )
+        XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://settings")!))
+        XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/")!))
+    }
+
+    func testFromDeepLinkSectionAsHost() {
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://security")!),
+            .security
+        )
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://doctor")!),
+            .doctor
+        )
+    }
+
+    func testFromDeepLinkPathForms() {
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://host/settings/network")!),
+            .network
+        )
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://ignored/logs")!),
+            .logs
+        )
+    }
+
+    func testFromDeepLinkIsCaseInsensitive() {
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://Settings/Security")!),
+            .security
+        )
+    }
+
+    func testFromDeepLinkReturnsNilForUnknownSection() {
+        XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/unknown")!))
+        XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://not-a-section")!))
+    }
+
+    func testFromDeepLinkRejectsSectionHostWithExtraPath() {
+        XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://security/extra")!))
+    }
+}

@@ -126,4 +126,18 @@ cd cli && uv sync && uv run sandwalk serve
 # or on macOS: cd apps/sandwalk-mac && swift run
 ```
 
+### Unit tests & coverage
+
+Each component has unit tests with an **≥80%** scoped coverage gate. CI uploads
+reports to [Codecov](https://app.codecov.io/gh/fastfold-ai/sandwalk)
+with flags `agent-cli`, `agent-server`, `local-web`, and `mac-app`.
+
+```bash
+pnpm test:coverage       # Local Web UI
+pnpm test:cli:coverage   # Agent CLI + Agent Server
+pnpm test:mac            # Mac app (Xcode required)
+```
+
+Full guide: [docs/TESTING.md](docs/TESTING.md).
+
 See `apps/sandwalk-mac/README.md` and `cli/README.md` for package-specific notes.

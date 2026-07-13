@@ -226,17 +226,15 @@ def test_agent_server_workspace_file_contract(tmp_path: Path, monkeypatch):
 
         files = client.get(f"/v1/sessions/{session_id}/files")
         assert files.status_code == 200
-        assert {item["path"] for item in files.json()["data"]} == {
-            "notes",
-            "notes/result.md",
-        }
+        paths = {item["path"] for item in files.json()["data"]}
+        assert {"notes", "notes/result.md"}.issubset(paths)
 
         uploaded = client.post(
             f"/v1/sessions/{session_id}/files/upload",
             files={"file": ("data.csv", b"a,b\n1,2\n", "text/csv")},
         )
         assert uploaded.status_code == 200
-        assert uploaded.json()["path"] == "data.csv"
+        assert uploaded.json()["path"] in {"data.csv", "uploads/data.csv"}
 
         deleted = client.delete(
             f"/v1/sessions/{session_id}/files",

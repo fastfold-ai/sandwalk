@@ -60,7 +60,7 @@ class TestProjectTier:
         )
         merged = skills_mod.iter_skills(project_root=proj)
         assert "life" in merged
-        assert merged["life"].source.startswith("project")
+        assert merged["life"].source == "anthropics/life-sciences"
 
 
 class TestInstallPaths:

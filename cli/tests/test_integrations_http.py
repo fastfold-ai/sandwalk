@@ -1,0 +1,103 @@
+"""HTTP coverage for integrations and specialists routes."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from agent.config import Config
+from agent_server.app import create_app
+
+
+def test_integrations_http_crud(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
+    (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
+    Config({}).save()
+
+    app = create_app(store_path=tmp_path / "agent.db", allowed_hosts=["testserver"])
+    with TestClient(app) as client:
+        listing = client.get("/v1/integrations")
+        assert listing.status_code == 200
+        keys = {item["key"] for item in listing.json()["data"]}
+        assert "anthropic" in keys
+
+        detail = client.get("/v1/integrations/anthropic")
+        assert detail.status_code == 200
+
+        updated = client.put(
+            "/v1/integrations/anthropic",
+            json={"value": "sk-ant-api03-validkey"},
+        )
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["configured"] is True
+
+        validated = client.post("/v1/integrations/anthropic/validate")
+        assert validated.status_code == 200
+        assert validated.json()["ok"] is True
+
+        removed = client.delete("/v1/integrations/anthropic")
+        assert removed.status_code == 200
+        assert removed.json()["configured"] is False
+
+        missing = client.get("/v1/integrations/not-real")
+        assert missing.status_code == 404
+
+
+def test_specialists_http_crud(tmp_path: Path):
+    app = create_app(store_path=tmp_path / "agent.db", allowed_hosts=["testserver"])
+    with TestClient(app) as client:
+        seeded = client.get("/v1/specialists")
+        assert seeded.status_code == 200
+        assert len(seeded.json()["data"]) >= 1
+
+        created = client.post(
+            "/v1/specialists",
+            json={
+                "name": "HTTP Specialist",
+                "slug": "http-specialist",
+                "description": "Test",
+                "skillNames": ["fold"],
+            },
+        )
+        assert created.status_code == 201
+        specialist_id = created.json()["id"]
+
+        fetched = client.get(f"/v1/specialists/{specialist_id}")
+        assert fetched.status_code == 200
+
+        patched = client.patch(
+            f"/v1/specialists/{specialist_id}",
+            json={"name": "Updated Specialist", "enabled": False},
+        )
+        assert patched.status_code == 200
+        assert patched.json()["enabled"] is False
+
+        deleted = client.delete(f"/v1/specialists/{specialist_id}")
+        assert deleted.status_code == 200
+        assert deleted.json()["deleted"] is True
+
+
+def test_mcp_catalog_and_skills_routes(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "agent_server.skills_service.SkillsService.list",
+        lambda self: [],
+    )
+    monkeypatch.setattr(
+        "agent_server.skills_service.SkillsService.suggested_sources",
+        lambda self: [],
+    )
+
+    app = create_app(store_path=tmp_path / "agent.db", allowed_hosts=["testserver"])
+    with TestClient(app) as client:
+        catalog = client.get("/v1/mcp-servers/catalog")
+        assert catalog.status_code == 200
+        assert len(catalog.json()["data"]) >= 1
+
+        skills = client.get("/v1/skills")
+        assert skills.status_code == 200
+        assert skills.json()["data"] == []
+
+        sources = client.get("/v1/skills/sources")
+        assert sources.status_code == 200

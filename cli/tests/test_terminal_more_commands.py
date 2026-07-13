@@ -123,6 +123,8 @@ class TestSettingsAndCommands:
 
 class TestOpenAICompatibleSetupAndFetch:
     def test_switch_model_lists_configured_profile_models_top_level(self):
+        from ui.terminal import AVAILABLE_MODELS
+
         term = _mk_terminal()
         cfg = Config(data={"llm.provider": "openai", "llm.model": "gpt-5.5"})
         cfg.upsert_openai_profile(
@@ -145,7 +147,15 @@ class TestOpenAICompatibleSetupAndFetch:
         term.session.config = cfg
         term.session.config.save = MagicMock()
         term.session.current_model = "gpt-5.5"
-        term._prompt_session.prompt.return_value = "12"  # first profile model option after static entries
+        static_count = sum(
+            1
+            for models in AVAILABLE_MODELS.values()
+            for model_id, _display, _desc in models
+            if model_id != "__custom_openai_compatible__"
+            and model_id not in set(cfg.hidden_models())
+        )
+        # First discovered profile model is listed immediately after static catalog entries.
+        term._prompt_session.prompt.return_value = str(static_count + 1)
         term._fetch_compatible_models = MagicMock(
             side_effect=[["omlx-a", "omlx-b"], ["unsloth-a"]]
         )

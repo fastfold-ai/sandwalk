@@ -40,8 +40,11 @@ class TestDatasetCatalog:
         assert expected == set(DATASETS.keys())
 
     def test_auto_download_datasets_have_urls(self):
+        # PRISM is auto_download but builds from a multi-file DepMap release
+        # (URL is None on the collapsed artifact; download_dataset has a special path).
+        special = {"prism"}
         for name, ds in DATASETS.items():
-            if ds.get("auto_download"):
+            if ds.get("auto_download") and name not in special:
                 for fname, url in ds["files"].items():
                     assert url is not None, f"{name}/{fname} is auto_download but has no URL"
 
@@ -50,9 +53,10 @@ class TestDatasetCatalog:
         for fname, url in DATASETS["depmap"]["files"].items():
             assert url is not None, f"depmap/{fname} missing URL"
 
-    def test_prism_is_manual_download(self):
-        assert DATASETS["prism"]["auto_download"] is False
+    def test_prism_is_auto_download_with_builder(self):
+        assert DATASETS["prism"]["auto_download"] is True
         assert "note" in DATASETS["prism"]
+        assert DATASETS["prism"]["files"]["prism_LFC_COLLAPSED.csv"] is None
 
     def test_l1000_exists(self):
         assert "l1000" in DATASETS
@@ -188,13 +192,15 @@ class TestDownloadDataset:
     @patch("data.downloader._download_file")
     @patch("data.downloader.Config")
     def test_prism_manual_download(self, mock_config, mock_dl, tmp_path):
-        """PRISM is now manual — should not call _download_file."""
+        """PRISM uses a dedicated builder — should not call generic _download_file."""
         mock_cfg = MagicMock()
         mock_cfg.get.return_value = str(tmp_path)
         mock_config.load.return_value = mock_cfg
 
-        download_dataset("prism", output=tmp_path)
+        with patch("data.downloader._download_prism", return_value=True) as mock_prism:
+            download_dataset("prism", output=tmp_path)
         assert mock_dl.call_count == 0
+        mock_prism.assert_called_once()
 
 
 class TestDownloadAll:

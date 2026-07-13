@@ -165,12 +165,25 @@ class TestTerminalMethods:
         )
 
     def test_switch_model_can_change_provider(self, terminal):
+        from ui.terminal import AVAILABLE_MODELS
+
         terminal.session.config.get.side_effect = (
             lambda key, default=None: "anthropic" if key == "llm.provider" else default
         )
+        terminal.session.config.hidden_models.return_value = []
+        terminal.session.current_model = "claude-opus-4-8"
         terminal._prompt_session = MagicMock()
-        # 4th option in AVAILABLE_MODELS order is gpt-5.5 (openai)
-        terminal._prompt_session.prompt.return_value = "4"
+        choices = [
+            (prov, model_id)
+            for prov, models in AVAILABLE_MODELS.items()
+            for model_id, _display, _desc in models
+            if model_id != "__custom_openai_compatible__"
+        ]
+        target_idx = next(
+            i for i, (prov, model_id) in enumerate(choices, start=1)
+            if prov == "openai" and model_id == "gpt-5.5"
+        )
+        terminal._prompt_session.prompt.return_value = str(target_idx)
 
         terminal._switch_model()
 
@@ -180,11 +193,20 @@ class TestTerminalMethods:
         terminal.session.config.save.assert_called_once()
 
     def test_switch_model_no_change_when_same_model_and_provider(self, terminal):
+        from ui.terminal import AVAILABLE_MODELS
+
         terminal.session.config.get.side_effect = (
             lambda key, default=None: "anthropic" if key == "llm.provider" else default
         )
+        terminal.session.config.hidden_models.return_value = []
+        first_model = next(
+            model_id
+            for models in AVAILABLE_MODELS.values()
+            for model_id, _display, _desc in models
+            if model_id != "__custom_openai_compatible__"
+        )
+        terminal.session.current_model = first_model
         terminal._prompt_session = MagicMock()
-        # 1st option is current model (claude-sonnet-4-5-20250929, anthropic)
         terminal._prompt_session.prompt.return_value = "1"
 
         terminal._switch_model()
