@@ -146,6 +146,7 @@ class AgentService:
         title: str | None,
         workspace_path: str | None,
         project_id: str | None = None,
+        specialist_id: str | None = None,
     ) -> AgentSession:
         normalized_workspace: str | None = None
         if workspace_path:
@@ -157,6 +158,7 @@ class AgentService:
             title=title,
             workspace_path=normalized_workspace,
             project_id=project_id,
+            specialist_id=specialist_id,
         )
         if normalized_workspace is None:
             workspace = default_workspace_path(session.id)
@@ -180,6 +182,8 @@ class AgentService:
         update_organize_label: bool,
         project_id: str | None = None,
         update_project_id: bool = False,
+        specialist_id: str | None = None,
+        update_specialist_id: bool = False,
     ) -> AgentSession:
         session = self.store.update_session(
             session_id,
@@ -188,6 +192,8 @@ class AgentService:
             update_organize_label=update_organize_label,
             project_id=project_id,
             update_project_id=update_project_id,
+            specialist_id=specialist_id,
+            update_specialist_id=update_specialist_id,
         )
         if session is None:
             raise KeyError(session_id)
@@ -337,11 +343,28 @@ class AgentService:
 
             mcp_servers = McpService(self.store).resolve_runtime_servers()
             project_context = None
+            specialist_instructions = None
+            allowed_skill_names = None
             current = self.store.get_session(session_id)
             if current and current.project_id:
                 project = self.store.get_project(current.project_id)
                 if project and project.agent_context:
                     project_context = project.agent_context
+            if current and current.specialist_id:
+                specialist = self.store.get_specialist(current.specialist_id)
+                if specialist is not None:
+                    from agent_server.default_specialists import (
+                        filter_mcp_servers_for_specialist,
+                    )
+
+                    if specialist.instructions and specialist.instructions.strip():
+                        specialist_instructions = specialist.instructions.strip()
+                    allowed_skill_names = list(specialist.skill_names or [])
+                    mcp_servers = filter_mcp_servers_for_specialist(
+                        mcp_servers,
+                        mcp_server_ids=list(specialist.mcp_server_ids or []),
+                        mcp_catalog_ids=list(specialist.mcp_catalog_ids or []),
+                    )
             summary = await asyncio.to_thread(
                 self._run_existing_agent,
                 content,
@@ -350,6 +373,8 @@ class AgentService:
                 history,
                 mcp_servers,
                 project_context,
+                specialist_instructions,
+                allowed_skill_names,
             )
             assistant_message = self.store.add_message(
                 session_id=session_id,
@@ -427,6 +452,8 @@ class AgentService:
         history,
         mcp_servers,
         project_context: str | None = None,
+        specialist_instructions: str | None = None,
+        allowed_skill_names: list[str] | None = None,
     ) -> str:
         """Temporary adapter until AgentRunner is split into AgentRuntime."""
         from agent.config import Config
@@ -456,6 +483,10 @@ class AgentService:
             context["mcp_servers"] = mcp_servers
         if project_context:
             context["project_context"] = project_context
+        if specialist_instructions:
+            context["specialist_instructions"] = specialist_instructions
+        if allowed_skill_names is not None:
+            context["allowed_skill_names"] = allowed_skill_names
         result = runner.run(content, context, progress_callback=progress_callback)
         return result.summary or "Done."
 

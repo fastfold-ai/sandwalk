@@ -179,7 +179,7 @@ export function GeneralView({
               </div>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 space-y-1">
-                  <div className="truncate text-sm font-medium">
+                  <div className="break-all text-sm font-medium">
                     {email || account?.user?.username || 'Fastfold account'}
                   </div>
                   <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">

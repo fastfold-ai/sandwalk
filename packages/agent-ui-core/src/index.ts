@@ -177,8 +177,61 @@ export type AgentSession = {
   status: AgentSessionStatus
   organizeLabel: 'pinned' | 'archive' | null
   projectId: string | null
+  specialistId: string | null
   workspacePath: string | null
   lastMessageAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type SpecialistColor =
+  | 'ink'
+  | 'gray'
+  | 'red'
+  | 'orange'
+  | 'amber'
+  | 'green'
+  | 'teal'
+  | 'blue'
+  | 'indigo'
+  | 'violet'
+  | 'pink'
+
+export type SpecialistIcon =
+  | 'agent'
+  | 'organization'
+  | 'chat'
+  | 'lightning'
+  | 'star'
+  | 'signpost'
+  | 'code'
+  | 'database'
+  | 'globe'
+  | 'flask'
+  | 'dna'
+  | 'microscope'
+  | 'book'
+  | 'sparkles'
+  | 'hard-hat'
+  | 'git-branch'
+  | 'target'
+  | 'shield'
+  | 'heart'
+  | 'briefcase'
+  | 'atom'
+
+export type Specialist = {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  instructions: string | null
+  color: SpecialistColor | string
+  icon: SpecialistIcon | string
+  skillNames: string[]
+  mcpServerIds: string[]
+  mcpCatalogIds: string[]
+  enabled: boolean
   createdAt: string
   updatedAt: string
 }
@@ -811,6 +864,40 @@ export interface AgentClient {
     options?: { projectId?: string | null; signal?: AbortSignal },
   ): Promise<AgentSession[]>
   listProjects?(signal?: AbortSignal): Promise<AgentProject[]>
+  listSpecialists?(signal?: AbortSignal): Promise<Specialist[]>
+  getSpecialist?(specialistId: string, signal?: AbortSignal): Promise<Specialist>
+  createSpecialist?(
+    input: {
+      name: string
+      slug?: string | null
+      description?: string | null
+      instructions?: string | null
+      color?: string
+      icon?: string
+      skillNames?: string[]
+      mcpServerIds?: string[]
+      mcpCatalogIds?: string[]
+      enabled?: boolean
+    },
+    signal?: AbortSignal,
+  ): Promise<Specialist>
+  updateSpecialist?(
+    specialistId: string,
+    input: {
+      name?: string
+      slug?: string | null
+      description?: string | null
+      instructions?: string | null
+      color?: string
+      icon?: string
+      skillNames?: string[]
+      mcpServerIds?: string[]
+      mcpCatalogIds?: string[]
+      enabled?: boolean
+    },
+    signal?: AbortSignal,
+  ): Promise<Specialist>
+  deleteSpecialist?(specialistId: string, signal?: AbortSignal): Promise<void>
   createProject?(
     input: {
       name: string
@@ -837,6 +924,7 @@ export interface AgentClient {
       title?: string
       workspacePath?: string | null
       projectId?: string | null
+      specialistId?: string | null
     },
     signal?: AbortSignal,
   ): Promise<AgentSession>
@@ -846,6 +934,7 @@ export interface AgentClient {
       title?: string
       organizeLabel?: 'pinned' | 'archive' | null
       projectId?: string | null
+      specialistId?: string | null
     },
     signal?: AbortSignal,
   ): Promise<AgentSession>

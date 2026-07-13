@@ -14,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { CardGridSkeleton } from '@/components/agents/PageSkeletons'
@@ -261,6 +262,8 @@ export function McpView({
   onDeleteMcp: (id: string) => Promise<void>
   onToggleCustom: (id: string, enabled: boolean) => Promise<void>
 }) {
+  const location = useLocation()
+  const [focusedMcpKey, setFocusedMcpKey] = useState<string | null>(null)
   const [mcpMode, setMcpMode] = useState<CustomMode>('remote')
   const [mcpName, setMcpName] = useState('')
   const [mcpTransport, setMcpTransport] = useState<'sse' | 'streamable_http'>(
@@ -344,6 +347,26 @@ export function McpView({
     () => mcpServers.filter(server => !server.catalogId),
     [mcpServers],
   )
+
+  useEffect(() => {
+    const raw = String(location.hash || '').replace(/^#/, '').trim()
+    if (!raw) {
+      setFocusedMcpKey(null)
+      return
+    }
+    let key = ''
+    try {
+      key = decodeURIComponent(raw)
+    } catch {
+      key = raw
+    }
+    setFocusedMcpKey(key)
+    const timer = window.setTimeout(() => {
+      const node = document.getElementById(`mcp-${key}`)
+      node?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 80)
+    return () => window.clearTimeout(timer)
+  }, [location.hash])
 
   useEffect(() => {
     // Drop optimistic patches once the catalog reflects the latest server state.
@@ -547,8 +570,13 @@ export function McpView({
 
     return (
       <div
+        id={`mcp-catalog-${view.id}`}
         key={view.id}
-        className="bg-background/60 hover:bg-muted/40 flex h-full flex-col rounded-lg p-3 transition-colors"
+        className={cn(
+          'bg-background/60 hover:bg-muted/40 flex h-full flex-col rounded-lg p-3 transition-colors',
+          focusedMcpKey === `catalog-${view.id}` &&
+            'ring-ring ring-2 ring-offset-2 ring-offset-background',
+        )}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -1045,8 +1073,13 @@ export function McpView({
             <div className="mt-3 space-y-2">
               {customServers.map(server => (
                 <div
+                  id={`mcp-server-${server.id}`}
                   key={server.id}
-                  className="bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors"
+                  className={cn(
+                    'bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors',
+                    focusedMcpKey === `server-${server.id}` &&
+                      'ring-ring ring-2 ring-offset-2 ring-offset-background',
+                  )}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

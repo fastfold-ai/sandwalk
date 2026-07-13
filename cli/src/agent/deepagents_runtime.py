@@ -152,6 +152,54 @@ def skill_source_dirs() -> list[str]:
     return sources
 
 
+def skill_source_dirs_for_names(skill_names: list[str]) -> list[str]:
+    """Stage only the named skills into a temp directory for deepagents ``skills=``.
+
+    When a specialist scopes a run, deepagents still expects parent directories that
+    contain skill folders — so we symlink the selected skill directories into a
+    staging root and return that root alone.
+    """
+    import hashlib
+    import shutil
+    import tempfile
+
+    from agent.skills import skill_info
+
+    names = [str(name).strip() for name in skill_names if str(name).strip()]
+    if not names:
+        return []
+
+    resolved: list[tuple[str, Path]] = []
+    for name in names:
+        info = skill_info(name)
+        if info is None:
+            continue
+        directory = info.directory
+        if directory is None or not directory.is_dir():
+            continue
+        resolved.append((directory.name, directory.resolve()))
+
+    if not resolved:
+        return []
+
+    stamp = hashlib.sha1(
+        "|".join(sorted(f"{key}:{path}" for key, path in resolved)).encode()
+    ).hexdigest()[:16]
+    staging = Path(tempfile.gettempdir()) / "sandwalk-specialist-skills" / stamp
+    if staging.exists():
+        shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir(parents=True, exist_ok=True)
+    for key, directory in resolved:
+        link = staging / key
+        if link.exists() or link.is_symlink():
+            link.unlink()
+        try:
+            link.symlink_to(directory, target_is_directory=True)
+        except OSError:
+            shutil.copytree(directory, link)
+    return [str(staging)]
+
+
 async def create_external_mcp_tools(servers: list[dict] | None) -> list[Any]:
     """Load tools from enabled stdio/SSE/streamable-HTTP MCP servers.
 

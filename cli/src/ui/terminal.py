@@ -50,11 +50,12 @@ SLASH_COMMANDS = {
     "/help": "Show command reference with examples",
     "/tools": "List all tools with status (stable/experimental)",
     "/data": "Manage local datasets (/data list | status | pull <name> | pull-all)",
-    "/skills": "List currently loaded skills",
+    "/skills": "List loaded skills (filtered to active specialist if set)",
     "/skills-add": "Install a skill from GitHub/local path/name",
     "/skills-find": "Discover installable skills from the catalog",
     "/skills-upgrade": "Sync the Fastfold catalog and update installed skills",
     "/skills-remove": "Remove a globally-installed skill",
+    "/specialist": "Set/list specialists (/specialist <slug> | use|clear|list|show)",
     "/model": "Switch LLM model/provider interactively",
     "/settings": "Configure UI and agent preferences",
     "/config": "Show active runtime configuration",
@@ -591,6 +592,8 @@ class InteractiveTerminal:
         self._show_exit_hint = False
         self._show_interrupt_hint = False
         self._verbose_hint = None
+        self._cli_specialist_label: str | None = None
+        self._refresh_cli_specialist_label()
         self._last_response = None  # Last synthesis text for /copy
         self._suggestions = list(DEFAULT_SUGGESTIONS)
         random.shuffle(self._suggestions)
@@ -1157,6 +1160,18 @@ class InteractiveTerminal:
         else:
             self._advance_suggestion()
 
+    def _refresh_cli_specialist_label(self) -> None:
+        """Cache active specialist name for the bottom toolbar."""
+        try:
+            from agent.specialists_manage import get_active_specialist
+
+            # Always read from disk so /specialist use|clear updates immediately
+            # even when session.config is an older in-memory snapshot.
+            active = get_active_specialist()
+            self._cli_specialist_label = active.name if active else None
+        except Exception:
+            self._cli_specialist_label = None
+
     def _model_display_name(self, model_id: str = None) -> str:
         """Get a short display name for a model ID."""
         model_id = model_id or self.session.current_model
@@ -1591,8 +1606,17 @@ class InteractiveTerminal:
             )
         verbose = ' <style fg="#50fa7b" bg="default">verbose</style>' if self.session.verbose else ""
         plan = ' <style fg="#ff79c6" bg="default">plan mode</style>' if self.session.config.get("agent.plan_preview", False) else ""
+        specialist = ""
+        label = getattr(self, "_cli_specialist_label", None)
+        if label:
+            from html import escape as _html_escape
+
+            specialist = (
+                f' <style fg="#555555" bg="default">·</style> '
+                f'<style fg="#bd93f9" bg="default">{_html_escape(label)}</style>'
+            )
         return HTML(
-            f'<style fg="#8be9fd" bg="default">{model}</style>{verbose}{plan}'
+            f'<style fg="#8be9fd" bg="default">{model}</style>{specialist}{verbose}{plan}'
             '<style fg="#555555" bg="default"> · ? for commands · Ctrl+O verbose</style>'
         )
 
@@ -1738,6 +1762,10 @@ class InteractiveTerminal:
                 continue
             if cmd in ("skill", "/skill", "skills", "/skills"):
                 self._show_skills()
+                self._advance_suggestion()
+                continue
+            if cmd_head in ("specialist", "/specialist"):
+                self._handle_specialist_command(query)
                 self._advance_suggestion()
                 continue
             if cmd_head in ("data", "/data"):
@@ -1905,6 +1933,25 @@ class InteractiveTerminal:
 
         run_context = dict(context)
 
+        # Apply (or clear) active CLI specialist each run so /specialist use|clear
+        # takes effect without restarting the session.
+        try:
+            from agent.specialists_manage import (
+                apply_specialist_to_context,
+                get_active_specialist,
+            )
+
+            run_context.pop("specialist_instructions", None)
+            run_context.pop("allowed_skill_names", None)
+            # Drop prior specialist MCP filter; re-apply only when active.
+            if "mcp_servers" in run_context and get_active_specialist() is None:
+                run_context.pop("mcp_servers", None)
+            active = get_active_specialist()
+            if active is not None:
+                run_context = apply_specialist_to_context(run_context, active)
+        except Exception:  # noqa: BLE001
+            pass
+
         # Extract @mentions and inject into context
         cleaned_query, mention_tools, mention_datasets, mention_workflows = extract_mentions(query)
         if mention_tools or mention_datasets or mention_workflows:
@@ -1962,7 +2009,7 @@ class InteractiveTerminal:
             has_messages = bool(getattr(trajectory, "turns", None))
         if session_id and has_messages:
             self.console.print("Resume this session with:")
-            self.console.print(f"[cyan]fastfold --resume {session_id}[/cyan]")
+            self.console.print(f"[cyan]sandwalk --resume {session_id}[/cyan]")
 
     def _ensure_llm_ready_for_query(self) -> bool:
         """Ensure required provider API key is present; prompt interactively if missing."""
@@ -3735,6 +3782,16 @@ class InteractiveTerminal:
             parts = parts[1:]
         handle_mcp_argv(parts or ["list"], self.console)
 
+    def _handle_specialist_command(self, query: str) -> None:
+        """Handle /specialist — list and activate run profiles."""
+        from agent.specialists_manage import handle_specialist_argv
+
+        parts = query.strip().split()
+        if parts and parts[0].lstrip("/").lower() == "specialist":
+            parts = parts[1:]
+        handle_specialist_argv(parts or ["list"], self.console)
+        self._refresh_cli_specialist_label()
+
     def _handle_keys_command(self, query: str) -> None:
         """Handle /keys with optional compatible-profile actions."""
         from agent.config import Config
@@ -5058,20 +5115,50 @@ class InteractiveTerminal:
         """List currently loaded skills in interactive mode."""
         from rich.table import Table
         from agent.skills import list_skills, display_author, display_updated, display_version
+        from agent.specialists_manage import get_active_specialist
 
         skills = list_skills()
-        if not skills:
-            self.console.print("  [yellow]No skills loaded.[/yellow]")
+        active = get_active_specialist()
+        if active is not None:
+            allowed = {
+                str(name).strip().lower()
+                for name in (active.skill_names or [])
+                if str(name).strip()
+            }
+            skills = [
+                info
+                for info in skills
+                if str(info.name).strip().lower() in allowed
+            ]
             self.console.print(
-                "  [dim]Add one with[/dim] /skills-add <github url or owner/repo@path>"
+                f"  [dim]Showing skills for specialist[/dim] "
+                f"[bold]{active.name}[/bold] "
+                f"[dim]({active.slug}) · {len(allowed)} configured[/dim]"
             )
+        if not skills:
+            if active is not None:
+                self.console.print(
+                    "  [yellow]No matching installed skills for this specialist.[/yellow]"
+                )
+                self.console.print(
+                    "  [dim]Clear with[/dim] /specialist clear  "
+                    "[dim]to list all skills, or install missing ones.[/dim]"
+                )
+            else:
+                self.console.print("  [yellow]No skills loaded.[/yellow]")
+                self.console.print(
+                    "  [dim]Add one with[/dim] /skills-add <github url or owner/repo@path>"
+                )
             return
 
         enabled_count = len([info for info in skills if getattr(info, "enabled", True)])
-        table = Table(
-            title=f"Loaded Skills ({len(skills)} total, {enabled_count} enabled)",
-            show_lines=False,
+        title = (
+            f"Specialist Skills — {active.name} "
+            f"({len(skills)} installed, {enabled_count} enabled)"
+            if active is not None
+            else f"Loaded Skills ({len(skills)} total, {enabled_count} enabled)"
         )
+        table = Table(title=title, show_lines=False)
         table.add_column("Skill", style="bold cyan", no_wrap=True)
         table.add_column("Enabled", style="dim", no_wrap=True)
         table.add_column("Source", style="dim")
@@ -5092,6 +5179,10 @@ class InteractiveTerminal:
             )
 
         self.console.print(table)
+        if active is not None:
+            self.console.print(
+                "  [dim]Only specialist skills are listed while one is active.[/dim]"
+            )
 
     def _add_skill(self, source: str):
         """Install a skill from a GitHub URL / shorthand / local path / name."""

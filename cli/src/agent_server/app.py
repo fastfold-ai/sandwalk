@@ -46,8 +46,10 @@ from agent_server.models import (
     CreateProjectRequest,
     CreatePtyRequest,
     CreateSessionRequest,
+    CreateSpecialistRequest,
     DeleteProjectResponse,
     DeleteSessionResponse,
+    DeleteSpecialistResponse,
     DoctorDiagnosticsRequest,
     DoctorReport,
     HealthResponse,
@@ -79,6 +81,8 @@ from agent_server.models import (
     SendMessageRequest,
     SessionList,
     StartRunResponse,
+    Specialist,
+    SpecialistList,
     StorageReport,
     EnvironmentReport,
     EnvironmentPackageRequest,
@@ -96,6 +100,7 @@ from agent_server.models import (
     UpdatePtyRequest,
     UpdateRuntimeSettingsRequest,
     UpdateMcpServerRequest,
+    UpdateSpecialistRequest,
     ValidateIntegrationResponse,
     UpdateSessionRequest,
     AutoTitleSessionRequest,
@@ -125,6 +130,7 @@ from agent_server.auth_settings import (
 from agent_server.pty_manager import PtyManager
 from agent_server.service import AgentService, SessionBusyError
 from agent_server.skills_service import SkillsService
+from agent_server.specialists_service import SpecialistsService
 from agent_server.integrations_service import IntegrationsService
 from agent_server.mcp_service import (
     McpService,
@@ -174,6 +180,7 @@ def create_app(
     store = AgentStore(store_path)
     service = AgentService(store)
     skills_service = SkillsService()
+    specialists_service = SpecialistsService(store)
     integrations_service = IntegrationsService()
     settings_service = SettingsService()
     account_service = AccountService(integrations=integrations_service)
@@ -1163,6 +1170,73 @@ def create_app(
             raise HTTPException(status_code=404, detail="Project not found.")
         return DeleteProjectResponse(deleted=True)
 
+    @app.get("/v1/specialists", response_model=SpecialistList)
+    async def list_specialists() -> SpecialistList:
+        return SpecialistList(data=await asyncio.to_thread(specialists_service.list))
+
+    @app.post("/v1/specialists", response_model=Specialist, status_code=201)
+    async def create_specialist(payload: CreateSpecialistRequest) -> Specialist:
+        try:
+            return await asyncio.to_thread(
+                specialists_service.create,
+                name=payload.name,
+                slug=payload.slug,
+                description=payload.description,
+                instructions=payload.instructions,
+                color=payload.color,
+                icon=payload.icon,
+                skill_names=payload.skill_names,
+                mcp_server_ids=payload.mcp_server_ids,
+                mcp_catalog_ids=payload.mcp_catalog_ids,
+                enabled=payload.enabled,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/v1/specialists/{specialist_id}", response_model=Specialist)
+    async def get_specialist(specialist_id: str) -> Specialist:
+        specialist = await asyncio.to_thread(specialists_service.get, specialist_id)
+        if specialist is None:
+            raise HTTPException(status_code=404, detail="Specialist not found.")
+        return specialist
+
+    @app.patch("/v1/specialists/{specialist_id}", response_model=Specialist)
+    async def update_specialist(
+        specialist_id: str,
+        payload: UpdateSpecialistRequest,
+    ) -> Specialist:
+        try:
+            specialist = await asyncio.to_thread(
+                specialists_service.update,
+                specialist_id,
+                name=payload.name,
+                slug=payload.slug,
+                description=payload.description,
+                update_description=payload.description is not None
+                or payload.clear_description,
+                instructions=payload.instructions,
+                update_instructions=payload.instructions is not None
+                or payload.clear_instructions,
+                color=payload.color,
+                icon=payload.icon,
+                skill_names=payload.skill_names,
+                mcp_server_ids=payload.mcp_server_ids,
+                mcp_catalog_ids=payload.mcp_catalog_ids,
+                enabled=payload.enabled,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if specialist is None:
+            raise HTTPException(status_code=404, detail="Specialist not found.")
+        return specialist
+
+    @app.delete("/v1/specialists/{specialist_id}", response_model=DeleteSpecialistResponse)
+    async def delete_specialist(specialist_id: str) -> DeleteSpecialistResponse:
+        deleted = await asyncio.to_thread(specialists_service.delete, specialist_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Specialist not found.")
+        return DeleteSpecialistResponse(deleted=True)
+
     @app.get("/v1/sessions", response_model=SessionList)
     async def list_sessions(
         project_id: str | None = Query(default=None, alias="projectId"),
@@ -1188,6 +1262,7 @@ def create_app(
                 title=payload.title,
                 workspace_path=payload.workspace_path,
                 project_id=payload.project_id,
+                specialist_id=payload.specialist_id,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1206,6 +1281,9 @@ def create_app(
     ) -> AgentSession:
         update_label = payload.organize_label is not None or payload.clear_organize_label
         update_project = payload.project_id is not None or payload.clear_project_id
+        update_specialist = (
+            payload.specialist_id is not None or payload.clear_specialist_id
+        )
         try:
             return await asyncio.to_thread(
                 service.update_session,
@@ -1215,6 +1293,10 @@ def create_app(
                 update_organize_label=update_label,
                 project_id=None if payload.clear_project_id else payload.project_id,
                 update_project_id=update_project,
+                specialist_id=None
+                if payload.clear_specialist_id
+                else payload.specialist_id,
+                update_specialist_id=update_specialist,
             )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Session not found.") from exc

@@ -126,6 +126,7 @@ def build_system_prompt(
     tool_mode: str = "native",
     exclude_categories: set[str] | None = None,
     project_context: str | None = None,
+    specialist_instructions: str | None = None,
 ) -> str:
     """Build the unified system prompt for the agent runner.
 
@@ -145,6 +146,8 @@ def build_system_prompt(
             embedded and the model calls them as Python inside ``run_python``.
         exclude_categories: Tool categories omitted from the runtime, so the PTC
             catalog matches the tools actually available.
+        specialist_instructions: Optional specialist profile text appended after
+            project context.
 
     Returns:
         The complete system prompt string.
@@ -157,6 +160,10 @@ def build_system_prompt(
     if project_context and str(project_context).strip():
         parts.append("\n## Project Context\n")
         parts.append(str(project_context).strip())
+
+    if specialist_instructions and str(specialist_instructions).strip():
+        parts.append("\n## Specialist Instructions\n")
+        parts.append(str(specialist_instructions).strip())
 
     ptc = str(tool_mode).strip().lower() == "ptc"
 

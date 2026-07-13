@@ -6,6 +6,7 @@ import type {
   AgentModel,
   AgentProject,
   AgentSession,
+  Specialist,
   AgentCatalogSkill,
   AgentCatalogSkillAudit,
   AgentCatalogSkillDetail,
@@ -301,6 +302,95 @@ export class LocalAgentClient
     )
   }
 
+  async listSpecialists(signal?: AbortSignal): Promise<Specialist[]> {
+    const result = await this.request<{ data: Specialist[] }>('/specialists', { signal })
+    return result.data
+  }
+
+  getSpecialist(specialistId: string, signal?: AbortSignal): Promise<Specialist> {
+    return this.request<Specialist>(`/specialists/${encodeURIComponent(specialistId)}`, {
+      signal,
+    })
+  }
+
+  createSpecialist(
+    input: {
+      name: string
+      slug?: string | null
+      description?: string | null
+      instructions?: string | null
+      color?: string
+      icon?: string
+      skillNames?: string[]
+      mcpServerIds?: string[]
+      mcpCatalogIds?: string[]
+      enabled?: boolean
+    },
+    signal?: AbortSignal,
+  ): Promise<Specialist> {
+    return this.request<Specialist>('/specialists', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: input.name,
+        slug: input.slug,
+        description: input.description,
+        instructions: input.instructions,
+        color: input.color,
+        icon: input.icon,
+        skill_names: input.skillNames ?? [],
+        mcp_server_ids: input.mcpServerIds ?? [],
+        mcp_catalog_ids: input.mcpCatalogIds ?? [],
+        enabled: input.enabled ?? true,
+      }),
+      headers: { 'content-type': 'application/json' },
+      signal,
+    })
+  }
+
+  updateSpecialist(
+    specialistId: string,
+    input: {
+      name?: string
+      slug?: string | null
+      description?: string | null
+      instructions?: string | null
+      color?: string
+      icon?: string
+      skillNames?: string[]
+      mcpServerIds?: string[]
+      mcpCatalogIds?: string[]
+      enabled?: boolean
+    },
+    signal?: AbortSignal,
+  ): Promise<Specialist> {
+    return this.request<Specialist>(`/specialists/${encodeURIComponent(specialistId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name: input.name,
+        slug: input.slug,
+        description: input.description,
+        clear_description: input.description === null,
+        instructions: input.instructions,
+        clear_instructions: input.instructions === null,
+        color: input.color,
+        icon: input.icon,
+        skill_names: input.skillNames,
+        mcp_server_ids: input.mcpServerIds,
+        mcp_catalog_ids: input.mcpCatalogIds,
+        enabled: input.enabled,
+      }),
+      headers: { 'content-type': 'application/json' },
+      signal,
+    })
+  }
+
+  async deleteSpecialist(specialistId: string, signal?: AbortSignal): Promise<void> {
+    await this.request<{ deleted: boolean }>(
+      `/specialists/${encodeURIComponent(specialistId)}`,
+      { method: 'DELETE', signal },
+    )
+  }
+
   async searchSessions(query: string, signal?: AbortSignal): Promise<AgentSession[]> {
     const params = new URLSearchParams({ q: query })
     const result = await this.request<{ data: AgentSession[] }>(`/sessions/search?${params}`, {
@@ -314,6 +404,7 @@ export class LocalAgentClient
       title?: string
       workspacePath?: string | null
       projectId?: string | null
+      specialistId?: string | null
     },
     signal?: AbortSignal,
   ): Promise<AgentSession> {
@@ -323,6 +414,7 @@ export class LocalAgentClient
         title: input.title,
         workspace_path: input.workspacePath,
         project_id: input.projectId,
+        specialist_id: input.specialistId,
       }),
       headers: { 'content-type': 'application/json' },
       signal,
@@ -335,6 +427,7 @@ export class LocalAgentClient
       title?: string
       organizeLabel?: 'pinned' | 'archive' | null
       projectId?: string | null
+      specialistId?: string | null
     },
     signal?: AbortSignal,
   ): Promise<AgentSession> {
@@ -346,6 +439,8 @@ export class LocalAgentClient
         clear_organize_label: input.organizeLabel === null,
         project_id: input.projectId ?? undefined,
         clear_project_id: input.projectId === null,
+        specialist_id: input.specialistId ?? undefined,
+        clear_specialist_id: input.specialistId === null,
       }),
       headers: { 'content-type': 'application/json' },
       signal,

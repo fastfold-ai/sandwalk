@@ -634,7 +634,7 @@ class TestTerminalMethods:
         terminal._print_exit_with_resume_hint()
         printed = " ".join(str(c) for c in terminal.console.print.call_args_list)
         assert "Resume this session with:" in printed
-        assert "fastfold --resume d0b0571d" in printed
+        assert "sandwalk --resume d0b0571d" in printed
 
     def test_print_exit_without_messages_hides_resume_hint(self, terminal):
         terminal.agent = MagicMock()

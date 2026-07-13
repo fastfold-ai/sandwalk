@@ -19,6 +19,7 @@ from agent_server.models import (
     McpServer,
     MessageRole,
     SessionStatus,
+    Specialist,
 )
 
 
@@ -109,6 +110,27 @@ class AgentStore:
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS specialists (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    slug TEXT NOT NULL UNIQUE,
+                    description TEXT,
+                    instructions TEXT,
+                    color TEXT NOT NULL,
+                    icon TEXT NOT NULL,
+                    skill_names TEXT NOT NULL,
+                    mcp_server_ids TEXT NOT NULL,
+                    mcp_catalog_ids TEXT NOT NULL DEFAULT '[]',
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS store_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
                 """
             )
             columns = {
@@ -121,10 +143,30 @@ class AgentStore:
                 connection.execute("ALTER TABLE sessions ADD COLUMN last_message_at TEXT")
             if "project_id" not in columns:
                 connection.execute("ALTER TABLE sessions ADD COLUMN project_id TEXT")
+            if "specialist_id" not in columns:
+                connection.execute("ALTER TABLE sessions ADD COLUMN specialist_id TEXT")
+            specialist_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(specialists)").fetchall()
+            }
+            if "mcp_catalog_ids" not in specialist_columns:
+                connection.execute(
+                    "ALTER TABLE specialists ADD COLUMN mcp_catalog_ids TEXT NOT NULL DEFAULT '[]'"
+                )
+            if "enabled" not in specialist_columns:
+                connection.execute(
+                    "ALTER TABLE specialists ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1"
+                )
             connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS sessions_project_updated
                     ON sessions(project_id, updated_at DESC)
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS sessions_specialist_updated
+                    ON sessions(specialist_id, updated_at DESC)
                 """
             )
             mcp_columns = {
@@ -153,6 +195,29 @@ class AgentStore:
                 """
             )
 
+        from agent_server.default_specialists import ensure_default_specialists
+
+        ensure_default_specialists(self)
+
+    def get_meta(self, key: str) -> str | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM store_meta WHERE key = ?",
+                (key,),
+            ).fetchone()
+        return str(row["value"]) if row is not None else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        with self._write_lock:
+            with self._connect() as connection:
+                connection.execute(
+                    """
+                    INSERT INTO store_meta(key, value) VALUES (?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                    """,
+                    (key, value),
+                )
+
     @staticmethod
     def _session(row: sqlite3.Row) -> AgentSession:
         keys = set(row.keys())
@@ -162,12 +227,45 @@ class AgentStore:
             status=row["status"],
             organize_label=row["organize_label"],
             project_id=row["project_id"] if "project_id" in keys else None,
+            specialist_id=row["specialist_id"] if "specialist_id" in keys else None,
             workspace_path=row["workspace_path"],
             last_message_at=(
                 datetime.fromisoformat(row["last_message_at"])
                 if row["last_message_at"]
                 else None
             ),
+            created_at=datetime.fromisoformat(row["created_at"]),
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+        )
+
+    @staticmethod
+    def _specialist(row: sqlite3.Row) -> Specialist:
+        def _json_list(raw: Any) -> list[str]:
+            if not raw:
+                return []
+            try:
+                parsed = json.loads(raw)
+            except (TypeError, json.JSONDecodeError):
+                return []
+            if not isinstance(parsed, list):
+                return []
+            return [str(item).strip() for item in parsed if str(item).strip()]
+
+        keys = set(row.keys())
+        return Specialist(
+            id=row["id"],
+            name=row["name"],
+            slug=row["slug"],
+            description=row["description"],
+            instructions=row["instructions"],
+            color=row["color"] or "ink",
+            icon=row["icon"] or "agent",
+            skill_names=_json_list(row["skill_names"]),
+            mcp_server_ids=_json_list(row["mcp_server_ids"]),
+            mcp_catalog_ids=_json_list(
+                row["mcp_catalog_ids"] if "mcp_catalog_ids" in keys else "[]"
+            ),
+            enabled=bool(row["enabled"]) if "enabled" in keys else True,
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
         )
@@ -201,12 +299,14 @@ class AgentStore:
         title: str | None,
         workspace_path: str | None,
         project_id: str | None = None,
+        specialist_id: str | None = None,
     ) -> AgentSession:
         return self.ensure_session(
             str(uuid.uuid4()),
             title=title,
             workspace_path=workspace_path,
             project_id=project_id,
+            specialist_id=specialist_id,
         )
 
     def ensure_session(
@@ -216,6 +316,7 @@ class AgentStore:
         title: str | None = None,
         workspace_path: str | None = None,
         project_id: str | None = None,
+        specialist_id: str | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> AgentSession:
@@ -230,6 +331,8 @@ class AgentStore:
 
         if project_id is not None and self.get_project(project_id) is None:
             raise ValueError(f"Project not found: {project_id}")
+        if specialist_id is not None and self.get_specialist(specialist_id) is None:
+            raise ValueError(f"Specialist not found: {specialist_id}")
 
         now = utc_now()
         created = created_at or now
@@ -240,6 +343,7 @@ class AgentStore:
             status="idle",
             organize_label=None,
             project_id=project_id,
+            specialist_id=specialist_id,
             workspace_path=workspace_path,
             last_message_at=None,
             created_at=created,
@@ -249,10 +353,10 @@ class AgentStore:
             connection.execute(
                 """
                 INSERT INTO sessions(
-                    id, title, status, organize_label, project_id, workspace_path,
-                    last_message_at, created_at, updated_at
+                    id, title, status, organize_label, project_id, specialist_id,
+                    workspace_path, last_message_at, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session.id,
@@ -260,6 +364,7 @@ class AgentStore:
                     session.status,
                     session.organize_label,
                     session.project_id,
+                    session.specialist_id,
                     session.workspace_path,
                     None,
                     session.created_at.isoformat(),
@@ -320,6 +425,8 @@ class AgentStore:
         update_organize_label: bool = False,
         project_id: str | None = None,
         update_project_id: bool = False,
+        specialist_id: str | None = None,
+        update_specialist_id: bool = False,
     ) -> AgentSession | None:
         current = self.get_session(session_id)
         if current is None:
@@ -335,15 +442,28 @@ class AgentStore:
             if project_id is not None and self.get_project(project_id) is None:
                 raise ValueError(f"Project not found: {project_id}")
             next_project_id = project_id
+        next_specialist_id = current.specialist_id
+        if update_specialist_id:
+            if specialist_id is not None and self.get_specialist(specialist_id) is None:
+                raise ValueError(f"Specialist not found: {specialist_id}")
+            next_specialist_id = specialist_id
         now = utc_now()
         with self._write_lock, self._connect() as connection:
             connection.execute(
                 """
                 UPDATE sessions
-                SET title = ?, organize_label = ?, project_id = ?, updated_at = ?
+                SET title = ?, organize_label = ?, project_id = ?, specialist_id = ?,
+                    updated_at = ?
                 WHERE id = ?
                 """,
-                (next_title, next_label, next_project_id, now.isoformat(), session_id),
+                (
+                    next_title,
+                    next_label,
+                    next_project_id,
+                    next_specialist_id,
+                    now.isoformat(),
+                    session_id,
+                ),
             )
         return self.get_session(session_id)
 
@@ -476,6 +596,215 @@ class AgentStore:
             )
             cursor = connection.execute(
                 "DELETE FROM projects WHERE id = ?", (project_id,)
+            )
+        return cursor.rowcount > 0
+
+    @staticmethod
+    def _slugify(value: str) -> str:
+        import re
+
+        slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
+        return slug or "specialist"
+
+    def create_specialist(
+        self,
+        *,
+        name: str,
+        slug: str | None = None,
+        description: str | None = None,
+        instructions: str | None = None,
+        color: str = "ink",
+        icon: str = "git-branch",
+        skill_names: list[str] | None = None,
+        mcp_server_ids: list[str] | None = None,
+        mcp_catalog_ids: list[str] | None = None,
+        enabled: bool = True,
+    ) -> Specialist:
+        normalized = name.strip()
+        if not normalized:
+            raise ValueError("Specialist name cannot be empty.")
+        next_slug = self._slugify(slug or normalized)
+        now = utc_now()
+        specialist_id = str(uuid.uuid4())
+        skills = [str(item).strip() for item in (skill_names or []) if str(item).strip()]
+        mcps = [
+            str(item).strip() for item in (mcp_server_ids or []) if str(item).strip()
+        ]
+        catalogs = [
+            str(item).strip() for item in (mcp_catalog_ids or []) if str(item).strip()
+        ]
+        with self._write_lock, self._connect() as connection:
+            existing = connection.execute(
+                "SELECT id FROM specialists WHERE slug = ?", (next_slug,)
+            ).fetchone()
+            if existing is not None:
+                raise ValueError(f"Specialist slug already exists: {next_slug}")
+            connection.execute(
+                """
+                INSERT INTO specialists(
+                    id, name, slug, description, instructions, color, icon,
+                    skill_names, mcp_server_ids, mcp_catalog_ids, enabled,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    specialist_id,
+                    normalized,
+                    next_slug,
+                    (description or "").strip() or None,
+                    (instructions or "").strip() or None,
+                    (color or "ink").strip() or "ink",
+                    (icon or "git-branch").strip() or "git-branch",
+                    json.dumps(skills),
+                    json.dumps(mcps),
+                    json.dumps(catalogs),
+                    1 if enabled else 0,
+                    now.isoformat(),
+                    now.isoformat(),
+                ),
+            )
+        specialist = self.get_specialist(specialist_id)
+        if specialist is None:
+            raise RuntimeError("Failed to create specialist.")
+        return specialist
+
+    def list_specialists(self) -> list[Specialist]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM specialists
+                ORDER BY updated_at DESC, name ASC, id DESC
+                """
+            ).fetchall()
+        return [self._specialist(row) for row in rows]
+
+    def get_specialist(self, specialist_id: str) -> Specialist | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM specialists WHERE id = ?", (specialist_id,)
+            ).fetchone()
+        return self._specialist(row) if row else None
+
+    def get_specialist_by_slug(self, slug: str) -> Specialist | None:
+        key = self._slugify(slug)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM specialists WHERE slug = ?", (key,)
+            ).fetchone()
+        return self._specialist(row) if row else None
+
+    def resolve_specialist_ref(self, ref: str) -> Specialist | None:
+        """Resolve by id, slug, or case-insensitive name."""
+        key = (ref or "").strip()
+        if not key:
+            return None
+        by_id = self.get_specialist(key)
+        if by_id is not None:
+            return by_id
+        by_slug = self.get_specialist_by_slug(key)
+        if by_slug is not None:
+            return by_slug
+        lowered = key.lower()
+        for specialist in self.list_specialists():
+            if specialist.name.strip().lower() == lowered:
+                return specialist
+        return None
+
+    def update_specialist(
+        self,
+        specialist_id: str,
+        *,
+        name: str | None = None,
+        slug: str | None = None,
+        description: str | None = None,
+        update_description: bool = False,
+        instructions: str | None = None,
+        update_instructions: bool = False,
+        color: str | None = None,
+        icon: str | None = None,
+        skill_names: list[str] | None = None,
+        mcp_server_ids: list[str] | None = None,
+        mcp_catalog_ids: list[str] | None = None,
+        enabled: bool | None = None,
+    ) -> Specialist | None:
+        current = self.get_specialist(specialist_id)
+        if current is None:
+            return None
+        next_name = current.name
+        if name is not None:
+            next_name = name.strip()
+            if not next_name:
+                raise ValueError("Specialist name cannot be empty.")
+        next_slug = current.slug
+        if slug is not None:
+            next_slug = self._slugify(slug)
+        next_description = current.description
+        if update_description:
+            next_description = (description or "").strip() or None
+        next_instructions = current.instructions
+        if update_instructions:
+            next_instructions = (instructions or "").strip() or None
+        next_color = current.color if color is None else ((color or "").strip() or "ink")
+        next_icon = current.icon if icon is None else ((icon or "").strip() or "agent")
+        next_skills = (
+            current.skill_names
+            if skill_names is None
+            else [str(item).strip() for item in skill_names if str(item).strip()]
+        )
+        next_mcps = (
+            current.mcp_server_ids
+            if mcp_server_ids is None
+            else [str(item).strip() for item in mcp_server_ids if str(item).strip()]
+        )
+        next_catalogs = (
+            current.mcp_catalog_ids
+            if mcp_catalog_ids is None
+            else [str(item).strip() for item in mcp_catalog_ids if str(item).strip()]
+        )
+        next_enabled = current.enabled if enabled is None else bool(enabled)
+        now = utc_now()
+        with self._write_lock, self._connect() as connection:
+            if next_slug != current.slug:
+                clash = connection.execute(
+                    "SELECT id FROM specialists WHERE slug = ? AND id != ?",
+                    (next_slug, specialist_id),
+                ).fetchone()
+                if clash is not None:
+                    raise ValueError(f"Specialist slug already exists: {next_slug}")
+            connection.execute(
+                """
+                UPDATE specialists
+                SET name = ?, slug = ?, description = ?, instructions = ?,
+                    color = ?, icon = ?, skill_names = ?, mcp_server_ids = ?,
+                    mcp_catalog_ids = ?, enabled = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    next_name,
+                    next_slug,
+                    next_description,
+                    next_instructions,
+                    next_color,
+                    next_icon,
+                    json.dumps(next_skills),
+                    json.dumps(next_mcps),
+                    json.dumps(next_catalogs),
+                    1 if next_enabled else 0,
+                    now.isoformat(),
+                    specialist_id,
+                ),
+            )
+        return self.get_specialist(specialist_id)
+
+    def delete_specialist(self, specialist_id: str) -> bool:
+        with self._write_lock, self._connect() as connection:
+            connection.execute(
+                "UPDATE sessions SET specialist_id = NULL WHERE specialist_id = ?",
+                (specialist_id,),
+            )
+            cursor = connection.execute(
+                "DELETE FROM specialists WHERE id = ?", (specialist_id,)
             )
         return cursor.rowcount > 0
 

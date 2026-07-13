@@ -734,6 +734,7 @@ class AgentRunner:
                 create_ct_langchain_tools,
                 process_events,
                 skill_source_dirs,
+                skill_source_dirs_for_names,
             )
             from agent.system_prompt import build_system_prompt
             from ui.traces import TraceRenderer
@@ -822,6 +823,7 @@ class AgentRunner:
                 tool_mode=tool_mode,
                 exclude_categories=exclude_cats,
                 project_context=ctx.get("project_context"),
+                specialist_instructions=ctx.get("specialist_instructions"),
             )
 
             # ----- User prompt -----
@@ -852,7 +854,13 @@ class AgentRunner:
                     )
 
             # ----- Build agent -----
-            skills_sources = skill_source_dirs()
+            allowed_skill_names = ctx.get("allowed_skill_names")
+            if allowed_skill_names is not None:
+                skills_sources = skill_source_dirs_for_names(
+                    list(allowed_skill_names or [])
+                )
+            else:
+                skills_sources = skill_source_dirs()
             workspace_root = str(ctx.get("workspace_path") or "/").strip() or "/"
             backend = FilesystemBackend(root_dir=workspace_root, virtual_mode=False)
             agent = create_deep_agent(

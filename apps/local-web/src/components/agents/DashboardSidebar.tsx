@@ -10,6 +10,7 @@ import {
   PanelLeft,
   Plug,
   Settings2,
+  GitBranch,
   Sparkles,
   Stethoscope,
   Wrench
@@ -35,6 +36,7 @@ export type DashboardSection =
   | 'skills'
   | 'integrations'
   | 'mcp'
+  | 'specialists'
 
 type NavItem = {
   id: DashboardSection
@@ -88,6 +90,12 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
         label: 'Skills',
         path: '/dashboard/skills',
         icon: Sparkles
+      },
+      {
+        id: 'specialists',
+        label: 'Specialists',
+        path: '/dashboard/specialists',
+        icon: GitBranch
       },
       {
         id: 'integrations',

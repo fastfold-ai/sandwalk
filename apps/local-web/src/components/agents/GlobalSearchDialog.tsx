@@ -18,6 +18,7 @@ import {
   Settings2,
   Sparkles,
   Stethoscope,
+  GitBranch,
   Wrench,
   X,
   Zap
@@ -182,6 +183,13 @@ const DASHBOARD_COMMANDS = [
     path: '/dashboard/skills',
     value: 'command skills',
     icon: Sparkles
+  },
+  {
+    id: 'specialists',
+    label: 'Specialists',
+    path: '/dashboard/specialists',
+    value: 'command specialists agent profiles',
+    icon: GitBranch
   },
   {
     id: 'integrations',

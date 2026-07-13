@@ -142,12 +142,65 @@ class DeleteProjectResponse(ApiModel):
     deleted: bool = True
 
 
+class Specialist(ApiModel):
+    id: str
+    name: str
+    slug: str
+    description: str | None = None
+    instructions: str | None = None
+    color: str = "ink"
+    icon: str = "agent"
+    skill_names: list[str] = Field(default_factory=list)
+    mcp_server_ids: list[str] = Field(default_factory=list)
+    mcp_catalog_ids: list[str] = Field(default_factory=list)
+    enabled: bool = True
+    created_at: datetime
+    updated_at: datetime
+
+
+class CreateSpecialistRequest(ApiModel):
+    name: str = Field(min_length=1)
+    slug: str | None = None
+    description: str | None = None
+    instructions: str | None = None
+    color: str = "ink"
+    icon: str = "agent"
+    skill_names: list[str] = Field(default_factory=list)
+    mcp_server_ids: list[str] = Field(default_factory=list)
+    mcp_catalog_ids: list[str] = Field(default_factory=list)
+    enabled: bool = True
+
+
+class UpdateSpecialistRequest(ApiModel):
+    name: str | None = None
+    slug: str | None = None
+    description: str | None = None
+    instructions: str | None = None
+    color: str | None = None
+    icon: str | None = None
+    skill_names: list[str] | None = None
+    mcp_server_ids: list[str] | None = None
+    mcp_catalog_ids: list[str] | None = None
+    enabled: bool | None = None
+    clear_description: bool = False
+    clear_instructions: bool = False
+
+
+class SpecialistList(ApiModel):
+    data: list[Specialist]
+
+
+class DeleteSpecialistResponse(ApiModel):
+    deleted: bool = True
+
+
 class AgentSession(ApiModel):
     id: str
     title: str
     status: SessionStatus = "idle"
     organize_label: OrganizeLabel | None = None
     project_id: str | None = None
+    specialist_id: str | None = None
     workspace_path: str | None = None
     last_message_at: datetime | None = None
     created_at: datetime
@@ -158,6 +211,7 @@ class CreateSessionRequest(ApiModel):
     title: str | None = None
     workspace_path: str | None = None
     project_id: str | None = None
+    specialist_id: str | None = None
 
 
 class UpdateSessionRequest(ApiModel):
@@ -166,7 +220,8 @@ class UpdateSessionRequest(ApiModel):
     clear_organize_label: bool = False
     project_id: str | None = None
     clear_project_id: bool = False
-
+    specialist_id: str | None = None
+    clear_specialist_id: bool = False
 
 class AutoTitleSessionRequest(ApiModel):
     force: bool = False

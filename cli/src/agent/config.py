@@ -310,6 +310,8 @@ DEFAULTS = {
     "agent.quality_gate_max_next_steps": 3,
     "agent.synthesis_style": "standard",
     "agent.profile": "research",
+    # Active specialist slug for interactive/batch CLI runs (empty = global).
+    "agent.cli_specialist": "",
     "agent.enable_claude_code_tool": False,
     "agent.parallel_default_count": 3,
     "agent.parallel_auto_suggest": True,

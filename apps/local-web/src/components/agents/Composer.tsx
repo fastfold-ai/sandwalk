@@ -2,6 +2,7 @@ import type {
   AgentSkill,
   AgentSkillDetail,
   RuntimeSettings,
+  Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import { Icon } from '@iconify/react'
@@ -18,6 +19,10 @@ import {
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
+import {
+  SpecialistGlyph,
+  specialistColorClass
+} from '@/components/agents/SpecialistsView'
 import {
   fileChipToken,
   parseComposerParts,
@@ -76,6 +81,8 @@ export function Composer({
   fileChips = [],
   workspaceFiles = [],
   modelOptions,
+  specialists = [],
+  selectedSpecialistId = null,
   showAura = true,
   onChange,
   onSkillChipsChange,
@@ -87,7 +94,9 @@ export function Composer({
   onOpenFile,
   runtimeSettings,
   tokenUsage,
-  onModelSelect
+  onModelSelect,
+  onSpecialistSelect,
+  onCreateSpecialist
 }: {
   value: string
   running: boolean
@@ -103,6 +112,8 @@ export function Composer({
     profileId?: string | null
     source?: string
   }>
+  specialists?: Specialist[]
+  selectedSpecialistId?: string | null
   showAura?: boolean
   onChange: (value: string) => void
   onSkillChipsChange: (skills: string[]) => void
@@ -119,6 +130,8 @@ export function Composer({
     model: string,
     profileId?: string | null
   ) => Promise<void>
+  onSpecialistSelect?: (specialistId: string | null) => void | Promise<void>
+  onCreateSpecialist?: () => void
 }) {
   const uploadRef = useRef<HTMLInputElement | null>(null)
   const textInputRefs = useRef<Map<number, HTMLInputElement>>(new Map())
@@ -135,6 +148,7 @@ export function Composer({
   const [atDismissed, setAtDismissed] = useState(false)
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
+  const [specialistPickerOpen, setSpecialistPickerOpen] = useState(false)
   const previewCacheRef = useRef<Map<string, string>>(new Map())
   const skillItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const fileItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
@@ -204,12 +218,26 @@ export function Composer({
     activeMention === 'slash' && Boolean(slash) && !slashDismissed
   const atOpen = activeMention === 'at' && Boolean(atMention) && !atDismissed
 
+  const selectedSpecialist =
+    specialists.find(item => item.id === selectedSpecialistId) || null
+
   const slashResults = useMemo(() => {
     if (!slash) return []
     const query = slash.query.toLowerCase().trim()
+    const specialistSkillSet = selectedSpecialist
+      ? new Set(
+          (selectedSpecialist.skillNames || [])
+            .map(name => name.trim().toLowerCase())
+            .filter(Boolean)
+        )
+      : null
     const seen = new Set<string>()
     return skills
       .filter(skill => skill.enabled)
+      .filter(skill => {
+        if (!specialistSkillSet) return true
+        return specialistSkillSet.has(skill.name.trim().toLowerCase())
+      })
       .filter(skill => {
         const key = skill.name.trim().toLowerCase()
         if (!key || seen.has(key)) return false
@@ -218,7 +246,7 @@ export function Composer({
       })
       .slice()
       .sort((a, b) => compareSkillsBySearchRank(a, b, query))
-  }, [skills, slash])
+  }, [selectedSpecialist, skills, slash])
 
   const atResults = useMemo(() => {
     if (!atMention) return []
@@ -734,6 +762,14 @@ export function Composer({
 
       {slashOpen ? (
         <div className="bg-popover border-border/70 absolute bottom-full left-0 right-0 z-40 mb-2 overflow-hidden rounded-lg border shadow-lg">
+          {selectedSpecialist ? (
+            <div className="border-border/60 text-muted-foreground border-b px-3 py-1.5 text-[11px]">
+              Showing skills for{' '}
+              <span className="text-foreground font-medium">
+                {selectedSpecialist.name}
+              </span>
+            </div>
+          ) : null}
           <div className="grid h-72 grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div ref={slashListRootRef} className="min-h-0 min-w-0">
               <ScrollArea className="border-border/60 h-72 border-r">
@@ -802,7 +838,9 @@ export function Composer({
                     })
                   ) : (
                     <div className="text-muted-foreground px-2 py-1.5 text-xs">
-                      No skills found
+                      {selectedSpecialist
+                        ? `No matching skills for ${selectedSpecialist.name}`
+                        : 'No skills found'}
                     </div>
                   )}
                 </div>
@@ -1159,6 +1197,111 @@ export function Composer({
                 </div>
               </PopoverContent>
             </Popover>
+            {onSpecialistSelect ? (
+              <Popover
+                open={specialistPickerOpen}
+                onOpenChange={setSpecialistPickerOpen}
+              >
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="border-border/70 bg-muted/40 hover:bg-muted inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
+                  >
+                    {selectedSpecialist ? (
+                      <span
+                        className={cn(
+                          'flex size-3.5 items-center justify-center rounded-full text-white',
+                          specialistColorClass(selectedSpecialist.color)
+                        )}
+                      >
+                        <SpecialistGlyph
+                          icon={selectedSpecialist.icon}
+                          className="size-2"
+                        />
+                      </span>
+                    ) : (
+                      <span className="bg-muted-foreground/40 size-2 rounded-full" />
+                    )}
+                    <span className="font-medium">
+                      {selectedSpecialist?.name || 'None'}
+                    </span>
+                    <ChevronDown className="text-muted-foreground size-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  side="top"
+                  className="w-64 overflow-hidden p-0"
+                >
+                  <div className="text-muted-foreground border-b px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
+                    Specialist
+                  </div>
+                  <div className="max-h-72 overflow-y-auto overscroll-contain py-1">
+                    <button
+                      type="button"
+                      className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm"
+                      onClick={() => {
+                        void onSpecialistSelect(null)
+                        setSpecialistPickerOpen(false)
+                      }}
+                    >
+                      <span className="bg-muted-foreground/40 size-2.5 rounded-full" />
+                      <span className="truncate">None</span>
+                      {!selectedSpecialistId ? (
+                        <Check className="text-foreground ml-auto size-4 shrink-0" />
+                      ) : null}
+                    </button>
+                    {specialists
+                      .filter(item => item.enabled !== false)
+                      .map(item => {
+                      const isSelected = item.id === selectedSpecialistId
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm"
+                          onClick={() => {
+                            void onSpecialistSelect(item.id)
+                            setSpecialistPickerOpen(false)
+                          }}
+                        >
+                          <span
+                            className={cn(
+                              'flex size-4 shrink-0 items-center justify-center rounded-full text-white',
+                              specialistColorClass(item.color)
+                            )}
+                          >
+                            <SpecialistGlyph
+                              icon={item.icon}
+                              className="size-2.5"
+                            />
+                          </span>
+                          <span className="truncate">{item.name}</span>
+                          {isSelected ? (
+                            <Check className="text-foreground ml-auto size-4 shrink-0" />
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {onCreateSpecialist ? (
+                    <div className="border-t p-1">
+                      <button
+                        type="button"
+                        className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+                        onClick={() => {
+                          setSpecialistPickerOpen(false)
+                          onCreateSpecialist()
+                        }}
+                      >
+                        <Plus className="size-3.5" />
+                        Create new…
+                      </button>
+                    </div>
+                  ) : null}
+                </PopoverContent>
+              </Popover>
+            ) : null}
           </div>
           <div className="flex items-center gap-1.5">
             <TooltipProvider delayDuration={200}>

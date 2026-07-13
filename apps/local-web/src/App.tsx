@@ -19,6 +19,7 @@ import type {
   McpCatalogEntry,
   McpServer,
   RuntimeSettings,
+  Specialist,
   WorkspaceFile,
   AccountSummary
 } from '@sandwalk/agent-ui-core'
@@ -83,6 +84,7 @@ import { EnvironmentView } from '@/components/agents/EnvironmentView'
 import { GeneralView } from '@/components/agents/GeneralView'
 import { McpView } from '@/components/agents/McpView'
 import { ModelsView } from '@/components/agents/ModelsView'
+import { SpecialistsView } from '@/components/agents/SpecialistsView'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import { ServerStatusView } from '@/components/agents/ServerStatusView'
 import { StorageView } from '@/components/agents/StorageView'
@@ -212,6 +214,55 @@ function loginPathWithNext(returnTo: string | null): string {
 function nextFromSearch(search: string): string | null {
   const raw = new URLSearchParams(search).get('next')
   return sanitizeAuthReturnTo(raw)
+}
+
+function formatConnectError(raw: string): { title: string; detail: string } {
+  const text = String(raw || '').trim()
+  if (!text) {
+    return {
+      title: 'Unable to connect',
+      detail: 'Check that the agent backend is running, then try again.'
+    }
+  }
+  const statusMatch = text.match(/FastFold Agent API (\d+)/i)
+  const status = statusMatch ? Number(statusMatch[1]) : null
+  let detail = text
+  try {
+    const jsonMatch = text.match(/\{.*\}/s)
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]) as { detail?: unknown }
+      if (typeof parsed.detail === 'string' && parsed.detail.trim()) {
+        detail = parsed.detail.trim()
+      }
+    }
+  } catch {
+    // keep raw text
+  }
+  if (status === 404) {
+    return {
+      title: 'Backend endpoint missing',
+      detail:
+        detail === 'Not Found'
+          ? 'The UI called an API the running backend does not have yet. Restart Sandwalk / the agent server after updating, then connect again.'
+          : detail
+    }
+  }
+  if (status === 401 || status === 403) {
+    return {
+      title: 'Authentication failed',
+      detail: 'Check the API key and try again.'
+    }
+  }
+  if (/failed to fetch|networkerror|load failed/i.test(text)) {
+    return {
+      title: 'Backend unreachable',
+      detail: 'Confirm the URL is correct and the agent server is running.'
+    }
+  }
+  return {
+    title: 'Unable to connect',
+    detail: detail.length > 180 ? `${detail.slice(0, 177)}…` : detail
+  }
 }
 
 function projectTabsKey(projectId: string | null | undefined) {
@@ -939,15 +990,14 @@ type SkillsViewMode =
   | 'import_file'
   | 'trusted_sources'
 
-/** Prefer linked Fastfold Cloud name; otherwise null (caller may fall back to local). */
+/** Prefer linked Fastfold Cloud email; otherwise username. */
 function cloudAccountDisplayName(account: AccountSummary | null): string | null {
   if (!account?.configured) return null
+  const email = account.user?.email?.trim()
+  if (email) return email
   const username = account.user?.username?.trim()
   if (username) return username
-  const email = account.user?.email?.trim()
-  if (!email) return null
-  const local = email.split('@')[0]?.trim()
-  return local || email
+  return null
 }
 
 export default function App() {
@@ -1004,6 +1054,8 @@ export default function App() {
   const [mcpServers, setMcpServers] = useState<McpServer[]>([])
   const [mcpCatalog, setMcpCatalog] = useState<McpCatalogEntry[]>([])
   const [mcpCatalogLoading, setMcpCatalogLoading] = useState(false)
+  const [specialists, setSpecialists] = useState<Specialist[]>([])
+  const [specialistsLoading, setSpecialistsLoading] = useState(false)
   const [runtimeSettings, setRuntimeSettings] =
     useState<RuntimeSettings | null>(null)
   const [modelOptions, setModelOptions] = useState<ComposerModelOption[]>([])
@@ -1145,7 +1197,25 @@ export default function App() {
     : null
   const sessionRoute = matchPath('/agents/:sessionId', location.pathname)
   const projectRoute = matchPath('/projects/:projectId', location.pathname)
+  const specialistNewRoute = matchPath(
+    '/dashboard/specialists/new',
+    location.pathname
+  )
+  const specialistEditRoute = matchPath(
+    '/dashboard/specialists/:specialistId',
+    location.pathname
+  )
   const routeProjectId = projectRoute?.params.projectId ?? null
+  const specialistsViewMode: 'list' | 'new' | 'edit' = specialistNewRoute
+    ? 'new'
+    : specialistEditRoute?.params.specialistId &&
+        specialistEditRoute.params.specialistId !== 'new'
+      ? 'edit'
+      : 'list'
+  const specialistsEditId =
+    specialistsViewMode === 'edit'
+      ? specialistEditRoute?.params.specialistId ?? null
+      : null
   const activeProjectId = projectScopeId
   const tabsScopeKey = projectTabsKey(activeProjectId)
   const openTabIds = openTabsByProject[tabsScopeKey] || []
@@ -1177,11 +1247,13 @@ export default function App() {
                   ? 'environment'
                   : location.pathname.startsWith('/dashboard/skills')
                     ? 'skills'
-                    : location.pathname.startsWith('/dashboard/integrations')
-                      ? 'integrations'
-                      : location.pathname.startsWith('/dashboard/mcp')
-                        ? 'mcp'
-                        : 'overview'
+                    : location.pathname.startsWith('/dashboard/specialists')
+                      ? 'specialists'
+                      : location.pathname.startsWith('/dashboard/integrations')
+                        ? 'integrations'
+                        : location.pathname.startsWith('/dashboard/mcp')
+                          ? 'mcp'
+                          : 'overview'
   const isSkills =
     dashboardSection === 'skills' ||
     location.pathname === '/agents/skills' ||
@@ -1211,6 +1283,7 @@ export default function App() {
   const isDashboardStorage = dashboardSection === 'storage'
   const isDashboardEnvironment = dashboardSection === 'environment'
   const isDashboardMcp = dashboardSection === 'mcp'
+  const isDashboardSpecialists = dashboardSection === 'specialists'
   const isDashboardOverview = isDashboard && dashboardSection === 'overview'
   const isHome =
     location.pathname === '/' || location.pathname === '/agents/home'
@@ -1409,6 +1482,18 @@ export default function App() {
     await Promise.all([loadMcpServers(), loadMcpCatalog()])
   }, [loadMcpCatalog, loadMcpServers])
 
+  const loadSpecialists = useCallback(async () => {
+    setSpecialistsLoading(true)
+    try {
+      setSpecialists(await client.listSpecialists())
+    } catch {
+      // Optional capability — older backends may not expose /v1/specialists yet.
+      setSpecialists([])
+    } finally {
+      setSpecialistsLoading(false)
+    }
+  }, [client])
+
   const loadModelOptions = useCallback(async () => {
     try {
       const models = await client.listModels({
@@ -1551,13 +1636,14 @@ export default function App() {
       needsAuthLoginRef.current = false
       setNeedsAuthLogin(false)
       setHealth(nextHealth)
-      const [, , , , , , settings] = await Promise.all([
+      const [, , , , , , , settings] = await Promise.all([
         loadSessions(),
         loadProjects(),
         loadSkills(),
         loadIntegrations(),
         loadMcpServers(),
         loadMcpCatalog(),
+        loadSpecialists(),
         client.getRuntimeSettings(),
         loadModelOptions()
       ])
@@ -1598,6 +1684,7 @@ export default function App() {
     loadProjects,
     loadSessions,
     loadSkills,
+    loadSpecialists,
     location.hash,
     location.pathname,
     location.search,
@@ -1745,6 +1832,10 @@ export default function App() {
       document.title = `Skills · ${base}`
       return
     }
+    if (isDashboardSpecialists) {
+      document.title = `Specialists · ${base}`
+      return
+    }
     if (isIntegrations) {
       if (activeIntegration) {
         document.title = `${activeIntegration.name} · Integrations · ${base}`
@@ -1775,6 +1866,7 @@ export default function App() {
     isDashboardModels,
     isDashboardData,
     isDashboardTools,
+    isDashboardSpecialists,
     isIntegrations,
     isSkills,
     session?.title
@@ -2509,6 +2601,11 @@ export default function App() {
     }
   }
 
+  const selectSessionSpecialist = async (specialistId: string | null) => {
+    if (!session) return
+    await updateSession(session, { specialistId })
+  }
+
   const createProject = async (input: {
     name: string
     description: string
@@ -2966,6 +3063,8 @@ export default function App() {
     ? 'Environment'
     : isSkills
     ? 'Skills'
+    : isDashboardSpecialists
+    ? 'Specialists'
     : isIntegrations
     ? 'Integrations'
     : isDashboardMcp
@@ -3008,6 +3107,7 @@ export default function App() {
   }
 
   if (!health) {
+    const connectError = error ? formatConnectError(error) : null
     return (
       <main className="bg-background grid h-full place-items-center p-6">
         <form
@@ -3039,8 +3139,18 @@ export default function App() {
             onChange={event => setBackendApiKey(event.target.value)}
             placeholder="Backend API key (remote servers only)"
           />
-          {error ? (
-            <p className="text-destructive mt-3 text-sm">{error}</p>
+          {connectError ? (
+            <div
+              role="alert"
+              className="border-destructive/30 bg-destructive/10 mt-3 rounded-lg border px-3 py-2.5"
+            >
+              <p className="text-destructive text-sm font-medium">
+                {connectError.title}
+              </p>
+              <p className="text-destructive/90 mt-1 text-xs leading-relaxed">
+                {connectError.detail}
+              </p>
+            </div>
           ) : null}
           <Button className="mt-4 w-full" disabled={connecting}>
             {connecting ? <Loader2 className="animate-spin" /> : null}
@@ -3968,6 +4078,45 @@ export default function App() {
                 await loadMcpServers()
               }}
             />
+          ) : isDashboardSpecialists ? (
+            <SpecialistsView
+              mode={specialistsViewMode}
+              specialistId={specialistsEditId}
+              specialists={specialists}
+              skills={skills}
+              mcpServers={mcpServers}
+              mcpCatalog={mcpCatalog}
+              loading={specialistsLoading}
+              onRefresh={loadSpecialists}
+              onCreate={input => client.createSpecialist(input)}
+              onUpdate={(id, input) => client.updateSpecialist(id, input)}
+              onDelete={id => client.deleteSpecialist(id)}
+              onOpenNew={() => navigate('/dashboard/specialists/new')}
+              onOpenEdit={id =>
+                navigate(`/dashboard/specialists/${encodeURIComponent(id)}`)
+              }
+              onBack={() => navigate('/dashboard/specialists')}
+              onManageSkills={() => navigate('/dashboard/skills')}
+              onManageMcps={() => navigate('/dashboard/mcp')}
+              onOpenSkill={name =>
+                navigate(`/dashboard/skills/${encodeURIComponent(name)}`)
+              }
+              onOpenMcp={({ kind, id }) => {
+                const hash =
+                  kind === 'catalog'
+                    ? `catalog-${encodeURIComponent(id)}`
+                    : `server-${encodeURIComponent(id)}`
+                navigate(`/dashboard/mcp#${hash}`)
+              }}
+              onEnableSkill={async name => {
+                await client.setSkillEnabled(name, true)
+                await loadSkills()
+              }}
+              onInstallSkill={async source => {
+                await client.installSkill(source)
+                await loadSkills()
+              }}
+            />
           ) : isHome || isProjectHome ? (
             <HomeView
               projects={projects}
@@ -4250,6 +4399,8 @@ export default function App() {
                           fileChips={composerFiles}
                           workspaceFiles={workspaceFiles}
                           modelOptions={modelOptions}
+                          specialists={specialists}
+                          selectedSpecialistId={session?.specialistId ?? null}
                           showAura={false}
                           onChange={setComposer}
                           onSkillChipsChange={setComposerSkills}
@@ -4274,6 +4425,10 @@ export default function App() {
                           }}
                           runtimeSettings={runtimeSettings}
                           tokenUsage={tokenUsage}
+                          onSpecialistSelect={selectSessionSpecialist}
+                          onCreateSpecialist={() =>
+                            navigate('/dashboard/specialists/new')
+                          }
                           onModelSelect={async (provider, model, profileId) => {
                             if (profileId) {
                               try {
@@ -4693,6 +4848,8 @@ export default function App() {
                           fileChips={composerFiles}
                           workspaceFiles={workspaceFiles}
                           modelOptions={modelOptions}
+                          specialists={specialists}
+                          selectedSpecialistId={session?.specialistId ?? null}
                           showAura={false}
                           onChange={setComposer}
                           onSkillChipsChange={setComposerSkills}
@@ -4717,6 +4874,10 @@ export default function App() {
                           }}
                           runtimeSettings={runtimeSettings}
                           tokenUsage={tokenUsage}
+                          onSpecialistSelect={selectSessionSpecialist}
+                          onCreateSpecialist={() =>
+                            navigate('/dashboard/specialists/new')
+                          }
                           onModelSelect={async (provider, model, profileId) => {
                             if (profileId) {
                               try {
@@ -6417,7 +6578,7 @@ function SkillsView({
                 <img
                   src="/suggestions/skills-sh.png"
                   alt=""
-                  className="size-3.5 rounded object-contain"
+                  className="size-3.5 rounded object-contain dark:invert"
                 />
                 View in Skills.sh
               </a>
@@ -6600,7 +6761,7 @@ function SkillsView({
                   <img
                     src="/suggestions/skills-sh.png"
                     alt=""
-                    className="size-3.5 rounded object-contain"
+                    className="size-3.5 rounded object-contain dark:invert"
                   />
                   View in Skills.sh
                 </a>
@@ -6903,7 +7064,7 @@ function SkillsView({
                   <img
                     src="/suggestions/skills-sh.png"
                     alt=""
-                    className="size-3.5 rounded object-contain"
+                    className="size-3.5 rounded object-contain dark:invert"
                   />
                   <span>Skills.sh</span>
                   <span
@@ -6950,7 +7111,7 @@ function SkillsView({
                       src="/suggestions/skills-sh.png"
                       alt=""
                       className={cn(
-                        'size-4 rounded object-contain',
+                        'size-4 rounded object-contain dark:invert',
                         !catalogSearchEnabled && 'opacity-60'
                       )}
                     />
@@ -7012,7 +7173,7 @@ function SkillsView({
                                 <img
                                   src="/suggestions/skills-sh.png"
                                   alt=""
-                                  className="size-6 rounded object-contain"
+                                  className="size-6 rounded object-contain dark:invert"
                                 />
                                 <span className="truncate text-sm font-medium">
                                   {title}
@@ -7690,7 +7851,7 @@ function IntegrationsView({
                       <img
                         src="/integrations/vercel.png"
                         alt=""
-                        className="size-4 rounded object-contain"
+                        className="size-4 rounded object-contain dark:invert"
                       />
                     )}
                     {selected.configured ? 'Re-link Project' : 'Link Project'}

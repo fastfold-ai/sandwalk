@@ -841,6 +841,169 @@ def keys_cmd():
     console.print(cfg.keys_table())
 
 
+# ─── Specialists subcommand ──────────────────────────────────
+
+specialists_app = typer.Typer(
+    help="Manage agent run profiles (skills + MCPs + instructions)",
+    invoke_without_command=True,
+)
+app.add_typer(specialists_app, name="specialists")
+
+
+@specialists_app.callback(invoke_without_command=True)
+def specialists_root(ctx: typer.Context):
+    """List specialists (same as `fastfold specialists list`)."""
+    if ctx.invoked_subcommand is not None:
+        return
+    from agent.specialists_manage import cmd_list
+
+    code = cmd_list(console)
+    if code:
+        raise typer.Exit(code=code)
+
+
+@specialists_app.command("list")
+def specialists_list_cmd():
+    """List specialists shared with the dashboard."""
+    from agent.specialists_manage import cmd_list
+
+    code = cmd_list(console)
+    if code:
+        raise typer.Exit(code=code)
+
+
+@specialists_app.command("show")
+def specialists_show_cmd(
+    ref: str = typer.Argument(..., help="Slug, name, or id"),
+):
+    """Show one specialist."""
+    from agent.specialists_manage import cmd_show
+
+    code = cmd_show(console, ref)
+    if code:
+        raise typer.Exit(code=code)
+
+
+@specialists_app.command("create")
+def specialists_create_cmd(
+    name: str = typer.Argument(..., help="Display name"),
+    slug: Optional[str] = typer.Option(None, "--slug", help="URL-safe slug"),
+    description: Optional[str] = typer.Option(None, "--description", "-d"),
+    instructions: Optional[str] = typer.Option(
+        None, "--instructions", "-i", help="Extra system-prompt text"
+    ),
+    color: str = typer.Option("ink", "--color"),
+    icon: str = typer.Option("agent", "--icon"),
+    skill: Optional[list[str]] = typer.Option(
+        None, "--skill", "-s", help="Skill name (repeatable)"
+    ),
+    mcp: Optional[list[str]] = typer.Option(
+        None, "--mcp", help="MCP server id (repeatable)"
+    ),
+    use: bool = typer.Option(False, "--use", help="Activate for CLI runs"),
+):
+    """Create a specialist (same store as Dashboard → Specialists)."""
+    from agent.specialists_manage import cmd_create
+
+    code = cmd_create(
+        console,
+        name=name,
+        slug=slug,
+        description=description,
+        instructions=instructions,
+        color=color,
+        icon=icon,
+        skills=list(skill or []),
+        mcps=list(mcp or []),
+        use=use,
+    )
+    if code:
+        raise typer.Exit(code=code)
+
+
+@specialists_app.command("update")
+def specialists_update_cmd(
+    ref: str = typer.Argument(..., help="Slug, name, or id"),
+    name: Optional[str] = typer.Option(None, "--name"),
+    slug: Optional[str] = typer.Option(None, "--slug"),
+    description: Optional[str] = typer.Option(None, "--description", "-d"),
+    clear_description: bool = typer.Option(False, "--clear-description"),
+    instructions: Optional[str] = typer.Option(None, "--instructions", "-i"),
+    clear_instructions: bool = typer.Option(False, "--clear-instructions"),
+    color: Optional[str] = typer.Option(None, "--color"),
+    icon: Optional[str] = typer.Option(None, "--icon"),
+    skill: Optional[list[str]] = typer.Option(
+        None, "--skill", "-s", help="Replace skill list (repeatable)"
+    ),
+    mcp: Optional[list[str]] = typer.Option(
+        None, "--mcp", help="Replace MCP id list (repeatable)"
+    ),
+):
+    """Update a specialist."""
+    from agent.specialists_manage import cmd_update
+
+    code = cmd_update(
+        console,
+        ref,
+        name=name,
+        slug=slug,
+        description=description,
+        clear_description=clear_description,
+        instructions=instructions,
+        clear_instructions=clear_instructions,
+        color=color,
+        icon=icon,
+        skills=None if skill is None else list(skill),
+        mcps=None if mcp is None else list(mcp),
+    )
+    if code:
+        raise typer.Exit(code=code)
+
+
+@specialists_app.command("delete")
+def specialists_delete_cmd(
+    ref: str = typer.Argument(..., help="Slug, name, or id"),
+):
+    """Delete a specialist."""
+    from agent.specialists_manage import cmd_delete
+
+    code = cmd_delete(console, ref)
+    if code:
+        raise typer.Exit(code=code)
+
+
+@specialists_app.command("use")
+def specialists_use_cmd(
+    ref: str = typer.Argument(..., help="Slug, name, or id"),
+):
+    """Activate a specialist for CLI interactive/batch runs."""
+    from agent.specialists_manage import cmd_use
+
+    code = cmd_use(console, ref)
+    if code:
+        raise typer.Exit(code=code)
+
+
+@specialists_app.command("clear")
+def specialists_clear_cmd():
+    """Clear the active CLI specialist (use global skills/MCPs)."""
+    from agent.specialists_manage import cmd_clear
+
+    code = cmd_clear(console)
+    if code:
+        raise typer.Exit(code=code)
+
+
+@specialists_app.command("active")
+def specialists_active_cmd():
+    """Show the specialist currently active for CLI runs."""
+    from agent.specialists_manage import cmd_active
+
+    code = cmd_active(console)
+    if code:
+        raise typer.Exit(code=code)
+
+
 # ─── MCP subcommand ──────────────────────────────────────────
 
 mcp_app = typer.Typer(
@@ -1294,7 +1457,7 @@ def agent_fork_cmd(
             console.print("  [dim]File import:[/dim] skipped (--no-files)")
         if fork_count is not None:
             console.print(f"  [dim]Fork count:[/dim] {fork_count}")
-        console.print(f"  [cyan]Resume this session:[/cyan] fastfold --resume {session_id}")
+        console.print(f"  [cyan]Resume this session:[/cyan] sandwalk --resume {session_id}")
     except RuntimeError as exc:
         message = str(exc)
         if " 404 " in f" {message} " and "/shares/" in message:
@@ -4791,6 +4954,11 @@ def run_cmd(
     continue_last: bool = typer.Option(
         False, "--continue", "-c", help="Continue the most recent session"
     ),
+    specialist: Optional[str] = typer.Option(
+        None,
+        "--specialist",
+        help="Specialist slug/name/id for this run (overrides CLI active specialist)",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
     version: bool = typer.Option(False, "--version", "-V", help="Show version"),
 ):
@@ -4814,6 +4982,36 @@ def run_cmd(
         context["target"] = target
     if indication:
         context["indication"] = indication
+
+    from agent.specialists_manage import (
+        apply_specialist_to_context,
+        get_active_specialist,
+        resolve_specialist_ref,
+        set_active_specialist_ref,
+    )
+
+    if specialist:
+        resolved = resolve_specialist_ref(specialist)
+        if resolved is None:
+            console.print(f"  [red]Specialist not found:[/red] {specialist}")
+            raise typer.Exit(code=2)
+        # Persist for interactive follow-ups in this CLI install.
+        set_active_specialist_ref(resolved.slug)
+        console.print(
+            f"  [dim]Specialist:[/dim] [bold]{resolved.name}[/bold] "
+            f"[dim]({resolved.slug})[/dim]"
+        )
+        if query:
+            context = apply_specialist_to_context(context, resolved)
+    else:
+        active = get_active_specialist()
+        if active is not None:
+            console.print(
+                f"  [dim]Specialist:[/dim] [bold]{active.name}[/bold] "
+                f"[dim]({active.slug})[/dim]"
+            )
+            if query:
+                context = apply_specialist_to_context(context, active)
 
     # Determine session resume
     resume_id = None
@@ -5157,6 +5355,7 @@ def entry():
         "keys",
         "auth",
         "mcp",
+        "specialists",
         "serve",
         "sync",
         "doctor",

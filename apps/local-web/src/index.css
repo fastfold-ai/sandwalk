@@ -280,12 +280,12 @@
 .chat-scrollbar {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.28) transparent;
 }
 
 .chat-scrollbar:hover,
 .chat-scrollbar:focus-within {
-  scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
 }
 
 .chat-scrollbar::-webkit-scrollbar {
@@ -299,18 +299,18 @@
 }
 
 .chat-scrollbar::-webkit-scrollbar-thumb {
-  background: transparent;
+  background: hsl(var(--muted-foreground) / 0.28);
   border-radius: 9999px;
 }
 
 .chat-scrollbar:hover::-webkit-scrollbar-thumb,
 .chat-scrollbar:focus-within::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
+  background: hsl(var(--muted-foreground) / 0.45);
 }
 
 .chat-scrollbar:hover::-webkit-scrollbar-thumb:hover,
 .chat-scrollbar:focus-within::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: hsl(var(--muted-foreground) / 0.6);
 }
 
 /* Horizontal strips (session tabs) — no reserved gutter, thinner thumb. */

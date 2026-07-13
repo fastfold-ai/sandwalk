@@ -144,7 +144,7 @@ export function SandwalkServerCard({
         <div className="min-w-0 flex-1 space-y-0.5">
           {titleText ? (
             <div className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate text-sm font-semibold leading-tight">
+              <span className="break-all text-sm font-semibold leading-tight">
                 {titleText}
               </span>
             </div>

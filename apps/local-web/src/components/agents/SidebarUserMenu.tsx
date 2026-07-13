@@ -162,7 +162,7 @@ export function SidebarUserMenu({
           <span className="bg-muted text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
             {initials}
           </span>
-          <span className="truncate text-sm font-medium">{displayName}</span>
+          <span className="break-all text-sm font-medium">{displayName}</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
