@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "sandwalk"
 version = "0.0.1"
-description = "Sandwalk — open science agents for drug discovery research"
+description = "Sandwalk — a thinking path for open science"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"

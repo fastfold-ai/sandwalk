@@ -217,7 +217,7 @@ export function DoctorView({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Doctor</h1>
             <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-              Same checks as <code className="text-xs">fastfold doctor</code> and
+              Same checks as <code className="text-xs">sandwalk doctor</code> and
               interactive <code className="text-xs">/doctor</code>: runtime
               tooling, skills inventory, environment keys, LLM config, and more.
             </p>

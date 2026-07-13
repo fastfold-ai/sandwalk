@@ -43,6 +43,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            handleDeepLink(url)
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         supervisor?.reapSync()
     }
@@ -58,5 +64,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ) -> Bool {
         SettingsWindowController.shared.show()
         return true
+    }
+
+    /// `sandwalk://settings/security` → Settings → Security (and other sections).
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme?.lowercased() == "sandwalk" else { return }
+        let section = SettingsSection.fromDeepLink(url)
+        DispatchQueue.main.async {
+            SettingsWindowController.shared.show(section: section)
+        }
     }
 }

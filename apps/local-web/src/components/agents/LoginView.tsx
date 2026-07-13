@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, CircleHelp, Copy, Loader2, Terminal } from 'lucide-react'
+import { ArrowUpRight, Check, CircleHelp, Copy, Loader2, Terminal } from 'lucide-react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { MirageBackground } from '@/components/MirageBackground'
@@ -7,7 +7,6 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -15,6 +14,8 @@ import {
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+
+const SANDWALK_SECURITY_DEEP_LINK = 'sandwalk://settings/security'
 
 const HELP_COMMANDS = [
   {
@@ -27,7 +28,7 @@ const HELP_COMMANDS = [
     id: 'enable',
     title: 'Require login',
     command: 'sandwalk auth enable',
-    description: 'Turns auth on. Restart serve if it is already running.'
+    description: 'Turns auth on so the local UI and API require a key.'
   },
   {
     id: 'show',
@@ -67,6 +68,20 @@ function CommandRow({
       >
         {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
       </button>
+    </div>
+  )
+}
+
+function MacAppIcon({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'flex size-11 shrink-0 items-center justify-center rounded-[11px] bg-white p-2 shadow-[0_1px_2px_rgba(0,0,0,0.12)] ring-1 ring-black/5',
+        className
+      )}
+      aria-hidden
+    >
+      <img src="/sandwalk-mark.svg" alt="" className="size-full" />
     </div>
   )
 }
@@ -180,34 +195,38 @@ export function LoginView({
                   <DialogTitle className="text-lg font-semibold">
                     How to get an API key
                   </DialogTitle>
-                  <DialogDescription className="text-muted-foreground text-sm">
-                    Use the Sandwalk CLI on any OS, or the Mac menubar app on
-                    macOS. Restart{' '}
-                    <code className="text-foreground font-mono text-[12px]">
-                      sandwalk serve
-                    </code>{' '}
-                    after changing auth settings.
-                  </DialogDescription>
                 </DialogHeader>
 
                 <ScrollArea className="h-[min(55vh,28rem)] px-6">
                   <div className="space-y-4 py-2 pr-3">
                     <div className="bg-muted/50 border-border rounded-xl border px-3.5 py-3">
-                      <p className="text-foreground text-sm font-semibold">
-                        Mac app
-                      </p>
-                      <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
-                        Open the Sandwalk menubar app →{' '}
-                        <span className="text-foreground font-medium">
-                          Settings…
-                        </span>{' '}
-                        →{' '}
-                        <span className="text-foreground font-medium">
-                          Security
-                        </span>
-                        . There you can show, copy, or regenerate your API key
-                        and toggle whether login is required.
-                      </p>
+                      <div className="flex items-start gap-3">
+                        <MacAppIcon />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-foreground text-sm font-semibold">
+                            Mac app
+                          </p>
+                          <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                            Open Sandwalk, then go to{' '}
+                            <span className="text-foreground font-medium">
+                              General
+                            </span>{' '}
+                            →{' '}
+                            <span className="text-foreground font-medium">
+                              Security
+                            </span>
+                            . Show, copy, or regenerate your key and turn login
+                            on or off — the app applies changes automatically.
+                          </p>
+                          <a
+                            href={SANDWALK_SECURITY_DEEP_LINK}
+                            className="bg-background text-foreground border-border hover:bg-muted mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors"
+                          >
+                            Open Security settings
+                            <ArrowUpRight className="size-3.5" />
+                          </a>
+                        </div>
+                      </div>
                     </div>
 
                     <div>

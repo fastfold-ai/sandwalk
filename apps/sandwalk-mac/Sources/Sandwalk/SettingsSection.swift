@@ -1,6 +1,9 @@
 import Foundation
 
 enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
+    case status
+    case network
+    case logs
     case models
     case tools
     case datasets
@@ -10,9 +13,6 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
     case doctor
     case storage
     case environment
-    case status
-    case network
-    case logs
     case security
     case about
 
@@ -54,5 +54,29 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
         case .security: return "lock"
         case .about: return "info.circle"
         }
+    }
+
+    /// Parse `sandwalk://settings/security`, `sandwalk://security`, etc.
+    static func fromDeepLink(_ url: URL) -> SettingsSection? {
+        let host = (url.host ?? "").lowercased()
+        let parts = url.path
+            .split(separator: "/")
+            .map { String($0).lowercased() }
+            .filter { !$0.isEmpty }
+
+        if host == "settings" {
+            guard let raw = parts.first else { return nil }
+            return SettingsSection(rawValue: raw)
+        }
+        if let section = SettingsSection(rawValue: host), parts.isEmpty {
+            return section
+        }
+        if parts.first == "settings", let raw = parts.dropFirst().first {
+            return SettingsSection(rawValue: raw)
+        }
+        if let raw = parts.first {
+            return SettingsSection(rawValue: raw)
+        }
+        return nil
     }
 }

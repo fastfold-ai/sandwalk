@@ -51,7 +51,7 @@ BANNER = """
 app = typer.Typer(
     name="sandwalk",
     help=(
-        "Sandwalk — open science agents for drug discovery.\n\n"
+        "Sandwalk — a thinking path for open science.\n\n"
         "Common usage:\n"
         '  sandwalk "your research question"\n'
         '  sandwalk --smiles "CCO" "Profile this compound"\n'
@@ -4795,7 +4795,7 @@ def run_cmd(
     version: bool = typer.Option(False, "--version", "-V", help="Show version"),
 ):
     """
-    Sandwalk — open science agents for drug discovery.
+    Sandwalk — a thinking path for open science.
 
     Run without arguments for interactive mode.
     Pass a question for single-query mode.

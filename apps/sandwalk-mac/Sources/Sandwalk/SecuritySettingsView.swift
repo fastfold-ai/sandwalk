@@ -170,7 +170,6 @@ struct SecuritySettingsView: View {
         }
         settings.apiKey = trimmed
 
-        let prior = AuthSettingsStore.load()
         do {
             try AuthSettingsStore.save(settings)
         } catch {
@@ -178,37 +177,21 @@ struct SecuritySettingsView: View {
             return
         }
 
-        let pushed = await pushToRunningServer(prior: prior)
-        statusMessage = pushed
-            ? "Saved and applied to the running API."
-            : "Saved. Restart if the server did not pick it up."
-    }
-
-    private func pushToRunningServer(prior: SandwalkAuthSettings) async -> Bool {
-        let config = SandwalkRuntime.config
-        var request = URLRequest(url: config.apiBaseURL.appendingPathComponent("v1/auth/settings"))
-        request.httpMethod = "PATCH"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 4
-        let body: [String: Any] = [
-            "apiKey": settings.apiKey,
-            "authEnabled": settings.authEnabled,
-        ]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-
-        if prior.authEnabled, !prior.apiKey.isEmpty {
-            request.setValue("Bearer \(prior.apiKey)", forHTTPHeaderField: "Authorization")
-        } else if settings.authEnabled, !settings.apiKey.isEmpty {
-            request.setValue("Bearer \(settings.apiKey)", forHTTPHeaderField: "Authorization")
+        guard let supervisor = SandwalkRuntime.supervisor else {
+            statusMessage = "Saved. Start Sandwalk to apply."
+            return
         }
 
-        guard let (_, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse,
-              (200..<300).contains(http.statusCode)
-        else {
-            return false
+        if supervisor.overall.isLive {
+            do {
+                try await supervisor.restartAll()
+                statusMessage = "Saved — services restarted with new auth."
+            } catch {
+                statusMessage = "Saved, but restart failed: \(error.localizedDescription)"
+            }
+        } else {
+            statusMessage = "Saved. Start Sandwalk to apply."
         }
-        return true
     }
 }
 

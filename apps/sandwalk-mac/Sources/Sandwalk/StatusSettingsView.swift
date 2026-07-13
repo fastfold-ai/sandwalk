@@ -61,9 +61,11 @@ struct StatusSettingsView: View {
 
     private var heroCard: some View {
         HStack(spacing: 16) {
-            Image(nsImage: SandwalkIcon.appLogo(pointSize: 52))
+            Image(nsImage: SandwalkIcon.menubarMark(pointSize: 52))
                 .resizable()
                 .interpolation(.high)
+                .renderingMode(.template)
+                .foregroundStyle(theme.text)
                 .frame(width: 52, height: 52)
 
             VStack(alignment: .leading, spacing: 4) {

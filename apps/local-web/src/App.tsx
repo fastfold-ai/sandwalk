@@ -706,9 +706,9 @@ function catalogSkillInstallCommand(
   skill: string,
   files?: Array<{ path: string }> | null
 ): string {
-  // Match `fastfold skills add <source>` — CLI has no --skill flag; use @subpath.
+  // Match `sandwalk skills add <source>` — CLI has no --skill flag; use @subpath.
   const target = catalogSkillInstallTarget(source, skill, files)
-  return target ? `fastfold skills add ${target}` : ''
+  return target ? `sandwalk skills add ${target}` : ''
 }
 
 function catalogSkillInstallTarget(
@@ -3551,14 +3551,14 @@ export default function App() {
                           )
                         })()
                       : null}
-                    <Popover
+                    <DropdownMenu
                       open={cliMenuOpen}
                       onOpenChange={open => {
                         setCliMenuOpen(open)
                         if (!open) setCopiedResumeCommand(false)
                       }}
                     >
-                      <PopoverTrigger asChild>
+                      <DropdownMenuTrigger asChild>
                         <Button
                           type="button"
                           variant="ghost"
@@ -3570,10 +3570,12 @@ export default function App() {
                         >
                           <Terminal className="size-4" />
                         </Button>
-                      </PopoverTrigger>
-                      <PopoverContent
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
                         align="end"
-                        className="w-[22rem] overflow-hidden p-0"
+                        sideOffset={6}
+                        className="w-[22rem] overflow-hidden rounded-xl p-0"
+                        onCloseAutoFocus={event => event.preventDefault()}
                       >
                         <div className="px-4 pt-3">
                           <p className="text-foreground text-sm font-semibold">
@@ -3585,8 +3587,8 @@ export default function App() {
                             <Terminal className="text-muted-foreground size-4 shrink-0" />
                             <code className="min-w-0 flex-1 truncate font-mono text-[13px]">
                               {sessionId
-                                ? `fastfold --resume ${sessionId}`
-                                : 'fastfold --resume <chat_id>'}
+                                ? `sandwalk --resume ${sessionId}`
+                                : 'sandwalk --resume <chat_id>'}
                             </code>
                             <Button
                               type="button"
@@ -3594,10 +3596,12 @@ export default function App() {
                               size="icon"
                               className="size-7 shrink-0 rounded-md"
                               disabled={!sessionId}
-                              onClick={() => {
+                              onClick={event => {
+                                event.preventDefault()
+                                event.stopPropagation()
                                 if (!sessionId) return
                                 void navigator.clipboard.writeText(
-                                  `fastfold --resume ${sessionId}`
+                                  `sandwalk --resume ${sessionId}`
                                 )
                                 setCopiedResumeCommand(true)
                                 window.setTimeout(
@@ -3616,36 +3620,24 @@ export default function App() {
                             </Button>
                           </div>
                           <p className="text-muted-foreground mt-2 text-xs">
-                            Continue this session in your local{' '}
-                            <a
-                              href="https://docs.fastfold.ai/agents/cli"
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline underline-offset-2 hover:text-foreground"
-                            >
-                              Fastfold Agent CLI
-                            </a>
-                            .
+                            Continue this session in your local Sandwalk CLI.
                           </p>
                         </div>
                         <div className="border-border/70 border-t px-4 py-3">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-10 w-full justify-start gap-2 rounded-lg px-3 text-sm"
+                          <DropdownMenuItem
+                            className="h-10 cursor-pointer gap-2 rounded-lg px-3 text-sm"
                             disabled={!session}
-                            onClick={() => {
+                            onSelect={() => {
                               if (!session) return
                               void exportTranscript(session)
-                              setCliMenuOpen(false)
                             }}
                           >
                             <Download className="size-4" />
                             Export transcript
-                          </Button>
+                          </DropdownMenuItem>
                         </div>
-                      </PopoverContent>
-                    </Popover>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button
                       type="button"
                       variant="ghost"
@@ -5316,7 +5308,7 @@ function SkillsView({
   const removeEligibleCount = filteredSkillNames.length
   const [copiedInstall, setCopiedInstall] = useState(false)
   const detailInstallCommand = detail
-    ? `fastfold skills add ${skillInstallSource(detail.name, detail.source)} --skill ${detail.name}`
+    ? `sandwalk skills add ${skillInstallSource(detail.name, detail.source)} --skill ${detail.name}`
     : ''
   const detailGithubUrl = detail
     ? skillGithubUrl(detail.name, detail.source)
@@ -5648,7 +5640,7 @@ function SkillsView({
               <h2 className="text-lg font-semibold">Import from GitHub</h2>
               <p className="text-muted-foreground mt-1 text-sm">
                 Use owner/repo, owner/repo@path, or a GitHub URL. This matches how
-                `fastfold skills add` parses sources.
+                `sandwalk skills add` parses sources.
               </p>
             </div>
             <Input

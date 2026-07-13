@@ -4,13 +4,25 @@ import SwiftUI
 /// oMLX-style settings shell: sidebar + detail for server + agent CRUD.
 struct SettingsRootView: View {
     @Environment(\.colorScheme) private var colorScheme
-    @State private var selection: SettingsSection? = .status
+    @State private var selection: SettingsSection?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var theme = SandwalkTheme.current()
+
+    init(initialSection: SettingsSection = .status) {
+        _selection = State(initialValue: initialSection)
+    }
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: $selection) {
+                Section {
+                    SidebarRow(section: .status)
+                    SidebarRow(section: .network)
+                    SidebarRow(section: .logs)
+                } header: {
+                    Text("Server")
+                }
+
                 Section {
                     SidebarRow(section: .models)
                 }
@@ -31,14 +43,6 @@ struct SettingsRootView: View {
                     SidebarRow(section: .environment)
                 } header: {
                     Text("Workspace")
-                }
-
-                Section {
-                    SidebarRow(section: .status)
-                    SidebarRow(section: .network)
-                    SidebarRow(section: .logs)
-                } header: {
-                    Text("Server")
                 }
 
                 Section {
@@ -158,7 +162,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private var window: NSWindow?
 
-    func show() {
+    func show(section: SettingsSection? = nil) {
         if NSApp.activationPolicy() != .regular {
             NSApp.setActivationPolicy(.regular)
         }
@@ -166,10 +170,18 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
         if let window {
             window.makeKeyAndOrderFront(nil)
+            if let section {
+                NotificationCenter.default.post(
+                    name: .sandwalkSelectSettingsSection,
+                    object: section
+                )
+            }
             return
         }
 
-        let hosting = NSHostingController(rootView: SettingsRootView())
+        let hosting = NSHostingController(
+            rootView: SettingsRootView(initialSection: section ?? .status)
+        )
         let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 920, height: 640),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],

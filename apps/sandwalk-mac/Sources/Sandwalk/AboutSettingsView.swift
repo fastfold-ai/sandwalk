@@ -58,47 +58,12 @@ struct AboutSettingsView: View {
                                 .font(.sandwalk(13, weight: .medium))
                                 .foregroundStyle(theme.text)
                         }
-                        Text("Copyright © 2026 CellType Inc. Licensed under the MIT License. See the LICENSE file in the repository for the full text.")
+                        Text("Copyright © 2026 Fastfold AI Labs. Licensed under the MIT License. See the LICENSE file in the repository for the full text.")
                             .font(.sandwalk(11.5))
                             .foregroundStyle(theme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-            }
-
-            SettingsSectionHeader("BUILT ON")
-            SettingsListGroup {
-                AboutLinkRow(
-                    label: "FastAPI",
-                    sublabel: "Agent API — /v1 sessions, auth, and health",
-                    icon: "server.rack",
-                    url: URL(string: "https://fastapi.tiangolo.com")!
-                )
-                AboutLinkRow(
-                    label: "Vite + React",
-                    sublabel: "Local web dashboard supervised by the menubar",
-                    icon: "globe",
-                    url: URL(string: "https://vite.dev")!
-                )
-                AboutLinkRow(
-                    label: "assistant-ui",
-                    sublabel: "Chat primitives for the agent dashboard",
-                    icon: "bubble.left.and.bubble.right",
-                    url: URL(string: "https://www.assistant-ui.com")!
-                )
-                AboutLinkRow(
-                    label: "LangGraph",
-                    sublabel: "Agentic research loop and tool orchestration",
-                    icon: "point.3.connected.trianglepath.dotted",
-                    url: URL(string: "https://langchain-ai.github.io/langgraph/")!
-                )
-                AboutLinkRow(
-                    label: "SwiftUI",
-                    sublabel: "macOS menubar supervisor and Settings",
-                    icon: "apple.logo",
-                    url: URL(string: "https://developer.apple.com/xcode/swiftui/")!,
-                    isLast: true
-                )
             }
         }
         .padding(.top, 4)

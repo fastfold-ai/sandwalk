@@ -1,4 +1,4 @@
-"""sandwalk: open science agents for drug discovery research."""
+"""sandwalk: a thinking path for open science."""
 
 from importlib.metadata import PackageNotFoundError, version
 
