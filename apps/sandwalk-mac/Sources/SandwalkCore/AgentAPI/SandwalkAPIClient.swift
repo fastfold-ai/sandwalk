@@ -169,6 +169,20 @@ enum SandwalkAPIClient {
         try await post("/v1/mcp-servers/\(enc(id))/validate", body: [:] as [String: Any])
     }
 
+    static func validateMcpCatalog(id: String) async throws -> ValidateMcpDTO {
+        try await post(
+            "/v1/mcp-servers/catalog/\(enc(id))/validate",
+            body: [:] as [String: Any]
+        )
+    }
+
+    static func setMcpCatalogEnabled(id: String, enabled: Bool) async throws -> ConnectMcpDTO {
+        try await patch(
+            "/v1/mcp-servers/catalog/\(enc(id))",
+            body: ["enabled": enabled]
+        )
+    }
+
     static func connectMcpCatalog(id: String, apiKey: String) async throws -> ConnectMcpDTO {
         try await post(
             "/v1/mcp-servers/catalog/\(enc(id))/connect",

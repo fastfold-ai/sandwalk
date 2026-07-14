@@ -139,23 +139,35 @@ struct McpCatalogEntryDTO: Codable, Identifiable, Hashable {
     let transport: String?
     let authMode: String?
     let preferredAuth: String?
+    let docsUrl: String?
     let configured: Bool?
     let enabled: Bool?
     let connected: Bool?
     let serverId: String?
+    let toolCount: Int?
     let statusMessage: String?
+}
+
+struct McpToolDetailDTO: Codable, Identifiable, Hashable {
+    var id: String { name }
+    let name: String
+    let title: String?
+    let description: String?
 }
 
 struct ValidateMcpDTO: Codable {
     let ok: Bool?
     let message: String?
     let toolCount: Int?
+    let tools: [String]?
+    let toolDetails: [McpToolDetailDTO]?
 }
 
 struct ConnectMcpDTO: Codable {
     let ok: Bool?
     let serverId: String?
     let message: String?
+    let toolCount: Int?
 }
 
 // MARK: - Specialists
