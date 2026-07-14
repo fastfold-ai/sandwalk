@@ -11,7 +11,14 @@ from agent.config import (
     OPENAI_PROFILE_DEFAULTS,
     Config,
 )
-from agent.model_catalog import cloud_catalog_models, format_discovered_model_label
+from agent.model_catalog import (
+    cloud_catalog_models,
+    format_discovered_model_label,
+    get_model_reasoning,
+    model_supports_reasoning_effort,
+    opencode_model_is_supported,
+    reasoning_effort_options,
+)
 from agent.model_discovery import probe_compatible_profile
 from agent_server.models import (
     AgentModel,
@@ -32,6 +39,23 @@ def _masked_preview(value: str | None) -> str | None:
     if len(normalized) <= 8:
         return "••••••••"
     return f"{normalized[:4]}…{normalized[-4:]}"
+
+
+def _reasoning_fields(cfg: Config, provider: str, model_id: str) -> dict[str, Any]:
+    supports = model_supports_reasoning_effort(provider, model_id)
+    effort, fast = get_model_reasoning(
+        cfg.get("llm.model_reasoning"),
+        provider,
+        model_id,
+    )
+    return {
+        "supports_reasoning_effort": supports,
+        "reasoning_effort_options": (
+            reasoning_effort_options(provider, model_id) if supports else []
+        ),
+        "reasoning_effort": effort if supports else None,
+        "reasoning_fast": bool(fast) if supports else False,
+    }
 
 
 class ModelsService:
@@ -64,6 +88,7 @@ class ModelsService:
                     backend=None,
                     enabled=enabled,
                     health=None,
+                    **_reasoning_fields(cfg, entry["provider"], model_id),
                 )
             )
 
@@ -84,6 +109,7 @@ class ModelsService:
                     backend=None,
                     enabled=enabled,
                     health=None,
+                    **_reasoning_fields(cfg, entry["provider"], model_id),
                 )
             )
 
@@ -119,6 +145,10 @@ class ModelsService:
                 for model_id in discovered:
                     if model_id in known_ids:
                         continue
+                    if provider == "opencode" and not opencode_model_is_supported(
+                        model_id
+                    ):
+                        continue
                     known_ids.add(model_id)
                     enabled = model_id not in hidden
                     if enabled_only and not enabled:
@@ -134,6 +164,7 @@ class ModelsService:
                             backend=None,
                             enabled=enabled,
                             health=health,
+                            **_reasoning_fields(cfg, provider, model_id),
                         )
                     )
 
@@ -171,6 +202,7 @@ class ModelsService:
                         backend=backend,
                         enabled=enabled,
                         health=health,
+                        **_reasoning_fields(cfg, "local", model_id),
                     )
                 )
 

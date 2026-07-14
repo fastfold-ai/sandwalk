@@ -164,11 +164,16 @@ function isKnownDefaultLabel(label: string): boolean {
 function formatDiscoveredModelLabel(modelId: string): string {
   const raw = modelId.trim()
   if (!raw) return raw
+  const acronyms = new Set(['gpt', 'glm', 'aws', 'api', 'llm', 'ml'])
   return raw
     .replace(/_/g, '-')
     .split('-')
     .filter(Boolean)
-    .map(part => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .map(part => {
+      const lower = part.toLowerCase()
+      if (acronyms.has(lower)) return lower.toUpperCase()
+      return part.slice(0, 1).toUpperCase() + part.slice(1)
+    })
     .join(' ')
 }
 
@@ -305,7 +310,8 @@ export function ModelsView({
   onProbeProfile,
   onDiscoverEndpoint,
   onSaveProviderKey,
-  onClearProviderKey
+  onClearProviderKey,
+  embedded = false
 }: {
   integrations: IntegrationSummary[]
   onListModels: (options?: {
@@ -350,6 +356,8 @@ export function ModelsView({
     value: string
   ) => Promise<void>
   onClearProviderKey: (key: string) => Promise<void>
+  /** Compact chrome for setup wizard embedding. */
+  embedded?: boolean
 }) {
   const [models, setModels] = useState<AgentModel[]>([])
   const [profiles, setProfiles] = useState<ModelProfile[]>([])
@@ -767,14 +775,21 @@ export function ModelsView({
   const localProfiles = profiles.filter(profile => !profile.isCloud)
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-7xl space-y-8 p-4 md:p-6">
-        <div>
-          <h2 className="text-2xl font-semibold">Models</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Choose which cloud and local models are available to the agent.
-          </p>
-        </div>
+    <ScrollArea className={embedded ? 'h-[min(28rem,55vh)]' : 'flex-1'}>
+      <div
+        className={cn(
+          'mx-auto w-full space-y-8',
+          embedded ? 'max-w-5xl p-1' : 'max-w-7xl p-4 md:p-6'
+        )}
+      >
+        {!embedded ? (
+          <div>
+            <h2 className="text-2xl font-semibold">Models</h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Choose which cloud and local models are available to the agent.
+            </p>
+          </div>
+        ) : null}
 
         {error ? (
           <div className="border-destructive/40 text-destructive rounded-md border px-3 py-2 text-sm">

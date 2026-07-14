@@ -17,6 +17,10 @@ def test_run_server_loopback_starts_uvicorn(tmp_path: Path, monkeypatch):
         captured["app"] = app
         captured["kwargs"] = kwargs
 
+    cfg_dir = tmp_path / "cfg"
+    cfg_dir.mkdir()
+    monkeypatch.setattr("agent.config.CONFIG_DIR", cfg_dir)
+    monkeypatch.setattr("agent.config.CONFIG_FILE", cfg_dir / "config.json")
     monkeypatch.setattr("uvicorn.run", fake_run)
     monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
 
@@ -34,6 +38,10 @@ def test_run_server_uds_mode(tmp_path: Path, monkeypatch):
     def fake_run(app, **kwargs):
         captured.update(kwargs)
 
+    cfg_dir = tmp_path / "cfg"
+    cfg_dir.mkdir()
+    monkeypatch.setattr("agent.config.CONFIG_DIR", cfg_dir)
+    monkeypatch.setattr("agent.config.CONFIG_FILE", cfg_dir / "config.json")
     monkeypatch.setattr("uvicorn.run", fake_run)
     monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
 

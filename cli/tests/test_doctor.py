@@ -316,3 +316,165 @@ def test_to_report_summary_counts():
     assert report["ok"] is False
     assert report["summary"] == {"ok": 1, "warn": 1, "error": 1, "total": 3}
     assert report["checks"][0]["category"] == "runtime"
+
+
+def test_run_checks_core_is_small_and_includes_llm(monkeypatch):
+    from agent.doctor import run_checks_core
+
+    cfg = Config(
+        data={
+            "llm.provider": "anthropic",
+            "llm.model": "claude-sonnet-4-5",
+            "llm.anthropic_api_key": "sk-ant-test-key-1234567890",
+            "llm.google_api_key": "gk-test",
+            "sandbox.backend": "builtin",
+        }
+    )
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key-1234567890")
+    monkeypatch.setenv("GEMINI_API_KEY", "gk-test")
+
+    checks = _checks_by_name(run_checks_core(cfg))
+    assert set(checks) == {
+        "config_file",
+        "llm",
+        "python_runtime",
+        "sandbox_backend",
+    }
+    assert checks["llm"].status == "ok"
+    assert "Anthropic" in checks["llm"].detail
+    assert "Google Gemini" in checks["llm"].detail
+    # Configured providers — not the selected model id.
+    assert "claude-sonnet-4-5" not in checks["llm"].detail
+    assert checks["sandbox_backend"].status == "ok"
+    assert checks["python_runtime"].status in {"ok", "warn"}
+
+
+def test_run_checks_core_llm_errors_without_keys():
+    from agent.doctor import run_checks_core
+
+    cfg = Config(
+        data={
+            "llm.provider": "anthropic",
+            "llm.model": "claude-sonnet-5",
+            "sandbox.backend": "builtin",
+            "llm.openai_profiles": {
+                "openai_cloud": {
+                    "label": "OpenAI Cloud",
+                    "backend": "openai",
+                    "base_url": "https://api.openai.com/v1",
+                },
+            },
+        }
+    )
+    checks = _checks_by_name(run_checks_core(cfg))
+    assert checks["llm"].status == "error"
+
+
+def test_heal_gemini_model_under_openai_provider():
+    from agent.model_catalog import catalog_provider_for_model
+
+    assert catalog_provider_for_model("gemini-3.1-flash-lite") == "google"
+
+    cfg = Config(
+        data={
+            "llm.provider": "openai",
+            "llm.model": "gemini-3.1-flash-lite",
+            "llm.google_api_key": "gk-test",
+            "llm.openai_active_profile": "ollama_local",
+            "llm.openai_profiles": {
+                "openai_cloud": {
+                    "label": "OpenAI Cloud",
+                    "backend": "openai",
+                    "base_url": "https://api.openai.com/v1",
+                },
+                "ollama_local": {
+                    "label": "Ollama Local",
+                    "backend": "ollama",
+                    "base_url": "http://localhost:11434/v1",
+                },
+            },
+        }
+    )
+    assert cfg.get("llm.provider") == "google"
+    assert "Google Gemini" in cfg.llm_selection_summary()
+    assert "gemini-3.1-flash-lite" in cfg.llm_selection_summary()
+    assert "provider=openai" not in cfg.llm_selection_summary()
+
+
+def test_heal_openai_model_under_google_provider():
+    cfg = Config(
+        data={
+            "llm.provider": "google",
+            "llm.model": "gpt-5.6-sol",
+            "llm.openai_api_key": "sk-test-key",
+            "llm.openai_active_profile": "ollama_local",
+            "llm.openai_profiles": {
+                "openai_cloud": {
+                    "label": "OpenAI Cloud",
+                    "backend": "openai",
+                    "base_url": "https://api.openai.com/v1",
+                },
+                "ollama_local": {
+                    "label": "Ollama Local",
+                    "backend": "ollama",
+                    "base_url": "http://localhost:11434/v1",
+                    "default_model": "llama3.1",
+                },
+            },
+        }
+    )
+    assert cfg.get("llm.provider") == "openai"
+    assert cfg.get("llm.model") == "gpt-5.6-sol"
+    assert cfg.get("llm.openai_active_profile") == "openai_cloud"
+    assert "OpenAI" in cfg.llm_selection_summary()
+    assert "gpt-5.6-sol" in cfg.llm_selection_summary()
+
+
+def test_heal_anthropic_with_gemini_model_prefers_google():
+    cfg = Config(
+        data={
+            "llm.provider": "anthropic",
+            "llm.model": "gemini-3.1-flash-lite",
+            "llm.google_api_key": "gk-test",
+            "llm.openai_profiles": {
+                "openai_cloud": {
+                    "label": "OpenAI Cloud",
+                    "backend": "openai",
+                    "base_url": "https://api.openai.com/v1",
+                },
+                "ollama_local": {
+                    "label": "Ollama Local",
+                    "backend": "ollama",
+                    "base_url": "http://localhost:11434/v1",
+                    "default_model": "llama3.1",
+                },
+            },
+        }
+    )
+    assert cfg.get("llm.provider") == "google"
+
+
+def test_to_report_scope_core(monkeypatch):
+    from agent.doctor import to_report
+
+    monkeypatch.setattr(
+        "agent.doctor.run_checks_core",
+        lambda config=None: [
+            DoctorCheck(name="llm", status="ok", detail="provider=anthropic", category="llm"),
+            DoctorCheck(
+                name="python_runtime",
+                status="ok",
+                detail="Python 3.13",
+                category="runtime",
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        "agent.doctor.run_checks",
+        lambda config=None, session=None: [
+            DoctorCheck(name="should_not_run", status="ok", detail="nope"),
+        ],
+    )
+    report = to_report(scope="core")
+    assert report["summary"]["total"] == 2
+    assert report["checks"][0]["name"] == "llm"

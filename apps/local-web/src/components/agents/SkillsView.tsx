@@ -121,7 +121,8 @@ export function SkillsView({
   onGetCatalogAudit,
   onBulkAction,
   onSetEnabled,
-  onRemove
+  onRemove,
+  embedded = false
 }: {
   mode: SkillsViewMode
   skills: AgentSkill[]
@@ -163,6 +164,7 @@ export function SkillsView({
   ) => Promise<AgentSkillBatchResult>
   onSetEnabled: (name: string, enabled: boolean) => Promise<void>
   onRemove: (name: string) => Promise<void>
+  embedded?: boolean
 }) {
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
@@ -1583,16 +1585,24 @@ export function SkillsView({
 
   return (
     <>
-      <ScrollArea className="flex-1">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 xl:flex-row">
+      <ScrollArea className={embedded ? 'h-[min(22rem,45vh)]' : 'flex-1'}>
+        <div
+          className={
+            embedded
+              ? 'mx-auto flex w-full max-w-5xl flex-col gap-6 p-1 xl:flex-row'
+              : 'mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 xl:flex-row'
+          }
+        >
           <div className="min-w-0 flex-1">
-            <div className="mb-4">
-              <h2 className="text-2xl font-semibold">Skills</h2>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Packaged instructions and scripts the agent can load on demand.
-                Install from the catalog or GitHub, and toggle which are active.
-              </p>
-            </div>
+            {!embedded ? (
+              <div className="mb-4">
+                <h2 className="text-2xl font-semibold">Skills</h2>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Packaged instructions and scripts the agent can load on demand.
+                  Install from the catalog or GitHub, and toggle which are active.
+                </p>
+              </div>
+            ) : null}
             <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-2 pb-3 pt-2 backdrop-blur">
               <div className="relative min-w-[280px] flex-1 max-w-3xl">
                 <Search className="text-muted-foreground/70 pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />

@@ -530,6 +530,8 @@ class RuntimeSettings(ApiModel):
     openai_profile_id: str | None = None
     agent_profile: str
     tool_mode: str
+    reasoning_effort: str = "medium"
+    reasoning_fast: bool = False
     recursion_limit: int = 120
     max_sdk_turns: int = 30
     group_tool_traces: bool = True
@@ -548,6 +550,8 @@ class UpdateRuntimeSettingsRequest(ApiModel):
     openai_base_url: str | None = None
     agent_profile: str | None = None
     tool_mode: str | None = None
+    reasoning_effort: str | None = None
+    reasoning_fast: bool | None = None
     recursion_limit: int | None = None
     max_sdk_turns: int | None = None
     group_tool_traces: bool | None = None
@@ -558,6 +562,16 @@ class UpdateRuntimeSettingsRequest(ApiModel):
     tool_health_enabled: bool | None = None
     tool_health_fail_threshold: int | None = None
     tool_health_suppress_seconds: int | None = None
+
+
+class OnboardingSettings(ApiModel):
+    completed: bool = False
+    step: int = 0
+
+
+class UpdateOnboardingSettingsRequest(ApiModel):
+    completed: bool | None = None
+    step: int | None = None
 
 
 class SandboxSettings(ApiModel):
@@ -640,6 +654,11 @@ class AgentModel(ApiModel):
     backend: str | None = None
     enabled: bool = True
     health: str | None = None
+    supports_reasoning_effort: bool = False
+    reasoning_effort_options: list[str] = Field(default_factory=list)
+    # Per-model Effort/Fast (only meaningful when supports_reasoning_effort).
+    reasoning_effort: str | None = None
+    reasoning_fast: bool = False
 
 
 class AgentModelList(ApiModel):

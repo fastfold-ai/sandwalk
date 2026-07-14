@@ -82,8 +82,8 @@ BOLTZ_API_KEYS_URL = "https://api.boltz.bio/console"
 BOLTZ_SKILL_SOURCE = "fastfold-ai/skills@skills/boltz"
 BOLTZ_INSTALL_SCRIPT = "set -euo pipefail; curl -fsSL https://install.boltz.bio/boltz-api/install.sh | sh"
 SETUP_PROVIDER_ORDER = (
-    "anthropic",
     "openai",
+    "anthropic",
     "xai",
     "google",
     "nvidia",
@@ -1574,6 +1574,22 @@ def setup_cmd(
     skip_datasets: bool = typer.Option(
         False, "--skip-datasets", help="Skip the dataset download step"
     ),
+    mcp: str | None = typer.Option(
+        None,
+        "--mcp",
+        help="Comma-separated MCP catalog ids to connect non-interactively",
+    ),
+    skip_mcp: bool = typer.Option(
+        False, "--skip-mcp", help="Skip the MCP connect step"
+    ),
+    sandbox_backend: str | None = typer.Option(
+        None,
+        "--sandbox-backend",
+        help="Sandbox backend for setup: builtin or modal",
+    ),
+    skip_sandbox: bool = typer.Option(
+        False, "--skip-sandbox", help="Skip the sandbox setup step"
+    ),
 ):
     """Interactive setup wizard — configure fastfold for first use."""
     from agent.config import Config
@@ -1614,6 +1630,14 @@ def setup_cmd(
         datasets = None
     if isinstance(skip_datasets, OptionInfo):
         skip_datasets = False
+    if isinstance(mcp, OptionInfo):
+        mcp = None
+    if isinstance(skip_mcp, OptionInfo):
+        skip_mcp = False
+    if isinstance(sandbox_backend, OptionInfo):
+        sandbox_backend = None
+    if isinstance(skip_sandbox, OptionInfo):
+        skip_sandbox = False
 
     if profile_endpoint and not openai_base_url:
         openai_base_url = profile_endpoint
@@ -1623,9 +1647,9 @@ def setup_cmd(
 
     cfg = Config.load()
 
-    default_provider = str(provider or cfg.get("llm.provider", "anthropic") or "anthropic").strip().lower()
+    default_provider = str(provider or cfg.get("llm.provider", "openai") or "openai").strip().lower()
     if default_provider not in {"anthropic", "openai", "openai_compatible"}:
-        default_provider = "anthropic"
+        default_provider = "openai"
 
     # Azure AI Foundry: skip interactive key prompt when Foundry is configured
     if (
@@ -1868,6 +1892,11 @@ def setup_cmd(
         if default_model and (not prefix or not current_model.startswith(prefix)):
             cfg.set("llm.model", default_model)
     if active_setup_provider == "openai":
+        current_model = str(cfg.get("llm.model") or "").strip()
+        from agent.config import Config as _Cfg
+
+        if not _Cfg._looks_like_openai_cloud_model(current_model):
+            cfg.set("llm.model", "gpt-5.6-sol")
         if "openai_compatible" in selected_providers and resolved_compatible_profile_id:
             cfg.set_openai_active_profile(resolved_compatible_profile_id)
         else:
@@ -1920,18 +1949,19 @@ def setup_cmd(
             f"or visit {BOLTZ_API_KEYS_URL}"
         )
 
-    # Optional: install agent skills (live catalog + custom sources)
+    # MCP + skills (combined conceptual step), then datasets, then sandbox last.
+    _prompt_setup_mcps(mcp_arg=mcp, skip=skip_mcp)
     _prompt_install_skills(skills_arg=skills, skip=skip_skills)
     _prompt_install_boltz_stack(boltz_key)
-
-    # Optional: download local datasets (auto-downloadable ones, all preselected)
     _prompt_install_datasets(datasets_arg=datasets, skip=skip_datasets)
+    _prompt_setup_sandbox(cfg, backend_arg=sandbox_backend, skip=skip_sandbox)
 
     # Quick health check
     console.print()
     console.print("  [cyan]Running health check...[/cyan]")
     from agent.doctor import has_errors, run_checks, to_table
 
+    cfg = Config.load()
     checks = run_checks(cfg)
     console.print(to_table(checks))
 
@@ -1941,6 +1971,14 @@ def setup_cmd(
         )
     else:
         console.print("\n  [green]All checks passed.[/green]")
+
+    # Mark UI onboarding complete when CLI setup finishes.
+    try:
+        cfg.set("ui.onboarding_completed", True)
+        cfg.set("ui.onboarding_step", 6)
+        cfg.save()
+    except Exception:
+        pass
 
     # Done
     console.print()
@@ -3483,6 +3521,170 @@ def _select_suggested_sources() -> list[str]:
         if token.isdigit() and 1 <= int(token) <= len(SUGGESTED_SKILL_SOURCES):
             sources.append(SUGGESTED_SKILL_SOURCES[int(token) - 1]["source"])
     return sources
+
+
+def _prompt_setup_mcps(mcp_arg: str | None = None, skip: bool = False) -> None:
+    """Setup step: connect suggested MCP servers (optional)."""
+    from agent.mcp_catalog import MCP_CATALOG, get_catalog_entry
+    from agent.mcp_manage import handle_mcp_argv
+
+    if skip:
+        return
+
+    ids: list[str] = []
+    if mcp_arg:
+        ids = [s.strip().lower() for s in mcp_arg.split(",") if s.strip()]
+    else:
+        interactive = sys.stdin.isatty() and sys.stdout.isatty()
+        if not interactive:
+            console.print(
+                "\n  [dim]Skipping MCP setup (non-interactive). "
+                "Connect later with `sandwalk mcp connect <id>`.[/dim]"
+            )
+            return
+        console.print("\n  [cyan]MCP servers[/cyan]")
+        console.print(
+            "  [dim]Connect remote tool servers (optional). "
+            "Catalog ids:[/dim] " + ", ".join(e.id for e in MCP_CATALOG)
+        )
+        try:
+            proceed = input("  Connect MCP servers now? [y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n  [dim]Setup cancelled.[/dim]")
+            raise typer.Exit()
+        if proceed not in ("y", "yes"):
+            console.print(
+                "  [dim]Skipped. Connect later with `sandwalk mcp connect <id>` "
+                "or Dashboard → MCP.[/dim]"
+            )
+            return
+        try:
+            raw = input(
+                "  Catalog ids to connect (comma-separated; Enter to skip): "
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            raw = ""
+        ids = [s.strip().lower() for s in raw.split(",") if s.strip()]
+
+    if not ids:
+        console.print("  [dim]No MCP servers selected.[/dim]")
+        return
+
+    for catalog_id in ids:
+        entry = get_catalog_entry(catalog_id)
+        if entry is None:
+            console.print(f"  [yellow]Unknown MCP catalog id:[/yellow] {catalog_id}")
+            continue
+        argv = ["connect", catalog_id]
+        if entry.auth_mode in {"api_key", "api_key_or_oauth"} and entry.preferred_auth != "oauth":
+            try:
+                key = _prompt_masked_secret(
+                    f"  API key for {entry.name} (Enter to skip): "
+                ).strip()
+            except (EOFError, KeyboardInterrupt):
+                key = ""
+            if not key:
+                console.print(f"  [dim]Skipped {entry.name}.[/dim]")
+                continue
+            argv.extend(["--api-key", key])
+        code = handle_mcp_argv(argv, console)
+        if code != 0:
+            console.print(
+                f"  [yellow]Could not finish connect for {catalog_id}.[/yellow] "
+                "Use Dashboard → MCP or `sandwalk mcp connect`."
+            )
+
+
+def _prompt_setup_sandbox(
+    cfg,
+    backend_arg: str | None = None,
+    skip: bool = False,
+) -> None:
+    """Setup step: choose Local vs Modal sandbox (last config step)."""
+    from agent.sandbox_probe import modal_tokens_present
+
+    if skip:
+        return
+
+    current = str(cfg.get("sandbox.backend") or "builtin").strip().lower()
+    if current not in {"builtin", "modal"}:
+        current = "builtin"
+
+    chosen = str(backend_arg or "").strip().lower() or None
+    if chosen not in {None, "builtin", "modal", "local"}:
+        console.print(
+            f"  [yellow]Unknown sandbox backend:[/yellow] {backend_arg}. "
+            "Use builtin or modal."
+        )
+        chosen = None
+    if chosen == "local":
+        chosen = "builtin"
+
+    interactive = sys.stdin.isatty() and sys.stdout.isatty()
+    if chosen is None:
+        if not interactive:
+            console.print(
+                "\n  [dim]Skipping sandbox setup (non-interactive). "
+                f"Current backend: {current}.[/dim]"
+            )
+            return
+        console.print("\n  [cyan]Sandbox[/cyan]")
+        console.print(
+            "  [dim]Where the agent runs code: Local Sandbox on this machine, "
+            "or Modal in the cloud.[/dim]"
+        )
+        console.print(f"  [1] Local Sandbox  [dim](current: {current})[/dim]")
+        console.print("  [2] Modal")
+        console.print("  [3] Skip")
+        try:
+            pick = input("  Choose sandbox [1/2/3]: ").strip() or "3"
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n  [dim]Setup cancelled.[/dim]")
+            raise typer.Exit()
+        if pick == "1":
+            chosen = "builtin"
+        elif pick == "2":
+            chosen = "modal"
+        else:
+            console.print("  [dim]Sandbox unchanged.[/dim]")
+            return
+
+    if chosen == "modal":
+        ok, detail = modal_tokens_present(cfg)
+        if not ok and interactive:
+            console.print(
+                "  [yellow]Modal tokens not configured.[/yellow] "
+                f"[dim]{detail}[/dim]"
+            )
+            try:
+                token_id = _prompt_masked_secret(
+                    "  Modal token id (Enter to keep Local): "
+                ).strip()
+            except (EOFError, KeyboardInterrupt):
+                token_id = ""
+            if not token_id:
+                chosen = "builtin"
+            else:
+                try:
+                    token_secret = _prompt_masked_secret("  Modal token secret: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    token_secret = ""
+                if not token_secret:
+                    chosen = "builtin"
+                else:
+                    cfg.set("compute.modal_token_id", token_id)
+                    cfg.set("compute.modal_token_secret", token_secret)
+                    ok = True
+        if chosen == "modal" and not ok:
+            console.print(
+                "  [yellow]Modal tokens missing — keeping Local Sandbox.[/yellow]"
+            )
+            chosen = "builtin"
+
+    cfg.set("sandbox.backend", chosen)
+    cfg.save()
+    label = "Modal" if chosen == "modal" else "Local Sandbox"
+    console.print(f"  [green]Sandbox backend:[/green] {label}")
 
 
 def _prompt_install_skills(skills_arg: str | None = None, skip: bool = False) -> None:

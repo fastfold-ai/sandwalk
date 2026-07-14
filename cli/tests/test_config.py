@@ -53,7 +53,8 @@ def test_load_invalid_json_does_not_crash(monkeypatch, tmp_path):
 
     cfg = Config.load()
     # Should fall back to defaults when config file is corrupt
-    assert cfg.get("llm.provider") == "anthropic"
+    assert cfg.get("llm.provider") == "openai"
+    assert cfg.get("llm.model") == "gpt-5.6-sol"
 
 
 def test_load_recovers_from_backup_when_primary_is_corrupt(monkeypatch, tmp_path):

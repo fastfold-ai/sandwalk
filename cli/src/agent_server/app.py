@@ -96,6 +96,7 @@ from agent_server.models import (
     ModelProfileList,
     ModelProfileProbeResult,
     MoveWorkspaceFileRequest,
+    OnboardingSettings,
     ProjectList,
     PtySessionInfo,
     PtySessionList,
@@ -127,6 +128,7 @@ from agent_server.models import (
     UpdateIntegrationRequest,
     UpdateMcpCatalogRequest,
     UpdateMcpServerRequest,
+    UpdateOnboardingSettingsRequest,
     UpdateProjectRequest,
     UpdatePtyRequest,
     UpdateRuntimeSettingsRequest,
@@ -187,7 +189,7 @@ def create_app(
     allowed_origins: list[str] | None = None,
     allowed_hosts: list[str] | None = None,
 ) -> FastAPI:
-    store = AgentStore(store_path)
+    store = AgentStore(store_path, exclusive=True)
     service = AgentService(store)
     skills_service = SkillsService()
     specialists_service = SpecialistsService(store)
@@ -235,6 +237,7 @@ def create_app(
         yield
         await pty_manager.shutdown()
         await service.shutdown()
+        store.close()
 
     app = FastAPI(
         title="Sandwalk",
@@ -473,10 +476,16 @@ def create_app(
         return await asyncio.to_thread(clear_cache)
 
     @app.get("/v1/doctor", response_model=DoctorReport)
-    async def doctor() -> DoctorReport:
+    async def doctor(scope: str = "full") -> DoctorReport:
         from agent.doctor import to_report
 
-        payload = await asyncio.to_thread(to_report)
+        normalized = str(scope or "full").strip().lower()
+        if normalized not in {"full", "core"}:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid scope. Use 'full' or 'core'.",
+            )
+        payload = await asyncio.to_thread(to_report, scope=normalized)
         return DoctorReport.model_validate(payload)
 
     async def _build_diagnostics_response(
@@ -929,6 +938,16 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.get("/v1/settings/onboarding", response_model=OnboardingSettings)
+    async def get_onboarding_settings() -> OnboardingSettings:
+        return await asyncio.to_thread(settings_service.get_onboarding)
+
+    @app.patch("/v1/settings/onboarding", response_model=OnboardingSettings)
+    async def update_onboarding_settings(
+        payload: UpdateOnboardingSettingsRequest,
+    ) -> OnboardingSettings:
+        return await asyncio.to_thread(settings_service.update_onboarding, payload)
+
     @app.get("/v1/settings/sandbox", response_model=SandboxSettings)
     async def get_sandbox_settings() -> SandboxSettings:
         return await asyncio.to_thread(sandbox_settings_service.get)
@@ -1008,6 +1027,17 @@ def create_app(
             raise HTTPException(
                 status_code=404, detail=f"Unknown dataset '{dataset_id}'."
             ) from exc
+
+    @app.delete("/v1/datasets/{dataset_id}", response_model=DatasetInstallResponse)
+    async def remove_dataset(dataset_id: str) -> DatasetInstallResponse:
+        try:
+            return await asyncio.to_thread(datasets_service.remove, dataset_id)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=404, detail=f"Unknown dataset '{dataset_id}'."
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/v1/tools", response_model=ToolList)
     async def list_tools(

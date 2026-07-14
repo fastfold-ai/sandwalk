@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
+import atexit
 import json
 import logging
-import shutil
+import os
 import sqlite3
-import subprocess
 import threading
+import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from agent.config import CONFIG_DIR
+from agent import config as agent_config
 from agent_server.models import (
     AgentMessage,
     AgentProject,
@@ -27,34 +28,164 @@ from agent_server.models import (
 
 logger = logging.getLogger(__name__)
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows
+    fcntl = None  # type: ignore[assignment]
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-class AgentStore:
-    """Small durable store shared by CLI and web transports."""
+class AgentStoreError(RuntimeError):
+    """Base error for agent store open/lifecycle failures."""
 
-    def __init__(self, path: Path | None = None) -> None:
-        self.path = (path or (CONFIG_DIR / "agent-server.db")).expanduser()
+
+class AgentStoreCorruptedError(AgentStoreError):
+    """SQLite file exists but fails integrity_check — refuse to open or rewrite it."""
+
+
+class AgentStoreLockError(AgentStoreError):
+    """Another process already holds the exclusive serve lock for this database."""
+
+
+class AgentStore:
+    """Small durable store shared by CLI and web transports.
+
+    Durability rules:
+    - Never auto-quarantine / restore / wipe the DB on open (that rewound user
+      settings and could race with a live writer).
+    - ``exclusive=True`` (agent server) takes a process lock so a second serve
+      cannot open the same file, and checkpoints WAL on ``close()``.
+    - Short-lived CLI opens leave ``exclusive=False`` so they can share the DB
+      with a running server via SQLite WAL.
+    """
+
+    def __init__(
+        self,
+        path: Path | None = None,
+        *,
+        exclusive: bool = False,
+        verify_integrity: bool | None = None,
+    ) -> None:
+        self.path = (path or (agent_config.CONFIG_DIR / "agent-server.db")).expanduser()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._write_lock = threading.RLock()
-        self._ensure_healthy_database()
-        self._initialize()
+        self._exclusive = exclusive
+        self._lock_fd: int | None = None
+        self._lock_path = self.path.with_name(f"{self.path.name}.lock")
+        self._closed = False
+        self._atexit_registered = False
+
+        if exclusive:
+            self._acquire_exclusive_lock()
+
+        try:
+            check = verify_integrity if verify_integrity is not None else exclusive
+            if check:
+                self._assert_healthy_database()
+            self._initialize()
+        except Exception:
+            self._release_exclusive_lock()
+            raise
+
+        if exclusive:
+            atexit.register(self.close)
+            self._atexit_registered = True
+
+    def close(self) -> None:
+        """Checkpoint WAL and release the exclusive lock (idempotent)."""
+        with self._write_lock:
+            if self._closed:
+                return
+            self._closed = True
+            try:
+                if self.path.exists():
+                    with self._connect() as connection:
+                        connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except sqlite3.Error as exc:
+                logger.warning("WAL checkpoint on close failed: %s", exc)
+            self._release_exclusive_lock()
+
+    def _acquire_exclusive_lock(self) -> None:
+        """Non-blocking exclusive flock so only one serve owns this DB.
+
+        Retries briefly so a graceful restart (old process shutting down) can
+        release the lock without forcing the user to wait and retry manually.
+        """
+        deadline = time.monotonic() + 5.0
+        last_exc: OSError | None = None
+        while True:
+            fd = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                if fcntl is not None:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                else:  # pragma: no cover - Windows
+                    import msvcrt
+
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                try:
+                    os.ftruncate(fd, 0)
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    os.write(fd, f"{os.getpid()}\n".encode())
+                except OSError:
+                    pass
+                self._lock_fd = fd
+                return
+            except OSError as exc:
+                last_exc = exc
+                holder = ""
+                try:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    raw = os.read(fd, 64).decode("utf-8", errors="replace").strip()
+                    if raw:
+                        holder = f" (held by pid {raw})"
+                except OSError:
+                    pass
+                os.close(fd)
+                if time.monotonic() >= deadline:
+                    raise AgentStoreLockError(
+                        f"Another Sandwalk server already has this database open"
+                        f"{holder}: {self.path}. Stop the other process before "
+                        "starting a new one."
+                    ) from last_exc
+                time.sleep(0.1)
+
+    def _release_exclusive_lock(self) -> None:
+        fd = self._lock_fd
+        self._lock_fd = None
+        if fd is None:
+            return
+        try:
+            if fcntl is not None:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            else:  # pragma: no cover - Windows
+                import msvcrt
+
+                try:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                except OSError:
+                    pass
+        finally:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA journal_mode = WAL")
-        # NORMAL is durable enough with WAL and much less likely to leave a
-        # torn page if the process is force-killed mid-write than OFF.
+        # NORMAL is durable enough with WAL; avoid OFF (torn pages on kill).
         connection.execute("PRAGMA synchronous = NORMAL")
         connection.execute("PRAGMA busy_timeout = 30000")
         return connection
 
-    def _ensure_healthy_database(self) -> None:
-        """Repair a malformed DB so serve does not crash-loop on startup."""
+    def _assert_healthy_database(self) -> None:
+        """Fail loud on a malformed DB — never rewrite or restore silently."""
         if not self.path.exists():
             return
         try:
@@ -65,88 +196,10 @@ class AgentStore:
                 detail = str(row[0]) if row else "integrity_check failed"
         except sqlite3.DatabaseError as exc:
             detail = str(exc)
-        self._repair_database(reason=detail)
-
-    def _sidecar(self, base: Path, suffix: str) -> Path:
-        return Path(f"{base}{suffix}")
-
-    def _quarantine_database(self, *, stamp: str) -> Path:
-        backup = self.path.with_name(f"{self.path.name}.corrupt-{stamp}")
-        for suffix in ("", "-wal", "-shm"):
-            src = self._sidecar(self.path, suffix)
-            if not src.exists():
-                continue
-            dest = self._sidecar(backup, suffix)
-            try:
-                if dest.exists():
-                    dest.unlink()
-                shutil.move(str(src), str(dest))
-            except OSError as exc:
-                logger.warning("Failed to quarantine %s: %s", src, exc)
-        return backup
-
-    def _integrity_ok(self, path: Path) -> bool:
-        try:
-            with sqlite3.connect(path, timeout=5) as connection:
-                row = connection.execute("PRAGMA integrity_check").fetchone()
-                return bool(row and str(row[0]) == "ok")
-        except sqlite3.DatabaseError:
-            return False
-
-    def _repair_database(self, *, reason: str) -> None:
-        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-        backup = self._quarantine_database(stamp=stamp)
-        logger.error(
-            "Agent store database is corrupt (%s); quarantined to %s and recovering",
-            reason,
-            backup,
-        )
-
-        # Prefer a previously recovered sibling when present.
-        sibling = Path(f"{self.path}.recovered")
-        if sibling.exists() and self._integrity_ok(sibling):
-            try:
-                shutil.copy2(sibling, self.path)
-                if self._integrity_ok(self.path):
-                    logger.error("Restored agent store from %s", sibling)
-                    return
-            except OSError as exc:
-                logger.warning("Failed to restore %s: %s", sibling, exc)
-
-        # sqlite3 .recover dumps a rebuild script (best-effort).
-        try:
-            recover_sql = subprocess.check_output(
-                ["sqlite3", str(backup), ".recover"],
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=120,
-            )
-            if self.path.exists():
-                self.path.unlink()
-            with sqlite3.connect(self.path) as connection:
-                connection.executescript(recover_sql)
-            if self._integrity_ok(self.path):
-                try:
-                    shutil.copy2(self.path, sibling)
-                except OSError:
-                    pass
-                logger.error("Recovered agent store via sqlite3 .recover")
-                return
-        except (OSError, subprocess.SubprocessError, sqlite3.Error) as exc:
-            logger.warning("sqlite3 .recover failed: %s", exc)
-
-        # Last resort: empty DB so the API can boot (schema created in _initialize).
-        for suffix in ("", "-wal", "-shm"):
-            path = self._sidecar(self.path, suffix)
-            if path.exists():
-                try:
-                    path.unlink()
-                except OSError:
-                    pass
-        logger.error(
-            "Could not recover agent store data; starting with a fresh database "
-            "(corrupt backup kept at %s)",
-            backup,
+        raise AgentStoreCorruptedError(
+            f"Agent store database is corrupt ({detail}): {self.path}. "
+            "Refusing to auto-repair so settings are not silently rewritten. "
+            "Restore from backup or remove the file only if you accept data loss."
         )
 
     def _initialize(self) -> None:

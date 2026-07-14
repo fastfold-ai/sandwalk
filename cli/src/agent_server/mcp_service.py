@@ -186,6 +186,42 @@ def resolve_auth_headers(
     return None
 
 
+def oauth_access_token_expired(
+    entry: McpCatalogEntry,
+    config: Config | None = None,
+    *,
+    skew_seconds: int = 60,
+) -> bool:
+    """Return True when a stored OAuth access token is past ``token_expires_at``."""
+    cfg = config or Config.load()
+    raw = cfg.get(f"mcp.{entry.id}_token_expires_at")
+    if raw is None or str(raw).strip() == "":
+        return False
+    try:
+        expires_at = float(raw)
+    except (TypeError, ValueError):
+        return False
+    return time.time() >= (expires_at - max(0, skew_seconds))
+
+
+def oauth_reconnect_required(
+    entry: McpCatalogEntry,
+    config: Config | None = None,
+) -> str | None:
+    """Human message when OAuth must be reconnected, else None."""
+    cfg = config or Config.load()
+    access = _cfg_secret(cfg, f"mcp.{entry.id}_access_token", None)
+    if not access:
+        return None
+    refresh = _cfg_secret(cfg, f"mcp.{entry.id}_refresh_token", None)
+    if oauth_access_token_expired(entry, cfg) and not refresh:
+        return (
+            "OAuth access token expired and no refresh token is stored. "
+            "Disconnect and Connect again to re-authorize."
+        )
+    return None
+
+
 def credentials_configured(entry: McpCatalogEntry, config: Config | None = None) -> bool:
     return resolve_auth_headers(entry, config) is not None
 
@@ -545,8 +581,16 @@ class McpService:
                     # Enabled + configured, but not probed yet.
                     status_message = None
             else:
-                # Disabled cards should not show stale probe errors.
+                # Disabled cards should not show stale probe errors…
                 status_message = None
+
+            # …except expired OAuth that needs reconnect — keep that visible so
+            # the list matches the detail-page probe message.
+            if configured:
+                reconnect = oauth_reconnect_required(entry, cfg)
+                if reconnect:
+                    status_message = reconnect
+                    connected = False
 
             out.append(
                 {
@@ -675,10 +719,10 @@ class McpService:
                 break
         assert result is not None
 
+        # Connect authenticates only — never flip the enable toggle.
+        # Users turn MCPs on/off via UI toggle or `mcp enable|disable`.
+        server = self.ensure_catalog_server(catalog_id, enabled=False)
         if not result["ok"]:
-            server = self.ensure_catalog_server(catalog_id, enabled=False)
-            if server.enabled:
-                server = self.store.update_mcp_server(server.id, enabled=False) or server
             clear_tool_count(catalog_id)
             save_status_message(
                 catalog_id, str(result.get("message") or "Connection failed")
@@ -686,18 +730,15 @@ class McpService:
             return {
                 "ok": False,
                 "serverId": server.id,
-                "enabled": False,
+                "enabled": bool(server.enabled),
                 **result,
             }
 
-        server = self.ensure_catalog_server(catalog_id, enabled=True)
-        if not server.enabled:
-            server = self.store.update_mcp_server(server.id, enabled=True) or server
         save_tool_count(catalog_id, int(result.get("toolCount") or 0))
         return {
             "ok": True,
             "serverId": server.id,
-            "enabled": True,
+            "enabled": bool(server.enabled),
             **result,
         }
 
@@ -783,6 +824,16 @@ class McpService:
                     "ok": False,
                     "toolCount": 0,
                     "message": "Not configured — Connect with OAuth or API key first",
+                    "tools": [],
+                    "toolDetails": [],
+                }
+            reconnect = oauth_reconnect_required(entry, cfg)
+            if reconnect:
+                save_status_message(catalog_id, reconnect)
+                return {
+                    "ok": False,
+                    "toolCount": 0,
+                    "message": reconnect,
                     "tools": [],
                     "toolDetails": [],
                 }
@@ -949,11 +1000,8 @@ class McpService:
             url=entry.url,
             headers={"Authorization": f"Bearer {data['access_token']}"},
         )
-        server = self.ensure_catalog_server(catalog_id, enabled=result["ok"])
-        if result["ok"] and not server.enabled:
-            server = self.store.update_mcp_server(server.id, enabled=True) or server
-        elif not result["ok"] and server.enabled:
-            self.store.update_mcp_server(server.id, enabled=False)
+        # OAuth finish authenticates only — never flip the enable toggle.
+        server = self.ensure_catalog_server(catalog_id, enabled=False)
         if result["ok"]:
             save_tool_count(catalog_id, int(result.get("toolCount") or 0))
         else:

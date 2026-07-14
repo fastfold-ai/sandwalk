@@ -1,0 +1,23 @@
+{
+  "name": "model-catalog-smoke",
+  "description": "Default model catalog benchmark: connectivity, short reasoning, and a biology smoke prompt. Effort matrix (low/medium/high/fast) applies only to models that support reasoning effort.",
+  "questions": [
+    {
+      "id": "hi",
+      "prompt": "hi",
+      "description": "Latency / connectivity smoke"
+    },
+    {
+      "id": "math",
+      "prompt": "What is 17 multiplied by 19? Reply with only the number.",
+      "expectContains": ["323"],
+      "description": "Short deterministic reasoning check"
+    },
+    {
+      "id": "kras",
+      "prompt": "In one short sentence, what is the KRAS G12C mutation in cancer biology?",
+      "expectContains": ["kras"],
+      "description": "Domain knowledge smoke (case-insensitive contains)"
+    }
+  ]
+}

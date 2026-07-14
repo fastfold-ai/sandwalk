@@ -111,7 +111,7 @@ class TestReportHelpers:
 
 class TestConfigCommands:
     def test_config_show_and_get(self, monkeypatch, tmp_path):
-        cfg = Config(data={"llm": {"provider": "anthropic"}})
+        cfg = Config(data={"llm.provider": "anthropic"})
         monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
 
         show_result = runner.invoke(app, ["config", "show"])

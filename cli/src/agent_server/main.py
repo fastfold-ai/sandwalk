@@ -68,6 +68,7 @@ def run_server(
         hosts = ["127.0.0.1", "localhost"]
 
     from agent_server.app import create_app
+    from agent_server.store import AgentStoreCorruptedError, AgentStoreLockError
 
     # Match CLI Session: expose ~/.sandwalk config credentials to process env
     # so shell/skill subprocesses and PTYs see the same keys as interactive CLI.
@@ -98,11 +99,16 @@ def run_server(
     if key:
         os.environ.setdefault("FASTFOLD_SERVER_API_KEY", key)
 
-    app = create_app(
-        api_key=key,
-        allowed_origins=origins,
-        allowed_hosts=hosts,
-    )
+    try:
+        app = create_app(
+            api_key=key,
+            allowed_origins=origins,
+            allowed_hosts=hosts,
+        )
+    except AgentStoreLockError as exc:
+        raise SystemExit(f"Error: {exc}") from exc
+    except AgentStoreCorruptedError as exc:
+        raise SystemExit(f"Error: {exc}") from exc
 
     run_kwargs = {"log_level": "info"}
     if log_config is not None:

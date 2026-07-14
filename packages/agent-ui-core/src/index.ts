@@ -360,6 +360,10 @@ export type RuntimeSettings = {
   openaiProfileId?: string | null
   agentProfile: string
   toolMode: string
+  /** Stored effort level: low | medium | high (Fast maps to API none). */
+  reasoningEffort?: string
+  /** When true, API reasoning_effort is none regardless of reasoningEffort. */
+  reasoningFast?: boolean
   recursionLimit: number
   maxSdkTurns: number
   groupToolTraces: boolean
@@ -370,6 +374,11 @@ export type RuntimeSettings = {
   toolHealthEnabled: boolean
   toolHealthFailThreshold: number
   toolHealthSuppressSeconds: number
+}
+
+export type OnboardingSettings = {
+  completed: boolean
+  step: number
 }
 
 export type SandboxSettings = {
@@ -458,6 +467,13 @@ export type AgentModel = {
   backend?: string | null
   enabled: boolean
   health: string | null
+  /** True when Effort / Fast controls apply (OpenAI GPT-5 / o-series, etc.). */
+  supportsReasoningEffort?: boolean
+  reasoningEffortOptions?: string[]
+  /** Per-model effort level (low|medium|high). */
+  reasoningEffort?: string | null
+  /** Per-model Fast toggle. */
+  reasoningFast?: boolean
 }
 
 export type CreateAgentModelInput = {
@@ -512,6 +528,11 @@ export interface SettingsProvider {
     changes: Partial<RuntimeSettings>,
     signal?: AbortSignal,
   ): Promise<RuntimeSettings>
+  getOnboardingSettings?(signal?: AbortSignal): Promise<OnboardingSettings>
+  updateOnboardingSettings?(
+    changes: Partial<OnboardingSettings>,
+    signal?: AbortSignal,
+  ): Promise<OnboardingSettings>
   getSandboxSettings?(signal?: AbortSignal): Promise<SandboxSettings>
   updateSandboxSettings?(
     changes: Partial<SandboxSettings>,
@@ -599,6 +620,10 @@ export type ToolCatalog = {
 export interface DatasetsProvider {
   listDatasets(signal?: AbortSignal): Promise<DatasetSummary[]>
   installDataset(
+    datasetId: string,
+    signal?: AbortSignal,
+  ): Promise<DatasetInstallResult>
+  removeDataset(
     datasetId: string,
     signal?: AbortSignal,
   ): Promise<DatasetInstallResult>
@@ -962,7 +987,11 @@ export interface AgentClient {
   stopServer?(signal?: AbortSignal): Promise<ServerLifecycleResult>
   restartServer?(signal?: AbortSignal): Promise<ServerLifecycleResult>
   clearRuntimeCache?(signal?: AbortSignal): Promise<ServerCacheInfo>
-  runDoctor?(signal?: AbortSignal): Promise<DoctorReport>
+  runDoctor?(
+    signalOrOptions?:
+      | AbortSignal
+      | { scope?: 'full' | 'core'; signal?: AbortSignal },
+  ): Promise<DoctorReport>
   getStorage?(signal?: AbortSignal): Promise<StorageReport>
   getEnvironment?(signal?: AbortSignal): Promise<EnvironmentReport>
   installEnvironmentPackage?(

@@ -19,7 +19,6 @@ def test_fork_command_imports_into_agent_store(tmp_path: Path, monkeypatch):
     sessions_dir.mkdir()
 
     monkeypatch.setattr("agent.config.CONFIG_DIR", cfg_dir)
-    monkeypatch.setattr("agent_server.store.CONFIG_DIR", cfg_dir)
     monkeypatch.setattr("agent_server.service.CONFIG_DIR", cfg_dir)
     monkeypatch.setattr(Trajectory, "sessions_dir", staticmethod(lambda: sessions_dir))
 

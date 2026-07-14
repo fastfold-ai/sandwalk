@@ -31,6 +31,17 @@ def _openai_temperature_kwargs(model: str, temperature: float) -> dict[str, floa
     return {"temperature": float(temperature)}
 
 
+def _anthropic_temperature_kwargs(model: str, temperature: float) -> dict[str, float]:
+    """Omit temperature for Anthropic models that reject sampling params."""
+    try:
+        from agent.model_catalog import anthropic_model_omits_temperature
+    except Exception:
+        return {"temperature": float(temperature)}
+    if anthropic_model_omits_temperature(model):
+        return {}
+    return {"temperature": float(temperature)}
+
+
 @dataclass
 class LLMResponse:
     """Standardized response from any LLM backend."""
@@ -116,7 +127,7 @@ class LLMClient:
     # Default models per provider
     DEFAULT_MODELS = {
         "anthropic": "claude-sonnet-4-5-20250929",
-        "openai": "gpt-4o",
+        "openai": "gpt-5.6-sol",
         "xai": "grok-4.5",
         "google": "gemini-3.5-flash",
         "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
@@ -134,7 +145,7 @@ class LLMClient:
         "opencode": ("https://opencode.ai/zen/v1", "OPENCODE_API_KEY"),
     }
 
-    def __init__(self, provider: str = "anthropic", model: str = None,
+    def __init__(self, provider: str = "openai", model: str = None,
                  api_key: str = None, base_url: str | None = None):
         self.provider = provider
         self.model = model or self.DEFAULT_MODELS.get(provider)
@@ -239,8 +250,8 @@ class LLMClient:
             "model": self.model,
             "system": system,
             "messages": messages,
-            "temperature": temperature,
             "max_tokens": max_tokens,
+            **_anthropic_temperature_kwargs(self.model or "", temperature),
         }
         if tools:
             kwargs["tools"] = tools
@@ -285,8 +296,8 @@ class LLMClient:
             model=self.model,
             system=system,
             messages=messages,
-            temperature=temperature,
             max_tokens=max_tokens,
+            **_anthropic_temperature_kwargs(self.model or "", temperature),
         ) as stream:
             try:
                 yield from stream.text_stream

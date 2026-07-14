@@ -36,6 +36,7 @@ import type {
   ModelProfile,
   ModelProfileProbeResult,
   DiscoverModelEndpointInput,
+  OnboardingSettings,
   ServerCacheInfo,
   ServerLifecycleResult,
   ServerStatusReport,
@@ -205,8 +206,24 @@ export class LocalAgentClient
     })
   }
 
-  runDoctor(signal?: AbortSignal): Promise<DoctorReport> {
-    return this.request<DoctorReport>('/doctor', { signal })
+  runDoctor(
+    signalOrOptions?: AbortSignal | { scope?: 'full' | 'core'; signal?: AbortSignal },
+    maybeSignal?: AbortSignal,
+  ): Promise<DoctorReport> {
+    let scope: 'full' | 'core' = 'full'
+    let signal: AbortSignal | undefined
+    if (
+      signalOrOptions &&
+      typeof signalOrOptions === 'object' &&
+      !('aborted' in signalOrOptions)
+    ) {
+      scope = signalOrOptions.scope === 'core' ? 'core' : 'full'
+      signal = signalOrOptions.signal ?? maybeSignal
+    } else {
+      signal = (signalOrOptions as AbortSignal | undefined) ?? maybeSignal
+    }
+    const query = scope === 'core' ? '?scope=core' : ''
+    return this.request<DoctorReport>(`/doctor${query}`, { signal })
   }
 
   getStorage(signal?: AbortSignal): Promise<StorageReport> {
@@ -1038,6 +1055,8 @@ export class LocalAgentClient
         openai_base_url: changes.openaiBaseUrl,
         agent_profile: changes.agentProfile,
         tool_mode: changes.toolMode,
+        reasoning_effort: changes.reasoningEffort,
+        reasoning_fast: changes.reasoningFast,
         recursion_limit: changes.recursionLimit,
         max_sdk_turns: changes.maxSdkTurns,
         group_tool_traces: changes.groupToolTraces,
@@ -1048,6 +1067,25 @@ export class LocalAgentClient
         tool_health_enabled: changes.toolHealthEnabled,
         tool_health_fail_threshold: changes.toolHealthFailThreshold,
         tool_health_suppress_seconds: changes.toolHealthSuppressSeconds,
+      }),
+      headers: { 'content-type': 'application/json' },
+      signal,
+    })
+  }
+
+  getOnboardingSettings(signal?: AbortSignal): Promise<OnboardingSettings> {
+    return this.request<OnboardingSettings>('/settings/onboarding', { signal })
+  }
+
+  updateOnboardingSettings(
+    changes: Partial<OnboardingSettings>,
+    signal?: AbortSignal,
+  ): Promise<OnboardingSettings> {
+    return this.request<OnboardingSettings>('/settings/onboarding', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        completed: changes.completed,
+        step: changes.step,
       }),
       headers: { 'content-type': 'application/json' },
       signal,
@@ -1274,6 +1312,16 @@ export class LocalAgentClient
     return this.request<DatasetInstallResult>(
       `/datasets/${encodeURIComponent(datasetId)}/install`,
       { method: 'POST', signal },
+    )
+  }
+
+  removeDataset(
+    datasetId: string,
+    signal?: AbortSignal,
+  ): Promise<DatasetInstallResult> {
+    return this.request<DatasetInstallResult>(
+      `/datasets/${encodeURIComponent(datasetId)}`,
+      { method: 'DELETE', signal },
     )
   }
 

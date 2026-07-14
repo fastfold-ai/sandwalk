@@ -1,0 +1,191 @@
+.mirage-walk {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+}
+
+.mirage-walk--hero {
+  flex: none;
+}
+
+.mirage-walk--rail {
+  width: 112px;
+  height: 300px;
+  max-height: 100%;
+  flex-shrink: 0;
+  align-self: start;
+}
+
+.mirage-walk__frame {
+  position: relative;
+  width: fit-content;
+  height: fit-content;
+  max-width: 100%;
+}
+
+.mirage-walk__svg {
+  overflow: visible;
+  display: block;
+}
+
+.mirage-walk--hero .mirage-walk__svg {
+  width: min(100%, 300px);
+  height: auto;
+  max-height: min(480px, 55vh);
+}
+
+.mirage-walk--rail .mirage-walk__frame {
+  width: 100%;
+  height: 100%;
+}
+
+.mirage-walk--rail .mirage-walk__svg {
+  width: 100%;
+  height: 100%;
+}
+
+.mirage-walk__fills {
+  opacity: 1;
+}
+
+.mirage-walk--appear .mirage-walk__reveal-rect {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: mirage-walk-reveal 1.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mirage-walk--appear .mirage-walk__path-layer {
+  opacity: 0;
+  animation: mirage-walk-enter 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mirage-walk__gold-rim {
+  fill: #8a5a20;
+  opacity: 0.7;
+}
+
+.mirage-walk__gold {
+  opacity: 0.98;
+  animation: mirage-walk-shimmer 5.5s ease-in-out infinite;
+}
+
+.mirage-walk__strand-orange {
+  fill: #d97e26;
+  opacity: 0.7;
+}
+
+.mirage-walk__strand-pale {
+  fill: #f6d98e;
+  opacity: 0.75;
+}
+
+.mirage-walk__gold-core {
+  fill: #f8dc84;
+  opacity: 0.85;
+}
+
+.mirage-walk__dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mirage-walk__dot {
+  pointer-events: auto;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  /* Match top stepper dots. */
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: hsl(var(--muted-foreground) / 0.25);
+  box-shadow: 0 0 0 3px hsl(var(--background) / 0.55);
+  transition:
+    background 160ms ease,
+    width 160ms ease,
+    height 160ms ease;
+}
+
+.mirage-walk__dot:hover {
+  background: hsl(var(--foreground) / 0.7);
+}
+
+.mirage-walk__dot--done {
+  background: hsl(var(--foreground) / 0.4);
+}
+
+.mirage-walk__dot--active {
+  width: 10px;
+  height: 10px;
+  background: hsl(var(--foreground));
+}
+
+.mirage-walk__dot:focus-visible {
+  outline: 2px solid hsl(var(--foreground) / 0.35);
+  outline-offset: 3px;
+}
+
+.mirage-walk__dot--enter {
+  opacity: 0;
+  animation: mirage-walk-dot-enter 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes mirage-walk-reveal {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes mirage-walk-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mirage-walk-dot-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mirage-walk-shimmer {
+  0%,
+  100% {
+    opacity: 0.92;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mirage-walk--appear .mirage-walk__reveal-rect,
+  .mirage-walk--appear .mirage-walk__path-layer,
+  .mirage-walk__dot--enter,
+  .mirage-walk__gold {
+    animation: none;
+  }
+
+  .mirage-walk--appear .mirage-walk__path-layer,
+  .mirage-walk__dot--enter {
+    opacity: 1;
+  }
+}
+
+.dark .mirage-walk__svg {
+  opacity: 0.95;
+}

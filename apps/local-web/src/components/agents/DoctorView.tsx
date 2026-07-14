@@ -134,12 +134,14 @@ function DoctorScanProgress({ active }: { active: boolean }) {
 export function DoctorView({
   onRun,
   onDownloadDiagnostics,
+  embedded = false,
 }: {
   onRun: (signal?: AbortSignal) => Promise<DoctorReport>
   onDownloadDiagnostics: (
     uiDiagnostics: Record<string, unknown>,
     signal?: AbortSignal,
   ) => Promise<{ blob: Blob; filename: string }>
+  embedded?: boolean
 }) {
   const [report, setReport] = useState<DoctorReport | null>(null)
   const [loading, setLoading] = useState(false)
@@ -211,16 +213,30 @@ export function DoctorView({
   }, [report])
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 py-10">
+    <ScrollArea className={embedded ? 'h-[min(28rem,55vh)]' : 'flex-1'}>
+      <div
+        className={
+          embedded
+            ? 'mx-auto flex w-full max-w-3xl flex-col gap-6 px-1 py-2'
+            : 'mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 py-10'
+        }
+      >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Doctor</h1>
-            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-              Same checks as <code className="text-xs">sandwalk doctor</code> and
-              interactive <code className="text-xs">/doctor</code>: runtime
-              tooling, skills inventory, environment keys, LLM config, and more.
-            </p>
+            {!embedded ? (
+              <>
+                <h1 className="text-2xl font-semibold tracking-tight">Doctor</h1>
+                <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+                  Same checks as <code className="text-xs">sandwalk doctor</code>{' '}
+                  and interactive <code className="text-xs">/doctor</code>: runtime
+                  tooling, skills inventory, environment keys, LLM config, and more.
+                </p>
+              </>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                Run the same checks as <code className="text-xs">sandwalk doctor</code>.
+              </p>
+            )}
           </div>
           <Button
             type="button"

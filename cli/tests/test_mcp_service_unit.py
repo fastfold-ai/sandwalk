@@ -19,6 +19,7 @@ from agent_server.mcp_service import (
     credentials_configured,
     enrich_mcp_server,
     get_custom_headers,
+    oauth_reconnect_required,
     parse_sse_or_json,
     read_status_message,
     read_tool_count,
@@ -97,6 +98,24 @@ def test_resolve_auth_headers_oauth_token(tmp_path: Path, monkeypatch):
     headers = resolve_auth_headers(entry, Config.load())
     assert headers == {"Authorization": "Bearer oauth-access"}
     assert auth_method_in_use(entry, Config.load()) == "oauth"
+
+
+def test_oauth_reconnect_required_when_expired_without_refresh(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
+    (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
+    cfg = Config({})
+    cfg.set("mcp.latch_access_token", "oauth-access")
+    cfg.set("mcp.latch_token_expires_at", "1")  # far in the past
+    cfg.save()
+
+    entry = get_catalog_entry("latch")
+    assert entry is not None
+    message = oauth_reconnect_required(entry, Config.load())
+    assert message is not None
+    assert "expired" in message.lower()
 
 
 def test_tool_count_and_status_message_roundtrip(tmp_path: Path, monkeypatch):
@@ -243,8 +262,13 @@ def test_mcp_service_connect_with_api_key(tmp_path: Path, monkeypatch):
     )
     result = svc.connect_with_api_key("tamarind", "my-api-key")
     assert result["ok"] is True
-    assert result["enabled"] is True
+    # Connect must not auto-enable — toggle is UI/CLI only.
+    assert result["enabled"] is False
     assert read_tool_count("tamarind") == 3
+
+    enabled = svc.set_enabled("tamarind", True)
+    assert enabled["ok"] is True
+    assert enabled["enabled"] is True
 
 
 def test_mcp_service_set_enabled_requires_credentials(tmp_path: Path, monkeypatch):

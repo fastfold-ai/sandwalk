@@ -36,7 +36,7 @@ def test_parse_provider_list_single():
 
 
 def test_parse_provider_list_multiple_preserves_order():
-    assert _parse_provider_list("openai,anthropic") == ["anthropic", "openai"]
+    assert _parse_provider_list("openai,anthropic") == ["openai", "anthropic"]
 
 
 def test_parse_provider_list_openai_compatible_alias():
@@ -53,7 +53,7 @@ def test_prompt_setup_providers_inline_accepts_aliases(monkeypatch):
     monkeypatch.setattr("cli.sys.stdout.isatty", lambda: False)
     monkeypatch.setattr("builtins.input", lambda _: "o a")
     selected = _prompt_setup_providers("openai")
-    assert selected == ["anthropic", "openai"]
+    assert selected == ["openai", "anthropic"]
 
 
 def test_prompt_setup_providers_inline_requires_explicit_selection(monkeypatch):
@@ -81,7 +81,7 @@ def test_prompt_setup_providers_interactive_arrow_space_mode(monkeypatch):
     monkeypatch.setattr("questionary.checkbox", _fake_checkbox)
 
     selected = _prompt_setup_providers("openai")
-    assert selected == ["anthropic", "openai"]
+    assert selected == ["openai", "anthropic"]
     assert captured["kwargs"]["qmark"] == "❯"
     assert captured["kwargs"]["pointer"] == "▸"
     assert "space toggle" in captured["kwargs"]["instruction"]

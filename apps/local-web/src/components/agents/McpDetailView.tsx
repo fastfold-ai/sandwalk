@@ -1,4 +1,5 @@
 import type {
+  ConnectMcpResult,
   McpCatalogEntry,
   McpServer,
   McpToolDetail,
@@ -8,15 +9,24 @@ import {
   ArrowLeft,
   ChevronDown,
   ExternalLink,
+  KeyRound,
   Loader2,
   Plug,
   RefreshCw,
   Search,
+  Unplug,
   Wrench
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
@@ -200,13 +210,21 @@ function ToolCard({ tool }: { tool: McpToolDetail }) {
   )
 }
 
+function formatConnectError(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return String(err || 'Connection failed')
+}
+
 export function McpDetailView({
   kind,
   catalogEntry,
   server,
   onBack,
   onLoadTools,
-  onToggleEnabled
+  onToggleEnabled,
+  onConnectCatalog,
+  onDisconnectCatalog,
+  onRefreshMeta
 }: {
   kind: 'catalog' | 'server'
   catalogEntry?: McpCatalogEntry | null
@@ -214,12 +232,22 @@ export function McpDetailView({
   onBack: () => void
   onLoadTools: () => Promise<ValidateMcpResult>
   onToggleEnabled?: (enabled: boolean) => Promise<void>
+  onConnectCatalog?: (input: {
+    method: 'oauth' | 'api_key'
+    apiKey?: string
+  }) => Promise<ConnectMcpResult>
+  onDisconnectCatalog?: () => Promise<ConnectMcpResult | void>
+  onRefreshMeta?: () => Promise<void>
 }) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ValidateMcpResult | null>(null)
   const [togglePending, setTogglePending] = useState(false)
+  const [connectPending, setConnectPending] = useState(false)
+  const [disconnectPending, setDisconnectPending] = useState(false)
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [toolQuery, setToolQuery] = useState('')
 
   const title =
@@ -234,9 +262,13 @@ export function McpDetailView({
     kind === 'catalog'
       ? Boolean(catalogEntry?.enabled)
       : Boolean(server?.enabled)
+  const configured =
+    kind === 'catalog'
+      ? Boolean(catalogEntry?.configured || catalogEntry?.connected)
+      : Boolean(server)
   const connected =
     kind === 'catalog'
-      ? Boolean(catalogEntry?.connected)
+      ? Boolean(catalogEntry?.connected || catalogEntry?.configured)
       : Boolean(server?.enabled)
   const docsUrl =
     kind === 'catalog' ? catalogEntry?.docsUrl || null : null
@@ -248,6 +280,37 @@ export function McpDetailView({
     kind === 'catalog'
       ? catalogEntry?.url || null
       : server?.url || server?.command || null
+
+  const supportsApiKey =
+    kind === 'catalog' && catalogEntry
+      ? catalogEntry.authMode !== 'oauth'
+      : false
+  const supportsOAuth =
+    kind === 'catalog' && catalogEntry
+      ? catalogEntry.authMode !== 'api_key'
+      : false
+  const hasBothAuth = supportsApiKey && supportsOAuth
+  const connectLabel = configured ? 'Reconnect' : 'Connect'
+  const needsReconnect =
+    Boolean(error) &&
+    /expired|reconnect|invalid_token|unauthorized|401|500/i.test(error || '')
+
+  const statusLabel = useMemo(() => {
+    if (result) {
+      if (result.ok) return 'Healthy'
+      if (needsReconnect || /expired|reconnect/i.test(result.message || '')) {
+        return 'Needs reconnect'
+      }
+      return 'Probe failed'
+    }
+    if (connected) return 'Connected'
+    if (enabled) return 'Enabled'
+    return 'Disabled'
+  }, [connected, enabled, needsReconnect, result])
+
+  const statusHealthy = result?.ok === true
+  const statusWarn =
+    Boolean(result && !result.ok) || needsReconnect || Boolean(error)
 
   const tools = useMemo(() => {
     if (result?.toolDetails?.length) return result.toolDetails
@@ -298,6 +361,138 @@ export function McpDetailView({
     // Intentionally reload when the target MCP changes.
   }, [kind, catalogEntry?.id, server?.id])
 
+  useEffect(() => {
+    if (kind !== 'catalog' || !onRefreshMeta) return
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data
+      if (!data || data.type !== 'fastfold-mcp-oauth') return
+      const catalogId = String(data.catalogId || '')
+      if (catalogEntry?.id && catalogId && catalogId !== catalogEntry.id) {
+        return
+      }
+      if (data.ok) {
+        toast.dismiss()
+        toast.success(data.message || 'Connected via OAuth', {
+          description: catalogEntry?.name
+        })
+        void onRefreshMeta().then(() => loadTools(true))
+      } else {
+        toast.error(data.error || 'OAuth failed', {
+          description: catalogEntry?.name
+        })
+        void onRefreshMeta()
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [catalogEntry?.id, catalogEntry?.name, kind, onRefreshMeta])
+
+  const connectOAuth = useCallback(async () => {
+    if (!onConnectCatalog || !catalogEntry) return
+    setConnectPending(true)
+    try {
+      const connectResult = await onConnectCatalog({ method: 'oauth' })
+      if (connectResult.authorizeUrl) {
+        window.open(
+          connectResult.authorizeUrl,
+          'fastfold-mcp-oauth',
+          'width=560,height=720'
+        )
+        toast.message('Complete sign-in in the browser window…', {
+          description: catalogEntry.name
+        })
+      } else if (!connectResult.ok) {
+        toast.error(connectResult.message || 'OAuth connect failed', {
+          description: catalogEntry.name
+        })
+        if (supportsApiKey) setShowApiKey(true)
+      } else {
+        toast.success(
+          connectResult.message ||
+            `Connected · ${connectResult.toolCount ?? 0} tools`,
+          { description: catalogEntry.name }
+        )
+        await onRefreshMeta?.()
+        await loadTools(true)
+      }
+    } catch (err) {
+      const message = formatConnectError(err)
+      toast.error(message, { description: catalogEntry.name })
+      if (supportsApiKey) setShowApiKey(true)
+    } finally {
+      setConnectPending(false)
+    }
+  }, [catalogEntry, onConnectCatalog, onRefreshMeta, supportsApiKey])
+
+  const connectApiKey = useCallback(async () => {
+    if (!onConnectCatalog || !catalogEntry) return
+    const apiKey = apiKeyDraft.trim()
+    if (!apiKey) {
+      toast.error('API key is required', { description: catalogEntry.name })
+      return
+    }
+    setConnectPending(true)
+    try {
+      const connectResult = await onConnectCatalog({
+        method: 'api_key',
+        apiKey
+      })
+      if (!connectResult.ok) {
+        toast.error(connectResult.message || 'Connect failed', {
+          description: catalogEntry.name
+        })
+      } else {
+        toast.success(
+          connectResult.message ||
+            `Connected · ${connectResult.toolCount ?? 0} tools`,
+          { description: catalogEntry.name }
+        )
+        setShowApiKey(false)
+        setApiKeyDraft('')
+        await onRefreshMeta?.()
+        await loadTools(true)
+      }
+    } catch (err) {
+      toast.error(formatConnectError(err), { description: catalogEntry.name })
+    } finally {
+      setConnectPending(false)
+    }
+  }, [apiKeyDraft, catalogEntry, onConnectCatalog, onRefreshMeta])
+
+  const primaryConnect = () => {
+    if (supportsOAuth && catalogEntry?.preferredAuth === 'oauth') {
+      void connectOAuth()
+      return
+    }
+    if (supportsApiKey && !supportsOAuth) {
+      setShowApiKey(true)
+      return
+    }
+    if (supportsOAuth) {
+      void connectOAuth()
+      return
+    }
+    setShowApiKey(true)
+  }
+
+  const disconnect = async () => {
+    if (!onDisconnectCatalog || !catalogEntry) return
+    setDisconnectPending(true)
+    try {
+      await onDisconnectCatalog()
+      toast.success('Disconnected', { description: catalogEntry.name })
+      setResult(null)
+      setError(null)
+      await onRefreshMeta?.()
+    } catch (err) {
+      toast.error(formatConnectError(err), { description: catalogEntry.name })
+    } finally {
+      setDisconnectPending(false)
+    }
+  }
+
+  const showCatalogActions = kind === 'catalog' && Boolean(onConnectCatalog)
+
   return (
     <ScrollArea className="flex-1">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
@@ -320,13 +515,86 @@ export function McpDetailView({
               MCPs
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {showCatalogActions ? (
+              <>
+                {hasBothAuth ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant={needsReconnect ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-7 gap-1.5 px-2 text-xs"
+                        disabled={connectPending || disconnectPending}
+                      >
+                        {connectPending ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Plug className="size-3.5" />
+                        )}
+                        {connectLabel}
+                        <ChevronDown className="size-3.5 opacity-70" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem
+                        disabled={connectPending}
+                        onSelect={() => void connectOAuth()}
+                      >
+                        With OAuth
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={connectPending}
+                        onSelect={() => setShowApiKey(true)}
+                      >
+                        <KeyRound className="mr-2 size-3.5" />
+                        With API key
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <Button
+                    type="button"
+                    variant={needsReconnect ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 gap-1.5 px-2 text-xs"
+                    disabled={connectPending || disconnectPending}
+                    onClick={() => primaryConnect()}
+                  >
+                    {connectPending ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Plug className="size-3.5" />
+                    )}
+                    {connectLabel}
+                  </Button>
+                )}
+                {configured && onDisconnectCatalog ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 px-2 text-xs"
+                    disabled={connectPending || disconnectPending}
+                    onClick={() => void disconnect()}
+                  >
+                    {disconnectPending ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Unplug className="size-3.5" />
+                    )}
+                    Disconnect
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
             <Button
               type="button"
               variant="outline"
               size="sm"
               className="h-7 gap-1.5 px-2 text-xs"
-              disabled={loading || refreshing}
+              disabled={loading || refreshing || connectPending}
               onClick={() => void loadTools(true)}
             >
               {refreshing ? (
@@ -349,6 +617,44 @@ export function McpDetailView({
             ) : null}
           </div>
         </div>
+
+        {showCatalogActions && showApiKey && supportsApiKey ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
+            <Input
+              type="password"
+              className="max-w-md"
+              placeholder={catalogEntry?.apiKeyEnvVar || 'API key'}
+              value={apiKeyDraft}
+              onChange={event => setApiKeyDraft(event.target.value)}
+              disabled={connectPending}
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={connectPending}
+              onClick={() => void connectApiKey()}
+            >
+              {connectPending ? (
+                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              ) : null}
+              Save & connect
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs"
+              disabled={connectPending}
+              onClick={() => {
+                setShowApiKey(false)
+                setApiKeyDraft('')
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : null}
 
         <div className="grid items-start gap-4 lg:grid-cols-[240px_minmax(0,1fr)_220px]">
           <aside className="space-y-3 lg:sticky lg:top-4 lg:border-r lg:border-border/60 lg:pr-4">
@@ -375,6 +681,17 @@ export function McpDetailView({
                         togglePending && 'cursor-not-allowed opacity-60'
                       )}
                       onClick={() => {
+                        if (
+                          kind === 'catalog' &&
+                          !configured &&
+                          !enabled
+                        ) {
+                          toast.error(
+                            'Connect with OAuth or API key first, then enable.',
+                            { description: title }
+                          )
+                          return
+                        }
                         setTogglePending(true)
                         void onToggleEnabled(!enabled)
                           .catch(() => undefined)
@@ -456,7 +773,42 @@ export function McpDetailView({
 
             {!loading && error ? (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-900 dark:text-amber-200">
-                {error}
+                <p>{error}</p>
+                {showCatalogActions ? (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      disabled={connectPending}
+                      onClick={() => primaryConnect()}
+                    >
+                      {connectPending ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Plug className="size-3.5" />
+                      )}
+                      {configured ? 'Reconnect' : 'Connect'}
+                    </Button>
+                    {configured && onDisconnectCatalog ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1.5 px-2 text-xs"
+                        disabled={disconnectPending}
+                        onClick={() => void disconnect()}
+                      >
+                        {disconnectPending ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Unplug className="size-3.5" />
+                        )}
+                        Disconnect
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -510,10 +862,16 @@ export function McpDetailView({
                 <span
                   className={cn(
                     'size-1.5 rounded-full',
-                    connected ? 'bg-emerald-500' : 'bg-muted-foreground/50'
+                    statusHealthy
+                      ? 'bg-emerald-500'
+                      : statusWarn
+                        ? 'bg-amber-500'
+                        : connected
+                          ? 'bg-emerald-500'
+                          : 'bg-muted-foreground/50'
                   )}
                 />
-                {connected ? 'Connected' : enabled ? 'Enabled' : 'Disabled'}
+                {statusLabel}
               </p>
             </div>
             {endpoint ? (

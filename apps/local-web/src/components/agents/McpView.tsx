@@ -210,19 +210,51 @@ function statusBadge(
       </span>
     )
   }
-  // Only show live errors while enabled; disable/reconnect clears prior failures.
-  if (entry.enabled && entry.statusMessage) {
+  if (entry.statusMessage) {
+    const needsReconnect = /expired|reconnect|invalid_token|unauthorized/i.test(
+      entry.statusMessage,
+    )
     return (
       <span
-        className="inline-flex max-w-[14rem] items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
+        className={cn(
+          'inline-flex items-center gap-1.5 text-xs',
+          needsReconnect
+            ? 'text-amber-700 dark:text-amber-300'
+            : 'text-red-600 dark:text-red-400',
+        )}
         title={entry.statusMessage}
       >
-        <span className="size-1.5 shrink-0 rounded-full bg-red-500" />
-        <span className="truncate">{entry.statusMessage}</span>
+        <span
+          className={cn(
+            'size-1.5 shrink-0 rounded-full',
+            needsReconnect ? 'bg-amber-500' : 'bg-red-500',
+          )}
+        />
+        {needsReconnect ? 'Needs reconnect' : 'Error'}
       </span>
     )
   }
   return null
+}
+
+function statusCallout(entry: McpCatalogEntry) {
+  if (!entry.statusMessage || entry.connected) return null
+  const needsReconnect = /expired|reconnect|invalid_token|unauthorized/i.test(
+    entry.statusMessage,
+  )
+  return (
+    <div
+      className={cn(
+        'mt-2 rounded-md border px-2.5 py-2 text-xs leading-relaxed',
+        needsReconnect
+          ? 'border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200'
+          : 'border-red-500/30 bg-red-500/10 text-red-800 dark:text-red-300',
+      )}
+      title={entry.statusMessage}
+    >
+      {entry.statusMessage}
+    </div>
+  )
 }
 
 type CatalogStatusPatch = {
@@ -255,6 +287,8 @@ export function McpView({
   catalog,
   catalogLoading,
   featuredOnly = false,
+  featuredLimit,
+  featuredLabel = 'MCPs',
   onShowAll,
   onRefresh,
   onConnectCatalog,
@@ -264,12 +298,17 @@ export function McpView({
   onToggleCustom,
   onOpenCatalog,
   onOpenServer,
+  embedded = false
 }: {
   mcpServers: McpServer[]
   catalog: McpCatalogEntry[]
   catalogLoading?: boolean
   /** Overview: only the Featured catalog grid (same cards as MCP page). */
   featuredOnly?: boolean
+  /** When featuredOnly, how many cards to show. Omit for 2; null = all. */
+  featuredLimit?: number | null
+  /** Section title when featuredOnly (default MCPs). */
+  featuredLabel?: string
   onShowAll?: () => void
   onRefresh: () => Promise<void>
   onConnectCatalog: (
@@ -284,6 +323,7 @@ export function McpView({
   onToggleCustom: (id: string, enabled: boolean) => Promise<void>
   onOpenCatalog?: (entry: McpCatalogEntry) => void
   onOpenServer?: (server: McpServer) => void
+  embedded?: boolean
 }) {
   const location = useLocation()
   const [focusedMcpKey, setFocusedMcpKey] = useState<string | null>(null)
@@ -437,7 +477,7 @@ export function McpView({
             ...prev,
             [catalogId]: {
               connected: true,
-              enabled: true,
+              // Connect must not flip the enable toggle.
               statusMessage: null,
               toolCount: null,
             },
@@ -452,7 +492,6 @@ export function McpView({
             ...prev,
             [catalogId]: {
               connected: false,
-              enabled: true,
               statusMessage: data.error || 'OAuth failed',
             },
           }))
@@ -530,7 +569,7 @@ export function McpView({
             ...prev,
             [entry.id]: {
               connected: true,
-              enabled: true,
+              // Connect must not flip the enable toggle.
               statusMessage: null,
               toolCount:
                 typeof result.toolCount === 'number' ? result.toolCount : 0,
@@ -623,6 +662,7 @@ export function McpView({
             <p className="text-muted-foreground mt-1 line-clamp-2 min-h-10 text-sm">
               {view.description}
             </p>
+            {statusCallout(view)}
           </div>
           {isSetup ? (
             <McpToggle
@@ -783,6 +823,13 @@ export function McpView({
     )
   }
 
+  const featuredVisible = (() => {
+    if (!featuredOnly) return catalog
+    if (featuredLimit === null) return catalog
+    const limit = featuredLimit === undefined ? 2 : featuredLimit
+    return catalog.slice(0, limit)
+  })()
+
   const featuredSection = (
     <section className={featuredOnly ? 'space-y-3' : 'space-y-2'}>
       <div
@@ -792,12 +839,18 @@ export function McpView({
         )}
       >
         {featuredOnly ? (
-          <div>
-            <h3 className="text-base font-semibold tracking-tight">MCPs</h3>
-            <p className="text-muted-foreground text-xs font-medium">
-              Featured ({catalog.length})
-            </p>
-          </div>
+          onShowAll ? (
+            <div>
+              <h3 className="text-base font-semibold tracking-tight">
+                {featuredLabel}
+              </h3>
+              <p className="text-muted-foreground text-xs font-medium">
+                Featured ({catalog.length})
+              </p>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">{featuredLabel}</p>
+          )
         ) : (
           <p className="text-muted-foreground text-xs font-medium">
             Featured ({catalog.length})
@@ -815,12 +868,17 @@ export function McpView({
         ) : null}
       </div>
       {catalogLoading && catalog.length === 0 ? (
-        <CardGridSkeleton cards={featuredOnly ? 2 : 4} columns={2} />
+        <CardGridSkeleton
+          cards={
+            featuredOnly && featuredLimit !== null
+              ? Math.min(featuredLimit ?? 2, 4)
+              : 4
+          }
+          columns={2}
+        />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {(featuredOnly ? catalog.slice(0, 2) : catalog).map(entry =>
-            renderCatalogCard(entry),
-          )}
+          {featuredVisible.map(entry => renderCatalogCard(entry))}
         </div>
       )}
     </section>
@@ -831,15 +889,23 @@ export function McpView({
   }
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
-        <div>
-          <h2 className="text-2xl font-semibold">MCP servers</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Connect featured cloud MCPs (off by default). Credentials save under
-            Integrations / keys. Add custom stdio, SSE, or HTTP servers below.
-          </p>
-        </div>
+    <ScrollArea className={embedded ? 'h-[min(22rem,45vh)]' : 'flex-1'}>
+      <div
+        className={
+          embedded
+            ? 'mx-auto w-full max-w-5xl space-y-6 p-1'
+            : 'mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6'
+        }
+      >
+        {!embedded ? (
+          <div>
+            <h2 className="text-2xl font-semibold">MCP servers</h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Connect featured cloud MCPs (off by default). Credentials save under
+              Integrations / keys. Add custom stdio, SSE, or HTTP servers below.
+            </p>
+          </div>
+        ) : null}
 
         <div className="space-y-6 pb-4">
           {featuredSection}

@@ -45,7 +45,8 @@ export function GeneralView({
   backendVersion,
   connected,
   onLoadAccount,
-  onLogoutAccount
+  onLogoutAccount,
+  onOpenSetupWizard
 }: {
   backendUrl: string
   backendVersion: string | null
@@ -55,6 +56,7 @@ export function GeneralView({
     signal?: AbortSignal
   }) => Promise<AccountSummary>
   onLogoutAccount: (signal?: AbortSignal) => Promise<AccountSummary>
+  onOpenSetupWizard?: () => void
 }) {
   const navigate = useNavigate()
   const [account, setAccount] = useState<AccountSummary | null>(null)
@@ -307,6 +309,20 @@ export function GeneralView({
             })}
           </div>
         </section>
+
+        {onOpenSetupWizard ? (
+          <section className="space-y-3">
+            <div>
+              <h3 className="text-base font-semibold">Setup wizard</h3>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Short guided setup — model, keys, tools, sandbox.
+              </p>
+            </div>
+            <Button type="button" variant="ghost" onClick={onOpenSetupWizard}>
+              Run setup wizard
+            </Button>
+          </section>
+        ) : null}
 
         <section className="space-y-4">
           <h3 className="text-base font-semibold">About</h3>

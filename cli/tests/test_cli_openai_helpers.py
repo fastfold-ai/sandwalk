@@ -81,7 +81,7 @@ class TestParseProviderList:
     def test_canonical_order(self, captured_console, monkeypatch):
         console, _ = captured_console
         monkeypatch.setattr("cli.console", console)
-        assert _parse_provider_list("openai,anthropic") == ["anthropic", "openai"]
+        assert _parse_provider_list("openai,anthropic") == ["openai", "anthropic"]
 
     def test_aliases(self, captured_console, monkeypatch):
         console, _ = captured_console

@@ -1,0 +1,41 @@
+.onboarding-step-body {
+  animation: onboarding-step-in 220ms ease;
+}
+
+@keyframes onboarding-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.onboarding-tada {
+  display: inline-block;
+  animation: onboarding-tada 700ms ease both;
+}
+
+@keyframes onboarding-tada {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-12deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.15) rotate(8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-step-body,
+  .onboarding-tada {
+    animation: none;
+  }
+}

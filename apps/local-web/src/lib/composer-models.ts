@@ -6,6 +6,10 @@ export type ComposerModelOption = {
   profileId?: string | null
   source?: 'cloud' | 'profile' | 'custom'
   backend?: string | null
+  supportsReasoningEffort?: boolean
+  reasoningEffortOptions?: string[]
+  reasoningEffort?: string | null
+  reasoningFast?: boolean
 }
 
 const CLOUD_PROVIDER_LABELS: Record<string, string> = {
@@ -72,6 +76,10 @@ export function toComposerModelOptions(
     backend?: string | null
     description?: string | null
     enabled: boolean
+    supportsReasoningEffort?: boolean
+    reasoningEffortOptions?: string[]
+    reasoningEffort?: string | null
+    reasoningFast?: boolean
   }>
 ): ComposerModelOption[] {
   return models
@@ -83,7 +91,11 @@ export function toComposerModelOptions(
       speed: modelOptionBadge(model),
       profileId: model.profileId,
       source: model.source,
-      backend: model.backend ?? null
+      backend: model.backend ?? null,
+      supportsReasoningEffort: Boolean(model.supportsReasoningEffort),
+      reasoningEffortOptions: model.reasoningEffortOptions || [],
+      reasoningEffort: model.reasoningEffort ?? 'medium',
+      reasoningFast: Boolean(model.reasoningFast)
     }))
 }
 
@@ -174,3 +186,24 @@ export function isComposerModelSelected(
   )
 }
 
+export const REASONING_EFFORT_LABELS: Record<string, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High'
+}
+
+export function formatReasoningEffortLabel(effort: string | null | undefined): string {
+  const key = String(effort || 'medium')
+    .trim()
+    .toLowerCase()
+  return REASONING_EFFORT_LABELS[key] || REASONING_EFFORT_LABELS.medium
+}
+
+export function formatModelEffortBadge(option: {
+  reasoningEffort?: string | null
+  reasoningFast?: boolean
+}): string {
+  return `${formatReasoningEffortLabel(option.reasoningEffort)}${
+    option.reasoningFast ? ' Fast' : ''
+  }`
+}

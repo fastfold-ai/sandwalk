@@ -67,6 +67,15 @@ import {
   useGlobalSearchHotkey
 } from '@/components/agents/GlobalSearchDialog'
 import { LoginView } from '@/components/agents/LoginView'
+import { OnboardingWizardHost } from '@/components/agents/OnboardingWizardHost'
+import {
+  clampOnboardingStep,
+  isOnboardingPath,
+  ONBOARDING_MAX_STEP,
+  onboardingPath,
+  onboardingStepDef,
+  onboardingStepFromSlug
+} from '@/lib/onboarding'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { NewProjectDialog } from '@/components/agents/NewProjectDialog'
 import {
@@ -189,6 +198,36 @@ import {
   type SkillsViewMode
 } from '@/lib/skills-catalog'
 import { cn } from '@/lib/utils'
+
+async function validateIntegrationOrProbeModal(
+  client: LocalAgentClient,
+  key: string
+): Promise<{ ok: boolean; message: string }> {
+  if (key === 'modal') {
+    try {
+      const report = await client.probeSandboxSettings()
+      const failed = report.steps.find(step => !step.ok)
+      return {
+        ok: report.ok,
+        message: report.ok
+          ? 'Modal sandbox probe passed.'
+          : failed?.detail || 'Modal sandbox probe failed.'
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      const missingProbe =
+        /\/v1\/settings\/sandbox\/probe/i.test(message) &&
+        /\b404\b|not found/i.test(message)
+      return {
+        ok: false,
+        message: missingProbe
+          ? 'Probe endpoint missing on this agent server. Restart Sandwalk / `sandwalk serve` after updating the CLI, then retry.'
+          : message
+      }
+    }
+  }
+  return client.validateIntegration(key)
+}
 
 const AgentRuntimeView = lazy(() =>
   import('@/components/agents/AgentRuntimeView').then(m => ({
@@ -406,6 +445,7 @@ export default function App() {
   const [integrationValues, setIntegrationValues] = useState<
     Record<string, string>
   >({})
+  const onboardingAutoOpenedRef = useRef(false)
   const streamControllersRef = useRef<Map<string, AbortController>>(new Map())
   const sessionIdRef = useRef<string | null>(null)
   const loadSessionsRef = useRef<(() => Promise<void>) | null>(null)
@@ -454,6 +494,11 @@ export default function App() {
     '/dashboard/agent/sandbox/:kind',
     location.pathname
   )
+  const onboardingRoute = matchPath('/onboarding/:slug', location.pathname)
+  const onOnboardingPath = isOnboardingPath(location.pathname)
+  const onboardingStep = onOnboardingPath
+    ? onboardingStepFromSlug(onboardingRoute?.params.slug)
+    : 0
   const legacyIntegrationRoute = matchPath(
     '/agents/integrations/:integrationKey',
     location.pathname
@@ -1042,6 +1087,19 @@ export default function App() {
       if (needsAuthLoginRef.current) return
       setRuntimeSettings(settings)
       setSandboxSettings(sandbox)
+      try {
+        const onboarding = await client.getOnboardingSettings()
+        const step = clampOnboardingStep(onboarding.step)
+        if (!onboarding.completed && !onboardingAutoOpenedRef.current) {
+          onboardingAutoOpenedRef.current = true
+          if (!isOnboardingPath(location.pathname)) {
+            navigate(onboardingPath(step), { replace: true })
+            return
+          }
+        }
+      } catch {
+        // Older backends may not expose onboarding settings yet.
+      }
       const returnTo = nextFromSearch(location.search)
       if (returnTo) {
         navigate(returnTo, { replace: true })
@@ -1194,16 +1252,30 @@ export default function App() {
         `/dashboard/integrations/${legacyIntegrationRoute.params.integrationKey}`,
         { replace: true }
       )
+      return
+    }
+    if (onOnboardingPath) {
+      const canonical = onboardingPath(onboardingStep)
+      if (location.pathname !== canonical) {
+        navigate(canonical, { replace: true })
+      }
     }
   }, [
     legacyIntegrationRoute?.params.integrationKey,
     legacySkillRoute?.params.skillName,
     location.pathname,
-    navigate
+    navigate,
+    onOnboardingPath,
+    onboardingStep
   ])
 
   useEffect(() => {
     const base = 'Sandwalk'
+    if (onOnboardingPath) {
+      const stepTitle = onboardingStepDef(onboardingStep).title
+      document.title = `Onboarding ${stepTitle} - ${base}`
+      return
+    }
     if (session?.title) {
       document.title = `${session.title} · ${base}`
       return
@@ -1222,10 +1294,6 @@ export default function App() {
     }
     if (isDashboardModels) {
       document.title = `Models · ${base}`
-      return
-    }
-    if (isDashboardData) {
-      document.title = `Datasets · ${base}`
       return
     }
     if (isDashboardTools) {
@@ -1258,6 +1326,10 @@ export default function App() {
         return
       }
       document.title = `Integrations · ${base}`
+      return
+    }
+    if (isDashboardData) {
+      document.title = `Datasets · ${base}`
       return
     }
     if (isDashboardAgentSandbox) {
@@ -1310,6 +1382,8 @@ export default function App() {
     isDashboardSpecialists,
     isIntegrations,
     isSkills,
+    onOnboardingPath,
+    onboardingStep,
     session?.title
   ])
 
@@ -3041,6 +3115,40 @@ export default function App() {
     )
   }
 
+  // Dedicated setup pages — no dashboard chrome.
+  if (onOnboardingPath) {
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <OnboardingWizardHost
+          step={onboardingStep}
+          client={client}
+          onStepChange={next => {
+            const clamped = clampOnboardingStep(next)
+            void client
+              .updateOnboardingSettings({ step: clamped })
+              .catch(() => {})
+            navigate(onboardingPath(clamped))
+          }}
+          onFinish={() => {
+            void client
+              .updateOnboardingSettings({
+                completed: true,
+                step: ONBOARDING_MAX_STEP
+              })
+              .catch(() => {})
+            void loadModelOptions()
+            void loadIntegrations()
+            void loadSkills()
+            void loadMcpServers()
+            void loadMcpCatalog()
+            navigate('/', { replace: true })
+          }}
+          onExit={() => navigate('/')}
+        />
+      </div>
+    )
+  }
+
   return (
     <>
       <ResizablePanelGroup
@@ -3687,7 +3795,9 @@ export default function App() {
                   )
                 }}
                 onSave={async () => {}}
-                onValidate={async key => client.validateIntegration(key)}
+                onValidate={async key =>
+                  validateIntegrationOrProbeModal(client, key)
+                }
                 onAutofill={async key => {
                   await client.autofillIntegration(key)
                   await loadIntegrations()
@@ -3730,6 +3840,9 @@ export default function App() {
               connected={Boolean(health)}
               onLoadAccount={loadAccountForUi}
               onLogoutAccount={logoutAccount}
+              onOpenSetupWizard={() => {
+                navigate(onboardingPath('welcome'))
+              }}
             />
           ) : isDashboardAgentRuntime ? (
             <AgentRuntimeView
@@ -3869,13 +3982,6 @@ export default function App() {
                 await loadModelOptions()
               }}
             />
-          ) : isDashboardData ? (
-            <DataView
-              onListDatasets={signal => client.listDatasets(signal)}
-              onInstallDataset={(datasetId, signal) =>
-                client.installDataset(datasetId, signal)
-              }
-            />
           ) : isDashboardTools ? (
             <ToolsView
               onListTools={signal => client.listTools({ signal })}
@@ -3887,6 +3993,16 @@ export default function App() {
               }
               onListDatasets={signal => client.listDatasets(signal)}
               onOpenData={() => navigate('/dashboard/datasets')}
+            />
+          ) : isDashboardData ? (
+            <DataView
+              onListDatasets={signal => client.listDatasets(signal)}
+              onInstallDataset={(datasetId, signal) =>
+                client.installDataset(datasetId, signal)
+              }
+              onRemoveDataset={(datasetId, signal) =>
+                client.removeDataset(datasetId, signal)
+              }
             />
           ) : isDashboardDoctor ? (
             <DoctorView
@@ -4011,7 +4127,9 @@ export default function App() {
                 setIntegrationValues({})
                 await loadIntegrations()
               }}
-              onValidate={async key => client.validateIntegration(key)}
+              onValidate={async key =>
+                validateIntegrationOrProbeModal(client, key)
+              }
               onAutofill={async key => {
                 await client.autofillIntegration(key)
                 await loadIntegrations()
@@ -4084,6 +4202,34 @@ export default function App() {
                         }
                       : undefined
                 }
+                onConnectCatalog={
+                  mcpCatalogDetailId
+                    ? async input => {
+                        const result = await client.connectMcpCatalog(
+                          mcpCatalogDetailId,
+                          input
+                        )
+                        await refreshMcp()
+                        await loadIntegrations()
+                        return result
+                      }
+                    : undefined
+                }
+                onDisconnectCatalog={
+                  mcpCatalogDetailId
+                    ? async () => {
+                        const result =
+                          await client.disconnectMcpCatalog(mcpCatalogDetailId)
+                        await refreshMcp()
+                        await loadIntegrations()
+                        return result
+                      }
+                    : undefined
+                }
+                onRefreshMeta={async () => {
+                  await refreshMcp()
+                  await loadIntegrations()
+                }}
               />
             ) : (
               <McpView
@@ -4448,6 +4594,7 @@ export default function App() {
                           value={composer}
                           running={runActive}
                           skills={skills}
+                          mcpServers={mcpServers}
                           skillChips={composerSkills}
                           fileChips={composerFiles}
                           workspaceFiles={workspaceFiles}
@@ -4516,6 +4663,21 @@ export default function App() {
                                 model
                               })
                             )
+                          }}
+                          onReasoningSettingsChange={async changes => {
+                            const runtimeProvider =
+                              changes.provider === 'local'
+                                ? 'openai'
+                                : changes.provider
+                            setRuntimeSettings(
+                              await client.updateRuntimeSettings({
+                                provider: runtimeProvider,
+                                model: changes.model,
+                                reasoningEffort: changes.reasoningEffort,
+                                reasoningFast: changes.reasoningFast
+                              })
+                            )
+                            await loadModelOptions()
                           }}
                         />
                       </div>
@@ -4915,6 +5077,7 @@ export default function App() {
                           value={composer}
                           running={runActive}
                           skills={skills}
+                          mcpServers={mcpServers}
                           skillChips={composerSkills}
                           fileChips={composerFiles}
                           workspaceFiles={workspaceFiles}
@@ -4981,6 +5144,21 @@ export default function App() {
                                 model
                               })
                             )
+                          }}
+                          onReasoningSettingsChange={async changes => {
+                            const runtimeProvider =
+                              changes.provider === 'local'
+                                ? 'openai'
+                                : changes.provider
+                            setRuntimeSettings(
+                              await client.updateRuntimeSettings({
+                                provider: runtimeProvider,
+                                model: changes.model,
+                                reasoningEffort: changes.reasoningEffort,
+                                reasoningFast: changes.reasoningFast
+                              })
+                            )
+                            await loadModelOptions()
                           }}
                         />
                       </div>

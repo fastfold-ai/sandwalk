@@ -18,7 +18,7 @@ def test_category_for_prefixes():
     assert category_for("llm.anthropic_api_key") == "AI Models"
     assert category_for("compute.runpod_api_key") == "Compute"
     assert category_for("notification.sendgrid_api_key") == "Notifications"
-    assert category_for("api.fastfold_cloud_key") == "Scientific Services"
+    assert category_for("api.fastfold_cloud_key") == "API"
     assert category_for("mcp.linear_api_key") == "MCP"
     assert category_for("other.thing") == "Other"
 

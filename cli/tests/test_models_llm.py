@@ -107,7 +107,7 @@ class TestLLMClientInit:
         assert anthropic.model == LLMClient.DEFAULT_MODELS["anthropic"]
 
         openai = LLMClient(provider="openai")
-        assert openai.model == "gpt-4o"
+        assert openai.model == "gpt-5.6-sol"
 
     def test_base_url_stripped(self):
         client = LLMClient(provider="openai", base_url="http://localhost:11434/v1/")

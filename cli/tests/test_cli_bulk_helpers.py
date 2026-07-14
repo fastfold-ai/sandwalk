@@ -321,7 +321,13 @@ class TestRunQueryAndBanner:
     def test_run_query_sdk_path(self, captured_console, monkeypatch, tmp_path):
         console, buf = captured_console
         monkeypatch.setattr("cli.console", console)
-        cfg = Config(data={"llm.api_key": "sk-ant-test", "agent.use_sdk": True})
+        cfg = Config(
+            data={
+                "llm.provider": "anthropic",
+                "llm.api_key": "sk-ant-test",
+                "agent.use_sdk": True,
+            }
+        )
         monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
 
         fake_result = MagicMock()
@@ -341,7 +347,12 @@ class TestRunQueryAndBanner:
         assert "report" not in buf.getvalue() or True  # smoke: no exception
 
     def test_run_query_orchestrator_when_agents_gt_one(self, monkeypatch):
-        cfg = Config(data={"llm.api_key": "sk-ant-test"})
+        cfg = Config(
+            data={
+                "llm.provider": "anthropic",
+                "llm.api_key": "sk-ant-test",
+            }
+        )
         monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
 
         fake_result = MagicMock()

@@ -75,20 +75,38 @@ def build_chat_model(config, *, streaming: bool = True):
     """
     from langchain.chat_models import init_chat_model
 
-    provider = str(config.get("llm.provider", "anthropic") or "anthropic").strip().lower()
+    provider = str(config.get("llm.provider", "openai") or "openai").strip().lower()
     model = config.get("llm.model")
     temperature = float(config.get("llm.temperature", 0.1))
 
     if provider == "anthropic":
+        from agent.model_catalog import (
+            anthropic_model_omits_temperature,
+            effective_anthropic_effort,
+            get_model_reasoning,
+            model_supports_reasoning_effort,
+        )
+
         model = model or "claude-sonnet-4-5-20250929"
-        kwargs: dict[str, Any] = {"temperature": temperature}
+        kwargs: dict[str, Any] = {}
+        if not anthropic_model_omits_temperature(model):
+            kwargs["temperature"] = temperature
         api_key = config.llm_api_key("anthropic")
         if api_key:
             kwargs["api_key"] = api_key
+        if model_supports_reasoning_effort("anthropic", model):
+            effort, fast = get_model_reasoning(
+                config.get("llm.model_reasoning"),
+                "anthropic",
+                model,
+                default_effort=str(config.get("llm.reasoning_effort") or "medium"),
+                default_fast=bool(config.get("llm.reasoning_fast", False)),
+            )
+            kwargs["effort"] = effective_anthropic_effort(effort=effort, fast=fast)
         return init_chat_model(f"anthropic:{model}", **kwargs)
 
     if provider == "openai":
-        model = model or "gpt-4o"
+        model = model or "gpt-5.6-sol"
         kwargs = {}
         # GPT-5 chat models reject a custom temperature; omit it for that family.
         if not str(model).strip().lower().startswith("gpt-5"):
@@ -100,15 +118,34 @@ def build_chat_model(config, *, streaming: bool = True):
         if base_url:
             kwargs["base_url"] = base_url
         # Default to chat completions for OpenAI-compatible local endpoints
-        # (Ollama, LM Studio, vLLM, ...). Codex models on OpenAI cloud only
-        # support the Responses API — enable it for those on managed hosts.
+        # (Ollama, LM Studio, vLLM, ...). Codex + GPT-5.6 on OpenAI cloud need
+        # Responses (tools + reasoning_effort are rejected on chat completions).
         from agent.config import Config
-        from agent.model_catalog import openai_model_requires_responses_api
+        from agent.model_catalog import (
+            effective_reasoning_effort,
+            get_model_reasoning,
+            model_supports_reasoning_effort,
+            openai_model_requires_responses_api,
+        )
 
         is_openai_cloud = (not base_url) or Config._is_openai_managed_base_url(base_url)
-        kwargs["use_responses_api"] = bool(
+        use_responses = bool(
             is_openai_cloud and openai_model_requires_responses_api(model)
         )
+        kwargs["use_responses_api"] = use_responses
+        if is_openai_cloud and model_supports_reasoning_effort("openai", model):
+            effort, fast = get_model_reasoning(
+                config.get("llm.model_reasoning"),
+                "openai",
+                model,
+                default_effort=str(config.get("llm.reasoning_effort") or "medium"),
+                default_fast=bool(config.get("llm.reasoning_fast", False)),
+            )
+            kwargs["reasoning_effort"] = effective_reasoning_effort(
+                effort=effort,
+                fast=fast,
+                model_id=model,
+            )
         return init_chat_model(f"openai:{model}", **kwargs)
 
     # Google Gemini must use the native GenAI SDK. Gemini 3+ requires
@@ -116,13 +153,35 @@ def build_chat_model(config, *, streaming: bool = True):
     # Generative Language endpoint drops those and returns HTTP 400.
     if provider == "google":
         from agent.config import OPENAI_COMPATIBLE_PROVIDERS
+        from agent.model_catalog import (
+            effective_gemini_thinking_level,
+            get_model_reasoning,
+            google_model_supports_thinking_level,
+            model_supports_reasoning_effort,
+            resolve_catalog_model_id,
+        )
 
         meta = OPENAI_COMPATIBLE_PROVIDERS.get("google", {})
-        model = model or str(meta.get("default_model") or "gemini-3.5-flash")
-        kwargs = {"temperature": temperature}
+        model = resolve_catalog_model_id(
+            model or str(meta.get("default_model") or "gemini-3.5-flash")
+        )
+        kwargs: dict[str, Any] = {"temperature": temperature}
         api_key = config.llm_api_key("google")
         if api_key:
             kwargs["api_key"] = api_key
+        if model_supports_reasoning_effort("google", model) or google_model_supports_thinking_level(
+            model
+        ):
+            effort, fast = get_model_reasoning(
+                config.get("llm.model_reasoning"),
+                "google",
+                model,
+                default_effort=str(config.get("llm.reasoning_effort") or "medium"),
+                default_fast=bool(config.get("llm.reasoning_fast", False)),
+            )
+            kwargs["thinking_level"] = effective_gemini_thinking_level(
+                effort=effort, fast=fast
+            )
         return init_chat_model(f"google_genai:{model}", **kwargs)
 
     # First-party OpenAI-compatible providers (xAI, NVIDIA, OpenCode Zen)
@@ -130,6 +189,10 @@ def build_chat_model(config, *, streaming: bool = True):
     # GPT → Responses API, Claude/Qwen → Anthropic Messages, others → chat.
     from agent.config import OPENAI_COMPATIBLE_PROVIDERS
     from agent.model_catalog import (
+        effective_reasoning_effort,
+        effective_xai_reasoning_effort,
+        get_model_reasoning,
+        model_supports_reasoning_effort,
         opencode_anthropic_base_url,
         opencode_model_uses_anthropic,
         opencode_model_uses_responses_api,
@@ -141,10 +204,28 @@ def build_chat_model(config, *, streaming: bool = True):
         model = model or str(meta.get("default_model") or "")
         api_key = config.llm_api_key(provider)
         if provider == "opencode" and opencode_model_uses_anthropic(model):
-            kwargs = {"temperature": temperature}
+            from agent.model_catalog import (
+                anthropic_model_omits_temperature,
+                effective_anthropic_effort,
+            )
+
+            kwargs = {}
+            if not anthropic_model_omits_temperature(model):
+                kwargs["temperature"] = temperature
             if api_key:
                 kwargs["api_key"] = api_key
             kwargs["base_url"] = opencode_anthropic_base_url(base_url)
+            if model_supports_reasoning_effort("opencode", model):
+                effort, fast = get_model_reasoning(
+                    config.get("llm.model_reasoning"),
+                    "opencode",
+                    model,
+                    default_effort=str(config.get("llm.reasoning_effort") or "medium"),
+                    default_fast=bool(config.get("llm.reasoning_fast", False)),
+                )
+                kwargs["effort"] = effective_anthropic_effort(
+                    effort=effort, fast=fast
+                )
             return init_chat_model(f"anthropic:{model}", **kwargs)
         kwargs = {}
         if not (
@@ -157,6 +238,26 @@ def build_chat_model(config, *, streaming: bool = True):
         kwargs["use_responses_api"] = bool(
             provider == "opencode" and opencode_model_uses_responses_api(model)
         )
+        if model_supports_reasoning_effort(provider, model):
+            effort, fast = get_model_reasoning(
+                config.get("llm.model_reasoning"),
+                provider,
+                model,
+                default_effort=str(config.get("llm.reasoning_effort") or "medium"),
+                default_fast=bool(config.get("llm.reasoning_fast", False)),
+            )
+            if provider == "xai":
+                kwargs["reasoning_effort"] = effective_xai_reasoning_effort(
+                    effort=effort,
+                    fast=fast,
+                    model_id=model,
+                )
+            else:
+                kwargs["reasoning_effort"] = effective_reasoning_effort(
+                    effort=effort,
+                    fast=fast,
+                    model_id=model,
+                )
         return init_chat_model(f"openai:{model}", **kwargs)
 
     raise ValueError(

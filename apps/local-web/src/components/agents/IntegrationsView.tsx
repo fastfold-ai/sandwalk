@@ -11,6 +11,7 @@ import {
   Search
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
 import {
@@ -18,6 +19,7 @@ import {
   ListRowsSkeleton
 } from '@/components/agents/PageSkeletons'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
+import { BusyConfirmOverlay } from '@/components/BusyConfirmOverlay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -40,7 +42,8 @@ export function IntegrationsView({
   onAutofill,
   onSetup,
   onOpenVercelTerminal,
-  onRemove
+  onRemove,
+  embedded = false
 }: {
   terminalClient: LocalAgentClient
   integrations: IntegrationSummary[]
@@ -58,6 +61,7 @@ export function IntegrationsView({
   onSetup: (key: string) => Promise<IntegrationSetupResult>
   onOpenVercelTerminal: () => Promise<string>
   onRemove: (key: string) => Promise<void>
+  embedded?: boolean
 }) {
   const selected = integrations.find(item => item.key === selectedKey)
   const [integrationSearch, setIntegrationSearch] = useState('')
@@ -68,6 +72,12 @@ export function IntegrationsView({
   const [validationMessage, setValidationMessage] = useState<string | null>(
     null
   )
+  const [validationBusy, setValidationBusy] = useState(false)
+  const [overlay, setOverlay] = useState<{
+    phase: 'working' | 'done'
+    message: string
+    description?: string
+  } | null>(null)
   const [setupResult, setSetupResult] = useState<IntegrationSetupResult | null>(
     null
   )
@@ -84,7 +94,53 @@ export function IntegrationsView({
     setSetupResult(null)
     setAutoFetchPending(false)
     autoFetchAttemptsRef.current = 0
+    setValidationMessage(null)
+    setValidationBusy(false)
+    setOverlay(null)
   }, [selectedKey])
+
+  async function showDoneOverlay(message: string, description?: string) {
+    setOverlay({ phase: 'done', message, description })
+    await new Promise(resolve => setTimeout(resolve, 900))
+    setOverlay(null)
+  }
+
+  async function runValidate(key: string) {
+    const isModalProbe = key === 'modal'
+    setValidationBusy(true)
+    setValidationMessage(null)
+    if (isModalProbe) {
+      setOverlay({
+        phase: 'working',
+        message: 'Probing Modal…',
+        description:
+          'Creating a sandbox, syncing files, and running a health check.'
+      })
+    }
+    try {
+      const result = await onValidate(key)
+      setValidationMessage(result.message)
+      if (isModalProbe) {
+        if (result.ok) {
+          await showDoneOverlay(
+            'Probe healthy',
+            'Modal sandbox is ready to use.'
+          )
+        } else {
+          setOverlay(null)
+        }
+      }
+    } catch (error) {
+      setOverlay(null)
+      setValidationMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to test integration.'
+      )
+    } finally {
+      setValidationBusy(false)
+    }
+  }
   useEffect(() => {
     if (!autoFetchPending || selected?.key !== 'skills-sh') return
     let cancelled = false
@@ -229,6 +285,12 @@ export function IntegrationsView({
   if (selected) {
     return (
       <ScrollArea className="flex-1">
+        <BusyConfirmOverlay
+          open={Boolean(overlay)}
+          phase={overlay?.phase || 'working'}
+          message={overlay?.message || ''}
+          description={overlay?.description}
+        />
         <div className="mx-auto max-w-6xl px-8 py-8">
           <div className="mb-8 flex items-center gap-2 text-sm">
             <button
@@ -248,7 +310,7 @@ export function IntegrationsView({
               Integrations
             </button>
           </div>
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
               <IntegrationIcon integration={selected} size="lg" />
               <div>
@@ -290,6 +352,11 @@ export function IntegrationsView({
                       <code>{vercelSetupCommands.join('\n')}</code>
                     </pre>
                   </div>
+                ) : selected.key === 'modal' ? (
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Modal tokens for sandbox chats. App defaults and images live
+                    under Modal Settings.
+                  </p>
                 ) : (
                   <p className="text-muted-foreground mt-1 text-sm">
                     Preset provider env keys. Fill values and save.
@@ -311,6 +378,14 @@ export function IntegrationsView({
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {selected.key === 'modal' ? (
+                <Link
+                  to="/dashboard/agent/sandbox/modal"
+                  className="text-muted-foreground hover:text-foreground shrink-0 text-xs underline underline-offset-4"
+                >
+                  Modal Settings
+                </Link>
+              ) : null}
               {selected.key === 'skills-sh' ? (
                 <>
                   <Button
@@ -409,32 +484,35 @@ export function IntegrationsView({
             </div>
           ) : null}
           <div className="mt-5 overflow-hidden rounded-md border">
-            <div className="bg-muted/20 text-muted-foreground grid grid-cols-[1.15fr_2fr_1.1fr_auto] border-b px-3 py-2 text-xs">
+            <div className="bg-muted/20 text-muted-foreground grid grid-cols-[minmax(9.5rem,0.9fr)_minmax(0,1.4fr)_minmax(7.5rem,0.85fr)_4.5rem] items-center gap-3 border-b px-3 py-2 text-xs">
               <span>Key</span>
               <span>Value</span>
               <span>Status</span>
-              <span>Action</span>
+              <span className="text-right">Action</span>
             </div>
             {selected.fields.map(field => (
               <div
                 key={field.envVar}
-                className="grid grid-cols-[1.15fr_2fr_1.1fr_auto] items-center gap-3 border-b px-3 py-3 last:border-b-0"
+                className="grid grid-cols-[minmax(9.5rem,0.9fr)_minmax(0,1.4fr)_minmax(7.5rem,0.85fr)_4.5rem] items-center gap-3 border-b px-3 py-3 last:border-b-0"
               >
-                <div>
-                  <strong className="text-sm">{field.envVar}</strong>
-                  <span className="text-muted-foreground block text-xs">
+                <div className="min-w-0">
+                  <strong className="block truncate text-sm">
+                    {field.envVar}
+                  </strong>
+                  <span className="text-muted-foreground block truncate text-xs">
                     {field.label}
                   </span>
                 </div>
                 <Input
                   type={field.isSecret ? 'password' : 'text'}
                   value={values[field.envVar] || ''}
+                  className="min-w-0 w-full"
                   onChange={event =>
                     onValueChange(field.envVar, event.target.value)
                   }
                   placeholder={`Enter ${field.envVar}`}
                 />
-                <span className="text-muted-foreground text-xs">
+                <span className="text-muted-foreground min-w-0 truncate text-xs">
                   {field.configured
                     ? `Configured · ${field.maskedPreview || field.source}`
                     : 'Not configured'}
@@ -443,13 +521,15 @@ export function IntegrationsView({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-destructive"
+                    className="text-destructive justify-self-end"
                     onClick={() => void onRemove(selected.key)}
                   >
                     Remove
                   </Button>
                 ) : (
-                  <span className="text-muted-foreground px-3">-</span>
+                  <span className="text-muted-foreground justify-self-end px-1">
+                    -
+                  </span>
                 )}
               </div>
             ))}
@@ -462,13 +542,14 @@ export function IntegrationsView({
           <div className="mt-4 flex justify-end gap-2">
             <Button
               variant="secondary"
-              onClick={() =>
-                void onValidate(selected.key).then(result =>
-                  setValidationMessage(result.message)
-                )
-              }
+              disabled={validationBusy}
+              onClick={() => void runValidate(selected.key)}
             >
-              <CircleCheck className="size-4" />
+              {validationBusy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CircleCheck className="size-4" />
+              )}
               Test API Key
             </Button>
             <Button
@@ -524,16 +605,24 @@ export function IntegrationsView({
   }
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 xl:flex-row">
+    <ScrollArea className={embedded ? 'h-[min(28rem,55vh)]' : 'flex-1'}>
+      <div
+        className={
+          embedded
+            ? 'mx-auto flex w-full max-w-5xl flex-col gap-6 p-1 xl:flex-row'
+            : 'mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 xl:flex-row'
+        }
+      >
         <div className="min-w-0 flex-1">
-          <div className="mb-4">
-            <h2 className="text-2xl font-semibold">Integrations</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Connect API keys and services the agent uses for models, search,
-              compute, and cloud workflows.
-            </p>
-          </div>
+          {!embedded ? (
+            <div className="mb-4">
+              <h2 className="text-2xl font-semibold">Integrations</h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Connect API keys and services the agent uses for models, search,
+                compute, and cloud workflows.
+              </p>
+            </div>
+          ) : null}
           <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-2 pb-3 pt-2 backdrop-blur">
             <div className="relative min-w-[280px] max-w-3xl flex-1">
               <Search className="text-muted-foreground/70 pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />

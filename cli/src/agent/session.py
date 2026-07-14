@@ -74,7 +74,7 @@ class Session:
         """Return the current model name."""
         if self._llm:
             return self._llm.model
-        return self.config.get("llm.model") or "claude-sonnet-4-5-20250929"
+        return self.config.get("llm.model") or "gpt-5.6-sol"
 
     def log(self, message: str):
         """Log to scratchpad (for debugging/transparency)."""

@@ -43,7 +43,7 @@ export function isFeaturedIntegration(integration: IntegrationSummary) {
     key === 'skills-sh' ||
     key === 'boltz' ||
     key === 'fastfold-cloud' ||
-    key === 'openai'
+    key === 'slack'
   )
 }
 

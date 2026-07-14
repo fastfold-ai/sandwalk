@@ -1,11 +1,22 @@
 """Runtime settings shared by terminal and web presentation layers."""
 
 from agent.config import Config, sync_process_env_from_config
-from agent_server.models import RuntimeSettings, UpdateRuntimeSettingsRequest
+from agent.model_catalog import (
+    get_model_reasoning,
+    normalize_reasoning_effort,
+    upsert_model_reasoning,
+)
+from agent_server.models import (
+    OnboardingSettings,
+    RuntimeSettings,
+    UpdateOnboardingSettingsRequest,
+    UpdateRuntimeSettingsRequest,
+)
 
 _DEFAULT_RECURSION_LIMIT = 120
 _MIN_RECURSION_LIMIT = 25
 _MAX_RECURSION_LIMIT = 2000
+_ONBOARDING_MAX_STEP = 6
 
 
 def _clamp_int(value: object, *, minimum: int, maximum: int, default: int) -> int:
@@ -43,13 +54,24 @@ class SettingsService:
     @staticmethod
     def get() -> RuntimeSettings:
         config = Config.load()
+        provider = str(config.get("llm.provider") or "openai")
+        model = str(config.get("llm.model") or "gpt-5.6-sol")
+        effort, fast = get_model_reasoning(
+            config.get("llm.model_reasoning"),
+            provider,
+            model,
+            default_effort=str(config.get("llm.reasoning_effort") or "medium"),
+            default_fast=_bool_from_config(config, "llm.reasoning_fast", False),
+        )
         return RuntimeSettings(
-            provider=str(config.get("llm.provider") or "anthropic"),
-            model=str(config.get("llm.model") or "claude-sonnet-4-5-20250929"),
+            provider=provider,
+            model=model,
             openai_base_url=str(config.get("llm.openai_base_url") or "").strip() or None,
             openai_profile_id=str(config.get("llm.openai_active_profile") or "").strip() or None,
             agent_profile=str(config.get("agent.profile") or "research"),
             tool_mode=str(config.get("agent.tool_mode") or "ptc"),
+            reasoning_effort=effort,
+            reasoning_fast=fast,
             recursion_limit=_recursion_limit_from_config(config),
             max_sdk_turns=_clamp_int(
                 config.get("agent.max_sdk_turns", 30),
@@ -116,6 +138,43 @@ class SettingsService:
         for key, value in non_model_updates.items():
             if value is not None:
                 config.set(key, value)
+
+        if payload.reasoning_effort is not None or payload.reasoning_fast is not None:
+            target_provider = str(
+                payload.provider
+                if payload.provider is not None
+                else (config.get("llm.provider") or "openai")
+            ).strip().lower()
+            target_model = str(
+                payload.model
+                if payload.model is not None
+                else (config.get("llm.model") or "")
+            ).strip()
+            store = upsert_model_reasoning(
+                config.get("llm.model_reasoning"),
+                target_provider,
+                target_model,
+                effort=payload.reasoning_effort,
+                fast=payload.reasoning_fast,
+            )
+            config.set("llm.model_reasoning", store)
+            effort, fast = get_model_reasoning(
+                store, target_provider, target_model
+            )
+            # Mirror onto legacy globals when updating the active (or about-to-be) model.
+            next_provider = str(
+                payload.provider
+                if payload.provider is not None
+                else (config.get("llm.provider") or "openai")
+            ).strip().lower()
+            next_model = str(
+                payload.model
+                if payload.model is not None
+                else (config.get("llm.model") or "")
+            ).strip()
+            if target_provider == next_provider and target_model == next_model:
+                config.set("llm.reasoning_effort", effort)
+                config.set("llm.reasoning_fast", fast)
 
         if payload.recursion_limit is not None:
             config.set(
@@ -241,3 +300,34 @@ class SettingsService:
             ],
         )
         return SettingsService.get()
+
+    @staticmethod
+    def get_onboarding() -> OnboardingSettings:
+        config = Config.load()
+        return OnboardingSettings(
+            completed=_bool_from_config(config, "ui.onboarding_completed", False),
+            step=_clamp_int(
+                config.get("ui.onboarding_step", 0),
+                minimum=0,
+                maximum=_ONBOARDING_MAX_STEP,
+                default=0,
+            ),
+        )
+
+    @staticmethod
+    def update_onboarding(payload: UpdateOnboardingSettingsRequest) -> OnboardingSettings:
+        config = Config.load()
+        if payload.completed is not None:
+            config.set("ui.onboarding_completed", bool(payload.completed))
+        if payload.step is not None:
+            config.set(
+                "ui.onboarding_step",
+                _clamp_int(
+                    payload.step,
+                    minimum=0,
+                    maximum=_ONBOARDING_MAX_STEP,
+                    default=0,
+                ),
+            )
+        config.save()
+        return SettingsService.get_onboarding()

@@ -103,7 +103,11 @@ describe('toComposerModelOptions', () => {
         speed: 'Anthropic',
         profileId: null,
         source: 'cloud',
-        backend: null
+        backend: null,
+        supportsReasoningEffort: false,
+        reasoningEffortOptions: [],
+        reasoningEffort: 'medium',
+        reasoningFast: false
       },
       {
         provider: 'local',
@@ -112,7 +116,11 @@ describe('toComposerModelOptions', () => {
         speed: 'oMLX',
         profileId: 'omlx_local',
         source: 'profile',
-        backend: 'omlx'
+        backend: 'omlx',
+        supportsReasoningEffort: false,
+        reasoningEffortOptions: [],
+        reasoningEffort: 'medium',
+        reasoningFast: false
       }
     ])
   })

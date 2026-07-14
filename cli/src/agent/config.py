@@ -88,7 +88,7 @@ OPENAI_PROFILE_DEFAULTS = {
         "label": "OpenAI Cloud",
         "base_url": "https://api.openai.com/v1",
         "discovery": ["v1_models"],
-        "default_model": "gpt-5.5",
+        "default_model": "gpt-5.6-sol",
         "install_url": "https://platform.openai.com/api-keys",
     },
     "ollama": {
@@ -193,8 +193,12 @@ def _rewrite_legacy_config_paths(data: dict[str, Any]) -> None:
 _migrate_legacy_config()
 
 DEFAULTS = {
-    "llm.provider": "anthropic",
-    "llm.model": "claude-sonnet-4-5-20250929",
+    "llm.provider": "openai",
+    "llm.model": "gpt-5.6-sol",
+    "llm.reasoning_effort": "medium",
+    "llm.reasoning_fast": False,
+    # Per-model Effort/Fast: {"openai:gpt-5.6-sol": {"effort": "high", "fast": true}}
+    "llm.model_reasoning": {},
     "llm.anthropic_api_key": None,
     "llm.api_key": None,
     "llm.openai_api_key": None,
@@ -274,6 +278,8 @@ DEFAULTS = {
     "ui.mermaid.enabled": True,
     "ui.mermaid.ascii": False,
     "ui.mermaid.theme": "default",
+    "ui.onboarding_completed": False,
+    "ui.onboarding_step": 0,
 
     "models.deepternary": None,
     "models.boltz2": None,
@@ -1140,6 +1146,15 @@ class Config:
             for profile in profiles.values()
         )
         configured_model = str(data.get("llm.model") or "").strip()
+        try:
+            from agent.model_catalog import resolve_catalog_model_id
+
+            resolved_model = resolve_catalog_model_id(configured_model)
+            if resolved_model and resolved_model != configured_model:
+                data["llm.model"] = resolved_model
+                configured_model = resolved_model
+        except Exception:
+            pass
         provider_raw = str(data.get("llm.provider") or "").strip().lower()
         if apply_legacy_compat and not has_compatible_profiles and legacy_key:
             bootstrap_backend = (
@@ -1184,7 +1199,7 @@ class Config:
                         break
 
         # Heal provider/model mismatch: if provider says Anthropic but model
-        # clearly targets a compatible backend, prefer openai provider.
+        # clearly targets another backend, prefer that provider.
         compatible_profile_ids = [
             profile_id
             for profile_id, profile in profiles.items()
@@ -1194,17 +1209,47 @@ class Config:
             provider_raw == "anthropic"
             and configured_model
             and not cls._looks_like_anthropic_model(configured_model)
-            and compatible_profile_ids
         ):
-            data["llm.provider"] = "openai"
-            if active_profile == "openai_cloud":
-                model_match_profile = None
-                for profile_id in compatible_profile_ids:
-                    model_hint = str((profiles.get(profile_id) or {}).get("default_model") or "").strip()
-                    if model_hint == configured_model:
-                        model_match_profile = profile_id
-                        break
-                active_profile = model_match_profile or compatible_profile_ids[0]
+            from agent.model_catalog import catalog_provider_for_model
+
+            catalog_provider = catalog_provider_for_model(configured_model)
+            if catalog_provider and catalog_provider != "openai":
+                data["llm.provider"] = catalog_provider
+                provider_raw = catalog_provider
+            elif compatible_profile_ids:
+                data["llm.provider"] = "openai"
+                provider_raw = "openai"
+                if active_profile == "openai_cloud":
+                    model_match_profile = None
+                    for profile_id in compatible_profile_ids:
+                        model_hint = str(
+                            (profiles.get(profile_id) or {}).get("default_model") or ""
+                        ).strip()
+                        if model_hint == configured_model:
+                            model_match_profile = profile_id
+                            break
+                    active_profile = model_match_profile or compatible_profile_ids[0]
+
+        # Heal first-party cloud catalog mismatches
+        # (e.g. Gemini under openai, or GPT under google).
+        if configured_model:
+            from agent.model_catalog import catalog_provider_for_model
+
+            catalog_provider = catalog_provider_for_model(configured_model)
+            if catalog_provider and provider_raw != catalog_provider:
+                data["llm.provider"] = catalog_provider
+                provider_raw = catalog_provider
+                if catalog_provider == "openai":
+                    active_profile_candidate = profiles.get(active_profile) or {}
+                    active_backend_candidate = str(
+                        active_profile_candidate.get("backend") or ""
+                    ).strip().lower()
+                    if (
+                        active_profile not in profiles
+                        or active_backend_candidate
+                        in {"ollama", "unsloth", "omlx", "ds4", "llama_cpp", "lm_studio"}
+                    ) and cls._looks_like_openai_cloud_model(configured_model):
+                        active_profile = "openai_cloud"
 
         # Heal cloud-model/local-backend mismatch (e.g. GPT-5 + Ollama endpoint).
         active_profile_data = profiles.get(active_profile) if isinstance(profiles, dict) else None
@@ -1326,9 +1371,20 @@ class Config:
         return {"id": selected_profile_id, **dict(profile)}
 
     def set_openai_active_profile(self, profile_id: str) -> None:
-        """Set active OpenAI profile and sync legacy projection fields."""
-        profiles, _, _ = self._ensure_openai_profiles_data(self._data)
+        """Set active OpenAI profile and sync legacy projection fields.
+
+        Active profile is written before ``_ensure_openai_profiles_data`` so the
+        cloud-model/local-backend heal does not rewrite an intentionally selected
+        cloud model (e.g. ``gpt-5.6-sol``) back to the local profile default
+        while we are switching away from Ollama/oMLX.
+        """
         selected_profile_id = self._slugify_profile_id(profile_id)
+        profiles = self._data.get("llm.openai_profiles")
+        if not isinstance(profiles, dict) or selected_profile_id not in profiles:
+            profiles, _, _ = self._ensure_openai_profiles_data(
+                self._data,
+                apply_legacy_compat=False,
+            )
         if selected_profile_id not in profiles:
             raise ValueError(f"Unknown OpenAI profile '{profile_id}'.")
         self._data["llm.openai_active_profile"] = selected_profile_id
@@ -1704,6 +1760,10 @@ class Config:
             if val and config_key not in data:
                 data[config_key] = val
 
+        # Capture disk provider/model before profile heal mutates ``data`` in place.
+        disk_provider = str(data.get("llm.provider") or "").strip().lower()
+        disk_model = str(data.get("llm.model") or "").strip()
+
         cfg = cls(data)
         cfg._dirty_keys.clear()
         cfg._unset_keys.clear()
@@ -1713,6 +1773,32 @@ class Config:
             config_key for env_var, config_key in env_mappings.items()
             if os.environ.get(env_var) and config_key in data
         }
+
+        # Persist provider heals (e.g. Gemini under openai → google).
+        healed_provider = str(cfg.get("llm.provider") or "").strip().lower()
+        if healed_provider and healed_provider != disk_provider:
+            try:
+                cfg.set("llm.provider", healed_provider)
+                cfg.save()
+            except OSError as exc:
+                logger.warning(
+                    "Failed to persist healed llm.provider=%s: %s",
+                    healed_provider,
+                    exc,
+                )
+
+        # Persist catalog model id aliases (e.g. gemini-3.1-pro → …-preview).
+        healed_model = str(cfg.get("llm.model") or "").strip()
+        if healed_model and healed_model != disk_model:
+            try:
+                cfg.set("llm.model", healed_model)
+                cfg.save()
+            except OSError as exc:
+                logger.warning(
+                    "Failed to persist healed llm.model=%s: %s",
+                    healed_model,
+                    exc,
+                )
 
         # Run validation and log warnings (never crash)
         issues = _validate_config(data)
@@ -2125,6 +2211,35 @@ class Config:
             "For Azure AI Foundry: set ANTHROPIC_FOUNDRY_API_KEY and "
             "ANTHROPIC_FOUNDRY_RESOURCE"
         )
+
+    def llm_selection_summary(self) -> str:
+        """Human-readable selected LLM line for doctor / UI (not raw provider=)."""
+        provider = str(self.get("llm.provider") or "anthropic").strip().lower()
+        model = str(self.get("llm.model") or "").strip() or "(default)"
+
+        if os.environ.get("ANTHROPIC_FOUNDRY_API_KEY") or os.environ.get(
+            "ANTHROPIC_FOUNDRY_RESOURCE"
+        ):
+            if provider == "anthropic":
+                return f"Anthropic (Azure Foundry) · {model}"
+
+        if provider == "openai":
+            profile = self.get_openai_profile() or {}
+            backend = str(profile.get("backend") or "openai").strip().lower()
+            label = str(profile.get("label") or "").strip()
+            if backend and backend != "openai":
+                return f"{label or backend} · {model}"
+            return f"OpenAI · {model}"
+
+        if provider in OPENAI_COMPATIBLE_PROVIDERS:
+            label = OPENAI_COMPATIBLE_PROVIDERS[provider].get("label") or provider
+            return f"{label} · {model}"
+
+        labels = {
+            "anthropic": "Anthropic",
+            "openai": "OpenAI",
+        }
+        return f"{labels.get(provider, provider)} · {model}"
 
     def keys_table(self) -> Table:
         """Render API key status as a rich table."""

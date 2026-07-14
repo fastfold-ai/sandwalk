@@ -1070,7 +1070,7 @@ class AgentRunner:
                 except (TypeError, ValueError):
                     recursion_limit = max(25, max_turns * 2 + 10)
             model_name = config.get("llm.model") or (
-                "claude-sonnet-4-5-20250929" if provider == "anthropic" else "gpt-4o"
+                "claude-sonnet-4-5-20250929" if provider == "anthropic" else "gpt-5.6-sol"
             )
 
             events = agent.astream_events(

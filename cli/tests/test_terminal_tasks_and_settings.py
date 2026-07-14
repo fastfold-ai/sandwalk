@@ -18,7 +18,22 @@ def _mk_terminal_stub():
     def _set(key, value):
         store[key] = value
 
-    cfg = SimpleNamespace(get=_get, set=_set, save=MagicMock(), unset=MagicMock())
+    def _get_openai_profile():
+        return store.get(
+            "_openai_profile",
+            {
+                "api_key": store.get("llm.openai_compatible_api_key") or "",
+                "backend": store.get("llm.openai_compatible_backend") or "",
+            },
+        )
+
+    cfg = SimpleNamespace(
+        get=_get,
+        set=_set,
+        save=MagicMock(),
+        unset=MagicMock(),
+        get_openai_profile=_get_openai_profile,
+    )
     llm = SimpleNamespace(usage=SimpleNamespace(calls=[]))
     term.session = SimpleNamespace(config=cfg, get_llm=lambda: llm)
     term.console = MagicMock()

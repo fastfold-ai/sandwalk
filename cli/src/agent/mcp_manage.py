@@ -201,7 +201,12 @@ def handle_mcp_argv(args: list[str], console: Console) -> int:
         if result.get("ok"):
             console.print(
                 f"  [green]Connected[/green] {entry.name} — "
-                f"{result.get('toolCount', 0)} tools · enabled"
+                f"{result.get('toolCount', 0)} tools · configured"
+                + (
+                    " · enabled"
+                    if result.get("enabled")
+                    else " · disabled (mcp enable to turn on)"
+                )
             )
             return 0
         console.print(f"  [red]Connect failed:[/red] {result.get('message')}")

@@ -91,10 +91,9 @@ class TestSessionBasics:
     def test_openai_provider_uses_openai_api_key(self):
         cfg = Config(data={
             "llm.provider": "openai",
-            "llm.model": "gpt-4o",
+            "llm.model": "gpt-5.6-sol",
             "llm.api_key": "anthropic-key",
             "llm.openai_api_key": "openai-key",
-            "llm.openai_base_url": "http://localhost:11434/v1",
         })
         session = Session(config=cfg)
 
@@ -104,7 +103,7 @@ class TestSessionBasics:
 
         assert kwargs["provider"] == "openai"
         assert kwargs["api_key"] == "openai-key"
-        assert kwargs["base_url"] == "http://localhost:11434/v1"
+        assert kwargs["base_url"] in (None, "")
 
     def test_session_exports_tool_keys_to_env_when_missing(self, monkeypatch):
         monkeypatch.delenv("BOLTZ_API_KEY", raising=False)

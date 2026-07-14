@@ -74,7 +74,7 @@ export function SandboxListView({
                         {item.name}
                       </span>
                       {item.badge ? (
-                        <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                        <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-medium">
                           {item.badge}
                         </span>
                       ) : null}

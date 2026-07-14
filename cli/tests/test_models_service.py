@@ -291,6 +291,10 @@ def test_format_discovered_model_label():
 
     assert format_discovered_model_label("kimi-k2.7-code") == "Kimi K2.7 Code"
     assert format_discovered_model_label("deepseek-v4-flash") == "Deepseek V4 Flash"
+    assert format_discovered_model_label("gpt-5.1") == "GPT 5.1"
+    assert format_discovered_model_label("gpt-5.6-luna") == "GPT 5.6 Luna"
+    assert format_discovered_model_label("glm-5") == "GLM 5"
+    assert format_discovered_model_label("glm-5.2") == "GLM 5.2"
     assert opencode_model_uses_anthropic("claude-sonnet-5") is True
     assert opencode_model_uses_anthropic("qwen3.7-plus") is True
     assert opencode_model_uses_anthropic("minimax-m3") is False
@@ -303,8 +307,106 @@ def test_openai_model_requires_responses_api():
     assert openai_model_requires_responses_api("gpt-5.3-codex") is True
     assert openai_model_requires_responses_api("gpt-5.2-codex") is True
     assert openai_model_requires_responses_api("gpt-5.1-codex-mini") is True
-    assert openai_model_requires_responses_api("gpt-5.5") is False
+    assert openai_model_requires_responses_api("gpt-5.6") is True
+    assert openai_model_requires_responses_api("gpt-5.6-sol") is True
+    assert openai_model_requires_responses_api("gpt-5.6-terra") is True
+    assert openai_model_requires_responses_api("gpt-5.5") is True
+    assert openai_model_requires_responses_api("gpt-5.4-mini") is True
+    assert openai_model_requires_responses_api("gpt-5.4-pro") is True
+    assert openai_model_requires_responses_api("o3-mini") is True
     assert openai_model_requires_responses_api("gpt-4o") is False
+    assert openai_model_requires_responses_api("gpt-5-chat-latest") is False
+
+
+def test_model_supports_reasoning_effort():
+    from agent.model_catalog import (
+        effective_reasoning_effort,
+        model_supports_reasoning_effort,
+        reasoning_effort_options,
+    )
+
+    assert model_supports_reasoning_effort("openai", "gpt-5.6-sol") is True
+    assert model_supports_reasoning_effort("openai", "o3-mini") is True
+    assert model_supports_reasoning_effort("opencode", "gpt-5.2") is True
+    assert model_supports_reasoning_effort("anthropic", "claude-opus-4-8") is True
+    assert model_supports_reasoning_effort("anthropic", "claude-sonnet-5") is True
+    assert model_supports_reasoning_effort("anthropic", "claude-fable-5") is True
+    assert model_supports_reasoning_effort("anthropic", "claude-sonnet-4-6") is True
+    assert model_supports_reasoning_effort("anthropic", "claude-haiku-4-5-20251001") is False
+    assert model_supports_reasoning_effort("google", "gemini-3.5-flash") is True
+    assert model_supports_reasoning_effort("google", "gemini-3.1-pro-preview") is True
+    assert model_supports_reasoning_effort("xai", "grok-4.5") is True
+    assert model_supports_reasoning_effort("xai", "grok-4.3") is True
+    assert model_supports_reasoning_effort("xai", "grok-4.20") is True
+    assert model_supports_reasoning_effort("nvidia", "nvidia/nemotron-3-ultra-550b-a55b") is False
+    assert model_supports_reasoning_effort("openai", "gpt-5-chat-latest") is False
+    assert reasoning_effort_options("openai", "gpt-5.6-sol") == [
+        "low",
+        "medium",
+        "high",
+    ]
+    assert reasoning_effort_options("anthropic", "claude-sonnet-5") == [
+        "low",
+        "medium",
+        "high",
+    ]
+    assert reasoning_effort_options("google", "gemini-3.5-flash") == [
+        "low",
+        "medium",
+        "high",
+    ]
+    assert effective_reasoning_effort(effort="high", fast=False) == "high"
+    assert effective_reasoning_effort(effort="high", fast=True) == "none"
+    assert (
+        effective_reasoning_effort(effort="high", fast=True, model_id="gpt-5-mini")
+        == "minimal"
+    )
+    assert (
+        effective_reasoning_effort(effort="low", fast=False, model_id="gpt-5.5-pro")
+        == "medium"
+    )
+    assert effective_reasoning_effort(effort="bogus", fast=False) == "medium"
+
+    from agent.model_catalog import (
+        effective_anthropic_effort,
+        effective_gemini_thinking_level,
+        effective_xai_reasoning_effort,
+    )
+
+    assert effective_anthropic_effort(effort="high", fast=False) == "high"
+    assert effective_anthropic_effort(effort="high", fast=True) == "low"
+    assert effective_anthropic_effort(effort="none", fast=False) == "low"
+    assert effective_gemini_thinking_level(effort="high", fast=False) == "high"
+    assert effective_gemini_thinking_level(effort="medium", fast=False) == "medium"
+    assert effective_gemini_thinking_level(effort="low", fast=False) == "low"
+    assert effective_gemini_thinking_level(effort="high", fast=True) == "minimal"
+    assert (
+        effective_xai_reasoning_effort(effort="high", fast=True, model_id="grok-4.5")
+        == "low"
+    )
+    assert (
+        effective_xai_reasoning_effort(effort="high", fast=True, model_id="grok-4.3")
+        == "none"
+    )
+
+
+def test_anthropic_model_omits_temperature():
+    from agent.model_catalog import anthropic_model_omits_temperature
+
+    assert anthropic_model_omits_temperature("claude-opus-4-8") is True
+    assert anthropic_model_omits_temperature("claude-sonnet-5") is True
+    assert anthropic_model_omits_temperature("claude-fable-5") is True
+    assert anthropic_model_omits_temperature("claude-opus-4-6") is False
+    assert anthropic_model_omits_temperature("claude-sonnet-4-6") is False
+    assert anthropic_model_omits_temperature("claude-sonnet-4-5-20250929") is False
+
+
+def test_resolve_catalog_model_id():
+    from agent.model_catalog import resolve_catalog_model_id
+
+    assert resolve_catalog_model_id("gemini-3.1-pro") == "gemini-3.1-pro-preview"
+    assert resolve_catalog_model_id("gemini-3.1-pro-preview") == "gemini-3.1-pro-preview"
+    assert resolve_catalog_model_id("gemini-3.5-flash") == "gemini-3.5-flash"
 
 
 def test_custom_models_http_routes(isolated_config: Config, tmp_path: Path):

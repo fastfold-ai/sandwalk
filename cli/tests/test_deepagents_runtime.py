@@ -85,6 +85,69 @@ class TestBuildChatModel:
         assert captured["kwargs"]["temperature"] == 0.1
         assert captured["kwargs"]["api_key"] == "sk-ant"
 
+    def test_anthropic_sonnet5_omits_temperature(self, monkeypatch):
+        captured = self._patch_init(monkeypatch)
+        dr.build_chat_model(
+            _stub_config("anthropic", model="claude-sonnet-5", api_key="sk-ant")
+        )
+        assert captured["model_id"] == "anthropic:claude-sonnet-5"
+        assert "temperature" not in captured["kwargs"]
+        assert captured["kwargs"]["effort"] == "medium"
+
+    def test_anthropic_opus48_omits_temperature(self, monkeypatch):
+        captured = self._patch_init(monkeypatch)
+        dr.build_chat_model(
+            _stub_config("anthropic", model="claude-opus-4-8", api_key="sk-ant")
+        )
+        assert "temperature" not in captured["kwargs"]
+        assert captured["kwargs"]["effort"] == "medium"
+
+    def test_anthropic_fast_maps_to_low_effort(self, monkeypatch):
+        captured = self._patch_init(monkeypatch)
+        cfg = _stub_config("anthropic", model="claude-sonnet-5", api_key="sk-ant")
+        data = {
+            "llm.provider": "anthropic",
+            "llm.model": "claude-sonnet-5",
+            "llm.temperature": 0.1,
+            "llm.reasoning_effort": "high",
+            "llm.reasoning_fast": True,
+        }
+        cfg = SimpleNamespace(
+            get=lambda key, default=None: data.get(key, default),
+            llm_api_key=lambda _provider: "sk-ant",
+            llm_openai_base_url=lambda: None,
+            llm_provider_base_url=lambda _provider: None,
+        )
+        dr.build_chat_model(cfg)
+        assert captured["kwargs"]["effort"] == "low"
+
+    def test_google_resolves_gemini_pro_alias(self, monkeypatch):
+        captured = self._patch_init(monkeypatch)
+        dr.build_chat_model(
+            _stub_config("google", model="gemini-3.1-pro", api_key="gk")
+        )
+        assert captured["model_id"] == "google_genai:gemini-3.1-pro-preview"
+        assert captured["kwargs"]["thinking_level"] == "medium"
+
+    def test_google_fast_maps_to_minimal_thinking(self, monkeypatch):
+        captured = self._patch_init(monkeypatch)
+        data = {
+            "llm.provider": "google",
+            "llm.model": "gemini-3.5-flash",
+            "llm.temperature": 0.1,
+            "llm.reasoning_effort": "high",
+            "llm.reasoning_fast": True,
+            "llm.model_reasoning": {},
+        }
+        cfg = SimpleNamespace(
+            get=lambda key, default=None: data.get(key, default),
+            llm_api_key=lambda _provider: "gk",
+            llm_openai_base_url=lambda: None,
+            llm_provider_base_url=lambda _provider: None,
+        )
+        dr.build_chat_model(cfg)
+        assert captured["kwargs"]["thinking_level"] == "minimal"
+
     def test_anthropic_explicit_model_no_key(self, monkeypatch):
         captured = self._patch_init(monkeypatch)
         dr.build_chat_model(_stub_config("anthropic", model="claude-x"))
@@ -107,7 +170,8 @@ class TestBuildChatModel:
         dr.build_chat_model(_stub_config("openai", model="gpt-5-mini"))
         assert captured["model_id"] == "openai:gpt-5-mini"
         assert "temperature" not in captured["kwargs"]
-        assert captured["kwargs"]["use_responses_api"] is False
+        assert captured["kwargs"]["use_responses_api"] is True
+        assert captured["kwargs"]["reasoning_effort"] == "medium"
 
     def test_openai_codex_uses_responses_api_on_cloud(self, monkeypatch):
         captured = self._patch_init(monkeypatch)

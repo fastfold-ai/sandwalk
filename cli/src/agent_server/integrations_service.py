@@ -104,7 +104,7 @@ def category_for(config_key: str) -> str:
     if config_key.startswith("notification."):
         return "Notifications"
     if config_key.startswith("api."):
-        return "Scientific Services"
+        return "API"
     if config_key.startswith("mcp."):
         return "MCP"
     return "Other"

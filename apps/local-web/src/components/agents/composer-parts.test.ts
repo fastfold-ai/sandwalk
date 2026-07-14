@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   composerToMessage,
   fileChipToken,
+  mcpChipToken,
   parseComposerParts,
   parseMessageParts,
   removeComposerChipAt,
@@ -12,9 +13,12 @@ import {
 } from './composer-parts'
 
 describe('chip tokens', () => {
-  it('builds file and skill chip tokens', () => {
+  it('builds file, skill, and mcp chip tokens', () => {
     expect(fileChipToken('src/a.ts')).toBe('⟦@:src/a.ts⟧')
     expect(skillChipToken('fold')).toBe('⟦/:fold⟧')
+    expect(mcpChipToken('linear', 'Linear')).toBe(
+      '⟦mcp:linear:Linear⟧'
+    )
   })
 })
 
@@ -22,18 +26,23 @@ describe('spaceAroundChips', () => {
   it('normalizes spacing around chip tokens', () => {
     expect(spaceAroundChips('hi⟦@:a.ts⟧there')).toBe('hi ⟦@:a.ts⟧ there')
     expect(spaceAroundChips('hi  ⟦/:fold⟧  x')).toBe('hi ⟦/:fold⟧ x')
+    expect(spaceAroundChips(`hi${mcpChipToken('linear', 'Linear')}x`)).toBe(
+      `hi ${mcpChipToken('linear', 'Linear')} x`
+    )
   })
 })
 
 describe('parseComposerParts / serializeComposerParts', () => {
-  it('parses text, file, and skill parts', () => {
-    const value = `hello ${fileChipToken('README.md')} use ${skillChipToken('fold')}`
+  it('parses text, file, skill, and mcp parts', () => {
+    const value = `hello ${fileChipToken('README.md')} use ${skillChipToken('fold')} with ${mcpChipToken('linear', 'Linear')}`
     const parts = parseComposerParts(value)
     expect(parts).toEqual([
       { type: 'text', text: 'hello ' },
       { type: 'file', path: 'README.md' },
       { type: 'text', text: ' use ' },
       { type: 'skill', name: 'fold' },
+      { type: 'text', text: ' with ' },
+      { type: 'mcp', id: 'linear', name: 'Linear' },
       { type: 'text', text: '' }
     ])
     expect(serializeComposerParts(parts)).toBe(value)
@@ -45,12 +54,16 @@ describe('parseComposerParts / serializeComposerParts', () => {
 })
 
 describe('parseMessageParts', () => {
-  it('parses plain @file and /skill mentions', () => {
-    expect(parseMessageParts('see @src/a.ts with /fold please')).toEqual([
+  it('parses plain @file, /skill, and mcp:Name mentions', () => {
+    expect(
+      parseMessageParts('see @src/a.ts with /fold and mcp:Linear please')
+    ).toEqual([
       { type: 'text', text: 'see ' },
       { type: 'file', path: 'src/a.ts' },
       { type: 'text', text: ' with ' },
       { type: 'skill', name: 'fold' },
+      { type: 'text', text: ' and ' },
+      { type: 'mcp', id: 'Linear', name: 'Linear' },
       { type: 'text', text: ' please' }
     ])
   })
@@ -63,9 +76,9 @@ describe('parseMessageParts', () => {
 })
 
 describe('composerToMessage', () => {
-  it('converts chips to @path /skill mentions with spacing', () => {
-    const value = `${fileChipToken('a.ts')}${skillChipToken('fold')}`
-    expect(composerToMessage(value)).toBe('@a.ts /fold')
+  it('converts chips to @path /skill mcp:Name mentions with spacing', () => {
+    const value = `${fileChipToken('a.ts')}${skillChipToken('fold')}${mcpChipToken('linear', 'Linear')}`
+    expect(composerToMessage(value)).toBe('@a.ts /fold mcp:Linear')
   })
 })
 

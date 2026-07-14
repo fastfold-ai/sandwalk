@@ -80,3 +80,25 @@ class DatasetsService:
         return DatasetInstallResponse(
             ok=ok, id=target, status=status, summary=summary, dataset=after
         )
+
+    def remove(self, dataset_id: str) -> DatasetInstallResponse:
+        from data.downloader import DATASETS, remove_dataset
+
+        target = str(dataset_id or "").strip()
+        if target not in DATASETS:
+            raise KeyError(target)
+
+        after_record = remove_dataset(target)
+        after = self._to_summary(after_record)
+        removed = bool(after_record.get("removed"))
+        if removed:
+            summary = f"{target} removed from local disk."
+        else:
+            summary = f"{target} was not installed locally."
+        return DatasetInstallResponse(
+            ok=True,
+            id=target,
+            status=after.status,
+            summary=summary,
+            dataset=after,
+        )

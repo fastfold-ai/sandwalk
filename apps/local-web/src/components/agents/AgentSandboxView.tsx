@@ -3,61 +3,48 @@ import type {
   SandboxProbeReport,
   SandboxSettings
 } from '@sandwalk/agent-ui-core'
-import { ArrowLeft, Check, Loader2 } from 'lucide-react'
+import { ArrowLeft, Check, CircleCheck, Loader2, RotateCcw } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import { BusyConfirmOverlay } from '@/components/BusyConfirmOverlay'
 import { ErrorPage } from '@/components/ErrorPage'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  CPU_PRESETS,
-  DEFAULT_CPU_PRESET,
-  DEFAULT_GPU_PRESET,
-  GPU_PRESETS,
-  matchCpuPresetId,
-  matchGpuPreset
-} from '@/lib/sandbox-presets'
-import { cn } from '@/lib/utils'
 
-type Draft = {
-  backend: 'builtin' | 'modal'
+type ImageDraft = {
   modalApp: string
+  idleTtlSeconds: string
   cpuImage: string
   gpuImage: string
   pipPackages: string
-  computeType: 'cpu' | 'gpu'
-  gpuClass: string
-  cpuCores: string
-  ramGb: string
-  idleTtlSeconds: string
 }
 
 const DEFAULT_CPU_IMAGE = 'python:3.12-slim'
 const DEFAULT_GPU_IMAGE = 'pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime'
 const DEFAULT_PIP =
   'pandas, numpy, scipy, scikit-learn, matplotlib, seaborn'
+const DEFAULT_MODAL_APP = 'sandwalk'
+const DEFAULT_IDLE_TTL = '600'
 
-const selectClassName =
-  'border-input bg-background h-9 w-full rounded-md border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60'
-
-function settingsToDraft(settings: SandboxSettings | null): Draft {
-  const gpuClass = settings?.gpuClass?.trim() || DEFAULT_GPU_PRESET.gpu
-  const knownGpu = GPU_PRESETS.some(item => item.gpu === gpuClass)
+function settingsToImageDraft(settings: SandboxSettings | null): ImageDraft {
   return {
-    backend: settings?.backend === 'modal' ? 'modal' : 'builtin',
-    modalApp: settings?.modalApp ?? 'sandwalk',
+    modalApp: settings?.modalApp ?? DEFAULT_MODAL_APP,
+    idleTtlSeconds: String(settings?.idleTtlSeconds ?? DEFAULT_IDLE_TTL),
     cpuImage: settings?.cpuImage?.trim() || DEFAULT_CPU_IMAGE,
     gpuImage: settings?.gpuImage?.trim() || DEFAULT_GPU_IMAGE,
-    pipPackages: settings?.pipPackages ?? DEFAULT_PIP,
-    computeType: settings?.computeType === 'gpu' ? 'gpu' : 'cpu',
-    gpuClass: knownGpu ? gpuClass : DEFAULT_GPU_PRESET.gpu,
-    cpuCores: String(settings?.cpuCores ?? DEFAULT_CPU_PRESET.cpu),
-    ramGb: String(settings?.ramGb ?? DEFAULT_CPU_PRESET.ram),
-    idleTtlSeconds: String(settings?.idleTtlSeconds ?? 600)
+    pipPackages: settings?.pipPackages ?? DEFAULT_PIP
+  }
+}
+
+function defaultImageDraft(): ImageDraft {
+  return {
+    modalApp: DEFAULT_MODAL_APP,
+    idleTtlSeconds: DEFAULT_IDLE_TTL,
+    cpuImage: DEFAULT_CPU_IMAGE,
+    gpuImage: DEFAULT_GPU_IMAGE,
+    pipPackages: DEFAULT_PIP
   }
 }
 
@@ -72,17 +59,6 @@ function clampNumber(
   return Math.max(minimum, Math.min(maximum, n))
 }
 
-function ModalGlyph({ className }: { className?: string }) {
-  const icon = INTEGRATION_ICONS.modal
-  return (
-    <img
-      src={icon.src}
-      alt=""
-      className={cn('size-4 shrink-0 rounded-sm object-contain', className)}
-    />
-  )
-}
-
 export function AgentSandboxView({
   connected,
   sandboxSettings,
@@ -93,7 +69,9 @@ export function AgentSandboxView({
   onSaveModalIntegration,
   onRemoveModalIntegration,
   onRefreshIntegrations,
-  onBack
+  onBack,
+  embedded = false,
+  bare = false
 }: {
   connected: boolean
   sandboxSettings: SandboxSettings | null
@@ -109,15 +87,17 @@ export function AgentSandboxView({
   onRemoveModalIntegration?: () => Promise<void>
   onRefreshIntegrations?: () => Promise<void>
   onBack?: () => void
+  embedded?: boolean
+  /** Skip page chrome / ScrollArea (e.g. onboarding embed). */
+  bare?: boolean
 }) {
-  const [draft, setDraft] = useState<Draft>(() =>
-    settingsToDraft(sandboxSettings)
+  const [draft, setDraft] = useState<ImageDraft>(() =>
+    settingsToImageDraft(sandboxSettings)
   )
-  const [saved, setSaved] = useState<Draft>(() =>
-    settingsToDraft(sandboxSettings)
+  const [saved, setSaved] = useState<ImageDraft>(() =>
+    settingsToImageDraft(sandboxSettings)
   )
   const [busy, setBusy] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorStack, setErrorStack] = useState<string | null>(null)
   const [unavailable, setUnavailable] = useState(false)
@@ -133,10 +113,12 @@ export function AgentSandboxView({
   const savedRef = useRef(saved)
   savedRef.current = saved
   const preserveDraftRef = useRef(false)
+  const onLoadSandboxSettingsRef = useRef(onLoadSandboxSettings)
+  onLoadSandboxSettingsRef.current = onLoadSandboxSettings
 
   useEffect(() => {
     if (!sandboxSettings) return
-    const next = settingsToDraft(sandboxSettings)
+    const next = settingsToImageDraft(sandboxSettings)
     setSaved(next)
     setDraft(prev => {
       if (preserveDraftRef.current) return prev
@@ -148,10 +130,12 @@ export function AgentSandboxView({
   }, [sandboxSettings])
 
   useEffect(() => {
-    if (sandboxSettings || !connected || !onLoadSandboxSettings) return
+    if (sandboxSettings || !connected || !onLoadSandboxSettingsRef.current) {
+      return
+    }
     let cancelled = false
-    setLoading(true)
-    void onLoadSandboxSettings()
+    // Load in the background — form is already visible with defaults.
+    void onLoadSandboxSettingsRef.current()
       .then(next => {
         if (cancelled) return
         if (!next) {
@@ -168,17 +152,18 @@ export function AgentSandboxView({
         setError(err instanceof Error ? err.message : String(err))
         setErrorStack(err instanceof Error ? err.stack || null : null)
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
     return () => {
       cancelled = true
     }
-  }, [connected, onLoadSandboxSettings, sandboxSettings])
+  }, [connected, sandboxSettings])
 
   const dirty = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(saved),
     [draft, saved]
+  )
+  const atDefaults = useMemo(
+    () => JSON.stringify(draft) === JSON.stringify(defaultImageDraft()),
+    [draft]
   )
 
   const modalReady = Boolean(
@@ -203,18 +188,7 @@ export function AgentSandboxView({
     }
   ]
   const tokenDirty = Object.values(tokenDrafts).some(value => value.trim())
-  const formDisabled = !connected || busy || unavailable || loading
-
-  const cpuCoresNum = Number(draft.cpuCores)
-  const ramGbNum = Number(draft.ramGb)
-  const cpuPresetId = matchCpuPresetId(cpuCoresNum, ramGbNum)
-  const selectedGpuPreset =
-    matchGpuPreset(draft.gpuClass) ?? DEFAULT_GPU_PRESET
-
-  const computeSummary =
-    draft.computeType === 'gpu'
-      ? `${selectedGpuPreset.gpu} · ${selectedGpuPreset.vram} GB VRAM · ${draft.cpuCores} CPU · ${draft.ramGb} GB RAM`
-      : `${draft.cpuCores} CPU cores · ${draft.ramGb} GB RAM`
+  const formDisabled = !connected || busy || unavailable
 
   async function showDone(message: string, description?: string) {
     setOverlay({ phase: 'done', message, description })
@@ -323,45 +297,36 @@ export function AgentSandboxView({
     }
   }
 
-  async function apply() {
-    if (!connected || busy || !dirty || unavailable) return
+  async function apply(nextDraft: ImageDraft = draft) {
+    if (!connected || busy || unavailable) return
     setBusy(true)
     setError(null)
     setErrorStack(null)
     setOverlay({
       phase: 'working',
       message: 'Saving sandbox…',
-      description: 'Applied when a chat enables Modal Sandbox.'
+      description: 'Used when a chat enables Modal Sandbox.'
     })
     try {
       const next = await onUpdateSandboxSettings({
-        // Chats default to Local; this page configures Modal defaults only.
-        backend: 'builtin',
-        modalApp: draft.modalApp.trim() || 'sandwalk',
-        cpuImage: draft.cpuImage.trim() || DEFAULT_CPU_IMAGE,
-        gpuImage: draft.gpuImage.trim() || DEFAULT_GPU_IMAGE,
-        pipPackages: draft.pipPackages.trim(),
-        computeType: draft.computeType,
-        gpuClass: draft.gpuClass.trim() || DEFAULT_GPU_PRESET.gpu,
-        cpuCores: clampNumber(
-          draft.cpuCores,
-          0.25,
-          64,
-          DEFAULT_CPU_PRESET.cpu
-        ),
-        ramGb: clampNumber(draft.ramGb, 0.5, 256, DEFAULT_CPU_PRESET.ram),
+        modalApp: nextDraft.modalApp.trim() || DEFAULT_MODAL_APP,
         idleTtlSeconds: Math.round(
-          clampNumber(draft.idleTtlSeconds, 60, 86400, 600)
-        )
+          clampNumber(
+            nextDraft.idleTtlSeconds,
+            60,
+            86400,
+            Number(DEFAULT_IDLE_TTL)
+          )
+        ),
+        cpuImage: nextDraft.cpuImage.trim() || DEFAULT_CPU_IMAGE,
+        gpuImage: nextDraft.gpuImage.trim() || DEFAULT_GPU_IMAGE,
+        pipPackages: nextDraft.pipPackages.trim()
       })
-      const normalized = settingsToDraft(next)
+      const normalized = settingsToImageDraft(next)
       setDraft(normalized)
       setSaved(normalized)
       setUnavailable(false)
-      await showDone(
-        'Sandbox saved',
-        'Modal chats use these compute and image settings.'
-      )
+      await showDone('Sandbox saved')
     } catch (err) {
       setOverlay(null)
       setError(err instanceof Error ? err.message : String(err))
@@ -371,12 +336,15 @@ export function AgentSandboxView({
     }
   }
 
+  function restoreDefaults() {
+    setDraft(defaultImageDraft())
+  }
+
   function retryLoad() {
     if (!onLoadSandboxSettings) return
     setError(null)
     setErrorStack(null)
     setUnavailable(false)
-    setLoading(true)
     void onLoadSandboxSettings()
       .then(next => {
         if (!next) {
@@ -391,41 +359,24 @@ export function AgentSandboxView({
         setError(err instanceof Error ? err.message : String(err))
         setErrorStack(err instanceof Error ? err.stack || null : null)
       })
-      .finally(() => setLoading(false))
   }
 
-  function selectCpuPreset(presetId: string) {
-    const preset =
-      CPU_PRESETS.find(item => item.id === presetId) ?? DEFAULT_CPU_PRESET
-    setDraft(current => ({
-      ...current,
-      computeType: 'cpu',
-      cpuCores: String(preset.cpu),
-      ramGb: String(preset.ram)
-    }))
-  }
-
-  function selectGpuPreset(gpu: string) {
-    const preset = matchGpuPreset(gpu) ?? DEFAULT_GPU_PRESET
-    setDraft(current => ({
-      ...current,
-      computeType: 'gpu',
-      gpuClass: preset.gpu,
-      cpuCores: String(preset.cpu),
-      ramGb: String(preset.ram)
-    }))
-  }
-
-  return (
-    <ScrollArea className="flex-1">
+  const body = (
+    <>
       <BusyConfirmOverlay
         open={Boolean(overlay)}
         phase={overlay?.phase || 'working'}
         message={overlay?.message || ''}
         description={overlay?.description}
       />
-      <div className="mx-auto max-w-4xl space-y-10 px-8 py-10">
-        {onBack ? (
+      <div
+        className={
+          bare
+            ? 'space-y-6'
+            : 'mx-auto max-w-3xl space-y-8 px-8 py-10'
+        }
+      >
+        {!bare && onBack ? (
           <div className="flex items-center gap-2 text-sm">
             <button
               type="button"
@@ -445,18 +396,19 @@ export function AgentSandboxView({
             </button>
           </div>
         ) : null}
-        <div>
-          <h2 className="text-2xl font-semibold">Modal Sandbox</h2>
-          <p className="text-muted-foreground mt-2 text-sm">
-            Configure Modal Sandbox compute, images, and credentials. Chats
-            default to Local Sandbox; enable Modal per chat in the composer.
-          </p>
-        </div>
 
-        {loading ? (
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading sandbox settings…
+        {!bare && !embedded ? (
+          <div>
+            <h2 className="text-2xl font-semibold">Modal Sandbox</h2>
+            <p className="text-muted-foreground mt-2 text-sm">
+              Credentials, app defaults, and base images. Compute is chosen per
+              chat.
+            </p>
+          </div>
+        ) : null}
+        {!bare && embedded ? (
+          <div>
+            <h2 className="text-lg font-semibold">Modal Sandbox</h2>
           </div>
         ) : null}
 
@@ -483,361 +435,261 @@ export function AgentSandboxView({
           </div>
         ) : null}
 
-        <section className="space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-base font-semibold">Modal credentials</h3>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Required before chats can start Modal Sandbox.
-              </p>
-            </div>
-            <Link
-              to="/dashboard/integrations/modal"
-              className="text-muted-foreground hover:text-foreground shrink-0 text-xs underline underline-offset-4"
-            >
-              Open Integrations
-            </Link>
-          </div>
-
-          {!modalReady ? (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-900 dark:text-amber-200">
-              Modal is not set up.{' '}
-              <Link
-                to="/dashboard/integrations/modal"
-                className="font-medium underline underline-offset-2"
-              >
-                Set up Modal
-              </Link>{' '}
-              to enable Modal Sandbox in chats.
-            </div>
-          ) : null}
-
-          <div className="overflow-hidden rounded-md border">
-            <div className="bg-muted/20 text-muted-foreground grid grid-cols-[1.15fr_2fr_1.1fr] border-b px-3 py-2 text-xs">
-              <span>Key</span>
-              <span>Value</span>
-              <span>Status</span>
-            </div>
-            {modalFields.map(field => (
-              <div
-                key={field.envVar}
-                className="grid grid-cols-[1.15fr_2fr_1.1fr] items-center gap-3 border-b px-3 py-3 last:border-b-0"
-              >
+        {!unavailable ? (
+          <>
+            <section className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <strong className="text-sm">{field.envVar}</strong>
-                  <span className="text-muted-foreground block text-xs">
-                    {field.label}
-                  </span>
+                  <h3 className="text-base font-semibold">Modal credentials</h3>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Required before chats can start Modal Sandbox.
+                  </p>
                 </div>
+                <Link
+                  to="/dashboard/integrations/modal"
+                  className="text-muted-foreground hover:text-foreground shrink-0 text-xs underline underline-offset-4"
+                >
+                  Open Integrations
+                </Link>
+              </div>
+
+              {!modalReady ? (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-900 dark:text-amber-200">
+                  Modal is not set up.{' '}
+                  <Link
+                    to="/dashboard/integrations/modal"
+                    className="font-medium underline underline-offset-2"
+                  >
+                    Set up Modal
+                  </Link>{' '}
+                  to enable Modal Sandbox in chats.
+                </div>
+              ) : null}
+
+              <div className="overflow-hidden rounded-md border">
+                <div className="bg-muted/20 text-muted-foreground grid grid-cols-[minmax(9.5rem,0.9fr)_minmax(0,1.4fr)_minmax(7.5rem,0.85fr)_4.5rem] items-center gap-3 border-b px-3 py-2 text-xs">
+                  <span>Key</span>
+                  <span>Value</span>
+                  <span>Status</span>
+                  <span className="text-right">Action</span>
+                </div>
+                {modalFields.map(field => (
+                  <div
+                    key={field.envVar}
+                    className="grid grid-cols-[minmax(9.5rem,0.9fr)_minmax(0,1.4fr)_minmax(7.5rem,0.85fr)_4.5rem] items-center gap-3 border-b px-3 py-3 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <strong className="block truncate text-sm">
+                        {field.envVar}
+                      </strong>
+                      <span className="text-muted-foreground block truncate text-xs">
+                        {field.label}
+                      </span>
+                    </div>
+                    <Input
+                      type={field.isSecret ? 'password' : 'text'}
+                      value={tokenDrafts[field.envVar] || ''}
+                      disabled={formDisabled || savingTokens}
+                      className="min-w-0 w-full"
+                      onChange={event => {
+                        const value = event.target.value
+                        setTokenDrafts(current => ({
+                          ...current,
+                          [field.envVar]: value
+                        }))
+                        setProbeOk(false)
+                        setProbeDetail(null)
+                      }}
+                      placeholder={`Enter ${field.envVar}`}
+                    />
+                    <span className="text-muted-foreground min-w-0 truncate text-xs">
+                      {field.configured
+                        ? `Configured · ${field.maskedPreview || field.source}`
+                        : 'Not configured'}
+                    </span>
+                    {field.configured ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive justify-self-end"
+                        disabled={formDisabled || savingTokens}
+                        onClick={() => void clearModalTokens()}
+                      >
+                        Remove
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground justify-self-end px-1">
+                        -
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {probeOk ? (
+                <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                  {probeDetail || 'Probe healthy.'}
+                </p>
+              ) : probeDetail ? (
+                <p className="text-muted-foreground text-sm">{probeDetail}</p>
+              ) : null}
+
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  variant="secondary"
+                  disabled={
+                    formDisabled ||
+                    savingTokens ||
+                    !modalReady ||
+                    !onProbeSandbox
+                  }
+                  onClick={() => void runProbe()}
+                >
+                  {busy && overlay?.message.startsWith('Probing') ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <CircleCheck className="size-4" />
+                  )}
+                  Test API Key
+                </Button>
+                <Button
+                  disabled={
+                    formDisabled ||
+                    savingTokens ||
+                    !tokenDirty ||
+                    !onSaveModalIntegration
+                  }
+                  onClick={() => void saveModalTokens()}
+                >
+                  {savingTokens ? <Loader2 className="animate-spin" /> : null}
+                  Save Overrides
+                </Button>
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <h3 className="text-base font-semibold">Sandbox settings</h3>
+
+              <label className="space-y-1.5 text-sm">
+                <span className="text-muted-foreground text-xs">App name</span>
                 <Input
-                  type={field.isSecret ? 'password' : 'text'}
-                  value={tokenDrafts[field.envVar] || ''}
-                  disabled={formDisabled || savingTokens}
-                  onChange={event => {
-                    const value = event.target.value
-                    setTokenDrafts(current => ({
+                  value={draft.modalApp}
+                  disabled={formDisabled}
+                  placeholder={DEFAULT_MODAL_APP}
+                  onChange={event =>
+                    setDraft(current => ({
                       ...current,
-                      [field.envVar]: value
+                      modalApp: event.target.value
                     }))
-                    setProbeOk(false)
-                    setProbeDetail(null)
-                  }}
-                  placeholder={
-                    field.configured
-                      ? field.maskedPreview || 'Configured'
-                      : `Enter ${field.envVar}`
                   }
                 />
+              </label>
+
+              <label className="space-y-1.5 text-sm">
                 <span className="text-muted-foreground text-xs">
-                  {field.configured
-                    ? `Configured · ${field.maskedPreview || field.source}`
-                    : 'Not configured'}
+                  Idle TTL (seconds)
                 </span>
+                <Input
+                  type="number"
+                  min={60}
+                  max={86400}
+                  step={60}
+                  value={draft.idleTtlSeconds}
+                  disabled={formDisabled}
+                  onChange={event =>
+                    setDraft(current => ({
+                      ...current,
+                      idleTtlSeconds: event.target.value
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="space-y-1.5 text-sm">
+                <span className="text-muted-foreground text-xs">
+                  CPU base image
+                </span>
+                <Input
+                  value={draft.cpuImage}
+                  disabled={formDisabled}
+                  placeholder={DEFAULT_CPU_IMAGE}
+                  className="font-mono text-xs"
+                  onChange={event =>
+                    setDraft(current => ({
+                      ...current,
+                      cpuImage: event.target.value
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="space-y-1.5 text-sm">
+                <span className="text-muted-foreground text-xs">
+                  GPU base image
+                </span>
+                <Input
+                  value={draft.gpuImage}
+                  disabled={formDisabled}
+                  placeholder={DEFAULT_GPU_IMAGE}
+                  className="font-mono text-xs"
+                  onChange={event =>
+                    setDraft(current => ({
+                      ...current,
+                      gpuImage: event.target.value
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="space-y-1.5 text-sm">
+                <span className="text-muted-foreground text-xs">
+                  Default pip installs
+                </span>
+                <Input
+                  value={draft.pipPackages}
+                  disabled={formDisabled}
+                  placeholder={DEFAULT_PIP}
+                  className="text-xs"
+                  onChange={event =>
+                    setDraft(current => ({
+                      ...current,
+                      pipPackages: event.target.value
+                    }))
+                  }
+                />
+              </label>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={formDisabled || atDefaults}
+                  onClick={restoreDefaults}
+                >
+                  <RotateCcw className="size-3.5" />
+                  Restore to defaults
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={formDisabled || !dirty}
+                  onClick={() => void apply()}
+                >
+                  {busy && overlay?.message.startsWith('Saving') ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Check />
+                  )}
+                  Save settings
+                </Button>
               </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {modalReady ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive"
-                disabled={formDisabled || savingTokens}
-                onClick={() => void clearModalTokens()}
-              >
-                Remove tokens
-              </Button>
-            ) : null}
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={
-                formDisabled || savingTokens || !modalReady || !onProbeSandbox
-              }
-              onClick={() => void runProbe()}
-            >
-              {busy && overlay?.message.startsWith('Probing') ? (
-                <Loader2 className="animate-spin" />
-              ) : null}
-              Test connection
-            </Button>
-            <Button
-              size="sm"
-              disabled={
-                formDisabled ||
-                savingTokens ||
-                !tokenDirty ||
-                !onSaveModalIntegration
-              }
-              onClick={() => void saveModalTokens()}
-            >
-              {savingTokens ? <Loader2 className="animate-spin" /> : null}
-              Save tokens
-            </Button>
-          </div>
-
-          {probeOk ? (
-            <p className="text-sm text-emerald-700 dark:text-emerald-400">
-              {probeDetail || 'Probe healthy.'}
-            </p>
-          ) : probeDetail ? (
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              {probeDetail}
-            </p>
-          ) : null}
-        </section>
-
-        <div className="grid gap-8 sm:grid-cols-2">
-          <section className="space-y-3">
-            <div>
-              <h3 className="text-base font-semibold">Modal compute</h3>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Default compute profile for chats that enable Modal Sandbox.
-              </p>
-            </div>
-
-            <div className="inline-flex rounded-lg border p-1">
-              <button
-                type="button"
-                disabled={formDisabled}
-                onClick={() => {
-                  const preset =
-                    CPU_PRESETS.find(item => item.id === cpuPresetId) ??
-                    DEFAULT_CPU_PRESET
-                  setDraft(current => ({
-                    ...current,
-                    computeType: 'cpu',
-                    cpuCores: String(preset.cpu),
-                    ramGb: String(preset.ram)
-                  }))
-                }}
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                  draft.computeType === 'cpu'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                  formDisabled && 'cursor-not-allowed opacity-60'
-                )}
-              >
-                CPU
-              </button>
-              <button
-                type="button"
-                disabled={formDisabled}
-                onClick={() => selectGpuPreset(selectedGpuPreset.gpu)}
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                  draft.computeType === 'gpu'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                  formDisabled && 'cursor-not-allowed opacity-60'
-                )}
-              >
-                GPU
-              </button>
-            </div>
-
-            {draft.computeType === 'cpu' ? (
-              <label className="space-y-1.5 text-sm">
-                <span className="text-muted-foreground text-xs">
-                  CPU preset
-                </span>
-                <select
-                  className={selectClassName}
-                  disabled={formDisabled}
-                  value={cpuPresetId ?? 'custom'}
-                  onChange={event => {
-                    if (event.target.value === 'custom') return
-                    selectCpuPreset(event.target.value)
-                  }}
-                >
-                  {CPU_PRESETS.map(preset => (
-                    <option key={preset.id} value={preset.id}>
-                      {preset.label}
-                    </option>
-                  ))}
-                  {cpuPresetId === null ? (
-                    <option value="custom">
-                      {draft.cpuCores} CPU cores · {draft.ramGb} GB RAM
-                    </option>
-                  ) : null}
-                </select>
-              </label>
-            ) : (
-              <label className="space-y-1.5 text-sm">
-                <span className="text-muted-foreground text-xs">GPU model</span>
-                <select
-                  className={selectClassName}
-                  disabled={formDisabled}
-                  value={selectedGpuPreset.gpu}
-                  onChange={event => selectGpuPreset(event.target.value)}
-                >
-                  {GPU_PRESETS.map(preset => (
-                    <option key={preset.gpu} value={preset.gpu}>
-                      {preset.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            <div className="flex items-center gap-2 border-t pt-3 text-xs">
-              <ModalGlyph />
-              <span className="text-muted-foreground font-medium">Modal</span>
-              <span className="text-muted-foreground ml-auto">
-                {computeSummary}
-              </span>
-            </div>
-
-            <label className="space-y-1.5 text-sm">
-              <span className="text-muted-foreground text-xs">App name</span>
-              <Input
-                value={draft.modalApp}
-                disabled={formDisabled}
-                onChange={event =>
-                  setDraft(current => ({
-                    ...current,
-                    modalApp: event.target.value
-                  }))
-                }
-              />
-            </label>
-
-            <label className="space-y-1.5 text-sm">
-              <span className="text-muted-foreground text-xs">
-                Idle TTL (seconds)
-              </span>
-              <Input
-                type="number"
-                min={60}
-                max={86400}
-                step={60}
-                value={draft.idleTtlSeconds}
-                disabled={formDisabled}
-                onChange={event =>
-                  setDraft(current => ({
-                    ...current,
-                    idleTtlSeconds: event.target.value
-                  }))
-                }
-              />
-              <p className="text-muted-foreground text-[11px]">
-                Terminate after this many idle seconds (60–86400).
-              </p>
-            </label>
-          </section>
-
-          <section className="space-y-3">
-            <div>
-              <h3 className="text-base font-semibold">Sandbox base images</h3>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Base images and pip packages for Modal sessions. Defaults:{' '}
-                <code className="text-xs">python:3.12-slim</code> (CPU),{' '}
-                <code className="text-xs">
-                  pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime
-                </code>{' '}
-                (GPU). <code className="text-xs">debian_slim</code> is also
-                valid as Modal’s built-in image helper.
-              </p>
-            </div>
-
-            <label className="space-y-1.5 text-sm">
-              <span className="text-muted-foreground text-xs">
-                CPU base image
-              </span>
-              <Input
-                value={draft.cpuImage}
-                disabled={formDisabled}
-                placeholder={DEFAULT_CPU_IMAGE}
-                className="font-mono text-xs"
-                onChange={event =>
-                  setDraft(current => ({
-                    ...current,
-                    cpuImage: event.target.value
-                  }))
-                }
-              />
-            </label>
-
-            <label className="space-y-1.5 text-sm">
-              <span className="text-muted-foreground text-xs">
-                GPU base image
-              </span>
-              <Input
-                value={draft.gpuImage}
-                disabled={formDisabled}
-                placeholder={DEFAULT_GPU_IMAGE}
-                className="font-mono text-xs"
-                onChange={event =>
-                  setDraft(current => ({
-                    ...current,
-                    gpuImage: event.target.value
-                  }))
-                }
-              />
-            </label>
-
-            <label className="space-y-1.5 text-sm">
-              <span className="text-muted-foreground text-xs">
-                Default pip installs
-              </span>
-              <Input
-                value={draft.pipPackages}
-                disabled={formDisabled}
-                placeholder={DEFAULT_PIP}
-                className="text-xs"
-                onChange={event =>
-                  setDraft(current => ({
-                    ...current,
-                    pipPackages: event.target.value
-                  }))
-                }
-              />
-              <p className="text-muted-foreground text-[11px]">
-                Comma-separated packages installed for every Modal sandbox.
-              </p>
-            </label>
-          </section>
-        </div>
-
-        {!loading && !unavailable ? (
-          <div className="flex flex-col items-end gap-2 pt-2">
-            <Button
-              size="sm"
-              disabled={formDisabled || !dirty}
-              onClick={() => void apply()}
-            >
-              {busy && overlay?.message.startsWith('Saving') ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <Check />
-              )}
-              Save settings
-            </Button>
-          </div>
+            </section>
+          </>
         ) : null}
       </div>
-    </ScrollArea>
+    </>
   )
+
+  if (bare) return body
+  return <ScrollArea className="flex-1">{body}</ScrollArea>
 }

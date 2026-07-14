@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import type {
   AgentSkill,
   AgentSkillDetail,
+  McpServer,
   RuntimeSettings,
   ServerSystemInfo,
   SessionSandboxStatus,
@@ -14,6 +15,7 @@ import {
   ChevronDown,
   CornerDownLeft,
   Loader,
+  Plug,
   Plus,
   RefreshCw,
   Sparkles,
@@ -25,7 +27,9 @@ import { Link } from 'react-router-dom'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import {
+  chipTokenLength,
   fileChipToken,
+  mcpChipToken,
   parseComposerParts,
   removeComposerChipAt,
   serializeComposerParts,
@@ -45,8 +49,11 @@ import {
 } from '@/components/agents/SpecialistsView'
 import { Button } from '@/components/ui/button'
 import {
+  formatModelEffortBadge,
+  formatReasoningEffortLabel,
   isComposerModelSelected,
-  resolveComposerModelOption
+  resolveComposerModelOption,
+  type ComposerModelOption
 } from '@/lib/composer-models'
 import { Input } from '@/components/ui/input'
 import {
@@ -192,10 +199,42 @@ function sandboxStatusDotClass(
   return 'bg-muted-foreground/50'
 }
 
+type SlashItem =
+  | { kind: 'skill'; key: string; skill: AgentSkill }
+  | { kind: 'mcp'; key: string; server: McpServer }
+
+function mcpSlashKey(server: McpServer): string {
+  return `mcp:${server.id}`
+}
+
+function mcpIconForServer(server: McpServer) {
+  const key = String(server.catalogId || server.name || '')
+    .trim()
+    .toLowerCase()
+  return INTEGRATION_ICONS[key] || null
+}
+
+function mcpMatchesSearch(server: McpServer, query: string): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  const haystack = [
+    server.name,
+    server.description || '',
+    server.catalogId || '',
+    server.id,
+    server.transport,
+    server.url || ''
+  ]
+    .join(' ')
+    .toLowerCase()
+  return haystack.includes(needle)
+}
+
 export function Composer({
   value,
   running,
   skills,
+  mcpServers = [],
   skillChips: _skillChips,
   fileChips: _fileChips = [],
   workspaceFiles = [],
@@ -216,6 +255,7 @@ export function Composer({
   runtimeSettings,
   tokenUsage,
   onModelSelect,
+  onReasoningSettingsChange,
   onSpecialistSelect,
   onCreateSpecialist,
   onAddModels,
@@ -229,17 +269,11 @@ export function Composer({
   value: string
   running: boolean
   skills: AgentSkill[]
+  mcpServers?: McpServer[]
   skillChips: string[]
   fileChips?: string[]
   workspaceFiles?: WorkspaceFile[]
-  modelOptions: Array<{
-    provider: string
-    model: string
-    label: string
-    speed?: string
-    profileId?: string | null
-    source?: string
-  }>
+  modelOptions: ComposerModelOption[]
   specialists?: Specialist[]
   selectedSpecialistId?: string | null
   sandboxStatus?: SessionSandboxStatus | null
@@ -260,6 +294,12 @@ export function Composer({
     model: string,
     profileId?: string | null
   ) => Promise<void>
+  onReasoningSettingsChange?: (changes: {
+    provider: string
+    model: string
+    reasoningEffort?: string
+    reasoningFast?: boolean
+  }) => Promise<void>
   onSpecialistSelect?: (specialistId: string | null) => void | Promise<void>
   onCreateSpecialist?: () => void
   onAddModels?: () => void
@@ -278,9 +318,7 @@ export function Composer({
   const textInputRefs = useRef<Map<number, HTMLInputElement>>(new Map())
   const [caretPos, setCaretPos] = useState(0)
   const [focusedPartIndex, setFocusedPartIndex] = useState(0)
-  const [selectedSkillName, setSelectedSkillName] = useState<string | null>(
-    null
-  )
+  const [selectedSlashKey, setSelectedSlashKey] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewOverview, setPreviewOverview] = useState<string | null>(null)
@@ -289,6 +327,7 @@ export function Composer({
   const [atDismissed, setAtDismissed] = useState(false)
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
+  const [effortMenuOpen, setEffortMenuOpen] = useState(false)
   const [specialistPickerOpen, setSpecialistPickerOpen] = useState(false)
   const [sandboxPickerOpen, setSandboxPickerOpen] = useState(false)
   const [sandboxDraft, setSandboxDraft] = useState<SandboxDraft>(() =>
@@ -299,6 +338,7 @@ export function Composer({
   const [localSystemLoading, setLocalSystemLoading] = useState(false)
   const previewCacheRef = useRef<Map<string, string>>(new Map())
   const skillItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const slashItemRefs = skillItemRefs
   const fileItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const slashListRootRef = useRef<HTMLDivElement | null>(null)
   const atListRootRef = useRef<HTMLDivElement | null>(null)
@@ -386,8 +426,8 @@ export function Composer({
     }
   }
 
-  const scrollSkillIntoView = useCallback((skillName: string) => {
-    const node = skillItemRefs.current.get(skillName)
+  const scrollSlashItemIntoView = useCallback((key: string) => {
+    const node = slashItemRefs.current.get(key)
     const viewport = slashListRootRef.current?.querySelector(
       '[data-radix-scroll-area-viewport]'
     ) as HTMLElement | null
@@ -443,7 +483,7 @@ export function Composer({
   const selectedSpecialist =
     specialists.find(item => item.id === selectedSpecialistId) || null
 
-  const slashResults = useMemo(() => {
+  const slashResults = useMemo((): SlashItem[] => {
     if (!slash) return []
     const query = slash.query.toLowerCase().trim()
     const specialistSkillSet = selectedSpecialist
@@ -453,22 +493,70 @@ export function Composer({
             .filter(Boolean)
         )
       : null
-    const seen = new Set<string>()
-    return skills
-      .filter(skill => skill.enabled)
-      .filter(skill => {
-        if (!specialistSkillSet) return true
-        return specialistSkillSet.has(skill.name.trim().toLowerCase())
+    const specialistMcpIds = selectedSpecialist
+      ? new Set(
+          [
+            ...(selectedSpecialist.mcpServerIds || []),
+            ...(selectedSpecialist.mcpCatalogIds || [])
+          ]
+            .map(id => id.trim())
+            .filter(Boolean)
+        )
+      : null
+
+    const skillItems: SlashItem[] = []
+    const seenSkills = new Set<string>()
+    for (const skill of skills) {
+      if (!skill.enabled) continue
+      if (
+        specialistSkillSet &&
+        !specialistSkillSet.has(skill.name.trim().toLowerCase())
+      ) {
+        continue
+      }
+      const nameKey = skill.name.trim().toLowerCase()
+      if (!nameKey || seenSkills.has(nameKey)) continue
+      if (!skillMatchesSearch(skill, query)) continue
+      seenSkills.add(nameKey)
+      skillItems.push({
+        kind: 'skill',
+        key: `skill:${nameKey}`,
+        skill
       })
-      .filter(skill => {
-        const key = skill.name.trim().toLowerCase()
-        if (!key || seen.has(key)) return false
-        seen.add(key)
-        return skillMatchesSearch(skill, query)
-      })
-      .slice()
-      .sort((a, b) => compareSkillsBySearchRank(a, b, query))
-  }, [selectedSpecialist, skills, slash])
+    }
+    skillItems.sort((a, b) =>
+      a.kind === 'skill' && b.kind === 'skill'
+        ? compareSkillsBySearchRank(a.skill, b.skill, query)
+        : 0
+    )
+
+    const mcpItems: SlashItem[] = []
+    const seenMcps = new Set<string>()
+    for (const server of mcpServers) {
+      if (!server.enabled) continue
+      if (specialistMcpIds && specialistMcpIds.size > 0) {
+        const catalogId = String(server.catalogId || '').trim()
+        if (
+          !specialistMcpIds.has(server.id) &&
+          !(catalogId && specialistMcpIds.has(catalogId))
+        ) {
+          continue
+        }
+      }
+      if (!mcpMatchesSearch(server, query)) continue
+      const key = mcpSlashKey(server)
+      if (seenMcps.has(key)) continue
+      seenMcps.add(key)
+      mcpItems.push({ kind: 'mcp', key, server })
+    }
+    mcpItems.sort((a, b) => {
+      if (a.kind !== 'mcp' || b.kind !== 'mcp') return 0
+      return a.server.name.localeCompare(b.server.name)
+    })
+
+    // Skills first (existing muscle memory), then MCPs.
+    return [...skillItems, ...mcpItems]
+  }, [mcpServers, selectedSpecialist, skills, slash])
 
   const atResults = useMemo(() => {
     if (!atMention) return []
@@ -493,10 +581,14 @@ export function Composer({
     setAtDismissed(false)
   }, [atMention?.start, atMention?.query])
 
-  const selectedSkill =
-    slashResults.find(skill => skill.name === selectedSkillName) ||
+  const selectedSlashItem =
+    slashResults.find(item => item.key === selectedSlashKey) ||
     slashResults[0] ||
     null
+  const selectedSkill =
+    selectedSlashItem?.kind === 'skill' ? selectedSlashItem.skill : null
+  const selectedMcp =
+    selectedSlashItem?.kind === 'mcp' ? selectedSlashItem.server : null
 
   const selectedFile =
     atResults.find(file => file.path === selectedFilePath) ||
@@ -505,17 +597,17 @@ export function Composer({
 
   useEffect(() => {
     if (!slashOpen) {
-      setSelectedSkillName(null)
+      setSelectedSlashKey(null)
       return
     }
     if (
-      selectedSkillName &&
-      slashResults.some(skill => skill.name === selectedSkillName)
+      selectedSlashKey &&
+      slashResults.some(item => item.key === selectedSlashKey)
     ) {
       return
     }
-    setSelectedSkillName(slashResults[0]?.name || null)
-  }, [selectedSkillName, slashOpen, slashResults])
+    setSelectedSlashKey(slashResults[0]?.key || null)
+  }, [selectedSlashKey, slashOpen, slashResults])
 
   useEffect(() => {
     if (!atOpen) {
@@ -533,8 +625,10 @@ export function Composer({
 
   useEffect(() => {
     if (!slashOpen || !selectedSkill) {
-      setPreviewOverview(null)
-      setPreviewLoading(false)
+      if (!selectedMcp) {
+        setPreviewOverview(null)
+        setPreviewLoading(false)
+      }
       return
     }
     const cached = previewCacheRef.current.get(selectedSkill.name)
@@ -568,7 +662,16 @@ export function Composer({
     return () => {
       active = false
     }
-  }, [onLoadSkill, selectedSkill, slashOpen])
+  }, [onLoadSkill, selectedMcp, selectedSkill, slashOpen])
+
+  useEffect(() => {
+    if (!slashOpen || !selectedMcp) return
+    setPreviewLoading(false)
+    setPreviewOverview(
+      String(selectedMcp.description || '').trim() ||
+        `Mention mcp:${selectedMcp.name} so the agent prefers tools from this MCP server.`
+    )
+  }, [selectedMcp, slashOpen])
 
   const selectedModel =
     resolveComposerModelOption(modelOptions, runtimeSettings) ||
@@ -585,6 +688,22 @@ export function Composer({
           label: 'Select model',
           speed: ''
         })
+
+  const supportsReasoningEffort = Boolean(
+    selectedModel.supportsReasoningEffort ||
+      (selectedModel.reasoningEffortOptions &&
+        selectedModel.reasoningEffortOptions.length > 0)
+  )
+  const selectedEffort = String(selectedModel.reasoningEffort || 'medium')
+    .trim()
+    .toLowerCase()
+  const selectedFast = Boolean(selectedModel.reasoningFast)
+  const reasoningBadge = supportsReasoningEffort
+    ? formatModelEffortBadge({
+        reasoningEffort: selectedEffort,
+        reasoningFast: selectedFast
+      })
+    : null
 
   const filteredModelOptions = useMemo(() => {
     const needle = modelSearch.trim().toLowerCase()
@@ -623,10 +742,30 @@ export function Composer({
     )
     onChange(nextValue)
     onSkillChipsChange([])
-    setSelectedSkillName(null)
+    setSelectedSlashKey(null)
     window.requestAnimationFrame(() => {
       focusComposerAt(nextValue, before.length + token.length)
     })
+  }
+
+  const insertMcpChip = (server: McpServer) => {
+    if (!slash) return
+    const before = value.slice(0, slash.start)
+    const after = value.slice(slash.end).replace(/^\s+/u, '')
+    const token = mcpChipToken(server.id, server.name)
+    const nextValue = spaceAroundChips(
+      after ? `${before}${token} ${after}` : `${before}${token}`
+    )
+    onChange(nextValue)
+    setSelectedSlashKey(null)
+    window.requestAnimationFrame(() => {
+      focusComposerAt(nextValue, before.length + token.length)
+    })
+  }
+
+  const insertSlashItem = (item: SlashItem) => {
+    if (item.kind === 'skill') insertSkillChip(item.skill)
+    else insertMcpChip(item.server)
   }
 
   const insertFileChip = (file: WorkspaceFile) => {
@@ -656,7 +795,7 @@ export function Composer({
     )
     onSkillChipsChange([])
     onChange(nextValue)
-    setSelectedSkillName(null)
+    setSelectedSlashKey(null)
     window.requestAnimationFrame(() => {
       focusComposerAt(
         nextValue,
@@ -672,10 +811,7 @@ export function Composer({
       for (let index = 0; index < parts.length; index += 1) {
         const part = parts[index]
         if (part.type !== 'text') {
-          offset +=
-            part.type === 'file'
-              ? fileChipToken(part.path).length
-              : skillChipToken(part.name).length
+          offset += chipTokenLength(part)
           continue
         }
         const tokenStart = offset
@@ -766,10 +902,7 @@ export function Composer({
     for (let index = 0; index < parts.length; index += 1) {
       const part = parts[index]
       if (part.type !== 'text') {
-        absolute +=
-          part.type === 'file'
-            ? fileChipToken(part.path).length
-            : skillChipToken(part.name).length
+        absolute += chipTokenLength(part)
         continue
       }
       if (index === partIndex) {
@@ -795,9 +928,9 @@ export function Composer({
   }, [atOpen, focusActiveComposerInput, slashOpen])
 
   useEffect(() => {
-    if (!slashOpen || !selectedSkill) return
-    scrollSkillIntoView(selectedSkill.name)
-  }, [scrollSkillIntoView, selectedSkill?.name, slashOpen])
+    if (!slashOpen || !selectedSlashItem) return
+    scrollSlashItemIntoView(selectedSlashItem.key)
+  }, [scrollSlashItemIntoView, selectedSlashItem?.key, slashOpen])
 
   useEffect(() => {
     if (!atOpen || !selectedFile) return
@@ -864,7 +997,7 @@ export function Composer({
     if (slashOpen && event.key === 'Escape') {
       event.preventDefault()
       setSlashDismissed(true)
-      setSelectedSkillName(null)
+      setSelectedSlashKey(null)
       return
     }
     if (slashOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
@@ -872,25 +1005,25 @@ export function Composer({
       event.stopPropagation()
       if (slashResults.length === 0) return
       const currentIndex = slashResults.findIndex(
-        skill => skill.name === selectedSkill?.name
+        item => item.key === selectedSlashItem?.key
       )
       const safeIndex = currentIndex < 0 ? 0 : currentIndex
       const nextIndex =
         event.key === 'ArrowDown'
           ? Math.min(safeIndex + 1, slashResults.length - 1)
           : Math.max(safeIndex - 1, 0)
-      const nextName = slashResults[nextIndex]?.name
-      if (!nextName) return
-      setSelectedSkillName(nextName)
+      const nextKey = slashResults[nextIndex]?.key
+      if (!nextKey) return
+      setSelectedSlashKey(nextKey)
       window.requestAnimationFrame(() => {
         focusActiveComposerInput()
-        scrollSkillIntoView(nextName)
+        scrollSlashItemIntoView(nextKey)
       })
       return
     }
     if (slashOpen && event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
-      if (selectedSkill) insertSkillChip(selectedSkill)
+      if (selectedSlashItem) insertSlashItem(selectedSlashItem)
       return
     }
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -986,7 +1119,7 @@ export function Composer({
         <div className="bg-popover border-border/70 absolute bottom-full left-0 right-0 z-40 mb-2 overflow-hidden rounded-lg border shadow-lg">
           {selectedSpecialist ? (
             <div className="border-border/60 text-muted-foreground border-b px-3 py-1.5 text-[11px]">
-              Showing skills for{' '}
+              Showing skills & MCPs for{' '}
               <span className="text-foreground font-medium">
                 {selectedSpecialist.name}
               </span>
@@ -995,26 +1128,88 @@ export function Composer({
           <div className="grid h-72 grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div ref={slashListRootRef} className="min-h-0 min-w-0">
               <ScrollArea className="border-border/60 h-72 border-r">
-                <div className="p-1" role="listbox" aria-label="Skills">
+                <div className="p-1" role="listbox" aria-label="Skills and MCPs">
                   {slashResults.length > 0 ? (
-                    slashResults.map(skill => {
+                    slashResults.map(item => {
+                      const isSelected = selectedSlashItem?.key === item.key
+                      if (item.kind === 'mcp') {
+                        const { server } = item
+                        const description =
+                          String(server.description || '').trim() ||
+                          server.transport
+                        const icon = mcpIconForServer(server)
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            tabIndex={-1}
+                            role="option"
+                            aria-selected={isSelected}
+                            ref={node => {
+                              if (node) slashItemRefs.current.set(item.key, node)
+                              else slashItemRefs.current.delete(item.key)
+                            }}
+                            onMouseDown={event => event.preventDefault()}
+                            onMouseEnter={() => setSelectedSlashKey(item.key)}
+                            onClick={() => {
+                              insertMcpChip(server)
+                              window.requestAnimationFrame(() => {
+                                focusActiveComposerInput()
+                              })
+                            }}
+                            className={cn(
+                              'hover:bg-muted flex w-full flex-col rounded-md px-2 py-1.5 text-left',
+                              isSelected && 'bg-muted'
+                            )}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              {icon ? (
+                                <img
+                                  src={icon.src}
+                                  alt=""
+                                  className={cn(
+                                    'size-[18px] shrink-0 rounded object-contain',
+                                    icon.invertInDark && 'dark:invert'
+                                  )}
+                                />
+                              ) : (
+                                <span className="bg-muted text-muted-foreground inline-flex size-[18px] shrink-0 items-center justify-center rounded">
+                                  <Plug className="size-3" />
+                                </span>
+                              )}
+                              <span className="truncate text-sm font-medium">
+                                MCP: {server.name}
+                              </span>
+                            </span>
+                            <span className="text-muted-foreground truncate text-xs">
+                              {description}
+                            </span>
+                            <span className="text-muted-foreground/70 truncate text-[10px]">
+                              {[server.transport, server.catalogId || 'custom']
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </span>
+                          </button>
+                        )
+                      }
+
+                      const { skill } = item
                       const description =
                         cleanSkillDescription(skill.description) || skill.name
                       const iconSource = composerSkillIcon(skill)
-                      const isSelected = selectedSkill?.name === skill.name
                       return (
                         <button
-                          key={skill.name}
+                          key={item.key}
                           type="button"
                           tabIndex={-1}
                           role="option"
                           aria-selected={isSelected}
                           ref={node => {
-                            if (node) skillItemRefs.current.set(skill.name, node)
-                            else skillItemRefs.current.delete(skill.name)
+                            if (node) slashItemRefs.current.set(item.key, node)
+                            else slashItemRefs.current.delete(item.key)
                           }}
                           onMouseDown={event => event.preventDefault()}
-                          onMouseEnter={() => setSelectedSkillName(skill.name)}
+                          onMouseEnter={() => setSelectedSlashKey(item.key)}
                           onClick={() => {
                             insertSkillChip(skill)
                             window.requestAnimationFrame(() => {
@@ -1042,7 +1237,7 @@ export function Composer({
                               </span>
                             )}
                             <span className="truncate text-sm font-medium">
-                              /{skill.name}
+                              Skill: {skill.name}
                             </span>
                           </span>
                           <span className="text-muted-foreground truncate text-xs">
@@ -1061,8 +1256,8 @@ export function Composer({
                   ) : (
                     <div className="text-muted-foreground px-2 py-1.5 text-xs">
                       {selectedSpecialist
-                        ? `No matching skills for ${selectedSpecialist.name}`
-                        : 'No skills found'}
+                        ? `No matching skills or MCPs for ${selectedSpecialist.name}`
+                        : 'No skills or MCPs found'}
                     </div>
                   )}
                 </div>
@@ -1070,11 +1265,66 @@ export function Composer({
             </div>
             <ScrollArea className="h-72">
               <div className="px-1 py-1">
-                {selectedSkill ? (
+                {selectedMcp ? (
                   <div className="space-y-3 px-2 py-1">
                     <div className="flex items-start justify-between gap-2">
                       <span className="truncate text-sm font-semibold">
-                        /{selectedSkill.name}
+                        MCP: {selectedMcp.name}
+                      </span>
+                      <a
+                        href={
+                          selectedMcp.catalogId
+                            ? `/dashboard/mcp/catalog/${encodeURIComponent(
+                                selectedMcp.catalogId
+                              )}`
+                            : `/dashboard/mcp/server/${encodeURIComponent(
+                                selectedMcp.id
+                              )}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary shrink-0 text-[11px] font-medium hover:underline"
+                        onMouseDown={event => event.preventDefault()}
+                      >
+                        Read more
+                      </a>
+                    </div>
+                    <p className="text-muted-foreground line-clamp-5 text-[11px] leading-relaxed">
+                      {previewOverview ||
+                        `Mention mcp:${selectedMcp.name} so the agent prefers tools from this MCP server.`}
+                    </p>
+                    <div className="border-border/60 border-t pt-2">
+                      <p className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">
+                        Insert
+                      </p>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onMouseDown={event => event.preventDefault()}
+                        onClick={() => insertMcpChip(selectedMcp)}
+                        className="hover:bg-muted/50 border-border/60 bg-background w-full rounded-md border px-2 py-1.5 text-left"
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="block truncate text-[11px] font-medium">
+                            Mention this MCP
+                          </span>
+                          <span className="border-primary/30 text-primary inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
+                            Insert
+                            <CornerDownLeft className="h-3 w-3" />
+                          </span>
+                        </span>
+                        <span className="text-muted-foreground mt-0.5 line-clamp-2 block text-[10px]">
+                          Adds mcp:{selectedMcp.name} so the agent can prioritize
+                          its tools.
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                ) : selectedSkill ? (
+                  <div className="space-y-3 px-2 py-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="truncate text-sm font-semibold">
+                        Skill: {selectedSkill.name}
                       </span>
                       <a
                         href={`/dashboard/skills/${encodeURIComponent(
@@ -1130,7 +1380,7 @@ export function Composer({
                   </div>
                 ) : (
                   <div className="text-muted-foreground p-3 text-xs">
-                    Select a skill to preview its workflow.
+                    Select a skill or MCP to preview.
                   </div>
                 )}
               </div>
@@ -1217,7 +1467,7 @@ export function Composer({
                       )
                     }
                   >
-                    /{part.name}
+                    Skill: {part.name}
                   </button>
                   <button
                     type="button"
@@ -1226,7 +1476,39 @@ export function Composer({
                       onChange(removeComposerChipAt(value, chipIndex))
                       onSkillChipsChange([])
                     }}
-                    aria-label={`Remove /${part.name}`}
+                    aria-label={`Remove skill ${part.name}`}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              )
+            }
+            if (part.type === 'mcp') {
+              chipRenderIndex += 1
+              const chipIndex = chipRenderIndex
+              const href = `/dashboard/mcp/server/${encodeURIComponent(part.id)}`
+              return (
+                <span
+                  key={`mcp-${partIndex}-${part.id}`}
+                  className="border-border/70 bg-muted/40 inline-flex max-w-full select-none items-center gap-1 rounded-full border px-2 py-0.5 align-middle text-xs"
+                >
+                  <Plug className="text-muted-foreground size-3.5 shrink-0" />
+                  <button
+                    type="button"
+                    className="text-foreground max-w-[200px] truncate hover:underline"
+                    onClick={() =>
+                      window.open(href, '_blank', 'noopener,noreferrer')
+                    }
+                  >
+                    MCP: {part.name}
+                  </button>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-4 items-center justify-center rounded-full"
+                    onClick={() => {
+                      onChange(removeComposerChipAt(value, chipIndex))
+                    }}
+                    aria-label={`Remove MCP ${part.name}`}
                   >
                     <X className="size-3" />
                   </button>
@@ -1250,9 +1532,7 @@ export function Composer({
               for (let index = 0; index < partIndex; index += 1) {
                 const item = composerParts[index]
                 if (item.type === 'text') absolute += item.text.length
-                else if (item.type === 'file') {
-                  absolute += fileChipToken(item.path).length
-                } else absolute += skillChipToken(item.name).length
+                else absolute += chipTokenLength(item)
               }
               setCaretPos(absolute + localCaret)
             }
@@ -1263,7 +1543,7 @@ export function Composer({
               isLastText &&
               !part.text &&
               (!hasInlineChips
-                ? 'Ask Agent, @ for context, / for skills'
+                ? 'Ask Agent, @ for context, / for skills & MCPs'
                 : 'Add a follow-up…')
 
             // Always render the same wrapper/input structure so React
@@ -1344,19 +1624,26 @@ export function Composer({
               open={modelPickerOpen}
               onOpenChange={open => {
                 setModelPickerOpen(open)
-                if (!open) setModelSearch('')
+                if (!open) {
+                  setModelSearch('')
+                  setEffortMenuOpen(false)
+                }
               }}
             >
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  title={`${selectedModel.label}${selectedModel.speed ? ` · ${selectedModel.speed}` : ''}`}
-                  className="text-muted-foreground hover:text-foreground inline-flex min-w-0 max-w-[min(100%,16rem)] items-center gap-1 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
+                  title={`${selectedModel.label}${selectedModel.speed ? ` · ${selectedModel.speed}` : ''}${reasoningBadge ? ` · ${reasoningBadge}` : ''}`}
+                  className="text-muted-foreground hover:text-foreground inline-flex min-w-0 max-w-[min(100%,20rem)] items-center gap-1 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
                 >
                   <span className="min-w-0 truncate font-medium">
                     {selectedModel.label}
                   </span>
-                  {selectedModel.speed ? (
+                  {reasoningBadge ? (
+                    <span className="text-muted-foreground shrink-0 text-[11px]">
+                      {reasoningBadge}
+                    </span>
+                  ) : selectedModel.speed ? (
                     <span className="text-muted-foreground shrink-0 text-[11px]">
                       {selectedModel.speed}
                     </span>
@@ -1367,81 +1654,271 @@ export function Composer({
               <PopoverContent
                 align="start"
                 side="top"
-                className="w-[min(28rem,calc(100vw-2rem))] overflow-hidden p-0"
+                className="w-[min(28rem,calc(100vw-2rem))] overflow-visible p-0"
+                onCloseAutoFocus={event => event.preventDefault()}
+                onInteractOutside={event => {
+                  // Nested Edit panel is portaled; don't dismiss the model list.
+                  if (effortMenuOpen) event.preventDefault()
+                }}
+                onFocusOutside={event => {
+                  if (effortMenuOpen) event.preventDefault()
+                }}
+                onPointerDownOutside={event => {
+                  if (effortMenuOpen) event.preventDefault()
+                }}
               >
-                <div className="bg-popover border-b px-3 py-2">
-                  <Input
-                    value={modelSearch}
-                    onChange={event => setModelSearch(event.target.value)}
-                    placeholder="Search models"
-                    className="h-7 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
-                    autoFocus
-                  />
-                </div>
-                <ScrollArea className="h-72 w-full">
-                  <div className="w-full py-1">
-                    {modelOptions.length === 0 ? (
-                      <div className="text-muted-foreground px-3 py-3 text-sm">
-                        No enabled models. Turn models on in Dashboard → Models.
-                      </div>
-                    ) : filteredModelOptions.length === 0 ? (
-                      <div className="text-muted-foreground px-3 py-3 text-sm">
-                        No models match “{modelSearch.trim()}”.
-                      </div>
-                    ) : (
-                      filteredModelOptions.map(option => {
-                        const isSelected = isComposerModelSelected(
-                          option,
-                          runtimeSettings,
-                          modelOptions
-                        )
-                        return (
-                          <button
-                            key={`${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`}
-                            type="button"
-                            title={`${option.label}${option.speed ? ` · ${option.speed}` : ''}`}
-                            className={cn(
-                              'hover:bg-muted grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5 text-left text-sm',
-                              isSelected && 'bg-muted'
-                            )}
-                            onClick={() => {
-                              void onModelSelect(
-                                option.provider,
-                                option.model,
-                                option.profileId
-                              )
-                              setModelPickerOpen(false)
-                              setModelSearch('')
-                            }}
-                          >
-                            <span className="truncate">{option.label}</span>
-                            {option.speed ? (
-                              <span className="text-muted-foreground text-xs whitespace-nowrap">
-                                {option.speed}
+                <div className="bg-popover overflow-hidden rounded-md border-0">
+                  <div className="bg-popover border-b px-3 py-2">
+                    <Input
+                      value={modelSearch}
+                      onChange={event => setModelSearch(event.target.value)}
+                      placeholder="Search models"
+                      className="h-7 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+                      autoFocus
+                    />
+                  </div>
+                  <ScrollArea className="h-72 w-full">
+                    <div className="w-full py-1">
+                      {modelOptions.length === 0 ? (
+                        <div className="text-muted-foreground px-3 py-3 text-sm">
+                          No enabled models. Turn models on in Dashboard →
+                          Models.
+                        </div>
+                      ) : filteredModelOptions.length === 0 ? (
+                        <div className="text-muted-foreground px-3 py-3 text-sm">
+                          No models match “{modelSearch.trim()}”.
+                        </div>
+                      ) : (
+                        filteredModelOptions.map(option => {
+                          const isSelected = isComposerModelSelected(
+                            option,
+                            runtimeSettings,
+                            modelOptions
+                          )
+                          const optionSupportsEffort = Boolean(
+                            option.supportsReasoningEffort ||
+                              (option.reasoningEffortOptions &&
+                                option.reasoningEffortOptions.length > 0)
+                          )
+                          const optionEffortOptions =
+                            option.reasoningEffortOptions &&
+                            option.reasoningEffortOptions.length > 0
+                              ? option.reasoningEffortOptions
+                              : ['low', 'medium', 'high']
+                          const optionEffort = String(
+                            option.reasoningEffort || 'medium'
+                          )
+                            .trim()
+                            .toLowerCase()
+                          const optionFast = Boolean(option.reasoningFast)
+                          const optionEffortLabel = formatModelEffortBadge({
+                            reasoningEffort: optionEffort,
+                            reasoningFast: optionFast
+                          })
+                          const selectModel = () => {
+                            void onModelSelect(
+                              option.provider,
+                              option.model,
+                              option.profileId
+                            )
+                            setModelSearch('')
+                            if (!optionSupportsEffort) {
+                              setEffortMenuOpen(false)
+                            }
+                          }
+                          return (
+                            <div
+                              key={`${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`}
+                              className={cn(
+                                'hover:bg-muted group relative flex w-full items-center gap-2 px-3 py-1.5 text-sm',
+                                isSelected && 'bg-muted'
+                              )}
+                            >
+                              <button
+                                type="button"
+                                title={`${option.label}${
+                                  optionSupportsEffort
+                                    ? ` ${optionEffortLabel}`
+                                    : option.speed
+                                      ? ` · ${option.speed}`
+                                      : ''
+                                }`}
+                                className="absolute inset-0 z-0"
+                                aria-label={`Select ${option.label}`}
+                                onClick={selectModel}
+                              />
+                              <span className="pointer-events-none flex min-w-0 flex-1 items-baseline gap-1.5 truncate text-left">
+                                <span className="text-foreground truncate">
+                                  {option.label}
+                                </span>
+                                {optionSupportsEffort ? (
+                                  <span className="text-muted-foreground shrink-0 text-[11px]">
+                                    {optionEffortLabel}
+                                  </span>
+                                ) : null}
                               </span>
-                            ) : null}
-                          </button>
-                        )
-                      })
-                    )}
-                  </div>
-                </ScrollArea>
-                {onAddModels ? (
-                  <div className="border-t p-1">
-                    <button
-                      type="button"
-                      className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
-                      onClick={() => {
-                        setModelPickerOpen(false)
-                        setModelSearch('')
-                        onAddModels()
-                      }}
-                    >
-                      <Plus className="size-3.5 shrink-0" />
-                      Add Models
-                    </button>
-                  </div>
-                ) : null}
+                              <div className="relative z-10 flex shrink-0 items-center gap-2">
+                                {optionSupportsEffort &&
+                                onReasoningSettingsChange ? (
+                                  isSelected ? (
+                                    <Popover
+                                      modal={false}
+                                      open={effortMenuOpen}
+                                      onOpenChange={setEffortMenuOpen}
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className="text-muted-foreground hover:text-foreground text-xs font-medium opacity-100"
+                                          onClick={event => {
+                                            event.stopPropagation()
+                                          }}
+                                        >
+                                          Edit
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent
+                                        side="right"
+                                        align="start"
+                                        sideOffset={10}
+                                        className="w-44 overflow-hidden p-0"
+                                        onOpenAutoFocus={event =>
+                                          event.preventDefault()
+                                        }
+                                        onCloseAutoFocus={event =>
+                                          event.preventDefault()
+                                        }
+                                      >
+                                        <div className="text-muted-foreground border-b px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
+                                          Effort
+                                        </div>
+                                        <div className="py-1">
+                                          {optionEffortOptions.map(level => {
+                                            const active = optionEffort === level
+                                            return (
+                                              <button
+                                                key={level}
+                                                type="button"
+                                                className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm"
+                                                onClick={event => {
+                                                  event.preventDefault()
+                                                  event.stopPropagation()
+                                                  void onReasoningSettingsChange(
+                                                    {
+                                                      provider: option.provider,
+                                                      model: option.model,
+                                                      reasoningEffort: level
+                                                    }
+                                                  )
+                                                }}
+                                              >
+                                                <span className="truncate">
+                                                  {formatReasoningEffortLabel(
+                                                    level
+                                                  )}
+                                                </span>
+                                                {active ? (
+                                                  <Check className="text-foreground ml-auto size-4 shrink-0" />
+                                                ) : null}
+                                              </button>
+                                            )
+                                          })}
+                                        </div>
+                                        <div className="text-muted-foreground border-t px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
+                                          Options
+                                        </div>
+                                        <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                                          <span className="text-sm font-medium">
+                                            Fast
+                                          </span>
+                                          <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={optionFast}
+                                            aria-label="Fast mode"
+                                            className={cn(
+                                              'relative h-5 w-9 shrink-0 rounded-full transition-colors',
+                                              optionFast
+                                                ? 'bg-primary'
+                                                : 'bg-muted-foreground/30'
+                                            )}
+                                            onClick={event => {
+                                              event.preventDefault()
+                                              event.stopPropagation()
+                                              void onReasoningSettingsChange({
+                                                provider: option.provider,
+                                                model: option.model,
+                                                reasoningFast: !optionFast
+                                              })
+                                            }}
+                                          >
+                                            <span
+                                              className={cn(
+                                                'bg-background pointer-events-none absolute top-0.5 left-0.5 size-4 rounded-full border border-black/5 shadow-sm transition-transform',
+                                                optionFast && 'translate-x-4'
+                                              )}
+                                            />
+                                          </button>
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="text-muted-foreground hover:text-foreground text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100"
+                                      onClick={event => {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                        void (async () => {
+                                          await onModelSelect(
+                                            option.provider,
+                                            option.model,
+                                            option.profileId
+                                          )
+                                          setModelSearch('')
+                                          setEffortMenuOpen(true)
+                                        })()
+                                      }}
+                                    >
+                                      Edit
+                                    </button>
+                                  )
+                                ) : null}
+                                {option.speed &&
+                                !isSelected &&
+                                !optionSupportsEffort ? (
+                                  <span className="text-muted-foreground pointer-events-none text-xs whitespace-nowrap">
+                                    {option.speed}
+                                  </span>
+                                ) : null}
+                                {isSelected ? (
+                                  <Check className="text-foreground pointer-events-none size-4 shrink-0" />
+                                ) : null}
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </ScrollArea>
+                  {onAddModels ? (
+                    <div className="border-t p-1">
+                      <button
+                        type="button"
+                        className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+                        onClick={() => {
+                          setModelPickerOpen(false)
+                          setModelSearch('')
+                          setEffortMenuOpen(false)
+                          onAddModels()
+                        }}
+                      >
+                        <Plus className="size-3.5 shrink-0" />
+                        Add Models
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </PopoverContent>
             </Popover>
             {onSpecialistSelect ? (
