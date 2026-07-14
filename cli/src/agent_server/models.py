@@ -561,11 +561,11 @@ class SandboxSettings(ApiModel):
     modal_app: str = "sandwalk"
     cpu_image: str = "debian_slim"
     gpu_image: str = "debian_slim"
-    pip_packages: str = "pandas,numpy,matplotlib,scipy,pillow"
+    pip_packages: str = "pandas,numpy,scipy,scikit-learn,matplotlib,seaborn"
     compute_type: str = "cpu"
     gpu_class: str = "T4"
-    cpu_cores: float = 1.0
-    ram_gb: float = 4.0
+    cpu_cores: float = 2.0
+    ram_gb: float = 8.0
     idle_ttl_seconds: int = 600
     modal_configured: bool = False
 
@@ -833,11 +833,19 @@ class ConnectMcpCatalogResponse(ApiModel):
     tools: list[str] = Field(default_factory=list)
 
 
+class McpToolDetail(ApiModel):
+    name: str
+    title: str | None = None
+    description: str | None = None
+    input_schema: dict[str, Any] | None = None
+
+
 class ValidateMcpResponse(ApiModel):
     ok: bool
     tool_count: int = 0
     message: str
     tools: list[str] = Field(default_factory=list)
+    tool_details: list[McpToolDetail] = Field(default_factory=list)
 
 
 class CreateMcpServerRequest(ApiModel):

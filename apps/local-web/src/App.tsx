@@ -178,6 +178,7 @@ import {
   visibleSessionIds
 } from '@/lib/sessions'
 import {
+  catalogSkillDetailPath,
   cloudAccountDisplayName,
   parseCatalogSkillId,
   type SkillsViewMode
@@ -230,6 +231,16 @@ const IntegrationsView = lazy(() =>
 )
 const McpView = lazy(() =>
   import('@/components/agents/McpView').then(m => ({ default: m.McpView }))
+)
+const McpDetailView = lazy(() =>
+  import('@/components/agents/McpDetailView').then(m => ({
+    default: m.McpDetailView
+  }))
+)
+const SandboxListView = lazy(() =>
+  import('@/components/agents/SandboxListView').then(m => ({
+    default: m.SandboxListView
+  }))
 )
 const ModelsView = lazy(() =>
   import('@/components/agents/ModelsView').then(m => ({ default: m.ModelsView }))
@@ -420,6 +431,18 @@ export default function App() {
     '/dashboard/integrations/:integrationKey',
     location.pathname
   )
+  const mcpCatalogDetailRoute = matchPath(
+    '/dashboard/mcp/catalog/:catalogId',
+    location.pathname
+  )
+  const mcpServerDetailRoute = matchPath(
+    '/dashboard/mcp/server/:serverId',
+    location.pathname
+  )
+  const sandboxDetailRoute = matchPath(
+    '/dashboard/agent/sandbox/:kind',
+    location.pathname
+  )
   const legacyIntegrationRoute = matchPath(
     '/agents/integrations/:integrationKey',
     location.pathname
@@ -562,6 +585,26 @@ export default function App() {
   const isDashboardStorage = dashboardSection === 'storage'
   const isDashboardEnvironment = dashboardSection === 'environment'
   const isDashboardMcp = dashboardSection === 'mcp'
+  const mcpCatalogDetailId = mcpCatalogDetailRoute?.params.catalogId
+    ? decodeURIComponent(mcpCatalogDetailRoute.params.catalogId)
+    : null
+  const mcpServerDetailId = mcpServerDetailRoute?.params.serverId
+    ? decodeURIComponent(mcpServerDetailRoute.params.serverId)
+    : null
+  const mcpDetailCatalogEntry = mcpCatalogDetailId
+    ? mcpCatalog.find(entry => entry.id === mcpCatalogDetailId) || null
+    : null
+  const mcpDetailServer = mcpServerDetailId
+    ? mcpServers.find(server => server.id === mcpServerDetailId) || null
+    : null
+  const isMcpDetail = Boolean(mcpCatalogDetailId || mcpServerDetailId)
+  const sandboxKindRaw = sandboxDetailRoute?.params.kind
+  const sandboxKind =
+    sandboxKindRaw === 'local' || sandboxKindRaw === 'modal'
+      ? sandboxKindRaw
+      : null
+  const isSandboxLocalDetail = sandboxKind === 'local'
+  const isSandboxModalDetail = sandboxKind === 'modal'
   const isDashboardSpecialists = dashboardSection === 'specialists'
   const isDashboardOverview = isDashboard && dashboardSection === 'overview'
   const isHome =
@@ -576,7 +619,6 @@ export default function App() {
       isDashboardStatus ||
       isDashboardGeneral ||
       isDashboardAgentRuntime ||
-      isDashboardAgentSandbox ||
       isDashboardStorage ||
       isDashboardEnvironment
     ) {
@@ -588,6 +630,9 @@ export default function App() {
       return specialistsViewMode === 'list' ? 'list' : 'detail'
     }
     if (isDashboardMcp || isIntegrations) return 'cards'
+    if (isDashboardAgentSandbox) {
+      return sandboxKind ? 'settings' : 'cards'
+    }
     if (isSkills) {
       return skillsViewMode === 'list' ? 'cards' : 'detail'
     }
@@ -1182,6 +1227,18 @@ export default function App() {
       document.title = `Integrations · ${base}`
       return
     }
+    if (isDashboardAgentSandbox) {
+      if (isSandboxLocalDetail) {
+        document.title = `Local Sandbox · ${base}`
+        return
+      }
+      if (isSandboxModalDetail) {
+        document.title = `Modal Sandbox · ${base}`
+        return
+      }
+      document.title = `Sandbox · ${base}`
+      return
+    }
     if (isDashboardMcp) {
       document.title = `MCP · ${base}`
       return
@@ -1197,6 +1254,9 @@ export default function App() {
     isDashboardDoctor,
     isDashboardStorage,
     isDashboardEnvironment,
+    isDashboardAgentSandbox,
+    isSandboxLocalDetail,
+    isSandboxModalDetail,
     isDashboardMcp,
     isDashboardOverview,
     isDashboardStatus,
@@ -1866,13 +1926,12 @@ export default function App() {
       try {
         const id = projectId ?? activeProjectId ?? null
         const scopeKey = projectTabsKey(id)
-        const preferModal =
-          sandboxSettings?.backend === 'modal' &&
-          sandboxSettings.modalConfigured
+        // New chats always start on Built-in. Modal starts only when the user
+        // turns on the per-session Modal toggle in the composer.
         const created = await client.createSession({
           title: 'Untitled session',
           projectId: id || undefined,
-          sandboxBackend: preferModal ? 'modal' : undefined
+          sandboxBackend: 'builtin'
         })
         if (id) {
           setProjectScopeId(id)
@@ -1901,41 +1960,6 @@ export default function App() {
         await loadSessions()
         if (id) await loadProjects()
         navigate(`/agents/${created.id}`)
-        if (preferModal) {
-          // Match Modal cloud UX: auto-start in the background.
-          sandboxActionSessionRef.current = created.id
-          setSessionSandboxPhase('starting')
-          void client
-            .startSessionSandbox(created.id)
-            .then(status => {
-              if (sessionIdRef.current === created.id) {
-                setSessionSandboxStatus(status)
-              }
-            })
-            .catch(async cause => {
-              setError(
-                cause instanceof Error
-                  ? cause.message
-                  : 'Unable to start sandbox'
-              )
-              try {
-                const status = await client.getSessionSandbox(created.id)
-                if (sessionIdRef.current === created.id) {
-                  setSessionSandboxStatus(status)
-                }
-              } catch {
-                // ignore refresh failure
-              }
-            })
-            .finally(() => {
-              if (sandboxActionSessionRef.current === created.id) {
-                sandboxActionSessionRef.current = null
-              }
-              if (sessionIdRef.current === created.id) {
-                setSessionSandboxPhase('idle')
-              }
-            })
-        }
       } catch (cause) {
         setError(
           cause instanceof Error ? cause.message : 'Unable to create agent'
@@ -1951,9 +1975,7 @@ export default function App() {
       loadSessions,
       navigate,
       patchChat,
-      patchOpenTabs,
-      sandboxSettings?.backend,
-      sandboxSettings?.modalConfigured
+      patchOpenTabs
     ]
   )
 
@@ -2185,6 +2207,12 @@ export default function App() {
     backend: 'builtin' | 'modal'
   ) => {
     if (!session) return
+    if (
+      backend === 'modal' &&
+      sessionSandboxStatus?.modalConfigured !== true
+    ) {
+      return
+    }
     const targetId = session.id
     try {
       if (backend === 'builtin' && sessionSandboxStatus?.status === 'running') {
@@ -2324,6 +2352,38 @@ export default function App() {
       if (sessionIdRef.current === targetId) {
         setSessionSandboxPhase('idle')
       }
+    }
+  }
+
+  const updateSessionSandboxCompute = async (changes: {
+    computeType: 'cpu' | 'gpu'
+    gpuClass: string
+    cpuCores: number
+    ramGb: number
+  }) => {
+    try {
+      const next = await client.updateSandboxSettings(changes)
+      setSandboxSettings(next)
+      setSessionSandboxStatus(current =>
+        current
+          ? {
+              ...current,
+              computeType: next.computeType,
+              gpuClass: next.gpuClass,
+              cpuCores: next.cpuCores,
+              ramGb: next.ramGb,
+              cpuImage:
+                next.computeType === 'gpu' ? next.gpuImage : next.cpuImage
+            }
+          : current
+      )
+      if (sessionId) await refreshSessionSandbox(sessionId)
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Unable to update sandbox compute'
+      )
     }
   }
 
@@ -3462,7 +3522,7 @@ export default function App() {
                   navigate(`/dashboard/skills/${encodeURIComponent(name)}`)
                 }
                 onOpenCatalogDetail={skill =>
-                  navigate(`/dashboard/skills/catalog/${skill.id}`)
+                  navigate(catalogSkillDetailPath(skill))
                 }
                 onBack={() => navigate('/dashboard/skills')}
                 onOpenImportGithub={() =>
@@ -3544,6 +3604,11 @@ export default function App() {
                   await client.updateMcpServer(id, { enabled })
                   await loadMcpServers()
                 }}
+                onOpenCatalog={entry =>
+                  navigate(
+                    `/dashboard/mcp/catalog/${encodeURIComponent(entry.id)}`
+                  )
+                }
               />
               <IntegrationsView
                 featuredOnly
@@ -3625,36 +3690,58 @@ export default function App() {
               }}
             />
           ) : isDashboardAgentSandbox ? (
-            <AgentSandboxView
-              connected={Boolean(health)}
-              sandboxSettings={sandboxSettings}
-              modalIntegration={
-                integrations.find(item => item.key === 'modal') || null
-              }
-              onLoadSandboxSettings={async () => {
-                const next = await client.getSandboxSettings()
-                setSandboxSettings(next)
-                return next
-              }}
-              onUpdateSandboxSettings={async changes => {
-                const next = await client.updateSandboxSettings(changes)
-                setSandboxSettings(next)
-                return next
-              }}
-              onProbeSandbox={() => client.probeSandboxSettings()}
-              onSaveModalIntegration={async values => {
-                const next = await client.updateIntegration('modal', values)
-                await loadIntegrations()
-                return next
-              }}
-              onRemoveModalIntegration={async () => {
-                await client.removeIntegration('modal')
-                await loadIntegrations()
-              }}
-              onRefreshIntegrations={async () => {
-                await loadIntegrations()
-              }}
-            />
+            isSandboxLocalDetail ? (
+              <EnvironmentView
+                title="Local Sandbox"
+                description="Python environment the agent uses for Local Sandbox chats. Manage packages used by skills and tools. Core dependencies stay locked."
+                onBack={() => navigate('/dashboard/agent/sandbox')}
+                onLoad={loadEnvironment}
+                onInstall={(name, options) =>
+                  client.installEnvironmentPackage(name, options)
+                }
+                onUninstall={(name, signal) =>
+                  client.uninstallEnvironmentPackage(name, signal)
+                }
+              />
+            ) : isSandboxModalDetail ? (
+              <AgentSandboxView
+                connected={Boolean(health)}
+                sandboxSettings={sandboxSettings}
+                modalIntegration={
+                  integrations.find(item => item.key === 'modal') || null
+                }
+                onBack={() => navigate('/dashboard/agent/sandbox')}
+                onLoadSandboxSettings={async () => {
+                  const next = await client.getSandboxSettings()
+                  setSandboxSettings(next)
+                  return next
+                }}
+                onUpdateSandboxSettings={async changes => {
+                  const next = await client.updateSandboxSettings(changes)
+                  setSandboxSettings(next)
+                  return next
+                }}
+                onProbeSandbox={() => client.probeSandboxSettings()}
+                onSaveModalIntegration={async values => {
+                  const next = await client.updateIntegration('modal', values)
+                  await loadIntegrations()
+                  return next
+                }}
+                onRemoveModalIntegration={async () => {
+                  await client.removeIntegration('modal')
+                  await loadIntegrations()
+                }}
+                onRefreshIntegrations={async () => {
+                  await loadIntegrations()
+                }}
+              />
+            ) : (
+              <SandboxListView
+                onOpen={id =>
+                  navigate(`/dashboard/agent/sandbox/${id}`)
+                }
+              />
+            )
           ) : isDashboardModels ? (
             <ModelsView
               integrations={integrations}
@@ -3761,7 +3848,7 @@ export default function App() {
                 navigate(`/dashboard/skills/${encodeURIComponent(name)}`)
               }
               onOpenCatalogDetail={skill =>
-                navigate(`/dashboard/skills/catalog/${skill.id}`)
+                navigate(catalogSkillDetailPath(skill))
               }
               onBack={() => navigate('/dashboard/skills')}
               onOpenImportGithub={() => navigate('/dashboard/skills/import/github')}
@@ -3886,34 +3973,86 @@ export default function App() {
               }}
             />
           ) : isDashboardMcp ? (
-            <McpView
-              mcpServers={mcpServers}
-              catalog={mcpCatalog}
-              catalogLoading={mcpCatalogLoading}
-              onRefresh={refreshMcp}
-              onConnectCatalog={async (catalogId, input) => {
-                const result = await client.connectMcpCatalog(catalogId, input)
-                await refreshMcp()
-                await loadIntegrations()
-                return result
-              }}
-              onToggleCatalog={async (entry, enabled) => {
-                await client.setMcpCatalogEnabled(entry.id, enabled)
-                await refreshMcp()
-              }}
-              onCreateMcp={async input => {
-                await client.createMcpServer(input)
-                await loadMcpServers()
-              }}
-              onDeleteMcp={async id => {
-                await client.deleteMcpServer(id)
-                await loadMcpServers()
-              }}
-              onToggleCustom={async (id, enabled) => {
-                await client.updateMcpServer(id, { enabled })
-                await loadMcpServers()
-              }}
-            />
+            isMcpDetail ? (
+              <McpDetailView
+                kind={mcpCatalogDetailId ? 'catalog' : 'server'}
+                catalogEntry={mcpDetailCatalogEntry}
+                server={mcpDetailServer}
+                onBack={() => navigate('/dashboard/mcp')}
+                onLoadTools={async () => {
+                  if (mcpCatalogDetailId) {
+                    return client.validateMcpCatalog(mcpCatalogDetailId)
+                  }
+                  if (mcpServerDetailId) {
+                    return client.validateMcpServer(mcpServerDetailId)
+                  }
+                  return {
+                    ok: false,
+                    toolCount: 0,
+                    message: 'MCP not found',
+                    tools: [],
+                    toolDetails: []
+                  }
+                }}
+                onToggleEnabled={
+                  mcpCatalogDetailId && mcpDetailCatalogEntry
+                    ? async enabled => {
+                        await client.setMcpCatalogEnabled(
+                          mcpCatalogDetailId,
+                          enabled
+                        )
+                        await refreshMcp()
+                      }
+                    : mcpServerDetailId
+                      ? async enabled => {
+                          await client.updateMcpServer(mcpServerDetailId, {
+                            enabled
+                          })
+                          await loadMcpServers()
+                        }
+                      : undefined
+                }
+              />
+            ) : (
+              <McpView
+                mcpServers={mcpServers}
+                catalog={mcpCatalog}
+                catalogLoading={mcpCatalogLoading}
+                onRefresh={refreshMcp}
+                onConnectCatalog={async (catalogId, input) => {
+                  const result = await client.connectMcpCatalog(catalogId, input)
+                  await refreshMcp()
+                  await loadIntegrations()
+                  return result
+                }}
+                onToggleCatalog={async (entry, enabled) => {
+                  await client.setMcpCatalogEnabled(entry.id, enabled)
+                  await refreshMcp()
+                }}
+                onCreateMcp={async input => {
+                  await client.createMcpServer(input)
+                  await loadMcpServers()
+                }}
+                onDeleteMcp={async id => {
+                  await client.deleteMcpServer(id)
+                  await loadMcpServers()
+                }}
+                onToggleCustom={async (id, enabled) => {
+                  await client.updateMcpServer(id, { enabled })
+                  await loadMcpServers()
+                }}
+                onOpenCatalog={entry =>
+                  navigate(
+                    `/dashboard/mcp/catalog/${encodeURIComponent(entry.id)}`
+                  )
+                }
+                onOpenServer={server =>
+                  navigate(
+                    `/dashboard/mcp/server/${encodeURIComponent(server.id)}`
+                  )
+                }
+              />
+            )
           ) : isDashboardSpecialists ? (
             <SpecialistsView
               mode={specialistsViewMode}
@@ -4273,9 +4412,16 @@ export default function App() {
                             navigate('/dashboard/specialists/new')
                           }
                           onSandboxBackendSelect={selectSessionSandboxBackend}
+                          onSandboxComputeChange={changes =>
+                            void updateSessionSandboxCompute(changes)
+                          }
                           onSandboxStart={() => void startSessionSandbox()}
                           onSandboxStop={() => void stopSessionSandbox()}
                           onSandboxRestart={() => void restartSessionSandbox()}
+                          onLoadLocalSystem={async () => {
+                            const report = await client.getServerStatus()
+                            return report.system
+                          }}
                           onModelSelect={async (provider, model, profileId) => {
                             if (profileId) {
                               try {
@@ -4732,9 +4878,16 @@ export default function App() {
                             navigate('/dashboard/specialists/new')
                           }
                           onSandboxBackendSelect={selectSessionSandboxBackend}
+                          onSandboxComputeChange={changes =>
+                            void updateSessionSandboxCompute(changes)
+                          }
                           onSandboxStart={() => void startSessionSandbox()}
                           onSandboxStop={() => void stopSessionSandbox()}
                           onSandboxRestart={() => void restartSessionSandbox()}
+                          onLoadLocalSystem={async () => {
+                            const report = await client.getServerStatus()
+                            return report.system
+                          }}
                           onModelSelect={async (provider, model, profileId) => {
                             if (profileId) {
                               try {

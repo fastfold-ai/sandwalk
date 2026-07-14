@@ -24,7 +24,8 @@ class _Cfg:
 def test_effective_session_sandbox_backend_override():
     assert effective_session_sandbox_backend("modal", config=_Cfg("builtin")) == "modal"
     assert effective_session_sandbox_backend("builtin", config=_Cfg("modal")) == "builtin"
-    assert effective_session_sandbox_backend(None, config=_Cfg("modal")) == "modal"
+    # Unset session backend always defaults to Built-in (never inherits global Modal).
+    assert effective_session_sandbox_backend(None, config=_Cfg("modal")) == "builtin"
     assert effective_session_sandbox_backend(None, config=_Cfg("builtin")) == "builtin"
 
 
@@ -48,14 +49,14 @@ def test_store_persists_session_sandbox_backend(tmp_path: Path):
     assert cleared.sandbox_backend is None
 
 
-def test_session_sandbox_status_builtin(tmp_path: Path, monkeypatch):
+def test_session_sandbox_status_ignores_global_modal(tmp_path: Path, monkeypatch):
     store = AgentStore(tmp_path / "agent.db")
     session = store.create_session(title="t", workspace_path=str(tmp_path / "ws"))
     (tmp_path / "ws").mkdir(parents=True, exist_ok=True)
 
     class _Settings:
-        backend = "builtin"
-        modal_configured = False
+        backend = "modal"
+        modal_configured = True
         compute_type = "cpu"
         gpu_class = "T4"
         cpu_cores = 2.0
@@ -67,5 +68,7 @@ def test_session_sandbox_status_builtin(tmp_path: Path, monkeypatch):
         staticmethod(lambda: _Settings()),
     )
     status = SessionSandboxService(store).status(session.id)
+    assert status.session_backend is None
+    assert status.global_backend == "modal"
     assert status.backend == "builtin"
     assert status.status == "ready"

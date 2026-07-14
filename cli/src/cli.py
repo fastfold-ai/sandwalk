@@ -3694,7 +3694,7 @@ def doctor_cmd(
 
 
 sandbox_app = typer.Typer(
-    help="Sandbox backend (Built-in / Modal) and Modal probes",
+    help="Sandbox backend (Local Sandbox / Modal Sandbox) and Modal probes",
     invoke_without_command=True,
 )
 app.add_typer(sandbox_app, name="sandbox")
@@ -3712,7 +3712,7 @@ def sandbox_root(ctx: typer.Context):
 
 @sandbox_app.command("status")
 def sandbox_status_cmd():
-    """Show the active sandbox backend (Built-in or Modal)."""
+    """Show the active sandbox backend (Local Sandbox or Modal Sandbox)."""
     from agent.sandbox_manage import handle_sandbox_argv
 
     handle_sandbox_argv(["status"], console)
@@ -3720,7 +3720,7 @@ def sandbox_status_cmd():
 
 @sandbox_app.command("builtin")
 def sandbox_builtin_cmd():
-    """Use the local Built-in sandbox (default)."""
+    """Use Local Sandbox (default)."""
     from agent.sandbox_manage import handle_sandbox_argv
 
     handle_sandbox_argv(["builtin"], console)
@@ -3728,7 +3728,7 @@ def sandbox_builtin_cmd():
 
 @sandbox_app.command("modal")
 def sandbox_modal_cmd():
-    """Use the Modal sandbox (requires Modal tokens)."""
+    """Use Modal Sandbox (requires Modal tokens)."""
     from agent.sandbox_manage import handle_sandbox_argv
 
     handle_sandbox_argv(["modal"], console)
@@ -3736,7 +3736,7 @@ def sandbox_modal_cmd():
 
 @sandbox_app.command("toggle")
 def sandbox_toggle_cmd():
-    """Flip between Built-in and Modal."""
+    """Flip between Local Sandbox and Modal Sandbox."""
     from agent.sandbox_manage import handle_sandbox_argv
 
     handle_sandbox_argv(["toggle"], console)

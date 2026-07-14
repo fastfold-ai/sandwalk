@@ -314,11 +314,44 @@ export function skillsShSkillUrl(source: string, skill: string): string | null {
   const normalizedSource = String(source || '')
     .trim()
     .replace(/^\/+|\/+$/g, '')
+  // Keep underscores — skills.sh canonical paths use the skill folder name
+  // (e.g. md_openmm_calvados), not a hyphenated slug.
   const normalizedSkill = String(skill || '')
     .trim()
     .replace(/^\/+|\/+$/g, '')
   if (!normalizedSource || !normalizedSkill) return null
   return `https://skills.sh/${normalizedSource}/${normalizedSkill}`
+}
+
+/** Prefer skills.sh / install name (underscores) over hyphenated API slugs. */
+export function catalogSkillPreferredName(skill: {
+  name?: string | null
+  slug?: string | null
+  id?: string | null
+}): string {
+  const name = String(skill.name || '').trim()
+  if (name) return name
+  const slug = String(skill.slug || '').trim()
+  if (slug) return slug
+  const id = String(skill.id || '').trim()
+  return id.split('/').filter(Boolean).pop() || ''
+}
+
+export function catalogSkillDetailPath(skill: {
+  id?: string | null
+  source?: string | null
+  name?: string | null
+  slug?: string | null
+}): string {
+  const source = String(skill.source || '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
+  const name = catalogSkillPreferredName(skill)
+  if (source && name) return `/dashboard/skills/catalog/${source}/${name}`
+  const id = String(skill.id || '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
+  return id ? `/dashboard/skills/catalog/${id}` : '/dashboard/skills'
 }
 
 export function skillAuthorUrl(rawSource: string | null | undefined): string | null {

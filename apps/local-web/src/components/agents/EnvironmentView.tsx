@@ -4,7 +4,15 @@ import type {
   EnvironmentPackageMutationResult,
   EnvironmentReport,
 } from '@sandwalk/agent-ui-core'
-import { ChevronDown, Lock, Package, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronDown,
+  Lock,
+  Package,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -66,6 +74,10 @@ export function EnvironmentView({
   onLoad,
   onInstall,
   onUninstall,
+  title = 'Environment',
+  description = 'Manage optional Python packages used by skills and tools. Core FastFold dependencies stay locked. Installs apply immediately — you usually do not need to restart the agent server.',
+  onBack,
+  backLabel = 'Sandbox',
 }: {
   onLoad: (signal?: AbortSignal) => Promise<EnvironmentReport>
   onInstall: (
@@ -76,6 +88,10 @@ export function EnvironmentView({
     name: string,
     signal?: AbortSignal,
   ) => Promise<EnvironmentPackageMutationResult>
+  title?: string
+  description?: string
+  onBack?: () => void
+  backLabel?: string
 }) {
   const [report, setReport] = useState<EnvironmentReport | null>(null)
   const [loading, setLoading] = useState(true)
@@ -181,14 +197,30 @@ export function EnvironmentView({
   return (
     <ScrollArea className="flex-1">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 py-10">
+        {onBack ? (
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              type="button"
+              onClick={onBack}
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+            <span className="text-muted-foreground/40">/</span>
+            <button
+              type="button"
+              onClick={onBack}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {backLabel}
+            </button>
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-semibold">Environment</h2>
-            <p className="text-muted-foreground mt-2 text-sm">
-              Manage optional Python packages used by skills and tools. Core
-              FastFold dependencies stay locked. Installs apply immediately —
-              you usually do not need to restart the agent server.
-            </p>
+            <h2 className="text-2xl font-semibold">{title}</h2>
+            <p className="text-muted-foreground mt-2 text-sm">{description}</p>
           </div>
           <Button
             type="button"

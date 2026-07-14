@@ -186,7 +186,7 @@ def _ensure_modal_tokens(config: Any) -> None:
         )
 
 
-def _build_modal_image(config: Any):
+def _build_modal_image(config: Any, *, compute_type: str = "cpu"):
     from agent.sandbox_deps import require_modal_deps
 
     require_modal_deps()
@@ -194,7 +194,15 @@ def _build_modal_image(config: Any):
 
     packages = parse_pip_packages(config.get("sandbox.pip_packages"))
     python_version = "3.11"
-    image = modal.Image.debian_slim(python_version=python_version)
+    image_key = (
+        "sandbox.gpu_image" if str(compute_type).strip().lower() == "gpu" else "sandbox.cpu_image"
+    )
+    ref = str(config.get(image_key) or "debian_slim").strip() or "debian_slim"
+    # debian_slim is Modal's helper (Image.debian_slim), not a Docker Hub tag.
+    if ref in {"debian_slim", "debian-slim"}:
+        image = modal.Image.debian_slim(python_version=python_version)
+    else:
+        image = modal.Image.from_registry(ref)
     if packages:
         image = image.pip_install(*packages)
     return image
@@ -222,7 +230,7 @@ def _create_or_reuse_modal_sandbox_impl(config: Any, *, session_id: str | None):
     ram_gb = float(config.get("sandbox.ram_gb") or 4.0)
     memory_mb = max(512, int(ram_gb * 1024))
     compute_type = str(config.get("sandbox.compute_type") or "cpu").strip().lower()
-    image = _build_modal_image(config)
+    image = _build_modal_image(config, compute_type=compute_type)
 
     app = modal.App.lookup(app_name, create_if_missing=True)
     modal_sandbox = None

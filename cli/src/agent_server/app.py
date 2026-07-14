@@ -135,6 +135,7 @@ from agent_server.models import (
     UpsertModelProfileRequest,
     ValidateIntegrationResponse,
     ValidateMcpResponse,
+    McpToolDetail,
     WorkspaceFileContent,
     WorkspaceFileList,
     WorkspaceMutationResponse,
@@ -656,11 +657,24 @@ def create_app(
     async def validate_mcp_catalog(catalog_id: str) -> ValidateMcpResponse:
         try:
             result = await asyncio.to_thread(mcp_service.validate, catalog_id, None)
+            details = []
+            for item in result.get("toolDetails") or []:
+                if not isinstance(item, dict):
+                    continue
+                details.append(
+                    McpToolDetail(
+                        name=str(item.get("name") or ""),
+                        title=item.get("title"),
+                        description=item.get("description"),
+                        input_schema=item.get("inputSchema"),
+                    )
+                )
             return ValidateMcpResponse(
                 ok=bool(result.get("ok")),
                 tool_count=int(result.get("toolCount") or 0),
                 message=str(result.get("message") or ""),
                 tools=list(result.get("tools") or []),
+                tool_details=details,
             )
         except KeyError:
             raise HTTPException(status_code=404, detail="Unknown MCP catalog entry") from None
@@ -769,11 +783,24 @@ def create_app(
     async def validate_mcp_server(server_id: str) -> ValidateMcpResponse:
         try:
             result = await asyncio.to_thread(mcp_service.validate, None, server_id)
+            details = []
+            for item in result.get("toolDetails") or []:
+                if not isinstance(item, dict):
+                    continue
+                details.append(
+                    McpToolDetail(
+                        name=str(item.get("name") or ""),
+                        title=item.get("title"),
+                        description=item.get("description"),
+                        input_schema=item.get("inputSchema"),
+                    )
+                )
             return ValidateMcpResponse(
                 ok=bool(result.get("ok")),
                 tool_count=int(result.get("toolCount") or 0),
                 message=str(result.get("message") or ""),
                 tools=list(result.get("tools") or []),
+                tool_details=details,
             )
         except KeyError:
             raise HTTPException(status_code=404, detail="MCP server not found") from None

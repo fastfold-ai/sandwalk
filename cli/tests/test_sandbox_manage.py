@@ -37,8 +37,8 @@ def test_get_and_set_builtin(tmp_path, monkeypatch):
     cfg = MagicMock()
     cfg.get.return_value = "builtin"
     assert get_sandbox_backend(cfg) == "builtin"
-    assert sandbox_toolbar_label("builtin") == "Built-in"
-    assert sandbox_toolbar_label("modal") == "Modal"
+    assert sandbox_toolbar_label("builtin") == "Local Sandbox"
+    assert sandbox_toolbar_label("modal") == "Modal Sandbox"
 
     saved = {}
 
@@ -96,5 +96,5 @@ def test_handle_sandbox_argv_status(capsys):
     cfg.get.return_value = "builtin"
     handle_sandbox_argv(["status"], console, config=cfg)
     out = capsys.readouterr().out
-    assert "Built-in" in out
+    assert "Local Sandbox" in out
     assert "builtin" in out

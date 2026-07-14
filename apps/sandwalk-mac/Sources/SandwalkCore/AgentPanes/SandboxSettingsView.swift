@@ -55,17 +55,17 @@ struct SandboxSettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 SettingsSectionHeader(
                     "BACKEND",
-                    subtitle: "Built-in uses the local workspace. Modal isolates execute/fs tools remotely; domain tools stay on this Mac."
+                    subtitle: "Local Sandbox uses the workspace on this Mac. Modal Sandbox isolates execute/fs tools remotely; domain tools stay on this Mac."
                 )
                 SettingsListGroup {
-                    SettingsRow(label: "Backend", sublabel: "Local FilesystemBackend vs ModalSandbox") {
+                    SettingsRow(label: "Backend", sublabel: "Local Sandbox vs Modal Sandbox") {
                         Picker("", selection: backendBinding) {
-                            Text("Built-in").tag("builtin")
-                            Text("Modal").tag("modal")
+                            Text("Local Sandbox").tag("builtin")
+                            Text("Modal Sandbox").tag("modal")
                         }
                         .labelsHidden()
                         .pickerStyle(.segmented)
-                        .frame(width: 180)
+                        .frame(width: 240)
                     }
                     SettingsRow(
                         label: "Modal tokens",

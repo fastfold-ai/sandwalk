@@ -14,10 +14,12 @@ CLI_SANDBOX_CONFIG_KEY = "agent.cli_sandbox"
 _ALIASES = {
     "off": "builtin",
     "local": "builtin",
+    "local sandbox": "builtin",
     "built-in": "builtin",
     "builtin": "builtin",
     "on": "modal",
     "modal": "modal",
+    "modal sandbox": "modal",
     "remote": "modal",
 }
 
@@ -31,7 +33,7 @@ def normalize_sandbox_backend(raw: Any) -> str:
 
 
 def get_sandbox_backend(config: Config | None = None) -> str:
-    """Return the CLI sandbox backend. Default is Built-in unless Modal is set."""
+    """Return the CLI sandbox backend. Default is Local Sandbox unless Modal is set."""
     cfg = config or Config.load()
     raw = cfg.get(CLI_SANDBOX_CONFIG_KEY, "")
     if raw is None or str(raw).strip() == "":
@@ -44,7 +46,7 @@ def get_sandbox_backend(config: Config | None = None) -> str:
 
 def sandbox_toolbar_label(backend: str | None = None, config: Config | None = None) -> str:
     kind = backend or get_sandbox_backend(config)
-    return "Modal" if kind == "modal" else "Built-in"
+    return "Modal Sandbox" if kind == "modal" else "Local Sandbox"
 
 
 def set_sandbox_backend(backend: str, config: Config | None = None) -> str:
@@ -83,11 +85,11 @@ def handle_sandbox_argv(argv: list[str], console: Console, config: Config | None
     rest = parts[1:] if len(parts) > 1 else []
 
     if action in {"help", "-h", "--help"}:
-        console.print("  [bold]/sandbox[/bold] — choose Built-in or Modal sandbox")
+        console.print("  [bold]/sandbox[/bold] — choose Local Sandbox or Modal Sandbox")
         console.print("    /sandbox              Show current backend")
-        console.print("    /sandbox builtin|off  Use local Built-in sandbox (default)")
-        console.print("    /sandbox modal|on     Use Modal sandbox")
-        console.print("    /sandbox toggle       Flip Built-in ↔ Modal")
+        console.print("    /sandbox builtin|off  Use Local Sandbox (default)")
+        console.print("    /sandbox modal|on     Use Modal Sandbox")
+        console.print("    /sandbox toggle       Flip Local ↔ Modal")
         return
 
     if action in {"status", "show", "get"}:
@@ -95,7 +97,7 @@ def handle_sandbox_argv(argv: list[str], console: Console, config: Config | None
         label = sandbox_toolbar_label(kind)
         console.print(f"  Sandbox: [bold]{label}[/bold] ([cyan]{kind}[/cyan])")
         if kind == "builtin":
-            console.print("  [dim]Default for CLI. Only Modal is shown in the status bar.[/dim]")
+            console.print("  [dim]Default for CLI.[/dim]")
         if kind == "modal":
             from agent.sandbox_probe import modal_tokens_present
 

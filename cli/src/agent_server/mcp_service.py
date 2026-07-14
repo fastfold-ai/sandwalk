@@ -321,6 +321,14 @@ def probe_mcp_server(
                 exc.read().decode(),
             )
 
+    empty = {
+        "ok": False,
+        "toolCount": 0,
+        "message": "",
+        "tools": [],
+        "toolDetails": [],
+    }
+
     init_body = {
         "jsonrpc": "2.0",
         "id": 1,
@@ -334,10 +342,8 @@ def probe_mcp_server(
     status, resp_headers, raw = request(init_body)
     if status >= 400:
         return {
-            "ok": False,
-            "toolCount": 0,
+            **empty,
             "message": f"initialize failed HTTP {status}: {raw[:300]}",
-            "tools": [],
         }
     session = resp_headers.get("mcp-session-id")
     request({"jsonrpc": "2.0", "method": "notifications/initialized"}, session)
@@ -348,26 +354,51 @@ def probe_mcp_server(
     msgs = parse_sse_or_json(raw2)
     if status2 >= 400 or not msgs:
         return {
-            "ok": False,
-            "toolCount": 0,
+            **empty,
             "message": f"tools/list failed HTTP {status2}: {raw2[:300]}",
-            "tools": [],
         }
     msg = msgs[0]
     if "error" in msg:
         err = msg["error"]
         detail = err.get("message") if isinstance(err, dict) else str(err)
-        return {"ok": False, "toolCount": 0, "message": str(detail), "tools": []}
+        return {**empty, "message": str(detail)}
     tools = (msg.get("result") or {}).get("tools") or []
-    names = [str(t.get("name") or "") for t in tools if isinstance(t, dict)]
+    details: list[dict[str, Any]] = []
+    names: list[str] = []
+    for tool in tools:
+        if not isinstance(tool, dict):
+            continue
+        name = str(tool.get("name") or "").strip()
+        if not name:
+            continue
+        names.append(name)
+        schema = tool.get("inputSchema")
+        if schema is None:
+            schema = tool.get("input_schema")
+        title = str(tool.get("title") or "").strip() or None
+        if not title:
+            annotations = tool.get("annotations")
+            if isinstance(annotations, dict):
+                title = str(annotations.get("title") or "").strip() or None
+        details.append(
+            {
+                "name": name,
+                "title": title,
+                "description": str(tool.get("description") or "").strip() or None,
+                "inputSchema": schema if isinstance(schema, dict) else None,
+            }
+        )
+    init_msgs = parse_sse_or_json(raw)
+    server_info = None
+    if init_msgs:
+        server_info = (init_msgs[0].get("result") or {}).get("serverInfo")
     return {
         "ok": True,
-        "toolCount": len(tools),
-        "message": f"Connected — {len(tools)} tools available",
-        "tools": names[:50],
-        "serverInfo": (parse_sse_or_json(raw)[0].get("result") or {}).get("serverInfo")
-        if parse_sse_or_json(raw)
-        else None,
+        "toolCount": len(details),
+        "message": f"Connected — {len(details)} tools available",
+        "tools": names,
+        "toolDetails": details,
+        "serverInfo": server_info,
     }
 
 
@@ -753,6 +784,7 @@ class McpService:
                     "toolCount": 0,
                     "message": "Not configured — Connect with OAuth or API key first",
                     "tools": [],
+                    "toolDetails": [],
                 }
             return probe_mcp_server(url=entry.url, headers=headers)
 
@@ -776,6 +808,7 @@ class McpService:
                     "toolCount": 0,
                     "message": "stdio MCP probe not supported in doctor yet",
                     "tools": [],
+                    "toolDetails": [],
                 }
             return probe_mcp_server(url=server.url, headers=headers)
 

@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Copy,
   GitBranch,
+  Loader2,
   MoreHorizontal,
   Plus,
   Search,
@@ -213,6 +214,7 @@ export function SkillsView({
     useState<AgentCatalogSkillDetail | null>(null)
   const [localCatalogAudit, setLocalCatalogAudit] =
     useState<AgentCatalogSkillAudit | null>(null)
+  const [localCatalogLoading, setLocalCatalogLoading] = useState(false)
   useEffect(() => {
     if (mode !== 'catalog_detail' || !catalogSkillRoute) {
       setCatalogDetail(null)
@@ -226,6 +228,8 @@ export function SkillsView({
     setCatalogDetailLoading(true)
     setCatalogDetailError(null)
     setCatalogInstallError(null)
+    setCatalogDetail(null)
+    setCatalogAudit(null)
     void onGetCatalogDetail(
       catalogSkillRoute.source,
       catalogSkillRoute.skill,
@@ -266,23 +270,36 @@ export function SkillsView({
     if (mode !== 'detail' || !detail || !catalogSearchEnabled) {
       setLocalCatalogDetail(null)
       setLocalCatalogAudit(null)
+      setLocalCatalogLoading(false)
       return
     }
     const coords = catalogCoordsFromInstalledSkill(detail)
     if (!coords) {
       setLocalCatalogDetail(null)
       setLocalCatalogAudit(null)
+      setLocalCatalogLoading(false)
       return
     }
     const controller = new AbortController()
-    void onGetCatalogDetail(coords.source, coords.skill, controller.signal)
+    setLocalCatalogLoading(true)
+    setLocalCatalogDetail(null)
+    setLocalCatalogAudit(null)
+    const detailPromise = onGetCatalogDetail(
+      coords.source,
+      coords.skill,
+      controller.signal
+    )
       .then(result => {
         if (!controller.signal.aborted) setLocalCatalogDetail(result)
       })
       .catch(() => {
         if (!controller.signal.aborted) setLocalCatalogDetail(null)
       })
-    void onGetCatalogAudit(coords.source, coords.skill, controller.signal)
+    const auditPromise = onGetCatalogAudit(
+      coords.source,
+      coords.skill,
+      controller.signal
+    )
       .then(result => {
         if (!controller.signal.aborted) setLocalCatalogAudit(result)
       })
@@ -296,6 +313,9 @@ export function SkillsView({
           })
         }
       })
+    void Promise.allSettled([detailPromise, auditPromise]).then(() => {
+      if (!controller.signal.aborted) setLocalCatalogLoading(false)
+    })
     return () => controller.abort()
   }, [
     catalogSearchEnabled,
@@ -624,6 +644,29 @@ export function SkillsView({
       </aside>
     )
   }
+
+  const renderSkillsShMetricsLoading = () => (
+    <aside className="space-y-4 lg:sticky lg:top-4">
+      <div className="rounded-lg border border-border/60 p-4">
+        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+          <Loader2 className="size-4 shrink-0 animate-spin" />
+          <span>Fetching skills.sh details…</span>
+        </div>
+        <div className="mt-4 space-y-3">
+          <div className="bg-muted/60 h-3 w-16 animate-pulse rounded" />
+          <div className="bg-muted/50 h-8 w-12 animate-pulse rounded" />
+          <div className="bg-muted/60 mt-4 h-3 w-20 animate-pulse rounded" />
+          <div className="bg-muted/50 h-4 w-full animate-pulse rounded" />
+          <div className="bg-muted/60 mt-4 h-3 w-24 animate-pulse rounded" />
+          <div className="space-y-2">
+            <div className="bg-muted/50 h-4 w-full animate-pulse rounded" />
+            <div className="bg-muted/50 h-4 w-full animate-pulse rounded" />
+            <div className="bg-muted/50 h-4 w-5/6 animate-pulse rounded" />
+          </div>
+        </div>
+      </div>
+    </aside>
+  )
 
   const setSkillEnabled = async (name: string, enabled: boolean) => {
     setPendingEnabled(current => ({ ...current, [name]: true }))
@@ -1070,8 +1113,15 @@ export function SkillsView({
     const catalogInstalls = Number(catalogDetail?.installs || 0)
     const catalogAudits = catalogAudit?.audits || []
     const catalogSkillsShUrl =
-      catalogSource && catalogSlug
-        ? skillsShSkillUrl(catalogSource, catalogSlug)
+      catalogSource
+        ? skillsShSkillUrl(
+            catalogSource,
+            // Prefer the requested skill id (keeps underscores). API `slug`
+            // may hyphenate names (md-openmm-calvados vs md_openmm_calvados).
+            String(
+              catalogSkillRoute?.skill || catalogDetail?.slug || catalogSlug || ''
+            )
+          )
         : null
     const handleCatalogInstall = async () => {
       if (!catalogInstallTarget) return
@@ -1110,7 +1160,13 @@ export function SkillsView({
             ) : null}
           </div>
           {catalogDetailLoading ? (
-            <DetailPageSkeleton bare />
+            <div className="space-y-4">
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                <Loader2 className="size-4 animate-spin" />
+                Fetching skills.sh details…
+              </div>
+              <DetailPageSkeleton bare />
+            </div>
           ) : catalogDetailError ? (
             <p className="text-destructive text-sm">{catalogDetailError}</p>
           ) : (
@@ -1231,14 +1287,14 @@ export function SkillsView({
     ).trim()
     const localCatalogInstalls = Number(localCatalogDetail?.installs || 0)
     const localCatalogAudits = localCatalogAudit?.audits || []
-    const showLocalCatalogMetrics =
-      catalogSearchEnabled && localCatalogDetail != null
+    const localCatalogCoords = catalogCoordsFromInstalledSkill(detail)
+    const showLocalCatalogColumn =
+      catalogSearchEnabled &&
+      Boolean(localCatalogCoords) &&
+      (localCatalogLoading || localCatalogDetail != null)
     const localSkillsShUrl =
-      showLocalCatalogMetrics && localCatalogSource
-        ? skillsShSkillUrl(
-            localCatalogSource,
-            String(localCatalogDetail?.slug || detail.name)
-          )
+      !localCatalogLoading && localCatalogSource
+        ? skillsShSkillUrl(localCatalogSource, detail.name)
         : null
 
     return (
@@ -1276,7 +1332,12 @@ export function SkillsView({
                   <Trash2 className="mr-1 size-3.5" />
                   Remove
                 </Button>
-              {localSkillsShUrl ? (
+              {localCatalogLoading ? (
+                <span className="text-muted-foreground inline-flex items-center gap-1.5 rounded-md border border-border/60 px-3 py-1.5 text-xs">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Fetching skills.sh…
+                </span>
+              ) : localSkillsShUrl ? (
                 <a
                   href={localSkillsShUrl}
                   target="_blank"
@@ -1313,7 +1374,7 @@ export function SkillsView({
           <div
             className={cn(
               'grid items-start gap-4',
-              showLocalCatalogMetrics
+              showLocalCatalogColumn
                 ? 'lg:grid-cols-[240px_minmax(0,1fr)_220px]'
                 : 'lg:grid-cols-[240px_minmax(0,1fr)]'
             )}
@@ -1427,13 +1488,15 @@ export function SkillsView({
               />
             </section>
 
-            {showLocalCatalogMetrics
-              ? renderSkillsShMetrics(
-                  localCatalogSource,
-                  localCatalogInstalls,
-                  localCatalogAudits
-                )
-              : null}
+            {localCatalogLoading
+              ? renderSkillsShMetricsLoading()
+              : localCatalogDetail != null
+                ? renderSkillsShMetrics(
+                    localCatalogSource,
+                    localCatalogInstalls,
+                    localCatalogAudits
+                  )
+                : null}
           </div>
         </div>
       </ScrollArea>

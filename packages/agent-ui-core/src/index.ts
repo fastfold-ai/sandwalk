@@ -668,6 +668,13 @@ export type McpCatalogEntry = {
   statusMessage?: string | null
 }
 
+export type McpToolDetail = {
+  name: string
+  title?: string | null
+  description: string | null
+  inputSchema: Record<string, unknown> | null
+}
+
 export type ConnectMcpResult = {
   ok: boolean
   authorizeUrl?: string | null
@@ -686,6 +693,7 @@ export type ValidateMcpResult = {
   toolCount: number
   message: string
   tools: string[]
+  toolDetails?: McpToolDetail[]
 }
 
 export type PtySessionInfo = {

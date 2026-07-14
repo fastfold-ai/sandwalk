@@ -32,6 +32,7 @@ import type {
   McpCatalogEntry,
   ConnectMcpResult,
   ValidateMcpResult,
+  McpToolDetail,
   ModelProfile,
   ModelProfileProbeResult,
   ServerCacheInfo,
@@ -104,6 +105,46 @@ export class LocalAgentClient
     const text = await response.text()
     if (!text) return undefined as T
     return JSON.parse(text) as T
+  }
+
+  private normalizeValidateMcp(raw: Record<string, unknown>): ValidateMcpResult {
+    const toolsRaw = raw.tools
+    const tools = Array.isArray(toolsRaw)
+      ? toolsRaw.map(item => String(item))
+      : []
+    const detailsRaw = raw.toolDetails ?? raw.tool_details
+    const toolDetails: McpToolDetail[] = []
+    if (Array.isArray(detailsRaw)) {
+      for (const item of detailsRaw) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+        const row = item as Record<string, unknown>
+        const name = String(row.name || '').trim()
+        if (!name) continue
+        const schema = row.inputSchema ?? row.input_schema
+        toolDetails.push({
+          name,
+          title:
+            typeof row.title === 'string' && row.title.trim()
+              ? row.title.trim()
+              : null,
+          description:
+            typeof row.description === 'string' && row.description.trim()
+              ? row.description.trim()
+              : null,
+          inputSchema:
+            schema && typeof schema === 'object' && !Array.isArray(schema)
+              ? (schema as Record<string, unknown>)
+              : null,
+        })
+      }
+    }
+    return {
+      ok: Boolean(raw.ok),
+      toolCount: Number(raw.toolCount ?? raw.tool_count ?? tools.length) || 0,
+      message: String(raw.message || ''),
+      tools,
+      toolDetails,
+    }
   }
 
   authStatus(signal?: AbortSignal): Promise<{
@@ -1288,30 +1329,32 @@ export class LocalAgentClient
     )
   }
 
-  validateMcpCatalog(
+  async validateMcpCatalog(
     catalogId: string,
     signal?: AbortSignal,
   ): Promise<ValidateMcpResult> {
-    return this.request<ValidateMcpResult>(
+    const raw = await this.request<Record<string, unknown>>(
       `/mcp-servers/catalog/${encodeURIComponent(catalogId)}/validate`,
       {
         method: 'POST',
         signal,
       },
     )
+    return this.normalizeValidateMcp(raw || {})
   }
 
-  validateMcpServer(
+  async validateMcpServer(
     serverId: string,
     signal?: AbortSignal,
   ): Promise<ValidateMcpResult> {
-    return this.request<ValidateMcpResult>(
+    const raw = await this.request<Record<string, unknown>>(
       `/mcp-servers/${encodeURIComponent(serverId)}/validate`,
       {
         method: 'POST',
         signal,
       },
     )
+    return this.normalizeValidateMcp(raw || {})
   }
 
   createMcpServer(

@@ -180,10 +180,29 @@ function authMeta(entry: McpCatalogEntry) {
   )
 }
 
-function statusBadge(entry: McpCatalogEntry) {
+function statusBadge(
+  entry: McpCatalogEntry,
+  onOpen?: (entry: McpCatalogEntry) => void,
+) {
   if (entry.connected) {
     const count =
       typeof entry.toolCount === 'number' ? ` (${entry.toolCount})` : ''
+    if (onOpen) {
+      return (
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-2 hover:underline"
+          onClick={event => {
+            event.preventDefault()
+            event.stopPropagation()
+            onOpen(entry)
+          }}
+        >
+          <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
+          Connected{count}
+        </button>
+      )
+    }
     return (
       <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
         <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
@@ -243,6 +262,8 @@ export function McpView({
   onCreateMcp,
   onDeleteMcp,
   onToggleCustom,
+  onOpenCatalog,
+  onOpenServer,
 }: {
   mcpServers: McpServer[]
   catalog: McpCatalogEntry[]
@@ -261,6 +282,8 @@ export function McpView({
   ) => Promise<void>
   onDeleteMcp: (id: string) => Promise<void>
   onToggleCustom: (id: string, enabled: boolean) => Promise<void>
+  onOpenCatalog?: (entry: McpCatalogEntry) => void
+  onOpenServer?: (server: McpServer) => void
 }) {
   const location = useLocation()
   const [focusedMcpKey, setFocusedMcpKey] = useState<string | null>(null)
@@ -572,8 +595,19 @@ export function McpView({
       <div
         id={`mcp-catalog-${view.id}`}
         key={view.id}
+        role={onOpenCatalog ? 'button' : undefined}
+        tabIndex={onOpenCatalog ? 0 : undefined}
+        onClick={() => onOpenCatalog?.(view)}
+        onKeyDown={event => {
+          if (!onOpenCatalog) return
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            onOpenCatalog(view)
+          }
+        }}
         className={cn(
           'bg-background/60 hover:bg-muted/40 flex h-full flex-col rounded-lg p-3 transition-colors',
+          onOpenCatalog && 'cursor-pointer',
           focusedMcpKey === `catalog-${view.id}` &&
             'ring-ring ring-2 ring-offset-2 ring-offset-background',
         )}
@@ -584,7 +618,7 @@ export function McpView({
               <McpIcon id={view.id} name={view.name} />
               <span className="truncate text-sm font-medium">{view.name}</span>
               {authMeta(view)}
-              {statusBadge(view)}
+              {statusBadge(view, onOpenCatalog)}
             </div>
             <p className="text-muted-foreground mt-1 line-clamp-2 min-h-10 text-sm">
               {view.description}
@@ -649,6 +683,7 @@ export function McpView({
                   variant="outline"
                   className="h-7 text-xs"
                   disabled={pending}
+                  onClick={event => event.stopPropagation()}
                 >
                   {pending ? (
                     <Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -681,7 +716,10 @@ export function McpView({
               variant="outline"
               className="h-7 text-xs"
               disabled={pending}
-              onClick={() => primaryConnect()}
+              onClick={event => {
+                event.stopPropagation()
+                primaryConnect()
+              }}
             >
               {pending ? (
                 <Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -695,6 +733,7 @@ export function McpView({
               target="_blank"
               rel="noreferrer"
               className="text-muted-foreground hover:text-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-xs"
+              onClick={event => event.stopPropagation()}
             >
               Docs <ExternalLink className="size-3" />
             </a>
@@ -702,7 +741,10 @@ export function McpView({
         </div>
 
         {showApiKey[view.id] && supportsApiKey ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
+          <div
+            className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3"
+            onClick={event => event.stopPropagation()}
+          >
             <Input
               type="password"
               className="max-w-md"
@@ -1075,8 +1117,19 @@ export function McpView({
                 <div
                   id={`mcp-server-${server.id}`}
                   key={server.id}
+                  role={onOpenServer ? 'button' : undefined}
+                  tabIndex={onOpenServer ? 0 : undefined}
+                  onClick={() => onOpenServer?.(server)}
+                  onKeyDown={event => {
+                    if (!onOpenServer) return
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      onOpenServer(server)
+                    }
+                  }}
                   className={cn(
                     'bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors',
+                    onOpenServer && 'cursor-pointer',
                     focusedMcpKey === `server-${server.id}` &&
                       'ring-ring ring-2 ring-offset-2 ring-offset-background',
                   )}
@@ -1113,7 +1166,10 @@ export function McpView({
                         : server.url}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div
+                    className="flex items-center gap-2"
+                    onClick={event => event.stopPropagation()}
+                  >
                     <McpToggle
                       enabled={server.enabled}
                       label={`Enable ${server.name}`}

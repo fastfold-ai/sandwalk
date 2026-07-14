@@ -17,10 +17,15 @@ from agent_server.sandbox_settings_service import SandboxSettingsService
 from agent_server.store import AgentStore
 
 
-def _effective_backend(session_backend: str | None, global_backend: str) -> str:
+def _effective_backend(session_backend: str | None, _global_backend: str | None = None) -> str:
+    """Resolve the sandbox used for a chat.
+
+    Chats default to Built-in. Modal is used only when the session explicitly
+    selects it (composer toggle). Global ``sandbox.backend`` is not inherited.
+    """
     if session_backend in {"builtin", "modal"}:
         return session_backend
-    return global_backend if global_backend in {"builtin", "modal"} else "builtin"
+    return "builtin"
 
 
 class SessionSandboxService:

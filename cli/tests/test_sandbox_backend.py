@@ -13,6 +13,7 @@ from deepagents.backends import FilesystemBackend
 
 from agent.sandbox_backend import (
     SandboxHandle,
+    _build_modal_image,
     _safe_sandbox_name,
     clear_active_handles,
     get_active_handle,
@@ -31,6 +32,34 @@ def test_parse_pip_packages_defaults():
     assert parse_pip_packages("a, b ; c") == ["a", "b", "c"]
     assert parse_pip_packages(["x", " y "]) == ["x", "y"]
     assert parse_pip_packages("  ") == pkgs
+
+
+def test_build_modal_image_debian_slim_and_registry():
+    cfg = MagicMock()
+
+    def _get(key, default=None):
+        values = {
+            "sandbox.cpu_image": "debian_slim",
+            "sandbox.gpu_image": "python:3.12-slim",
+        }
+        return values.get(key, default)
+
+    cfg.get.side_effect = _get
+    fake_modal = MagicMock()
+    debian = MagicMock(name="debian_image")
+    registry = MagicMock(name="registry_image")
+    fake_modal.Image.debian_slim.return_value = debian
+    fake_modal.Image.from_registry.return_value = registry
+
+    with (
+        patch("agent.sandbox_deps.require_modal_deps"),
+        patch("agent.sandbox_backend.parse_pip_packages", return_value=[]),
+        patch.dict("sys.modules", {"modal": fake_modal}),
+    ):
+        assert _build_modal_image(cfg, compute_type="cpu") is debian
+        fake_modal.Image.debian_slim.assert_called_once()
+        assert _build_modal_image(cfg, compute_type="gpu") is registry
+        fake_modal.Image.from_registry.assert_called_once_with("python:3.12-slim")
 
 
 def test_safe_sandbox_name():

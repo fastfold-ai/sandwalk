@@ -597,7 +597,7 @@ class InteractiveTerminal:
         self._show_interrupt_hint = False
         self._verbose_hint = None
         self._cli_specialist_label: str | None = None
-        self._cli_sandbox_label: str = "Built-in"
+        self._cli_sandbox_label: str = "Local Sandbox"
         self._refresh_cli_specialist_label()
         self._refresh_cli_sandbox_label()
         self._last_response = None  # Last synthesis text for /copy
@@ -1186,7 +1186,7 @@ class InteractiveTerminal:
             # Always read from disk so /sandbox updates apply immediately.
             self._cli_sandbox_label = sandbox_toolbar_label()
         except Exception:
-            self._cli_sandbox_label = "Built-in"
+            self._cli_sandbox_label = "Local Sandbox"
 
     def _model_display_name(self, model_id: str = None) -> str:
         """Get a short display name for a model ID."""
@@ -1633,14 +1633,13 @@ class InteractiveTerminal:
             )
         from html import escape as _html_escape
 
-        sandbox_label = getattr(self, "_cli_sandbox_label", None) or "Built-in"
-        # Built-in is the default — only surface Modal in the toolbar.
-        sandbox = ""
-        if sandbox_label.lower() == "modal":
-            sandbox = (
-                f' <style fg="#555555" bg="default">·</style> '
-                f'<style fg="#ffb86c" bg="default">{_html_escape(sandbox_label)}</style>'
-            )
+        sandbox_label = getattr(self, "_cli_sandbox_label", None) or "Local Sandbox"
+        is_modal = "modal" in sandbox_label.lower()
+        sandbox_fg = "#ffb86c" if is_modal else "#8a8f98"
+        sandbox = (
+            f' <style fg="#555555" bg="default">·</style> '
+            f'<style fg="{sandbox_fg}" bg="default">{_html_escape(sandbox_label)}</style>'
+        )
         return HTML(
             f'<style fg="#8be9fd" bg="default">{model}</style>{specialist}{sandbox}{verbose}{plan}'
             '<style fg="#555555" bg="default"> · ? for commands · Ctrl+O verbose</style>'
@@ -3832,7 +3831,7 @@ class InteractiveTerminal:
         self._refresh_cli_specialist_label()
 
     def _handle_sandbox_command(self, query: str) -> None:
-        """Handle /sandbox — toggle Built-in vs Modal backend."""
+        """Handle /sandbox — toggle Local Sandbox vs Modal Sandbox."""
         from agent.sandbox_manage import handle_sandbox_argv
 
         parts = query.strip().split()

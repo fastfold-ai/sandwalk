@@ -136,14 +136,14 @@ class TestTerminalMethods:
         terminal._worker_thread = None
         terminal._queued_queries = []
         terminal._cli_specialist_label = "Protein Designer"
-        terminal._cli_sandbox_label = "Built-in"
+        terminal._cli_sandbox_label = "Local Sandbox"
         toolbar = str(terminal._bottom_toolbar())
         assert "Protein Designer" in toolbar
-        assert "Built-in" not in toolbar
+        assert "Local Sandbox" in toolbar
 
-        terminal._cli_sandbox_label = "Modal"
+        terminal._cli_sandbox_label = "Modal Sandbox"
         toolbar = str(terminal._bottom_toolbar())
-        assert "Modal" in toolbar
+        assert "Modal Sandbox" in toolbar
         assert "Protein Designer" in toolbar
 
     def test_switch_model_header_shows_compatible_backend_next_to_model(self, terminal):
