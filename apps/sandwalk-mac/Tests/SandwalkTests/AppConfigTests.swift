@@ -12,6 +12,7 @@ final class AppConfigTests: XCTestCase {
         "SANDWALK_DASHBOARD_HOST",
         "SANDWALK_DASHBOARD_PORT",
         "SANDWALK_DASHBOARD_URL",
+        "SANDWALK_DASHBOARD_MODE",
         "SANDWALK_AUTO_START",
         "SANDWALK_REPO_ROOT",
         "SANDWALK_AGENT_CLI",
@@ -34,7 +35,8 @@ final class AppConfigTests: XCTestCase {
         port: Int = 8787,
         dashboardHost: String = "127.0.0.1",
         dashboardPort: Int = 8969,
-        healthCheckIntervalSeconds: Int = AppConfig.defaultHealthCheckIntervalSeconds
+        healthCheckIntervalSeconds: Int = AppConfig.defaultHealthCheckIntervalSeconds,
+        dashboardServeMode: DashboardServeMode = .development
     ) -> AppConfig {
         AppConfig(
             bindHost: bindHost,
@@ -43,6 +45,7 @@ final class AppConfigTests: XCTestCase {
             dashboardPort: dashboardPort,
             autoStartOnLaunch: true,
             healthCheckIntervalSeconds: healthCheckIntervalSeconds,
+            dashboardServeMode: dashboardServeMode,
             agentCliRoot: nil,
             repoRoot: nil
         )
@@ -83,6 +86,14 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(config.agentsHomeURL.absoluteString, "http://127.0.0.1:9002/agents/home")
     }
 
+    func testProductionDashboardUsesAPIPort() {
+        let config = makeConfig(port: 9001, dashboardPort: 9002, dashboardServeMode: .production)
+        XCTAssertTrue(config.usesBundledDashboard)
+        XCTAssertEqual(config.dashboardURL.absoluteString, "http://127.0.0.1:9001/")
+        XCTAssertEqual(config.dashboardHomeURL.absoluteString, "http://127.0.0.1:9001/dashboard")
+        XCTAssertEqual(config.webHealthURL.absoluteString, "http://127.0.0.1:9001/")
+    }
+
     func testSupportLogPathsLiveUnderApplicationSupport() {
         let config = makeConfig()
         XCTAssertTrue(config.supportDirectory.path.contains("Application Support/Sandwalk"))
@@ -96,6 +107,7 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(AppConfig.defaultDashboardHost, "127.0.0.1")
         XCTAssertEqual(AppConfig.defaultDashboardPort, 8969)
         XCTAssertEqual(AppConfig.defaultHealthCheckIntervalSeconds, 60)
+        XCTAssertEqual(AppConfig.defaultDashboardServeMode, .production)
     }
 
     func testClampHealthCheckInterval() {
@@ -116,6 +128,8 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(config.dashboardHost, AppConfig.defaultDashboardHost)
         XCTAssertEqual(config.dashboardPort, AppConfig.defaultDashboardPort)
         XCTAssertTrue(config.autoStartOnLaunch)
+        XCTAssertEqual(config.dashboardServeMode, .production)
+        XCTAssertTrue(config.usesBundledDashboard)
     }
 
     func testLoadReadsNetworkSettingsFromFile() throws {
@@ -126,6 +140,7 @@ final class AppConfigTests: XCTestCase {
                 "dashboard_host": "10.0.0.3",
                 "dashboard_port": 8888,
                 "auto_start": false,
+                "dashboard_serve_mode": "development",
             ],
         ])
 
@@ -135,16 +150,18 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(config.dashboardHost, "10.0.0.3")
         XCTAssertEqual(config.dashboardPort, 8888)
         XCTAssertFalse(config.autoStartOnLaunch)
+        XCTAssertEqual(config.dashboardServeMode, .development)
     }
 
     func testLoadEnvironmentOverridesSettingsFile() throws {
         try SettingsTestSupport.writeSettingsJSON([
-            "server": ["host": "10.0.0.2", "port": 7777],
+            "server": ["host": "10.0.0.2", "port": 7777, "dashboard_serve_mode": "production"],
         ])
         setenv("SANDWALK_HOST", "0.0.0.0", 1)
         setenv("SANDWALK_PORT", "9001", 1)
         setenv("SANDWALK_DASHBOARD_HOST", "0.0.0.0", 1)
         setenv("SANDWALK_DASHBOARD_PORT", "9002", 1)
+        setenv("SANDWALK_DASHBOARD_MODE", "development", 1)
         setenv("SANDWALK_AUTO_START", "0", 1)
 
         let config = AppConfig.load()
@@ -153,6 +170,7 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(config.dashboardHost, "0.0.0.0")
         XCTAssertEqual(config.dashboardPort, 9002)
         XCTAssertFalse(config.autoStartOnLaunch)
+        XCTAssertEqual(config.dashboardServeMode, .development)
     }
 
     func testLoadDashboardURLFromEnvironment() {
@@ -191,6 +209,7 @@ final class AppConfigTests: XCTestCase {
 
         var config = makeConfig(bindHost: "0.0.0.0", port: 9100, dashboardHost: "127.0.0.1", dashboardPort: 9200)
         config.autoStartOnLaunch = false
+        config.dashboardServeMode = .production
         try config.saveNetworkSettings()
 
         let network = ServerSettingsStore.load()
@@ -199,6 +218,7 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(network.dashboardHost, "127.0.0.1")
         XCTAssertEqual(network.dashboardPort, 9200)
         XCTAssertEqual(network.autoStartOnLaunch, false)
+        XCTAssertEqual(network.dashboardServeMode, .production)
         XCTAssertEqual(
             network.healthCheckIntervalSeconds,
             AppConfig.defaultHealthCheckIntervalSeconds
@@ -223,6 +243,7 @@ final class AppConfigTests: XCTestCase {
             loaded.healthCheckIntervalSeconds,
             AppConfig.defaultHealthCheckIntervalSeconds
         )
+        XCTAssertEqual(loaded.dashboardServeMode, .production)
     }
 
     func testServerSettingsStoreLoadReturnsEmptyWhenMissingFile() {

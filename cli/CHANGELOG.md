@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `sandwalk fork` / `sandwalk agent fork` now imports the forked chat into the
+  shared SQLite store so it appears in the Web UI Agents list immediately
+  (no separate `sandwalk sync` required).
+
+### Changed
+
+- Prefer `sandwalk fork <share_id>` (kept `sandwalk agent fork` as an alias).
+
 ## [0.0.1] - 2026-07-12
 
 - Rename package and CLI entrypoint to `sandwalk` (monorepo).

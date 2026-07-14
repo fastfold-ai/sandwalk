@@ -20,4 +20,4 @@ export function nextFromSearch(search: string): string | null {
 }
 
 /** @deprecated Prefer normalizeAppError / ErrorPage from @/lib/app-error */
-export { formatConnectError, type AppErrorInfo as ConnectErrorInfo } from '@/lib/app-error'
+export { type AppErrorInfo as ConnectErrorInfo,formatConnectError } from '@/lib/app-error'

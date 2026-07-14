@@ -49,6 +49,9 @@ def _isolate_cli_config(tmp_path, monkeypatch):
     # auth_enabled=true does not 401 TestClient suites.
     settings_path = tmp_path / "sandwalk-auth-settings.json"
     monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(settings_path))
+    # Keep Modal token probes hermetic even when the host shell has tokens.
+    monkeypatch.delenv("MODAL_TOKEN_ID", raising=False)
+    monkeypatch.delenv("MODAL_TOKEN_SECRET", raising=False)
     yield
 
 

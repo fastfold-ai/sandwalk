@@ -296,7 +296,6 @@ export function McpDetailView({
   useEffect(() => {
     void loadTools(false)
     // Intentionally reload when the target MCP changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, catalogEntry?.id, server?.id])
 
   return (

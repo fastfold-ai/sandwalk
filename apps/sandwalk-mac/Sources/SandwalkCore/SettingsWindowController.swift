@@ -18,6 +18,7 @@ struct SettingsRootView: View {
                 Section {
                     SidebarRow(section: .status)
                     SidebarRow(section: .network)
+                    SidebarRow(section: .advanced)
                     SidebarRow(section: .security)
                     SidebarRow(section: .logs)
                 } header: {
@@ -165,6 +166,7 @@ private struct SettingsDetailScaffold: View {
         case .environment: EnvironmentSettingsView()
         case .status: StatusSettingsView()
         case .network: NetworkSettingsView()
+        case .advanced: AdvancedSettingsView()
         case .security: SecuritySettingsView()
         case .about: AboutSettingsView()
         case .logs: EmptyView()

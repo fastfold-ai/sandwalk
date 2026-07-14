@@ -19,9 +19,13 @@ struct NetworkSettingsView: View {
     }
 
     private var portsValid: Bool {
-        (1...65535).contains(draft.port)
-            && (1...65535).contains(draft.dashboardPort)
-            && draft.port != draft.dashboardPort
+        guard (1...65535).contains(draft.port) else { return false }
+        guard (1...65535).contains(draft.dashboardPort) else { return false }
+        // Production hosts UI on the API port — dashboard port only matters in development.
+        if draft.dashboardServeMode == .production {
+            return true
+        }
+        return draft.port != draft.dashboardPort
     }
 
     var body: some View {
@@ -56,7 +60,9 @@ struct NetworkSettingsView: View {
 
             SettingsSectionHeader(
                 "WEB DASHBOARD",
-                subtitle: "Vite UI supervised by the menubar."
+                subtitle: liveConfig.usesBundledDashboard
+                    ? "Used in Development mode (Vite). Production serves the UI from the API port."
+                    : "Vite UI supervised by the menubar."
             )
             SettingsListGroup {
                 SettingsRow(label: "Port", sublabel: "Default 8969") {

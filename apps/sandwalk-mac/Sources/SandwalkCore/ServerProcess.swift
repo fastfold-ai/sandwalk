@@ -211,7 +211,7 @@ final class ServerProcess: @unchecked Sendable {
         let proc = Process()
         proc.executableURL = runtime.executable
         proc.arguments = runtime.makeServeArguments(host: config.bindHost, port: config.port)
-        proc.environment = runtime.makeEnvironment()
+        proc.environment = runtime.makeEnvironment(config: config)
         proc.currentDirectoryURL = runtime.workingDirectory
         proc.standardOutput = handle
         proc.standardError = handle

@@ -32,6 +32,7 @@ import {
   skillChipToken,
   spaceAroundChips
 } from '@/components/agents/composer-parts'
+import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import {
   computeAtFileQuery,
   computeSlashSkillQuery,
@@ -41,7 +42,6 @@ import {
 import {
   specialistColorClass,
   SpecialistGlyph} from '@/components/agents/SpecialistsView'
-import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -109,7 +109,7 @@ function draftFromSandboxStatus(
 ): SandboxDraft {
   const computeType = status?.computeType === 'gpu' ? 'gpu' : 'cpu'
   const gpuPreset =
-    matchGpuPreset(status?.gpuClass) ?? DEFAULT_GPU_PRESET
+    matchGpuPreset(String(status?.gpuClass || '')) ?? DEFAULT_GPU_PRESET
   const cpuPreset =
     CPU_PRESETS.find(
       item =>
@@ -337,7 +337,6 @@ export function Composer({
       cancelled = true
     }
     // Snapshot draft only when the picker opens.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sandboxPickerOpen])
 
   const appliedSandboxBackend =
@@ -349,7 +348,7 @@ export function Composer({
       sandboxDraft.computeType !==
         (sandboxStatus?.computeType === 'gpu' ? 'gpu' : 'cpu') ||
       sandboxDraft.gpuClass !==
-        (matchGpuPreset(sandboxStatus?.gpuClass)?.gpu ??
+        (matchGpuPreset(String(sandboxStatus?.gpuClass || ''))?.gpu ??
           DEFAULT_GPU_PRESET.gpu) ||
       Number(sandboxDraft.cpuCores) !== Number(sandboxStatus?.cpuCores) ||
       Number(sandboxDraft.ramGb) !== Number(sandboxStatus?.ramGb)
@@ -367,7 +366,7 @@ export function Composer({
           sandboxDraft.computeType !==
             (sandboxStatus?.computeType === 'gpu' ? 'gpu' : 'cpu') ||
           sandboxDraft.gpuClass !==
-            (matchGpuPreset(sandboxStatus?.gpuClass)?.gpu ??
+            (matchGpuPreset(String(sandboxStatus?.gpuClass || ''))?.gpu ??
               DEFAULT_GPU_PRESET.gpu) ||
           Number(sandboxDraft.cpuCores) !== Number(sandboxStatus?.cpuCores) ||
           Number(sandboxDraft.ramGb) !== Number(sandboxStatus?.ramGb)

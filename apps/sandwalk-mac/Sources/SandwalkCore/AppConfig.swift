@@ -1,5 +1,29 @@
 import Foundation
 
+/// How the menubar serves the web dashboard.
+enum DashboardServeMode: String, Equatable, Sendable, CaseIterable {
+    /// Built Vite assets served by FastAPI on the API port (default).
+    case production
+    /// Separate Vite dev server with HMR on the dashboard port.
+    case development
+
+    var title: String {
+        switch self {
+        case .production: return "Production"
+        case .development: return "Development"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .production:
+            return "Serve the built dashboard from the API (one process, no Vite)."
+        case .development:
+            return "Run the Vite dev server with hot reload on the dashboard port."
+        }
+    }
+}
+
 /// Shared config for the menubar supervisor (API + web UI).
 struct AppConfig: Equatable, Sendable {
     var bindHost: String
@@ -10,6 +34,8 @@ struct AppConfig: Equatable, Sendable {
     /// How often the menubar probes `/v1/health` while the API is running.
     /// Cold-start still uses a short interval so Start stays responsive.
     var healthCheckIntervalSeconds: Int
+    /// Production (API-hosted UI) vs Development (Vite).
+    var dashboardServeMode: DashboardServeMode
     /// Monorepo `cli/` directory (Python package).
     var agentCliRoot: URL?
     /// Monorepo root (contains `apps/`, `cli/`, `package.json`).
@@ -20,6 +46,7 @@ struct AppConfig: Equatable, Sendable {
     static let defaultDashboardHost = "127.0.0.1"
     static let defaultDashboardPort = 8969
     static let defaultHealthCheckIntervalSeconds = 60
+    static let defaultDashboardServeMode: DashboardServeMode = .production
     static let minHealthCheckIntervalSeconds = 5
     static let maxHealthCheckIntervalSeconds = 300
 
@@ -30,8 +57,20 @@ struct AppConfig: Equatable, Sendable {
         )
     }
 
+    var usesBundledDashboard: Bool {
+        dashboardServeMode == .production
+    }
+
+    var uiDistURL: URL? {
+        guard let repoRoot else { return nil }
+        return DashboardBuilder.distURL(repoRoot: repoRoot)
+    }
+
     var dashboardURL: URL {
-        URL(string: "http://\(dashboardConnectableHost):\(dashboardPort)/")!
+        if usesBundledDashboard {
+            return URL(string: "http://\(connectableHost):\(port)/")!
+        }
+        return URL(string: "http://\(dashboardConnectableHost):\(dashboardPort)/")!
     }
 
     /// Settings / overview surface (`/dashboard`).
@@ -121,6 +160,13 @@ struct AppConfig: Equatable, Sendable {
                 saved.healthCheckIntervalSeconds ?? defaultHealthCheckIntervalSeconds
             )
         }()
+        let serveMode: DashboardServeMode = {
+            if let raw = env["SANDWALK_DASHBOARD_MODE"]?.lowercased() {
+                if raw == "development" || raw == "dev" { return .development }
+                if raw == "production" || raw == "prod" { return .production }
+            }
+            return saved.dashboardServeMode ?? defaultDashboardServeMode
+        }()
         let repoRoot = env["SANDWALK_REPO_ROOT"].map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
         } ?? discoverRepoRoot()
@@ -136,6 +182,7 @@ struct AppConfig: Equatable, Sendable {
             dashboardPort: dashPort,
             autoStartOnLaunch: autoStart,
             healthCheckIntervalSeconds: healthInterval,
+            dashboardServeMode: serveMode,
             agentCliRoot: cliRoot,
             repoRoot: repoRoot
         )
@@ -150,7 +197,8 @@ struct AppConfig: Equatable, Sendable {
                 dashboardHost: dashboardHost,
                 dashboardPort: dashboardPort,
                 autoStartOnLaunch: autoStartOnLaunch,
-                healthCheckIntervalSeconds: healthCheckIntervalSeconds
+                healthCheckIntervalSeconds: healthCheckIntervalSeconds,
+                dashboardServeMode: dashboardServeMode
             )
         )
     }
@@ -222,6 +270,7 @@ struct ServerNetworkSettings: Equatable, Sendable {
     var dashboardPort: Int?
     var autoStartOnLaunch: Bool?
     var healthCheckIntervalSeconds: Int?
+    var dashboardServeMode: DashboardServeMode?
 }
 
 enum ServerSettingsStore {
@@ -238,13 +287,22 @@ enum ServerSettingsStore {
         else {
             return ServerNetworkSettings()
         }
+        let modeRaw = (server["dashboard_serve_mode"] as? String)?.lowercased()
+        let mode: DashboardServeMode? = {
+            switch modeRaw {
+            case "development", "dev": return .development
+            case "production", "prod": return .production
+            default: return nil
+            }
+        }()
         return ServerNetworkSettings(
             bindHost: server["host"] as? String,
             port: server["port"] as? Int,
             dashboardHost: server["dashboard_host"] as? String,
             dashboardPort: server["dashboard_port"] as? Int,
             autoStartOnLaunch: server["auto_start"] as? Bool,
-            healthCheckIntervalSeconds: server["health_check_interval_seconds"] as? Int
+            healthCheckIntervalSeconds: server["health_check_interval_seconds"] as? Int,
+            dashboardServeMode: mode
         )
     }
 
@@ -269,6 +327,9 @@ enum ServerSettingsStore {
             "health_check_interval_seconds": AppConfig.clampHealthCheckInterval(
                 settings.healthCheckIntervalSeconds ?? AppConfig.defaultHealthCheckIntervalSeconds
             ),
+            "dashboard_serve_mode": (
+                settings.dashboardServeMode ?? AppConfig.defaultDashboardServeMode
+            ).rawValue,
         ]
         let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: url, options: .atomic)

@@ -7,13 +7,12 @@ import { ArrowLeft, Check, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
+import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import { BusyConfirmOverlay } from '@/components/BusyConfirmOverlay'
 import { ErrorPage } from '@/components/ErrorPage'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
-import { cn } from '@/lib/utils'
 import {
   CPU_PRESETS,
   DEFAULT_CPU_PRESET,
@@ -22,6 +21,7 @@ import {
   matchCpuPresetId,
   matchGpuPreset
 } from '@/lib/sandbox-presets'
+import { cn } from '@/lib/utils'
 
 type Draft = {
   backend: 'builtin' | 'modal'

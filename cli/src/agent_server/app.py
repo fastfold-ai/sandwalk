@@ -86,6 +86,7 @@ from agent_server.models import (
     McpCatalogList,
     McpServer,
     McpServerList,
+    McpToolDetail,
     MessageFeedbackRequest,
     MessageFeedbackResponse,
     MessageList,
@@ -135,7 +136,6 @@ from agent_server.models import (
     UpsertModelProfileRequest,
     ValidateIntegrationResponse,
     ValidateMcpResponse,
-    McpToolDetail,
     WorkspaceFileContent,
     WorkspaceFileList,
     WorkspaceMutationResponse,
@@ -143,10 +143,10 @@ from agent_server.models import (
 )
 from agent_server.models_service import ModelsService
 from agent_server.pty_manager import PtyManager
+from agent_server.sandbox_events import sandbox_event_bus
+from agent_server.sandbox_settings_service import SandboxSettingsService
 from agent_server.service import AgentService, SessionBusyError
 from agent_server.settings_service import SettingsService
-from agent_server.sandbox_settings_service import SandboxSettingsService
-from agent_server.sandbox_events import sandbox_event_bus
 from agent_server.skills_service import SkillsService
 from agent_server.specialists_service import SpecialistsService
 from agent_server.store import AgentStore
@@ -1960,5 +1960,12 @@ def create_app(
                 "X-Accel-Buffering": "no",
             },
         )
+
+    # Optional production UI (Vite dist/). Registered last so /v1/* stays first.
+    from agent_server.static_ui import mount_static_ui, resolve_ui_dist
+
+    ui_dist = resolve_ui_dist()
+    if ui_dist is not None:
+        mount_static_ui(app, ui_dist)
 
     return app

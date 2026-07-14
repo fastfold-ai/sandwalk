@@ -230,9 +230,12 @@ final class MenubarController: NSObject, NSMenuDelegate {
             if case .running = supervisor.api.state { return true }
             return false
         }()
-        let dashOk = live || {
+        let dashOk: Bool = {
+            if supervisor.config.usesBundledDashboard {
+                return apiUp || live
+            }
             if case .running = supervisor.web.state { return true }
-            return false
+            return live
         }()
         dashboardItem.isEnabled = dashOk
         newAgentItem.isEnabled = apiUp && dashOk

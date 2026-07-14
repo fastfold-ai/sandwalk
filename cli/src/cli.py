@@ -1264,9 +1264,13 @@ def upgrade_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("fork")
 @agent_app.command("fork")
-def agent_fork_cmd(
-    share_id: str = typer.Argument(..., help="Shared chat ID or full /agents/share/<id> URL"),
+def fork_cmd(
+    share_id: str = typer.Argument(
+        ...,
+        help="Cloud share / session ID, or full /agents/share/<id> URL",
+    ),
     agents_api_url: str | None = typer.Option(
         None,
         "--agents-api-url",
@@ -1285,9 +1289,11 @@ def agent_fork_cmd(
         help="Download shared files into local sandbox.output_dir/shared_forks/<share_id>",
     ),
 ):
-    """Fork a shared cloud chat into a local Fastfold Agent CLI session."""
+    """Fork a shared cloud chat into a local CLI + Web UI session."""
     from agent.config import Config
     from agent.trajectory import Trajectory, Turn
+    from agent_server.session_sync import import_trajectory
+    from agent_server.store import AgentStore
 
     try:
         cfg = Config.load()
@@ -1427,6 +1433,12 @@ def agent_fork_cmd(
             except Exception:
                 pass
 
+        # Import into the shared SQLite store so the Web UI lists this chat
+        # immediately (same path as `sandwalk sync`).
+        ui_sync_action = "skipped"
+        with spinner("Syncing forked session into the Web UI database..."):
+            ui_sync_action = import_trajectory(AgentStore(), trajectory, force=True)
+
         # Best-effort analytics so public and local CLI forks are reflected in
         # shared-page fork counts (same metric surface as cloud forks).
         try:
@@ -1447,6 +1459,7 @@ def agent_fork_cmd(
         console.print(f"  [dim]Share ID:[/dim] {resolved_share_id}")
         console.print(f"  [dim]Session ID:[/dim] {session_id}")
         console.print(f"  [dim]Session file:[/dim] {Trajectory.session_path(session_id)}")
+        console.print(f"  [dim]Web UI sync:[/dim] {ui_sync_action}")
         console.print(f"  [dim]Messages imported:[/dim] {len(messages)}")
         if include_files and restored_root is not None:
             console.print(f"  [dim]Shared files:[/dim] {share_files_count}")
@@ -1457,7 +1470,10 @@ def agent_fork_cmd(
             console.print("  [dim]File import:[/dim] skipped (--no-files)")
         if fork_count is not None:
             console.print(f"  [dim]Fork count:[/dim] {fork_count}")
-        console.print(f"  [cyan]Resume this session:[/cyan] sandwalk --resume {session_id}")
+        console.print(f"  [cyan]Resume in CLI:[/cyan] sandwalk --resume {session_id}")
+        console.print(
+            "  [cyan]Open in Web UI:[/cyan] sandwalk serve (or Sandwalk.app) → Agents"
+        )
     except RuntimeError as exc:
         message = str(exc)
         if " 404 " in f" {message} " and "/shares/" in message:
@@ -5476,6 +5492,7 @@ def entry():
         "case-study",
         "bench",
         "agent",
+        "fork",
         "run",  # legacy explicit runner command
         "--help",
         "-h",

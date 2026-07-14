@@ -3,6 +3,7 @@ import Foundation
 enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
     case status
     case network
+    case advanced
     case security
     case logs
     case runtime
@@ -37,6 +38,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
         case .environment: return "Environment"
         case .status: return "Status"
         case .network: return "Network"
+        case .advanced: return "Advanced"
         case .logs: return "Logs"
         case .security: return "Security"
         case .about: return "About"
@@ -59,6 +61,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
         case .environment: return "hexagon.fill"
         case .status: return "gauge.with.dots.needle.50percent"
         case .network: return "network"
+        case .advanced: return "gearshape.2"
         case .logs: return "scroll"
         case .security: return "lock"
         case .about: return "info.circle"

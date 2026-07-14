@@ -67,13 +67,19 @@ struct ServeRuntime {
         argumentsPrefix + ["serve", "--host", host, "--port", String(port)]
     }
 
-    func makeEnvironment() -> [String: String] {
+    func makeEnvironment(config: AppConfig) -> [String: String] {
         var env = PathSupport.processEnvironment(merging: [
             "SANDWALK_SUPERVISED": "menubar",
             "SANDWALK_SETTINGS_PATH": AuthSettingsStore.settingsFileURL().path,
         ])
         // Pin to Application Support; ignore stale shell overrides (e.g. /tmp).
         env.removeValue(forKey: "SANDWALK_HOME")
+        if config.usesBundledDashboard, let dist = config.uiDistURL {
+            env["SANDWALK_UI_DIST"] = dist.path
+        } else {
+            env.removeValue(forKey: "SANDWALK_UI_DIST")
+            env.removeValue(forKey: "FASTFOLD_UI_DIST")
+        }
         return env
     }
 }

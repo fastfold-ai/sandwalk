@@ -93,6 +93,8 @@ import {
 } from '@/components/agents/transcript'
 import { UserMessageContent } from '@/components/agents/UserMessageContent'
 import { WorkspacePanel } from '@/components/agents/WorkspacePanel'
+import { AppErrorBoundary } from '@/components/AppErrorBoundary'
+import { ErrorPage } from '@/components/ErrorPage'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import {
   AlertDialog,
@@ -155,8 +157,6 @@ import {
   writeProjectScopeId,
   writeRecentProjectIds
 } from '@/lib/app-storage'
-import { AppErrorBoundary } from '@/components/AppErrorBoundary'
-import { ErrorPage } from '@/components/ErrorPage'
 import {
   loginPathWithNext,
   nextFromSearch,
@@ -2892,7 +2892,7 @@ export default function App() {
     const isNetworkFailure =
       Boolean(error) &&
       /failed to fetch|networkerror|load failed|network request failed/i.test(
-        error
+        error ?? ''
       )
 
     // Local Mac / Vite dashboard: don't show the remote "Connect to backend"

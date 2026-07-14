@@ -37,6 +37,15 @@ final class SettingsSectionTests: XCTestCase {
         XCTAssertEqual(SettingsSection.runtime.symbol, "cpu")
         XCTAssertEqual(SettingsSection.sandbox.title, "Sandbox")
         XCTAssertEqual(SettingsSection.sandbox.symbol, "shippingbox")
+        XCTAssertEqual(SettingsSection.advanced.title, "Advanced")
+        XCTAssertEqual(SettingsSection.advanced.symbol, "gearshape.2")
+    }
+
+    func testFromDeepLinkAdvanced() {
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/advanced")!),
+            .advanced
+        )
     }
 
     func testFromDeepLinkSectionAsHost() {

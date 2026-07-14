@@ -71,11 +71,21 @@ final class SandwalkSupervisor {
         partialRecoveryAttempts = 0
         notify()
         do {
+            if config.usesBundledDashboard {
+                // Stop any leftover Vite from a previous Development session.
+                web.reapSync(timeout: 3)
+                try prepareProductionDashboard()
+            }
             _ = try api.start()
         } catch {
             overall = .failed(error.localizedDescription)
             notify()
             throw error
+        }
+        if config.usesBundledDashboard {
+            // Dashboard is served by the API — no separate Vite process.
+            recompute()
+            return
         }
         do {
             try web.start()
@@ -88,6 +98,17 @@ final class SandwalkSupervisor {
         recompute()
     }
 
+    private func prepareProductionDashboard() throws {
+        guard let repoRoot = config.repoRoot else {
+            throw DashboardBuilder.BuildError.missingRepo
+        }
+        try DashboardBuilder.ensureBuilt(
+            repoRoot: repoRoot,
+            force: false,
+            logURL: config.webLogURL
+        )
+    }
+
     func stopAll() async {
         overall = .stopping
         notify()
@@ -96,7 +117,7 @@ final class SandwalkSupervisor {
         recompute()
     }
 
-    /// Persist network settings and restart API + web with the new binds.
+    /// Persist network / advanced settings and restart API + web when live.
     func applyNetworkConfig(_ next: AppConfig) async throws {
         var updated = next
         // Preserve discovery paths from the running supervisor.
@@ -110,6 +131,22 @@ final class SandwalkSupervisor {
 
         let shouldRestart = overall.isLive
         if shouldRestart {
+            await stopAll()
+            try startAll()
+        }
+    }
+
+    /// Rebuild the production dashboard assets (does not restart unless live + production).
+    func rebuildProductionDashboard() async throws {
+        guard let repoRoot = config.repoRoot else {
+            throw DashboardBuilder.BuildError.missingRepo
+        }
+        try DashboardBuilder.ensureBuilt(
+            repoRoot: repoRoot,
+            force: true,
+            logURL: config.webLogURL
+        )
+        if config.usesBundledDashboard, overall.isLive {
             await stopAll()
             try startAll()
         }
@@ -170,6 +207,10 @@ final class SandwalkSupervisor {
             }
         }()
         let webLive: Bool = {
+            if config.usesBundledDashboard {
+                // Production UI is hosted by the API process.
+                return apiLive
+            }
             switch web.state {
             case .running: return true
             default: return false
@@ -180,6 +221,7 @@ final class SandwalkSupervisor {
             return false
         }()
         let webStarting = {
+            if config.usesBundledDashboard { return false }
             if case .starting = web.state { return true }
             return false
         }()
@@ -188,6 +230,7 @@ final class SandwalkSupervisor {
             return false
         }()
         let webStopping = {
+            if config.usesBundledDashboard { return false }
             if case .stopping = web.state { return true }
             return false
         }()
@@ -202,7 +245,7 @@ final class SandwalkSupervisor {
             overall = .partial(api: apiLive, web: webLive)
         } else if case .failed(let message) = api.state {
             overall = .failed(message)
-        } else if case .failed(let message) = web.state {
+        } else if !config.usesBundledDashboard, case .failed(let message) = web.state {
             overall = .failed(message)
         } else {
             overall = .stopped
