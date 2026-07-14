@@ -61,6 +61,7 @@ class ModelsService:
                     provider=entry["provider"],
                     source="cloud",
                     profile_id=None,
+                    backend=None,
                     enabled=enabled,
                     health=None,
                 )
@@ -80,6 +81,7 @@ class ModelsService:
                     provider=entry["provider"],
                     source="custom",
                     profile_id=None,
+                    backend=None,
                     enabled=enabled,
                     health=None,
                 )
@@ -129,6 +131,7 @@ class ModelsService:
                             provider=provider,
                             source="cloud",
                             profile_id=None,
+                            backend=None,
                             enabled=enabled,
                             health=health,
                         )
@@ -165,6 +168,7 @@ class ModelsService:
                         provider="local",
                         source="profile",
                         profile_id=profile_id,
+                        backend=backend,
                         enabled=enabled,
                         health=health,
                     )
@@ -200,6 +204,7 @@ class ModelsService:
                 provider=entry["provider"],
                 source="cloud",
                 profile_id=None,
+                backend=None,
                 enabled=enabled,
                 health=None,
             )
@@ -212,6 +217,7 @@ class ModelsService:
                 provider=custom["provider"],
                 source="custom",
                 profile_id=None,
+                backend=None,
                 enabled=enabled,
                 health=None,
             )
@@ -233,6 +239,7 @@ class ModelsService:
                 provider=provider,
                 source="cloud",
                 profile_id=None,
+                backend=None,
                 enabled=enabled,
                 health=None,
             )
@@ -243,6 +250,7 @@ class ModelsService:
             provider="local",
             source="profile",
             profile_id=None,
+            backend=None,
             enabled=enabled,
             health=None,
         )
@@ -262,6 +270,7 @@ class ModelsService:
             provider=record["provider"],
             source="custom",
             profile_id=None,
+            backend=None,
             enabled=record["id"] not in set(cfg.hidden_models()),
             health=None,
         )
@@ -329,6 +338,19 @@ class ModelsService:
             set_default=bool(payload.set_default),
         )
         cfg.save()
+        if payload.set_active:
+            from agent.config import sync_process_env_from_config
+
+            # Keep serve-process env aligned with the newly active Local LLM
+            # profile so chat does not reuse a stale OPENAI_* key from cloud.
+            sync_process_env_from_config(
+                cfg,
+                only_missing=False,
+                config_keys=[
+                    "llm.openai_base_url",
+                    "llm.openai_api_key",
+                ],
+            )
         profile = cfg.get_openai_profile(profile_id)
         if profile is None:
             raise RuntimeError(f"Failed to persist profile '{profile_id}'.")

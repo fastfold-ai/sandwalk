@@ -128,7 +128,12 @@ def test_models_service_toggle_and_profile_crud(isolated_config: Config, monkeyp
     assert any(item.id == created.id for item in profiles.data)
 
     discovered = service.list_models(discover=True)
-    assert any(item.id == "local-model-a" and item.profile_id == created.id for item in discovered.data)
+    assert any(
+        item.id == "local-model-a"
+        and item.profile_id == created.id
+        and item.backend == "ollama"
+        for item in discovered.data
+    )
 
     preview = service.discover_endpoint(
         backend="ollama",

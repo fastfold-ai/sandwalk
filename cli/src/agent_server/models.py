@@ -527,6 +527,7 @@ class RuntimeSettings(ApiModel):
     provider: str
     model: str
     openai_base_url: str | None = None
+    openai_profile_id: str | None = None
     agent_profile: str
     tool_mode: str
     recursion_limit: int = 120
@@ -636,6 +637,7 @@ class AgentModel(ApiModel):
     provider: str
     source: Literal["cloud", "profile", "custom"]
     profile_id: str | None = None
+    backend: str | None = None
     enabled: bool = True
     health: str | None = None
 

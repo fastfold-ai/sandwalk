@@ -303,7 +303,10 @@ class TestOpenAICompatibleSetupAndFetch:
 
         term._configure_openai_compatible_model()
 
-        term.session.config.unset.assert_any_call("llm.openai_compatible_api_key")
+        term.session.config.upsert_openai_profile.assert_called()
+        upsert_kwargs = term.session.config.upsert_openai_profile.call_args.kwargs
+        assert upsert_kwargs["backend"] == "ollama"
+        assert upsert_kwargs.get("api_key") in (None, "")
         term.session.set_model.assert_called_once_with("llama3.1", provider="openai")
 
     def test_configure_openai_compatible_model_cancelled_backend(self):
@@ -326,7 +329,9 @@ class TestOpenAICompatibleSetupAndFetch:
 
         term._configure_openai_compatible_model()
 
-        term.session.config.unset.assert_any_call("llm.openai_compatible_api_key")
+        upsert_kwargs = term.session.config.upsert_openai_profile.call_args.kwargs
+        assert upsert_kwargs["backend"] == "unsloth"
+        assert upsert_kwargs.get("api_key") in (None, "")
 
     def test_configure_openai_compatible_model_retry_with_new_api_key(self):
         term = _mk_terminal()
@@ -359,7 +364,10 @@ class TestOpenAICompatibleSetupAndFetch:
             backend="omlx",
             api_key="sk-omlx-retry",
         )
-        term.session.config.set.assert_any_call("llm.openai_compatible_api_key", "sk-omlx-retry")
+        term.session.config.upsert_openai_profile.assert_called()
+        upsert_kwargs = term.session.config.upsert_openai_profile.call_args.kwargs
+        assert upsert_kwargs["api_key"] == "sk-omlx-retry"
+        assert upsert_kwargs["backend"] == "omlx"
         term.session.set_model.assert_called_once_with("omlx-model", provider="openai")
 
     def test_fetch_openai_models_success_and_dedup(self):

@@ -130,7 +130,10 @@ def test_setup_cmd_openai_compatible_persists_backend(monkeypatch):
     assert cfg.get("llm.provider") == "openai"
     assert cfg.get("llm.openai_base_url") == "http://localhost:8888/v1"
     assert cfg.get("llm.openai_compatible_backend") == "unsloth"
-    assert cfg.get("llm.openai_compatible_api_key") == "sk-unsloth-test"
+    assert cfg.get("llm.openai_compatible_api_key") is None
+    active = cfg.get_openai_profile()
+    assert active is not None
+    assert active.get("api_key") == "sk-unsloth-test"
     assert cfg.get("llm.model") == "gpt-oss:20b"
 
 
@@ -159,7 +162,10 @@ def test_setup_cmd_openai_compatible_model_prompt_can_override_key(monkeypatch):
     setup_cmd(provider="openai_compatible")
 
     assert cfg.get("llm.openai_compatible_backend") == "omlx"
-    assert cfg.get("llm.openai_compatible_api_key") == "fresh-key"
+    assert cfg.get("llm.openai_compatible_api_key") is None
+    active = cfg.get_openai_profile()
+    assert active is not None
+    assert active.get("api_key") == "fresh-key"
     assert cfg.get("llm.model") == "omlx-model"
 
 

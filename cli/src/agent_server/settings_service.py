@@ -47,6 +47,7 @@ class SettingsService:
             provider=str(config.get("llm.provider") or "anthropic"),
             model=str(config.get("llm.model") or "claude-sonnet-4-5-20250929"),
             openai_base_url=str(config.get("llm.openai_base_url") or "").strip() or None,
+            openai_profile_id=str(config.get("llm.openai_active_profile") or "").strip() or None,
             agent_profile=str(config.get("agent.profile") or "research"),
             tool_mode=str(config.get("agent.tool_mode") or "ptc"),
             recursion_limit=_recursion_limit_from_config(config),
@@ -233,6 +234,7 @@ class SettingsService:
             only_missing=False,
             config_keys=[
                 "llm.openai_base_url",
+                "llm.openai_api_key",
                 "llm.provider",
                 "llm.model",
                 "data.base",

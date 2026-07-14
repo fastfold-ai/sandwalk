@@ -61,6 +61,7 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             "Your model provider rejected the API key (401 — invalid or missing).\n"
             "Set a valid key, then re-run your query:\n"
             "  • sandwalk config set llm.anthropic_api_key sk-ant-...\n"
+            "  • For Local LLM (oMLX/Ollama/…), set the key on that Local LLM profile in Models\n"
             "  • or run: sandwalk setup",
         )
 

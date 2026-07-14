@@ -1371,7 +1371,7 @@ class InteractiveTerminal:
                     "label": "OpenAI-compatible endpoint",
                     "backend": legacy_backend,
                     "base_url": legacy_base_url,
-                    "api_key": str(self.session.config.get("llm.openai_compatible_api_key") or "").strip(),
+                    "api_key": "",
                 }
             else:
                 profile = {
@@ -1526,7 +1526,10 @@ class InteractiveTerminal:
             return "Custom"
 
         # Fallback heuristics for older configs that predate backend selection.
-        key = str((profile or {}).get("api_key") or self.session.config.get("llm.openai_compatible_api_key") or "").strip().lower()
+        key = str(
+            (profile or {}).get("api_key")
+            or ""
+        ).strip().lower()
         endpoint_text = str(endpoint).strip().lower()
         if key.startswith("sk-unsloth-") or "8888" in endpoint_text:
             return "Unsloth"
@@ -2114,7 +2117,7 @@ class InteractiveTerminal:
                 ).strip().lower()
             is_compat = bool(openai_base_url) and profile_backend not in {"", "openai"}
             self.console.print(
-                "  [dim]Set OPENAI_COMPATIBLE_API_KEY (or OPENAI_API_KEY) or enter it now to continue.[/dim]"
+                "  [dim]Set the API key on this Local LLM profile (Models → Local LLM) or enter it now.[/dim]"
                 if is_compat
                 else "  [dim]Set OPENAI_API_KEY or enter it now to continue.[/dim]"
             )
@@ -2160,7 +2163,8 @@ class InteractiveTerminal:
                     set_active=True,
                 )
             else:
-                target_key = cfg_key or "llm.openai_compatible_api_key"
+                # Cloud OpenAI key (or first-party provider key).
+                target_key = cfg_key or "llm.openai_api_key"
                 self.session.config.set(target_key, api_key)
         except ValueError as exc:
             self.console.print(f"  [red]{exc}[/red]")
@@ -2690,7 +2694,9 @@ class InteractiveTerminal:
         default_model = str(self.session.current_model or "").strip()
         if default_model in {"", "__custom_openai_compatible__"}:
             default_model = "llama3.1"
-        current_key = str(self.session.config.get("llm.openai_compatible_api_key") or "").strip()
+        current_key = str(
+            (self.session.config.get_openai_profile() or {}).get("api_key") or ""
+        ).strip()
 
         self.console.print("\n  [cyan]OpenAI-compatible endpoint setup[/cyan]")
         self.console.print(
@@ -2794,18 +2800,20 @@ class InteractiveTerminal:
             return
 
         self.session.set_model(model_id, provider="openai")
-        self.session.config.set("llm.openai_base_url", base_url)
-        self.session.config.set("llm.openai_compatible_backend", backend)
-        if effective_key:
-            self.session.config.set("llm.openai_compatible_api_key", effective_key)
-        else:
-            self.session.config.unset("llm.openai_compatible_api_key")
+        profile_id = self.session.config.upsert_openai_profile(
+            label=f"{backend} Local" if backend != "other" else "Compatible Endpoint",
+            backend=backend,
+            base_url=base_url,
+            api_key=effective_key or None,
+            default_model=model_id,
+            set_active=True,
+        )
         self.session.config.save()
 
-        key_state = "configured" if self.session.config.get("llm.openai_compatible_api_key") else "not set"
+        key_state = "configured" if effective_key else "not set"
         self.console.print(
             "  [green]Switched to OpenAI-compatible endpoint[/green] "
-            f"[dim]model={model_id} endpoint={base_url} api_key={key_state}[/dim]"
+            f"[dim]profile={profile_id} model={model_id} endpoint={base_url} api_key={key_state}[/dim]"
         )
 
     def _create_or_edit_compatible_profile(self, profile_id: str | None = None) -> str | None:
@@ -2982,7 +2990,6 @@ class InteractiveTerminal:
             current_profile = None
         current_key = str(
             (current_profile or {}).get("api_key")
-            or self.session.config.get("llm.openai_compatible_api_key")
             or ""
         ).strip()
         current_backend = str(

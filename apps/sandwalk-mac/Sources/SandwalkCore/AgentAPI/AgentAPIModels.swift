@@ -9,6 +9,7 @@ struct AgentModelDTO: Codable, Identifiable, Hashable {
     let provider: String
     let source: String
     let profileId: String?
+    let backend: String?
     let enabled: Bool
     let health: String?
 }

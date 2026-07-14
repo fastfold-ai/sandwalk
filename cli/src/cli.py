@@ -2347,7 +2347,10 @@ def _resolve_openai_compatible_endpoint(
 ) -> tuple[str, str]:
     """Resolve compatible endpoint URL and backend type for setup."""
     existing = _normalize_openai_base_url(cfg.get("llm.openai_base_url"))
-    existing_key = cfg.get("llm.openai_compatible_api_key")
+    active = cfg.get_openai_profile()
+    existing_key = (active or {}).get("api_key") if active and str(active.get("backend") or "").lower() != "openai" else None
+    if not existing_key:
+        existing_key = None
     configured_backend = _normalize_compatible_backend_name(
         str(cfg.get("llm.openai_compatible_backend") or "").strip().lower()
     )
@@ -2928,19 +2931,30 @@ def _resolve_provider_key(
         is_compat = provider == "openai_compatible" or (
             bool(openai_base_url) and not _is_openai_managed_base_url(openai_base_url)
         )
-        key_config_key = "llm.openai_compatible_api_key" if is_compat else "llm.openai_api_key"
-        existing_key = cfg.get(key_config_key) or cfg.llm_api_key("openai")
-        env_var_name = "OPENAI_COMPATIBLE_API_KEY" if is_compat else "OPENAI_API_KEY"
-        prompt_fn = _prompt_openai_api_key
-        label = "OpenAI-compatible" if is_compat else "OpenAI"
-        config_key = key_config_key
-        backend = _normalize_compatible_backend_name(compatible_backend)
-        if backend not in {"ollama", "unsloth", "omlx", "ds4", "llama_cpp", "lm_studio", "other"}:
-            backend = _infer_openai_compatible_backend(openai_base_url, existing_key)
-        default_compat_key = "ollama" if (is_compat and backend == "ollama") else None
-        if is_compat and not default_compat_key:
+        if is_compat:
+            config_key = "llm.openai_compatible_api_key"
+            env_var_name = ""  # keys live on Local LLM profiles, not a global env
+            label = "OpenAI-compatible"
+            backend = _normalize_compatible_backend_name(compatible_backend)
+            if backend not in {"ollama", "unsloth", "omlx", "ds4", "llama_cpp", "lm_studio", "other"}:
+                backend = _infer_openai_compatible_backend(openai_base_url, None)
+            active = cfg.get_openai_profile()
+            existing_key = None
+            if active and str(active.get("backend") or "").strip().lower() != "openai":
+                existing_key = cfg._normalized_secret((active or {}).get("api_key"))
+            if not existing_key:
+                existing_key = cfg.llm_api_key("openai")
+            default_compat_key = "ollama" if backend == "ollama" else None
+
             def prompt_fn():
                 return _prompt_openai_compatible_api_key(backend=backend)
+        else:
+            config_key = "llm.openai_api_key"
+            existing_key = cfg.get(config_key) or cfg.llm_api_key("openai")
+            env_var_name = "OPENAI_API_KEY"
+            prompt_fn = _prompt_openai_api_key
+            label = "OpenAI"
+            default_compat_key = None
     elif provider in ("xai", "google", "nvidia", "opencode"):
         from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
@@ -2995,7 +3009,7 @@ def _resolve_provider_key(
                 console.print("  [green]Keeping existing key.[/green]")
                 return existing_key
 
-    env_key = os.environ.get(env_var_name)
+    env_key = os.environ.get(env_var_name) if env_var_name else None
     if env_key:
         env_issue = cfg.validate_llm_api_key(
             config_key,

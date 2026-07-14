@@ -263,9 +263,12 @@ class TestTerminalMethods:
         terminal._configure_openai_compatible_model()
 
         terminal.session.set_model.assert_called_once_with("qwen3.6:27b", provider="openai")
-        terminal.session.config.set.assert_any_call("llm.openai_base_url", "http://localhost:11434/v1")
-        terminal.session.config.set.assert_any_call("llm.openai_compatible_backend", "ollama")
-        terminal.session.config.unset.assert_any_call("llm.openai_compatible_api_key")
+        terminal.session.config.upsert_openai_profile.assert_called()
+        upsert_kwargs = terminal.session.config.upsert_openai_profile.call_args.kwargs
+        assert upsert_kwargs["base_url"] == "http://localhost:11434/v1"
+        assert upsert_kwargs["backend"] == "ollama"
+        assert upsert_kwargs.get("api_key") in (None, "")
+        assert upsert_kwargs.get("set_active") is True
         terminal.session.config.save.assert_called_once()
 
     def test_configure_openai_compatible_model_unsloth_defaults_to_8888_endpoint(self, terminal):
@@ -290,7 +293,8 @@ class TestTerminalMethods:
 
         terminal._configure_openai_compatible_model()
 
-        terminal.session.config.set.assert_any_call("llm.openai_compatible_backend", "unsloth")
+        upsert_kwargs = terminal.session.config.upsert_openai_profile.call_args.kwargs
+        assert upsert_kwargs["backend"] == "unsloth"
         terminal._fetch_compatible_models.assert_called_once_with(
             "http://localhost:8888/v1",
             backend="unsloth",
@@ -353,11 +357,43 @@ class TestTerminalMethods:
             return values.get(key, default)
 
         terminal.session.config.get.side_effect = _cfg_get
+        terminal.session.config.get_openai_profile.return_value = {
+            "id": "ollama_local",
+            "label": "Ollama Local",
+            "backend": "ollama",
+            "base_url": "http://localhost:11434/v1",
+        }
+        terminal.session.config.llm_openai_base_url.return_value = "http://localhost:11434/v1"
+        terminal.session.config.upsert_openai_profile = MagicMock(return_value="ollama_local")
+        # Use a real Config so the ensure path upserts the Local LLM profile key.
+        from agent.config import Config
+
+        real = Config(
+            data={
+                "llm.provider": "openai",
+                "llm.openai_base_url": "http://localhost:11434/v1",
+                "llm.openai_active_profile": "ollama_local",
+                "llm.openai_profiles": {
+                    "openai_cloud": {"backend": "openai", "base_url": "https://api.openai.com/v1"},
+                    "ollama_local": {
+                        "backend": "ollama",
+                        "base_url": "http://localhost:11434/v1",
+                        "label": "Ollama Local",
+                    },
+                },
+            }
+        )
+        real.llm_preflight_issue = MagicMock(side_effect=[
+            "OpenAI-compatible API key not configured",
+            None,
+        ])
+        terminal.session.config = real
         terminal._secret_prompt_session = MagicMock()
         terminal._secret_prompt_session.prompt.return_value = "ollama"
         assert terminal._ensure_llm_ready_for_query() is True
-        terminal.session.config.set.assert_called_once_with("llm.openai_compatible_api_key", "ollama")
-        terminal.session.config.save.assert_called_once()
+        profile = real.get_openai_profile("ollama_local")
+        assert profile is not None
+        assert profile.get("api_key") == "ollama"
 
     def test_ensure_llm_ready_cancelled_returns_false(self, terminal):
         terminal.session.config.llm_preflight_issue.return_value = "OpenAI API key not configured"

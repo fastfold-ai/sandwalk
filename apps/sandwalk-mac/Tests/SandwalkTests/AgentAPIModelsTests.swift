@@ -27,6 +27,7 @@ final class AgentAPIModelsTests: XCTestCase {
         XCTAssertEqual(model.provider, "openai")
         XCTAssertEqual(model.source, "cloud")
         XCTAssertEqual(model.profileId, "openai_cloud")
+        XCTAssertNil(model.backend)
         XCTAssertTrue(model.enabled)
         XCTAssertEqual(model.health, "ok")
 

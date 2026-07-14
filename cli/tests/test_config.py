@@ -290,11 +290,11 @@ def test_keys_table_lists_compatible_profiles_dynamically():
     status_col = list(getattr(table.columns[1], "_cells", []))
     unlocks_col = list(getattr(table.columns[3], "_cells", []))
 
-    assert "OpenAI-compatible: oMLX Local" in service_col
-    assert "OpenAI-compatible: Unsloth Lab" in service_col
+    assert "Local LLM: oMLX Local" in service_col
+    assert "Local LLM: Unsloth Lab" in service_col
 
-    omlx_idx = service_col.index("OpenAI-compatible: oMLX Local")
-    unsloth_idx = service_col.index("OpenAI-compatible: Unsloth Lab")
+    omlx_idx = service_col.index("Local LLM: oMLX Local")
+    unsloth_idx = service_col.index("Local LLM: Unsloth Lab")
     assert "configured" in status_col[omlx_idx]
     assert "active" in status_col[omlx_idx]
     assert "not set" in status_col[unsloth_idx]
@@ -330,9 +330,9 @@ def test_keys_table_uses_template_install_links_for_compatible_profiles():
     service_col = list(getattr(table.columns[0], "_cells", []))
     signup_col = list(getattr(table.columns[5], "_cells", []))
 
-    ds4_idx = service_col.index("OpenAI-compatible: DS4 Local")
-    llama_idx = service_col.index("OpenAI-compatible: llama.cpp Local")
-    custom_idx = service_col.index("OpenAI-compatible: Custom Other")
+    ds4_idx = service_col.index("Local LLM: DS4 Local")
+    llama_idx = service_col.index("Local LLM: llama.cpp Local")
+    custom_idx = service_col.index("Local LLM: Custom Other")
 
     assert "github.com/antirez/ds4" in signup_col[ds4_idx]
     assert "github.com/ggml-org/llama.cpp" in signup_col[llama_idx]
@@ -396,7 +396,11 @@ def test_set_openai_key_accepts_non_sk_for_custom_compatible_endpoint():
         }
     )
     cfg.set("llm.openai_compatible_api_key", "ollama")
-    assert cfg.get("llm.openai_compatible_api_key") == "ollama"
+    # Legacy set migrates into the active Local LLM profile; global slot stays cleared.
+    assert cfg.get("llm.openai_compatible_api_key") is None
+    profile = cfg.get_openai_profile()
+    assert profile is not None
+    assert profile.get("api_key") == "ollama"
 
 
 def test_llm_api_key_prefers_compatible_key_for_custom_endpoint():
@@ -408,7 +412,39 @@ def test_llm_api_key_prefers_compatible_key_for_custom_endpoint():
             "llm.openai_compatible_api_key": "ollama",
         }
     )
+    # Legacy global key migrates into a compatible profile; chat uses that profile key.
     assert cfg.llm_api_key("openai") == "ollama"
+    assert cfg.get("llm.openai_compatible_api_key") is None
+
+
+def test_llm_api_key_uses_active_profile_only_ignores_stale_env(monkeypatch):
+    """Each Local LLM profile owns its key; global env must not override."""
+    monkeypatch.setenv("OPENAI_COMPATIBLE_API_KEY", "sk-proj-stale-cloud-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-proj-stale-cloud-key")
+    cfg = Config(
+        data={
+            "llm.provider": "openai",
+            "llm.openai_active_profile": "omlx_local",
+            "llm.openai_profiles": {
+                "openai_cloud": {
+                    "label": "OpenAI Cloud",
+                    "backend": "openai",
+                    "base_url": "https://api.openai.com/v1",
+                    "api_key": "sk-proj-cloud-key",
+                },
+                "omlx_local": {
+                    "label": "oMLX Local",
+                    "backend": "omlx",
+                    "base_url": "http://127.0.0.1:8009/v1",
+                    "api_key": "sk-omlx-profile-key",
+                    "default_model": "Qwen3.5-4B-MLX-4bit",
+                },
+            },
+        }
+    )
+    assert cfg.llm_api_key("openai") == "sk-omlx-profile-key"
+    assert cfg.llm_openai_base_url() == "http://127.0.0.1:8009/v1"
+    assert cfg.get("llm.openai_compatible_api_key") is None
 
 
 def test_load_bootstraps_compatible_profile_when_legacy_key_exists_without_endpoint(monkeypatch, tmp_path):
@@ -534,7 +570,7 @@ def test_upsert_profile_key_does_not_get_overwritten_by_stale_legacy_projection(
     unsloth_profile = cfg.get_openai_profile("unsloth_local")
     assert unsloth_profile is not None
     assert unsloth_profile["api_key"] == "sk-unsloth-new"
-    assert cfg.get("llm.openai_compatible_api_key") == "sk-unsloth-new"
+    assert cfg.get("llm.openai_compatible_api_key") is None
 
 
 def test_set_legacy_compatible_key_updates_active_profile_key():

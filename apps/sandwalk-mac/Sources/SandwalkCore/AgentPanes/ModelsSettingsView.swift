@@ -303,7 +303,11 @@ struct ModelsSettingsView: View {
         switch model.source {
         case "cloud": source = "\(model.provider) · cloud"
         case "custom": source = "\(model.provider) · custom"
-        case "profile": source = "local · \(model.profileId ?? "endpoint")"
+        case "profile":
+            let backend = (model.backend ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            source = backend.isEmpty
+                ? "local · \(model.profileId ?? "endpoint")"
+                : "\(backend) · local"
         default: source = "\(model.provider) · \(model.source)"
         }
         return source + (model.enabled ? "" : " · disabled")

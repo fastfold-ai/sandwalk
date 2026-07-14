@@ -356,6 +356,8 @@ export type RuntimeSettings = {
   provider: string
   model: string
   openaiBaseUrl: string | null
+  /** Active OpenAI-compatible profile id (local oMLX/Ollama/… or openai_cloud). */
+  openaiProfileId?: string | null
   agentProfile: string
   toolMode: string
   recursionLimit: number
@@ -452,6 +454,8 @@ export type AgentModel = {
   provider: string
   source: 'cloud' | 'profile' | 'custom'
   profileId: string | null
+  /** Local LLM backend id (ollama, unsloth, omlx, …); null/absent for cloud. */
+  backend?: string | null
   enabled: boolean
   health: string | null
 }

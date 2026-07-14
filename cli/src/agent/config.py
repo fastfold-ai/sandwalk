@@ -201,7 +201,7 @@ DEFAULTS = {
     "llm.xai_api_key": None,
     "llm.google_api_key": None,
     "llm.opencode_api_key": None,
-    "llm.openai_compatible_api_key": None,
+    "llm.openai_compatible_api_key": None,  # legacy; migrated into profiles then cleared
     "llm.openai_base_url": None,
     "llm.openai_compatible_backend": None,
     "llm.openai_profiles": None,
@@ -496,15 +496,6 @@ API_KEYS = {
         "url": "https://opencode.ai/zen",
         "free": False,
     },
-    "llm.openai_compatible_api_key": {
-        "name": "OpenAI-compatible",
-        "env_var": "OPENAI_COMPATIBLE_API_KEY",
-        "description": "Legacy global key for OpenAI-compatible endpoints; prefer per-profile keys under Local LLM.",
-        "url": "https://docs.ollama.com/api/introduction",
-        "free": True,
-        # Keys live on Local LLM profiles; keep config for migration/CLI only.
-        "ui": False,
-    },
     "api.ibm_rxn_key": {
         "name": "IBM RXN",
         "env_var": "IBM_RXN_API_KEY",
@@ -690,17 +681,6 @@ def _config_secret_for_env(config: "Config", config_key: str) -> str:
         return str(
             config._normalized_secret(config.get("llm.openai_api_key") or cloud_key) or ""
         ).strip()
-    if config_key == "llm.openai_compatible_api_key":
-        profiles = config.get("llm.openai_profiles") or {}
-        active_id = str(config.get("llm.openai_active_profile") or "").strip()
-        active = profiles.get(active_id) if isinstance(profiles, dict) else None
-        profile_key = (active or {}).get("api_key") if isinstance(active, dict) else None
-        return str(
-            config._normalized_secret(
-                config.get("llm.openai_compatible_api_key") or profile_key
-            )
-            or ""
-        ).strip()
     if config_key == "llm.openai_base_url":
         # Prefer profile / config URL without reading OPENAI_BASE_URL (avoid loops).
         profile = None
@@ -737,6 +717,11 @@ def sync_process_env_from_config(
     cfg = config or Config.load()
     allowed = set(config_keys) if config_keys is not None else None
     applied: list[str] = []
+
+    # Local LLM keys live on profiles only — never re-export a global compatible key.
+    if "OPENAI_COMPATIBLE_API_KEY" in os.environ:
+        os.environ.pop("OPENAI_COMPATIBLE_API_KEY", None)
+        applied.append("OPENAI_COMPATIBLE_API_KEY(cleared)")
 
     for config_key, info in API_KEYS.items():
         if allowed is not None and config_key not in allowed:
@@ -1272,8 +1257,9 @@ class Config:
         else:
             data["llm.openai_base_url"] = base_url
             data["llm.openai_compatible_backend"] = backend or "other"
-            if api_key:
-                data["llm.openai_compatible_api_key"] = api_key
+            # Keys stay on the active profile only — never mirror into the
+            # retired global llm.openai_compatible_api_key / env slot.
+            data["llm.openai_compatible_api_key"] = None
 
     def _sync_openai_profile_projection(self, *, apply_legacy_compat: bool = True) -> None:
         """Refresh legacy OpenAI-compatible fields after profile updates."""
@@ -1699,7 +1685,6 @@ class Config:
             "XAI_API_KEY": "llm.xai_api_key",
             "GEMINI_API_KEY": "llm.google_api_key",
             "OPENCODE_API_KEY": "llm.opencode_api_key",
-            "OPENAI_COMPATIBLE_API_KEY": "llm.openai_compatible_api_key",
             "OPENAI_BASE_URL": "llm.openai_base_url",
             "CT_DATA_DIR": "data.base",
             "CT_LLM_PROVIDER": "llm.provider",
@@ -2006,14 +1991,9 @@ class Config:
             backend = str((profile or {}).get("backend") or "").strip().lower()
             profile_key = self._normalized_secret((profile or {}).get("api_key"))
             if backend and backend != "openai":
-                env_key = self._normalized_secret(os.environ.get("OPENAI_COMPATIBLE_API_KEY"))
-                if env_key:
-                    return env_key
-                return self._normalized_secret(
-                    profile_key
-                    or self.get("llm.openai_compatible_api_key")
-                    or self.get("llm.openai_api_key")
-                )
+                # Each Local LLM profile owns its key. Do not read
+                # OPENAI_COMPATIBLE_API_KEY or the retired global config slot.
+                return profile_key
             env_openai_key = self._normalized_secret(os.environ.get("OPENAI_API_KEY"))
             if env_openai_key:
                 return env_openai_key
@@ -2031,18 +2011,18 @@ class Config:
 
     def llm_openai_base_url(self) -> str | None:
         """Return normalized OpenAI-compatible base URL, if configured."""
-        env_override = self._normalize_openai_base_url(os.environ.get("OPENAI_BASE_URL"))
-        if env_override:
-            if self._is_openai_managed_base_url(env_override):
-                return None
-            return env_override
-
         profile = self.get_openai_profile()
         backend = str((profile or {}).get("backend") or "").strip().lower()
         if backend and backend != "openai":
             profile_base_url = self._normalize_openai_base_url((profile or {}).get("base_url"))
             if profile_base_url:
                 return profile_base_url
+
+        env_override = self._normalize_openai_base_url(os.environ.get("OPENAI_BASE_URL"))
+        if env_override:
+            if self._is_openai_managed_base_url(env_override):
+                return None
+            return env_override
 
         value = self._normalize_openai_base_url(self.get("llm.openai_base_url"))
         if not value or self._is_openai_managed_base_url(value):
@@ -2125,11 +2105,11 @@ class Config:
 
         if provider == "openai":
             base_url = self.llm_openai_base_url()
-            compat_key = self._normalized_secret(self.get("llm.openai_compatible_api_key"))
-            if base_url and not self._is_openai_managed_base_url(base_url):
-                # For compatible endpoints, key may be optional or custom.
-                if compat_key:
-                    return None
+            profile = self.get_openai_profile()
+            backend = str((profile or {}).get("backend") or "").strip().lower()
+            if backend and backend != "openai":
+                # Local / compatible endpoints: key optional at preflight;
+                # chat uses the active profile key when present.
                 return None
             if self._is_local_openai_base_url(base_url):
                 return None
@@ -2188,8 +2168,21 @@ class Config:
                 status = "[green]configured[/green]" if val else "[red]not set[/red]"
                 if active_profile_backend == "openai":
                     status = f"{status} [dim](active: {active_profile_label or 'OpenAI Cloud'})[/dim]"
-            elif config_key == "llm.openai_compatible_api_key":
-                profile_rows: list[tuple[str, str, str, str, str]] = []
+            else:
+                val = self._normalized_secret(self.get(config_key))
+                status = "[green]configured[/green]" if val else "[red]not set[/red]"
+
+            free_tag = " (free)" if info["free"] else ""
+            table.add_row(
+                info["name"],
+                status,
+                self._secret_preview(val),
+                info["description"],
+                config_key,
+                info["url"] + free_tag,
+            )
+
+            if config_key == "llm.openai_api_key":
                 for profile_id, profile in sorted(
                     compatible_profiles.items(),
                     key=lambda item: str(item[1].get("label") or item[0]).strip().lower(),
@@ -2206,67 +2199,13 @@ class Config:
                     )
                     if profile_id == active_profile_id:
                         profile_status = f"{profile_status} [dim](active)[/dim]"
-                    profile_rows.append(
-                        (
-                            f"OpenAI-compatible: {profile_label}",
-                            profile_status,
-                            self._secret_preview(profile_key),
-                            f"{profile_backend} endpoint ({profile_endpoint})",
-                            profile_install_url,
-                        )
-                    )
-
-                if active_profile_backend != "openai":
-                    val = self._normalized_secret(
-                        os.environ.get("OPENAI_COMPATIBLE_API_KEY")
-                        or (active_profile or {}).get("api_key")
-                        or self.get("llm.openai_compatible_api_key")
-                    )
-                    status = "[green]configured[/green]" if val else "[red]not set[/red]"
-                    status = (
-                        f"{status} [dim](active: {active_profile_label or active_profile_id}, "
-                        f"endpoint: {active_profile_endpoint})[/dim]"
-                    )
-                else:
-                    compatible_keys = [
-                        self._normalized_secret(profile.get("api_key"))
-                        for profile in compatible_profiles.values()
-                    ]
-                    compatible_keys = [key for key in compatible_keys if key]
-                    val = compatible_keys[0] if compatible_keys else None
-                    profile_count = len(compatible_profiles)
-                    count_label = f"{profile_count} profile" if profile_count == 1 else f"{profile_count} profiles"
-                    status = "[green]configured[/green]" if val else "[red]not set[/red]"
-                    status = f"{status} [dim]({count_label}, active: {active_profile_label or 'OpenAI Cloud'})[/dim]"
-            else:
-                val = self._normalized_secret(self.get(config_key))
-                status = "[green]configured[/green]" if val else "[red]not set[/red]"
-
-            free_tag = " (free)" if info["free"] else ""
-            table.add_row(
-                info["name"],
-                status,
-                self._secret_preview(val),
-                info["description"],
-                config_key,
-                info["url"] + free_tag,
-            )
-
-            if config_key == "llm.openai_compatible_api_key" and profile_rows:
-                for (
-                    profile_service,
-                    profile_status,
-                    profile_preview,
-                    profile_unlocks,
-                    profile_install_url,
-                ) in profile_rows:
                     table.add_row(
-                        profile_service,
+                        f"Local LLM: {profile_label}",
                         profile_status,
-                        profile_preview,
-                        profile_unlocks,
+                        self._secret_preview(profile_key),
+                        f"{profile_backend} endpoint ({profile_endpoint})",
                         "llm.openai_profiles.<id>.api_key",
-                        profile_install_url + free_tag if profile_install_url else "—",
+                        (profile_install_url + " (free)") if profile_install_url else "—",
                     )
 
         return table

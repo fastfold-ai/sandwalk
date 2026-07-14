@@ -888,12 +888,7 @@ def _api_key_configured(cfg: Config, config_key: str) -> bool:
                 continue
             if Config._normalized_secret(profile.get("api_key")):
                 return True
-        return bool(
-            Config._normalized_secret(
-                os.environ.get("OPENAI_COMPATIBLE_API_KEY")
-                or cfg.get("llm.openai_compatible_api_key")
-            )
-        )
+        return False
 
     return bool(
         Config._normalized_secret(

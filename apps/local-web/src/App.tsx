@@ -860,11 +860,28 @@ export default function App() {
 
   const loadModelOptions = useCallback(async () => {
     try {
-      const models = await client.listModels({
-        enabledOnly: true,
-        discover: true
-      })
-      setModelOptions(toComposerModelOptions(models))
+      const [models, profiles] = await Promise.all([
+        client.listModels({
+          enabledOnly: true,
+          discover: true
+        }),
+        client.listModelProfiles().catch(() => [])
+      ])
+      const backendsByProfileId = Object.fromEntries(
+        (profiles || []).map(profile => [profile.id, profile.backend])
+      )
+      setModelOptions(
+        toComposerModelOptions(
+          models.map(model => ({
+            ...model,
+            backend:
+              model.backend ??
+              (model.profileId
+                ? backendsByProfileId[model.profileId] || null
+                : null)
+          }))
+        )
+      )
     } catch {
       // Keep the last known selector list if the catalog request fails.
     }
@@ -4467,6 +4484,7 @@ export default function App() {
                           onCreateSpecialist={() =>
                             navigate('/dashboard/specialists/new')
                           }
+                          onAddModels={() => navigate('/dashboard/models')}
                           onSandboxBackendSelect={selectSessionSandboxBackend}
                           onSandboxComputeChange={changes =>
                             void updateSessionSandboxCompute(changes)
@@ -4933,6 +4951,7 @@ export default function App() {
                           onCreateSpecialist={() =>
                             navigate('/dashboard/specialists/new')
                           }
+                          onAddModels={() => navigate('/dashboard/models')}
                           onSandboxBackendSelect={selectSessionSandboxBackend}
                           onSandboxComputeChange={changes =>
                             void updateSessionSandboxCompute(changes)

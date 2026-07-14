@@ -41,8 +41,13 @@ import {
 } from '@/components/agents/skill-examples'
 import {
   specialistColorClass,
-  SpecialistGlyph} from '@/components/agents/SpecialistsView'
+  SpecialistGlyph
+} from '@/components/agents/SpecialistsView'
 import { Button } from '@/components/ui/button'
+import {
+  isComposerModelSelected,
+  resolveComposerModelOption
+} from '@/lib/composer-models'
 import { Input } from '@/components/ui/input'
 import {
   Popover,
@@ -213,6 +218,7 @@ export function Composer({
   onModelSelect,
   onSpecialistSelect,
   onCreateSpecialist,
+  onAddModels,
   onSandboxBackendSelect,
   onSandboxComputeChange,
   onSandboxStart,
@@ -256,6 +262,7 @@ export function Composer({
   ) => Promise<void>
   onSpecialistSelect?: (specialistId: string | null) => void | Promise<void>
   onCreateSpecialist?: () => void
+  onAddModels?: () => void
   onSandboxBackendSelect?: (
     backend: 'builtin' | 'modal'
   ) => void | Promise<void>
@@ -564,7 +571,7 @@ export function Composer({
   }, [onLoadSkill, selectedSkill, slashOpen])
 
   const selectedModel =
-    modelOptions.find(option => option.model === runtimeSettings?.model) ||
+    resolveComposerModelOption(modelOptions, runtimeSettings) ||
     (runtimeSettings
       ? {
           provider: runtimeSettings.provider,
@@ -1312,8 +1319,8 @@ export function Composer({
             )
           })}
         </div>
-        <div className="flex items-center justify-between px-0.5">
-          <div className="flex items-center gap-1">
+        <div className="flex min-w-0 items-center justify-between gap-2 px-0.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
             <input
               ref={uploadRef}
               type="file"
@@ -1327,7 +1334,7 @@ export function Composer({
             <Button
               variant="ghost"
               size="icon"
-              className="size-7 rounded-full"
+              className="size-7 shrink-0 rounded-full"
               type="button"
               onClick={() => uploadRef.current?.click()}
             >
@@ -1343,23 +1350,26 @@ export function Composer({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
+                  title={`${selectedModel.label}${selectedModel.speed ? ` · ${selectedModel.speed}` : ''}`}
+                  className="text-muted-foreground hover:text-foreground inline-flex min-w-0 max-w-[min(100%,16rem)] items-center gap-1 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
                 >
-                  <span className="font-medium">{selectedModel.label}</span>
+                  <span className="min-w-0 truncate font-medium">
+                    {selectedModel.label}
+                  </span>
                   {selectedModel.speed ? (
-                    <span className="text-muted-foreground text-[11px]">
+                    <span className="text-muted-foreground shrink-0 text-[11px]">
                       {selectedModel.speed}
                     </span>
                   ) : null}
-                  <ChevronDown className="text-muted-foreground size-3.5" />
+                  <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
                 </button>
               </PopoverTrigger>
               <PopoverContent
                 align="start"
                 side="top"
-                className="w-64 overflow-hidden p-0"
+                className="w-[min(28rem,calc(100vw-2rem))] overflow-hidden p-0"
               >
-                <div className="border-b px-3 py-2">
+                <div className="bg-popover border-b px-3 py-2">
                   <Input
                     value={modelSearch}
                     onChange={event => setModelSearch(event.target.value)}
@@ -1368,8 +1378,8 @@ export function Composer({
                     autoFocus
                   />
                 </div>
-                <ScrollArea className="h-72">
-                  <div className="py-1">
+                <ScrollArea className="h-72 w-full">
+                  <div className="w-full py-1">
                     {modelOptions.length === 0 ? (
                       <div className="text-muted-foreground px-3 py-3 text-sm">
                         No enabled models. Turn models on in Dashboard → Models.
@@ -1380,13 +1390,20 @@ export function Composer({
                       </div>
                     ) : (
                       filteredModelOptions.map(option => {
-                        const isSelected =
-                          option.model === runtimeSettings?.model
+                        const isSelected = isComposerModelSelected(
+                          option,
+                          runtimeSettings,
+                          modelOptions
+                        )
                         return (
                           <button
                             key={`${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`}
                             type="button"
-                            className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm"
+                            title={`${option.label}${option.speed ? ` · ${option.speed}` : ''}`}
+                            className={cn(
+                              'hover:bg-muted grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5 text-left text-sm',
+                              isSelected && 'bg-muted'
+                            )}
                             onClick={() => {
                               void onModelSelect(
                                 option.provider,
@@ -1399,12 +1416,9 @@ export function Composer({
                           >
                             <span className="truncate">{option.label}</span>
                             {option.speed ? (
-                              <span className="text-muted-foreground truncate text-xs">
+                              <span className="text-muted-foreground text-xs whitespace-nowrap">
                                 {option.speed}
                               </span>
-                            ) : null}
-                            {isSelected ? (
-                              <Check className="text-foreground ml-auto size-4 shrink-0" />
                             ) : null}
                           </button>
                         )
@@ -1412,6 +1426,22 @@ export function Composer({
                     )}
                   </div>
                 </ScrollArea>
+                {onAddModels ? (
+                  <div className="border-t p-1">
+                    <button
+                      type="button"
+                      className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+                      onClick={() => {
+                        setModelPickerOpen(false)
+                        setModelSearch('')
+                        onAddModels()
+                      }}
+                    >
+                      <Plus className="size-3.5 shrink-0" />
+                      Add Models
+                    </button>
+                  </div>
+                ) : null}
               </PopoverContent>
             </Popover>
             {onSpecialistSelect ? (
@@ -1422,7 +1452,7 @@ export function Composer({
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
+                    className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
                   >
                     {selectedSpecialist ? (
                       <span
@@ -1439,10 +1469,10 @@ export function Composer({
                     ) : (
                       <span className="bg-muted-foreground/40 size-2 rounded-full" />
                     )}
-                    <span className="font-medium">
+                    <span className="max-w-[7rem] truncate font-medium">
                       {selectedSpecialist?.name || 'None'}
                     </span>
-                    <ChevronDown className="text-muted-foreground size-3.5" />
+                    <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
                   </button>
                 </PopoverTrigger>
                 <PopoverContent
@@ -1527,7 +1557,7 @@ export function Composer({
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
+                    className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
                     aria-label="Sandbox backend"
                   >
                     {sandboxPhase !== 'idle' ||
@@ -1956,7 +1986,7 @@ export function Composer({
               </Popover>
             ) : null}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1.5">
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
