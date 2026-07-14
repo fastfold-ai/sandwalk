@@ -41,6 +41,7 @@ from agent_server.mcp_service import (
     set_custom_headers,
 )
 from agent_server.models import (
+    PromptBudgetResponse,
     AccountSummary,
     AgentModel,
     AgentModelList,
@@ -900,6 +901,20 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.get("/v1/settings/prompt-budget", response_model=PromptBudgetResponse)
+    async def get_prompt_budget(
+        specialist_id: str | None = Query(default=None, alias="specialistId"),
+        project_id: str | None = Query(default=None, alias="projectId"),
+        sample_query: str | None = Query(default=None, alias="sampleQuery"),
+    ) -> PromptBudgetResponse:
+        from agent_server.prompt_budget_service import PromptBudgetService
+
+        return await PromptBudgetService(store).estimate(
+            specialist_id=specialist_id,
+            project_id=project_id,
+            sample_query=sample_query,
+        )
+
     @app.get("/v1/settings/runtime", response_model=RuntimeSettings)
     async def get_runtime_settings() -> RuntimeSettings:
         return await asyncio.to_thread(settings_service.get)
@@ -1259,6 +1274,7 @@ def create_app(
                 color=payload.color,
                 icon=payload.icon,
                 skill_names=payload.skill_names,
+                tool_names=payload.tool_names,
                 mcp_server_ids=payload.mcp_server_ids,
                 mcp_catalog_ids=payload.mcp_catalog_ids,
                 enabled=payload.enabled,
@@ -1293,6 +1309,7 @@ def create_app(
                 color=payload.color,
                 icon=payload.icon,
                 skill_names=payload.skill_names,
+                tool_names=payload.tool_names,
                 mcp_server_ids=payload.mcp_server_ids,
                 mcp_catalog_ids=payload.mcp_catalog_ids,
                 enabled=payload.enabled,

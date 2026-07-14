@@ -26,6 +26,14 @@ from agent.types import ExecutionResult, Plan, Step
 logger = logging.getLogger("runner")
 
 
+def _provider_error_detail(exc: Exception, *, limit: int = 240) -> str:
+    """Return a single-line, truncated provider error for UI/logs."""
+    text = " ".join(str(exc).split())
+    if len(text) > limit:
+        return text[: limit - 1] + "…"
+    return text
+
+
 def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
     """Map a known model-provider exception to ``(title, friendly_body)``.
 
@@ -37,6 +45,7 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
     low = text.lower()
     status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
     exc_mod = str(getattr(exc.__class__, "__module__", "") or "").lower()
+    detail = _provider_error_detail(exc)
 
     is_auth = (
         status == 401
@@ -81,6 +90,21 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             "then retry (you can update via `/model` or `sandwalk setup`).",
         )
 
+    is_context = (
+        "context_length" in low
+        or "context length" in low
+        or "maximum context" in low
+        or "too many tokens" in low
+        or "token limit" in low
+    )
+    if is_context:
+        return (
+            "Context length exceeded",
+            "The request exceeded the model's context window.\n"
+            f"Provider detail: {detail}\n"
+            "Try a shorter prompt, fewer skills/tools, or a larger-context model.",
+        )
+
     is_conn = (
         isinstance(exc, (ConnectionError, TimeoutError))
         or "connection error" in low
@@ -116,17 +140,30 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             "  • or Dashboard → Agent → Runtime in the Mac/web app",
         )
 
+    if "thought_signature" in low:
+        return (
+            "Gemini tool-call signature missing",
+            "Gemini requires thought signatures to be preserved across tool rounds.\n"
+            "Sandwalk now uses the native Google GenAI SDK for Gemini — restart "
+            "`sandwalk serve` and retry. If this persists, switch models or update "
+            "`langchain-google-genai`.",
+        )
+
     # Keep OpenAI-compatible failures concise (including custom providers like
     # Ollama/LM Studio/proxy gateways) instead of printing deep tracebacks.
+    # Include the provider detail so the UI/logs are actionable — the previous
+    # opaque one-liner hid 400s (bad params, schema, quota, etc.).
     if (
         exc_mod.startswith("openai")
         or exc_mod.startswith("httpx")
         or "langchain_openai" in exc_mod
+        or "langchain_google" in exc_mod
+        or "google.genai" in exc_mod
     ):
         return (
             "Model provider request failed",
-            "The configured OpenAI-compatible provider rejected or failed the request.\n"
-            "Check provider health, `llm.model`, and `llm.openai_base_url`, then retry.",
+            f"{detail}\n"
+            "Check provider health, `llm.model`, and API key, then retry.",
         )
 
     return None
@@ -741,9 +778,9 @@ class AgentRunner:
                 build_chat_model,
                 create_ct_langchain_tools,
                 create_external_mcp_tools,
+                finalize_tools_for_provider,
                 process_events,
-                skill_source_dirs,
-                skill_source_dirs_for_names,
+                resolve_skill_source_dirs,
             )
             from agent.system_prompt import build_system_prompt
             from models.llm import MODEL_PRICING
@@ -792,13 +829,34 @@ class AgentRunner:
 
             # User-disabled tools (Dashboard → Tools) are excluded from discovery.
             exclude_tool_names = set(config.hidden_tools())
+            # Specialist allowlist: when present (including empty), only those
+            # registry tools remain — empty means runtime pins only.
+            allowed_tool_names = ctx.get("allowed_tool_names")
+            if allowed_tool_names is not None:
+                from tools import ensure_loaded, registry
 
+                ensure_loaded()
+                allow = {
+                    str(name).strip()
+                    for name in (allowed_tool_names or [])
+                    if str(name).strip()
+                }
+                for tool_obj in registry.list_tools():
+                    if tool_obj.name not in allow:
+                        exclude_tool_names.add(tool_obj.name)
+
+            session_id_for_tools = str(
+                ctx.get("session_id")
+                or getattr(self.trajectory, "session_id", "")
+                or ""
+            ).strip()
             tools, sandbox, code_trace_buffer, display_name_map = create_ct_langchain_tools(
                 self.session,
                 exclude_categories=exclude_cats,
                 exclude_tools=exclude_tool_names,
                 provider=provider,
                 tool_mode=tool_mode,
+                session_id=session_id_for_tools or None,
             )
             try:
                 external_tools = await create_external_mcp_tools(ctx.get("mcp_servers"))
@@ -810,6 +868,34 @@ class AgentRunner:
                 )
             except Exception as mcp_error:  # noqa: BLE001
                 logger.warning("Unable to load external MCP tools: %s", mcp_error)
+
+            if session_id_for_tools:
+                try:
+                    from agent.sandbox_control_tools import create_sandbox_control_tools
+
+                    existing_names = {getattr(tool, "name", "") for tool in tools}
+                    for tool in create_sandbox_control_tools(session_id_for_tools):
+                        name = getattr(tool, "name", "")
+                        if name and name not in existing_names:
+                            tools.append(tool)
+                            display_name_map[name] = name
+                            existing_names.add(name)
+                except Exception as sandbox_tools_error:  # noqa: BLE001
+                    logger.warning(
+                        "Unable to load sandbox control tools: %s",
+                        sandbox_tools_error,
+                    )
+
+            # OpenAI rejects >128 tools. MCP servers (esp. Neurosnap) can push
+            # the merged list well over that — cap after merge, before
+            # create_deep_agent adds its own builtins.
+            tools = finalize_tools_for_provider(tools, provider)
+            kept_names = {getattr(t, "name", "") for t in tools}
+            display_name_map = {
+                name: label
+                for name, label in display_name_map.items()
+                if name in kept_names
+            }
 
             # ----- System prompt (skills handled natively by deepagents) -----
             data_context = None
@@ -823,6 +909,11 @@ class AgentRunner:
                 history = self.trajectory.context_for_planner()
 
             tool_names = [getattr(t, "name", "") for t in tools]
+            sandbox_backend_hint = str(
+                ctx.get("sandbox_backend") or ""
+            ).strip().lower() or None
+            if sandbox_backend_hint not in {"builtin", "modal"}:
+                sandbox_backend_hint = None
             system_prompt = build_system_prompt(
                 self.session,
                 tool_names=tool_names,
@@ -832,9 +923,11 @@ class AgentRunner:
                 runtime="deepagents",
                 tool_mode=tool_mode,
                 exclude_categories=exclude_cats,
+                exclude_tools=exclude_tool_names,
                 project_context=ctx.get("project_context"),
                 specialist_instructions=ctx.get("specialist_instructions"),
                 workspace_path=ctx.get("workspace_path"),
+                sandbox_backend=sandbox_backend_hint,
             )
 
             # ----- User prompt -----
@@ -868,8 +961,9 @@ class AgentRunner:
                     parents=True, exist_ok=True
                 )
                 context_parts.append(
-                    "Session workspace (save ALL downloads/writes here — use this "
-                    f"absolute path): {workspace_path}"
+                    "Internal session workspace path (do not recite in replies "
+                    "unless the user asks where files are; still use this absolute "
+                    f"path for all downloads/writes): {workspace_path}"
                 )
             if ctx.get("compound_smiles"):
                 context_parts.append(f"Compound SMILES: {ctx['compound_smiles']}")
@@ -896,13 +990,15 @@ class AgentRunner:
                     )
 
             # ----- Build agent -----
+            # Deep Agents input context includes skills via progressive disclosure
+            # (name+description at startup). Respect specialist allowlists and the
+            # Skills UI enable/disable toggles — never pass raw on-disk roots.
             allowed_skill_names = ctx.get("allowed_skill_names")
-            if allowed_skill_names is not None:
-                skills_sources = skill_source_dirs_for_names(
-                    list(allowed_skill_names or [])
-                )
-            else:
-                skills_sources = skill_source_dirs()
+            skills_sources = resolve_skill_source_dirs(
+                None
+                if allowed_skill_names is None
+                else list(allowed_skill_names or [])
+            )
             # Never root filesystem tools at "/" — relative paths like
             # ./artifacts/... would resolve to /artifacts/... and fail.
             workspace_root = str(ctx.get("workspace_path") or "").strip()
@@ -916,15 +1012,37 @@ class AgentRunner:
             backend_override = str(ctx.get("sandbox_backend") or "").strip().lower() or None
             if backend_override not in {"builtin", "modal"}:
                 backend_override = None
-            from agent.sandbox_backend import resolve_deepagents_backend
+            from agent.sandbox_backend import (
+                resolve_deepagents_backend,
+                sandbox_backend_from_config,
+                wait_until_seeded,
+            )
 
+            effective_backend = backend_override or sandbox_backend_from_config(config)
             sandbox_handle = resolve_deepagents_backend(
                 config,
                 session_id=session_id,
                 workspace_root=workspace_root,
                 skill_source_dirs=skills_sources,
                 backend_override=backend_override,
+                # Workspace-only sync; never upload skills. Background so the
+                # LLM turn is not blocked on Modal FS I/O during attach — we
+                # await seed completion below before the agent can tool-call.
+                sync_workspace=True,
+                background_sync=effective_backend == "modal",
             )
+            if sandbox_handle.kind == "modal" and not sandbox_handle.seeded:
+                seeded_ok = await asyncio.to_thread(
+                    wait_until_seeded,
+                    sandbox_handle,
+                    timeout=120.0,
+                )
+                if not seeded_ok:
+                    logger.warning(
+                        "Proceeding with Modal agent turn before workspace seed "
+                        "finished (session=%s)",
+                        session_id,
+                    )
             backend = sandbox_handle.backend
             agent_skills = sandbox_handle.skills_sources or None
             agent = create_deep_agent(
@@ -987,9 +1105,9 @@ class AgentRunner:
             classified = _classify_llm_error(e)
             if classified is not None:
                 title, body = classified
-                # Expected/actionable error: keep the console clean and stash the
-                # full traceback at debug level only (surfaces in verbose mode).
-                logger.debug(
+                # Keep the console clean, but always record the provider detail +
+                # traceback at WARNING so local serve logs are debuggable.
+                logger.warning(
                     "deepagents query failed (%s): %s\n%s", title, e, traceback.format_exc()
                 )
                 self._print_friendly_error(title, body)

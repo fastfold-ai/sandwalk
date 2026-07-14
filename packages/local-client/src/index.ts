@@ -51,6 +51,7 @@ import type {
   ToolCatalog,
   ToolSummary,
   UpsertModelProfileInput,
+  PromptBudgetResponse,
   WorkspaceFile,
   WorkspaceFileContent,
   PtySessionInfo,
@@ -371,6 +372,7 @@ export class LocalAgentClient
       color?: string
       icon?: string
       skillNames?: string[]
+      toolNames?: string[]
       mcpServerIds?: string[]
       mcpCatalogIds?: string[]
       enabled?: boolean
@@ -387,6 +389,7 @@ export class LocalAgentClient
         color: input.color,
         icon: input.icon,
         skill_names: input.skillNames ?? [],
+        tool_names: input.toolNames ?? [],
         mcp_server_ids: input.mcpServerIds ?? [],
         mcp_catalog_ids: input.mcpCatalogIds ?? [],
         enabled: input.enabled ?? true,
@@ -406,6 +409,7 @@ export class LocalAgentClient
       color?: string
       icon?: string
       skillNames?: string[]
+      toolNames?: string[]
       mcpServerIds?: string[]
       mcpCatalogIds?: string[]
       enabled?: boolean
@@ -424,6 +428,7 @@ export class LocalAgentClient
         color: input.color,
         icon: input.icon,
         skill_names: input.skillNames,
+        tool_names: input.toolNames,
         mcp_server_ids: input.mcpServerIds,
         mcp_catalog_ids: input.mcpCatalogIds,
         enabled: input.enabled,
@@ -431,6 +436,27 @@ export class LocalAgentClient
       headers: { 'content-type': 'application/json' },
       signal,
     })
+  }
+
+  getPromptBudget(
+    options?: {
+      specialistId?: string | null
+      projectId?: string | null
+      sampleQuery?: string | null
+    },
+    signal?: AbortSignal,
+  ): Promise<PromptBudgetResponse> {
+    const params = new URLSearchParams()
+    if (options?.specialistId) params.set('specialistId', options.specialistId)
+    if (options?.projectId) params.set('projectId', options.projectId)
+    if (options?.sampleQuery != null && options.sampleQuery !== '') {
+      params.set('sampleQuery', options.sampleQuery)
+    }
+    const query = params.toString()
+    return this.request<PromptBudgetResponse>(
+      `/settings/prompt-budget${query ? `?${query}` : ''}`,
+      { signal },
+    )
   }
 
   async deleteSpecialist(specialistId: string, signal?: AbortSignal): Promise<void> {

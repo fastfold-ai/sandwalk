@@ -48,8 +48,18 @@ def _load_installed_skills(session=None, user_request: str | None = None) -> str
 
 _IDENTITY = """\
 You are **fastfold-agent-cli**, an autonomous drug discovery research agent.
-When introducing yourself, always use the name **Fastfold Agent**.
-In introductory replies, briefly mention both your tool capabilities and your skill capabilities.
+Your display name is **Fastfold Agent**.
+
+Greeting / identity (strict):
+- Introduce yourself **only** on the first user message of a chat, or when the
+  user explicitly asks who you are / what you can do.
+- A first-turn intro may briefly mention domain tools and installed skills.
+- On **every later turn**, do **not** re-introduce yourself, restate your
+  capabilities, or open with “Fastfold Agent — I can run…”. Answer the request
+  directly (especially after tool calls).
+- Do **not** paste or announce the session workspace path in greetings or
+  routine replies. Use it silently for saves; mention it only if the user asks
+  where files are or you need to point at a specific artifact path.
 
 You have access to 190+ domain tools covering target discovery, chemistry,
 expression, viability, safety, clinical development, omics, genomics, literature,
@@ -76,6 +86,10 @@ synthesis at the end.
 - Never run task-id recovery loops (TaskOutput retries, filesystem scans,
   shell-history scans) for prior tasks unless the current user request is
   specifically about that task.
+- When reporting CLI / tool results that are tabular (e.g. ``nvidia-smi``,
+  ``df -h``, CSV-like text), prefer a GitHub-flavored **Markdown table** in the
+  final answer instead of pasting the raw ASCII box-drawing output. Keep a
+  short fenced code block only if the user asks for the raw dump.
 
 ## Session workspace (non-negotiable when provided)
 When a **Session workspace** path is listed below (or in `SANDWALK_SESSION_WORKSPACE`):
@@ -92,6 +106,8 @@ When a **Session workspace** path is listed below (or in `SANDWALK_SESSION_WORKS
   the shell cwd is already the session workspace.
 - You may read installed skill directories (e.g. ``~/.sandwalk/skills/...``)
   to run scripts; never treat those as the download or write destination.
+- Do **not** announce the workspace path in greetings or ordinary answers.
+  Only cite it when pointing the user at a concrete saved file, or when asked.
 """
 
 
@@ -126,6 +142,61 @@ If tools failed, pivot to answering from your knowledge instead.
 
 
 # ---------------------------------------------------------------------------
+# Compute / sandbox policy
+# ---------------------------------------------------------------------------
+
+_MODAL_COMPUTE_POLICY = """\
+## Compute environment (Modal)
+This chat uses **Modal** for isolated compute. Host tools still exist for skills
+and domain loaders — pick the right surface:
+
+| Goal | Use |
+| --- | --- |
+| Isolated Python in the Modal sandbox | **`run_python`** (auto-routes to Modal `/workspace`) or Deep Agents **`execute`** |
+| Domain tools via PTC / host data loaders | **`run_python`** with ``tools.*`` (stays on **host**) |
+| Skill scripts (`python scripts/...`) | **`shell_run`** on the **host** skill path (never Modal `execute`) |
+| Inspect / start / stop Modal | **`sandbox_status`**, **`sandbox_start`**, **`sandbox_stop`** |
+
+Filesystem:
+- Host session folder (Files panel): `{host_workspace}`
+- Same tree inside Modal: **`/workspace`** (use this in Modal `run_python` / `execute`)
+- Modal `/tmp` is fast scratch (wiped when the sandbox stops). Put heavy builds,
+  clones, and venvs under `/tmp`, then copy final artifacts to `/workspace`.
+- Do **not** `execute` host-only skill paths (`/skills/...` or `~/.sandwalk/skills/...`).
+- Never `mkdir('/workspace')` on the Mac host — that path is Modal-only.
+
+Lifecycle:
+- If the user asks whether Modal is up, call `sandbox_status`.
+- If Modal is stopped / missing and the user wants Modal compute, call
+  `sandbox_start` once, then continue in the same turn.
+- If the user asks to shut Modal down, call `sandbox_stop`.
+"""
+
+_BUILTIN_COMPUTE_POLICY = """\
+## Compute environment (Built-in)
+This chat uses the **Built-in host sandbox**: session files live on disk under
+the Session workspace path, and ``run_python`` / ``shell_run`` run on the host.
+
+- Prefer ``run_python`` for analysis and PTC domain-tool calls.
+- Prefer ``shell_run`` for skill scripts.
+- Use ``sandbox_status`` when the user asks about sandbox state.
+- If the user asks to start / switch to **Modal**, call ``sandbox_start``
+  (enable_modal=true). Use ``sandbox_stop`` only after Modal is running.
+"""
+
+
+def _compute_environment_section(
+    sandbox_backend: str | None,
+    workspace_path: str | None,
+) -> str:
+    backend = str(sandbox_backend or "").strip().lower()
+    host = str(workspace_path or "").strip() or "<session-workspace>"
+    if backend == "modal":
+        return "\n" + _MODAL_COMPUTE_POLICY.format(host_workspace=host)
+    return "\n" + _BUILTIN_COMPUTE_POLICY
+
+
+# ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
 
@@ -140,9 +211,11 @@ def build_system_prompt(
     runtime: str = "sdk",
     tool_mode: str = "native",
     exclude_categories: set[str] | None = None,
+    exclude_tools: set[str] | None = None,
     project_context: str | None = None,
     specialist_instructions: str | None = None,
     workspace_path: str | None = None,
+    sandbox_backend: str | None = None,
 ) -> str:
     """Build the unified system prompt for the agent runner.
 
@@ -165,6 +238,8 @@ def build_system_prompt(
         specialist_instructions: Optional specialist profile text appended after
             project context.
         workspace_path: Per-session workspace directory shown in the UI file tree.
+        sandbox_backend: ``"builtin"`` or ``"modal"`` — adds Modal-specific skill
+            vs compute guidance when Modal is selected.
 
     Returns:
         The complete system prompt string.
@@ -175,17 +250,32 @@ def build_system_prompt(
     parts.append(_IDENTITY)
 
     workspace = str(workspace_path or "").strip()
+    modal_on = str(sandbox_backend or "").strip().lower() == "modal"
     if workspace:
         parts.append("\n## Session Workspace\n")
-        parts.append(
-            f"- **Path:** `{workspace}`\n"
-            "- This is the dedicated folder for **this chat** (Files panel / file tree).\n"
-            "- Save **all** downloads, writes, exports, plots, and generated files under "
-            f"this path (prefer `{workspace}/artifacts/` or `{workspace}/outputs/`).\n"
-            "- Use this **absolute** path in tool commands. Do not ask where to save; "
-            "do not browse `/`, `$HOME`, or `/tmp`. Prefer the literal path over "
-            "`$SANDWALK_SESSION_WORKSPACE/...` (an empty var expands to `/artifacts/...`).\n"
-        )
+        if modal_on:
+            parts.append(
+                f"- **Host path (Files panel):** `{workspace}`\n"
+                "- **Modal path:** `/workspace` (same tree after sync — use this in "
+                "`execute`)\n"
+                "- Save **all** downloads, writes, exports, plots, and generated files "
+                f"under the session tree (prefer `{workspace}/artifacts/` on host or "
+                "`/workspace/artifacts/` in Modal).\n"
+                "- Prefer literal absolute host paths in `shell_run` / host tools; "
+                "prefer `/workspace/...` inside Modal `execute`.\n"
+            )
+        else:
+            parts.append(
+                f"- **Path:** `{workspace}`\n"
+                "- This is the dedicated folder for **this chat** (Files panel / file tree).\n"
+                "- Save **all** downloads, writes, exports, plots, and generated files under "
+                f"this path (prefer `{workspace}/artifacts/` or `{workspace}/outputs/`).\n"
+                "- Use this **absolute** path in tool commands. Do not ask where to save; "
+                "do not browse `/`, `$HOME`, or `/tmp`. Prefer the literal path over "
+                "`$SANDWALK_SESSION_WORKSPACE/...` (an empty var expands to `/artifacts/...`).\n"
+            )
+
+    parts.append(_compute_environment_section(sandbox_backend, workspace_path))
 
     if project_context and str(project_context).strip():
         parts.append("\n## Project Context\n")
@@ -206,14 +296,19 @@ def build_system_prompt(
 
             parts.append(
                 "\n"
-                + build_tool_catalog(exclude_categories=exclude_categories or set())
+                + build_tool_catalog(
+                exclude_categories=exclude_categories or set(),
+                exclude_tools=exclude_tools or set(),
+            )
             )
         except Exception as e:  # noqa: BLE001
             logger.warning("Could not build PTC tool catalog: %s", e)
         parts.append(
             "\nOther tools: **run_python** (write code here; the `tools` namespace is "
             "pre-bound), **run_r** (R via rpy2), **shell_run** (run skill scripts / shell "
-            "commands), **search_tools** (look up domain-tool signatures).\n"
+            "commands), **search_tools** (look up domain-tool signatures), "
+            "**sandbox_status** / **sandbox_start** / **sandbox_stop** (inspect or "
+            "control Modal).\n"
         )
     elif tool_names:
         parts.append(f"\n## Available Tools ({len(tool_names)} total)\n")
@@ -222,6 +317,7 @@ def build_system_prompt(
             "- **shell.run**: Execute terminal commands (best for skill scripts, e.g. `python scripts/<name>.py ...` from a skill's directory).\n"
             "- **run_python**: Execute Python code in a sandbox (pd, np, plt, scipy, sklearn, pysam, gseapy, pydeseq2, BioPython). Variables persist between calls.\n"
             "- **run_r**: Execute R code directly. Prefer run_r over run_python for: natural splines (ns()), wilcox.test(), p.adjust(), fisher.test(), lm()/predict(), organism-specific KEGG ORA (use KEGGREST package: keggList, keggLink, keggGet for any organism code), and any analysis where R is the reference implementation. R and Python give DIFFERENT results for splines, multiple testing correction, and nonparametric tests — when the expected answer was computed in R, use R.\n"
+            "- **sandbox_status** / **sandbox_start** / **sandbox_stop**: Inspect or control the chat sandbox (Built-in vs Modal).\n"
             "- **literature.pubmed_search**, **literature.chembl_query**, **literature.openalex_search**: Literature/DB search\n"
             "- **data_api.opentargets_search**, **data_api.depmap_search**, **data_api.uniprot_lookup**: Platform APIs\n"
             "- **omics.geo_search**, **omics.geo_fetch**, **omics.deseq2**, **omics.dataset_info**: Omics data discovery + analysis\n"
@@ -243,13 +339,25 @@ def build_system_prompt(
         if skills_context:
             parts.append("\n" + skills_context)
     elif runtime == "deepagents":
+        modal_on = str(sandbox_backend or "").strip().lower() == "modal"
+        skills_exec = (
+            "To run a skill's bundled scripts, use the `shell_run` tool "
+            "(``python3`` + absolute **host** script path from the skill listing). "
+            "Skill scripts run on the host (API keys / env), not inside Modal.\n"
+            "Modal `execute` is only for `/workspace` compute (CPU/GPU code). "
+            "Do **not** `execute` skill paths like `/skills/.../scripts/*.py` — "
+            "those files are not in the Modal sandbox.\n"
+            if modal_on
+            else "To run a skill's bundled scripts, prefer the `shell_run` tool "
+            "(``python3`` + absolute script path from the skill listing).\n"
+        )
         parts.append(
             "\n## Skills & Filesystem\n"
             "Installed skills are listed in the Skills System section below. Read a "
             "skill's full SKILL.md with `read_file(path, limit=1000)` before following "
-            "it. To run a skill's bundled scripts, prefer the `shell_run` tool "
-            "(``python3`` + absolute script path from the skill listing).\n"
-            "Filesystem tools (`read_file`, `ls`, `glob`, `grep`) may read skill "
+            "it. "
+            + skills_exec
+            + "Filesystem tools (`read_file`, `ls`, `glob`, `grep`) may read skill "
             "directories and the **session workspace**. Do not use them to roam "
             "the whole machine (`/`, `$HOME`, `/tmp`, unrelated repos) looking for "
             "artifacts — downloads belong in the session workspace so the UI file "

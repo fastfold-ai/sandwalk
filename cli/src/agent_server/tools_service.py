@@ -24,11 +24,14 @@ def _tool_status(tool) -> str:
 
 class ToolsService:
     def _summary(self, tool, hidden: set[str]) -> ToolSummary:
+        from agent.tool_tiers import tool_tier
+
         return ToolSummary(
             id=tool.name,
             name=tool.name,
             category=str(tool.category or "general"),
             status=_tool_status(tool),  # type: ignore[arg-type]
+            tier=tool_tier(tool.name),  # type: ignore[arg-type]
             description=str(tool.description or ""),
             requires_data=list(tool.requires_data or []),
             enabled=tool.name not in hidden,

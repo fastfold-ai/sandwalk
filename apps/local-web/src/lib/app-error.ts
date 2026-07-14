@@ -144,11 +144,14 @@ export function normalizeAppError(
     }
   }
 
-  if (/failed to fetch|networkerror|load failed|network request failed/i.test(raw)) {
+  if (/failed to fetch|networkerror|load failed|network request failed|cors|access-control-allow-origin/i.test(raw)) {
     return {
-      title: 'Network error',
-      detail: 'The browser could not reach the backend.',
-      hint: 'Confirm the backend URL and that the agent server is running.',
+      title: 'Backend unreachable',
+      detail:
+        /cors|access-control-allow-origin/i.test(raw)
+          ? 'The browser blocked the response (often a crashing backend without CORS headers).'
+          : 'The browser could not reach the backend, or a server crash hid the real HTTP status.',
+      hint: 'Confirm the agent server is running on the expected port, check its logs for 500s, then retry. This is not an API-key problem.',
       status,
       raw,
       stack: stack || raw,
@@ -158,9 +161,9 @@ export function normalizeAppError(
 
   if (status != null && status >= 500) {
     return {
-      title: 'Server error',
-      detail: jsonDetail || `The backend returned HTTP ${status}.`,
-      hint: 'Check agent server logs, then retry.',
+      title: 'Backend error',
+      detail: jsonDetail || `The agent server returned HTTP ${status}.`,
+      hint: 'Check agent server logs (and ~/.sandwalk if the store is corrupt), then retry. This is not an API-key problem.',
       status,
       raw,
       stack: stack || raw,
@@ -189,6 +192,24 @@ export function normalizeAppError(
     stack: stack || (jsonDetail && jsonDetail !== raw ? raw : null),
     name
   }
+}
+
+/** True only for credential / permission rejections — not network or 5xx. */
+export function isAuthCredentialError(error: unknown): boolean {
+  const info = normalizeAppError(error)
+  return info.status === 401 || info.status === 403
+}
+
+/** True when the agent API is down, crashing, or blocked by CORS. */
+export function isBackendUnavailableError(error: unknown): boolean {
+  const info = normalizeAppError(error)
+  if (info.status != null && info.status >= 500) return true
+  return (
+    info.title === 'Backend unreachable' ||
+    /failed to fetch|networkerror|load failed|network request failed|cors|access-control-allow-origin/i.test(
+      info.raw
+    )
+  )
 }
 
 /** @deprecated Prefer normalizeAppError — kept for connect-form call sites. */

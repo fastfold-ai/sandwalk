@@ -70,7 +70,25 @@ class TestClassifyLlmError:
     def test_openai_style_error_falls_back_to_provider_message(self):
         title, body = _classify_llm_error(_OpenAIStyleErr("something odd happened"))
         assert title == "Model provider request failed"
-        assert "openai-compatible" in body.lower()
+        assert "something odd happened" in body
+        assert "llm.model" in body
+
+    def test_context_length_exceeded(self):
+        title, body = _classify_llm_error(
+            _OpenAIStyleErr("Error code: 400 - context_length_exceeded")
+        )
+        assert title == "Context length exceeded"
+        assert "context" in body.lower()
+
+    def test_gemini_thought_signature_error(self):
+        title, body = _classify_llm_error(
+            _Err(
+                "Error code: 400 - Function call is missing a thought_signature "
+                "in functionCall parts."
+            )
+        )
+        assert title == "Gemini tool-call signature missing"
+        assert "native Google GenAI" in body
 
     def test_unrecognized(self):
         assert _classify_llm_error(_Err("completely unknown")) is None

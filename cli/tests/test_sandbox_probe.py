@@ -61,6 +61,10 @@ def test_probe_mocked_success(monkeypatch, tmp_path):
 
     fake_backend.execute.side_effect = _exec
     fake_backend.upload_files.return_value = []
+    fake_backend.read.return_value = SimpleNamespace(
+        error=None,
+        file_data={"content": "---\nname: e2e_probe\n---\n\n# Probe\n", "encoding": "utf-8"},
+    )
 
     handle = MagicMock()
     handle.kind = "modal"

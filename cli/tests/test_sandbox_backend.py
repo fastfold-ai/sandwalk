@@ -139,7 +139,7 @@ def test_resolve_modal_mocked(tmp_path: Path):
     (tmp_path / "hello.txt").write_text("hi")
     skills = tmp_path / "skills" / "demo"
     skills.mkdir(parents=True)
-    (skills / "SKILL.md").write_text("x")
+    (skills / "SKILL.md").write_text("---\nname: demo\n---\n\n# Demo\n")
 
     fake_backend = MagicMock()
     fake_backend.execute.return_value = SimpleNamespace(output="", exit_code=0)
@@ -179,9 +179,53 @@ def test_resolve_modal_mocked(tmp_path: Path):
     assert handle.kind == "modal"
     assert again is handle
     assert handle.skills_sources == ["/skills/"]
-    assert handle.backend is fake_backend
-    assert fake_backend.upload_files.called
+    # Skills are routed locally via CompositeBackend — not uploaded to Modal.
+    from deepagents.backends import CompositeBackend
+
+    assert isinstance(handle.backend, CompositeBackend)
+    assert handle.backend.default is fake_backend
+    assert fake_backend.upload_files.called  # workspace push only
+    # seed_skills must not run: no /skills/ uploads beyond workspace files
+    uploaded_paths = []
+    for call in fake_backend.upload_files.call_args_list:
+        files = call.args[0] if call.args else call.kwargs.get("files", [])
+        uploaded_paths.extend(path for path, _ in files)
+    assert all(not str(p).startswith("/skills/") for p in uploaded_paths)
     assert push_paths_for_session("s1", tmp_path, ["hello.txt"]) >= 0
+
+
+def test_resolve_modal_does_not_upload_skills(tmp_path: Path):
+    clear_active_handles()
+    skills = tmp_path / "skills" / "demo"
+    skills.mkdir(parents=True)
+    (skills / "SKILL.md").write_text("x")
+    # Large-ish skill tree should still never touch Modal upload for /skills/
+    blob = skills / "big.bin"
+    blob.write_bytes(b"0" * 1024)
+    fake_backend = MagicMock()
+    fake_backend.execute.return_value = SimpleNamespace(output="", exit_code=0)
+    fake_backend.upload_files.return_value = []
+    cfg = SimpleNamespace(
+        get=lambda key, default=None: {"sandbox.backend": "modal"}.get(key, default)
+    )
+    with patch(
+        "agent.sandbox_backend._create_or_reuse_modal_sandbox",
+        return_value=(fake_backend, MagicMock(), "sandwalk-ns", True),
+    ):
+        resolve_deepagents_backend(
+            cfg,
+            session_id="no-skills-upload",
+            workspace_root=str(tmp_path),
+            skill_source_dirs=[str(tmp_path / "skills")],
+        )
+    uploaded_paths = []
+    for call in fake_backend.upload_files.call_args_list:
+        files = call.args[0] if call.args else call.kwargs.get("files", [])
+        uploaded_paths.extend(path for path, _ in files)
+    assert all(not str(p).startswith("/skills/") for p in uploaded_paths)
+    from agent import sandbox_backend as sb
+
+    assert not hasattr(sb, "seed_skills")
 
 
 def test_resolve_modal_background_sync_registers_immediately(tmp_path: Path):
@@ -197,7 +241,7 @@ def test_resolve_modal_background_sync_registers_immediately(tmp_path: Path):
             "agent.sandbox_backend._create_or_reuse_modal_sandbox",
             return_value=(fake_backend, fake_modal_sb, "sandwalk-bg", True),
         ),
-        patch("agent.sandbox_backend._seed_modal_handle") as seed,
+        patch("agent.sandbox_backend._seed_modal_workspace") as seed,
     ):
         handle = resolve_deepagents_backend(
             cfg,
@@ -210,6 +254,68 @@ def test_resolve_modal_background_sync_registers_immediately(tmp_path: Path):
     assert get_active_handle("bg-1") is handle
     # Seed is scheduled on a daemon thread; don't require it to have finished.
     assert seed.call_count >= 0
+
+
+def test_modal_skills_execute_runs_on_host(tmp_path: Path):
+    clear_active_handles()
+    skills = tmp_path / "skills" / "demo"
+    skills.mkdir(parents=True)
+    script = skills / "scripts"
+    script.mkdir()
+    (script / "hello.py").write_text("print('host-skill-ok')\n")
+    (skills / "SKILL.md").write_text("---\nname: demo\n---\n")
+
+    fake_backend = MagicMock()
+    fake_backend.execute.return_value = SimpleNamespace(
+        output="should-not-use-modal", exit_code=0
+    )
+    cfg = SimpleNamespace(
+        get=lambda key, default=None: {"sandbox.backend": "modal"}.get(key, default)
+    )
+    with patch(
+        "agent.sandbox_backend._create_or_reuse_modal_sandbox",
+        return_value=(fake_backend, MagicMock(), "sandwalk-exec", True),
+    ):
+        handle = resolve_deepagents_backend(
+            cfg,
+            session_id="exec-skills",
+            workspace_root=str(tmp_path),
+            skill_source_dirs=[str(tmp_path / "skills")],
+            sync_workspace=False,
+        )
+
+    result = handle.backend.execute(
+        "python3 /skills/demo/scripts/hello.py",
+        timeout=30,
+    )
+    assert "host-skill-ok" in str(getattr(result, "output", result))
+    assert getattr(result, "exit_code", None) == 0
+    # Modal execute must not be used for /skills/ paths
+    fake_backend.execute.assert_not_called()
+
+
+def test_modal_workspace_execute_uses_modal(tmp_path: Path):
+    clear_active_handles()
+    fake_backend = MagicMock()
+    fake_backend.execute.return_value = SimpleNamespace(output="modal-ok", exit_code=0)
+    cfg = SimpleNamespace(
+        get=lambda key, default=None: {"sandbox.backend": "modal"}.get(key, default)
+    )
+    with patch(
+        "agent.sandbox_backend._create_or_reuse_modal_sandbox",
+        return_value=(fake_backend, MagicMock(), "sandwalk-ws", True),
+    ):
+        handle = resolve_deepagents_backend(
+            cfg,
+            session_id="exec-ws",
+            workspace_root=str(tmp_path),
+            skill_source_dirs=[],
+            sync_workspace=False,
+        )
+
+    result = handle.backend.execute("echo hi", timeout=10)
+    assert getattr(result, "output", None) == "modal-ok"
+    fake_backend.execute.assert_called()
 
 
 def test_run_modal_blocking_offloads_when_loop_running():

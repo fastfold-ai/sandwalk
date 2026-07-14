@@ -404,6 +404,7 @@ class AgentService:
             project_context = None
             specialist_instructions = None
             allowed_skill_names = None
+            allowed_tool_names = None
             current = self.store.get_session(session_id)
             if current and current.project_id:
                 project = self.store.get_project(current.project_id)
@@ -419,6 +420,8 @@ class AgentService:
                     if specialist.instructions and specialist.instructions.strip():
                         specialist_instructions = specialist.instructions.strip()
                     allowed_skill_names = list(specialist.skill_names or [])
+                    # Explicit allowlist (may be empty → no domain registry tools).
+                    allowed_tool_names = list(specialist.tool_names or [])
                     mcp_servers = filter_mcp_servers_for_specialist(
                         mcp_servers,
                         mcp_server_ids=list(specialist.mcp_server_ids or []),
@@ -436,6 +439,7 @@ class AgentService:
                 allowed_skill_names,
                 session_id,
                 current.sandbox_backend if current else None,
+                allowed_tool_names,
             )
             assistant_message = self.store.add_message(
                 session_id=session_id,
@@ -517,6 +521,7 @@ class AgentService:
         allowed_skill_names: list[str] | None = None,
         session_id: str | None = None,
         sandbox_backend: str | None = None,
+        allowed_tool_names: list[str] | None = None,
     ) -> str:
         """Temporary adapter until AgentRunner is split into AgentRuntime."""
         from agent.config import Config
@@ -557,6 +562,8 @@ class AgentService:
             context["specialist_instructions"] = specialist_instructions
         if allowed_skill_names is not None:
             context["allowed_skill_names"] = allowed_skill_names
+        if allowed_tool_names is not None:
+            context["allowed_tool_names"] = allowed_tool_names
         result = runner.run(content, context, progress_callback=progress_callback)
         return result.summary or "Done."
 

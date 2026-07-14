@@ -1,4 +1,8 @@
-"""Resolve deepagents filesystem backends (builtin vs Modal)."""
+"""Resolve deepagents filesystem backends (builtin vs Modal).
+
+Modal is the compute runtime (execute + /workspace). Skills stay on the host via
+CompositeBackend routing — they are never uploaded into Modal.
+"""
 
 from __future__ import annotations
 
@@ -8,12 +12,16 @@ import hashlib
 import logging
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
-from deepagents.backends import FilesystemBackend
+from deepagents.backends import CompositeBackend, FilesystemBackend
 
 from agent.sandbox_sync import (
     SKILLS_REMOTE_ROOT,
@@ -21,7 +29,6 @@ from agent.sandbox_sync import (
     pull_tree,
     push_paths,
     push_tree,
-    seed_skills,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +45,14 @@ _MODAL_IO_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
     thread_name_prefix="sandwalk-modal",
 )
 _T = TypeVar("_T")
+
+_SKILLS_EXECUTE_HINT = (
+    "Skill scripts are not available inside the Modal sandbox. "
+    "Use the shell_run tool with the absolute host path to the skill script "
+    "(from the Skills listing), e.g. "
+    "`python3 /path/to/skills/<name>/scripts/<script>.py ...`. "
+    "Modal `execute` is only for /workspace compute."
+)
 
 
 def _run_modal_blocking(fn: Callable[[], _T]) -> _T:
@@ -84,14 +99,17 @@ class SandboxHandle:
     def pull(self) -> int:
         if self.kind != "modal":
             return 0
-        return pull_tree(self.backend, self.workspace_root)
+        # Prefer the Modal default when wrapped in CompositeBackend.
+        target = getattr(self.backend, "default", self.backend)
+        return pull_tree(target, self.workspace_root)
 
     def push(self, relative_paths: list[str] | None = None) -> int:
         if self.kind != "modal":
             return 0
+        target = getattr(self.backend, "default", self.backend)
         if relative_paths:
-            return push_paths(self.backend, self.workspace_root, relative_paths)
-        return push_tree(self.backend, self.workspace_root)
+            return push_paths(target, self.workspace_root, relative_paths)
+        return push_tree(target, self.workspace_root)
 
     def terminate(self) -> None:
         if self.kind != "modal" or self.modal_sandbox is None:
@@ -139,7 +157,8 @@ def push_paths_for_session(
         return 0
     # Prefer the live handle workspace; fall back to caller root.
     root = handle.workspace_root or str(local_root)
-    return push_paths(handle.backend, root, relative_paths)
+    target = getattr(handle.backend, "default", handle.backend)
+    return push_paths(target, root, relative_paths)
 
 
 def sandbox_backend_from_config(config: Any) -> str:
@@ -194,10 +213,14 @@ def _build_modal_image(config: Any, *, compute_type: str = "cpu"):
 
     packages = parse_pip_packages(config.get("sandbox.pip_packages"))
     python_version = "3.11"
-    image_key = (
-        "sandbox.gpu_image" if str(compute_type).strip().lower() == "gpu" else "sandbox.cpu_image"
+    is_gpu = str(compute_type).strip().lower() == "gpu"
+    image_key = "sandbox.gpu_image" if is_gpu else "sandbox.cpu_image"
+    default_ref = (
+        "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime"
+        if is_gpu
+        else "python:3.12-slim"
     )
-    ref = str(config.get(image_key) or "debian_slim").strip() or "debian_slim"
+    ref = str(config.get(image_key) or default_ref).strip() or default_ref
     # debian_slim is Modal's helper (Image.debian_slim), not a Docker Hub tag.
     if ref in {"debian_slim", "debian-slim"}:
         image = modal.Image.debian_slim(python_version=python_version)
@@ -226,8 +249,8 @@ def _create_or_reuse_modal_sandbox_impl(config: Any, *, session_id: str | None):
     name = _safe_sandbox_name(session_id)
     idle_ttl = int(config.get("sandbox.idle_ttl_seconds") or 600)
     timeout = max(idle_ttl + 60, int(config.get("sandbox.timeout") or 30) * 60)
-    cpu = float(config.get("sandbox.cpu_cores") or 1.0)
-    ram_gb = float(config.get("sandbox.ram_gb") or 4.0)
+    cpu = float(config.get("sandbox.cpu_cores") or 2.0)
+    ram_gb = float(config.get("sandbox.ram_gb") or 8.0)
     memory_mb = max(512, int(ram_gb * 1024))
     compute_type = str(config.get("sandbox.compute_type") or "cpu").strip().lower()
     image = _build_modal_image(config, compute_type=compute_type)
@@ -372,6 +395,120 @@ def _patch_modal_filesystem_io(backend: Any, modal_sandbox: Any) -> None:
     backend.download_files = download_files  # type: ignore[method-assign]
 
 
+def _skills_filesystem_root(sources: list[str]) -> Path | None:
+    """Build a single host root for CompositeBackend ``/skills/`` routing.
+
+    Later sources override earlier ones on name collision (bundled -> npx -> global).
+    """
+    existing: list[Path] = []
+    for raw in sources:
+        path = Path(str(raw)).expanduser().resolve()
+        if path.is_dir():
+            existing.append(path)
+    if not existing:
+        return None
+    if len(existing) == 1:
+        return existing[0]
+
+    staging = Path(tempfile.mkdtemp(prefix="sandwalk-skills-route-"))
+    for src in existing:
+        try:
+            children = list(src.iterdir())
+        except OSError:
+            continue
+        for child in children:
+            if not child.is_dir():
+                continue
+            dest = staging / child.name
+            if dest.exists() or dest.is_symlink():
+                if dest.is_symlink() or dest.is_file():
+                    dest.unlink(missing_ok=True)
+                elif dest.is_dir():
+                    shutil.rmtree(dest, ignore_errors=True)
+            try:
+                dest.symlink_to(child, target_is_directory=True)
+            except OSError:
+                try:
+                    shutil.copytree(child, dest, dirs_exist_ok=True)
+                except OSError as exc:
+                    logger.warning("Could not stage skill %s: %s", child, exc)
+    return staging
+
+
+def _command_targets_skills(command: str) -> bool:
+    text = str(command or "")
+    if f"{SKILLS_REMOTE_ROOT}/" in text:
+        return True
+    # Bare relative forms agents sometimes try.
+    return bool(re.search(r"(^|[\s'\"])skills/", text))
+
+
+def _wrap_composite_execute_for_skills(backend: CompositeBackend, skills_root: Path) -> None:
+    """Reject Modal execute for skill paths; optionally rewrite + run on host.
+
+    Prefer host ``shell_run`` (prompted). If the model still uses ``execute`` with
+    a ``/skills/...`` path, rewrite to the host skills root and run locally so
+    FastFold API scripts keep working with host env/secrets.
+    """
+    from deepagents.backends.protocol import ExecuteResponse
+
+    original_execute = backend.execute
+    host_prefix = str(skills_root.resolve()).rstrip("/") + "/"
+
+    def execute(command: str, *, timeout: int | None = None) -> Any:
+        if not _command_targets_skills(command):
+            if timeout is not None:
+                return original_execute(command, timeout=timeout)
+            return original_execute(command)
+
+        host_cmd = str(command).replace(f"{SKILLS_REMOTE_ROOT}/", host_prefix)
+        host_cmd = re.sub(r"(^|[\s'\"])skills/", rf"\1{host_prefix}", host_cmd)
+        try:
+            completed = subprocess.run(
+                host_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout or 600,
+                check=False,
+            )
+            output = (completed.stdout or "") + (completed.stderr or "")
+            return ExecuteResponse(output=output, exit_code=completed.returncode)
+        except subprocess.TimeoutExpired as exc:
+            output = (exc.stdout or "") + (exc.stderr or "")
+            if isinstance(output, bytes):
+                output = output.decode("utf-8", errors="replace")
+            return ExecuteResponse(
+                output=(output or "") + f"\nTimed out. {_SKILLS_EXECUTE_HINT}",
+                exit_code=124,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return ExecuteResponse(
+                output=f"{exc}\n{_SKILLS_EXECUTE_HINT}",
+                exit_code=1,
+            )
+
+    backend.execute = execute  # type: ignore[method-assign]
+
+
+def _compose_modal_with_local_skills(
+    modal_backend: Any,
+    skill_source_dirs: list[str],
+) -> tuple[Any, list[str], Path | None]:
+    """Wrap Modal with a local ``/skills/`` FilesystemBackend route."""
+    skills_root = _skills_filesystem_root(skill_source_dirs)
+    if skills_root is None:
+        return modal_backend, [], None
+
+    skills_fs = FilesystemBackend(root_dir=str(skills_root), virtual_mode=True)
+    composite = CompositeBackend(
+        default=modal_backend,
+        routes={f"{SKILLS_REMOTE_ROOT}/": skills_fs},
+    )
+    _wrap_composite_execute_for_skills(composite, skills_root)
+    return composite, [f"{SKILLS_REMOTE_ROOT}/"], skills_root
+
+
 def resolve_deepagents_backend(
     config: Any,
     *,
@@ -384,10 +521,12 @@ def resolve_deepagents_backend(
 ) -> SandboxHandle:
     """Return the deepagents backend for the current config + session.
 
-    When ``sync_workspace`` is False, the Modal sandbox is created/reused and
-    registered immediately without pushing local files (fast Start UX).
-    When ``background_sync`` is True, seeding runs in a daemon thread after
-    registration so callers can return ``running`` right away.
+    Modal mode uses CompositeBackend: Modal for ``/workspace`` + ``execute``,
+    local FilesystemBackend for ``/skills/`` (no skills upload).
+
+    Workspace sync never uploads skills. When ``background_sync`` is True (or
+    when reusing an unseeded handle), workspace push runs in a daemon thread so
+    Start / first message are not blocked.
     """
     override = str(backend_override or "").strip().lower()
     if override in {"builtin", "modal"}:
@@ -415,62 +554,112 @@ def resolve_deepagents_backend(
         and existing.kind == "modal"
         and existing.workspace_root == workspace_root
     ):
+        # Refresh skills route sources if callers pass new dirs (specialist scope).
+        if sources and existing.extras.get("skills_root") is None:
+            composed, skill_paths, skills_root = _compose_modal_with_local_skills(
+                getattr(existing.backend, "default", existing.backend),
+                sources,
+            )
+            if skills_root is not None:
+                existing.backend = composed
+                existing.skills_sources = skill_paths
+                existing.extras["skills_root"] = str(skills_root)
         if sync_workspace and not existing.seeded:
-            _seed_modal_handle(existing, sources)
+            # Never block the agent on workspace sync.
+            threading.Thread(
+                target=_seed_modal_workspace,
+                args=(existing,),
+                name=f"modal-seed-{session_id or 'default'}",
+                daemon=True,
+            ).start()
         return existing
 
-    backend, modal_sandbox, name, _created = _create_or_reuse_modal_sandbox(
+    modal_backend, modal_sandbox, name, _created = _create_or_reuse_modal_sandbox(
         config, session_id=session_id
+    )
+    backend, skill_paths, skills_root = _compose_modal_with_local_skills(
+        modal_backend, sources
     )
     handle = SandboxHandle(
         kind="modal",
         backend=backend,
         workspace_root=workspace_root,
-        skills_sources=[f"{SKILLS_REMOTE_ROOT}/"],
+        skills_sources=skill_paths,
         session_id=session_id,
         provider_sandbox_name=name,
         modal_sandbox=modal_sandbox,
         seeded=False,
+        extras={"skills_root": str(skills_root)} if skills_root else {},
     )
     # Register before sync so status APIs can report "running" immediately.
     register_handle(handle)
 
-    def _run_seed() -> None:
-        try:
-            backend.execute(
-                f"mkdir -p {WORKSPACE_REMOTE_ROOT} {SKILLS_REMOTE_ROOT}",
-                timeout=60,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Modal mkdir failed: %s", exc)
-        _seed_modal_handle(handle, sources)
-
     if not sync_workspace:
         return handle
+
+    # Workspace-only sync (no skills upload). Prefer background so Start and
+    # first message stay fast; empty workspaces finish almost instantly.
     if background_sync:
         threading.Thread(
-            target=_run_seed,
+            target=_seed_modal_workspace,
+            args=(handle,),
             name=f"modal-seed-{session_id or 'default'}",
             daemon=True,
         ).start()
         return handle
-    _run_seed()
+
+    # Synchronous path still never uploads skills — only /workspace.
+    _seed_modal_workspace(handle)
     return handle
 
 
-def _seed_modal_handle(handle: SandboxHandle, sources: list[str]) -> None:
+def _seed_modal_workspace(handle: SandboxHandle) -> None:
+    """Push local session workspace into Modal. Never uploads skills."""
     if handle.kind != "modal":
         return
     with _seed_lock_for(handle.session_id):
         if handle.seeded:
             return
+        target = getattr(handle.backend, "default", handle.backend)
         try:
-            push_tree(handle.backend, handle.workspace_root)
-            if sources:
-                seed_skills(handle.backend, sources)
+            try:
+                target.execute(
+                    f"mkdir -p {WORKSPACE_REMOTE_ROOT}",
+                    timeout=60,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Modal mkdir failed: %s", exc)
+            push_tree(target, handle.workspace_root)
         except Exception as exc:  # noqa: BLE001
-            # Mark seeded anyway so a failed/partial sync does not retry forever
-            # and keep hammering Modal (or the local event loop).
-            logger.warning("Modal seed sync failed: %s", exc)
+            # Mark seeded anyway so a failed/partial sync does not retry forever.
+            logger.warning("Modal workspace sync failed: %s", exc)
         finally:
             handle.seeded = True
+
+
+def wait_until_seeded(
+    handle: SandboxHandle,
+    *,
+    timeout: float = 120.0,
+    poll_interval: float = 0.25,
+) -> bool:
+    """Block until Modal workspace seed finishes (or ``timeout`` elapses).
+
+    Returns True when ``handle.seeded`` is True. Built-in handles always return
+    True immediately. Used by the agent runner so the first Modal ``execute``
+    sees a synced ``/workspace``.
+    """
+    if handle.kind != "modal":
+        return True
+    if handle.seeded:
+        return True
+    deadline = time.monotonic() + max(0.0, float(timeout))
+    while not handle.seeded:
+        if time.monotonic() >= deadline:
+            logger.warning(
+                "Timed out waiting for Modal workspace seed (session=%s)",
+                handle.session_id,
+            )
+            return False
+        time.sleep(max(0.05, float(poll_interval)))
+    return True

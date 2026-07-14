@@ -365,13 +365,13 @@ struct SandboxSettingsDTO: Codable, Hashable {
     static let defaults = SandboxSettingsDTO(
         backend: "builtin",
         modalApp: "sandwalk",
-        cpuImage: "debian_slim",
-        gpuImage: "debian_slim",
+        cpuImage: "python:3.12-slim",
+        gpuImage: "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
         pipPackages: "pandas,numpy,matplotlib,scipy,pillow",
         computeType: "cpu",
         gpuClass: "T4",
-        cpuCores: 1.0,
-        ramGb: 4.0,
+        cpuCores: 2.0,
+        ramGb: 8.0,
         idleTtlSeconds: 600,
         modalConfigured: false
     )

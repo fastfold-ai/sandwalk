@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { MirageBackground } from '@/components/MirageBackground'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { ErrorPage } from '@/components/ErrorPage'
 import {
   Dialog,
   DialogContent,
@@ -89,10 +90,15 @@ function MacAppIcon({ className }: { className?: string }) {
 export function LoginView({
   onSubmit,
   submitting = false,
+  error = null,
+  onRetry,
   className
 }: {
   onSubmit: (apiKey: string, remember: boolean) => void | Promise<void>
   submitting?: boolean
+  /** Backend/network failure shown above the form — not a bad API key. */
+  error?: unknown | null
+  onRetry?: () => void
   className?: string
 }) {
   const [apiKey, setApiKey] = useState('')
@@ -125,6 +131,17 @@ export function LoginView({
               Sandwalk
             </h1>
           </div>
+
+          {error ? (
+            <div className="mb-4 w-full">
+              <ErrorPage
+                variant="inline"
+                error={error}
+                onRetry={onRetry}
+                retryLabel="Retry connection"
+              />
+            </div>
+          ) : null}
 
           <form
             className="bg-card border-border w-full rounded-2xl border px-8 py-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-none"

@@ -230,6 +230,7 @@ export type Specialist = {
   color: SpecialistColor | string
   icon: SpecialistIcon | string
   skillNames: string[]
+  toolNames: string[]
   mcpServerIds: string[]
   mcpCatalogIds: string[]
   enabled: boolean
@@ -540,9 +541,42 @@ export type ToolSummary = {
   name: string
   category: string
   status: 'stable' | 'experimental' | 'guarded'
+  tier?: 'core' | 'extra'
   description: string
   requiresData: string[]
   enabled: boolean
+}
+
+export type PromptBudgetBucket = {
+  id: string
+  label: string
+  tokens: number
+  chars: number
+  count?: number | null
+  children: PromptBudgetBucket[]
+}
+
+export type PromptBudgetToolCounts = {
+  domain: number
+  mcp: number
+  deepagents: number
+  total: number
+  openaiCap: number
+}
+
+export type PromptBudgetResponse = {
+  totalTokens: number
+  totalChars: number
+  tokenizer: string
+  toolMode: string
+  provider: string | null
+  model: string | null
+  specialistId: string | null
+  specialistName: string | null
+  toolCounts: PromptBudgetToolCounts
+  buckets: PromptBudgetBucket[]
+  warnings: string[]
+  sampleQuery: string
 }
 
 export type ToolCatalog = {
@@ -944,6 +978,7 @@ export interface AgentClient {
       color?: string
       icon?: string
       skillNames?: string[]
+      toolNames?: string[]
       mcpServerIds?: string[]
       mcpCatalogIds?: string[]
       enabled?: boolean
@@ -960,12 +995,21 @@ export interface AgentClient {
       color?: string
       icon?: string
       skillNames?: string[]
+      toolNames?: string[]
       mcpServerIds?: string[]
       mcpCatalogIds?: string[]
       enabled?: boolean
     },
     signal?: AbortSignal,
   ): Promise<Specialist>
+  getPromptBudget?(
+    options?: {
+      specialistId?: string | null
+      projectId?: string | null
+      sampleQuery?: string | null
+    },
+    signal?: AbortSignal,
+  ): Promise<PromptBudgetResponse>
   deleteSpecialist?(specialistId: string, signal?: AbortSignal): Promise<void>
   createProject?(
     input: {

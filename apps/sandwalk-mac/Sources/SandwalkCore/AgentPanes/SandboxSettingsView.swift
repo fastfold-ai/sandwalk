@@ -446,7 +446,7 @@ struct ModalSandboxDetailView: View {
 
                 SettingsSectionHeader(
                     "IMAGES",
-                    subtitle: "debian_slim is Modal’s helper; Docker refs like python:3.12-slim also work."
+                    subtitle: "Defaults: python:3.12-slim (CPU), pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime (GPU)."
                 )
                 SettingsListGroup {
                     SettingsRow(label: "CPU image", sublabel: "Base image for CPU sandboxes") {
@@ -584,9 +584,9 @@ struct ModalSandboxDetailView: View {
             "modalApp": draft.modalApp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? "sandwalk" : draft.modalApp,
             "cpuImage": draft.cpuImage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "debian_slim" : draft.cpuImage,
+                ? "python:3.12-slim" : draft.cpuImage,
             "gpuImage": draft.gpuImage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "debian_slim" : draft.gpuImage,
+                ? "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime" : draft.gpuImage,
             "pipPackages": draft.pipPackages,
             "computeType": draft.computeType == "gpu" ? "gpu" : "cpu",
             "gpuClass": selectedGpu,

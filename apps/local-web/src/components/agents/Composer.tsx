@@ -290,7 +290,6 @@ export function Composer({
   const [sandboxConfirming, setSandboxConfirming] = useState(false)
   const [localSystem, setLocalSystem] = useState<ServerSystemInfo | null>(null)
   const [localSystemLoading, setLocalSystemLoading] = useState(false)
-  const sandboxHoverCloseRef = useRef<number | null>(null)
   const previewCacheRef = useRef<Map<string, string>>(new Map())
   const skillItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const fileItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
@@ -305,14 +304,6 @@ export function Composer({
     if (document.activeElement === preferred) return
     preferred.focus({ preventScroll: true })
   }, [focusedPartIndex])
-
-  useEffect(() => {
-    return () => {
-      if (sandboxHoverCloseRef.current != null) {
-        window.clearTimeout(sandboxHoverCloseRef.current)
-      }
-    }
-  }, [])
 
   useEffect(() => {
     if (!sandboxPickerOpen) return
@@ -1377,48 +1368,50 @@ export function Composer({
                     autoFocus
                   />
                 </div>
-                <div className="max-h-72 overflow-y-auto overscroll-contain py-1">
-                  {modelOptions.length === 0 ? (
-                    <div className="text-muted-foreground px-3 py-3 text-sm">
-                      No enabled models. Turn models on in Dashboard → Models.
-                    </div>
-                  ) : filteredModelOptions.length === 0 ? (
-                    <div className="text-muted-foreground px-3 py-3 text-sm">
-                      No models match “{modelSearch.trim()}”.
-                    </div>
-                  ) : (
-                    filteredModelOptions.map(option => {
-                      const isSelected =
-                        option.model === runtimeSettings?.model
-                      return (
-                        <button
-                          key={`${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`}
-                          type="button"
-                          className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm"
-                          onClick={() => {
-                            void onModelSelect(
-                              option.provider,
-                              option.model,
-                              option.profileId
-                            )
-                            setModelPickerOpen(false)
-                            setModelSearch('')
-                          }}
-                        >
-                          <span className="truncate">{option.label}</span>
-                          {option.speed ? (
-                            <span className="text-muted-foreground truncate text-xs">
-                              {option.speed}
-                            </span>
-                          ) : null}
-                          {isSelected ? (
-                            <Check className="text-foreground ml-auto size-4 shrink-0" />
-                          ) : null}
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
+                <ScrollArea className="h-72">
+                  <div className="py-1">
+                    {modelOptions.length === 0 ? (
+                      <div className="text-muted-foreground px-3 py-3 text-sm">
+                        No enabled models. Turn models on in Dashboard → Models.
+                      </div>
+                    ) : filteredModelOptions.length === 0 ? (
+                      <div className="text-muted-foreground px-3 py-3 text-sm">
+                        No models match “{modelSearch.trim()}”.
+                      </div>
+                    ) : (
+                      filteredModelOptions.map(option => {
+                        const isSelected =
+                          option.model === runtimeSettings?.model
+                        return (
+                          <button
+                            key={`${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`}
+                            type="button"
+                            className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm"
+                            onClick={() => {
+                              void onModelSelect(
+                                option.provider,
+                                option.model,
+                                option.profileId
+                              )
+                              setModelPickerOpen(false)
+                              setModelSearch('')
+                            }}
+                          >
+                            <span className="truncate">{option.label}</span>
+                            {option.speed ? (
+                              <span className="text-muted-foreground truncate text-xs">
+                                {option.speed}
+                              </span>
+                            ) : null}
+                            {isSelected ? (
+                              <Check className="text-foreground ml-auto size-4 shrink-0" />
+                            ) : null}
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
               </PopoverContent>
             </Popover>
             {onSpecialistSelect ? (
@@ -1531,147 +1524,113 @@ export function Composer({
                 open={sandboxPickerOpen}
                 onOpenChange={setSandboxPickerOpen}
               >
-                <div
-                  onMouseEnter={() => {
-                    if (sandboxHoverCloseRef.current != null) {
-                      window.clearTimeout(sandboxHoverCloseRef.current)
-                      sandboxHoverCloseRef.current = null
-                    }
-                    setSandboxPickerOpen(true)
-                  }}
-                  onMouseLeave={() => {
-                    if (sandboxHoverCloseRef.current != null) {
-                      window.clearTimeout(sandboxHoverCloseRef.current)
-                    }
-                    sandboxHoverCloseRef.current = window.setTimeout(() => {
-                      setSandboxPickerOpen(false)
-                      sandboxHoverCloseRef.current = null
-                    }, 180)
-                  }}
-                >
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
-                      aria-label="Sandbox backend"
-                    >
-                      {sandboxPhase !== 'idle' ||
-                      sandboxStatus?.status === 'starting' ||
-                      sandboxStatus?.status === 'stopping' ? (
-                        <Loader className="text-muted-foreground size-3.5 shrink-0 animate-spin" />
-                      ) : sandboxStatus?.backend === 'modal' ? (
-                        <>
-                          <ModalGlyph />
-                          <span
-                            className={cn(
-                              'size-1.5 rounded-full',
-                              sandboxStatusDotClass(sandboxStatus, sandboxPhase)
-                            )}
-                          />
-                        </>
-                      ) : (
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
+                    aria-label="Sandbox backend"
+                  >
+                    {sandboxPhase !== 'idle' ||
+                    sandboxStatus?.status === 'starting' ||
+                    sandboxStatus?.status === 'stopping' ? (
+                      <Loader className="text-muted-foreground size-3.5 shrink-0 animate-spin" />
+                    ) : sandboxStatus?.backend === 'modal' ? (
+                      <>
+                        <ModalGlyph />
                         <span
                           className={cn(
                             'size-1.5 rounded-full',
                             sandboxStatusDotClass(sandboxStatus, sandboxPhase)
                           )}
                         />
-                      )}
-                      <span className="font-medium">
-                        {sandboxStatusLabel(sandboxStatus, sandboxPhase)}
-                      </span>
-                      <ChevronDown className="text-muted-foreground size-3.5" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="start"
-                    side="top"
-                    sideOffset={6}
-                    className="w-[16.5rem] overflow-hidden p-0"
-                    onMouseEnter={() => {
-                      if (sandboxHoverCloseRef.current != null) {
-                        window.clearTimeout(sandboxHoverCloseRef.current)
-                        sandboxHoverCloseRef.current = null
-                      }
-                      setSandboxPickerOpen(true)
-                    }}
-                    onMouseLeave={() => {
-                      if (sandboxHoverCloseRef.current != null) {
-                        window.clearTimeout(sandboxHoverCloseRef.current)
-                      }
-                      sandboxHoverCloseRef.current = window.setTimeout(() => {
-                        setSandboxPickerOpen(false)
-                        sandboxHoverCloseRef.current = null
-                      }, 180)
-                    }}
-                    onOpenAutoFocus={event => event.preventDefault()}
-                  >
-                    <div className="flex items-center justify-between gap-2 border-b px-2.5 py-1.5">
-                      <span className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
-                        Sandbox
-                      </span>
-                      <Link
-                        to="/dashboard/agent/sandbox"
-                        className="text-muted-foreground hover:text-foreground text-[10px] font-medium underline-offset-2 hover:underline"
-                        onClick={() => setSandboxPickerOpen(false)}
+                      </>
+                    ) : (
+                      <span
+                        className={cn(
+                          'size-1.5 rounded-full',
+                          sandboxStatusDotClass(sandboxStatus, sandboxPhase)
+                        )}
+                      />
+                    )}
+                    <span className="font-medium">
+                      {sandboxStatusLabel(sandboxStatus, sandboxPhase)}
+                    </span>
+                    <ChevronDown className="text-muted-foreground size-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  side="top"
+                  sideOffset={6}
+                  className="w-[16.5rem] overflow-hidden p-0"
+                  onOpenAutoFocus={event => event.preventDefault()}
+                >
+                  <div className="flex items-center justify-between gap-2 border-b px-2.5 py-1.5">
+                    <span className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
+                      Sandbox
+                    </span>
+                    <Link
+                      to="/dashboard/agent/sandbox"
+                      className="text-muted-foreground hover:text-foreground text-[10px] font-medium underline-offset-2 hover:underline"
+                      onClick={() => setSandboxPickerOpen(false)}
+                    >
+                      Settings
+                    </Link>
+                  </div>
+                  <div className="space-y-1.5 p-2">
+                    <div className="inline-flex w-full rounded-md border p-0.5">
+                      <button
+                        type="button"
+                        disabled={sandboxPhase !== 'idle' || sandboxConfirming}
+                        onClick={() =>
+                          setSandboxDraft(current => ({
+                            ...current,
+                            backend: 'builtin'
+                          }))
+                        }
+                        className={cn(
+                          'flex flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium transition-colors',
+                          sandboxDraft.backend === 'builtin'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground',
+                          (sandboxPhase !== 'idle' || sandboxConfirming) &&
+                            'cursor-not-allowed opacity-60'
+                        )}
                       >
-                        Settings
-                      </Link>
-                    </div>
-                    <div className="space-y-1.5 p-2">
-                      <div className="inline-flex w-full rounded-md border p-0.5">
+                        <span className="bg-muted-foreground/40 size-1.5 rounded-full" />
+                        Local
+                      </button>
+                      {sandboxStatus?.modalConfigured !== true ? (
+                        <div className="text-muted-foreground flex flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 text-[11px] opacity-60">
+                          <ModalGlyph className="size-3 opacity-70" />
+                          Modal
+                        </div>
+                      ) : (
                         <button
                           type="button"
-                          disabled={sandboxPhase !== 'idle' || sandboxConfirming}
+                          disabled={
+                            sandboxPhase !== 'idle' || sandboxConfirming
+                          }
                           onClick={() =>
                             setSandboxDraft(current => ({
                               ...current,
-                              backend: 'builtin'
+                              backend: 'modal'
                             }))
                           }
                           className={cn(
                             'flex flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium transition-colors',
-                            sandboxDraft.backend === 'builtin'
+                            sandboxDraft.backend === 'modal'
                               ? 'bg-background text-foreground shadow-sm'
                               : 'text-muted-foreground hover:text-foreground',
                             (sandboxPhase !== 'idle' || sandboxConfirming) &&
                               'cursor-not-allowed opacity-60'
                           )}
                         >
-                          <span className="bg-muted-foreground/40 size-1.5 rounded-full" />
-                          Local
+                          <ModalGlyph className="size-3" />
+                          Modal
                         </button>
-                        {sandboxStatus?.modalConfigured !== true ? (
-                          <div className="text-muted-foreground flex flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 text-[11px] opacity-60">
-                            <ModalGlyph className="size-3 opacity-70" />
-                            Modal
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={
-                              sandboxPhase !== 'idle' || sandboxConfirming
-                            }
-                            onClick={() =>
-                              setSandboxDraft(current => ({
-                                ...current,
-                                backend: 'modal'
-                              }))
-                            }
-                            className={cn(
-                              'flex flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium transition-colors',
-                              sandboxDraft.backend === 'modal'
-                                ? 'bg-background text-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground',
-                              (sandboxPhase !== 'idle' || sandboxConfirming) &&
-                                'cursor-not-allowed opacity-60'
-                            )}
-                          >
-                            <ModalGlyph className="size-3" />
-                            Modal
-                          </button>
-                        )}
-                      </div>
+                      )}
+                    </div>
 
                       {sandboxStatus?.modalConfigured !== true ? (
                         <p className="text-muted-foreground px-0.5 text-[10px] leading-snug">
@@ -1899,7 +1858,7 @@ export function Composer({
                           <div className="text-muted-foreground space-y-0.5 px-0.5 text-[10px]">
                             <span>Base image</span>
                             <div className="text-foreground truncate font-mono text-[10px]">
-                              {sandboxStatus?.cpuImage || 'debian_slim'}
+                              {sandboxStatus?.cpuImage || 'python:3.12-slim'}
                             </div>
                           </div>
                         </>
@@ -1994,7 +1953,6 @@ export function Composer({
                       ) : null}
                     </div>
                   </PopoverContent>
-                </div>
               </Popover>
             ) : null}
           </div>

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { normalizeAppError } from './app-error'
+import {
+  isAuthCredentialError,
+  isBackendUnavailableError,
+  normalizeAppError
+} from './app-error'
 
 describe('normalizeAppError extras', () => {
   it('handles empty input', () => {
@@ -12,5 +16,25 @@ describe('normalizeAppError extras', () => {
   it('detects chunk load failures', () => {
     const info = normalizeAppError('Loading chunk 12 failed')
     expect(info.title).toBe('Failed to load UI')
+  })
+
+  it('classifies network and 5xx as backend problems, not auth', () => {
+    expect(isAuthCredentialError('Failed to fetch')).toBe(false)
+    expect(isBackendUnavailableError('Failed to fetch')).toBe(true)
+    expect(
+      isAuthCredentialError(
+        'FastFold Agent API 500: {"detail":"boom"} [GET http://127.0.0.1:8787/v1/specialists]'
+      )
+    ).toBe(false)
+    expect(
+      isBackendUnavailableError(
+        'FastFold Agent API 500: {"detail":"boom"} [GET http://127.0.0.1:8787/v1/specialists]'
+      )
+    ).toBe(true)
+    expect(
+      isAuthCredentialError(
+        'FastFold Agent API 401: {"detail":"Missing or invalid backend API key."}'
+      )
+    ).toBe(true)
   })
 })

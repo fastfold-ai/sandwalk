@@ -70,6 +70,16 @@ function statusClass(status: ToolSummary['status']) {
   return 'text-muted-foreground bg-muted'
 }
 
+function tierClass(tier: ToolSummary['tier']) {
+  if (tier === 'core')
+    return 'text-sky-700 bg-sky-500/10 dark:text-sky-300'
+  return 'text-muted-foreground bg-muted'
+}
+
+function toolTier(tool: ToolSummary): 'core' | 'extra' {
+  return tool.tier === 'core' ? 'core' : 'extra'
+}
+
 export function ToolsView({
   onListTools,
   onUpdateToolEnabled,
@@ -98,6 +108,7 @@ export function ToolsView({
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [tierFilter, setTierFilter] = useState<'all' | 'core' | 'extra'>('all')
   const [statusFilter, setStatusFilter] = useState<
     'all' | 'enabled' | 'disabled'
   >('all')
@@ -161,6 +172,8 @@ export function ToolsView({
 
   const enabledCount = tools.filter(t => t.enabled).length
   const disabledCount = tools.length - enabledCount
+  const coreCount = tools.filter(t => toolTier(t) === 'core').length
+  const extraCount = tools.length - coreCount
 
   // Map a requires_data token (e.g. "depmap_mutations") to a known dataset id
   // (e.g. "depmap") and its install status.
@@ -193,6 +206,7 @@ export function ToolsView({
     return tools.filter(tool => {
       if (categoryFilter !== 'all' && tool.category !== categoryFilter)
         return false
+      if (tierFilter !== 'all' && toolTier(tool) !== tierFilter) return false
       if (statusFilter === 'enabled' && !tool.enabled) return false
       if (statusFilter === 'disabled' && tool.enabled) return false
       if (!needle) return true
@@ -206,7 +220,7 @@ export function ToolsView({
         .toLowerCase()
       return haystack.includes(needle)
     })
-  }, [tools, query, categoryFilter, statusFilter])
+  }, [tools, query, categoryFilter, tierFilter, statusFilter])
 
   const enableEligible = useMemo(
     () => filtered.filter(t => !t.enabled).map(t => t.id),
@@ -289,7 +303,8 @@ export function ToolsView({
             <h2 className="text-2xl font-semibold">Tools</h2>
             <p className="text-muted-foreground mt-1 text-sm">
               Research tools available to the agent. Toggle a tool off to hide it
-              from the agent's discovery and calls.
+              from the agent's discovery and calls. Core tools are the default
+              set for new specialists; Extra tools stay opt-in.
             </p>
           </div>
 
@@ -378,6 +393,14 @@ export function ToolsView({
                       <span className="font-mono text-sm font-medium">
                         {tool.id}
                       </span>
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-xs font-medium',
+                          tierClass(toolTier(tool))
+                        )}
+                      >
+                        {toolTier(tool) === 'core' ? 'Core' : 'Extra'}
+                      </span>
                       {tool.status !== 'stable' ? (
                         <span
                           className={cn(
@@ -440,6 +463,32 @@ export function ToolsView({
         </div>
 
         <aside className="flex w-full shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:self-start xl:w-[280px]">
+          <section className="bg-background/70 rounded-lg p-2">
+            <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
+              Tier
+            </div>
+            <button
+              type="button"
+              className={filterButtonClass(tierFilter === 'all')}
+              onClick={() => setTierFilter('all')}
+            >
+              All ({tools.length})
+            </button>
+            <button
+              type="button"
+              className={filterButtonClass(tierFilter === 'core')}
+              onClick={() => setTierFilter('core')}
+            >
+              Core ({coreCount})
+            </button>
+            <button
+              type="button"
+              className={filterButtonClass(tierFilter === 'extra')}
+              onClick={() => setTierFilter('extra')}
+            >
+              Extra ({extraCount})
+            </button>
+          </section>
           <section className="bg-background/70 rounded-lg p-2">
             <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
               Status

@@ -226,6 +226,7 @@ class AgentStore:
                     color TEXT NOT NULL,
                     icon TEXT NOT NULL,
                     skill_names TEXT NOT NULL,
+                    tool_names TEXT NOT NULL DEFAULT '[]',
                     mcp_server_ids TEXT NOT NULL,
                     mcp_catalog_ids TEXT NOT NULL DEFAULT '[]',
                     enabled INTEGER NOT NULL DEFAULT 1,
@@ -260,6 +261,10 @@ class AgentStore:
             if "mcp_catalog_ids" not in specialist_columns:
                 connection.execute(
                     "ALTER TABLE specialists ADD COLUMN mcp_catalog_ids TEXT NOT NULL DEFAULT '[]'"
+                )
+            if "tool_names" not in specialist_columns:
+                connection.execute(
+                    "ALTER TABLE specialists ADD COLUMN tool_names TEXT NOT NULL DEFAULT '[]'"
                 )
             if "enabled" not in specialist_columns:
                 connection.execute(
@@ -303,9 +308,19 @@ class AgentStore:
                 """
             )
 
-        from agent_server.default_specialists import ensure_default_specialists
+        from agent_server.default_specialists import (
+            ensure_default_specialist_tool_names,
+            ensure_default_specialists,
+            ensure_fast_computational_scientist,
+        )
+        from agent.config import Config
+        from agent.tool_tiers import apply_core_tool_defaults
 
         ensure_default_specialists(self)
+        ensure_fast_computational_scientist(self)
+        ensure_default_specialist_tool_names(self)
+        # Idempotent via config flag (safe across multiple AgentStore paths).
+        apply_core_tool_defaults(Config.load())
 
     def get_meta(self, key: str) -> str | None:
         with self._connect() as connection:
@@ -376,6 +391,7 @@ class AgentStore:
             color=row["color"] or "ink",
             icon=row["icon"] or "agent",
             skill_names=_json_list(row["skill_names"]),
+            tool_names=_json_list(row["tool_names"] if "tool_names" in keys else "[]"),
             mcp_server_ids=_json_list(row["mcp_server_ids"]),
             mcp_catalog_ids=_json_list(
                 row["mcp_catalog_ids"] if "mcp_catalog_ids" in keys else "[]"
@@ -754,6 +770,7 @@ class AgentStore:
         color: str = "ink",
         icon: str = "git-branch",
         skill_names: list[str] | None = None,
+        tool_names: list[str] | None = None,
         mcp_server_ids: list[str] | None = None,
         mcp_catalog_ids: list[str] | None = None,
         enabled: bool = True,
@@ -765,6 +782,7 @@ class AgentStore:
         now = utc_now()
         specialist_id = str(uuid.uuid4())
         skills = [str(item).strip() for item in (skill_names or []) if str(item).strip()]
+        tools = [str(item).strip() for item in (tool_names or []) if str(item).strip()]
         mcps = [
             str(item).strip() for item in (mcp_server_ids or []) if str(item).strip()
         ]
@@ -781,10 +799,10 @@ class AgentStore:
                 """
                 INSERT INTO specialists(
                     id, name, slug, description, instructions, color, icon,
-                    skill_names, mcp_server_ids, mcp_catalog_ids, enabled,
+                    skill_names, tool_names, mcp_server_ids, mcp_catalog_ids, enabled,
                     created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     specialist_id,
@@ -795,6 +813,7 @@ class AgentStore:
                     (color or "ink").strip() or "ink",
                     (icon or "git-branch").strip() or "git-branch",
                     json.dumps(skills),
+                    json.dumps(tools),
                     json.dumps(mcps),
                     json.dumps(catalogs),
                     1 if enabled else 0,
@@ -862,6 +881,7 @@ class AgentStore:
         color: str | None = None,
         icon: str | None = None,
         skill_names: list[str] | None = None,
+        tool_names: list[str] | None = None,
         mcp_server_ids: list[str] | None = None,
         mcp_catalog_ids: list[str] | None = None,
         enabled: bool | None = None,
@@ -890,6 +910,11 @@ class AgentStore:
             if skill_names is None
             else [str(item).strip() for item in skill_names if str(item).strip()]
         )
+        next_tools = (
+            current.tool_names
+            if tool_names is None
+            else [str(item).strip() for item in tool_names if str(item).strip()]
+        )
         next_mcps = (
             current.mcp_server_ids
             if mcp_server_ids is None
@@ -914,8 +939,9 @@ class AgentStore:
                 """
                 UPDATE specialists
                 SET name = ?, slug = ?, description = ?, instructions = ?,
-                    color = ?, icon = ?, skill_names = ?, mcp_server_ids = ?,
-                    mcp_catalog_ids = ?, enabled = ?, updated_at = ?
+                    color = ?, icon = ?, skill_names = ?, tool_names = ?,
+                    mcp_server_ids = ?, mcp_catalog_ids = ?, enabled = ?,
+                    updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -926,6 +952,7 @@ class AgentStore:
                     next_color,
                     next_icon,
                     json.dumps(next_skills),
+                    json.dumps(next_tools),
                     json.dumps(next_mcps),
                     json.dumps(next_catalogs),
                     1 if next_enabled else 0,

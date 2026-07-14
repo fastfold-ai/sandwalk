@@ -60,22 +60,22 @@ class SandboxSettingsService:
         return SandboxSettings(
             backend=backend,
             modal_app=str(config.get("sandbox.modal_app") or "sandwalk"),
-            cpu_image=str(config.get("sandbox.cpu_image") or "debian_slim"),
-            gpu_image=str(config.get("sandbox.gpu_image") or "debian_slim"),
+            cpu_image=str(config.get("sandbox.cpu_image") or "python:3.12-slim"),
+            gpu_image=str(config.get("sandbox.gpu_image") or "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime"),
             pip_packages=_pip_packages_str(config.get("sandbox.pip_packages")),
             compute_type=compute_type,
             gpu_class=str(config.get("sandbox.gpu_class") or "T4"),
             cpu_cores=_clamp_float(
-                config.get("sandbox.cpu_cores", 1.0),
+                config.get("sandbox.cpu_cores", 2.0),
                 minimum=0.25,
                 maximum=64.0,
-                default=1.0,
+                default=2.0,
             ),
             ram_gb=_clamp_float(
-                config.get("sandbox.ram_gb", 4.0),
+                config.get("sandbox.ram_gb", 8.0),
                 minimum=0.5,
                 maximum=256.0,
-                default=4.0,
+                default=8.0,
             ),
             idle_ttl_seconds=_clamp_int(
                 config.get("sandbox.idle_ttl_seconds", 600),
@@ -104,9 +104,12 @@ class SandboxSettingsService:
             app = str(payload.modal_app).strip() or "sandwalk"
             config.set("sandbox.modal_app", app)
         if payload.cpu_image is not None:
-            config.set("sandbox.cpu_image", str(payload.cpu_image).strip() or "debian_slim")
+            config.set("sandbox.cpu_image", str(payload.cpu_image).strip() or "python:3.12-slim")
         if payload.gpu_image is not None:
-            config.set("sandbox.gpu_image", str(payload.gpu_image).strip() or "debian_slim")
+            config.set(
+                "sandbox.gpu_image",
+                str(payload.gpu_image).strip() or "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
+            )
         if payload.pip_packages is not None:
             config.set("sandbox.pip_packages", _pip_packages_str(payload.pip_packages))
         if payload.compute_type is not None:
@@ -120,13 +123,13 @@ class SandboxSettingsService:
             config.set(
                 "sandbox.cpu_cores",
                 _clamp_float(
-                    payload.cpu_cores, minimum=0.25, maximum=64.0, default=1.0
+                    payload.cpu_cores, minimum=0.25, maximum=64.0, default=2.0
                 ),
             )
         if payload.ram_gb is not None:
             config.set(
                 "sandbox.ram_gb",
-                _clamp_float(payload.ram_gb, minimum=0.5, maximum=256.0, default=4.0),
+                _clamp_float(payload.ram_gb, minimum=0.5, maximum=256.0, default=8.0),
             )
         if payload.idle_ttl_seconds is not None:
             config.set(

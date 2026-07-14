@@ -95,6 +95,11 @@ import { UserMessageContent } from '@/components/agents/UserMessageContent'
 import { WorkspacePanel } from '@/components/agents/WorkspacePanel'
 import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 import { ErrorPage } from '@/components/ErrorPage'
+import {
+  isAuthCredentialError,
+  isBackendUnavailableError,
+  normalizeAppError
+} from '@/lib/app-error'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import {
   AlertDialog,
@@ -188,6 +193,11 @@ import { cn } from '@/lib/utils'
 const AgentRuntimeView = lazy(() =>
   import('@/components/agents/AgentRuntimeView').then(m => ({
     default: m.AgentRuntimeView
+  }))
+)
+const AgentPromptsView = lazy(() =>
+  import('@/components/agents/AgentPromptsView').then(m => ({
+    default: m.AgentPromptsView
   }))
 )
 const AgentSandboxView = lazy(() =>
@@ -297,6 +307,7 @@ export default function App() {
   const needsAuthLoginRef = useRef(false)
   const [authBootstrapped, setAuthBootstrapped] = useState(false)
   const [authLoggingIn, setAuthLoggingIn] = useState(false)
+  const [authLoginError, setAuthLoginError] = useState<unknown>(null)
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorStack, setErrorStack] = useState<string | null>(null)
@@ -531,29 +542,31 @@ export default function App() {
       ? 'general'
       : location.pathname.startsWith('/dashboard/agent/sandbox')
         ? 'agent_sandbox'
-        : location.pathname.startsWith('/dashboard/agent')
-          ? 'agent_runtime'
-          : location.pathname.startsWith('/dashboard/models')
-            ? 'models'
-            : location.pathname.startsWith('/dashboard/datasets')
-              ? 'datasets'
-              : location.pathname.startsWith('/dashboard/tools')
-                ? 'tools'
-                : location.pathname.startsWith('/dashboard/doctor')
-                  ? 'doctor'
-                  : location.pathname.startsWith('/dashboard/storage')
-                    ? 'storage'
-                    : location.pathname.startsWith('/dashboard/environment')
-                      ? 'environment'
-                      : location.pathname.startsWith('/dashboard/skills')
-                        ? 'skills'
-                        : location.pathname.startsWith('/dashboard/specialists')
-                          ? 'specialists'
-                          : location.pathname.startsWith('/dashboard/integrations')
-                            ? 'integrations'
-                            : location.pathname.startsWith('/dashboard/mcp')
-                              ? 'mcp'
-                              : 'overview'
+        : location.pathname.startsWith('/dashboard/agent/prompts')
+          ? 'agent_prompts'
+          : location.pathname.startsWith('/dashboard/agent')
+            ? 'agent_runtime'
+            : location.pathname.startsWith('/dashboard/models')
+              ? 'models'
+              : location.pathname.startsWith('/dashboard/datasets')
+                ? 'datasets'
+                : location.pathname.startsWith('/dashboard/tools')
+                  ? 'tools'
+                  : location.pathname.startsWith('/dashboard/doctor')
+                    ? 'doctor'
+                    : location.pathname.startsWith('/dashboard/storage')
+                      ? 'storage'
+                      : location.pathname.startsWith('/dashboard/environment')
+                        ? 'environment'
+                        : location.pathname.startsWith('/dashboard/skills')
+                          ? 'skills'
+                          : location.pathname.startsWith('/dashboard/specialists')
+                            ? 'specialists'
+                            : location.pathname.startsWith('/dashboard/integrations')
+                              ? 'integrations'
+                              : location.pathname.startsWith('/dashboard/mcp')
+                                ? 'mcp'
+                                : 'overview'
   const isSkills =
     dashboardSection === 'skills' ||
     location.pathname === '/agents/skills' ||
@@ -578,6 +591,7 @@ export default function App() {
   const isDashboardGeneral = dashboardSection === 'general'
   const isDashboardAgentRuntime = dashboardSection === 'agent_runtime'
   const isDashboardAgentSandbox = dashboardSection === 'agent_sandbox'
+  const isDashboardAgentPrompts = dashboardSection === 'agent_prompts'
   const isDashboardModels = dashboardSection === 'models'
   const isDashboardData = dashboardSection === 'datasets'
   const isDashboardTools = dashboardSection === 'tools'
@@ -619,6 +633,7 @@ export default function App() {
       isDashboardStatus ||
       isDashboardGeneral ||
       isDashboardAgentRuntime ||
+      isDashboardAgentPrompts ||
       isDashboardStorage ||
       isDashboardEnvironment
     ) {
@@ -943,11 +958,6 @@ export default function App() {
         navigate(target, { replace: true })
       }
     }
-    const looksLikeAuthFailure = (message: string) =>
-      message.includes('401') ||
-      /failed to fetch|networkerror|load failed|network request failed/i.test(
-        message
-      )
 
     try {
       // If we already decided login is required (e.g. logout), do not remount
@@ -985,8 +995,7 @@ export default function App() {
           try {
             await client.getRuntimeSettings()
           } catch (cause) {
-            const message = cause instanceof Error ? cause.message : ''
-            if (looksLikeAuthFailure(message)) {
+            if (isAuthCredentialError(cause)) {
               goToLogin()
               return
             }
@@ -1025,28 +1034,26 @@ export default function App() {
       const message =
         cause instanceof Error ? cause.message : 'Unable to connect'
       const isLocalBackend = /127\.0\.0\.1|localhost/i.test(backendUrl)
-      const isNetworkFailure =
-        /failed to fetch|networkerror|load failed|network request failed/i.test(
-          message
-        )
-      // Health succeeded path already handled; if auth is on and later
-      // batch calls fail with opaque network/401 errors, prefer login UI.
-      try {
-        const status = await client.authStatus()
-        if (status.authEnabled && looksLikeAuthFailure(message)) {
-          goToLogin()
-          return
+      // Only credential failures belong on the login screen. Network / CORS /
+      // 5xx must surface as a backend error — not a fake "enter API key" page.
+      if (isAuthCredentialError(cause)) {
+        try {
+          const status = await client.authStatus()
+          if (status.authEnabled) {
+            goToLogin()
+            return
+          }
+        } catch {
+          // Fall through to backend-error UI below.
         }
-      } catch {
-        // Local Mac dashboard: once the API is back, auto-retry reaches login.
-        // Prefer login UI over the remote "Connect to backend" form when we
-        // already know this is a local Sandwalk with auth enabled in settings.
-        if (isLocalBackend && isNetworkFailure) {
-          setHealth(null)
-          setError(message)
-          setErrorStack(cause instanceof Error ? cause.stack || null : null)
-          return
-        }
+      }
+      if (isLocalBackend && isBackendUnavailableError(cause)) {
+        needsAuthLoginRef.current = false
+        setNeedsAuthLogin(false)
+        setHealth(null)
+        setError(message)
+        setErrorStack(cause instanceof Error ? cause.stack || null : null)
+        return
       }
       setHealth(null)
       setError(message)
@@ -1075,6 +1082,7 @@ export default function App() {
   const submitAuthLogin = useCallback(
     async (apiKey: string, remember: boolean) => {
       setAuthLoggingIn(true)
+      setAuthLoginError(null)
       try {
         await client.login(apiKey, { remember })
         setClientApiKey(apiKey.trim())
@@ -1084,22 +1092,29 @@ export default function App() {
         await connect()
       } catch (cause) {
         needsAuthLoginRef.current = true
-        const raw = cause instanceof Error ? cause.message : 'Invalid API key'
-        let message = 'Invalid API key'
-        try {
-          const jsonMatch = raw.match(/\{.*\}/s)
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]) as { detail?: string }
-            if (parsed.detail) message = parsed.detail
-          } else if (/invalid api key/i.test(raw)) {
-            message = 'Invalid API key'
-          } else if (raw && !raw.startsWith('FastFold Agent API')) {
-            message = raw
+        setNeedsAuthLogin(true)
+        if (isBackendUnavailableError(cause) || !isAuthCredentialError(cause)) {
+          setAuthLoginError(cause)
+          const info = normalizeAppError(cause)
+          toast.error(info.title)
+        } else {
+          const raw = cause instanceof Error ? cause.message : 'Invalid API key'
+          let message = 'Invalid API key'
+          try {
+            const jsonMatch = raw.match(/\{.*\}/s)
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]) as { detail?: string }
+              if (parsed.detail) message = parsed.detail
+            } else if (/invalid api key/i.test(raw)) {
+              message = 'Invalid API key'
+            } else if (raw && !raw.startsWith('FastFold Agent API')) {
+              message = raw
+            }
+          } catch {
+            // keep friendly default
           }
-        } catch {
-          // keep friendly default
+          toast.error(message)
         }
-        toast.error(message)
       } finally {
         setAuthLoggingIn(false)
       }
@@ -1112,6 +1127,7 @@ export default function App() {
     // before the logout request finishes / cookie is cleared.
     needsAuthLoginRef.current = true
     setNeedsAuthLogin(true)
+    setAuthLoginError(null)
     setHealth(null)
     setAuthBootstrapped(true)
     setBackendApiKey('')
@@ -1239,6 +1255,14 @@ export default function App() {
       document.title = `Sandbox · ${base}`
       return
     }
+    if (isDashboardAgentPrompts) {
+      document.title = `Prompts · ${base}`
+      return
+    }
+    if (isDashboardAgentRuntime) {
+      document.title = `Runtime · ${base}`
+      return
+    }
     if (isDashboardMcp) {
       document.title = `MCP · ${base}`
       return
@@ -1255,6 +1279,8 @@ export default function App() {
     isDashboardStorage,
     isDashboardEnvironment,
     isDashboardAgentSandbox,
+    isDashboardAgentPrompts,
+    isDashboardAgentRuntime,
     isSandboxLocalDetail,
     isSandboxModalDetail,
     isDashboardMcp,
@@ -1275,19 +1301,13 @@ export default function App() {
     void connect()
   }, [connect, needsAuthLogin])
 
-  // Local dashboard: when the API is temporarily down (Mac "partially running"),
-  // keep retrying until health succeeds — then auth routes to LoginView.
+  // Local dashboard: when the API is temporarily down or returning 5xx,
+  // keep retrying until health/bootstrap succeeds.
   useEffect(() => {
     if (needsAuthLogin || health || connecting) return
     if (!error) return
     if (!/127\.0\.0\.1|localhost/i.test(backendUrl)) return
-    if (
-      !/failed to fetch|networkerror|load failed|network request failed/i.test(
-        error
-      )
-    ) {
-      return
-    }
+    if (!isBackendUnavailableError(error)) return
     const timer = window.setInterval(() => {
       void connect()
     }, 5000)
@@ -2830,6 +2850,10 @@ export default function App() {
     ? 'Status'
     : isDashboardGeneral
     ? 'General'
+    : isDashboardAgentRuntime
+    ? 'Runtime'
+    : isDashboardAgentPrompts
+    ? 'Prompts'
     : isDashboardModels
     ? 'Models'
     : isDashboardData
@@ -2882,6 +2906,11 @@ export default function App() {
     return (
       <LoginView
         submitting={authLoggingIn || connecting}
+        error={authLoginError}
+        onRetry={() => {
+          setAuthLoginError(null)
+          void connect()
+        }}
         onSubmit={submitAuthLogin}
       />
     )
@@ -2889,11 +2918,12 @@ export default function App() {
 
   if (!health) {
     const isLocalBackend = /127\.0\.0\.1|localhost/i.test(backendUrl)
-    const isNetworkFailure =
-      Boolean(error) &&
-      /failed to fetch|networkerror|load failed|network request failed/i.test(
-        error ?? ''
-      )
+    const backendDown = Boolean(error) && isBackendUnavailableError(error)
+    const connectError = error
+      ? errorStack
+        ? Object.assign(new Error(error), { stack: errorStack })
+        : error
+      : null
 
     // Local Mac / Vite dashboard: don't show the remote "Connect to backend"
     // form. Wait for the API, then connect() sends you to Login when auth is on.
@@ -2908,32 +2938,36 @@ export default function App() {
               <div>
                 <h1 className="font-semibold">Sandwalk</h1>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  {connecting || isNetworkFailure
-                    ? 'Waiting for the local agent API…'
-                    : 'Connecting…'}
+                  {backendDown
+                    ? 'Local agent API error'
+                    : connecting
+                      ? 'Waiting for the local agent API…'
+                      : 'Connecting…'}
                 </p>
               </div>
-              {(connecting || isNetworkFailure) && (
+              {(connecting && !connectError) && (
                 <Loader2 className="text-muted-foreground size-5 animate-spin" />
               )}
             </div>
-            {error && isNetworkFailure ? (
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                The agent server on {backendUrl} is not reachable. In the menu
-                bar, use Restart (⌘R), or wait — this page retries
-                automatically, then opens login.
-              </p>
-            ) : error ? (
-              <ErrorPage className="text-left" variant="inline" error={error} />
+            {connectError ? (
+              <ErrorPage
+                className="text-left"
+                variant="inline"
+                error={connectError}
+                onRetry={() => void connect()}
+                retryLabel="Retry"
+              />
             ) : null}
-            <Button
-              className="w-full"
-              disabled={connecting}
-              onClick={() => void connect()}
-            >
-              {connecting ? <Loader2 className="animate-spin" /> : null}
-              Retry
-            </Button>
+            {!connectError ? (
+              <Button
+                className="w-full"
+                disabled={connecting}
+                onClick={() => void connect()}
+              >
+                {connecting ? <Loader2 className="animate-spin" /> : null}
+                Retry
+              </Button>
+            ) : null}
           </div>
         </main>
       )
@@ -3486,6 +3520,7 @@ export default function App() {
           isDashboardGeneral ||
           isDashboardAgentRuntime ||
           isDashboardAgentSandbox ||
+          isDashboardAgentPrompts ||
           isDashboardModels ||
           isDashboardData ||
           isDashboardTools ||
@@ -3689,6 +3724,14 @@ export default function App() {
                 return next
               }}
             />
+          ) : isDashboardAgentPrompts ? (
+            <AgentPromptsView
+              connected={Boolean(health)}
+              onGetPromptBudget={(options, signal) =>
+                client.getPromptBudget(options, signal)
+              }
+              onListSpecialists={signal => client.listSpecialists(signal)}
+            />
           ) : isDashboardAgentSandbox ? (
             isSandboxLocalDetail ? (
               <EnvironmentView
@@ -3725,14 +3768,23 @@ export default function App() {
                 onSaveModalIntegration={async values => {
                   const next = await client.updateIntegration('modal', values)
                   await loadIntegrations()
+                  const settings = await client.getSandboxSettings()
+                  setSandboxSettings(settings)
+                  await refreshSessionSandbox()
                   return next
                 }}
                 onRemoveModalIntegration={async () => {
                   await client.removeIntegration('modal')
                   await loadIntegrations()
+                  const settings = await client.getSandboxSettings()
+                  setSandboxSettings(settings)
+                  await refreshSessionSandbox()
                 }}
                 onRefreshIntegrations={async () => {
                   await loadIntegrations()
+                  const settings = await client.getSandboxSettings()
+                  setSandboxSettings(settings)
+                  await refreshSessionSandbox()
                 }}
               />
             ) : (
@@ -4091,6 +4143,7 @@ export default function App() {
                 await client.installSkill(source)
                 await loadSkills()
               }}
+              onListTools={signal => client.listTools({ signal })}
             />
           ) : isHome || isProjectHome ? (
             <HomeView

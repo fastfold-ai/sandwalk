@@ -212,6 +212,7 @@ DEFAULTS = {
     "llm.catalog_defaults_version": 0,
     "llm.temperature": 0.1,
     "agent.hidden_tools": [],
+    "agent.core_tools_defaults_applied": False,
 
     "data.base": str(CONFIG_DIR / "data"),
     "data.depmap": None,
@@ -295,8 +296,8 @@ DEFAULTS = {
     # or "modal" (langchain-modal ModalSandbox). Domain tools stay on the host.
     "sandbox.backend": "builtin",
     "sandbox.modal_app": "sandwalk",
-    "sandbox.cpu_image": "debian_slim",
-    "sandbox.gpu_image": "debian_slim",
+    "sandbox.cpu_image": "python:3.12-slim",
+    "sandbox.gpu_image": "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
     "sandbox.pip_packages": "pandas,numpy,scipy,scikit-learn,matplotlib,seaborn",
     "sandbox.compute_type": "cpu",
     "sandbox.gpu_class": "T4",

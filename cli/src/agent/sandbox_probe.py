@@ -127,38 +127,34 @@ def run_modal_sandbox_probe(
                 )
             )
 
-            skill_remote = "/skills/e2e_probe/scripts/probe.py"
-            skill_workspace = "/workspace/skills/e2e_probe/scripts/probe.py"
-            probe_bytes = (scripts / "probe.py").read_bytes()
-            # Ensure nested parents exist, then upload to both locations.
-            from agent.sandbox_sync import ensure_remote_directories
-
-            ensure_remote_directories(
-                handle.backend, [skill_remote, skill_workspace]
-            )
-            handle.backend.upload_files(
-                [
-                    (skill_remote, probe_bytes),
-                    (skill_workspace, probe_bytes),
-                ]
-            )
-            check = handle.backend.execute(
-                f"test -f {skill_remote} && echo SKILLS_OK || "
-                f"(test -f {skill_workspace} && echo WORKSPACE_OK || echo MISSING)",
-                timeout=60,
-            )
-            check_out = str(getattr(check, "output", check) or "")
-            ok_skill_seed = "OK" in check_out
+            # Skills stay on the host via CompositeBackend — never uploaded to Modal.
+            skill_md = "/skills/e2e_probe/SKILL.md"
+            try:
+                read_result = handle.backend.read(skill_md)
+                if hasattr(read_result, "file_data") and read_result.file_data:
+                    content = str(read_result.file_data)
+                else:
+                    content = str(read_result)
+                ok_skills_local = (
+                    getattr(read_result, "error", None) is None
+                    and ("e2e_probe" in content or "Probe" in content)
+                )
+                detail = content[:200]
+            except Exception as exc:  # noqa: BLE001
+                ok_skills_local = False
+                detail = str(exc)
             steps.append(
                 ProbeStep(
-                    "skill_seed",
-                    ok_skill_seed,
-                    check_out[:200] if check_out else "(empty)",
+                    "skills_local_route",
+                    ok_skills_local,
+                    detail,
                 )
             )
 
+            # Modal execute is for /workspace compute only.
             exec_result = handle.backend.execute(
-                f"python {skill_remote} 2>/dev/null || python {skill_workspace}",
+                "python -c \"from pathlib import Path; "
+                "Path('/workspace/out.txt').write_text('probe-ok\\n')\"",
                 timeout=120,
             )
             exec_out = getattr(exec_result, "output", str(exec_result))
@@ -166,7 +162,7 @@ def run_modal_sandbox_probe(
             ok_exec = int(exit_code or 0) == 0
             steps.append(
                 ProbeStep(
-                    "skill_execute",
+                    "workspace_execute",
                     ok_exec,
                     f"exit={exit_code} {str(exec_out)[:160]}",
                 )

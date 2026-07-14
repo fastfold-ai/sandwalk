@@ -127,8 +127,8 @@ class SessionSandboxService:
             )
         )
         config = Config.load()
-        # Create/reuse the Modal sandbox and return immediately. Full workspace
-        # + skills sync runs in the background so the UI can leave "Starting".
+        # Create/reuse the Modal sandbox and return immediately. Workspace
+        # sync (not skills) runs in the background so the UI can leave "Starting".
         resolve_deepagents_backend(
             config,
             session_id=session_id,

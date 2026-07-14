@@ -127,6 +127,16 @@ class TestBuildChatModel:
         )
         assert captured["kwargs"]["use_responses_api"] is False
 
+    def test_google_uses_native_genai_not_openai_compat(self, monkeypatch):
+        captured = self._patch_init(monkeypatch)
+        dr.build_chat_model(
+            _stub_config("google", model="gemini-3.1-flash-lite", api_key="gk")
+        )
+        assert captured["model_id"] == "google_genai:gemini-3.1-flash-lite"
+        assert captured["kwargs"]["api_key"] == "gk"
+        assert captured["kwargs"]["temperature"] == 0.1
+        assert "base_url" not in captured["kwargs"]
+
     def test_unsupported_provider_raises(self, monkeypatch):
         self._patch_init(monkeypatch)
         with pytest.raises(ValueError, match="does not support"):
@@ -193,11 +203,37 @@ class TestHelpers:
         assert len(capped) == 3
         assert "run_python" in names
 
+    def test_cap_tools_for_openai_keeps_search_tools(self):
+        tools = [
+            SimpleNamespace(name=n)
+            for n in ("mcp_1", "mcp_2", "mcp_3", "search_tools", "run_python")
+        ]
+        capped = dr._cap_tools_for_openai(tools, max_total=3)
+        names = {t.name for t in capped}
+        assert len(capped) == 3
+        assert "search_tools" in names
+        assert "run_python" in names
+
     def test_cap_tools_for_openai_under_budget_is_copy(self):
         tools = [SimpleNamespace(name="a"), SimpleNamespace(name="b")]
         capped = dr._cap_tools_for_openai(tools, max_total=10)
         assert capped == tools
         assert capped is not tools
+
+    def test_finalize_tools_for_provider_caps_openai_after_mcp_merge(self):
+        tools = [SimpleNamespace(name=f"t{i}") for i in range(200)]
+        tools[0] = SimpleNamespace(name="run_python")
+        tools[1] = SimpleNamespace(name="search_tools")
+        capped = dr.finalize_tools_for_provider(tools, "openai")
+        assert len(capped) == dr.OPENAI_TOOL_BUDGET
+        names = {t.name for t in capped}
+        assert "run_python" in names
+        assert "search_tools" in names
+
+    def test_finalize_tools_for_provider_skips_anthropic(self):
+        tools = [SimpleNamespace(name=f"t{i}") for i in range(200)]
+        out = dr.finalize_tools_for_provider(tools, "anthropic")
+        assert len(out) == 200
 
 
 class TestSkillSourceDirs:

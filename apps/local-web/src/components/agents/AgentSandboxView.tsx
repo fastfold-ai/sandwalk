@@ -36,8 +36,8 @@ type Draft = {
   idleTtlSeconds: string
 }
 
-const DEFAULT_CPU_IMAGE = 'debian_slim'
-const DEFAULT_GPU_IMAGE = 'debian_slim'
+const DEFAULT_CPU_IMAGE = 'python:3.12-slim'
+const DEFAULT_GPU_IMAGE = 'pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime'
 const DEFAULT_PIP =
   'pandas, numpy, scipy, scikit-learn, matplotlib, seaborn'
 
@@ -752,10 +752,13 @@ export function AgentSandboxView({
             <div>
               <h3 className="text-base font-semibold">Sandbox base images</h3>
               <p className="text-muted-foreground mt-1 text-sm">
-                Base images and pip packages for Modal sessions.{' '}
-                <code className="text-xs">debian_slim</code> is Modal’s built-in
-                image helper (valid). Docker refs like{' '}
-                <code className="text-xs">python:3.12-slim</code> also work.
+                Base images and pip packages for Modal sessions. Defaults:{' '}
+                <code className="text-xs">python:3.12-slim</code> (CPU),{' '}
+                <code className="text-xs">
+                  pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime
+                </code>{' '}
+                (GPU). <code className="text-xs">debian_slim</code> is also
+                valid as Modal’s built-in image helper.
               </p>
             </div>
 

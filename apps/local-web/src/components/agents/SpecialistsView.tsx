@@ -4,7 +4,9 @@ import type {
   McpServer,
   Specialist,
   SpecialistColor,
-  SpecialistIcon
+  SpecialistIcon,
+  ToolCatalog,
+  ToolSummary
 } from '@sandwalk/agent-ui-core'
 import {
   AlertTriangle,
@@ -292,7 +294,7 @@ export function SpecialistGlyph({
   return <Icon className={className} />
 }
 
-function SpecialistAvatar({
+export function SpecialistAvatar({
   color,
   icon,
   className
@@ -332,6 +334,7 @@ type FormState = {
   color: SpecialistColor
   icon: SpecialistIcon
   skillNames: string[]
+  toolNames: string[]
   mcpServerIds: string[]
   mcpCatalogIds: string[]
   enabled: boolean
@@ -346,6 +349,7 @@ function emptyForm(): FormState {
     color: 'ink',
     icon: 'git-branch',
     skillNames: [],
+    toolNames: [],
     mcpServerIds: [],
     mcpCatalogIds: [],
     enabled: true
@@ -361,6 +365,7 @@ function formFromSpecialist(specialist: Specialist): FormState {
     color: (specialist.color as SpecialistColor) || 'ink',
     icon: (specialist.icon as SpecialistIcon) || 'git-branch',
     skillNames: [...(specialist.skillNames || [])],
+    toolNames: [...(specialist.toolNames || [])],
     mcpServerIds: [...(specialist.mcpServerIds || [])],
     mcpCatalogIds: [...(specialist.mcpCatalogIds || [])],
     enabled: specialist.enabled !== false
@@ -397,7 +402,8 @@ export function SpecialistsView({
   onOpenSkill,
   onOpenMcp,
   onEnableSkill,
-  onInstallSkill
+  onInstallSkill,
+  onListTools
 }: {
   mode: 'list' | 'new' | 'edit'
   specialistId: string | null
@@ -415,6 +421,7 @@ export function SpecialistsView({
     color?: string
     icon?: string
     skillNames?: string[]
+    toolNames?: string[]
     mcpServerIds?: string[]
     mcpCatalogIds?: string[]
     enabled?: boolean
@@ -429,6 +436,7 @@ export function SpecialistsView({
       color?: string
       icon?: string
       skillNames?: string[]
+      toolNames?: string[]
       mcpServerIds?: string[]
       mcpCatalogIds?: string[]
       enabled?: boolean
@@ -447,6 +455,7 @@ export function SpecialistsView({
   }) => void
   onEnableSkill?: (name: string) => Promise<void>
   onInstallSkill?: (source: string) => Promise<void>
+  onListTools?: (signal?: AbortSignal) => Promise<ToolCatalog>
 }) {
   const editing = useMemo(
     () =>
@@ -470,6 +479,26 @@ export function SpecialistsView({
     null
   )
   const [togglePendingId, setTogglePendingId] = useState<string | null>(null)
+  const [catalogTools, setCatalogTools] = useState<ToolSummary[]>([])
+  const [toolsLoading, setToolsLoading] = useState(false)
+  const [toolQuery, setToolQuery] = useState('')
+
+  useEffect(() => {
+    if (!onListTools || (mode !== 'new' && mode !== 'edit')) return
+    const controller = new AbortController()
+    setToolsLoading(true)
+    void onListTools(controller.signal)
+      .then(catalog => {
+        if (!controller.signal.aborted) setCatalogTools(catalog.data || [])
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setCatalogTools([])
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setToolsLoading(false)
+      })
+    return () => controller.abort()
+  }, [mode, onListTools])
 
   useEffect(() => {
     if (mode === 'new') {
@@ -478,6 +507,7 @@ export function SpecialistsView({
       setSkillAddQuery('')
       setMcpAddQuery('')
       setIconQuery('')
+      setToolQuery('')
       return
     }
     if (mode === 'edit' && editing) {
@@ -486,8 +516,23 @@ export function SpecialistsView({
       setSkillAddQuery('')
       setMcpAddQuery('')
       setIconQuery('')
+      setToolQuery('')
     }
   }, [editing, mode])
+
+  useEffect(() => {
+    if (mode !== 'new' || catalogTools.length === 0) return
+    setForm(current => {
+      if (current.toolNames.length > 0) return current
+      return {
+        ...current,
+        toolNames: catalogTools
+          .filter(tool => tool.tier === 'core')
+          .map(tool => tool.id)
+          .sort()
+      }
+    })
+  }, [mode, catalogTools])
 
   const availableSkills = useMemo(() => {
     const selected = new Set(form.skillNames)
@@ -609,6 +654,51 @@ export function SpecialistsView({
     return issues
   }, [selectedMcpRows, selectedSkillRows])
 
+  const filteredCatalogTools = useMemo(() => {
+    const needle = toolQuery.trim().toLowerCase()
+    if (!needle) return catalogTools
+    return catalogTools.filter(tool =>
+      `${tool.id} ${tool.name} ${tool.description} ${tool.category}`
+        .toLowerCase()
+        .includes(needle)
+    )
+  }, [catalogTools, toolQuery])
+
+  const coreTools = useMemo(
+    () => filteredCatalogTools.filter(tool => tool.tier === 'core'),
+    [filteredCatalogTools]
+  )
+  const extraTools = useMemo(
+    () => filteredCatalogTools.filter(tool => tool.tier !== 'core'),
+    [filteredCatalogTools]
+  )
+
+  const toggleTool = (toolId: string) => {
+    setForm(current => {
+      const selected = new Set(current.toolNames)
+      if (selected.has(toolId)) selected.delete(toolId)
+      else selected.add(toolId)
+      return {
+        ...current,
+        toolNames: Array.from(selected).sort()
+      }
+    })
+  }
+
+  const setTierTools = (tools: ToolSummary[], enabled: boolean) => {
+    setForm(current => {
+      const selected = new Set(current.toolNames)
+      for (const tool of tools) {
+        if (enabled) selected.add(tool.id)
+        else selected.delete(tool.id)
+      }
+      return {
+        ...current,
+        toolNames: Array.from(selected).sort()
+      }
+    })
+  }
+
   const addSkill = (name: string) => {
     setForm(current => ({
       ...current,
@@ -664,6 +754,7 @@ export function SpecialistsView({
         color: form.color,
         icon: form.icon,
         skillNames: form.skillNames,
+        toolNames: form.toolNames,
         mcpServerIds: form.mcpServerIds,
         mcpCatalogIds: form.mcpCatalogIds,
         enabled: form.enabled
@@ -863,9 +954,12 @@ export function SpecialistsView({
                         <span className="text-muted-foreground mt-0.5 block line-clamp-1 text-sm">
                           {item.description || 'No description'}
                         </span>
-                        <span className="text-muted-foreground mt-1.5 block text-xs">
+        <span className="text-muted-foreground mt-1.5 block text-xs">
                           {item.skillNames.length} skill
                           {item.skillNames.length === 1 ? '' : 's'}
+                          <span className="mx-1.5 opacity-40">·</span>
+                          {(item.toolNames?.length || 0)} tool
+                          {(item.toolNames?.length || 0) === 1 ? '' : 's'}
                           <span className="mx-1.5 opacity-40">·</span>
                           {(item.mcpServerIds?.length || 0) +
                             (item.mcpCatalogIds?.length || 0)}{' '}
@@ -1346,6 +1440,103 @@ export function SpecialistsView({
                     </div>
                   )
                 })}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-sm font-medium">
+                  Tools ({form.toolNames.length})
+                </h2>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Allowlist for this specialist. Core tools are the usual
+                  defaults; Extra tools are opt-in.
+                </p>
+              </div>
+            </div>
+            <div className="relative">
+              <Search className="text-muted-foreground/70 pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2" />
+              <Input
+                value={toolQuery}
+                onChange={event => setToolQuery(event.target.value)}
+                placeholder="Search tools"
+                className="border-border/50 bg-muted/40 h-9 pl-9"
+              />
+            </div>
+            {toolsLoading && catalogTools.length === 0 ? (
+              <p className="text-muted-foreground py-2 text-sm">Loading tools…</p>
+            ) : catalogTools.length === 0 ? (
+              <p className="text-muted-foreground py-2 text-sm">
+                No tools available.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {(
+                  [
+                    { label: 'Core', tools: coreTools },
+                    { label: 'Extra', tools: extraTools }
+                  ] as const
+                ).map(group => (
+                  <div key={group.label} className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                        {group.label} ({group.tools.length})
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground text-[11px] transition-colors"
+                          onClick={() => setTierTools(group.tools, true)}
+                        >
+                          All
+                        </button>
+                        <span className="text-muted-foreground/40 text-[11px]">
+                          /
+                        </span>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground text-[11px] transition-colors"
+                          onClick={() => setTierTools(group.tools, false)}
+                        >
+                          None
+                        </button>
+                      </div>
+                    </div>
+                    {group.tools.length === 0 ? (
+                      <p className="text-muted-foreground text-xs">
+                        No {group.label.toLowerCase()} tools match.
+                      </p>
+                    ) : (
+                      <div className="divide-border/40 max-h-56 divide-y overflow-y-auto rounded-xl border border-border/40">
+                        {group.tools.map(tool => {
+                          const checked = form.toolNames.includes(tool.id)
+                          return (
+                            <div
+                              key={tool.id}
+                              className="flex items-start justify-between gap-3 px-3 py-2"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate font-mono text-xs font-medium">
+                                  {tool.id}
+                                </p>
+                                <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">
+                                  {tool.description}
+                                </p>
+                              </div>
+                              <SpecialistToggle
+                                enabled={checked}
+                                label={`${checked ? 'Remove' : 'Allow'} ${tool.id}`}
+                                onToggle={() => toggleTool(tool.id)}
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </section>

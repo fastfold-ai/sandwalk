@@ -38,7 +38,28 @@ logging.getLogger("deepagents.middleware.skills").setLevel(logging.ERROR)
 # Leave headroom below the OpenAI 128-tool ceiling for deepagents' built-in
 # tools (write_todos, filesystem ops, task, execute).
 OPENAI_TOOL_BUDGET = 116
-_PINNED_TOOL_NAMES = ("run_python", "run_r", "shell_run")
+# Always keep sandbox / discovery tools when truncating for OpenAI.
+_PINNED_TOOL_NAMES = (
+    "run_python",
+    "run_r",
+    "shell_run",
+    "search_tools",
+    "sandbox_status",
+    "sandbox_start",
+    "sandbox_stop",
+)
+
+
+def provider_needs_openai_tool_cap(provider: str | None) -> bool:
+    """Return True when the provider enforces OpenAI's ≤128 tools limit."""
+    return str(provider or "").strip().lower() == "openai"
+
+
+def finalize_tools_for_provider(tools: list, provider: str | None) -> list:
+    """Apply provider-specific tool-list limits after domain + MCP assembly."""
+    if not provider_needs_openai_tool_cap(provider):
+        return list(tools)
+    return _cap_tools_for_openai(tools)
 
 
 # ---------------------------------------------------------------------------
@@ -48,9 +69,9 @@ _PINNED_TOOL_NAMES = ("run_python", "run_r", "shell_run")
 def build_chat_model(config, *, streaming: bool = True):
     """Create a LangChain chat model from Fastfold config via ``init_chat_model``.
 
-    Supports ``anthropic`` and ``openai`` (including OpenAI-compatible
-    endpoints such as Ollama / LM Studio / vLLM, surfaced as ``openai`` +
-    ``base_url``).
+    Supports ``anthropic``, ``openai`` (including OpenAI-compatible local
+    endpoints), ``google`` via the native Google GenAI SDK, and other
+    first-party OpenAI-compatible providers (xAI, NVIDIA, OpenCode Zen).
     """
     from langchain.chat_models import init_chat_model
 
@@ -90,8 +111,22 @@ def build_chat_model(config, *, streaming: bool = True):
         )
         return init_chat_model(f"openai:{model}", **kwargs)
 
-    # First-party OpenAI-compatible providers (xAI, Google Gemini, NVIDIA,
-    # OpenCode Zen) route through a fixed base URL + key. OpenCode Zen routes
+    # Google Gemini must use the native GenAI SDK. Gemini 3+ requires
+    # thought_signature to be echoed on tool-call turns; the OpenAI-compatible
+    # Generative Language endpoint drops those and returns HTTP 400.
+    if provider == "google":
+        from agent.config import OPENAI_COMPATIBLE_PROVIDERS
+
+        meta = OPENAI_COMPATIBLE_PROVIDERS.get("google", {})
+        model = model or str(meta.get("default_model") or "gemini-3.5-flash")
+        kwargs = {"temperature": temperature}
+        api_key = config.llm_api_key("google")
+        if api_key:
+            kwargs["api_key"] = api_key
+        return init_chat_model(f"google_genai:{model}", **kwargs)
+
+    # First-party OpenAI-compatible providers (xAI, NVIDIA, OpenCode Zen)
+    # route through a fixed base URL + key. OpenCode Zen routes
     # GPT → Responses API, Claude/Qwen → Anthropic Messages, others → chat.
     from agent.config import OPENAI_COMPATIBLE_PROVIDERS
     from agent.model_catalog import (
@@ -139,6 +174,10 @@ def skill_source_dirs() -> list[str]:
 
     Ordered low -> high priority (later sources win on name collision), mirroring
     :func:`agent.skills.iter_skills`: bundled -> npx -> global.
+
+    Prefer :func:`resolve_skill_source_dirs` at runtime so Dashboard enable/disable
+    and specialist allowlists are respected — this helper returns raw roots and
+    will expose every on-disk skill to SkillsMiddleware.
     """
     from agent.skills import BUNDLED_SKILLS_DIR, GLOBAL_SKILLS_DIR, NPX_SKILLS_DIR
 
@@ -198,6 +237,192 @@ def skill_source_dirs_for_names(skill_names: list[str]) -> list[str]:
         except OSError:
             shutil.copytree(directory, link)
     return [str(staging)]
+
+
+def resolve_skill_source_dirs(
+    allowed_skill_names: list[str] | None = None,
+) -> list[str]:
+    """Skill roots for ``create_deep_agent(skills=...)``.
+
+    Deep Agents loads skills with progressive disclosure: name + description at
+    startup, full SKILL.md on demand
+    (https://docs.langchain.com/oss/python/deepagents/overview#skills).
+
+    - Specialist allowlist (``allowed_skill_names is not None``): stage those
+      names only (empty list → no skills).
+    - Default (None): stage **enabled** skills from the Skills UI — never the
+      raw on-disk roots, which would ignore disable toggles.
+    """
+    from agent.skills import list_skills
+
+    if allowed_skill_names is not None:
+        return skill_source_dirs_for_names(list(allowed_skill_names or []))
+    enabled = [s.name for s in list_skills(enabled_only=True)]
+    return skill_source_dirs_for_names(enabled)
+
+
+def build_skills_index_text(
+    allowed_skill_names: list[str] | None = None,
+) -> tuple[str, int]:
+    """Build the progressive-disclosure skills catalog text Deep Agents injects.
+
+    Mirrors ``SkillsMiddleware`` formatting (name, description, path hint) so
+    Prompts estimates match first-turn input context.
+    """
+    from agent.skills import list_skills, skill_info
+    from deepagents.middleware.skills import SKILLS_SYSTEM_PROMPT
+
+    if allowed_skill_names is not None:
+        skills = []
+        for name in allowed_skill_names or []:
+            info = skill_info(str(name).strip())
+            if info is not None:
+                skills.append(info)
+    else:
+        skills = list(list_skills(enabled_only=True))
+
+    if not skills:
+        body = "(No skills available yet.)"
+    else:
+        lines: list[str] = []
+        for skill in skills:
+            desc = str(getattr(skill, "description", "") or "").strip()
+            path = getattr(skill, "directory", None)
+            path_s = f"{path}/SKILL.md" if path else "SKILL.md"
+            lines.append(f"- **{skill.name}**: {desc}")
+            lines.append(f"  -> Read `{path_s}` for full instructions")
+        body = "\n".join(lines)
+
+    sources = resolve_skill_source_dirs(allowed_skill_names)
+    locations = "\n".join(f"**Skills**: `{src}`" for src in sources) or "**Skills**: (none)"
+    text = SKILLS_SYSTEM_PROMPT.format(
+        skills_locations=locations,
+        skills_load_warnings="",
+        skills_list=body,
+    )
+    return text, len(skills)
+
+
+def measure_deepagents_builtin_tool_schemas(
+    *,
+    domain_tools: list[Any],
+    system_prompt: str,
+    skills_sources: list[str],
+    config: Any | None = None,
+    workspace_root: str | None = None,
+) -> tuple[str, list[str]]:
+    """Return (schema_text, tool_names) for deepagents-injected builtins.
+
+    Builds a real ``create_deep_agent`` graph (FakeListChatModel, no provider
+    call) and reads ToolNode tools. Domain tools are excluded so Prompts can
+    attribute filesystem / todos / task / execute separately.
+
+    Per Deep Agents docs, input context = custom system prompt + BASE harness
+    guidance + skills index + tool schemas
+    (https://docs.langchain.com/oss/python/deepagents/context-engineering).
+    """
+    import tempfile
+
+    from deepagents import create_deep_agent
+    from langchain_core.language_models.fake_chat_models import FakeListChatModel
+    from langgraph.prebuilt.tool_node import ToolNode
+
+    from agent.sandbox_backend import resolve_deepagents_backend
+
+    domain_names = {
+        str(getattr(t, "name", "") or "")
+        for t in domain_tools
+        if getattr(t, "name", None)
+    }
+    model = FakeListChatModel(responses=["ok"])
+    root = workspace_root or tempfile.mkdtemp(prefix="sandwalk-budget-")
+    Path(root).mkdir(parents=True, exist_ok=True)
+
+    handle = resolve_deepagents_backend(
+        config,
+        session_id="prompt-budget",
+        workspace_root=root,
+        skill_source_dirs=list(skills_sources or []),
+        backend_override="builtin",
+        sync_workspace=False,
+    )
+    agent = create_deep_agent(
+        model=model,
+        tools=list(domain_tools),
+        system_prompt=system_prompt or "You are a helpful assistant.",
+        skills=handle.skills_sources or (skills_sources or None),
+        backend=handle.backend,
+    )
+
+    def _find_toolnodes(
+        obj: Any, seen: set[int] | None = None, depth: int = 0
+    ) -> list[Any]:
+        if seen is None:
+            seen = set()
+        if obj is None or id(obj) in seen or depth > 10:
+            return []
+        seen.add(id(obj))
+        if isinstance(obj, ToolNode):
+            return [obj]
+        found: list[Any] = []
+        if isinstance(obj, dict):
+            for value in obj.values():
+                found.extend(_find_toolnodes(value, seen, depth + 1))
+            return found
+        if isinstance(obj, (list, tuple)):
+            for value in obj:
+                found.extend(_find_toolnodes(value, seen, depth + 1))
+            return found
+        for attr in (
+            "nodes",
+            "bound",
+            "runnable",
+            "tools_by_name",
+            "node",
+            "afunc",
+            "func",
+            "_func",
+        ):
+            if hasattr(obj, attr):
+                try:
+                    found.extend(_find_toolnodes(getattr(obj, attr), seen, depth + 1))
+                except Exception:  # noqa: BLE001
+                    continue
+        return found
+
+    tools_by_name: dict[str, Any] = {}
+    for node in _find_toolnodes(agent):
+        mapping = getattr(node, "tools_by_name", None) or {}
+        if isinstance(mapping, dict):
+            tools_by_name.update(mapping)
+
+    builtin = [
+        tool
+        for name, tool in sorted(tools_by_name.items())
+        if name and name not in domain_names
+    ]
+
+    def _schema_text(tool: Any) -> str:
+        name = str(getattr(tool, "name", "") or "")
+        description = str(getattr(tool, "description", "") or "")
+        schema: Any = {}
+        args_schema = getattr(tool, "args_schema", None)
+        if args_schema is not None:
+            try:
+                if hasattr(args_schema, "model_json_schema"):
+                    schema = args_schema.model_json_schema()
+                elif isinstance(args_schema, dict):
+                    schema = args_schema
+            except Exception:  # noqa: BLE001
+                schema = {}
+        try:
+            schema_text = json.dumps(schema, ensure_ascii=True, default=str)
+        except Exception:  # noqa: BLE001
+            schema_text = str(schema)
+        return f"{name}\n{description}\n{schema_text}"
+
+    text = "\n\n".join(_schema_text(t) for t in builtin)
+    return text, [str(getattr(t, "name", "") or "") for t in builtin]
 
 
 async def create_external_mcp_tools(servers: list[dict] | None) -> list[Any]:
@@ -402,6 +627,7 @@ def create_ct_langchain_tools(
     include_run_python: bool = True,
     provider: str = "anthropic",
     tool_mode: str = "native",
+    session_id: str | None = None,
 ) -> tuple[list, Any, list[dict], dict[str, str]]:
     """Build LangChain tools for the deepagents graph from the ct registry.
 
@@ -501,22 +727,32 @@ def create_ct_langchain_tools(
     sandbox = None
     if include_run_python:
         rp_handler, sandbox = _make_run_python_handler(
-            session, code_trace_buffer, tools_namespace=tools_namespace
+            session,
+            code_trace_buffer,
+            tools_namespace=tools_namespace,
+            session_id=session_id,
         )
         display_name_map["run_python"] = "run_python"
         used_names.add("run_python")
         rp_description = (
             "Execute Python code in a persistent sandbox. Variables persist "
-            "between calls. Pre-imported: pd, np, plt, sns, scipy_stats, sklearn, "
-            "json, re, math, Path, safe_subprocess_run. Save plots to OUTPUT_DIR. "
-            "When done, assign result = {'summary': '...', 'answer': '...'}."
+            "between calls on the host CT sandbox. Pre-imported on host: pd, np, "
+            "plt, sns, scipy_stats, sklearn, json, re, math, Path, "
+            "safe_subprocess_run. Save plots to OUTPUT_DIR. When done, assign "
+            "result = {'summary': '...', 'answer': '...'}. "
+            "IMPORTANT: when a Modal sandbox is attached for this chat, general "
+            "Python (no tools.* calls) is executed inside Modal under /workspace "
+            "(remote Linux). Code that calls tools.<category>.<name>(...) stays "
+            "on the host. Prefer /workspace paths for Modal runs; do not mkdir "
+            "/workspace on the host."
         )
         if ptc:
             rp_description += (
                 " The full domain-tool library is pre-bound as `tools` — call "
                 "tools.<category>.<name>(**kwargs) -> dict and process results here; "
                 "only what you print returns. Use tools.search('...') or the "
-                "search_tools tool to find signatures."
+                "search_tools tool to find signatures. Domain-tool calls always "
+                "run on the host even when Modal is attached."
             )
         tools.append(
             _make_lc_tool(
@@ -551,9 +787,10 @@ def create_ct_langchain_tools(
         except ImportError:
             logger.info("rpy2 not available — run_r tool disabled")
 
-    # PTC exposes only a handful of tools, so the OpenAI tool-count ceiling
-    # never applies; the cap is only needed for the native fan-out.
-    if not ptc and str(provider).strip().lower() == "openai":
+    # Soft-cap native fan-out early so traces stay small; runner still applies
+    # ``finalize_tools_for_provider`` after MCP tools are merged (Neurosnap
+    # alone can exceed OpenAI's 128-tool limit).
+    if not ptc and provider_needs_openai_tool_cap(provider):
         tools = _cap_tools_for_openai(tools)
 
     return tools, sandbox, code_trace_buffer, display_name_map

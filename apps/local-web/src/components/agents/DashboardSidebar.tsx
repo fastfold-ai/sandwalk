@@ -9,6 +9,7 @@ import {
   GitBranch,
   HardDrive,
   LayoutDashboard,
+  MessageSquareText,
   Network,
   PanelLeft,
   Plug,
@@ -31,6 +32,7 @@ export type DashboardSection =
   | 'general'
   | 'agent_runtime'
   | 'agent_sandbox'
+  | 'agent_prompts'
   | 'models'
   | 'datasets'
   | 'tools'
@@ -92,6 +94,12 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
         label: 'Sandbox',
         path: '/dashboard/agent/sandbox',
         icon: Container
+      },
+      {
+        id: 'agent_prompts',
+        label: 'Prompts',
+        path: '/dashboard/agent/prompts',
+        icon: MessageSquareText
       }
     ]
   },

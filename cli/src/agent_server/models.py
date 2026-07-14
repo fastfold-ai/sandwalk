@@ -152,6 +152,7 @@ class Specialist(ApiModel):
     color: str = "ink"
     icon: str = "agent"
     skill_names: list[str] = Field(default_factory=list)
+    tool_names: list[str] = Field(default_factory=list)
     mcp_server_ids: list[str] = Field(default_factory=list)
     mcp_catalog_ids: list[str] = Field(default_factory=list)
     enabled: bool = True
@@ -167,6 +168,7 @@ class CreateSpecialistRequest(ApiModel):
     color: str = "ink"
     icon: str = "agent"
     skill_names: list[str] = Field(default_factory=list)
+    tool_names: list[str] = Field(default_factory=list)
     mcp_server_ids: list[str] = Field(default_factory=list)
     mcp_catalog_ids: list[str] = Field(default_factory=list)
     enabled: bool = True
@@ -180,6 +182,7 @@ class UpdateSpecialistRequest(ApiModel):
     color: str | None = None
     icon: str | None = None
     skill_names: list[str] | None = None
+    tool_names: list[str] | None = None
     mcp_server_ids: list[str] | None = None
     mcp_catalog_ids: list[str] | None = None
     enabled: bool | None = None
@@ -248,9 +251,9 @@ class SessionSandboxStatus(ApiModel):
     modal_configured: bool = False
     compute_type: str = "cpu"
     gpu_class: str = "T4"
-    cpu_cores: float = 1.0
-    ram_gb: float = 4.0
-    cpu_image: str = "debian_slim"
+    cpu_cores: float = 2.0
+    ram_gb: float = 8.0
+    cpu_image: str = "python:3.12-slim"
     detail: str | None = None
 
 
@@ -559,8 +562,8 @@ class UpdateRuntimeSettingsRequest(ApiModel):
 class SandboxSettings(ApiModel):
     backend: str = "builtin"
     modal_app: str = "sandwalk"
-    cpu_image: str = "debian_slim"
-    gpu_image: str = "debian_slim"
+    cpu_image: str = "python:3.12-slim"
+    gpu_image: str = "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime"
     pip_packages: str = "pandas,numpy,scipy,scikit-learn,matplotlib,seaborn"
     compute_type: str = "cpu"
     gpu_class: str = "T4"
@@ -674,6 +677,7 @@ class ToolSummary(ApiModel):
     name: str
     category: str
     status: Literal["stable", "experimental", "guarded"]
+    tier: Literal["core", "extra"] = "extra"
     description: str
     requires_data: list[str] = Field(default_factory=list)
     enabled: bool = True
@@ -705,6 +709,38 @@ class ToolBatchActionResponse(ApiModel):
     succeeded: list[str] = Field(default_factory=list)
     failed: list[str] = Field(default_factory=list)
     summary: str
+
+
+class PromptBudgetBucket(ApiModel):
+    id: str
+    label: str
+    tokens: int = 0
+    chars: int = 0
+    count: int | None = None
+    children: list["PromptBudgetBucket"] = Field(default_factory=list)
+
+
+class PromptBudgetToolCounts(ApiModel):
+    domain: int = 0
+    mcp: int = 0
+    deepagents: int = 0
+    total: int = 0
+    openai_cap: int = 128
+
+
+class PromptBudgetResponse(ApiModel):
+    total_tokens: int = 0
+    total_chars: int = 0
+    tokenizer: str = "chars/4"
+    tool_mode: str = "ptc"
+    provider: str | None = None
+    model: str | None = None
+    specialist_id: str | None = None
+    specialist_name: str | None = None
+    tool_counts: PromptBudgetToolCounts = Field(default_factory=PromptBudgetToolCounts)
+    buckets: list[PromptBudgetBucket] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    sample_query: str = "Hello"
 
 
 class CreateAgentModelRequest(ApiModel):

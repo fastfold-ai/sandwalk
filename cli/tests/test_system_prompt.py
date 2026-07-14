@@ -19,6 +19,14 @@ class TestSystemPrompt:
         assert "Available Tools" in prompt
         assert "run_python" in prompt
 
+    @patch("agent.system_prompt._load_installed_skills", return_value="")
+    def test_identity_discourages_reintroduction(self, mock_skills):
+        session = type("Session", (), {"config": None})()
+        prompt = build_system_prompt(session, include_skills=False)
+        assert "do **not** re-introduce yourself" in prompt
+        assert "Fastfold Agent" in prompt
+        assert "Do **not** paste or announce the session workspace path" in prompt
+
     @patch("agent.system_prompt._load_installed_skills", return_value="## Skills\n- fold")
     def test_build_includes_skills_section(self, mock_skills):
         session = type("Session", (), {"config": type("Cfg", (), {
@@ -102,7 +110,40 @@ class TestSystemPrompt:
         assert "Compact catalog" in prompt
         assert "Other tools" in prompt
         assert "Skills & Filesystem" in prompt
-        mock_catalog.assert_called_once_with(exclude_categories={"unsafe"})
+        mock_catalog.assert_called_once_with(
+            exclude_categories={"unsafe"},
+            exclude_tools=set(),
+        )
+    @patch("agent.system_prompt._load_installed_skills", return_value="")
+    def test_modal_sandbox_prompt_guides_skill_scripts_to_host(self, mock_skills):
+        session = type("Session", (), {"config": None})()
+        prompt = build_system_prompt(
+            session,
+            include_skills=False,
+            runtime="deepagents",
+            sandbox_backend="modal",
+            workspace_path="/tmp/ws-chat",
+        )
+        assert "not inside Modal" in prompt
+        assert "/workspace" in prompt
+        assert "shell_run" in prompt
+        assert "Compute environment (Modal)" in prompt
+        assert "sandbox_status" in prompt
+        assert "Host path (Files panel)" in prompt
+        assert "auto-routes" in prompt or "run_python" in prompt
+        assert "`execute`" in prompt or "execute" in prompt
+
+    @patch("agent.system_prompt._load_installed_skills", return_value="")
+    def test_builtin_compute_policy_mentions_sandbox_tools(self, mock_skills):
+        session = type("Session", (), {"config": None})()
+        prompt = build_system_prompt(
+            session,
+            include_skills=False,
+            runtime="deepagents",
+            sandbox_backend="builtin",
+        )
+        assert "Compute environment (Built-in)" in prompt
+        assert "sandbox_start" in prompt
 
     @patch("agent.system_prompt._load_installed_skills", return_value="")
     @patch("agent.ptc_tools.build_tool_catalog", side_effect=RuntimeError("catalog failed"))
