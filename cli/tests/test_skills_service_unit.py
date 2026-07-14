@@ -185,10 +185,52 @@ def test_catalog_detail_and_audit(monkeypatch):
     svc = SkillsService()
     detail = svc.get_catalog_detail("src", "fold")
     assert detail.slug == "fold"
+    assert detail.installs == 1
     assert detail.files and detail.files[0].path == "SKILL.md"
 
     audit = svc.get_catalog_audit("src", "fold")
     assert audit.audits[0].status == "pass"
+
+
+def test_catalog_detail_enriches_installs_from_search(monkeypatch):
+    from agent_server.models import CatalogSkill
+
+    monkeypatch.setattr(
+        "agent_server.skills_service.SkillsService._skills_sh_token",
+        lambda self: "token",
+    )
+
+    def fake_request(self, endpoint, operation=""):
+        assert "/skills/" in endpoint
+        return {
+            "id": "fastfold-ai/skills/md-openmm-calvados",
+            "source": "fastfold-ai/skills",
+            "slug": "md-openmm-calvados",
+            "installs": 0,
+            "files": [{"path": "SKILL.md", "contents": "# MD"}],
+        }
+
+    monkeypatch.setattr(
+        "agent_server.skills_service.SkillsService._skills_sh_request_json",
+        fake_request,
+    )
+    monkeypatch.setattr(
+        "agent_server.skills_service.SkillsService.search_catalog",
+        lambda self, query, limit=20: [
+            CatalogSkill(
+                id="fastfold-ai/skills/md_openmm_calvados",
+                slug="md_openmm_calvados",
+                name="md_openmm_calvados",
+                source="fastfold-ai/skills",
+                installs=114,
+                source_type="github",
+            )
+        ],
+    )
+    svc = SkillsService()
+    detail = svc.get_catalog_detail("fastfold-ai/skills", "md_openmm_calvados")
+    assert detail.installs == 114
+    assert detail.slug == "md-openmm-calvados"
 
 
 def test_install_uploaded_zip(tmp_path: Path, monkeypatch):

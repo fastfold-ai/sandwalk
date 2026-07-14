@@ -17,7 +17,7 @@ import {
   ChevronDown,
   Copy,
   GitBranch,
-  Loader2,
+  Loader,
   MoreHorizontal,
   Plus,
   Search,
@@ -646,24 +646,13 @@ export function SkillsView({
   }
 
   const renderSkillsShMetricsLoading = () => (
-    <aside className="space-y-4 lg:sticky lg:top-4">
-      <div className="rounded-lg border border-border/60 p-4">
-        <div className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Loader2 className="size-4 shrink-0 animate-spin" />
-          <span>Fetching skills.sh details…</span>
-        </div>
-        <div className="mt-4 space-y-3">
-          <div className="bg-muted/60 h-3 w-16 animate-pulse rounded" />
-          <div className="bg-muted/50 h-8 w-12 animate-pulse rounded" />
-          <div className="bg-muted/60 mt-4 h-3 w-20 animate-pulse rounded" />
-          <div className="bg-muted/50 h-4 w-full animate-pulse rounded" />
-          <div className="bg-muted/60 mt-4 h-3 w-24 animate-pulse rounded" />
-          <div className="space-y-2">
-            <div className="bg-muted/50 h-4 w-full animate-pulse rounded" />
-            <div className="bg-muted/50 h-4 w-full animate-pulse rounded" />
-            <div className="bg-muted/50 h-4 w-5/6 animate-pulse rounded" />
-          </div>
-        </div>
+    <aside className="lg:sticky lg:top-4 lg:pt-1">
+      <div className="text-muted-foreground flex items-center gap-2 text-xs">
+        <Loader
+          className="size-3.5 shrink-0 animate-spin"
+          aria-hidden
+        />
+        <span>Fetching Skills.sh metadata</span>
       </div>
     </aside>
   )
@@ -1160,12 +1149,9 @@ export function SkillsView({
             ) : null}
           </div>
           {catalogDetailLoading ? (
-            <div className="space-y-4">
-              <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                <Loader2 className="size-4 animate-spin" />
-                Fetching skills.sh details…
-              </div>
-              <DetailPageSkeleton bare />
+            <div className="text-muted-foreground flex min-h-[40vh] items-center justify-center gap-2 text-sm">
+              <Loader className="size-4 shrink-0 animate-spin" aria-hidden />
+              <span>Fetching Skills.sh metadata</span>
             </div>
           ) : catalogDetailError ? (
             <p className="text-destructive text-sm">{catalogDetailError}</p>
@@ -1185,8 +1171,8 @@ export function SkillsView({
                   <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                     Installation
                   </p>
-                  <div className="bg-muted/50 overflow-hidden rounded-lg border">
-                    <div className="bg-muted/80 flex items-center justify-between border-b px-3 py-1.5">
+                  <div className="bg-muted/50 overflow-hidden rounded-lg">
+                    <div className="bg-muted/80 flex items-center justify-between px-3 py-1.5">
                       <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                         bash
                       </span>
@@ -1332,12 +1318,7 @@ export function SkillsView({
                   <Trash2 className="mr-1 size-3.5" />
                   Remove
                 </Button>
-              {localCatalogLoading ? (
-                <span className="text-muted-foreground inline-flex items-center gap-1.5 rounded-md border border-border/60 px-3 py-1.5 text-xs">
-                  <Loader2 className="size-3.5 animate-spin" />
-                  Fetching skills.sh…
-                </span>
-              ) : localSkillsShUrl ? (
+              {localSkillsShUrl ? (
                 <a
                   href={localSkillsShUrl}
                   target="_blank"
@@ -1452,8 +1433,8 @@ export function SkillsView({
                 <p className="text-muted-foreground text-sm font-medium">
                   Install this skill
                 </p>
-                <div className="bg-muted/50 overflow-hidden rounded-lg border">
-                  <div className="bg-muted/80 flex items-center justify-between border-b px-3 py-1.5">
+                <div className="bg-muted/50 overflow-hidden rounded-lg">
+                  <div className="bg-muted/80 flex items-center justify-between px-3 py-1.5">
                     <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                       bash
                     </span>

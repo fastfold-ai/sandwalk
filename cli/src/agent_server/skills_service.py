@@ -275,6 +275,33 @@ class SkillsService:
             )
         return results
 
+    @staticmethod
+    def _normalize_skill_key(value: str) -> str:
+        return str(value or "").strip().lower().replace("-", "_").strip("/")
+
+    def _installs_from_search(self, source: str, skill: str) -> int | None:
+        """skills.sh detail often returns installs=0; search has the real count."""
+        skill_key = self._normalize_skill_key(skill)
+        source_key = self._normalize_skill_key(source)
+        if not skill_key:
+            return None
+        try:
+            results = self.search_catalog(skill, limit=10)
+        except Exception:
+            return None
+        best: int | None = None
+        for item in results:
+            name_key = self._normalize_skill_key(item.name or item.slug or "")
+            if name_key != skill_key:
+                continue
+            item_source = self._normalize_skill_key(item.source or "")
+            if source_key and item_source and item_source != source_key:
+                continue
+            installs = int(item.installs or 0)
+            if best is None or installs > best:
+                best = installs
+        return best
+
     def get_catalog_detail(self, source: str, skill: str) -> CatalogSkillDetail:
         source_value = str(source or "").strip().strip("/")
         skill_value = str(skill or "").strip().strip("/")
@@ -305,11 +332,16 @@ class SkillsService:
                     )
                 )
             files = normalized_files
+        installs = int(payload.get("installs") or 0)
+        if installs <= 0:
+            enriched = self._installs_from_search(source_value, skill_value)
+            if enriched is not None and enriched > 0:
+                installs = enriched
         return CatalogSkillDetail(
             id=str(payload.get("id") or f"{source_value}/{skill_value}"),
             source=str(payload.get("source") or source_value),
             slug=str(payload.get("slug") or skill_value),
-            installs=int(payload.get("installs") or 0),
+            installs=installs,
             hash=str(payload.get("hash")) if payload.get("hash") is not None else None,
             files=files,
         )
