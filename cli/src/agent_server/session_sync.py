@@ -97,10 +97,15 @@ def import_trajectory(
     trajectory: Trajectory,
     *,
     force: bool = False,
+    mark_recent: bool = False,
 ) -> str:
     """Import one trajectory into SQLite.
 
     Returns one of: imported | updated | skipped.
+
+    When ``mark_recent`` is True (e.g. cloud forks), bump session activity
+    timestamps to now so the chat sorts to the top of the Web UI list even
+    though message history keeps its original times.
     """
     session_id = str(trajectory.session_id or "").strip()
     if not session_id:
@@ -109,6 +114,8 @@ def import_trajectory(
     title = (trajectory.title or "").strip() or f"CLI session {session_id}"
     created_at = _timestamp_to_datetime(trajectory.created_at)
     updated_at = _timestamp_to_datetime(trajectory.updated_at or trajectory.created_at)
+    if mark_recent:
+        updated_at = datetime.now(UTC)
 
     existing = store.get_session(session_id)
     existing_messages = store.list_messages(session_id) if existing else []
@@ -155,6 +162,10 @@ def import_trajectory(
 
     store.update_session(session_id, title=title)
     store.set_session_status(session_id, "idle")
+    if mark_recent:
+        # add_message stamps last_message_at from historical turns — refresh so
+        # the UI "Today" / recent sort treats the fork as newly added.
+        store.touch_session(session_id)
     return action
 
 

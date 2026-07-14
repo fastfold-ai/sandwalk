@@ -1373,6 +1373,8 @@ def fork_cmd(
                 "messages_count": len(messages),
                 "turns_count": len(turns),
             }
+            # Treat the fork as freshly added so CLI + Web UI sort it to the top.
+            trajectory.updated_at = time.time()
             trajectory.save()
 
         share_files_count = 0
@@ -1437,7 +1439,12 @@ def fork_cmd(
         # immediately (same path as `sandwalk sync`).
         ui_sync_action = "skipped"
         with spinner("Syncing forked session into the Web UI database..."):
-            ui_sync_action = import_trajectory(AgentStore(), trajectory, force=True)
+            ui_sync_action = import_trajectory(
+                AgentStore(),
+                trajectory,
+                force=True,
+                mark_recent=True,
+            )
 
         # Best-effort analytics so public and local CLI forks are reflected in
         # shared-page fork counts (same metric surface as cloud forks).

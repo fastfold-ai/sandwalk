@@ -968,6 +968,22 @@ class AgentStore:
             )
         return self.get_session(session_id)
 
+    def touch_session(self, session_id: str) -> AgentSession | None:
+        """Bump updated_at + last_message_at so the session sorts as recent in the UI."""
+        now = utc_now()
+        with self._write_lock, self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE sessions
+                SET updated_at = ?, last_message_at = ?
+                WHERE id = ?
+                """,
+                (now.isoformat(), now.isoformat(), session_id),
+            )
+            if cursor.rowcount <= 0:
+                return None
+        return self.get_session(session_id)
+
     def add_message(
         self,
         *,

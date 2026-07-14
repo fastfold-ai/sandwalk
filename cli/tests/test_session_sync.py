@@ -75,6 +75,27 @@ def test_import_trajectory_preserves_timestamps(tmp_path: Path):
     assert messages[1].created_at == datetime.fromtimestamp(1_700_000_051, tz=UTC)
 
 
+def test_import_trajectory_mark_recent_bumps_activity(tmp_path: Path):
+    store = AgentStore(tmp_path / "agent.db")
+    trajectory = Trajectory(session_id="forked01", title="Old cloud chat")
+    trajectory.created_at = 1_600_000_000
+    trajectory.updated_at = 1_600_000_100
+    trajectory.add_turn("hello", "from the past")
+    trajectory.turns[0].timestamp = 1_600_000_050
+
+    assert import_trajectory(store, trajectory, mark_recent=True) == "imported"
+    session = store.get_session("forked01")
+    assert session is not None
+    assert session.last_message_at is not None
+    # Activity stamps should be "now", not the historical turn time.
+    assert session.last_message_at.year >= 2026
+    assert session.updated_at.year >= 2026
+    assert abs((session.updated_at - session.last_message_at).total_seconds()) < 2
+    # Message history keeps original chronology.
+    messages = store.list_messages("forked01")
+    assert messages[0].created_at == datetime.fromtimestamp(1_600_000_050, tz=UTC)
+
+
 def test_export_store_to_trajectory_pulls_ui_turns(tmp_path: Path, monkeypatch):
     sessions_dir = tmp_path / "sessions"
     sessions_dir.mkdir()
