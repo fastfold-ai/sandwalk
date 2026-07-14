@@ -44,6 +44,10 @@ struct ToolSummaryDTO: Codable, Identifiable, Hashable {
     let description: String
     let requiresData: [String]?
     let enabled: Bool
+    /// ``core`` or ``extra`` — optional for older API payloads.
+    let tier: String?
+
+    var isCore: Bool { (tier ?? "extra").lowercased() == "core" }
 }
 
 struct ToolCatalogDTO: Codable {
@@ -181,11 +185,62 @@ struct SpecialistDTO: Codable, Identifiable, Hashable {
     let color: String
     let icon: String
     let skillNames: [String]
+    let toolNames: [String]
     let mcpServerIds: [String]
     let mcpCatalogIds: [String]
     let enabled: Bool
     let createdAt: String?
     let updatedAt: String?
+
+    init(
+        id: String,
+        name: String,
+        slug: String,
+        description: String?,
+        instructions: String?,
+        color: String,
+        icon: String,
+        skillNames: [String],
+        toolNames: [String] = [],
+        mcpServerIds: [String],
+        mcpCatalogIds: [String],
+        enabled: Bool,
+        createdAt: String?,
+        updatedAt: String?
+    ) {
+        self.id = id
+        self.name = name
+        self.slug = slug
+        self.description = description
+        self.instructions = instructions
+        self.color = color
+        self.icon = icon
+        self.skillNames = skillNames
+        self.toolNames = toolNames
+        self.mcpServerIds = mcpServerIds
+        self.mcpCatalogIds = mcpCatalogIds
+        self.enabled = enabled
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        slug = try c.decode(String.self, forKey: .slug)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        instructions = try c.decodeIfPresent(String.self, forKey: .instructions)
+        color = try c.decodeIfPresent(String.self, forKey: .color) ?? "ink"
+        icon = try c.decodeIfPresent(String.self, forKey: .icon) ?? "agent"
+        skillNames = try c.decodeIfPresent([String].self, forKey: .skillNames) ?? []
+        toolNames = try c.decodeIfPresent([String].self, forKey: .toolNames) ?? []
+        mcpServerIds = try c.decodeIfPresent([String].self, forKey: .mcpServerIds) ?? []
+        mcpCatalogIds = try c.decodeIfPresent([String].self, forKey: .mcpCatalogIds) ?? []
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
+    }
 }
 
 struct DeleteSpecialistDTO: Codable {
@@ -375,4 +430,104 @@ struct SandboxSettingsDTO: Codable, Hashable {
         idleTtlSeconds: 600,
         modalConfigured: false
     )
+}
+
+// MARK: - Prompt budget
+
+struct PromptBudgetBucketDTO: Codable, Identifiable, Hashable {
+    let id: String
+    let label: String
+    let tokens: Int
+    let chars: Int
+    let count: Int?
+    let children: [PromptBudgetBucketDTO]
+
+    init(
+        id: String,
+        label: String,
+        tokens: Int,
+        chars: Int,
+        count: Int? = nil,
+        children: [PromptBudgetBucketDTO] = []
+    ) {
+        self.id = id
+        self.label = label
+        self.tokens = tokens
+        self.chars = chars
+        self.count = count
+        self.children = children
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        label = try c.decode(String.self, forKey: .label)
+        tokens = try c.decodeIfPresent(Int.self, forKey: .tokens) ?? 0
+        chars = try c.decodeIfPresent(Int.self, forKey: .chars) ?? 0
+        count = try c.decodeIfPresent(Int.self, forKey: .count)
+        children = try c.decodeIfPresent([PromptBudgetBucketDTO].self, forKey: .children) ?? []
+    }
+}
+
+struct PromptBudgetToolCountsDTO: Codable, Hashable {
+    let domain: Int
+    let mcp: Int
+    let deepagents: Int
+    let total: Int
+    let openaiCap: Int
+
+    init(
+        domain: Int = 0,
+        mcp: Int = 0,
+        deepagents: Int = 0,
+        total: Int = 0,
+        openaiCap: Int = 128
+    ) {
+        self.domain = domain
+        self.mcp = mcp
+        self.deepagents = deepagents
+        self.total = total
+        self.openaiCap = openaiCap
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        domain = try c.decodeIfPresent(Int.self, forKey: .domain) ?? 0
+        mcp = try c.decodeIfPresent(Int.self, forKey: .mcp) ?? 0
+        deepagents = try c.decodeIfPresent(Int.self, forKey: .deepagents) ?? 0
+        total = try c.decodeIfPresent(Int.self, forKey: .total) ?? 0
+        openaiCap = try c.decodeIfPresent(Int.self, forKey: .openaiCap) ?? 128
+    }
+}
+
+struct PromptBudgetResponseDTO: Codable, Hashable {
+    let totalTokens: Int
+    let totalChars: Int
+    let tokenizer: String
+    let toolMode: String
+    let provider: String?
+    let model: String?
+    let specialistId: String?
+    let specialistName: String?
+    let toolCounts: PromptBudgetToolCountsDTO
+    let buckets: [PromptBudgetBucketDTO]
+    let warnings: [String]
+    let sampleQuery: String
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        totalTokens = try c.decodeIfPresent(Int.self, forKey: .totalTokens) ?? 0
+        totalChars = try c.decodeIfPresent(Int.self, forKey: .totalChars) ?? 0
+        tokenizer = try c.decodeIfPresent(String.self, forKey: .tokenizer) ?? "chars/4"
+        toolMode = try c.decodeIfPresent(String.self, forKey: .toolMode) ?? "ptc"
+        provider = try c.decodeIfPresent(String.self, forKey: .provider)
+        model = try c.decodeIfPresent(String.self, forKey: .model)
+        specialistId = try c.decodeIfPresent(String.self, forKey: .specialistId)
+        specialistName = try c.decodeIfPresent(String.self, forKey: .specialistName)
+        toolCounts = try c.decodeIfPresent(PromptBudgetToolCountsDTO.self, forKey: .toolCounts)
+            ?? PromptBudgetToolCountsDTO()
+        buckets = try c.decodeIfPresent([PromptBudgetBucketDTO].self, forKey: .buckets) ?? []
+        warnings = try c.decodeIfPresent([String].self, forKey: .warnings) ?? []
+        sampleQuery = try c.decodeIfPresent(String.self, forKey: .sampleQuery) ?? "Hello"
+    }
 }

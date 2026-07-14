@@ -381,8 +381,9 @@ class TestCreateLangchainTools:
         async def fake_handler(args):
             return {"content": []}
 
-        def fake_make(session, code_trace_buffer, tools_namespace=None):
+        def fake_make(session, code_trace_buffer, tools_namespace=None, session_id=None):
             captured["namespace"] = tools_namespace
+            captured["session_id"] = session_id
             return fake_handler, fake_sandbox
 
         monkeypatch.setattr("agent.mcp_server._make_run_python_handler", fake_make)

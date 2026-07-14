@@ -217,6 +217,16 @@ enum SandwalkAPIClient {
         try await delete("/v1/specialists/\(enc(id))")
     }
 
+    // MARK: - Prompt budget
+
+    static func getPromptBudget(specialistId: String? = nil) async throws -> PromptBudgetResponseDTO {
+        var q: [URLQueryItem] = []
+        if let specialistId, !specialistId.isEmpty {
+            q.append(.init(name: "specialistId", value: specialistId))
+        }
+        return try await get("/v1/settings/prompt-budget", query: q)
+    }
+
     // MARK: - Runtime settings
 
     static func getRuntimeSettings() async throws -> RuntimeSettingsDTO {

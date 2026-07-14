@@ -52,7 +52,7 @@ describe('normalizeAppError', () => {
 
   it('maps network failures', () => {
     const info = normalizeAppError('TypeError: Failed to fetch')
-    expect(info.title).toBe('Network error')
+    expect(info.title).toBe('Backend unreachable')
   })
 
   it('maps auth failures', () => {
@@ -63,7 +63,7 @@ describe('normalizeAppError', () => {
 
   it('maps server errors from JSON detail', () => {
     const info = normalizeAppError('FastFold Agent API 500: {"detail":"boom"}')
-    expect(info.title).toBe('Server error')
+    expect(info.title).toBe('Backend error')
     expect(info.detail).toBe('boom')
   })
 })

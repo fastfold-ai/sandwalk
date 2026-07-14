@@ -48,7 +48,7 @@ struct SpecialistsSettingsView: View {
                 AgentSearchField(text: $search)
                 SettingsSectionHeader(
                     "SPECIALISTS",
-                    subtitle: "\(filtered.count) profiles — skills + MCPs + instructions"
+                    subtitle: "\(filtered.count) profiles — tools + skills + MCPs + instructions"
                 )
                 SettingsListGroup {
                     if filtered.isEmpty {
@@ -108,10 +108,12 @@ struct SpecialistsSettingsView: View {
     }
 
     private func specialistSublabel(_ item: SpecialistDTO) -> String {
+        let tools = item.toolNames.count
         let skills = item.skillNames.count
         let mcps = item.mcpServerIds.count + item.mcpCatalogIds.count
         let parts = [
             item.slug,
+            "\(tools) tool\(tools == 1 ? "" : "s")",
             "\(skills) skill\(skills == 1 ? "" : "s")",
             "\(mcps) MCP\(mcps == 1 ? "" : "s")",
             item.enabled ? nil : "disabled",
@@ -179,15 +181,19 @@ struct SpecialistDetailSettingsView: View {
     @State private var color = "ink"
     @State private var icon = "git-branch"
     @State private var enabled = true
+    @State private var selectedTools: Set<String> = []
     @State private var selectedSkills: Set<String> = []
     @State private var selectedMcpServers: Set<String> = []
     @State private var selectedMcpCatalogs: Set<String> = []
 
+    @State private var catalogTools: [ToolSummaryDTO] = []
     @State private var skills: [AgentSkillDTO] = []
     @State private var mcpServers: [McpServerDTO] = []
     @State private var mcpCatalog: [McpCatalogEntryDTO] = []
+    @State private var toolFilter = ""
     @State private var skillFilter = ""
     @State private var mcpFilter = ""
+    @State private var didSeedCoreTools = false
 
     @State private var error: String?
     @State private var status: String?
@@ -204,6 +210,26 @@ struct SpecialistDetailSettingsView: View {
             "git-branch", "agent", "sparkles", "flask", "dna", "microscope",
             "target", "atom", "database", "code", "book", "globe",
         ]
+    }
+
+    private var filteredCatalogTools: [ToolSummaryDTO] {
+        let q = toolFilter.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let base = catalogTools.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        guard !q.isEmpty else { return base }
+        return base.filter {
+            $0.id.lowercased().contains(q)
+                || $0.name.lowercased().contains(q)
+                || $0.category.lowercased().contains(q)
+                || $0.description.lowercased().contains(q)
+        }
+    }
+
+    private var coreTools: [ToolSummaryDTO] {
+        filteredCatalogTools.filter(\.isCore)
+    }
+
+    private var extraTools: [ToolSummaryDTO] {
+        filteredCatalogTools.filter { !$0.isCore }
     }
 
     private var filteredSkills: [AgentSkillDTO] {
@@ -239,7 +265,7 @@ struct SpecialistDetailSettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 SettingsSectionHeader(
                     isCreate ? "NEW SPECIALIST" : "EDIT SPECIALIST",
-                    subtitle: "Runs use only this profile’s skills, MCPs, and instructions."
+                    subtitle: "Runs use only this profile’s tools, skills, MCPs, and instructions."
                 )
 
                 SettingsListGroup {
@@ -300,6 +326,39 @@ struct SpecialistDetailSettingsView: View {
                             .foregroundStyle(theme.textTertiary)
                     }
                     .padding(14)
+                }
+
+                SettingsSectionHeader(
+                    "TOOLS",
+                    subtitle: "\(selectedTools.count) selected · Core are usual defaults; Extra are opt-in"
+                )
+                HStack(spacing: 8) {
+                    Button("All core") { setTierTools(coreTools, enabled: true) }
+                        .buttonStyle(.sandwalk(.normal))
+                    Button("None core") { setTierTools(coreTools, enabled: false) }
+                        .buttonStyle(.sandwalk(.normal))
+                    Button("All extra") { setTierTools(extraTools, enabled: true) }
+                        .buttonStyle(.sandwalk(.normal))
+                    Button("None extra") { setTierTools(extraTools, enabled: false) }
+                        .buttonStyle(.sandwalk(.normal))
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 6)
+                AgentSearchField(text: $toolFilter)
+                SettingsListGroup {
+                    if catalogTools.isEmpty {
+                        SettingsRow(label: busy ? "Loading tools…" : "No tools in catalog", isLast: true) {
+                            EmptyView()
+                        }
+                    } else if filteredCatalogTools.isEmpty {
+                        SettingsRow(label: "No tools match", isLast: true) {
+                            EmptyView()
+                        }
+                    } else {
+                        toolGroupRows(label: "Core", tools: coreTools, trailingEmpty: extraTools.isEmpty)
+                        toolGroupRows(label: "Extra", tools: extraTools, trailingEmpty: true)
+                    }
                 }
 
                 SettingsSectionHeader(
@@ -439,9 +498,11 @@ struct SpecialistDetailSettingsView: View {
         error = nil
         defer { busy = false }
         do {
+            async let toolsTask = SandwalkAPIClient.listTools()
             async let skillsTask = SandwalkAPIClient.listSkills()
             async let serversTask = SandwalkAPIClient.listMcpServers()
             async let catalogTask = SandwalkAPIClient.listMcpCatalog()
+            catalogTools = try await toolsTask.data
             skills = try await skillsTask
             mcpServers = try await serversTask
             mcpCatalog = try await catalogTask
@@ -449,6 +510,8 @@ struct SpecialistDetailSettingsView: View {
             if let specialistId {
                 let item = try await SandwalkAPIClient.getSpecialist(id: specialistId)
                 apply(item)
+            } else {
+                seedCoreToolsIfNeeded()
             }
         } catch {
             self.error = error.localizedDescription
@@ -464,9 +527,51 @@ struct SpecialistDetailSettingsView: View {
         color = item.color.isEmpty ? "ink" : item.color
         icon = item.icon.isEmpty ? "git-branch" : item.icon
         enabled = item.enabled
+        selectedTools = Set(item.toolNames)
         selectedSkills = Set(item.skillNames)
         selectedMcpServers = Set(item.mcpServerIds)
         selectedMcpCatalogs = Set(item.mcpCatalogIds)
+        didSeedCoreTools = true
+    }
+
+    private func seedCoreToolsIfNeeded() {
+        guard isCreate, !didSeedCoreTools, selectedTools.isEmpty, !catalogTools.isEmpty else { return }
+        selectedTools = Set(catalogTools.filter(\.isCore).map(\.id))
+        didSeedCoreTools = true
+    }
+
+    private func setTierTools(_ tools: [ToolSummaryDTO], enabled: Bool) {
+        if enabled {
+            for tool in tools { selectedTools.insert(tool.id) }
+        } else {
+            for tool in tools { selectedTools.remove(tool.id) }
+        }
+    }
+
+    @ViewBuilder
+    private func toolGroupRows(label: String, tools: [ToolSummaryDTO], trailingEmpty: Bool) -> some View {
+        if !tools.isEmpty {
+            ForEach(Array(tools.enumerated()), id: \.element.id) { index, tool in
+                SettingsRow(
+                    label: tool.name,
+                    sublabel: "\(label) · \(tool.category) · \(tool.id)",
+                    isLast: trailingEmpty && index == tools.count - 1
+                ) {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { selectedTools.contains(tool.id) },
+                            set: { on in
+                                if on { selectedTools.insert(tool.id) }
+                                else { selectedTools.remove(tool.id) }
+                            }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                }
+            }
+        }
     }
 
     @MainActor
@@ -490,6 +595,7 @@ struct SpecialistDetailSettingsView: View {
                     "color": color,
                     "icon": icon,
                     "enabled": enabled,
+                    "toolNames": Array(selectedTools).sorted(),
                     "skillNames": Array(selectedSkills).sorted(),
                     "mcpServerIds": Array(selectedMcpServers).sorted(),
                     "mcpCatalogIds": Array(selectedMcpCatalogs).sorted(),
@@ -508,6 +614,7 @@ struct SpecialistDetailSettingsView: View {
                     "color": color,
                     "icon": icon,
                     "enabled": enabled,
+                    "toolNames": Array(selectedTools).sorted(),
                     "skillNames": Array(selectedSkills).sorted(),
                     "mcpServerIds": Array(selectedMcpServers).sorted(),
                     "mcpCatalogIds": Array(selectedMcpCatalogs).sorted(),

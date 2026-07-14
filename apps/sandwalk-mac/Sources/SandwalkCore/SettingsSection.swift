@@ -8,6 +8,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
     case logs
     case runtime
     case sandbox
+    case prompts
     case models
     case tools
     case datasets
@@ -26,6 +27,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
         switch self {
         case .runtime: return "Runtime"
         case .sandbox: return "Sandbox"
+        case .prompts: return "Prompts"
         case .models: return "Models"
         case .tools: return "Tools"
         case .datasets: return "Datasets"
@@ -49,6 +51,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
         switch self {
         case .runtime: return "cpu"
         case .sandbox: return "shippingbox"
+        case .prompts: return "text.alignleft"
         case .models: return "cube"
         case .tools: return "wrench"
         case .datasets: return "externaldrive"

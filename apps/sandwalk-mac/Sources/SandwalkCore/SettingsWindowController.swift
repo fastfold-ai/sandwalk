@@ -28,6 +28,7 @@ struct SettingsRootView: View {
                 Section {
                     SidebarRow(section: .runtime)
                     SidebarRow(section: .sandbox)
+                    SidebarRow(section: .prompts)
                 } header: {
                     Text("Agent")
                 }
@@ -154,6 +155,7 @@ private struct SettingsDetailScaffold: View {
         switch section {
         case .runtime: RuntimeSettingsView()
         case .sandbox: SandboxSettingsView()
+        case .prompts: PromptsSettingsView()
         case .models: ModelsSettingsView()
         case .tools: ToolsSettingsView()
         case .datasets: DatasetsSettingsView()
