@@ -14,7 +14,6 @@ export const INTEGRATION_ICONS: Record<
   nvidia: { src: '/nvidia.svg' },
   opencode: { src: '/opencode.png' },
   openai: { src: '/openai.svg', invertInDark: true },
-  'openai-compatible': { src: '/openai.svg', invertInDark: true },
   anthropic: { src: '/anthropic.png', invertInDark: true },
   xai: { src: '/xai.png' },
   google: { src: '/gemini.png' },

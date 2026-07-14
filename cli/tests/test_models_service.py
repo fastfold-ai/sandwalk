@@ -130,6 +130,14 @@ def test_models_service_toggle_and_profile_crud(isolated_config: Config, monkeyp
     discovered = service.list_models(discover=True)
     assert any(item.id == "local-model-a" and item.profile_id == created.id for item in discovered.data)
 
+    preview = service.discover_endpoint(
+        backend="ollama",
+        base_url="http://127.0.0.1:11434/v1",
+    )
+    assert preview.profile_id == "preview"
+    assert preview.models == ["local-model-a"]
+    assert preview.health == "healthy"
+
     with pytest.raises(ValueError, match="cannot be deleted"):
         service.delete_profile("openai_cloud")
 
@@ -176,6 +184,18 @@ def test_models_http_routes(isolated_config: Config, tmp_path: Path, monkeypatch
     probed = client.post(f"/v1/model-profiles/{profile_id}/probe")
     assert probed.status_code == 200
     assert "route-model" in probed.json()["models"]
+
+    discovered = client.post(
+        "/v1/model-profiles/discover",
+        json={
+            "backend": "lm_studio",
+            "baseUrl": "http://127.0.0.1:1234/v1",
+        },
+    )
+    assert discovered.status_code == 200
+    body = discovered.json()
+    assert body["profileId"] == "preview"
+    assert "route-model" in body["models"]
 
     deleted = client.delete(f"/v1/model-profiles/{profile_id}")
     assert deleted.status_code == 200

@@ -10,7 +10,6 @@ import signal
 import sys
 import traceback
 
-# Suppress matplotlib warnings before import
 import warnings
 from pathlib import Path
 from typing import Any
@@ -20,10 +19,12 @@ from agent.config import CONFIG_DIR
 warnings.filterwarnings("ignore", message="Unable to import Axes3D")
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 
-# Force non-interactive matplotlib backend before any import
-import matplotlib
 
-matplotlib.use("Agg")
+def _configure_matplotlib() -> None:
+    """Force Agg before pyplot import. Lazy so agent startup can report a clear miss."""
+    import matplotlib
+
+    matplotlib.use("Agg")
 
 
 # Modules blocked from import inside the sandbox
@@ -169,6 +170,7 @@ class Sandbox:
         import urllib.request
         import zipfile
 
+        _configure_matplotlib()
         import matplotlib.pyplot as plt
         import numpy as np
         import pandas as pd

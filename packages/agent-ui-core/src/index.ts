@@ -484,6 +484,12 @@ export type ModelProfileProbeResult = {
   error: string | null
 }
 
+export type DiscoverModelEndpointInput = {
+  backend?: string | null
+  baseUrl: string
+  apiKey?: string | null
+}
+
 export type UpsertModelProfileInput = {
   id?: string | null
   label?: string | null
@@ -654,6 +660,10 @@ export interface ModelsProvider {
   deleteModelProfile(profileId: string, signal?: AbortSignal): Promise<void>
   probeModelProfile(
     profileId: string,
+    signal?: AbortSignal,
+  ): Promise<ModelProfileProbeResult>
+  discoverModelEndpoint?(
+    input: DiscoverModelEndpointInput,
     signal?: AbortSignal,
   ): Promise<ModelProfileProbeResult>
 }

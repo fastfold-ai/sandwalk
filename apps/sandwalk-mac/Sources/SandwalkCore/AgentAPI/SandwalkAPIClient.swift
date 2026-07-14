@@ -43,8 +43,10 @@ enum SandwalkAPIClient {
 
     // MARK: - Models
 
-    static func listModels(enabledOnly: Bool = false) async throws -> [AgentModelDTO] {
-        var q: [URLQueryItem] = []
+    static func listModels(enabledOnly: Bool = false, discover: Bool = true) async throws -> [AgentModelDTO] {
+        var q: [URLQueryItem] = [
+            .init(name: "discover", value: discover ? "true" : "false"),
+        ]
         if enabledOnly { q.append(.init(name: "enabled_only", value: "true")) }
         let wrap: DataList<AgentModelDTO> = try await get("/v1/models", query: q)
         return wrap.data
@@ -64,13 +66,21 @@ enum SandwalkAPIClient {
         try await delete("/v1/models/\(enc(id))")
     }
 
-    static func listModelProfiles() async throws -> [ModelProfileDTO] {
-        let wrap: DataList<ModelProfileDTO> = try await get("/v1/model-profiles")
+    static func listModelProfiles(includeCloud: Bool = true) async throws -> [ModelProfileDTO] {
+        var q: [URLQueryItem] = []
+        if !includeCloud {
+            q.append(.init(name: "include_cloud", value: "false"))
+        }
+        let wrap: DataList<ModelProfileDTO> = try await get("/v1/model-profiles", query: q)
         return wrap.data
     }
 
     static func createModelProfile(_ input: [String: Any]) async throws -> ModelProfileDTO {
         try await post("/v1/model-profiles", body: input)
+    }
+
+    static func updateModelProfile(id: String, _ input: [String: Any]) async throws -> ModelProfileDTO {
+        try await patch("/v1/model-profiles/\(enc(id))", body: input)
     }
 
     static func deleteModelProfile(id: String) async throws {
@@ -79,6 +89,21 @@ enum SandwalkAPIClient {
 
     static func probeModelProfile(id: String) async throws -> ModelProfileProbeDTO {
         try await post("/v1/model-profiles/\(enc(id))/probe", body: [:] as [String: Any])
+    }
+
+    static func discoverModelEndpoint(
+        backend: String,
+        baseUrl: String,
+        apiKey: String? = nil
+    ) async throws -> ModelProfileProbeDTO {
+        var body: [String: Any] = [
+            "backend": backend,
+            "baseUrl": baseUrl,
+        ]
+        if let apiKey, !apiKey.isEmpty {
+            body["apiKey"] = apiKey
+        }
+        return try await post("/v1/model-profiles/discover", body: body)
     }
 
     // MARK: - Tools

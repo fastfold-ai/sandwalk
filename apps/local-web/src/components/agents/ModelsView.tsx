@@ -1,12 +1,16 @@
 import type {
   AgentModel,
   CreateAgentModelInput,
+  DiscoverModelEndpointInput,
   IntegrationSummary,
   ModelProfile,
+  ModelProfileProbeResult,
   UpsertModelProfileInput
 } from '@sandwalk/agent-ui-core'
 import {
+  Check,
   ChevronDown,
+  Cpu,
   Eye,
   EyeOff,
   Loader2,
@@ -26,6 +30,14 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
@@ -41,15 +53,124 @@ const CLOUD_PROVIDERS = [
 
 const MODEL_LIST_PREVIEW_LIMIT = 10
 
+/** Mirrors CLI `OPENAI_PROFILE_DEFAULTS` / setup backend menu (local backends only). */
 const PROFILE_BACKENDS = [
-  { value: 'ollama', label: 'Ollama' },
-  { value: 'lm_studio', label: 'LM Studio' },
-  { value: 'llama_cpp', label: 'llama.cpp' },
-  { value: 'unsloth', label: 'Unsloth' },
-  { value: 'omlx', label: 'oMLX' },
-  { value: 'ds4', label: 'DS4' },
-  { value: 'other', label: 'Other OpenAI-compatible' }
+  {
+    value: 'ollama',
+    label: 'Ollama',
+    hint: '/api/tags',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    defaultLabel: 'Ollama Local',
+    icon: '/local-llm/ollama.png'
+  },
+  {
+    value: 'unsloth',
+    label: 'Unsloth',
+    hint: '/v1/models · auth',
+    baseUrl: 'http://127.0.0.1:8888/v1',
+    defaultLabel: 'Unsloth Local',
+    icon: '/local-llm/unsloth.png'
+  },
+  {
+    value: 'omlx',
+    label: 'oMLX',
+    hint: '/v1/models · auth',
+    baseUrl: 'http://127.0.0.1:8000/v1',
+    defaultLabel: 'oMLX Local',
+    icon: '/local-llm/omlx.png'
+  },
+  {
+    value: 'ds4',
+    label: 'DS4',
+    hint: '/v1/models',
+    baseUrl: 'http://127.0.0.1:8000/v1',
+    defaultLabel: 'DS4 Local',
+    icon: 'cpu'
+  },
+  {
+    value: 'llama_cpp',
+    label: 'llama.cpp',
+    hint: '/v1/models',
+    baseUrl: 'http://127.0.0.1:8080/v1',
+    defaultLabel: 'llama.cpp Local',
+    icon: '/local-llm/llama-cpp.png'
+  },
+  {
+    value: 'lm_studio',
+    label: 'LM Studio',
+    hint: '/v1/models',
+    baseUrl: 'http://127.0.0.1:1234/v1',
+    defaultLabel: 'LM Studio Local',
+    icon: '/local-llm/lm-studio.png'
+  },
+  {
+    value: 'other',
+    label: 'Other OpenAI-compatible',
+    hint: '/v1/models then /api/tags',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    defaultLabel: 'Custom Compatible Endpoint',
+    icon: 'cpu'
+  }
 ] as const
+
+type ProfileBackendValue = (typeof PROFILE_BACKENDS)[number]['value']
+
+function ProfileBackendIcon({
+  icon,
+  className
+}: {
+  icon: string
+  className?: string
+}) {
+  if (icon === 'cpu') {
+    return <Cpu className={cn('text-muted-foreground size-4 shrink-0', className)} />
+  }
+  return (
+    <img
+      src={icon}
+      alt=""
+      className={cn('size-4 shrink-0 rounded-sm object-cover', className)}
+    />
+  )
+}
+
+function profileBackend(
+  value: string
+): (typeof PROFILE_BACKENDS)[number] | undefined {
+  return PROFILE_BACKENDS.find(item => item.value === value)
+}
+
+function isKnownDefaultBaseUrl(url: string): boolean {
+  const normalized = url
+    .trim()
+    .replace(/\/+$/, '')
+    .replace('://localhost', '://127.0.0.1')
+  return PROFILE_BACKENDS.some(item => {
+    const candidate = item.baseUrl
+      .replace(/\/+$/, '')
+      .replace('://localhost', '://127.0.0.1')
+    return candidate === normalized
+  })
+}
+
+function isKnownDefaultLabel(label: string): boolean {
+  const needle = label.trim().toLowerCase()
+  return PROFILE_BACKENDS.some(
+    item => item.defaultLabel.toLowerCase() === needle
+  )
+}
+
+/** Mirror CLI `format_discovered_model_label` for preview rows. */
+function formatDiscoveredModelLabel(modelId: string): string {
+  const raw = modelId.trim()
+  if (!raw) return raw
+  return raw
+    .replace(/_/g, '-')
+    .split('-')
+    .filter(Boolean)
+    .map(part => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(' ')
+}
 
 const LLM_API_KEY_ORDER = [
   'openai',
@@ -57,8 +178,7 @@ const LLM_API_KEY_ORDER = [
   'google',
   'xai',
   'nvidia',
-  'opencode',
-  'openai-compatible'
+  'opencode'
 ] as const
 
 const LLM_API_KEY_COPY: Record<
@@ -114,13 +234,6 @@ const LLM_API_KEY_COPY: Record<
     afterLink:
       ' for pay-as-you-go access to curated coding models (GPT, Claude, Gemini, Kimi, DeepSeek, and more).',
     placeholderUnset: 'Enter your OpenCode Zen API Key'
-  },
-  'openai-compatible': {
-    title: 'OpenAI-compatible API Key',
-    beforeLink: 'Optional key for ',
-    linkLabel: 'local OpenAI-compatible endpoints',
-    afterLink: ' (Ollama, LM Studio, llama.cpp, Unsloth, oMLX, and others).',
-    placeholderUnset: 'Enter your OpenAI-compatible API Key'
   }
 }
 
@@ -190,6 +303,7 @@ export function ModelsView({
   onUpdateProfile,
   onDeleteProfile,
   onProbeProfile,
+  onDiscoverEndpoint,
   onSaveProviderKey,
   onClearProviderKey
 }: {
@@ -225,7 +339,11 @@ export function ModelsView({
   onProbeProfile: (
     profileId: string,
     signal?: AbortSignal
-  ) => Promise<{ health: string; models: string[]; error: string | null }>
+  ) => Promise<ModelProfileProbeResult>
+  onDiscoverEndpoint: (
+    input: DiscoverModelEndpointInput,
+    signal?: AbortSignal
+  ) => Promise<ModelProfileProbeResult>
   onSaveProviderKey: (
     key: string,
     envVar: string,
@@ -256,6 +374,11 @@ export function ModelsView({
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ModelProfile | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
+  const [discovering, setDiscovering] = useState(false)
+  const [discoveredModels, setDiscoveredModels] = useState<string[]>([])
+  const [discoverSource, setDiscoverSource] = useState<string | null>(null)
+  const [discoverError, setDiscoverError] = useState<string | null>(null)
+  const [showProfileApiKey, setShowProfileApiKey] = useState(false)
   const [customDialogOpen, setCustomDialogOpen] = useState(false)
   const [savingCustom, setSavingCustom] = useState(false)
   const [customForm, setCustomForm] = useState({
@@ -265,11 +388,12 @@ export function ModelsView({
   })
   const [form, setForm] = useState({
     label: '',
-    backend: 'ollama',
+    backend: 'ollama' as ProfileBackendValue,
     baseUrl: 'http://127.0.0.1:11434/v1',
-    apiKey: '',
-    defaultModel: ''
+    apiKey: ''
   })
+
+  const selectedBackend = profileBackend(form.backend) || PROFILE_BACKENDS[0]
 
   const providerIntegrations = useMemo(() => {
     const byKey = new Map(integrations.map(item => [item.key, item]))
@@ -450,15 +574,44 @@ export function ModelsView({
     }
   }
 
+  const resetDiscoverState = () => {
+    setDiscoveredModels([])
+    setDiscoverSource(null)
+    setDiscoverError(null)
+  }
+
+  const resetProfileDialogSecrets = () => {
+    setShowProfileApiKey(false)
+  }
+
+  const applyBackendDefaults = (
+    backendValue: ProfileBackendValue,
+    previous: typeof form
+  ) => {
+    const next = profileBackend(backendValue) || PROFILE_BACKENDS[0]
+    const suggestUrl =
+      !previous.baseUrl.trim() || isKnownDefaultBaseUrl(previous.baseUrl)
+    const suggestLabel =
+      !previous.label.trim() || isKnownDefaultLabel(previous.label)
+    return {
+      ...previous,
+      backend: next.value,
+      baseUrl: suggestUrl ? next.baseUrl : previous.baseUrl,
+      label: suggestLabel ? next.defaultLabel : previous.label
+    }
+  }
+
   const openCreate = () => {
     setEditing(null)
+    const ollama = PROFILE_BACKENDS[0]
     setForm({
-      label: '',
-      backend: 'ollama',
-      baseUrl: 'http://127.0.0.1:11434/v1',
-      apiKey: '',
-      defaultModel: ''
+      label: ollama.defaultLabel,
+      backend: ollama.value,
+      baseUrl: ollama.baseUrl,
+      apiKey: ''
     })
+    resetDiscoverState()
+    resetProfileDialogSecrets()
     setDialogOpen(true)
   }
 
@@ -504,26 +657,72 @@ export function ModelsView({
   }
 
   const openEdit = (profile: ModelProfile) => {
+    const backendValue =
+      profile.backend === 'openai'
+        ? 'other'
+        : ((PROFILE_BACKENDS.find(item => item.value === profile.backend)
+            ?.value || 'other') as ProfileBackendValue)
     setEditing(profile)
     setForm({
       label: profile.label,
-      backend: profile.backend === 'openai' ? 'other' : profile.backend,
+      backend: backendValue,
       baseUrl: profile.baseUrl || '',
-      apiKey: '',
-      defaultModel: profile.defaultModel || ''
+      apiKey: ''
     })
+    resetDiscoverState()
+    resetProfileDialogSecrets()
     setDialogOpen(true)
+  }
+
+  const discoverModels = async () => {
+    const baseUrl = form.baseUrl.trim()
+    if (!baseUrl) {
+      setDiscoverError('Enter a base URL before discovering models.')
+      return
+    }
+    setDiscovering(true)
+    setDiscoverError(null)
+    try {
+      const result = await onDiscoverEndpoint({
+        backend: form.backend,
+        baseUrl,
+        apiKey: form.apiKey.trim() || null
+      })
+      const models = result.models || []
+      setDiscoveredModels(models)
+      setDiscoverSource(result.modelsSource || null)
+      if (result.error && models.length === 0) {
+        setDiscoverError(result.error)
+        return
+      }
+      if (models.length === 0) {
+        setDiscoverError(
+          'No models found. Check the base URL and API key, then try again.'
+        )
+      }
+    } catch (err) {
+      setDiscoverError(err instanceof Error ? err.message : String(err))
+      setDiscoveredModels([])
+      setDiscoverSource(null)
+    } finally {
+      setDiscovering(false)
+    }
   }
 
   const saveProfile = async () => {
     setSavingProfile(true)
     setError(null)
     try {
+      // Prefer a freshly discovered model as the profile default; otherwise keep
+      // the existing default when editing. All discovered models still appear in
+      // the model list via live probe after save.
+      const defaultModel =
+        discoveredModels[0] || editing?.defaultModel || null
       const input: UpsertModelProfileInput = {
         label: form.label.trim() || null,
         backend: editing?.isCloud ? 'openai' : form.backend,
         baseUrl: editing?.isCloud ? null : form.baseUrl.trim() || null,
-        defaultModel: form.defaultModel.trim() || null,
+        defaultModel,
         apiKey: form.apiKey.trim() || null
       }
       if (editing) {
@@ -1046,31 +1245,42 @@ export function ModelsView({
                     No local OpenAI-compatible endpoints yet.
                   </div>
                 ) : (
-                  localProfiles.map(profile => (
+                  localProfiles.map(profile => {
+                    const backendMeta =
+                      profileBackend(
+                        profile.backend === 'openai' ? 'other' : profile.backend
+                      ) || PROFILE_BACKENDS.find(item => item.value === 'other')!
+                    return (
                     <div
                       key={profile.id}
                       className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                     >
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">
-                          {profile.label}
-                          {profile.isActive ? (
-                            <span className="text-muted-foreground ml-2 text-xs">
-                              active
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-muted-foreground truncate font-mono text-xs">
-                          {profile.backend}
-                          {profile.baseUrl ? ` · ${profile.baseUrl}` : ''}
-                        </div>
-                        <div className="text-muted-foreground text-xs">
-                          {profile.hasApiKey
-                            ? `Key ${profile.apiKeyPreview || '••••'}`
-                            : 'No API key'}
-                          {profile.defaultModel
-                            ? ` · default ${profile.defaultModel}`
-                            : ''}
+                      <div className="flex min-w-0 items-start gap-3">
+                        <ProfileBackendIcon
+                          icon={backendMeta.icon}
+                          className="mt-0.5 size-5 rounded-md"
+                        />
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">
+                            {profile.label}
+                            {profile.isActive ? (
+                              <span className="text-muted-foreground ml-2 text-xs">
+                                active
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="text-muted-foreground truncate font-mono text-xs">
+                            {profile.backend}
+                            {profile.baseUrl ? ` · ${profile.baseUrl}` : ''}
+                          </div>
+                          <div className="text-muted-foreground text-xs">
+                            {profile.hasApiKey
+                              ? `Key ${profile.apiKeyPreview || '••••'}`
+                              : 'No API key'}
+                            {profile.defaultModel
+                              ? ` · default ${profile.defaultModel}`
+                              : ''}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
@@ -1103,7 +1313,8 @@ export function ModelsView({
                         </Button>
                       </div>
                     </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             </div>
@@ -1111,14 +1322,23 @@ export function ModelsView({
         </section>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={open => {
+          setDialogOpen(open)
+          if (!open) {
+            resetDiscoverState()
+            resetProfileDialogSecrets()
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[min(90dvh,42rem)] flex-col gap-4 overflow-hidden sm:max-w-lg">
+          <DialogHeader className="shrink-0">
             <DialogTitle>
               {editing ? 'Edit Local LLM' : 'Add Local LLM'}
             </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
+          <div className="grid shrink-0 gap-3">
             <label className="space-y-1.5 text-sm">
               <span className="text-muted-foreground text-xs">Label</span>
               <Input
@@ -1126,77 +1346,189 @@ export function ModelsView({
                 onChange={event =>
                   setForm(prev => ({ ...prev, label: event.target.value }))
                 }
-                placeholder="Ollama Local"
+                placeholder={selectedBackend.defaultLabel}
               />
             </label>
-            <label className="space-y-1.5 text-sm">
+
+            <div className="space-y-1.5 text-sm">
               <span className="text-muted-foreground text-xs">Backend</span>
-              <select
-                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                value={form.backend}
-                onChange={event =>
-                  setForm(prev => ({
-                    ...prev,
-                    backend: event.target.value
-                  }))
-                }
-              >
-                {PROFILE_BACKENDS.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 w-full justify-between px-3 font-normal"
+                  >
+                    <span className="flex min-w-0 items-center gap-2 truncate">
+                      <ProfileBackendIcon icon={selectedBackend.icon} />
+                      <span className="flex min-w-0 items-baseline gap-1.5 truncate">
+                        <span className="truncate">{selectedBackend.label}</span>
+                        <span className="text-muted-foreground shrink-0 text-[11px]">
+                          · {selectedBackend.hint}
+                        </span>
+                      </span>
+                    </span>
+                    <ChevronDown className="text-muted-foreground size-4 shrink-0" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-72"
+                >
+                  <DropdownMenuLabel className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+                    Endpoint type
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {PROFILE_BACKENDS.map(option => {
+                    const selected = option.value === form.backend
+                    return (
+                      <DropdownMenuItem
+                        key={option.value}
+                        className="gap-2"
+                        onSelect={() => {
+                          setForm(prev => applyBackendDefaults(option.value, prev))
+                          resetDiscoverState()
+                        }}
+                      >
+                        <ProfileBackendIcon icon={option.icon} />
+                        <span className="flex min-w-0 flex-1 items-baseline gap-1.5 truncate">
+                          <span className="truncate text-sm">{option.label}</span>
+                          <span className="text-muted-foreground truncate text-[11px]">
+                            · {option.hint}
+                          </span>
+                        </span>
+                        {selected ? (
+                          <Check className="ml-auto size-4 shrink-0" />
+                        ) : null}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
             <label className="space-y-1.5 text-sm">
               <span className="text-muted-foreground text-xs">Base URL</span>
               <Input
                 value={form.baseUrl}
-                onChange={event =>
+                onChange={event => {
                   setForm(prev => ({
                     ...prev,
                     baseUrl: event.target.value
                   }))
-                }
-                placeholder="http://127.0.0.1:11434/v1"
+                  resetDiscoverState()
+                }}
+                placeholder={selectedBackend.baseUrl}
                 className="font-mono text-sm"
               />
+              <span className="text-muted-foreground block text-[11px]">
+                Suggested for {selectedBackend.label}: {selectedBackend.baseUrl}
+              </span>
             </label>
-            <label className="space-y-1.5 text-sm">
+
+            <div className="space-y-1.5 text-sm">
               <span className="text-muted-foreground text-xs">
                 API key {editing?.hasApiKey ? '(leave blank to keep)' : ''}
               </span>
-              <Input
-                type="password"
-                value={form.apiKey}
-                onChange={event =>
-                  setForm(prev => ({ ...prev, apiKey: event.target.value }))
-                }
-                placeholder={
-                  editing?.hasApiKey
-                    ? editing.apiKeyPreview ||
-                      'Secret saved. Enter a new key to replace it.'
-                    : 'Optional'
-                }
-              />
-            </label>
-            <label className="space-y-1.5 text-sm">
-              <span className="text-muted-foreground text-xs">
-                Default model
-              </span>
-              <Input
-                value={form.defaultModel}
-                onChange={event =>
-                  setForm(prev => ({
-                    ...prev,
-                    defaultModel: event.target.value
-                  }))
-                }
-                placeholder="llama3.1"
-              />
-            </label>
+              <div className="relative">
+                <Input
+                  type={showProfileApiKey ? 'text' : 'password'}
+                  value={form.apiKey}
+                  onChange={event =>
+                    setForm(prev => ({ ...prev, apiKey: event.target.value }))
+                  }
+                  placeholder={
+                    editing?.hasApiKey
+                      ? editing.apiKeyPreview ||
+                        'Secret saved. Enter a new key to replace it.'
+                      : selectedBackend.value === 'ollama'
+                        ? 'Optional (Ollama usually needs none)'
+                        : 'Optional'
+                  }
+                  className="pr-10 font-mono text-sm"
+                  autoComplete="off"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-1/2 right-1 size-7 -translate-y-1/2"
+                  onClick={() => setShowProfileApiKey(open => !open)}
+                  aria-label={
+                    showProfileApiKey ? 'Hide API key' : 'Show API key'
+                  }
+                >
+                  {showProfileApiKey ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
-          <DialogFooter>
+
+          <div className="flex min-h-0 min-w-0 flex-col gap-1.5">
+            <div className="flex shrink-0 items-center justify-between gap-2">
+              <span className="text-muted-foreground text-xs">Models</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                disabled={discovering || !form.baseUrl.trim()}
+                onClick={() => void discoverModels()}
+              >
+                {discovering ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3.5" />
+                )}
+                Discover models
+              </Button>
+            </div>
+
+            {discoveredModels.length > 0 ? (
+              <ScrollArea className="h-52 w-full min-w-0 rounded-xl border">
+                <div className="divide-y pr-2">
+                  {discoveredModels.map(modelId => (
+                    <div
+                      key={modelId}
+                      className="flex min-w-0 items-center justify-between gap-3 px-4 py-3"
+                      title={modelId}
+                    >
+                      <div className="min-w-0 flex-1 overflow-hidden">
+                        <div className="truncate text-sm font-medium">
+                          {formatDiscoveredModelLabel(modelId)}
+                        </div>
+                        <div className="text-muted-foreground truncate text-xs">
+                          local · {selectedBackend.label.toLowerCase()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            ) : (
+              <p className="text-muted-foreground text-[11px]">
+                Discover to preview models from this endpoint. After Save, they
+                appear as selectable entries in the model list.
+              </p>
+            )}
+            {discoverSource && discoveredModels.length > 0 ? (
+              <span className="text-muted-foreground block shrink-0 text-[11px]">
+                Found {discoveredModels.length} via {discoverSource}. After
+                Save, all of them appear in the model list.
+              </span>
+            ) : null}
+            {discoverError ? (
+              <span className="text-destructive block shrink-0 text-[11px]">
+                {discoverError}
+              </span>
+            ) : null}
+          </div>
+
+          <DialogFooter className="shrink-0">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>

@@ -70,6 +70,7 @@ from agent_server.models import (
     DeleteProjectResponse,
     DeleteSessionResponse,
     DeleteSpecialistResponse,
+    DiscoverModelEndpointRequest,
     DoctorDiagnosticsRequest,
     DoctorReport,
     EnvironmentPackageMutationResult,
@@ -1042,6 +1043,22 @@ def create_app(
         return await asyncio.to_thread(
             models_service.list_profiles,
             include_cloud=include_cloud,
+        )
+
+    # Static path must be registered before `/{profile_id}` or POST /discover
+    # is captured as profile_id="discover" and returns 405.
+    @app.post(
+        "/v1/model-profiles/discover",
+        response_model=ModelProfileProbeResult,
+    )
+    async def discover_model_endpoint(
+        payload: DiscoverModelEndpointRequest,
+    ) -> ModelProfileProbeResult:
+        return await asyncio.to_thread(
+            models_service.discover_endpoint,
+            backend=payload.backend,
+            base_url=payload.base_url,
+            api_key=payload.api_key,
         )
 
     @app.post("/v1/model-profiles", response_model=ModelProfile, status_code=201)

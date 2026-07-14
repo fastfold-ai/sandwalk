@@ -38,6 +38,7 @@ def test_list_and_get_providers():
     keys = {item.key for item in providers}
     assert "anthropic" in keys
     assert "openai" in keys
+    assert "openai-compatible" not in keys
 
     provider = svc.get("anthropic")
     assert provider is not None

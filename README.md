@@ -11,14 +11,15 @@ Local science agents you can run on your machine — ask research questions in n
 Requires [uv](https://docs.astral.sh/uv/) and Python 3.11+.
 
 ```bash
-uv tool install "sandwalk[all]"
+uv tool install sandwalk
 sandwalk --version
 ```
 
-Lighter installs are available if you do not need every optional stack (chemistry, single-cell, etc.):
+That installs all **core** dependencies (agent server, Local Sandbox plotting stack,
+Modal runtime client, etc.). Optional science stacks are separate extras:
 
 ```bash
-uv tool install sandwalk
+uv tool install "sandwalk[all]"          # chemistry, single-cell, ML, …
 # or: uv tool install "sandwalk[chemistry]"
 ```
 
@@ -122,10 +123,13 @@ This is a monorepo (`cli/`, `apps/local-web/`, `apps/sandwalk-mac/`). For day-to
 
 ```bash
 pnpm install
-cd cli && uv sync --extra dev && uv run sandwalk serve
+cd cli && uv sync --extra dev --extra all --extra api && uv run sandwalk serve
 # another terminal: pnpm dev
 # or on macOS: cd apps/sandwalk-mac && swift run
 ```
+
+`uv sync` (no extras) already installs core deps including the Local Sandbox stack.
+`--extra all` adds optional chemistry / single-cell / ML packages for full science tooling.
 
 ### Lint
 

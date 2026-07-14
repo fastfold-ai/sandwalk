@@ -784,6 +784,14 @@ class UpsertModelProfileRequest(ApiModel):
     set_default: bool = False
 
 
+class DiscoverModelEndpointRequest(ApiModel):
+    """Probe an OpenAI-compatible endpoint without saving a profile first."""
+
+    backend: str = "other"
+    base_url: str
+    api_key: str | None = None
+
+
 class ModelProfileProbeResult(ApiModel):
     profile_id: str
     health: str

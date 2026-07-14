@@ -31,6 +31,7 @@ struct ModelProfileProbeDTO: Codable {
     let profileId: String?
     let health: String?
     let models: [String]?
+    let modelsSource: String?
     let error: String?
 }
 

@@ -499,9 +499,11 @@ API_KEYS = {
     "llm.openai_compatible_api_key": {
         "name": "OpenAI-compatible",
         "env_var": "OPENAI_COMPATIBLE_API_KEY",
-        "description": "Custom OpenAI-compatible endpoints (Ollama/Unsloth/oMLX/DS4/llama.cpp/LM Studio/proxy)",
+        "description": "Legacy global key for OpenAI-compatible endpoints; prefer per-profile keys under Local LLM.",
         "url": "https://docs.ollama.com/api/introduction",
         "free": True,
+        # Keys live on Local LLM profiles; keep config for migration/CLI only.
+        "ui": False,
     },
     "api.ibm_rxn_key": {
         "name": "IBM RXN",

@@ -160,7 +160,7 @@ class ModelsService:
                 items.append(
                     AgentModel(
                         id=model_id,
-                        label=model_id,
+                        label=format_discovered_model_label(model_id),
                         description=f"{label} ({backend})",
                         provider="local",
                         source="profile",
@@ -369,13 +369,39 @@ class ModelsService:
                 models_source=None,
                 error="Profile has no base URL.",
             )
-        probe = probe_compatible_profile(
-            base_url=base_url,
+        return self.discover_endpoint(
             backend=backend,
+            base_url=base_url,
             api_key=api_key,
+            profile_id=str(profile["id"]),
+        )
+
+    def discover_endpoint(
+        self,
+        *,
+        backend: str,
+        base_url: str,
+        api_key: str | None = None,
+        profile_id: str = "preview",
+    ) -> ModelProfileProbeResult:
+        cleaned_url = str(base_url or "").strip()
+        cleaned_backend = str(backend or "other").strip() or "other"
+        cleaned_key = str(api_key or "").strip() or None
+        if not cleaned_url:
+            return ModelProfileProbeResult(
+                profile_id=profile_id,
+                health="error",
+                models=[],
+                models_source=None,
+                error="Base URL is required.",
+            )
+        probe = probe_compatible_profile(
+            base_url=cleaned_url,
+            backend=cleaned_backend,
+            api_key=cleaned_key,
         )
         return ModelProfileProbeResult(
-            profile_id=str(profile["id"]),
+            profile_id=profile_id,
             health=str(probe.get("health") or "error"),
             models=list(probe.get("models") or []),
             models_source=str(probe.get("models_source") or "") or None,

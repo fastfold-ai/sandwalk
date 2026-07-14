@@ -3838,6 +3838,9 @@ export default function App() {
               onProbeProfile={(profileId, signal) =>
                 client.probeModelProfile(profileId, signal)
               }
+              onDiscoverEndpoint={(input, signal) =>
+                client.discoverModelEndpoint(input, signal)
+              }
               onSaveProviderKey={async (key, envVar, value) => {
                 await client.updateIntegration(key, { [envVar]: value })
                 await loadIntegrations()

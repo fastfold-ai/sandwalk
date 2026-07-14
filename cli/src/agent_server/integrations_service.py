@@ -27,7 +27,6 @@ from agent_server.models import (
 KEY_ALIASES = {
     "llm.anthropic_api_key": "anthropic",
     "llm.openai_api_key": "openai",
-    "llm.openai_compatible_api_key": "openai-compatible",
     "api.fastfold_cloud_key": "fastfold-cloud",
     "api.boltz_api_key": "boltz",
     "api.ibm_rxn_key": "ibm-rxn",
@@ -116,6 +115,8 @@ class IntegrationsService:
         self._lock = threading.RLock()
         self._providers: dict[str, list[tuple[str, dict]]] = {}
         for config_key, info in API_KEYS.items():
+            if info.get("ui") is False:
+                continue
             key = str(
                 info.get("provider_key")
                 or KEY_ALIASES.get(config_key)

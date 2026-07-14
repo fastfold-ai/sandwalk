@@ -35,6 +35,7 @@ import type {
   McpToolDetail,
   ModelProfile,
   ModelProfileProbeResult,
+  DiscoverModelEndpointInput,
   ServerCacheInfo,
   ServerLifecycleResult,
   ServerStatusReport,
@@ -957,7 +958,8 @@ export class LocalAgentClient
 
   async listIntegrations(signal?: AbortSignal): Promise<IntegrationSummary[]> {
     const result = await this.request<{ data: IntegrationSummary[] }>('/integrations', { signal })
-    return result.data
+    // Legacy global OpenAI-compatible key is redundant with per–Local LLM profile keys.
+    return result.data.filter(item => item.key !== 'openai-compatible')
   }
 
   updateIntegration(
@@ -1240,6 +1242,22 @@ export class LocalAgentClient
       `/model-profiles/${encodeURIComponent(profileId)}/probe`,
       { method: 'POST', signal },
     )
+  }
+
+  discoverModelEndpoint(
+    input: DiscoverModelEndpointInput,
+    signal?: AbortSignal,
+  ): Promise<ModelProfileProbeResult> {
+    return this.request<ModelProfileProbeResult>('/model-profiles/discover', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        backend: input.backend ?? undefined,
+        baseUrl: input.baseUrl,
+        apiKey: input.apiKey ?? undefined,
+      }),
+      signal,
+    })
   }
 
   async listDatasets(signal?: AbortSignal): Promise<DatasetSummary[]> {

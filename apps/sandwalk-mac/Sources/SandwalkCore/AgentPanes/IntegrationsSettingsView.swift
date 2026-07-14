@@ -81,6 +81,7 @@ struct IntegrationsSettingsView: View {
         defer { busy = false }
         do {
             items = try await SandwalkAPIClient.listIntegrations()
+                .filter { $0.key != "openai-compatible" }
         } catch {
             self.error = error.localizedDescription
         }
