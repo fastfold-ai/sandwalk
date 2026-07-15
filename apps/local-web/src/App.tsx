@@ -1,15 +1,10 @@
-import { PanelLeft } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
-import { AgentSessionMainPanel } from '@/components/agents/AgentSessionMainPanel'
-import { AgentSessionSidebar } from '@/components/agents/AgentSessionSidebar'
 import { fileChipToken } from '@/components/agents/composer-parts'
-import { DashboardMainViews } from '@/components/agents/DashboardMainViews'
 import {
   type DashboardSection,
-  DashboardSidebar
 } from '@/components/agents/DashboardSidebar'
 import {
   isOnboardingPath,
@@ -19,14 +14,8 @@ import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import {
   buildConversationTimeline
 } from '@/components/agents/transcript'
-import { AppDialogs } from '@/components/AppDialogs'
 import { AppGates } from '@/components/AppGates'
-import { Button } from '@/components/ui/button'
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup
-} from '@/components/ui/resizable'
+import { AppShell } from '@/components/AppShell'
 import {
   FILES_PANEL_COLLAPSED_STORAGE_KEY,
   projectTabsKey,
@@ -35,7 +24,6 @@ import {
   readOpenTabsByProject,
   readProjectScopeId,
   readRecentProjectIds,
-  SHELL_PANELS_AUTO_SAVE_ID,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   TERMINAL_OPEN_STORAGE_KEY,
   writeLastSessionByScope,
@@ -59,7 +47,6 @@ import {
   parseCatalogSkillId,
   type SkillsViewMode
 } from '@/lib/skills-catalog'
-import { cn } from '@/lib/utils'
 import type {
   AgentSession,
   AgentSkillDetail,
@@ -1021,367 +1008,183 @@ export default function App() {
   if (gate) return gate
 
   return (
-    <>
-      <ResizablePanelGroup
-        direction="horizontal"
-        autoSaveId={SHELL_PANELS_AUTO_SAVE_ID}
-        className="bg-background h-full w-full overflow-hidden"
-      >
-        <ResizablePanel
-          id="sidebar"
-          order={1}
-          ref={sidebarPanelRef}
-          collapsible
-          collapsedSize={0}
-          defaultSize={18}
-          minSize={12}
-          maxSize={30}
-          onCollapse={() => setSidebarCollapsed(true)}
-          onExpand={() => setSidebarCollapsed(false)}
-          className="min-w-0"
-        >
-        <aside className="bg-sidebar flex h-full flex-col overflow-hidden">
-          {isDashboard ? (
-            <DashboardSidebar
-              active={dashboardSection}
-              userName={sidebarUserName}
-              onCollapse={() => setSidebarCollapsed(true)}
-              onLogout={logoutSession}
-              onRefreshUser={refreshCloudUserName}
-              backendVersion={health?.version ?? null}
-              backendUrl={backendUrl}
-              connected={Boolean(health)}
-            />
-          ) : (
-            <AgentSessionSidebar
-              projects={projects}
-              activeProjectId={activeProjectId}
-              sections={sections}
-              collapsedSidebarSections={collapsedSidebarSections}
-              sessionId={sessionId}
-              chatBySessionId={chatBySessionId}
-              orderedVisibleSessionIds={orderedVisibleSessionIds}
-              selectedSessionIds={selectedSessionIds}
-              threadMenuOpenId={threadMenuOpenId}
-              batchBusy={batchBusy}
-              canShowFilesPanel={canShowFilesPanel}
-              filesPanelCollapsed={filesPanelCollapsed}
-              sidebarUserName={sidebarUserName}
-              health={health}
-              backendUrl={backendUrl}
-              navigate={navigate}
-              onNavigateHome={() => {
-                setProjectScopeId(null)
-                navigate('/')
-              }}
-              onSelectAllProjects={selectAllProjects}
-              onSelectProject={selectProjectScope}
-              onOpenProjectSettings={() => setProjectSettingsOpen(true)}
-              onNewProject={() => setNewProjectOpen(true)}
-              onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
-              onCollapseSidebar={() => setSidebarCollapsed(true)}
-              onCreateSession={() => createSession(activeProjectId)}
-              onToggleFilesPanel={() =>
-                setFilesPanelCollapsed(current => !current)
-              }
-              onClearSessionSelection={clearSessionSelection}
-              onBatchArchiveSelected={batchArchiveSelected}
-              onBatchMoveSelected={batchMoveSelected}
-              onBatchExportSelected={batchExportSelected}
-              onBatchDeletePending={() => setBatchDeletePending(true)}
-              setCollapsedSidebarSections={setCollapsedSidebarSections}
-              selectSessionRange={selectSessionRange}
-              toggleSessionSelected={toggleSessionSelected}
-              setSelectionAnchorId={setSelectionAnchorId}
-              openSessionTab={openSessionTab}
-              prefetchSessionMessages={prefetchSessionMessages}
-              setThreadMenuOpenId={setThreadMenuOpenId}
-              openRenameDialog={openRenameDialog}
-              updateSession={updateSession}
-              exportTranscript={exportTranscript}
-              setDeleteTarget={setDeleteTarget}
-              onLogout={logoutSession}
-              onRefreshUser={refreshCloudUserName}
-            />
-          )}
-        </aside>
-        </ResizablePanel>
-
-        <ResizableHandle
-          className={cn(
-            'w-px',
-            sidebarCollapsed && 'pointer-events-none opacity-0'
-          )}
-        />
-
-        <ResizablePanel
-          id="main"
-          order={2}
-          defaultSize={82}
-          minSize={40}
-          className="min-w-0"
-        >
-        <div className="relative flex h-full min-w-0 flex-col">
-          {showConnectionLimitWarning ? (
-            <div className="border-border bg-amber-500/10 text-amber-950 dark:text-amber-100 flex shrink-0 items-start gap-3 border-b px-3 py-2 text-xs">
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">
-                  {runningCount} agents running at once
-                </p>
-                <p className="text-muted-foreground mt-0.5">
-                  Browsers allow about 6 live connections to the local API. With
-                  this many concurrent runs, opening files or switching chats
-                  can stall. Prefer finishing some runs before starting more.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 shrink-0 px-2 text-xs"
-                onClick={() => setConnectionLimitDismissed(true)}
-              >
-                Dismiss
-              </Button>
-            </div>
-          ) : null}
-          {!showSessionTabs &&
-          !(isHome || isProjectHome || isDashboard) ? (
-            <div className="flex h-10 shrink-0 items-center gap-1 border-b px-1.5 md:px-2">
-              {sidebarCollapsed ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 shrink-0"
-                  onClick={() => setSidebarCollapsed(false)}
-                  aria-label="Show sidebar"
-                >
-                  <PanelLeft className="size-4" />
-                </Button>
-              ) : null}
-              <span className="min-w-0 flex-1 truncate px-2 text-sm font-medium">
-                {activeTitle}
-              </span>
-            </div>
-          ) : null}
-          {(isHome || isProjectHome || isDashboard) && sidebarCollapsed ? (
-            <div className="absolute left-2 top-2 z-20">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 shrink-0"
-                onClick={() => setSidebarCollapsed(false)}
-                aria-label="Show sidebar"
-              >
-                <PanelLeft className="size-4" />
-              </Button>
-            </div>
-          ) : null}
-
-          {isDashboardOverview ||
-          isDashboardStatus ||
-          isDashboardGeneral ||
-          isDashboardAgentRuntime ||
-          isDashboardAgentSandbox ||
-          isDashboardAgentPrompts ||
-          isDashboardModels ||
-          isDashboardData ||
-          isDashboardTools ||
-          isDashboardDoctor ||
-          isDashboardStorage ||
-          isDashboardEnvironment ||
-          isSkills ||
-          isIntegrations ||
-          isDashboardMcp ||
-          isDashboardSpecialists ||
-          isHome ||
-          isProjectHome ? (
-            <DashboardMainViews
-              client={client}
-              navigate={navigate}
-              location={location}
-              dashboardSection={dashboardSection}
-              dashboardSkeletonKind={dashboardSkeletonKind}
-              backendUrl={backendUrl}
-              health={health}
-              connecting={connecting}
-              sessions={sessions}
-              projects={projects}
-              sessionPreviews={sessionPreviews}
-              activeProjectId={activeProjectId}
-              skills={skills}
-              skillDetail={skillDetail}
-              catalogSkillRoute={catalogSkillRoute}
-              catalogSearchEnabled={catalogSearchEnabled}
-              isCatalogSearchPath={isCatalogSearchPath}
-              skillsViewMode={skillsViewMode}
-              integrations={integrations}
-              integrationValues={integrationValues}
-              selectedIntegrationKey={selectedIntegrationKey}
-              mcpServers={mcpServers}
-              mcpCatalog={mcpCatalog}
-              mcpCatalogLoading={mcpCatalogLoading}
-              mcpCatalogDetailId={mcpCatalogDetailId}
-              mcpServerDetailId={mcpServerDetailId}
-              mcpDetailCatalogEntry={mcpDetailCatalogEntry}
-              mcpDetailServer={mcpDetailServer}
-              isMcpDetail={isMcpDetail}
-              specialists={specialists}
-              specialistsLoading={specialistsLoading}
-              specialistsViewMode={specialistsViewMode}
-              specialistsEditId={specialistsEditId}
-              runtimeSettings={runtimeSettings}
-              sandboxSettings={sandboxSettings}
-              isDashboardOverview={isDashboardOverview}
-              isDashboardStatus={isDashboardStatus}
-              isDashboardGeneral={isDashboardGeneral}
-              isDashboardAgentRuntime={isDashboardAgentRuntime}
-              isDashboardAgentPrompts={isDashboardAgentPrompts}
-              isDashboardAgentSandbox={isDashboardAgentSandbox}
-              isDashboardModels={isDashboardModels}
-              isDashboardData={isDashboardData}
-              isDashboardTools={isDashboardTools}
-              isDashboardDoctor={isDashboardDoctor}
-              isDashboardStorage={isDashboardStorage}
-              isDashboardEnvironment={isDashboardEnvironment}
-              isSkills={isSkills}
-              isIntegrations={isIntegrations}
-              isDashboardMcp={isDashboardMcp}
-              isDashboardSpecialists={isDashboardSpecialists}
-              isHome={isHome}
-              isProjectHome={isProjectHome}
-              isSandboxLocalDetail={isSandboxLocalDetail}
-              isSandboxModalDetail={isSandboxModalDetail}
-              setSkillDetail={setSkillDetail}
-              setIntegrationValues={setIntegrationValues}
-              setRuntimeSettings={setRuntimeSettings}
-              setSandboxSettings={setSandboxSettings}
-              loadSkills={loadSkills}
-              loadIntegrations={loadIntegrations}
-              loadMcpServers={loadMcpServers}
-              refreshMcp={refreshMcp}
-              loadSpecialists={loadSpecialists}
-              loadModelOptions={loadModelOptions}
-              loadSessions={loadSessions}
-              loadServerStatus={loadServerStatus}
-              loadAccountForUi={loadAccountForUi}
-              logoutAccount={logoutAccount}
-              loadStorage={loadStorage}
-              loadEnvironment={loadEnvironment}
-              refreshSessionSandbox={refreshSessionSandbox}
-              onCreateProject={() => setNewProjectOpen(true)}
-              createSession={createSession}
-              onOpenProject={id => {
-                setProjectScopeId(id)
-                navigate(`/projects/${id}`)
-              }}
-              togglePinProject={togglePinProject}
-              deleteProject={deleteProject}
-            />
-          ) : (
-            <AgentSessionMainPanel
-              client={client}
-              navigate={navigate}
-              sidebarCollapsed={sidebarCollapsed}
-              setSidebarCollapsed={setSidebarCollapsed}
-              openTabs={openTabs}
-              sessionId={sessionId}
-              session={session}
-              openSessionTab={openSessionTab}
-              prefetchSessionMessages={prefetchSessionMessages}
-              closeSessionTab={closeSessionTab}
-              closeOtherSessionTabs={closeOtherSessionTabs}
-              openRenameDialog={openRenameDialog}
-              updateSession={updateSession}
-              exportTranscript={exportTranscript}
-              setDeleteTarget={setDeleteTarget}
-              projects={projects}
-              selectProjectScope={selectProjectScope}
-              cliMenuOpen={cliMenuOpen}
-              setCliMenuOpen={setCliMenuOpen}
-              copiedResumeCommand={copiedResumeCommand}
-              setCopiedResumeCommand={setCopiedResumeCommand}
-              terminalOpen={terminalOpen}
-              setTerminalOpen={setTerminalOpen}
-              filesPanelCollapsed={filesPanelCollapsed}
-              setFilesPanelCollapsed={setFilesPanelCollapsed}
-              isInspect={isInspect}
-              messages={messages}
-              tools={tools}
-              messagesLoaded={messagesLoaded}
-              runActive={runActive}
-              showChatSkeleton={showChatSkeleton}
-              agentComposerSlotProps={agentComposerSlotProps}
-              recentProjectIds={recentProjectIds}
-              activeProjectId={activeProjectId}
-              onNewProject={() => setNewProjectOpen(true)}
-              selectAllProjects={selectAllProjects}
-              chatScrollRef={chatScrollRef}
-              chatEndRef={chatEndRef}
-              conversationTimeline={conversationTimeline}
-              expandedToolRunKeys={expandedToolRunKeys}
-              patchChat={patchChat}
-              runIdByMessageId={runIdByMessageId}
-              usageByRunId={usageByRunId}
-              copiedMessageId={copiedMessageId}
-              setCopiedMessageId={setCopiedMessageId}
-              activeRunTools={activeRunTools}
-              activeRunTodos={activeRunTodos}
-              liveDelta={liveDelta}
-              showScrollToBottom={showScrollToBottom}
-              scrollChatToBottom={scrollChatToBottom}
-              error={error}
-              canShowFilesPanel={canShowFilesPanel}
-              filesPanelRef={filesPanelRef}
-              workspaceVersion={workspaceVersion}
-              pendingOpenPath={pendingOpenPath}
-              setPendingOpenPath={setPendingOpenPath}
-              setComposer={setComposer}
-              setComposerFiles={setComposerFiles}
-            />
-          )}
-        </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
-
-      <AppDialogs
-        client={client}
-        navigate={navigate}
-        globalSearchOpen={globalSearchOpen}
-        setGlobalSearchOpen={setGlobalSearchOpen}
-        sessions={sessions}
-        sessionId={sessionId}
-        sessionTitle={session?.title}
-        activeProject={activeProject}
-        activeProjectId={activeProjectId}
-        workspaceFiles={workspaceFiles}
-        openSessionTab={openSessionTab}
-        setFilesPanelCollapsed={setFilesPanelCollapsed}
-        setPendingOpenPath={setPendingOpenPath}
-        pendingMentionRef={pendingMentionRef}
-        setComposer={setComposer}
-        setComposerFiles={setComposerFiles}
-        createSession={createSession}
-        newProjectOpen={newProjectOpen}
-        setNewProjectOpen={setNewProjectOpen}
-        createProject={createProject}
-        projectSettingsOpen={projectSettingsOpen}
-        setProjectSettingsOpen={setProjectSettingsOpen}
-        saveProjectSettings={saveProjectSettings}
-        renameTarget={renameTarget}
-        renameValue={renameValue}
-        setRenameTarget={setRenameTarget}
-        setRenameValue={setRenameValue}
-        submitRename={submitRename}
-        deleteTarget={deleteTarget}
-        setDeleteTarget={setDeleteTarget}
-        confirmDelete={confirmDelete}
-        batchDeletePending={batchDeletePending}
-        setBatchDeletePending={setBatchDeletePending}
-        batchBusy={batchBusy}
-        selectedSessionIds={selectedSessionIds}
-        confirmBatchDelete={confirmBatchDelete}
-      />
-    </>
+    <AppShell
+      sidebarPanelRef={sidebarPanelRef}
+      isDashboard={isDashboard}
+      dashboardSection={dashboardSection}
+      sidebarUserName={sidebarUserName}
+      setSidebarCollapsed={setSidebarCollapsed}
+      logoutSession={logoutSession}
+      refreshCloudUserName={refreshCloudUserName}
+      health={health}
+      backendUrl={backendUrl}
+      projects={projects}
+      activeProjectId={activeProjectId}
+      sections={sections}
+      collapsedSidebarSections={collapsedSidebarSections}
+      sessionId={sessionId}
+      chatBySessionId={chatBySessionId}
+      orderedVisibleSessionIds={orderedVisibleSessionIds}
+      selectedSessionIds={selectedSessionIds}
+      threadMenuOpenId={threadMenuOpenId}
+      batchBusy={batchBusy}
+      canShowFilesPanel={canShowFilesPanel}
+      filesPanelCollapsed={filesPanelCollapsed}
+      navigate={navigate}
+      setProjectScopeId={setProjectScopeId}
+      selectAllProjects={selectAllProjects}
+      selectProjectScope={selectProjectScope}
+      setProjectSettingsOpen={setProjectSettingsOpen}
+      setNewProjectOpen={setNewProjectOpen}
+      setGlobalSearchOpen={setGlobalSearchOpen}
+      createSession={createSession}
+      setFilesPanelCollapsed={setFilesPanelCollapsed}
+      clearSessionSelection={clearSessionSelection}
+      batchArchiveSelected={batchArchiveSelected}
+      batchMoveSelected={batchMoveSelected}
+      batchExportSelected={batchExportSelected}
+      setBatchDeletePending={setBatchDeletePending}
+      setCollapsedSidebarSections={setCollapsedSidebarSections}
+      selectSessionRange={selectSessionRange}
+      toggleSessionSelected={toggleSessionSelected}
+      setSelectionAnchorId={setSelectionAnchorId}
+      openSessionTab={openSessionTab}
+      prefetchSessionMessages={prefetchSessionMessages}
+      setThreadMenuOpenId={setThreadMenuOpenId}
+      openRenameDialog={openRenameDialog}
+      updateSession={updateSession}
+      exportTranscript={exportTranscript}
+      setDeleteTarget={setDeleteTarget}
+      sidebarCollapsed={sidebarCollapsed}
+      showConnectionLimitWarning={showConnectionLimitWarning}
+      runningCount={runningCount}
+      setConnectionLimitDismissed={setConnectionLimitDismissed}
+      showSessionTabs={showSessionTabs}
+      isHome={isHome}
+      isProjectHome={isProjectHome}
+      activeTitle={activeTitle}
+      isDashboardOverview={isDashboardOverview}
+      isDashboardStatus={isDashboardStatus}
+      isDashboardGeneral={isDashboardGeneral}
+      isDashboardAgentRuntime={isDashboardAgentRuntime}
+      isDashboardAgentSandbox={isDashboardAgentSandbox}
+      isDashboardAgentPrompts={isDashboardAgentPrompts}
+      isDashboardModels={isDashboardModels}
+      isDashboardData={isDashboardData}
+      isDashboardTools={isDashboardTools}
+      isDashboardDoctor={isDashboardDoctor}
+      isDashboardStorage={isDashboardStorage}
+      isDashboardEnvironment={isDashboardEnvironment}
+      isSkills={isSkills}
+      isIntegrations={isIntegrations}
+      isDashboardMcp={isDashboardMcp}
+      isDashboardSpecialists={isDashboardSpecialists}
+      client={client}
+      location={location}
+      dashboardSkeletonKind={dashboardSkeletonKind}
+      connecting={connecting}
+      sessions={sessions}
+      sessionPreviews={sessionPreviews}
+      skills={skills}
+      skillDetail={skillDetail}
+      catalogSkillRoute={catalogSkillRoute}
+      catalogSearchEnabled={catalogSearchEnabled}
+      isCatalogSearchPath={isCatalogSearchPath}
+      skillsViewMode={skillsViewMode}
+      integrations={integrations}
+      integrationValues={integrationValues}
+      selectedIntegrationKey={selectedIntegrationKey}
+      mcpServers={mcpServers}
+      mcpCatalog={mcpCatalog}
+      mcpCatalogLoading={mcpCatalogLoading}
+      mcpCatalogDetailId={mcpCatalogDetailId}
+      mcpServerDetailId={mcpServerDetailId}
+      mcpDetailCatalogEntry={mcpDetailCatalogEntry}
+      mcpDetailServer={mcpDetailServer}
+      isMcpDetail={isMcpDetail}
+      specialists={specialists}
+      specialistsLoading={specialistsLoading}
+      specialistsViewMode={specialistsViewMode}
+      specialistsEditId={specialistsEditId}
+      runtimeSettings={runtimeSettings}
+      sandboxSettings={sandboxSettings}
+      isSandboxLocalDetail={isSandboxLocalDetail}
+      isSandboxModalDetail={isSandboxModalDetail}
+      setSkillDetail={setSkillDetail}
+      setIntegrationValues={setIntegrationValues}
+      setRuntimeSettings={setRuntimeSettings}
+      setSandboxSettings={setSandboxSettings}
+      loadSkills={loadSkills}
+      loadIntegrations={loadIntegrations}
+      loadMcpServers={loadMcpServers}
+      refreshMcp={refreshMcp}
+      loadSpecialists={loadSpecialists}
+      loadModelOptions={loadModelOptions}
+      loadSessions={loadSessions}
+      loadServerStatus={loadServerStatus}
+      loadAccountForUi={loadAccountForUi}
+      logoutAccount={logoutAccount}
+      loadStorage={loadStorage}
+      loadEnvironment={loadEnvironment}
+      refreshSessionSandbox={refreshSessionSandbox}
+      togglePinProject={togglePinProject}
+      deleteProject={deleteProject}
+      openTabs={openTabs}
+      session={session}
+      closeSessionTab={closeSessionTab}
+      closeOtherSessionTabs={closeOtherSessionTabs}
+      cliMenuOpen={cliMenuOpen}
+      setCliMenuOpen={setCliMenuOpen}
+      copiedResumeCommand={copiedResumeCommand}
+      setCopiedResumeCommand={setCopiedResumeCommand}
+      terminalOpen={terminalOpen}
+      setTerminalOpen={setTerminalOpen}
+      isInspect={isInspect}
+      messages={messages}
+      tools={tools}
+      messagesLoaded={messagesLoaded}
+      runActive={runActive}
+      showChatSkeleton={showChatSkeleton}
+      agentComposerSlotProps={agentComposerSlotProps}
+      recentProjectIds={recentProjectIds}
+      chatScrollRef={chatScrollRef}
+      chatEndRef={chatEndRef}
+      conversationTimeline={conversationTimeline}
+      expandedToolRunKeys={expandedToolRunKeys}
+      patchChat={patchChat}
+      runIdByMessageId={runIdByMessageId}
+      usageByRunId={usageByRunId}
+      copiedMessageId={copiedMessageId}
+      setCopiedMessageId={setCopiedMessageId}
+      activeRunTools={activeRunTools}
+      activeRunTodos={activeRunTodos}
+      liveDelta={liveDelta}
+      showScrollToBottom={showScrollToBottom}
+      scrollChatToBottom={scrollChatToBottom}
+      error={error}
+      filesPanelRef={filesPanelRef}
+      workspaceVersion={workspaceVersion}
+      pendingOpenPath={pendingOpenPath}
+      setPendingOpenPath={setPendingOpenPath}
+      setComposer={setComposer}
+      setComposerFiles={setComposerFiles}
+      globalSearchOpen={globalSearchOpen}
+      newProjectOpen={newProjectOpen}
+      activeProject={activeProject}
+      workspaceFiles={workspaceFiles}
+      pendingMentionRef={pendingMentionRef}
+      createProject={createProject}
+      projectSettingsOpen={projectSettingsOpen}
+      saveProjectSettings={saveProjectSettings}
+      renameTarget={renameTarget}
+      renameValue={renameValue}
+      setRenameTarget={setRenameTarget}
+      setRenameValue={setRenameValue}
+      submitRename={submitRename}
+      deleteTarget={deleteTarget}
+      confirmDelete={confirmDelete}
+      batchDeletePending={batchDeletePending}
+      confirmBatchDelete={confirmBatchDelete}
+    />
   )
 }
