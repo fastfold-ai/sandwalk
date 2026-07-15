@@ -14,6 +14,12 @@ const ScrollArea = React.forwardRef<
   >
     <ScrollAreaPrimitive.Viewport
       tabIndex={-1}
+      onFocus={event => {
+        // Keep page-load focus on the chat composer, not the transcript scroller.
+        if (event.target === event.currentTarget) {
+          event.currentTarget.blur()
+        }
+      }}
       className="h-full w-full rounded-[inherit] [&>div]:!block [&>div]:!min-w-0"
     >
       {children}

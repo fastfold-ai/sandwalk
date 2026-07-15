@@ -245,6 +245,8 @@ export function Composer({
   sandboxStatus = null,
   sandboxPhase = 'idle',
   showAura = true,
+  autoFocus = true,
+  focusKey,
   onChange,
   onLiveDraftChange,
   onSkillChipsChange,
@@ -281,6 +283,10 @@ export function Composer({
   sandboxStatus?: SessionSandboxStatus | null
   sandboxPhase?: SandboxActionPhase
   showAura?: boolean
+  /** Focus the chat input when mounted / when focusKey changes. */
+  autoFocus?: boolean
+  /** Re-run autofocus when this changes (e.g. session id). */
+  focusKey?: string | null
   onChange: (value: string) => void
   /** Fires on every local keystroke without requiring a parent re-render. */
   onLiveDraftChange?: (value: string) => void
@@ -407,7 +413,12 @@ export function Composer({
           input.value.length
         )
         input.focus({ preventScroll: true })
-        input.setSelectionRange(local, local)
+        try {
+          input.setSelectionRange(local, local)
+        } catch {
+          // Ignore selection errors on detached nodes.
+        }
+        if (document.activeElement !== input) return false
         setCaretPos(tokenStart + local)
         setFocusedPartIndex(index)
         return true
@@ -423,7 +434,12 @@ export function Composer({
     if (!last) return false
     const len = last.value.length
     last.focus({ preventScroll: true })
-    last.setSelectionRange(len, len)
+    try {
+      last.setSelectionRange(len, len)
+    } catch {
+      // Ignore selection errors on detached nodes.
+    }
+    if (document.activeElement !== last) return false
     setCaretPos(value.length)
     setFocusedPartIndex(lastTextIndex)
     return true
@@ -446,6 +462,74 @@ export function Composer({
     if (document.activeElement === preferred) return
     preferred.focus({ preventScroll: true })
   }, [focusedPartIndex])
+
+  const autoFocusedKeyRef = useRef<string | null>(null)
+  const isComposerInput = useCallback((node: Element | null) => {
+    if (!(node instanceof HTMLInputElement)) return false
+    return [...textInputRefs.current.values()].includes(node)
+  }, [])
+
+  // Focus chat input on page load / session switch (empty and non-empty).
+  // Only treat focus as done when document.activeElement is actually our input —
+  // browsers often ignore focus() on reload until a later tick.
+  useEffect(() => {
+    if (!autoFocus) return
+    const key = focusKey ?? ''
+    autoFocusedKeyRef.current = null
+    pendingCaretRef.current = draftRef.current.length
+    let cancelled = false
+
+    const tryFocus = () => {
+      if (cancelled) return true
+      if (isComposerInput(document.activeElement)) {
+        autoFocusedKeyRef.current = key
+        pendingCaretRef.current = null
+        return true
+      }
+      if (!applyComposerCaret(draftRef.current.length)) return false
+      if (!isComposerInput(document.activeElement)) return false
+      autoFocusedKeyRef.current = key
+      pendingCaretRef.current = null
+      return true
+    }
+
+    tryFocus()
+
+    let frames = 0
+    let frame = 0
+    const tick = () => {
+      if (cancelled || tryFocus()) return
+      frames += 1
+      if (frames < 60) frame = window.requestAnimationFrame(tick)
+    }
+    frame = window.requestAnimationFrame(tick)
+
+    const timers = [0, 16, 50, 100, 200, 400, 800, 1600].map(ms =>
+      window.setTimeout(() => {
+        tryFocus()
+      }, ms)
+    )
+
+    // If something else briefly steals focus (ScrollArea), reclaim it once.
+    const onFocusIn = (event: FocusEvent) => {
+      if (cancelled || autoFocusedKeyRef.current === key) return
+      const target = event.target
+      if (
+        target instanceof Element &&
+        target.closest('[data-radix-scroll-area-viewport]')
+      ) {
+        tryFocus()
+      }
+    }
+    document.addEventListener('focusin', onFocusIn)
+
+    return () => {
+      cancelled = true
+      window.cancelAnimationFrame(frame)
+      for (const timer of timers) window.clearTimeout(timer)
+      document.removeEventListener('focusin', onFocusIn)
+    }
+  }, [applyComposerCaret, autoFocus, focusKey, isComposerInput])
 
   useLayoutEffect(() => {
     const caret = pendingCaretRef.current
@@ -1673,8 +1757,6 @@ export function Composer({
                     }
                     textInputRefs.current.set(partIndex, node)
                     const pending = pendingCaretRef.current
-                    if (pending == null) return
-                    // Focus as soon as the owning input mounts (chip insert).
                     let absolute = 0
                     for (let index = 0; index < partIndex; index += 1) {
                       const item = composerParts[index]
@@ -1683,30 +1765,47 @@ export function Composer({
                     }
                     const tokenStart = absolute
                     const tokenEnd = absolute + part.text.length
-                    const isLastText =
+                    const lastText =
                       partIndex ===
                       composerParts.reduce(
                         (last, item, index) =>
                           item.type === 'text' ? index : last,
                         0
                       )
-                    if (
-                      (pending >= tokenStart && pending <= tokenEnd) ||
-                      (isLastText && pending >= tokenStart)
-                    ) {
-                      const local = Math.min(
-                        Math.max(0, pending - tokenStart),
-                        node.value.length
-                      )
-                      node.focus({ preventScroll: true })
+                    const key = focusKey ?? ''
+                    const shouldAutoFocus =
+                      autoFocus &&
+                      lastText &&
+                      autoFocusedKeyRef.current !== key
+                    const shouldPendingFocus =
+                      pending != null &&
+                      ((pending >= tokenStart && pending <= tokenEnd) ||
+                        (lastText && pending >= tokenStart))
+                    if (!shouldAutoFocus && !shouldPendingFocus) return
+                    const target =
+                      pending != null ? pending : draftRef.current.length
+                    const local = Math.min(
+                      Math.max(0, target - tokenStart),
+                      node.value.length
+                    )
+                    node.focus({ preventScroll: true })
+                    try {
                       node.setSelectionRange(local, local)
-                      pendingCaretRef.current = null
+                    } catch {
+                      // Ignore selection errors on detached nodes.
+                    }
+                    if (document.activeElement !== node) return
+                    pendingCaretRef.current = null
+                    autoFocusedKeyRef.current = key
+                    queueMicrotask(() => {
                       setCaretPos(tokenStart + local)
                       setFocusedPartIndex(partIndex)
-                    }
+                    })
                   }}
                   value={part.text}
                   size={1}
+                  // Native autofocus is allowed on load; JS focus() often is not.
+                  autoFocus={Boolean(autoFocus && isLastText)}
                   onChange={event => {
                     const localCaret = event.target.selectionStart ?? 0
                     updateTextPart(partIndex, event.target.value, localCaret)

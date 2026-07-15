@@ -4618,6 +4618,7 @@ export default function App() {
                           />
                         </div>
                         <Composer
+                          key={sessionId ?? 'empty-composer'}
                           value={composer}
                           running={runActive}
                           skills={skills}
@@ -4631,6 +4632,8 @@ export default function App() {
                           sandboxStatus={sessionSandboxStatus}
                           sandboxPhase={sessionSandboxPhase}
                           showAura={false}
+                          autoFocus
+                          focusKey={sessionId}
                           onChange={setComposer}
                           onLiveDraftChange={text => {
                             composerLiveRef.current = text
@@ -5104,6 +5107,7 @@ export default function App() {
                       </ScrollArea>
                       <div className="bg-background mx-auto w-full max-w-[44rem] shrink-0 px-5 pb-6 pt-2">
                         <Composer
+                          key={sessionId ?? 'empty-composer'}
                           value={composer}
                           running={runActive}
                           skills={skills}
@@ -5117,6 +5121,8 @@ export default function App() {
                           sandboxStatus={sessionSandboxStatus}
                           sandboxPhase={sessionSandboxPhase}
                           showAura={false}
+                          autoFocus
+                          focusKey={sessionId}
                           onChange={setComposer}
                           onLiveDraftChange={text => {
                             composerLiveRef.current = text
