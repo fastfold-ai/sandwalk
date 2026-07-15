@@ -252,7 +252,7 @@ def _cache_info() -> ServerCacheInfo:
     )
 
 
-def get_status_report(*, version: str, service: str = "Sandwalk") -> ServerStatusReport:
+def get_status_report(*, version: str, service: str = "sandwalk") -> ServerStatusReport:
     used, total = _ram_bytes()
     chip_name = _chip_name()
     gpu = _gpu_metrics_darwin()

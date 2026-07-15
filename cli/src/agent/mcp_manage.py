@@ -1,4 +1,4 @@
-"""Shared MCP list/manage helpers for `fastfold mcp` and interactive `/mcp`."""
+"""Shared MCP list/manage helpers for `sandwalk mcp` and interactive `/mcp`."""
 
 from __future__ import annotations
 

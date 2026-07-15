@@ -231,7 +231,7 @@ export function AgentSandboxView({
         /\b404\b|not found/i.test(message)
       setProbeDetail(
         missingProbe
-          ? 'Probe endpoint missing on this agent server. Restart Sandwalk / `sandwalk serve` after updating the CLI, then retry.'
+          ? 'Probe endpoint missing on this agent server. Restart sandwalk / `sandwalk serve` after updating the CLI, then retry.'
           : message
       )
     } finally {
@@ -430,7 +430,7 @@ export function AgentSandboxView({
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-900 dark:text-amber-200">
             This agent server does not expose{' '}
             <code className="text-xs">/v1/settings/sandbox</code> yet. Restart
-            Sandwalk / the agent server after updating the CLI, then reload this
+            sandwalk / the agent server after updating the CLI, then reload this
             page.
           </div>
         ) : null}

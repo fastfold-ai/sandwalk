@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Brand wordmark — drop licensed Garet Regular into public/fonts/. */
+@font-face {
+  font-family: 'Garet';
+  src:
+    local('Garet Regular'),
+    local('Garet-Regular'),
+    url('/fonts/Garet-Regular.woff2') format('woff2'),
+    url('/fonts/Garet-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @keyframes breathe {
   0%,
   100% {

@@ -21,7 +21,7 @@ export const THEME_PALETTES: ThemePaletteMeta[] = [
   {
     id: 'default',
     name: 'Default',
-    description: 'Neutral light and dark — the current Sandwalk look.',
+    description: 'Neutral light and dark — the current sandwalk look.',
     swatches: ['#111111', '#F8F8F8', '#A3A3A3']
   },
   {

@@ -1,4 +1,4 @@
-"""Shared specialists helpers for `fastfold specialists` and interactive `/specialist`."""
+"""Shared specialists helpers for `sandwalk specialists` and interactive `/specialist`."""
 
 from __future__ import annotations
 

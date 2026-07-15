@@ -372,6 +372,6 @@ def cmap_query(gene_signature: dict = None, compound_id: str = None,
 
     return {
         "summary": "L1000 data not available and no gene_signature provided for external query",
-        "error": "Load L1000 data (fastfold data pull l1000) or provide a gene_signature dict",
+        "error": "Load L1000 data (sandwalk data pull l1000) or provide a gene_signature dict",
         "hits": [],
     }

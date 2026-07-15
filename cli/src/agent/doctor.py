@@ -339,7 +339,7 @@ def run_checks(config: Config | None = None, session=None) -> list[DoctorCheck]:
                 DoctorCheck(
                     name="schema_monitor",
                     status="warn",
-                    detail="Schema monitor enabled but no baseline found. Run: fastfold knowledge schema-update",
+                    detail="Schema monitor enabled but no baseline found. Run: sandwalk knowledge schema-update",
                 )
             )
     else:
@@ -766,7 +766,7 @@ def _check_skills_loaded() -> DoctorCheck:
             status="warn",
             detail="0 discovered",
             category="skills",
-            fix="fastfold skills add fastfold-ai/skills",
+            fix="sandwalk skills add fastfold-ai/skills",
         )
 
     enabled = sum(1 for skill in skills if skill.enabled)
@@ -829,7 +829,7 @@ def _check_mcp_servers(cfg: Config) -> list[DoctorCheck]:
                 status="warn",
                 detail=f"Could not load MCP servers: {exc}",
                 category="mcp",
-                fix="Restart `fastfold serve`",
+                fix="Restart `sandwalk serve`",
             )
         )
         return checks
@@ -948,7 +948,7 @@ def _env_present(*names: str) -> bool:
 
 
 def _api_key_configured(cfg: Config, config_key: str) -> bool:
-    """True when a key is set in config and/or its mapped env var (same sources as `fastfold keys`)."""
+    """True when a key is set in config and/or its mapped env var (same sources as `sandwalk keys`)."""
     from agent.config import API_KEYS
 
     info = API_KEYS.get(config_key) or {}
@@ -1000,7 +1000,7 @@ def _check_environment(cfg: Config) -> list[DoctorCheck]:
             status="ok" if count > 0 else "warn",
             detail=f"{count} of {total} keys configured",
             category="environment",
-            fix=None if count > 0 else "Run `fastfold keys` and set keys via config or env",
+            fix=None if count > 0 else "Run `sandwalk keys` and set keys via config or env",
         )
     )
 
@@ -1024,7 +1024,7 @@ def _check_environment(cfg: Config) -> list[DoctorCheck]:
                 status="error",
                 detail=cfg.llm_preflight_issue() or f"provider={provider} key missing",
                 category="environment",
-                fix="fastfold keys  # then config set / export the provider key",
+                fix="sandwalk keys  # then config set / export the provider key",
             )
         )
     else:
@@ -1101,12 +1101,12 @@ def _check_data_availability(cfg: Config) -> DoctorCheck:
         return DoctorCheck(
             name="data_availability",
             status="warn",
-            detail=f"Missing datasets: {', '.join(sorted(missing))} (found: {', '.join(sorted(found))}). Run: fastfold data pull <name>",
+            detail=f"Missing datasets: {', '.join(sorted(missing))} (found: {', '.join(sorted(found))}). Run: sandwalk data pull <name>",
         )
     return DoctorCheck(
         name="data_availability",
         status="warn",
-        detail=f"No key datasets found ({', '.join(sorted(missing))}). Run: fastfold data pull depmap",
+        detail=f"No key datasets found ({', '.join(sorted(missing))}). Run: sandwalk data pull depmap",
     )
 
 

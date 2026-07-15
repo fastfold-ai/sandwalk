@@ -53,7 +53,7 @@ Notes:
 
 | Mode | Details |
 |------|---------|
-| **OAuth** | Browser Connect from Dashboard → MCP or `fastfold mcp connect latch` |
+| **OAuth** | Browser Connect from Dashboard → MCP or `sandwalk mcp connect latch` |
 
 ---
 

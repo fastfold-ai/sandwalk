@@ -221,7 +221,7 @@ async function validateIntegrationOrProbeModal(
       return {
         ok: false,
         message: missingProbe
-          ? 'Probe endpoint missing on this agent server. Restart Sandwalk / `sandwalk serve` after updating the CLI, then retry.'
+          ? 'Probe endpoint missing on this agent server. Restart sandwalk / `sandwalk serve` after updating the CLI, then retry.'
           : message
       }
     }
@@ -1270,7 +1270,7 @@ export default function App() {
   ])
 
   useEffect(() => {
-    const base = 'Sandwalk'
+    const base = 'sandwalk'
     if (onOnboardingPath) {
       const stepTitle = onboardingStepDef(onboardingStep).title
       document.title = `Onboarding ${stepTitle} - ${base}`
@@ -3027,7 +3027,7 @@ export default function App() {
                 <SandwalkMark className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="font-semibold">Sandwalk</h1>
+                <h1 className="font-semibold">sandwalk</h1>
                 <p className="text-muted-foreground mt-1 text-sm">
                   {backendDown
                     ? 'Local agent API error'
@@ -3078,7 +3078,7 @@ export default function App() {
               <SandwalkMark className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="font-semibold">Sandwalk</h1>
+              <h1 className="font-semibold">sandwalk</h1>
               <p className="text-muted-foreground text-sm">
                 Connect to an agent backend
               </p>
@@ -4475,7 +4475,7 @@ export default function App() {
                             </Button>
                           </div>
                           <p className="text-muted-foreground mt-2 text-xs">
-                            Continue this session in your local Sandwalk CLI.
+                            Continue this session in your local sandwalk CLI.
                           </p>
                         </div>
                         <div className="border-border/70 border-t px-4 py-3">

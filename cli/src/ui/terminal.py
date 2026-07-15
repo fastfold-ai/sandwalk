@@ -4728,7 +4728,7 @@ class InteractiveTerminal:
 
         ok = execute_upgrade(console_obj=self.console, cfg=self.session.config)
         if ok:
-            self.console.print("  [dim]Tip: restart fastfold to confirm the new version.[/dim]")
+            self.console.print("  [dim]Tip: restart sandwalk to confirm the new version.[/dim]")
 
     def _list_sessions(self):
         """Show recent saved sessions."""
@@ -4816,7 +4816,7 @@ class InteractiveTerminal:
                 if "failed" in line:
                     self.console.print(f"  [yellow]{line}[/yellow]")
         self.console.print(
-            "  [dim]Start the UI with `fastfold serve` + local-web to continue these chats there.[/dim]"
+            "  [dim]Start the UI with `sandwalk serve` + local-web to continue these chats there.[/dim]"
         )
 
     def _resolve_session_identifier(self, identifier: str, sessions: list[dict]) -> str | None:
@@ -5159,11 +5159,11 @@ class InteractiveTerminal:
             '- `find top genetically supported Parkinson targets`\n'
             '- `/agents 3 find repurposing hypotheses for ulcerative colitis`\n'
             '- `/case-study list` then `/case-study revlimid`\n'
-            '- `fastfold report publish` (from shell) to convert latest markdown report to HTML.'
+            '- `sandwalk report publish` (from shell) to convert latest markdown report to HTML.'
         )
         self.console.print(Panel(
             LeftMarkdown(help_text),
-            title="Sandwalk Help",
+            title="sandwalk Help",
             border_style="cyan",
         ))
 

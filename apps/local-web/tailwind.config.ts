@@ -13,6 +13,15 @@ const config: Config = {
       '2xl': '1580px'
     },
     extend: {
+      fontFamily: {
+        brand: [
+          'Garet',
+          'Inter',
+          'ui-sans-serif',
+          'system-ui',
+          'sans-serif'
+        ]
+      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',

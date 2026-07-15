@@ -298,7 +298,7 @@ def build_diagnostics_zip(
             zf.writestr(
                 f"{root_name}/logs/README.txt",
                 "No log files found yet under ~/.sandwalk/logs.\n"
-                "Restart `fastfold serve` once to begin writing agent-server.log.\n",
+                "Restart `sandwalk serve` once to begin writing agent-server.log.\n",
             )
         for path in log_files:
             zf.writestr(f"{root_name}/logs/{path.name}", _read_log_tail(path))

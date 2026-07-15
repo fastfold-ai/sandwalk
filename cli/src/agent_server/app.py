@@ -240,7 +240,7 @@ def create_app(
         store.close()
 
     app = FastAPI(
-        title="Sandwalk",
+        title="sandwalk",
         version=__version__,
         lifespan=lifespan,
     )

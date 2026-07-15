@@ -9,7 +9,7 @@ description = "Sandwalk — a thinking path for open science"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-authors = [{ name = "Fastfold AI Corp." }]
+authors = [{ name = "Fastfold AI Labs", email = "julio@fastfold.ai" }]
 
 dependencies = [
     "typer>=0.12",

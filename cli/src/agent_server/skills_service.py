@@ -425,7 +425,7 @@ class SkillsService:
         return self._icon_file_path(info)
 
     def install(self, source: str) -> SkillMutationResponse:
-        # Same path as `fastfold skills add`: git/archive first, then npx fallback.
+        # Same path as `sandwalk skills add`: git/archive first, then npx fallback.
         # Nested layouts (e.g. skills/.curated/<name>) are resolved by skill name.
         result = install_skill(source)
         return SkillMutationResponse(

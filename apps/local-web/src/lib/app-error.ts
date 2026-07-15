@@ -124,7 +124,7 @@ export function normalizeAppError(
     return {
       title: 'Not found',
       detail,
-      hint: 'The UI may be newer than the running agent server. Restart Sandwalk / the agent server after updating, then retry.',
+      hint: 'The UI may be newer than the running agent server. Restart sandwalk / the agent server after updating, then retry.',
       status,
       raw,
       stack: stack || raw,

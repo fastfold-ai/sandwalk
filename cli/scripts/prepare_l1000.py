@@ -147,7 +147,7 @@ def main():
         cfg.save()
         print(f"\nAuto-configured data.l1000 = {args.output}")
     except ImportError:
-        print(f"\nManual config: fastfold config set data.l1000 {args.output}")
+        print(f"\nManual config: sandwalk config set data.l1000 {args.output}")
 
     # Clean up raw GCTx (large)
     if gctx_path.exists() and parquet_path.exists():

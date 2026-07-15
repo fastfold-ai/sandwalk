@@ -2,7 +2,7 @@
 
 Suggested remote MCP servers shipped in the FastFold agent dashboard (`/dashboard/mcp`) and CLI.
 
-Defaults are **off** until Connect succeeds. Credentials are stored in `~/.sandwalk/config.json` (same store as Integrations / `fastfold keys`).
+Defaults are **off** until Connect succeeds. Credentials are stored in `~/.sandwalk/config.json` (same store as Integrations / `sandwalk keys`).
 
 Runtime uses [`langchain-mcp-adapters`](https://docs.langchain.com/oss/python/langchain/mcp) `MultiServerMCPClient` (stdio / SSE / streamable HTTP + auth headers).
 
@@ -18,14 +18,14 @@ Runtime uses [`langchain-mcp-adapters`](https://docs.langchain.com/oss/python/la
 ## CLI
 
 ```bash
-fastfold mcp                 # status (catalog + registered)
-fastfold mcp list
-fastfold mcp catalog
-fastfold mcp connect neurosnap --api-key "$NEUROSNAP_API_KEY"
-fastfold mcp validate neurosnap
-fastfold mcp enable|disable <id>
-fastfold mcp add my-server --url https://example.com/mcp
-fastfold mcp remove my-server
+sandwalk mcp                 # status (catalog + registered)
+sandwalk mcp list
+sandwalk mcp catalog
+sandwalk mcp connect neurosnap --api-key "$NEUROSNAP_API_KEY"
+sandwalk mcp validate neurosnap
+sandwalk mcp enable|disable <id>
+sandwalk mcp add my-server --url https://example.com/mcp
+sandwalk mcp remove my-server
 ```
 
 Interactive session: `/mcp` (same actions).

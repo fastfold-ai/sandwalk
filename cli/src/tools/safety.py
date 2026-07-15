@@ -319,7 +319,7 @@ def classify(compound_id: str = "all", **kwargs) -> dict:
     except FileNotFoundError:
         return {
             "error": "PRISM data not available.",
-            "summary": "PRISM data not available — skipping. Run: fastfold data pull prism",
+            "summary": "PRISM data not available — skipping. Run: sandwalk data pull prism",
         }
 
     results = []

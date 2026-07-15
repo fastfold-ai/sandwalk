@@ -145,7 +145,7 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
         return (
             "Gemini tool-call signature missing",
             "Gemini requires thought signatures to be preserved across tool rounds.\n"
-            "Sandwalk now uses the native Google GenAI SDK for Gemini — restart "
+            "sandwalk now uses the native Google GenAI SDK for Gemini — restart "
             "`sandwalk serve` and retry. If this persists, switch models or update "
             "`langchain-google-genai`.",
         )

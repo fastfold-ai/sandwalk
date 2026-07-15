@@ -19,7 +19,7 @@ const MANAGE_COMMANDS = [
     id: 'serve',
     title: 'Start the server',
     command: 'sandwalk serve',
-    description: 'Runs the Sandwalk API (default http://127.0.0.1:8787).'
+    description: 'Runs the sandwalk API (default http://127.0.0.1:8787).'
   },
   {
     id: 'status',
@@ -158,7 +158,7 @@ export function SandwalkServerCard({
                   : 'text-xs font-semibold'
               )}
             >
-              Sandwalk{version ? ` ${version}` : ''}
+              sandwalk{version ? ` ${version}` : ''}
             </span>
             {statusBadge}
           </div>
@@ -183,7 +183,7 @@ export function SandwalkServerCard({
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold tracking-tight">
-            Sandwalk{version ? ` ${version}` : ''}
+            sandwalk{version ? ` ${version}` : ''}
           </h3>
           {statusBadge}
         </div>
@@ -211,7 +211,7 @@ export function SandwalkServerCard({
         <DialogContent className="bg-card text-card-foreground border-border flex max-h-[min(90vh,44rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl p-0 shadow-xl sm:rounded-2xl">
           <DialogHeader className="shrink-0 space-y-2 px-6 pt-6 pb-2 text-left">
             <DialogTitle className="text-lg font-semibold">
-              How to manage Sandwalk
+              How to manage sandwalk
             </DialogTitle>
           </DialogHeader>
 
@@ -225,7 +225,7 @@ export function SandwalkServerCard({
                       Mac app
                     </p>
                     <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
-                      Use the Sandwalk menubar icon →{' '}
+                      Use the sandwalk menubar icon →{' '}
                       <span className="text-foreground font-medium">Start</span>
                       ,{' '}
                       <span className="text-foreground font-medium">Stop</span>,
@@ -234,7 +234,7 @@ export function SandwalkServerCard({
                         Restart
                       </span>
                       . That supervises the API and this web UI together when
-                      you run Sandwalk from the app.
+                      you run sandwalk from the app.
                     </p>
                   </div>
                 </div>

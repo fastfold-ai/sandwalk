@@ -217,7 +217,7 @@ class PromptBudgetService:
         section_children: list[PromptBudgetBucket] = [
             _bucket_from_text(
                 id="sandwalk_system",
-                label="Sandwalk system prompt",
+                label="sandwalk system prompt",
                 text=user_system_prompt,
                 model=model,
             ),

@@ -37,7 +37,7 @@ def _install_allowed(_session) -> bool:
     usage_guide=(
         "Use when the user wants to find, add, inspect, or remove agent skills. "
         "install/remove require the user to have enabled skills.allow_agent_install; "
-        "if disabled, instruct the user to run `fastfold skill add <source>` or `/skills-add`."
+        "if disabled, instruct the user to run `sandwalk skills add <source>` or `/skills-add`."
     ),
 )
 def manage(
@@ -93,7 +93,7 @@ def manage(
             return {
                 "summary": (
                     "Skill install is disabled for the agent (installs third-party code). "
-                    "Ask the user to run `fastfold skills add <source>` or `/skills-add <source>`, "
+                    "Ask the user to run `sandwalk skills add <source>` or `/skills-add <source>`, "
                     "or enable it with `sandwalk config set skills.allow_agent_install true`."
                 ),
                 "ok": False,
@@ -107,7 +107,7 @@ def manage(
             return {
                 "summary": (
                     "Skill removal is disabled for the agent. Ask the user to run "
-                    "`fastfold skills remove <name>` or `/skills-remove <name>`."
+                    "`sandwalk skills remove <name>` or `/skills-remove <name>`."
                 ),
                 "ok": False,
                 "blocked": True,

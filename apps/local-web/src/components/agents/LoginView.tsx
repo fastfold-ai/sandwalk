@@ -127,8 +127,8 @@ export function LoginView({
         <div className="relative z-10 flex w-full max-w-[380px] flex-col items-center">
           <div className="mb-8 flex flex-col items-center gap-3">
             <AuraIconPulse className="text-foreground h-14 w-14 [filter:drop-shadow(0_0_10px_hsl(var(--background)/0.95))_drop-shadow(0_0_22px_hsl(var(--background)/0.9))]" />
-            <h1 className="text-foreground text-[28px] font-bold tracking-tight [text-shadow:0_1px_8px_hsl(var(--background)/0.95),0_0_20px_hsl(var(--background)/0.9)]">
-              Sandwalk
+            <h1 className="font-brand text-foreground text-[28px] font-normal tracking-tight [text-shadow:0_1px_8px_hsl(var(--background)/0.95),0_0_20px_hsl(var(--background)/0.9)]">
+              sandwalk
             </h1>
           </div>
 
@@ -224,7 +224,7 @@ export function LoginView({
                             Mac app
                           </p>
                           <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
-                            Open Sandwalk, then go to{' '}
+                            Open sandwalk, then go to{' '}
                             <span className="text-foreground font-medium">
                               General
                             </span>{' '}

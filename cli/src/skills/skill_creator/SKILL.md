@@ -46,7 +46,7 @@ optional `scripts/`, `references/`, and `assets/` folders. Frontmatter requires
    ```
 
 6. **Install.** Install the new skill so the agent can use it:
-   - Local: `fastfold skills add <path/to/skill>` (or `/skills-add <path>`)
+   - Local: `sandwalk skills add <path/to/skill>` (or `/skills-add <path>`)
    - Or via the tool: `skills.manage(action="install", source="<path/to/skill>")`
 
    Installed skills are available on the next message (the system prompt reloads each turn).

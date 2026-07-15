@@ -16,7 +16,7 @@ const AURA_PATHS = [
  */
 export function SandwalkMark({
   className,
-  title = 'Sandwalk'
+  title = 'sandwalk'
 }: {
   className?: string
   title?: string

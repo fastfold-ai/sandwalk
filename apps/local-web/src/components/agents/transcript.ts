@@ -263,7 +263,7 @@ export function formatSessionExportMarkdown({
     if (entry.kind === 'message') {
       const role =
         entry.message.role === 'assistant'
-          ? 'Sandwalk'
+          ? 'sandwalk'
           : entry.message.role === 'system'
             ? 'system'
             : 'user'
@@ -277,13 +277,13 @@ export function formatSessionExportMarkdown({
     }
 
     if (entry.kind === 'thought') {
-      if (current.length === 0) current.push('## Sandwalk')
+      if (current.length === 0) current.push('## sandwalk')
       current.push('### Thought', entry.thought.trim())
       continue
     }
 
     if (entry.kind === 'tool') {
-      if (current.length === 0) current.push('## Sandwalk')
+      if (current.length === 0) current.push('## sandwalk')
       if (!current.some(line => line === '### Tools')) {
         current.push('### Tools')
       }
@@ -292,7 +292,7 @@ export function formatSessionExportMarkdown({
     }
 
     if (entry.kind === 'todos') {
-      if (current.length === 0) current.push('## Sandwalk')
+      if (current.length === 0) current.push('## sandwalk')
       const items = entry.todos
         .map(
           todo =>

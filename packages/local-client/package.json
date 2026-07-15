@@ -1,6 +1,8 @@
 {
   "name": "@sandwalk/agent-local-client",
   "version": "0.0.1",
+  "license": "MIT",
+  "author": "Fastfold AI Labs <julio@fastfold.ai>",
   "type": "module",
   "sideEffects": false,
   "exports": {

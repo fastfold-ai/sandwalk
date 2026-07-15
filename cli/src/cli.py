@@ -1,5 +1,5 @@
 """
-Sandwalk CLI entry point.
+sandwalk CLI entry point.
 
 Usage:
     sandwalk                              # Interactive mode
@@ -35,23 +35,20 @@ from agent.config import CONFIG_DIR
 from agent.session import Session
 from ui.terminal import SLASH_COMMANDS, InteractiveTerminal
 
-# ─── Startup banner ─────────────────────────────────────────
+# ─── Startup banner (sandwalk mark — compact 3-bar weave) ───
+# Left low → middle high → right low (weave, like the full mark).
 BANNER = """
-[bold #2D7BEA]     ▃▃[/]
-[bold #2D7BEA]    ▃▃▃▃[/]
-[bold #25C19F]  ▅▅ ▃▃▃[/]
-[bold #25C19F] ▅▅▅▅▅[/]
-[bold #F5A623]  ▅▅▅ ▆▆[/]
-[bold #F5A623]    ▆▆▆▆▆[/]
-[bold #D4148E]   ▃ ▆▆▆▆[/]
-[bold #D4148E]  ▃▃▃ ▆[/]
-[bold #D4148E]   ▃▃▃[/]
+
+   ██
+██ ██ ██
+██    ██
+
 """
 
 app = typer.Typer(
     name="sandwalk",
     help=(
-        "Sandwalk — a thinking path for open science.\n\n"
+        "sandwalk — a thinking path for open science.\n\n"
         "Common usage:\n"
         '  sandwalk "your research question"\n'
         '  sandwalk --smiles "CCO" "Profile this compound"\n'
@@ -558,7 +555,7 @@ def _maybe_offer_fastfold_skills_install_after_upgrade(
     if not interactive:
         ui.print(
             "\n  [dim]No official Fastfold skills detected. "
-            "Install them with `fastfold skills add fastfold-ai/skills`.[/dim]"
+            "Install them with `sandwalk skills add fastfold-ai/skills`.[/dim]"
         )
         return
 
@@ -573,7 +570,7 @@ def _maybe_offer_fastfold_skills_install_after_upgrade(
     if answer in {"n", "no"}:
         ui.print(
             "  [dim]Skipped. Add later with "
-            "`fastfold skills add fastfold-ai/skills`.[/dim]"
+            "`sandwalk skills add fastfold-ai/skills`.[/dim]"
         )
         return
 
@@ -617,7 +614,7 @@ def execute_upgrade(
         ui.print(f"[red]Upgrade failed[/red] (exit={proc.returncode}).")
         return False
 
-    ui.print("[green]Upgrade complete.[/green] Restart `fastfold` to use the new version.")
+    ui.print("[green]Upgrade complete.[/green] Restart `sandwalk` to use the new version.")
     _maybe_offer_fastfold_skills_install_after_upgrade(
         ui=ui,
         install_missing=install_missing_skills,
@@ -655,7 +652,7 @@ def execute_upgrade(
 
 # ─── Config subcommand ────────────────────────────────────────
 
-config_app = typer.Typer(help="Manage Sandwalk configuration")
+config_app = typer.Typer(help="Manage sandwalk configuration")
 app.add_typer(config_app, name="config")
 
 auth_app = typer.Typer(help="Manage local API key auth for serve / web UI")
@@ -852,7 +849,7 @@ app.add_typer(specialists_app, name="specialists")
 
 @specialists_app.callback(invoke_without_command=True)
 def specialists_root(ctx: typer.Context):
-    """List specialists (same as `fastfold specialists list`)."""
+    """List specialists (same as `sandwalk specialists list`)."""
     if ctx.invoked_subcommand is not None:
         return
     from agent.specialists_manage import cmd_list
@@ -1015,7 +1012,7 @@ app.add_typer(mcp_app, name="mcp")
 
 @mcp_app.callback(invoke_without_command=True)
 def mcp_root(ctx: typer.Context):
-    """Show MCP status (same as `fastfold mcp list`)."""
+    """Show MCP status (same as `sandwalk mcp list`)."""
     if ctx.invoked_subcommand is not None:
         return
     from agent.mcp_manage import handle_mcp_argv
@@ -1235,7 +1232,7 @@ def sync_cmd(
                 console.print(f"  [yellow]{line}[/yellow]")
     if result.imported or result.updated:
         console.print(
-            "  [dim]Run `fastfold serve` and open the local UI to continue these chats.[/dim]"
+            "  [dim]Run `sandwalk serve` and open the local UI to continue these chats.[/dim]"
         )
 
 
@@ -1481,7 +1478,7 @@ def fork_cmd(
             console.print(f"  [dim]Fork count:[/dim] {fork_count}")
         console.print(f"  [cyan]Resume in CLI:[/cyan] sandwalk --resume {session_id}")
         console.print(
-            "  [cyan]Open in Web UI:[/cyan] sandwalk serve (or Sandwalk.app) → Agents"
+            "  [cyan]Open in Web UI:[/cyan] sandwalk serve (or sandwalk.app) → Agents"
         )
     except RuntimeError as exc:
         message = str(exc)
@@ -1593,7 +1590,7 @@ def setup_cmd(
         False, "--skip-sandbox", help="Skip the sandbox setup step"
     ),
 ):
-    """Interactive setup wizard — configure fastfold for first use."""
+    """Interactive setup wizard — configure sandwalk for first use."""
     from agent.config import Config
 
     # setup_cmd is also called directly from Python paths (first-run flows),
@@ -1987,10 +1984,10 @@ def setup_cmd(
     console.print(
         Panel(
             "[bold green]You're all set![/bold green]\n\n"
-            "  [cyan]fastfold[/cyan]                      Interactive mode\n"
-            '  [cyan]fastfold "your question"[/cyan]      Single query\n'
+            "  [cyan]sandwalk[/cyan]                      Interactive mode\n"
+            '  [cyan]sandwalk "your question"[/cyan]      Single query\n'
             "  [cyan]sandwalk doctor[/cyan]               Full health check\n"
-            "  [cyan]fastfold keys[/cyan]                 Optional API keys",
+            "  [cyan]sandwalk keys[/cyan]                 Optional API keys",
             title="[green]Quick Start[/green]",
             border_style="green",
         )
@@ -3203,7 +3200,7 @@ def _install_boltz_skill_from_setup() -> bool:
         "  [yellow]Could not auto-install Boltz skill.[/yellow] "
         f"[dim]{result.get('summary', '')}[/dim]"
     )
-    console.print(f"  [dim]Install manually with:[/dim] fastfold skills add {BOLTZ_SKILL_SOURCE}")
+    console.print(f"  [dim]Install manually with:[/dim] sandwalk skills add {BOLTZ_SKILL_SOURCE}")
     return False
 
 
@@ -3260,7 +3257,7 @@ def _prompt_install_boltz_stack(boltz_key: str | None) -> None:
     if not interactive:
         console.print(
             "  [dim]Boltz key configured. Optional setup:[/dim] "
-            f"`fastfold skills add {BOLTZ_SKILL_SOURCE}` and "
+            f"`sandwalk skills add {BOLTZ_SKILL_SOURCE}` and "
             "`curl -fsSL https://install.boltz.bio/boltz-api/install.sh | sh`."
         )
         return
@@ -3708,7 +3705,7 @@ def _prompt_install_skills(skills_arg: str | None = None, skip: bool = False) ->
     if not interactive:
         console.print(
             "\n  [dim]Skipping skills install (non-interactive). "
-            "Add later with `fastfold skills find` / `fastfold skills add <source>`.[/dim]"
+            "Add later with `sandwalk skills find` / `sandwalk skills add <source>`.[/dim]"
         )
         return
 
@@ -3724,7 +3721,7 @@ def _prompt_install_skills(skills_arg: str | None = None, skip: bool = False) ->
         raise typer.Exit()
     if proceed in ("n", "no"):
         console.print(
-            "  [dim]Skipped. Add later with `fastfold skills find` / `fastfold skills add <source>`.[/dim]"
+            "  [dim]Skipped. Add later with `sandwalk skills find` / `sandwalk skills add <source>`.[/dim]"
         )
         return
 
@@ -3850,7 +3847,7 @@ def _prompt_install_datasets(datasets_arg: str | None = None, skip: bool = False
     if not interactive:
         console.print(
             "\n  [dim]Skipping dataset download (non-interactive). "
-            "Add later with `fastfold data pull-all` or `fastfold data pull <name>`.[/dim]"
+            "Add later with `sandwalk data pull-all` or `sandwalk data pull <name>`.[/dim]"
         )
         return
 
@@ -3866,8 +3863,8 @@ def _prompt_install_datasets(datasets_arg: str | None = None, skip: bool = False
         raise typer.Exit()
     if proceed not in ("y", "yes"):
         console.print(
-            "  [dim]Skipped. Download later with `fastfold data pull-all` "
-            "or `fastfold data pull <name>`.[/dim]"
+            "  [dim]Skipped. Download later with `sandwalk data pull-all` "
+            "or `sandwalk data pull <name>`.[/dim]"
         )
         return
 
@@ -4330,7 +4327,7 @@ def skill_find(
     for r in results:
         table.add_row(r["name"], r["install_source"], r["description"])
     console.print(table)
-    console.print("  [dim]Install with:[/dim] fastfold skills add <install source>")
+    console.print("  [dim]Install with:[/dim] sandwalk skills add <install source>")
 
 
 @skill_app.command("info")
@@ -4353,7 +4350,7 @@ def skill_info_cmd(
         console.print(f"  [dim]path:[/dim] {info.path}")
 
 
-# ─── Top-level `add` group (alias: `fastfold add skill <source>`) ─────────────
+# ─── Top-level `add` group (alias: `sandwalk add skill <source>`) ─────────────
 add_app = typer.Typer(help="Add skills and other resources")
 app.add_typer(add_app, name="add")
 
@@ -4362,7 +4359,7 @@ app.add_typer(add_app, name="add")
 def add_skills_cmd(
     source: str = typer.Argument(..., help="GitHub URL, owner/repo@subpath, local path, or name"),
 ):
-    """Install an agent skill (alias for ``fastfold skills add``)."""
+    """Install an agent skill (alias for ``sandwalk skills add``)."""
     skill_add(source)
 
 
@@ -4370,7 +4367,7 @@ def add_skills_cmd(
 def add_skill_cmd(
     source: str = typer.Argument(..., help="GitHub URL, owner/repo@subpath, local path, or name"),
 ):
-    """Back-compat alias for `fastfold add skills`."""
+    """Back-compat alias for `sandwalk add skills`."""
     skill_add(source)
 
 
@@ -5296,7 +5293,7 @@ def run_cmd(
     version: bool = typer.Option(False, "--version", "-V", help="Show version"),
 ):
     """
-    Sandwalk — a thinking path for open science.
+    sandwalk — a thinking path for open science.
 
     Run without arguments for interactive mode.
     Pass a question for single-query mode.
@@ -5394,7 +5391,7 @@ def run_query(
     console.print(
         Panel(
             f"[bold]{query}[/bold]",
-            title="[cyan]fastfold[/cyan]",
+            title="[cyan]sandwalk[/cyan]",
             border_style="cyan",
         )
     )
@@ -5560,7 +5557,7 @@ def bench(
 
 
 def print_banner(cfg=None):
-    """Print the startup banner with molecule illustration."""
+    """Print the startup banner with the sandwalk mark."""
     from rich.padding import Padding
     from rich.table import Table
     from rich.text import Text
@@ -5590,9 +5587,10 @@ def print_banner(cfg=None):
     status_line = " · ".join(status_parts)
     upgrade_version = _get_cached_upgrade_available_version(__version__)
 
-    logo_text = Text.from_markup(BANNER.strip("\n"))
+    # Medium gray — readable on light/dark terminals without competing with meta text.
+    logo_text = Text(BANNER.strip("\n"), style="#8B8B8B")
     meta_lines = [
-        f"[bold white]Sandwalk[/] [dim]v{__version__}[/]",
+        f"[bold white]sandwalk[/] [dim]v{__version__}[/]",
     ]
     if status_line:
         meta_lines.append(f"[dim]{status_line}[/dim]")
@@ -5616,7 +5614,8 @@ def print_banner(cfg=None):
     header = Table.grid(padding=(0, 2))
     header.add_column(no_wrap=True)
     header.add_column()
-    header.add_row(logo_text, Padding(meta_text, (2, 0, 0, 1)))
+    # Nudge mark down so it sits nearer the vertical center of the meta block.
+    header.add_row(Padding(logo_text, (1, 0, 0, 0)), Padding(meta_text, (0, 0, 0, 1)))
     console.print(header)
 
 
@@ -5637,8 +5636,8 @@ def run_interactive(
         except Exception:
             rows = 0
         # Approximate visible startup footprint:
-        # banner (~11 lines) + spacing + first prompt/separator.
-        startup_lines = 15
+        # mark (~6 lines) + spacing + first prompt/separator.
+        startup_lines = 11
         spacer = max(0, rows - startup_lines)
         console.clear()
         if spacer:
@@ -5725,7 +5724,7 @@ def entry():
         "--show-completion",
     }
 
-    # Support `fastfold help` and `fastfold help <subcommand>` as aliases.
+    # Support `sandwalk help` and `sandwalk help <subcommand>` as aliases.
     if argv and argv[0] == "help":
         argv = ["--help"] if len(argv) == 1 else [*argv[1:], "--help"]
 
@@ -5734,7 +5733,7 @@ def entry():
     #   sandwalk "question"            -> single-query mode
     #   sandwalk --smiles ... "q"      -> single-query with context
     # while preserving explicit subcommands like `sandwalk config ...`.
-    # Backward-compat: allow old `fastfold run <subcommand> ...` invocations by
+    # Backward-compat: allow old `sandwalk run <subcommand> ...` invocations by
     # unwrapping the legacy `run` prefix when the remainder is a real subcommand.
     if len(argv) >= 2 and argv[0] == "run" and argv[1] in subcommands:
         argv = argv[1:]

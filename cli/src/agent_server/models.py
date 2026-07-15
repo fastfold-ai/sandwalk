@@ -31,7 +31,7 @@ class Capabilities(ApiModel):
 
 class HealthResponse(ApiModel):
     status: Literal["ok", "degraded"] = "ok"
-    service: str = "Sandwalk"
+    service: str = "sandwalk"
     version: str
     backend_id: str
     user_name: str | None = None
@@ -63,7 +63,7 @@ class ServerCacheInfo(ApiModel):
 
 class ServerStatusReport(ApiModel):
     status: Literal["running", "degraded"] = "running"
-    service: str = "Sandwalk"
+    service: str = "sandwalk"
     version: str
     message: str | None = None
     host: str | None = None

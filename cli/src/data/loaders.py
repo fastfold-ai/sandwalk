@@ -3,7 +3,7 @@ Data loaders for common drug discovery datasets.
 
 Each loader checks configured paths, then the ct-data sister project,
 and supports both CSV and Parquet formats.
-Data paths are configured via fastfold config.
+Data paths are configured via sandwalk config.
 """
 
 from functools import lru_cache
@@ -95,7 +95,7 @@ def load_crispr() -> pd.DataFrame:
     if path is None:
         raise FileNotFoundError(
             "DepMap CRISPR data not found. "
-            "Run: fastfold data pull depmap\n"
+            "Run: sandwalk data pull depmap\n"
             "Or set: sandwalk config set data.base /path/to/data"
         )
     df = _read_tabular(path, index_col=0)
@@ -111,7 +111,7 @@ def load_model_metadata() -> pd.DataFrame:
     if path is None:
         raise FileNotFoundError(
             "Model metadata not found. "
-            "Run: fastfold data pull depmap"
+            "Run: sandwalk data pull depmap"
         )
     return _read_tabular(path)
 
@@ -209,7 +209,7 @@ def load_prism() -> pd.DataFrame:
 
     raise FileNotFoundError(
         "PRISM data not found. "
-        "Run: fastfold data pull prism\n"
+        "Run: sandwalk data pull prism\n"
         "Or set: sandwalk config set data.prism /path/to/file"
     )
 
@@ -220,7 +220,7 @@ def load_mutations() -> pd.DataFrame:
     if path is None:
         raise FileNotFoundError(
             "Mutation data not found. "
-            "Run: fastfold data pull depmap"
+            "Run: sandwalk data pull depmap"
         )
 
     df = _read_tabular(path)
@@ -253,4 +253,4 @@ def load_msigdb(collection: str = "h") -> dict[str, Any]:
                     return data
                 return {"data": data}
 
-    raise FileNotFoundError("MSigDB data not found. Run: fastfold data pull msigdb")
+    raise FileNotFoundError("MSigDB data not found. Run: sandwalk data pull msigdb")
