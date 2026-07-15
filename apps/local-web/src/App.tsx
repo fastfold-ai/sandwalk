@@ -16,24 +16,15 @@ import type {
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import {
-  Archive,
   Check,
-  ChevronDown,
   Copy,
   Download,
   Folder,
-  LayoutDashboard,
   Loader2,
-  MoreHorizontal,
   PanelLeft,
   PanelRight,
-  Pin,
-  Search,
-  Send,
   SquareTerminal,
-  Terminal,
-  Trash2,
-  X
+  Terminal
 } from 'lucide-react'
 import {
   lazy,
@@ -49,6 +40,7 @@ import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
+import { AgentSessionSidebar } from '@/components/agents/AgentSessionSidebar'
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ChatTranscript } from '@/components/agents/ChatTranscript'
 import { type SandboxActionPhase } from '@/components/agents/Composer'
@@ -79,12 +71,8 @@ import {
   DetailPageSkeleton
 } from '@/components/agents/PageSkeletons'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
-import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { ProjectSettingsDialog } from '@/components/agents/ProjectSettingsDialog'
-import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
-import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
 import { SessionTabs } from '@/components/agents/SessionTabs'
-import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import {
   buildConversationTimeline,
   formatSessionExportMarkdown
@@ -125,22 +113,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from '@/components/ui/popover'
-import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup
 } from '@/components/ui/resizable'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@/components/ui/tooltip'
 import {
   FILES_PANEL_COLLAPSED_STORAGE_KEY,
   projectTabsKey,
@@ -180,7 +156,6 @@ import {
   emptySessionChatState,
   groupSessions,
   isLowSignalTitle,
-  relativeTime,
   type SessionChatState,
   visibleSessionIds
 } from '@/lib/sessions'
@@ -3239,389 +3214,56 @@ export default function App() {
               connected={Boolean(health)}
             />
           ) : (
-            <>
-          <div className="shrink-0 p-3">
-            <div className="mb-2 flex items-center gap-1">
-              <button
-                type="button"
-                className="hover:bg-sidebar-accent/70 inline-flex size-8 shrink-0 items-center justify-center rounded-md"
-                onClick={() => {
-                  setProjectScopeId(null)
-                  navigate('/')
-                }}
-                aria-label="Home"
-                title="Home"
-              >
-                <SandwalkMark className="h-5 w-5" />
-              </button>
-              <ProjectSelector
-                projects={projects}
-                value={activeProjectId}
-                onSelectAll={selectAllProjects}
-                onSelectProject={selectProjectScope}
-                onOpenSettings={() => setProjectSettingsOpen(true)}
-                onNewProject={() => setNewProjectOpen(true)}
-              />
-              <div className="min-w-0 flex-1" />
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 shrink-0"
-                      onClick={() => setGlobalSearchOpen(true)}
-                      aria-label="Search"
-                    >
-                      <Search className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">Search ⌘K</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 shrink-0"
-                onClick={() => setSidebarCollapsed(true)}
-                aria-label="Hide sidebar"
-              >
-                <PanelLeft className="size-4" />
-              </Button>
-            </div>
-            <button
-              type="button"
-              className="text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[13px]"
-              onClick={() => void createSession(activeProjectId)}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Send className="size-3.5" />
-                New Agent
-              </span>
-              <span className="text-muted-foreground/70 text-[11px]">⌘N</span>
-            </button>
-            {canShowFilesPanel ? (
-              <button
-                type="button"
-                className={cn(
-                  'mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px]',
-                  !filesPanelCollapsed
-                    ? 'bg-sidebar-accent text-foreground'
-                    : 'text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground'
-                )}
-                onClick={() => setFilesPanelCollapsed(current => !current)}
-              >
-                <Folder className="size-3.5" />
-                Files
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px]"
-              onClick={() => navigate('/dashboard')}
-            >
-              <LayoutDashboard className="size-3.5" />
-              Dashboard
-            </button>
-          </div>
-          {selectedSessionIds.size > 0 ? (
-            <div className="border-border/60 mx-2 mb-1 space-y-2 rounded-lg border bg-sidebar-accent/40 px-2.5 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-foreground text-[12px] font-medium">
-                  {selectedSessionIds.size} selected
-                </span>
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-md"
-                  aria-label="Clear selection"
-                  disabled={batchBusy}
-                  onClick={clearSessionSelection}
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-[11px]"
-                  disabled={batchBusy}
-                  onClick={() => void batchArchiveSelected()}
-                >
-                  <Archive className="size-3" />
-                  Archive
-                </Button>
-                <ProjectPicker
-                  projects={projects}
-                  value={null}
-                  disabled={batchBusy}
-                  noneLabel="No project"
-                  trigger={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-[11px]"
-                      disabled={batchBusy}
-                    >
-                      <Folder className="size-3" />
-                      Move
-                    </Button>
-                  }
-                  onChange={projectId => {
-                    void batchMoveSelected(projectId)
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-[11px]"
-                  disabled={batchBusy}
-                  onClick={() => void batchExportSelected()}
-                >
-                  <Download className="size-3" />
-                  Export
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:text-destructive h-7 px-2 text-[11px]"
-                  disabled={batchBusy}
-                  onClick={() => setBatchDeletePending(true)}
-                >
-                  <Trash2 className="size-3" />
-                  Delete
-                </Button>
-              </div>
-              <p className="text-muted-foreground text-[10px] leading-snug">
-                Shift+click range · ⌘/Ctrl+click toggle · Esc clears
-              </p>
-            </div>
-          ) : null}
-          <ScrollArea className="flex-1">
-            <div className="space-y-3 p-3">
-              {sections.length === 0 ? (
-                <p className="text-muted-foreground px-1.5 py-2 text-[13px]">
-                  No Agents Yet
-                </p>
-              ) : (
-              sections.map(section => {
-                const collapsed = Boolean(collapsedSidebarSections[section.id])
-                return (
-                  <div key={section.id} className="space-y-1">
-                    <button
-                      type="button"
-                      className="text-muted-foreground/80 hover:text-foreground flex w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-[13px]"
-                      aria-expanded={!collapsed}
-                      onClick={() =>
-                        setCollapsedSidebarSections(current => ({
-                          ...current,
-                          [section.id]: !current[section.id]
-                        }))
-                      }
-                    >
-                      <ChevronDown
-                        className={cn(
-                          'size-3.5 shrink-0 transition-transform',
-                          collapsed && '-rotate-90'
-                        )}
-                      />
-                      <span className="min-w-0 flex-1 truncate">
-                        {section.title}
-                      </span>
-                      <span className="text-muted-foreground/60 shrink-0 text-[11px] tabular-nums">
-                        {section.items.length}
-                      </span>
-                    </button>
-                    {!collapsed ? (
-                      <ul className="space-y-0.5">
-                        {section.items.map(item => {
-                          const isSelected = selectedSessionIds.has(item.id)
-                          return (
-                          <li key={item.id}>
-                            <div
-                              className={cn(
-                                'hover:bg-sidebar-accent/70 group grid grid-cols-[minmax(0,1fr)_2.75rem] items-center rounded px-1.5 py-1.5',
-                                item.id === sessionId && 'bg-sidebar-accent',
-                                isSelected &&
-                                  'bg-sidebar-accent ring-primary/30 ring-1'
-                              )}
-                            >
-                              <button
-                                type="button"
-                                className="flex min-w-0 items-center gap-1.5 text-left"
-                                onClick={event => {
-                                  if (event.shiftKey) {
-                                    event.preventDefault()
-                                    selectSessionRange(
-                                      orderedVisibleSessionIds,
-                                      item.id
-                                    )
-                                    return
-                                  }
-                                  if (event.metaKey || event.ctrlKey) {
-                                    event.preventDefault()
-                                    toggleSessionSelected(item.id)
-                                    return
-                                  }
-                                  if (selectedSessionIds.size > 0) {
-                                    clearSessionSelection()
-                                  }
-                                  setSelectionAnchorId(item.id)
-                                  openSessionTab(item.id)
-                                  void prefetchSessionMessages(item.id)
-                                  navigate(`/agents/${item.id}`)
-                                }}
-                              >
-                                {isSelected || selectedSessionIds.size > 0 ? (
-                                  <span
-                                    className={cn(
-                                      'grid size-3.5 shrink-0 place-items-center rounded-[4px] border',
-                                      isSelected
-                                        ? 'border-primary bg-primary text-primary-foreground'
-                                        : 'border-muted-foreground/40'
-                                    )}
-                                    aria-hidden
-                                  >
-                                    {isSelected ? (
-                                      <Check className="size-2.5" strokeWidth={3} />
-                                    ) : null}
-                                  </span>
-                                ) : (
-                                  <SessionStatusIcon
-                                    status={
-                                      chatBySessionId[item.id]?.runActive
-                                        ? 'running'
-                                        : item.status
-                                    }
-                                  />
-                                )}
-                                {item.organizeLabel === 'pinned' ? (
-                                  <Pin className="text-muted-foreground/70 size-3 shrink-0" />
-                                ) : null}
-                                <span className="text-foreground/90 group-hover:text-foreground truncate text-[13px]">
-                                  {item.title || 'Untitled'}
-                                </span>
-                              </button>
-                              <div className="relative h-7 w-11 justify-self-end">
-                                <span
-                                  className={cn(
-                                    'text-muted-foreground/70 pointer-events-none absolute inset-0 flex items-center justify-end pr-0.5 text-[11px] transition-opacity',
-                                    threadMenuOpenId === item.id
-                                      ? 'opacity-0'
-                                      : 'opacity-100 group-hover:opacity-0'
-                                  )}
-                                >
-                                  {relativeTime(
-                                    item.lastMessageAt || item.updatedAt
-                                  )}
-                                </span>
-                                <Popover
-                                  open={threadMenuOpenId === item.id}
-                                  onOpenChange={open => {
-                                    setThreadMenuOpenId(open ? item.id : null)
-                                  }}
-                                >
-                                  <PopoverTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className={cn(
-                                        'text-muted-foreground hover:bg-muted absolute right-0 top-0 inline-flex h-7 w-7 items-center justify-center rounded-md',
-                                        threadMenuOpenId === item.id
-                                          ? 'opacity-100'
-                                          : 'opacity-0 group-hover:opacity-100'
-                                      )}
-                                      aria-label="Thread options"
-                                    >
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent
-                                    align="start"
-                                    className="w-44 p-1.5"
-                                  >
-                                    <SessionActionsMenu
-                                      session={item}
-                                      projects={projects}
-                                      onRename={() => {
-                                        setThreadMenuOpenId(null)
-                                        openRenameDialog(item)
-                                      }}
-                                      onTogglePin={() => {
-                                        setThreadMenuOpenId(null)
-                                        void updateSession(item, {
-                                          organizeLabel:
-                                            item.organizeLabel === 'pinned'
-                                              ? null
-                                              : 'pinned'
-                                        })
-                                      }}
-                                      onMoveToProject={projectId => {
-                                        setThreadMenuOpenId(null)
-                                        void updateSession(item, { projectId })
-                                      }}
-                                      onExport={() => {
-                                        setThreadMenuOpenId(null)
-                                        void exportTranscript(item)
-                                      }}
-                                      onInspect={() => {
-                                        setThreadMenuOpenId(null)
-                                        navigate(
-                                          `/agents/${item.id}?inspect=1`
-                                        )
-                                      }}
-                                      onArchive={() => {
-                                        setThreadMenuOpenId(null)
-                                        const nextLabel =
-                                          item.organizeLabel === 'archive'
-                                            ? null
-                                            : 'archive'
-                                        void updateSession(item, {
-                                          organizeLabel: nextLabel
-                                        })
-                                        if (nextLabel === 'archive') {
-                                          setCollapsedSidebarSections(
-                                            current => ({
-                                              ...current,
-                                              archive: false
-                                            })
-                                          )
-                                        }
-                                      }}
-                                      onDelete={() => {
-                                        setThreadMenuOpenId(null)
-                                        setDeleteTarget(item)
-                                      }}
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                              </div>
-                            </div>
-                          </li>
-                          )
-                        })}
-                      </ul>
-                    ) : null}
-                  </div>
-                )
-              })
-              )}
-            </div>
-          </ScrollArea>
-          <div className="shrink-0 p-2">
-            <SidebarUserMenu
-              userName={sidebarUserName}
+            <AgentSessionSidebar
+              projects={projects}
+              activeProjectId={activeProjectId}
+              sections={sections}
+              collapsedSidebarSections={collapsedSidebarSections}
+              sessionId={sessionId}
+              chatBySessionId={chatBySessionId}
+              orderedVisibleSessionIds={orderedVisibleSessionIds}
+              selectedSessionIds={selectedSessionIds}
+              threadMenuOpenId={threadMenuOpenId}
+              batchBusy={batchBusy}
+              canShowFilesPanel={canShowFilesPanel}
+              filesPanelCollapsed={filesPanelCollapsed}
+              sidebarUserName={sidebarUserName}
+              health={health}
+              backendUrl={backendUrl}
+              navigate={navigate}
+              onNavigateHome={() => {
+                setProjectScopeId(null)
+                navigate('/')
+              }}
+              onSelectAllProjects={selectAllProjects}
+              onSelectProject={selectProjectScope}
+              onOpenProjectSettings={() => setProjectSettingsOpen(true)}
+              onNewProject={() => setNewProjectOpen(true)}
+              onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
+              onCollapseSidebar={() => setSidebarCollapsed(true)}
+              onCreateSession={() => createSession(activeProjectId)}
+              onToggleFilesPanel={() =>
+                setFilesPanelCollapsed(current => !current)
+              }
+              onClearSessionSelection={clearSessionSelection}
+              onBatchArchiveSelected={batchArchiveSelected}
+              onBatchMoveSelected={batchMoveSelected}
+              onBatchExportSelected={batchExportSelected}
+              onBatchDeletePending={() => setBatchDeletePending(true)}
+              setCollapsedSidebarSections={setCollapsedSidebarSections}
+              selectSessionRange={selectSessionRange}
+              toggleSessionSelected={toggleSessionSelected}
+              setSelectionAnchorId={setSelectionAnchorId}
+              openSessionTab={openSessionTab}
+              prefetchSessionMessages={prefetchSessionMessages}
+              setThreadMenuOpenId={setThreadMenuOpenId}
+              openRenameDialog={openRenameDialog}
+              updateSession={updateSession}
+              exportTranscript={exportTranscript}
+              setDeleteTarget={setDeleteTarget}
               onLogout={logoutSession}
               onRefreshUser={refreshCloudUserName}
-              backendVersion={health?.version ?? null}
-              backendUrl={backendUrl}
-              connected={Boolean(health)}
             />
-          </div>
-            </>
           )}
         </aside>
         </ResizablePanel>
