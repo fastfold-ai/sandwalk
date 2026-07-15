@@ -3,7 +3,7 @@ import '@xterm/xterm/css/xterm.css'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { PtySessionInfo } from '@sandwalk/agent-ui-core'
 import { FitAddon } from '@xterm/addon-fit'
-import { type ITheme,Terminal as XTerm } from '@xterm/xterm'
+import { Terminal as XTerm } from '@xterm/xterm'
 import {
   Pencil,
   Plus,
@@ -14,6 +14,11 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import {
+  buildTerminalTheme,
+  isDocumentDark,
+  watchTerminalTheme
+} from '@/lib/terminal-theme'
 import { cn } from '@/lib/utils'
 
 import {
@@ -21,7 +26,8 @@ import {
   TabContextItem,
   TabContextMenuShell,
   TabContextSeparator,
-  TabInlineColorRow} from './tab-context-menu'
+  TabInlineColorRow
+} from './tab-context-menu'
 
 type TerminalPanelProps = {
   client: LocalAgentClient
@@ -81,67 +87,6 @@ function writeTerminalTabColors(
   }
 }
 
-const LIGHT_THEME: ITheme = {
-  background: '#FAFAFA',
-  foreground: '#24292F',
-  cursor: '#0969DA',
-  cursorAccent: '#FAFAFA',
-  selectionBackground: 'rgba(9, 105, 218, 0.22)',
-  selectionForeground: '#24292F',
-  black: '#24292F',
-  red: '#CF222E',
-  green: '#1A7F37',
-  yellow: '#9A6700',
-  blue: '#0969DA',
-  magenta: '#8250DF',
-  cyan: '#1B7C83',
-  white: '#EAEEF2',
-  brightBlack: '#6E7781',
-  brightRed: '#FF8182',
-  brightGreen: '#2DA44E',
-  brightYellow: '#D4A72C',
-  brightBlue: '#218BFF',
-  brightMagenta: '#A475F9',
-  brightCyan: '#3192AA',
-  brightWhite: '#FFFFFF'
-}
-
-const DARK_THEME: ITheme = {
-  background: '#0D1117',
-  foreground: '#E6EDF3',
-  cursor: '#58A6FF',
-  cursorAccent: '#0D1117',
-  selectionBackground: 'rgba(88, 166, 255, 0.28)',
-  selectionForeground: '#E6EDF3',
-  black: '#484F58',
-  red: '#FF7B72',
-  green: '#3FB950',
-  yellow: '#D29922',
-  blue: '#58A6FF',
-  magenta: '#BC8CFF',
-  cyan: '#39C5CF',
-  white: '#B1BAC4',
-  brightBlack: '#6E7681',
-  brightRed: '#FFA198',
-  brightGreen: '#56D364',
-  brightYellow: '#E3B341',
-  brightBlue: '#79C0FF',
-  brightMagenta: '#D2A8FF',
-  brightCyan: '#56D4DD',
-  brightWhite: '#FFFFFF'
-}
-
-function isDocumentDark() {
-  return (
-    typeof document !== 'undefined' &&
-    document.documentElement.classList.contains('dark')
-  )
-}
-
-function themeFor(dark: boolean): ITheme {
-  return dark ? DARK_THEME : LIGHT_THEME
-}
-
 export function TerminalPanel({
   client,
   sessionId,
@@ -155,7 +100,6 @@ export function TerminalPanel({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [booting, setBooting] = useState(true)
-  const [dark, setDark] = useState(isDocumentDark)
   const [tabColors, setTabColors] = useState<Record<string, string>>(() =>
     readTerminalTabColors(sessionId)
   )
@@ -176,9 +120,8 @@ export function TerminalPanel({
   const hostsRef = useRef<Record<string, HTMLDivElement | null>>({})
   const livesRef = useRef<Record<string, LiveTerminal>>({})
   const creatingRef = useRef(false)
-  const darkRef = useRef(dark)
+  const darkRef = useRef(isDocumentDark())
   const lastStartupNonceRef = useRef<number>(-1)
-  darkRef.current = dark
   renameIdRef.current = renameId
   renameValueRef.current = renameValue
   renameBusyRef.current = renameBusy
@@ -222,21 +165,18 @@ export function TerminalPanel({
   )
 
   useEffect(() => {
-    const root = document.documentElement
-    const sync = () => setDark(root.classList.contains('dark'))
-    sync()
-    const observer = new MutationObserver(sync)
-    observer.observe(root, { attributes: true, attributeFilter: ['class'] })
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    const next = themeFor(dark)
-    for (const live of Object.values(livesRef.current)) {
-      if (live.disposed) continue
-      live.term.options.theme = next
+    const apply = () => {
+      const nextDark = isDocumentDark()
+      darkRef.current = nextDark
+      const next = buildTerminalTheme(nextDark)
+      for (const live of Object.values(livesRef.current)) {
+        if (live.disposed) continue
+        live.term.options.theme = next
+      }
     }
-  }, [dark])
+    apply()
+    return watchTerminalTheme(apply)
+  }, [])
 
   const disposeLive = useCallback((ptyId: string) => {
     const live = livesRef.current[ptyId]
@@ -268,7 +208,7 @@ export function TerminalPanel({
         letterSpacing: 0,
         fontFamily:
           '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-        theme: themeFor(darkRef.current),
+        theme: buildTerminalTheme(darkRef.current),
         convertEol: true,
         allowTransparency: false,
         scrollback: 5000,
@@ -632,12 +572,7 @@ export function TerminalPanel({
   }, [activeId, sendCommandToLive, startupCommand, startupNonce, tabs])
 
   return (
-    <div
-      className={cn(
-        'flex h-full min-h-0 flex-col border-t',
-        dark ? 'border-white/10 bg-[#0D1117]' : 'border-border bg-[#FAFAFA]'
-      )}
-    >
+    <div className="bg-card border-border flex h-full min-h-0 flex-col border-t">
       <div className="flex h-10 shrink-0 items-center gap-1 px-1.5">
         <div className="chat-scrollbar-x flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto">
           {tabs.map(tab => {
@@ -652,12 +587,8 @@ export function TerminalPanel({
                   colored
                     ? 'text-[#1f2937]'
                     : activeId === tab.id || renaming
-                      ? dark
-                        ? 'bg-white/10 text-zinc-100'
-                        : 'bg-muted text-foreground'
-                      : dark
-                        ? 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
-                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
                   colored &&
                     activeId !== tab.id &&
                     !renaming &&
@@ -688,12 +619,9 @@ export function TerminalPanel({
                     <input
                       ref={renameInputRef}
                       className={cn(
-                        'h-6 w-full min-w-[6rem] rounded border px-1.5 text-xs font-medium outline-none focus-visible:ring-1',
-                        colored
-                          ? 'border-black/15 bg-white/70 text-[#1f2937] focus-visible:ring-black/20'
-                          : dark
-                            ? 'border-white/20 bg-[#0D1117] text-zinc-100 focus-visible:ring-white/30'
-                            : 'bg-background text-foreground border-input focus-visible:ring-ring'
+                        'border-input bg-background text-foreground focus-visible:ring-ring h-6 w-full min-w-[6rem] rounded border px-1.5 text-xs font-medium outline-none focus-visible:ring-1',
+                        colored &&
+                          'border-black/15 bg-white/70 text-[#1f2937] focus-visible:ring-black/20'
                       )}
                       value={renameValue}
                       onFocus={event => event.currentTarget.select()}
@@ -742,9 +670,7 @@ export function TerminalPanel({
                         'absolute right-0.5 top-1/2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100',
                         colored
                           ? 'bg-black/10 hover:bg-black/20'
-                          : dark
-                            ? 'bg-white/10 hover:bg-white/20'
-                            : 'bg-muted hover:bg-background/80'
+                          : 'bg-muted hover:bg-background/80'
                       )}
                       aria-label={`Close ${tab.title}`}
                       onClick={event => {
@@ -765,10 +691,7 @@ export function TerminalPanel({
             type="button"
             variant="ghost"
             size="icon"
-            className={cn(
-              'size-7',
-              dark && 'text-zinc-300 hover:bg-white/10 hover:text-white'
-            )}
+            className="text-muted-foreground hover:text-foreground size-7"
             title="New terminal"
             aria-label="New terminal"
             onClick={() => void createTab()}
@@ -780,10 +703,7 @@ export function TerminalPanel({
               type="button"
               variant="ghost"
               size="icon"
-              className={cn(
-                'size-7',
-                dark && 'text-zinc-300 hover:bg-white/10 hover:text-white'
-              )}
+              className="text-muted-foreground hover:text-foreground size-7"
               title="Hide terminal"
               aria-label="Hide terminal"
               onClick={onClose}
@@ -796,12 +716,7 @@ export function TerminalPanel({
 
       <div className="relative min-h-0 flex-1">
         {booting ? (
-          <div
-            className={cn(
-              'absolute inset-0 flex items-center justify-center text-xs',
-              dark ? 'text-zinc-500' : 'text-muted-foreground'
-            )}
-          >
+          <div className="text-muted-foreground absolute inset-0 flex items-center justify-center text-xs">
             Starting terminal…
           </div>
         ) : status && tabs.length === 0 ? (
@@ -811,10 +726,7 @@ export function TerminalPanel({
               type="button"
               variant="ghost"
               size="sm"
-              className={cn(
-                'h-7 text-xs',
-                dark && 'text-zinc-300 hover:bg-white/10 hover:text-white'
-              )}
+              className="h-7 text-xs"
               onClick={() => void createTab()}
             >
               Retry
@@ -822,22 +734,12 @@ export function TerminalPanel({
           </div>
         ) : tabs.length === 0 ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
-            <p
-              className={cn(
-                'text-xs',
-                dark ? 'text-zinc-500' : 'text-muted-foreground'
-              )}
-            >
-              No terminals open
-            </p>
+            <p className="text-muted-foreground text-xs">No terminals open</p>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className={cn(
-                'h-7 text-xs',
-                dark && 'text-zinc-300 hover:bg-white/10 hover:text-white'
-              )}
+              className="h-7 text-xs"
               onClick={() => void createTab()}
             >
               <Plus className="mr-1 size-3.5" />

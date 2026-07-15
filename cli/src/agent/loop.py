@@ -65,8 +65,11 @@ class AgentLoop:
         session_id = str(self.trajectory.session_id or "").strip()
         if not session_id:
             return
-        title = (self.trajectory.title or "").strip() or "New research session"
-        self.store.ensure_session(session_id, title=title)
+        title = (self.trajectory.title or "").strip()
+        if title:
+            self.store.ensure_session(session_id, title=title)
+        else:
+            self.store.ensure_session(session_id)
         # Always materialize a session workspace so CLI shell/skills get
         # SANDWALK_SESSION_WORKSPACE (same path the local UI file tree uses).
         try:

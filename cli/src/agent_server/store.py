@@ -512,8 +512,19 @@ class AgentStore:
             raise ValueError("Session id cannot be empty.")
         existing = self.get_session(normalized_id)
         if existing is not None:
-            if title is not None and title.strip() and title.strip() != existing.title:
-                return self.update_session(normalized_id, title=title.strip()) or existing
+            # Titles are owned by create/update/auto-title. Workspace boot and
+            # CLI ensure paths often pass placeholders like "New research session";
+            # never clobber a real title, and only upgrade placeholder → real.
+            from agent_server.title import is_placeholder_title
+
+            incoming = (title or "").strip()
+            if (
+                incoming
+                and incoming != existing.title
+                and is_placeholder_title(existing.title)
+                and not is_placeholder_title(incoming)
+            ):
+                return self.update_session(normalized_id, title=incoming) or existing
             return existing
 
         if project_id is not None and self.get_project(project_id) is None:

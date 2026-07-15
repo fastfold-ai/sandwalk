@@ -21,6 +21,31 @@ def test_ensure_session_reuses_custom_id(tmp_path: Path):
     assert store.list_sessions()[0].title == "CLI chat"
 
 
+def test_ensure_session_does_not_clobber_real_title(tmp_path: Path):
+    store = AgentStore(tmp_path / "agent.db")
+    store.ensure_session("title01", title="KRAS binder screen")
+    store.ensure_session("title01", title="New research session")
+    assert store.get_session("title01").title == "KRAS binder screen"
+
+
+def test_ensure_session_upgrades_placeholder_title(tmp_path: Path):
+    store = AgentStore(tmp_path / "agent.db")
+    store.ensure_session("title02", title="New research session")
+    store.ensure_session("title02", title="Glioblastoma kinases")
+    assert store.get_session("title02").title == "Glioblastoma kinases"
+
+
+def test_ensure_workspace_preserves_session_title(tmp_path: Path, monkeypatch):
+    from agent_server.service import AgentService, resolve_session_workspace
+
+    store = AgentStore(tmp_path / "agent.db")
+    store.ensure_session("ws01", title="Fold EGFR")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    resolve_session_workspace("ws01", store=store, persist=True)
+    AgentService(store).ensure_workspace("ws01")
+    assert store.get_session("ws01").title == "Fold EGFR"
+
+
 def test_sync_imports_jsonl_sessions(tmp_path: Path, monkeypatch):
     sessions_dir = tmp_path / "sessions"
     sessions_dir.mkdir()

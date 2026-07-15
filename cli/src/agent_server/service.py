@@ -62,7 +62,7 @@ def resolve_session_workspace(
 
     if persist and store is not None:
         try:
-            store.ensure_session(normalized, title="New research session")
+            store.ensure_session(normalized)
             if not existing_path or Path(existing_path).expanduser().resolve() != workspace:
                 store.set_workspace_path(normalized, str(workspace))
         except Exception:

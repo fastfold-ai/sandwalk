@@ -2540,13 +2540,14 @@ export function Composer({
             <Button
               type={running ? 'button' : 'submit'}
               size="icon"
-              className="size-7 rounded-full"
+              className="bg-foreground text-background hover:bg-foreground/90 size-7 rounded-full shadow-none [&_svg]:text-background"
               onClick={running ? onStop : undefined}
+              aria-label={running ? 'Stop' : 'Send'}
             >
               {running ? (
                 <Square className="size-3 fill-current" />
               ) : (
-                <ArrowUp className="size-4" />
+                <ArrowUp className="size-4" strokeWidth={2.5} />
               )}
             </Button>
           </div>

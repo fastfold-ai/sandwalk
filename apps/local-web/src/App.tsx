@@ -1976,12 +1976,14 @@ export default function App() {
       Boolean(prevRunActiveForTitleRef.current[sessionId]) && !runActive
     prevRunActiveForTitleRef.current[sessionId] = runActive
     if (!justFinished || autoTitleInFlightRef.current[sessionId]) return
-    if ((autoTitlePassCountRef.current[sessionId] || 0) > 0) return
     const conversationCount = messages.filter(
       message => message.role === 'user' || message.role === 'assistant'
     ).length
     if (conversationCount < AUTO_TITLE_FIRST_RESPONSE_THRESHOLD) return
     if (!isLowSignalTitle(session?.title || '')) return
+    // Keep retrying while the stored title is still a placeholder (e.g. after
+    // a bad overwrite). Cap attempts so intentional untitled chats settle.
+    if ((autoTitlePassCountRef.current[sessionId] || 0) >= 3) return
 
     autoTitleInFlightRef.current[sessionId] = true
     const titledSessionId = sessionId
@@ -1999,7 +2001,8 @@ export default function App() {
               : item
           )
         )
-        autoTitlePassCountRef.current[titledSessionId] = 1
+        autoTitlePassCountRef.current[titledSessionId] =
+          (autoTitlePassCountRef.current[titledSessionId] || 0) + 1
       } catch {
         // Best effort; retry on a later completed run.
       } finally {
