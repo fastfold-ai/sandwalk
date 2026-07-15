@@ -32,9 +32,9 @@ A thinking path for open science.
 </p>
 <br>
 
-**sandwalk** is a local science agent for ambitious researchers doing frontier science work: ask questions in natural language and it plans multi-step workflows across 190+ tools, database APIs, skills, MCPs, and sandboxes. Built for people who want the best tools and a clean research flow. Think of it as a coding agent, but for biology and drug discovery.
+**sandwalk** is a self-hosted science agent harness for researchers and scientists: multi-step workflows across 190+ tools, database APIs, skills, MCPs, and sandboxes. Covers biology, drug discovery, and related fields, and is extensible beyond them.
 
-Includes a CLI, local agent server, web dashboard with viewers, and a Mac app that starts everything for you. Run fully on your machine, or reach cloud GPUs when the work needs it.
+Use it from the terminal or a web dashboard where you manage agents, specialists, skills, and runtime, with built-in viewers for structures and results. A Mac app can bring the whole stack up locally. Run everything on your machine by default; reach for cloud GPUs when a job needs them.
 
 ## Features
 
@@ -385,7 +385,7 @@ For the Mac app, server and auth settings are also editable in **Settings…** a
 
 ## License
 
-MIT. Copyright © 2026 Fastfold AI Labs. See [LICENSE](LICENSE).
+Apache License 2.0. Copyright © 2026 Fastfold AI Labs. See [LICENSE](LICENSE).
 
 ## Contributing / from source
 

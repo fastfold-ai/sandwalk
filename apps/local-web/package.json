@@ -2,7 +2,7 @@
   "name": "@sandwalk/agent-local-web",
   "private": true,
   "version": "0.0.1",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Fastfold AI Labs <julio@fastfold.ai>",
   "type": "module",
   "scripts": {

@@ -64,4 +64,4 @@ from legacy `~/.fastfold-cli/` (never overwrites existing files).
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the MIT License.
+By contributing, you agree that your contributions are licensed under the Apache License 2.0.

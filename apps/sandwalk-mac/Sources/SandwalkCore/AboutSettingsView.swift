@@ -54,11 +54,11 @@ struct AboutSettingsView: View {
                             Image(systemName: "scale.3d")
                                 .font(.system(size: 13))
                                 .foregroundStyle(theme.textSecondary)
-                            Text("MIT License")
+                            Text("Apache License 2.0")
                                 .font(.sandwalk(13, weight: .medium))
                                 .foregroundStyle(theme.text)
                         }
-                        Text("Copyright © 2026 Fastfold AI Labs. Licensed under the MIT License. See the LICENSE file in the repository for the full text.")
+                        Text("Copyright © 2026 Fastfold AI Labs. Licensed under the Apache License, Version 2.0. See the LICENSE file in the repository for the full text.")
                             .font(.sandwalk(11.5))
                             .foregroundStyle(theme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
