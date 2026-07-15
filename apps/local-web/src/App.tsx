@@ -15,36 +15,18 @@ import type {
   Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
-import {
-  Check,
-  Copy,
-  Download,
-  Folder,
-  Loader2,
-  PanelLeft,
-  PanelRight,
-  SquareTerminal,
-  Terminal
-} from 'lucide-react'
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from 'react'
+import { Loader2, PanelLeft } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
+import { AgentSessionMainPanel } from '@/components/agents/AgentSessionMainPanel'
 import { AgentSessionSidebar } from '@/components/agents/AgentSessionSidebar'
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
-import { ChatTranscript } from '@/components/agents/ChatTranscript'
 import { type SandboxActionPhase } from '@/components/agents/Composer'
 import { fileChipToken } from '@/components/agents/composer-parts'
+import { DashboardMainViews } from '@/components/agents/DashboardMainViews'
 import {
   type DashboardSection,
   DashboardSidebar
@@ -64,21 +46,12 @@ import {
   onboardingStepFromSlug
 } from '@/lib/onboarding'
 import { NewProjectDialog } from '@/components/agents/NewProjectDialog'
-import {
-  ChatPageSkeleton,
-  DashboardPageSkeleton,
-  type DashboardSkeletonKind,
-  DetailPageSkeleton
-} from '@/components/agents/PageSkeletons'
-import { ProjectPicker } from '@/components/agents/ProjectPicker'
+import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import { ProjectSettingsDialog } from '@/components/agents/ProjectSettingsDialog'
-import { SessionTabs } from '@/components/agents/SessionTabs'
 import {
   buildConversationTimeline,
   formatSessionExportMarkdown
 } from '@/components/agents/transcript'
-import { WorkspacePanel } from '@/components/agents/WorkspacePanel'
-import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 import { ErrorPage } from '@/components/ErrorPage'
 import {
   isAuthCredentialError,
@@ -105,12 +78,6 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
   ResizableHandle,
@@ -125,7 +92,6 @@ import {
   readOpenTabsByProject,
   readProjectScopeId,
   readRecentProjectIds,
-  SESSION_PANELS_AUTO_SAVE_ID,
   SHELL_PANELS_AUTO_SAVE_ID,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   TERMINAL_OPEN_STORAGE_KEY,
@@ -148,7 +114,6 @@ import { useChatScroll } from '@/hooks/useChatScroll'
 import { useSessionChatState } from '@/hooks/useSessionChatState'
 import { useSessionChatSend } from '@/hooks/useSessionChatSend'
 import { useSessionChatStream } from '@/hooks/useSessionChatStream'
-import { validateIntegrationOrProbeModal } from '@/lib/app-helpers'
 import {
   AUTO_TITLE_FIRST_RESPONSE_THRESHOLD,
   groupSessions,
@@ -156,99 +121,11 @@ import {
   visibleSessionIds
 } from '@/lib/sessions'
 import {
-  catalogSkillDetailPath,
   cloudAccountDisplayName,
   parseCatalogSkillId,
   type SkillsViewMode
 } from '@/lib/skills-catalog'
 import { cn } from '@/lib/utils'
-
-const AgentRuntimeView = lazy(() =>
-  import('@/components/agents/AgentRuntimeView').then(m => ({
-    default: m.AgentRuntimeView
-  }))
-)
-const AgentPromptsView = lazy(() =>
-  import('@/components/agents/AgentPromptsView').then(m => ({
-    default: m.AgentPromptsView
-  }))
-)
-const AgentSandboxView = lazy(() =>
-  import('@/components/agents/AgentSandboxView').then(m => ({
-    default: m.AgentSandboxView
-  }))
-)
-const DashboardOverviewView = lazy(() =>
-  import('@/components/agents/DashboardOverviewView').then(m => ({
-    default: m.DashboardOverviewView
-  }))
-)
-const DataView = lazy(() =>
-  import('@/components/agents/DataView').then(m => ({ default: m.DataView }))
-)
-const DoctorView = lazy(() =>
-  import('@/components/agents/DoctorView').then(m => ({ default: m.DoctorView }))
-)
-const EnvironmentView = lazy(() =>
-  import('@/components/agents/EnvironmentView').then(m => ({
-    default: m.EnvironmentView
-  }))
-)
-const GeneralView = lazy(() =>
-  import('@/components/agents/GeneralView').then(m => ({
-    default: m.GeneralView
-  }))
-)
-const HomeView = lazy(() =>
-  import('@/components/agents/HomeView').then(m => ({ default: m.HomeView }))
-)
-const InspectView = lazy(() =>
-  import('@/components/agents/InspectView').then(m => ({
-    default: m.InspectView
-  }))
-)
-const IntegrationsView = lazy(() =>
-  import('@/components/agents/IntegrationsView').then(m => ({
-    default: m.IntegrationsView
-  }))
-)
-const McpView = lazy(() =>
-  import('@/components/agents/McpView').then(m => ({ default: m.McpView }))
-)
-const McpDetailView = lazy(() =>
-  import('@/components/agents/McpDetailView').then(m => ({
-    default: m.McpDetailView
-  }))
-)
-const SandboxListView = lazy(() =>
-  import('@/components/agents/SandboxListView').then(m => ({
-    default: m.SandboxListView
-  }))
-)
-const ModelsView = lazy(() =>
-  import('@/components/agents/ModelsView').then(m => ({ default: m.ModelsView }))
-)
-const ServerStatusView = lazy(() =>
-  import('@/components/agents/ServerStatusView').then(m => ({
-    default: m.ServerStatusView
-  }))
-)
-const SkillsView = lazy(() =>
-  import('@/components/agents/SkillsView').then(m => ({ default: m.SkillsView }))
-)
-const SpecialistsView = lazy(() =>
-  import('@/components/agents/SpecialistsView').then(m => ({
-    default: m.SpecialistsView
-  }))
-)
-const StorageView = lazy(() =>
-  import('@/components/agents/StorageView').then(m => ({
-    default: m.StorageView
-  }))
-)
-const ToolsView = lazy(() =>
-  import('@/components/agents/ToolsView').then(m => ({ default: m.ToolsView }))
-)
 
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8787'
 /** Soft warn: live SSE streams start crowding the browser's ~6 conn/host limit. */
@@ -2992,1038 +2869,149 @@ export default function App() {
           isDashboardSpecialists ||
           isHome ||
           isProjectHome ? (
-            <Suspense
-              fallback={
-                <DashboardPageSkeleton kind={dashboardSkeletonKind} />
-              }
-            >
-            <AppErrorBoundary
-              variant="panel"
-              resetKeys={[dashboardSection, location.pathname]}
-            >
-            {isDashboardOverview ? (
-            <DashboardOverviewView sessions={sessions}>
-              <SkillsView
-                featuredOnly
-                mode="list"
-                skills={skills}
-                loading={connecting && skills.length === 0}
-                detail={null}
-                catalogSkillRoute={null}
-                catalogSearchEnabled={catalogSearchEnabled}
-                onShowAll={() => navigate('/dashboard/skills')}
-                onOpen={name =>
-                  navigate(`/dashboard/skills/${encodeURIComponent(name)}`)
-                }
-                onOpenCatalogDetail={skill =>
-                  navigate(catalogSkillDetailPath(skill))
-                }
-                onBack={() => navigate('/dashboard/skills')}
-                onOpenImportGithub={() =>
-                  navigate('/dashboard/skills/import/github')
-                }
-                onOpenImportFile={() =>
-                  navigate('/dashboard/skills/import/file')
-                }
-                onOpenTrustedSources={() =>
-                  navigate('/dashboard/skills/trusted/sources')
-                }
-                onOpenCatalogSetup={() =>
-                  navigate('/dashboard/integrations/vercel')
-                }
-                onInstall={async source => {
-                  const installed = await client.installSkill(source)
-                  await loadSkills()
-                  return installed
-                }}
-                onUpload={async file => {
-                  await client.installSkillFile(file)
-                  await loadSkills()
-                }}
-                onLoadSuggestedSources={signal =>
-                  client.listSkillSources(signal)
-                }
-                onSearchCatalog={(query, signal) =>
-                  client.searchSkillCatalog(query, 12, signal)
-                }
-                onGetCatalogDetail={(source, skill, signal) =>
-                  client.getCatalogSkillDetail(source, skill, signal)
-                }
-                onGetCatalogAudit={(source, skill, signal) =>
-                  client.getCatalogSkillAudit(source, skill, signal)
-                }
-                onBulkAction={async (action, names) => {
-                  const result = await client.bulkSkillAction(action, names)
-                  await loadSkills()
-                  return result
-                }}
-                onSetEnabled={async (name, enabled) => {
-                  await client.setSkillEnabled(name, enabled)
-                  await loadSkills()
-                }}
-                onRemove={async name => {
-                  await client.removeSkill(name)
-                  await loadSkills()
-                }}
-              />
-              <McpView
-                featuredOnly
-                mcpServers={mcpServers}
-                catalog={mcpCatalog}
-                catalogLoading={mcpCatalogLoading}
-                onShowAll={() => navigate('/dashboard/mcp')}
-                onRefresh={refreshMcp}
-                onConnectCatalog={async (catalogId, input) => {
-                  const result = await client.connectMcpCatalog(
-                    catalogId,
-                    input
-                  )
-                  await refreshMcp()
-                  await loadIntegrations()
-                  return result
-                }}
-                onToggleCatalog={async (entry, enabled) => {
-                  await client.setMcpCatalogEnabled(entry.id, enabled)
-                  await refreshMcp()
-                }}
-                onCreateMcp={async input => {
-                  await client.createMcpServer(input)
-                  await loadMcpServers()
-                }}
-                onDeleteMcp={async id => {
-                  await client.deleteMcpServer(id)
-                  await loadMcpServers()
-                }}
-                onToggleCustom={async (id, enabled) => {
-                  await client.updateMcpServer(id, { enabled })
-                  await loadMcpServers()
-                }}
-                onOpenCatalog={entry =>
-                  navigate(
-                    `/dashboard/mcp/catalog/${encodeURIComponent(entry.id)}`
-                  )
-                }
-              />
-              <IntegrationsView
-                featuredOnly
-                terminalClient={client}
-                integrations={integrations}
-                loading={connecting && integrations.length === 0}
-                selectedKey={null}
-                values={{}}
-                onShowAll={() => navigate('/dashboard/integrations')}
-                onValueChange={() => {}}
-                onSelect={key => {
-                  if (!key) {
-                    navigate('/dashboard/integrations')
-                    return
-                  }
-                  const target = integrations.find(item => item.key === key)
-                  const segment = (target?.name || key)
-                    .trim()
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, '-')
-                    .replace(/^-+|-+$/g, '')
-                  navigate(
-                    `/dashboard/integrations/${encodeURIComponent(segment || key)}`
-                  )
-                }}
-                onSave={async () => {}}
-                onValidate={async key =>
-                  validateIntegrationOrProbeModal(client, key)
-                }
-                onAutofill={async key => {
-                  await client.autofillIntegration(key)
-                  await loadIntegrations()
-                }}
-                onSetup={async key => {
-                  const result = await client.setupIntegration(key)
-                  await loadIntegrations()
-                  return result
-                }}
-                onOpenVercelTerminal={async () => {
-                  const existing = sessions.find(item =>
-                    String(item.workspacePath || '')
-                      .trim()
-                      .endsWith('/.sandwalk/vercel-integration')
-                  )
-                  if (existing) return existing.id
-                  const created = await client.createSession({
-                    title: 'Vercel integration setup',
-                    workspacePath: '~/.sandwalk/vercel-integration',
-                    projectId: activeProjectId || undefined
-                  })
-                  await loadSessions()
-                  return created.id
-                }}
-                onRemove={async key => {
-                  await client.removeIntegration(key)
-                  await loadIntegrations()
-                }}
-              />
-            </DashboardOverviewView>
-          ) : isDashboardStatus ? (
-            <ServerStatusView
-              onLoad={loadServerStatus}
-              onClearCache={signal => client.clearRuntimeCache(signal)}
-            />
-          ) : isDashboardGeneral ? (
-            <GeneralView
+            <DashboardMainViews
+              client={client}
+              navigate={navigate}
+              location={location}
+              dashboardSection={dashboardSection}
+              dashboardSkeletonKind={dashboardSkeletonKind}
               backendUrl={backendUrl}
-              backendVersion={health?.version ?? null}
-              connected={Boolean(health)}
-              onLoadAccount={loadAccountForUi}
-              onLogoutAccount={logoutAccount}
-              onOpenSetupWizard={() => {
-                navigate(onboardingPath('welcome'))
-              }}
-            />
-          ) : isDashboardAgentRuntime ? (
-            <AgentRuntimeView
-              connected={Boolean(health)}
-              runtimeSettings={runtimeSettings}
-              onUpdateRuntimeSettings={async changes => {
-                const next = await client.updateRuntimeSettings(changes)
-                setRuntimeSettings(next)
-                return next
-              }}
-            />
-          ) : isDashboardAgentPrompts ? (
-            <AgentPromptsView
-              connected={Boolean(health)}
-              onGetPromptBudget={(options, signal) =>
-                client.getPromptBudget(options, signal)
-              }
-              onListSpecialists={signal => client.listSpecialists(signal)}
-            />
-          ) : isDashboardAgentSandbox ? (
-            isSandboxLocalDetail ? (
-              <EnvironmentView
-                title="Local Sandbox"
-                description="Python environment the agent uses for Local Sandbox chats. Manage packages used by skills and tools. Core dependencies stay locked."
-                onBack={() => navigate('/dashboard/agent/sandbox')}
-                onLoad={loadEnvironment}
-                onInstall={(name, options) =>
-                  client.installEnvironmentPackage(name, options)
-                }
-                onUninstall={(name, signal) =>
-                  client.uninstallEnvironmentPackage(name, signal)
-                }
-              />
-            ) : isSandboxModalDetail ? (
-              <AgentSandboxView
-                connected={Boolean(health)}
-                sandboxSettings={sandboxSettings}
-                modalIntegration={
-                  integrations.find(item => item.key === 'modal') || null
-                }
-                onBack={() => navigate('/dashboard/agent/sandbox')}
-                onLoadSandboxSettings={async () => {
-                  const next = await client.getSandboxSettings()
-                  setSandboxSettings(next)
-                  return next
-                }}
-                onUpdateSandboxSettings={async changes => {
-                  const next = await client.updateSandboxSettings(changes)
-                  setSandboxSettings(next)
-                  return next
-                }}
-                onProbeSandbox={() => client.probeSandboxSettings()}
-                onSaveModalIntegration={async values => {
-                  const next = await client.updateIntegration('modal', values)
-                  await loadIntegrations()
-                  const settings = await client.getSandboxSettings()
-                  setSandboxSettings(settings)
-                  await refreshSessionSandbox()
-                  return next
-                }}
-                onRemoveModalIntegration={async () => {
-                  await client.removeIntegration('modal')
-                  await loadIntegrations()
-                  const settings = await client.getSandboxSettings()
-                  setSandboxSettings(settings)
-                  await refreshSessionSandbox()
-                }}
-                onRefreshIntegrations={async () => {
-                  await loadIntegrations()
-                  const settings = await client.getSandboxSettings()
-                  setSandboxSettings(settings)
-                  await refreshSessionSandbox()
-                }}
-              />
-            ) : (
-              <SandboxListView
-                onOpen={id =>
-                  navigate(`/dashboard/agent/sandbox/${id}`)
-                }
-              />
-            )
-          ) : isDashboardModels ? (
-            <ModelsView
-              integrations={integrations}
-              onListModels={options => client.listModels(options)}
-              onUpdateModelEnabled={async (modelId, enabled, signal) => {
-                const updated = await client.updateModelEnabled(
-                  modelId,
-                  enabled,
-                  signal
-                )
-                void loadModelOptions()
-                return updated
-              }}
-              onCreateCustomModel={async (input, signal) => {
-                const created = await client.createCustomModel(input, signal)
-                void loadModelOptions()
-                return created
-              }}
-              onDeleteCustomModel={async (modelId, signal) => {
-                await client.deleteCustomModel(modelId, signal)
-                void loadModelOptions()
-              }}
-              onListProfiles={signal => client.listModelProfiles({ signal })}
-              onCreateProfile={async (input, signal) => {
-                const created = await client.createModelProfile(input, signal)
-                void loadModelOptions()
-                return created
-              }}
-              onUpdateProfile={async (profileId, input, signal) => {
-                const updated = await client.updateModelProfile(
-                  profileId,
-                  input,
-                  signal
-                )
-                void loadModelOptions()
-                return updated
-              }}
-              onDeleteProfile={async (profileId, signal) => {
-                await client.deleteModelProfile(profileId, signal)
-                void loadModelOptions()
-              }}
-              onProbeProfile={(profileId, signal) =>
-                client.probeModelProfile(profileId, signal)
-              }
-              onDiscoverEndpoint={(input, signal) =>
-                client.discoverModelEndpoint(input, signal)
-              }
-              onSaveProviderKey={async (key, envVar, value) => {
-                await client.updateIntegration(key, { [envVar]: value })
-                await loadIntegrations()
-                await loadModelOptions()
-              }}
-              onClearProviderKey={async key => {
-                await client.removeIntegration(key)
-                await loadIntegrations()
-                await loadModelOptions()
-              }}
-            />
-          ) : isDashboardTools ? (
-            <ToolsView
-              onListTools={signal => client.listTools({ signal })}
-              onUpdateToolEnabled={(toolId, enabled, signal) =>
-                client.updateToolEnabled(toolId, enabled, signal)
-              }
-              onBatchUpdateTools={(action, ids, signal) =>
-                client.batchUpdateTools(action, ids, signal)
-              }
-              onListDatasets={signal => client.listDatasets(signal)}
-              onOpenData={() => navigate('/dashboard/datasets')}
-            />
-          ) : isDashboardData ? (
-            <DataView
-              onListDatasets={signal => client.listDatasets(signal)}
-              onInstallDataset={(datasetId, signal) =>
-                client.installDataset(datasetId, signal)
-              }
-              onRemoveDataset={(datasetId, signal) =>
-                client.removeDataset(datasetId, signal)
-              }
-            />
-          ) : isDashboardDoctor ? (
-            <DoctorView
-              onRun={signal => client.runDoctor(signal)}
-              onDownloadDiagnostics={(uiDiagnostics, signal) =>
-                client.downloadDiagnostics(uiDiagnostics, signal)
-              }
-            />
-          ) : isDashboardStorage ? (
-            <StorageView onLoad={loadStorage} />
-          ) : isDashboardEnvironment ? (
-            <EnvironmentView
-              onLoad={loadEnvironment}
-              onInstall={(name, options) =>
-                client.installEnvironmentPackage(name, options)
-              }
-              onUninstall={(name, signal) =>
-                client.uninstallEnvironmentPackage(name, signal)
-              }
-            />
-          ) : isSkills ? (
-            <SkillsView
-              mode={skillsViewMode}
+              health={health}
+              connecting={connecting}
+              sessions={sessions}
+              projects={projects}
+              sessionPreviews={sessionPreviews}
+              activeProjectId={activeProjectId}
               skills={skills}
-              loading={connecting && skills.length === 0}
-              detail={skillDetail}
+              skillDetail={skillDetail}
               catalogSkillRoute={catalogSkillRoute}
               catalogSearchEnabled={catalogSearchEnabled}
-              openCatalogSearchInitially={isCatalogSearchPath}
-              onOpen={name =>
-                navigate(`/dashboard/skills/${encodeURIComponent(name)}`)
-              }
-              onOpenCatalogDetail={skill =>
-                navigate(catalogSkillDetailPath(skill))
-              }
-              onBack={() => navigate('/dashboard/skills')}
-              onOpenImportGithub={() => navigate('/dashboard/skills/import/github')}
-              onOpenImportFile={() => navigate('/dashboard/skills/import/file')}
-              onOpenTrustedSources={() => navigate('/dashboard/skills/trusted/sources')}
-              onOpenCatalogSetup={() => navigate('/dashboard/integrations/vercel')}
-              onInstall={async source => {
-                const installed = await client.installSkill(source)
-                await loadSkills()
-                return installed
-              }}
-              onUpload={async file => {
-                await client.installSkillFile(file)
-                await loadSkills()
-              }}
-              onLoadSuggestedSources={signal => client.listSkillSources(signal)}
-              onSearchCatalog={(query, signal) =>
-                client.searchSkillCatalog(query, 12, signal)
-              }
-              onGetCatalogDetail={(source, skill, signal) =>
-                client.getCatalogSkillDetail(source, skill, signal)
-              }
-              onGetCatalogAudit={(source, skill, signal) =>
-                client.getCatalogSkillAudit(source, skill, signal)
-              }
-              onBulkAction={async (action, names) => {
-                const result = await client.bulkSkillAction(action, names)
-                if (action === 'remove') {
-                  setSkillDetail(current =>
-                    current && result.succeeded.includes(current.name) ? null : current
-                  )
-                } else if (skillDetail && result.succeeded.includes(skillDetail.name)) {
-                  const refreshed = await client.getSkill(skillDetail.name)
-                  setSkillDetail(refreshed)
-                }
-                await loadSkills()
-                return result
-              }}
-              onSetEnabled={async (name, enabled) => {
-                const updated = await client.setSkillEnabled(name, enabled)
-                setSkillDetail(current =>
-                  current && current.name === name ? updated : current
-                )
-                await loadSkills()
-              }}
-              onRemove={async name => {
-                await client.removeSkill(name)
-                setSkillDetail(current =>
-                  current && current.name === name ? null : current
-                )
-                await loadSkills()
-              }}
-            />
-          ) : isIntegrations ? (
-            <IntegrationsView
-              terminalClient={client}
+              isCatalogSearchPath={isCatalogSearchPath}
+              skillsViewMode={skillsViewMode}
               integrations={integrations}
-              loading={connecting && integrations.length === 0}
-              selectedKey={selectedIntegrationKey}
-              values={integrationValues}
-              onValueChange={(envName, value) =>
-                setIntegrationValues(current => ({
-                  ...current,
-                  [envName]: value
-                }))
-              }
-              onSelect={key => {
-                if (!key) {
-                  navigate('/dashboard/integrations')
-                  return
-                }
-                const target = integrations.find(item => item.key === key)
-                const segment = (target?.name || key)
-                  .trim()
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, '-')
-                  .replace(/^-+|-+$/g, '')
-                navigate(
-                  `/dashboard/integrations/${encodeURIComponent(segment || key)}`
-                )
-              }}
-              onSave={async () => {
-                if (!selectedIntegrationKey) return
-                await client.updateIntegration(
-                  selectedIntegrationKey,
-                  integrationValues
-                )
-                setIntegrationValues({})
-                await loadIntegrations()
-              }}
-              onValidate={async key =>
-                validateIntegrationOrProbeModal(client, key)
-              }
-              onAutofill={async key => {
-                await client.autofillIntegration(key)
-                await loadIntegrations()
-              }}
-              onSetup={async key => {
-                const result = await client.setupIntegration(key)
-                await loadIntegrations()
-                return result
-              }}
-              onOpenVercelTerminal={async () => {
-                const existing = sessions.find(item =>
-                  String(item.workspacePath || '')
-                    .trim()
-                    .endsWith('/.sandwalk/vercel-integration')
-                )
-                if (existing) return existing.id
-                const created = await client.createSession({
-                  title: 'Vercel integration setup',
-                  workspacePath: '~/.sandwalk/vercel-integration',
-                  projectId: activeProjectId || undefined
-                })
-                await loadSessions()
-                return created.id
-              }}
-              onRemove={async key => {
-                await client.removeIntegration(key)
-                if (selectedIntegrationKey === key) {
-                  navigate('/dashboard/integrations', { replace: true })
-                }
-                await loadIntegrations()
-              }}
-            />
-          ) : isDashboardMcp ? (
-            isMcpDetail ? (
-              <McpDetailView
-                kind={mcpCatalogDetailId ? 'catalog' : 'server'}
-                catalogEntry={mcpDetailCatalogEntry}
-                server={mcpDetailServer}
-                onBack={() => navigate('/dashboard/mcp')}
-                onLoadTools={async () => {
-                  if (mcpCatalogDetailId) {
-                    return client.validateMcpCatalog(mcpCatalogDetailId)
-                  }
-                  if (mcpServerDetailId) {
-                    return client.validateMcpServer(mcpServerDetailId)
-                  }
-                  return {
-                    ok: false,
-                    toolCount: 0,
-                    message: 'MCP not found',
-                    tools: [],
-                    toolDetails: []
-                  }
-                }}
-                onToggleEnabled={
-                  mcpCatalogDetailId && mcpDetailCatalogEntry
-                    ? async enabled => {
-                        await client.setMcpCatalogEnabled(
-                          mcpCatalogDetailId,
-                          enabled
-                        )
-                        await refreshMcp()
-                      }
-                    : mcpServerDetailId
-                      ? async enabled => {
-                          await client.updateMcpServer(mcpServerDetailId, {
-                            enabled
-                          })
-                          await loadMcpServers()
-                        }
-                      : undefined
-                }
-                onConnectCatalog={
-                  mcpCatalogDetailId
-                    ? async input => {
-                        const result = await client.connectMcpCatalog(
-                          mcpCatalogDetailId,
-                          input
-                        )
-                        await refreshMcp()
-                        await loadIntegrations()
-                        return result
-                      }
-                    : undefined
-                }
-                onDisconnectCatalog={
-                  mcpCatalogDetailId
-                    ? async () => {
-                        const result =
-                          await client.disconnectMcpCatalog(mcpCatalogDetailId)
-                        await refreshMcp()
-                        await loadIntegrations()
-                        return result
-                      }
-                    : undefined
-                }
-                onRefreshMeta={async () => {
-                  await refreshMcp()
-                  await loadIntegrations()
-                }}
-              />
-            ) : (
-              <McpView
-                mcpServers={mcpServers}
-                catalog={mcpCatalog}
-                catalogLoading={mcpCatalogLoading}
-                onRefresh={refreshMcp}
-                onConnectCatalog={async (catalogId, input) => {
-                  const result = await client.connectMcpCatalog(catalogId, input)
-                  await refreshMcp()
-                  await loadIntegrations()
-                  return result
-                }}
-                onToggleCatalog={async (entry, enabled) => {
-                  await client.setMcpCatalogEnabled(entry.id, enabled)
-                  await refreshMcp()
-                }}
-                onCreateMcp={async input => {
-                  await client.createMcpServer(input)
-                  await loadMcpServers()
-                }}
-                onDeleteMcp={async id => {
-                  await client.deleteMcpServer(id)
-                  await loadMcpServers()
-                }}
-                onToggleCustom={async (id, enabled) => {
-                  await client.updateMcpServer(id, { enabled })
-                  await loadMcpServers()
-                }}
-                onOpenCatalog={entry =>
-                  navigate(
-                    `/dashboard/mcp/catalog/${encodeURIComponent(entry.id)}`
-                  )
-                }
-                onOpenServer={server =>
-                  navigate(
-                    `/dashboard/mcp/server/${encodeURIComponent(server.id)}`
-                  )
-                }
-              />
-            )
-          ) : isDashboardSpecialists ? (
-            <SpecialistsView
-              mode={specialistsViewMode}
-              specialistId={specialistsEditId}
-              specialists={specialists}
-              skills={skills}
+              integrationValues={integrationValues}
+              selectedIntegrationKey={selectedIntegrationKey}
               mcpServers={mcpServers}
               mcpCatalog={mcpCatalog}
-              loading={specialistsLoading}
-              onRefresh={loadSpecialists}
-              onCreate={input => client.createSpecialist(input)}
-              onUpdate={(id, input) => client.updateSpecialist(id, input)}
-              onDelete={id => client.deleteSpecialist(id)}
-              onOpenNew={() => navigate('/dashboard/specialists/new')}
-              onOpenEdit={id =>
-                navigate(`/dashboard/specialists/${encodeURIComponent(id)}`)
-              }
-              onBack={() => navigate('/dashboard/specialists')}
-              onManageSkills={() => navigate('/dashboard/skills')}
-              onManageMcps={() => navigate('/dashboard/mcp')}
-              onOpenSkill={name =>
-                navigate(`/dashboard/skills/${encodeURIComponent(name)}`)
-              }
-              onOpenMcp={({ kind, id }) => {
-                const hash =
-                  kind === 'catalog'
-                    ? `catalog-${encodeURIComponent(id)}`
-                    : `server-${encodeURIComponent(id)}`
-                navigate(`/dashboard/mcp#${hash}`)
-              }}
-              onEnableSkill={async name => {
-                await client.setSkillEnabled(name, true)
-                await loadSkills()
-              }}
-              onInstallSkill={async source => {
-                await client.installSkill(source)
-                await loadSkills()
-              }}
-              onListTools={signal => client.listTools({ signal })}
-            />
-          ) : isHome || isProjectHome ? (
-            <HomeView
-              projects={projects}
-              sessions={sessions}
-              previews={sessionPreviews}
-              userName={health.userName}
-              activeProjectId={activeProjectId}
+              mcpCatalogLoading={mcpCatalogLoading}
+              mcpCatalogDetailId={mcpCatalogDetailId}
+              mcpServerDetailId={mcpServerDetailId}
+              mcpDetailCatalogEntry={mcpDetailCatalogEntry}
+              mcpDetailServer={mcpDetailServer}
+              isMcpDetail={isMcpDetail}
+              specialists={specialists}
+              specialistsLoading={specialistsLoading}
+              specialistsViewMode={specialistsViewMode}
+              specialistsEditId={specialistsEditId}
+              runtimeSettings={runtimeSettings}
+              sandboxSettings={sandboxSettings}
+              isDashboardOverview={isDashboardOverview}
+              isDashboardStatus={isDashboardStatus}
+              isDashboardGeneral={isDashboardGeneral}
+              isDashboardAgentRuntime={isDashboardAgentRuntime}
+              isDashboardAgentPrompts={isDashboardAgentPrompts}
+              isDashboardAgentSandbox={isDashboardAgentSandbox}
+              isDashboardModels={isDashboardModels}
+              isDashboardData={isDashboardData}
+              isDashboardTools={isDashboardTools}
+              isDashboardDoctor={isDashboardDoctor}
+              isDashboardStorage={isDashboardStorage}
+              isDashboardEnvironment={isDashboardEnvironment}
+              isSkills={isSkills}
+              isIntegrations={isIntegrations}
+              isDashboardMcp={isDashboardMcp}
+              isDashboardSpecialists={isDashboardSpecialists}
+              isHome={isHome}
+              isProjectHome={isProjectHome}
+              isSandboxLocalDetail={isSandboxLocalDetail}
+              isSandboxModalDetail={isSandboxModalDetail}
+              setSkillDetail={setSkillDetail}
+              setIntegrationValues={setIntegrationValues}
+              setRuntimeSettings={setRuntimeSettings}
+              setSandboxSettings={setSandboxSettings}
+              loadSkills={loadSkills}
+              loadIntegrations={loadIntegrations}
+              loadMcpServers={loadMcpServers}
+              refreshMcp={refreshMcp}
+              loadSpecialists={loadSpecialists}
+              loadModelOptions={loadModelOptions}
+              loadSessions={loadSessions}
+              loadServerStatus={loadServerStatus}
+              loadAccountForUi={loadAccountForUi}
+              logoutAccount={logoutAccount}
+              loadStorage={loadStorage}
+              loadEnvironment={loadEnvironment}
+              refreshSessionSandbox={refreshSessionSandbox}
               onCreateProject={() => setNewProjectOpen(true)}
-              onCreateSession={projectId => void createSession(projectId)}
+              createSession={createSession}
               onOpenProject={id => {
                 setProjectScopeId(id)
                 navigate(`/projects/${id}`)
               }}
-              onOpenSession={id => navigate(`/agents/${id}`)}
-              onTogglePinProject={project => void togglePinProject(project)}
-              onDeleteProject={project => void deleteProject(project)}
+              togglePinProject={togglePinProject}
+              deleteProject={deleteProject}
             />
-            ) : null}
-            </AppErrorBoundary>
-            </Suspense>
           ) : (
-            <ResizablePanelGroup
-              direction="horizontal"
-              autoSaveId={SESSION_PANELS_AUTO_SAVE_ID}
-              className="min-h-0 flex-1"
-            >
-              <ResizablePanel
-                id="chat"
-                order={1}
-                defaultSize={65}
-                minSize={30}
-                className="min-w-0"
-              >
-              <main className="relative flex h-full min-w-0 flex-col">
-                <div className="flex h-10 shrink-0 items-center gap-1 px-1.5 md:px-2">
-                  {sidebarCollapsed ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 shrink-0"
-                      onClick={() => setSidebarCollapsed(false)}
-                      aria-label="Show sidebar"
-                    >
-                      <PanelLeft className="size-4" />
-                    </Button>
-                  ) : null}
-                  <SessionTabs
-                    tabs={openTabs}
-                    activeId={sessionId}
-                    onSelect={id => {
-                      openSessionTab(id)
-                      void prefetchSessionMessages(id)
-                      navigate(`/agents/${id}`)
-                    }}
-                    onClose={closeSessionTab}
-                    onCloseOthers={closeOtherSessionTabs}
-                    onRename={openRenameDialog}
-                    onTogglePin={item =>
-                      void updateSession(item, {
-                        organizeLabel:
-                          item.organizeLabel === 'pinned' ? null : 'pinned'
-                      })
-                    }
-                    onExport={item => void exportTranscript(item)}
-                    onInspect={item => navigate(`/agents/${item.id}?inspect=1`)}
-                    onArchive={item =>
-                      void updateSession(item, {
-                        organizeLabel:
-                          item.organizeLabel === 'archive' ? null : 'archive'
-                      })
-                    }
-                    onDelete={item => setDeleteTarget(item)}
-                  />
-                  <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                    {session?.projectId
-                      ? (() => {
-                          const projectName =
-                            projects.find(p => p.id === session.projectId)
-                              ?.name || null
-                          if (!projectName) return null
-                          return (
-                            <button
-                              type="button"
-                              className="text-muted-foreground hover:text-foreground mr-1 inline-flex max-w-[12rem] items-center gap-1.5 rounded-md px-1.5 py-1 text-xs"
-                              title={projectName}
-                              onClick={() =>
-                                selectProjectScope(session.projectId!)
-                              }
-                            >
-                              <Folder className="size-3.5 shrink-0" />
-                              <span className="truncate">{projectName}</span>
-                            </button>
-                          )
-                        })()
-                      : null}
-                    <DropdownMenu
-                      open={cliMenuOpen}
-                      onOpenChange={open => {
-                        setCliMenuOpen(open)
-                        if (!open) setCopiedResumeCommand(false)
-                      }}
-                    >
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          aria-label="Resume in Agent CLI"
-                          title="Resume in Agent CLI"
-                          disabled={!sessionId}
-                        >
-                          <Terminal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        sideOffset={6}
-                        className="w-[22rem] overflow-hidden rounded-xl p-0"
-                        onCloseAutoFocus={event => event.preventDefault()}
-                      >
-                        <div className="px-4 pt-3">
-                          <p className="text-foreground text-sm font-semibold">
-                            Resume in Agent CLI
-                          </p>
-                        </div>
-                        <div className="px-4 pb-3 pt-2">
-                          <div className="border-border/80 bg-muted/35 flex items-center gap-2 rounded-lg border p-2.5">
-                            <Terminal className="text-muted-foreground size-4 shrink-0" />
-                            <code className="min-w-0 flex-1 truncate font-mono text-[13px]">
-                              {sessionId
-                                ? `sandwalk --resume ${sessionId}`
-                                : 'sandwalk --resume <chat_id>'}
-                            </code>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="size-7 shrink-0 rounded-md"
-                              disabled={!sessionId}
-                              onClick={event => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                if (!sessionId) return
-                                void navigator.clipboard.writeText(
-                                  `sandwalk --resume ${sessionId}`
-                                )
-                                setCopiedResumeCommand(true)
-                                window.setTimeout(
-                                  () => setCopiedResumeCommand(false),
-                                  2000
-                                )
-                              }}
-                              aria-label="Copy resume command"
-                              title="Copy resume command"
-                            >
-                              {copiedResumeCommand ? (
-                                <Check className="size-3.5" />
-                              ) : (
-                                <Copy className="size-3.5" />
-                              )}
-                            </Button>
-                          </div>
-                          <p className="text-muted-foreground mt-2 text-xs">
-                            Continue this session in your local sandwalk CLI.
-                          </p>
-                        </div>
-                        <div className="border-border/70 border-t px-4 py-3">
-                          <DropdownMenuItem
-                            className="h-10 cursor-pointer gap-2 rounded-lg px-3 text-sm"
-                            disabled={!session}
-                            onSelect={() => {
-                              if (!session) return
-                              void exportTranscript(session)
-                            }}
-                          >
-                            <Download className="size-4" />
-                            Export transcript
-                          </DropdownMenuItem>
-                        </div>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-8"
-                      disabled={!sessionId}
-                      onClick={() => {
-                        if (terminalOpen) {
-                          setTerminalOpen(false)
-                          return
-                        }
-                        setFilesPanelCollapsed(false)
-                        setTerminalOpen(true)
-                      }}
-                      aria-label={
-                        terminalOpen ? 'Hide terminal' : 'Show terminal'
-                      }
-                      title={terminalOpen ? 'Hide terminal' : 'Show terminal'}
-                    >
-                      <SquareTerminal
-                        className={cn(
-                          'size-4',
-                          terminalOpen && 'text-foreground'
-                        )}
-                      />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-8"
-                      onClick={() =>
-                        setFilesPanelCollapsed(current => !current)
-                      }
-                      aria-label={
-                        filesPanelCollapsed
-                          ? 'Show files panel'
-                          : 'Hide files panel'
-                      }
-                      title={
-                        filesPanelCollapsed
-                          ? 'Show files panel'
-                          : 'Hide files panel'
-                      }
-                    >
-                      <PanelRight
-                        className={cn(
-                          'size-4',
-                          !filesPanelCollapsed && 'text-foreground'
-                        )}
-                      />
-                    </Button>
-                  </div>
-                </div>
-                {isInspect ? (
-                  <Suspense fallback={<DetailPageSkeleton />}>
-                    <InspectView
-                      messages={messages}
-                      tools={tools}
-                      onClose={() => navigate(`/agents/${sessionId}`)}
-                    />
-                  </Suspense>
-                ) : null}
-                <div
-                  className={cn(
-                    'flex min-h-0 flex-1 flex-col',
-                    isInspect && 'hidden'
-                  )}
-                >
-                  {!messagesLoaded && !runActive ? (
-                    showChatSkeleton ? (
-                      <div className="animate-in fade-in flex min-h-0 flex-1 flex-col overflow-hidden duration-200">
-                        <ChatPageSkeleton />
-                      </div>
-                    ) : (
-                      <div className="flex min-h-0 flex-1 flex-col" />
-                    )
-                  ) : messages.length === 0 && !runActive ? (
-                    <div className="animate-in fade-in flex min-h-0 flex-1 flex-col items-center justify-center px-5 pb-20 duration-200">
-                      <AuraIconPulse className="text-muted-foreground/70 mb-6 h-12 w-12" />
-                      <div className="bg-background w-full max-w-[44rem]">
-                        <div className="mb-2 flex items-center px-1">
-                          <ProjectPicker
-                            projects={projects}
-                            value={session?.projectId ?? activeProjectId}
-                            recentIds={recentProjectIds}
-                            noneLabel="All"
-                            onNewProject={() => setNewProjectOpen(true)}
-                            onChange={projectId => {
-                              if (session) {
-                                void updateSession(session, { projectId })
-                              }
-                              if (projectId) selectProjectScope(projectId)
-                              else selectAllProjects()
-                            }}
-                          />
-                        </div>
-                        <AgentComposerSlot {...agentComposerSlotProps} />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="animate-in fade-in flex min-h-0 flex-1 flex-col duration-200">
-                      <ChatTranscript
-                        chatScrollRef={chatScrollRef}
-                        chatEndRef={chatEndRef}
-                        conversationTimeline={conversationTimeline}
-                        expandedToolRunKeys={expandedToolRunKeys}
-                        sessionId={sessionId}
-                        onToggleToolRunExpanded={key => {
-                          if (!sessionId) return
-                          patchChat(sessionId, prev => ({
-                            ...prev,
-                            expandedToolRunKeys: {
-                              ...prev.expandedToolRunKeys,
-                              [key]: !(prev.expandedToolRunKeys[key] === true)
-                            }
-                          }))
-                        }}
-                        runActive={runActive}
-                        tools={tools}
-                        runIdByMessageId={runIdByMessageId}
-                        usageByRunId={usageByRunId}
-                        messages={messages}
-                        copiedMessageId={copiedMessageId}
-                        setCopiedMessageId={setCopiedMessageId}
-                        session={session}
-                        onOpenFile={path => {
-                          setFilesPanelCollapsed(false)
-                          setPendingOpenPath(path)
-                        }}
-                        onInterrupt={
-                          sessionId
-                            ? () => void client.interrupt(sessionId)
-                            : undefined
-                        }
-                        activeRunTools={activeRunTools}
-                        activeRunTodos={activeRunTodos}
-                        liveDelta={liveDelta}
-                        showScrollToBottom={showScrollToBottom}
-                        onScrollToBottom={scrollChatToBottom}
-                      />
-                      <div className="bg-background mx-auto w-full max-w-[44rem] shrink-0 px-5 pb-6 pt-2">
-                        <AgentComposerSlot {...agentComposerSlotProps} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {error ? (
-                  <div className="bg-destructive text-destructive-foreground absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md px-3 py-1.5 text-xs">
-                    {error}
-                  </div>
-                ) : null}
-              </main>
-              </ResizablePanel>
-              {canShowFilesPanel ? (
-                <>
-                  <ResizableHandle
-                    className={cn(
-                      'w-px',
-                      filesPanelCollapsed && 'pointer-events-none opacity-0'
-                    )}
-                  />
-                  <ResizablePanel
-                    id="files"
-                    order={2}
-                    ref={filesPanelRef}
-                    collapsible
-                    collapsedSize={0}
-                    defaultSize={35}
-                    minSize={20}
-                    maxSize={55}
-                    onCollapse={() => setFilesPanelCollapsed(true)}
-                    onExpand={() => setFilesPanelCollapsed(false)}
-                    className="min-w-0"
-                  >
-                    {sessionId ? (
-                      <WorkspacePanel
-                        key={sessionId}
-                        client={client}
-                        sessionId={sessionId}
-                        workspaceVersion={workspaceVersion}
-                        openPathRequest={pendingOpenPath}
-                        onOpenPathRequestHandled={() => setPendingOpenPath(null)}
-                        onAddToChat={path => {
-                          setComposer(current => `${current}${fileChipToken(path)}`)
-                          setComposerFiles([])
-                        }}
-                        onTogglePanel={() => setFilesPanelCollapsed(true)}
-                        terminalOpen={terminalOpen}
-                        onCloseTerminal={() => setTerminalOpen(false)}
-                        onOpenTerminal={() => setTerminalOpen(true)}
-                      />
-                    ) : null}
-                  </ResizablePanel>
-                </>
-              ) : null}
-            </ResizablePanelGroup>
+            <AgentSessionMainPanel
+              client={client}
+              navigate={navigate}
+              sidebarCollapsed={sidebarCollapsed}
+              setSidebarCollapsed={setSidebarCollapsed}
+              openTabs={openTabs}
+              sessionId={sessionId}
+              session={session}
+              openSessionTab={openSessionTab}
+              prefetchSessionMessages={prefetchSessionMessages}
+              closeSessionTab={closeSessionTab}
+              closeOtherSessionTabs={closeOtherSessionTabs}
+              openRenameDialog={openRenameDialog}
+              updateSession={updateSession}
+              exportTranscript={exportTranscript}
+              setDeleteTarget={setDeleteTarget}
+              projects={projects}
+              selectProjectScope={selectProjectScope}
+              cliMenuOpen={cliMenuOpen}
+              setCliMenuOpen={setCliMenuOpen}
+              copiedResumeCommand={copiedResumeCommand}
+              setCopiedResumeCommand={setCopiedResumeCommand}
+              terminalOpen={terminalOpen}
+              setTerminalOpen={setTerminalOpen}
+              filesPanelCollapsed={filesPanelCollapsed}
+              setFilesPanelCollapsed={setFilesPanelCollapsed}
+              isInspect={isInspect}
+              messages={messages}
+              tools={tools}
+              messagesLoaded={messagesLoaded}
+              runActive={runActive}
+              showChatSkeleton={showChatSkeleton}
+              agentComposerSlotProps={agentComposerSlotProps}
+              recentProjectIds={recentProjectIds}
+              activeProjectId={activeProjectId}
+              onNewProject={() => setNewProjectOpen(true)}
+              selectAllProjects={selectAllProjects}
+              chatScrollRef={chatScrollRef}
+              chatEndRef={chatEndRef}
+              conversationTimeline={conversationTimeline}
+              expandedToolRunKeys={expandedToolRunKeys}
+              patchChat={patchChat}
+              runIdByMessageId={runIdByMessageId}
+              usageByRunId={usageByRunId}
+              copiedMessageId={copiedMessageId}
+              setCopiedMessageId={setCopiedMessageId}
+              activeRunTools={activeRunTools}
+              activeRunTodos={activeRunTodos}
+              liveDelta={liveDelta}
+              showScrollToBottom={showScrollToBottom}
+              scrollChatToBottom={scrollChatToBottom}
+              error={error}
+              canShowFilesPanel={canShowFilesPanel}
+              filesPanelRef={filesPanelRef}
+              workspaceVersion={workspaceVersion}
+              pendingOpenPath={pendingOpenPath}
+              setPendingOpenPath={setPendingOpenPath}
+              setComposer={setComposer}
+              setComposerFiles={setComposerFiles}
+            />
           )}
         </div>
         </ResizablePanel>
