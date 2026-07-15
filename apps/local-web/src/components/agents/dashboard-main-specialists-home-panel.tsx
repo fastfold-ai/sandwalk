@@ -75,6 +75,7 @@ export function DashboardMainHomePanel({
   projects,
   sessions,
   sessionPreviews,
+  loadSessionPreviews,
   health,
   activeProjectId,
   onCreateProject,
@@ -88,6 +89,7 @@ export function DashboardMainHomePanel({
   | 'projects'
   | 'sessions'
   | 'sessionPreviews'
+  | 'loadSessionPreviews'
   | 'health'
   | 'activeProjectId'
   | 'onCreateProject'
@@ -103,6 +105,7 @@ export function DashboardMainHomePanel({
       previews={sessionPreviews}
       userName={health?.userName ?? null}
       activeProjectId={activeProjectId}
+      onLoadPreviews={loadSessionPreviews}
       onCreateProject={onCreateProject}
       onCreateSession={projectId => void createSession(projectId)}
       onOpenProject={onOpenProject}

@@ -72,6 +72,7 @@ export function buildDashboardMainViewsProps(
     loadSpecialists: props.loadSpecialists,
     loadModelOptions: props.loadModelOptions,
     loadSessions: props.loadSessions,
+    loadSessionPreviews: props.loadSessionPreviews,
     loadServerStatus: props.loadServerStatus,
     loadAccountForUi: props.loadAccountForUi,
     logoutAccount: props.logoutAccount,

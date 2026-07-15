@@ -1,5 +1,6 @@
 import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import { Plus } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -17,6 +18,7 @@ export function HomeView({
   previews,
   userName,
   activeProjectId,
+  onLoadPreviews,
   onCreateProject,
   onCreateSession,
   onOpenProject,
@@ -29,6 +31,10 @@ export function HomeView({
   previews: Record<string, string>
   userName: string | null
   activeProjectId: string | null
+  onLoadPreviews: (
+    sessionIds: string[],
+    signal?: AbortSignal
+  ) => void | Promise<void>
   onCreateProject: () => void
   onCreateSession: (projectId: string | null) => void
   onOpenProject: (id: string) => void
@@ -41,13 +47,29 @@ export function HomeView({
     hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const activeProject =
     projects.find(project => project.id === activeProjectId) || null
-  const recent = sessions
-    .filter(
-      item =>
-        item.organizeLabel !== 'archive' &&
-        (!activeProjectId || item.projectId === activeProjectId)
+  const recent = useMemo(
+    () =>
+      sessions
+        .filter(
+          item =>
+            item.organizeLabel !== 'archive' &&
+            (!activeProjectId || item.projectId === activeProjectId)
+        )
+        .slice(0, activeProjectId ? 20 : 8),
+    [activeProjectId, sessions]
+  )
+  const recentIdsKey = recent.map(item => item.id).join(',')
+
+  useEffect(() => {
+    if (!recentIdsKey) return
+    const controller = new AbortController()
+    void onLoadPreviews(
+      recentIdsKey.split(',').filter(Boolean),
+      controller.signal
     )
-    .slice(0, activeProjectId ? 20 : 8)
+    return () => controller.abort()
+  }, [onLoadPreviews, recentIdsKey])
+
   const projectNames = new Map(
     projects.map(project => [project.id, project.name])
   )

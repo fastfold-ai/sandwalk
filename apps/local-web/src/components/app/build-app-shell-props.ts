@@ -164,6 +164,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     loadSpecialists: input.bootstrap.loadSpecialists,
     loadModelOptions: input.bootstrap.loadModelOptions,
     loadSessions: input.bootstrap.loadSessions,
+    loadSessionPreviews: input.bootstrap.loadSessionPreviews,
     loadServerStatus: input.bootstrap.loadServerStatus,
     loadAccountForUi: input.bootstrap.loadAccountForUi,
     logoutAccount: input.bootstrap.logoutAccount,

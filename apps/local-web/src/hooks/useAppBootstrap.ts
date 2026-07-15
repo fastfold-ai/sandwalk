@@ -78,6 +78,7 @@ export function useAppBootstrap({
     setSessions: loaders.setSessions,
     projects: loaders.projects,
     sessionPreviews: loaders.sessionPreviews,
+    loadSessionPreviews: loaders.loadSessionPreviews,
     skills: loaders.skills,
     integrations: loaders.integrations,
     mcpServers: loaders.mcpServers,

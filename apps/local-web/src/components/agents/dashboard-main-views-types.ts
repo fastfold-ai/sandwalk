@@ -31,6 +31,10 @@ export type DashboardMainViewsProps = {
   sessions: AgentSession[]
   projects: AgentProject[]
   sessionPreviews: Record<string, string>
+  loadSessionPreviews: (
+    sessionIds: string[],
+    signal?: AbortSignal
+  ) => Promise<void>
   activeProjectId: string | null
   skills: AgentSkill[]
   skillDetail: AgentSkillDetail | null

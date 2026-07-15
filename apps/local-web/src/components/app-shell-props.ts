@@ -144,6 +144,7 @@ export type AppShellProps = {
   loadSpecialists: DashboardMainViewsProps['loadSpecialists']
   loadModelOptions: DashboardMainViewsProps['loadModelOptions']
   loadSessions: DashboardMainViewsProps['loadSessions']
+  loadSessionPreviews: DashboardMainViewsProps['loadSessionPreviews']
   loadServerStatus: DashboardMainViewsProps['loadServerStatus']
   loadAccountForUi: DashboardMainViewsProps['loadAccountForUi']
   logoutAccount: DashboardMainViewsProps['logoutAccount']
