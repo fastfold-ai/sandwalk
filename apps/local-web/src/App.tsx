@@ -17,10 +17,8 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import {
   Archive,
-  ArrowDown,
   Check,
   ChevronDown,
-  ChevronRight,
   Copy,
   Download,
   Folder,
@@ -52,6 +50,7 @@ import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
+import { ChatTranscript } from '@/components/agents/ChatTranscript'
 import {
   Composer,
   type SandboxActionPhase
@@ -78,7 +77,6 @@ import {
   onboardingStepDef,
   onboardingStepFromSlug
 } from '@/lib/onboarding'
-import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { NewProjectDialog } from '@/components/agents/NewProjectDialog'
 import {
   ChatPageSkeleton,
@@ -90,20 +88,14 @@ import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { ProjectSettingsDialog } from '@/components/agents/ProjectSettingsDialog'
 import { QueuedMessages } from '@/components/agents/QueuedMessages'
-import { ReasoningGhost } from '@/components/agents/ReasoningGhost'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
 import { SessionTabs } from '@/components/agents/SessionTabs'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
-import { TodoListInline } from '@/components/agents/TodoListInline'
-import { ToolCard, type TranscriptTool } from '@/components/agents/ToolCard'
 import {
   buildConversationTimeline,
-  formatSessionExportMarkdown,
-  thoughtDurationForTools,
-  TOOL_RUN_VISIBLE_COUNT
+  formatSessionExportMarkdown
 } from '@/components/agents/transcript'
-import { UserMessageContent } from '@/components/agents/UserMessageContent'
 import { WorkspacePanel } from '@/components/agents/WorkspacePanel'
 import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 import { ErrorPage } from '@/components/ErrorPage'
@@ -183,11 +175,10 @@ import {
   type ComposerModelOption,
   toComposerModelOptions
 } from '@/lib/composer-models'
+import { validateIntegrationOrProbeModal } from '@/lib/app-helpers'
 import {
   AUTO_TITLE_FIRST_RESPONSE_THRESHOLD,
-  downloadMarkdown,
   emptySessionChatState,
-  formatMessagePopoverDate,
   groupSessions,
   isLowSignalTitle,
   relativeTime,
@@ -201,36 +192,6 @@ import {
   type SkillsViewMode
 } from '@/lib/skills-catalog'
 import { cn } from '@/lib/utils'
-
-async function validateIntegrationOrProbeModal(
-  client: LocalAgentClient,
-  key: string
-): Promise<{ ok: boolean; message: string }> {
-  if (key === 'modal') {
-    try {
-      const report = await client.probeSandboxSettings()
-      const failed = report.steps.find(step => !step.ok)
-      return {
-        ok: report.ok,
-        message: report.ok
-          ? 'Modal sandbox probe passed.'
-          : failed?.detail || 'Modal sandbox probe failed.'
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      const missingProbe =
-        /\/v1\/settings\/sandbox\/probe/i.test(message) &&
-        /\b404\b|not found/i.test(message)
-      return {
-        ok: false,
-        message: missingProbe
-          ? 'Probe endpoint missing on this agent server. Restart sandwalk / `sandwalk serve` after updating the CLI, then retry.'
-          : message
-      }
-    }
-  }
-  return client.validateIntegration(key)
-}
 
 const AgentRuntimeView = lazy(() =>
   import('@/components/agents/AgentRuntimeView').then(m => ({
@@ -4957,415 +4918,45 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="animate-in fade-in flex min-h-0 flex-1 flex-col duration-200">
-                      <div className="relative min-h-0 flex-1">
-                        <ScrollArea
-                          ref={chatScrollRef}
-                          className="chat-scrollbar h-full min-h-0"
-                        >
-                          <div className="mx-auto flex w-full max-w-[44rem] flex-col px-5 py-6">
-                            <div className="mb-4 flex min-w-0 flex-1 flex-col gap-y-2 empty:hidden">
-                            {(() => {
-                              const items: Array<
-                                | {
-                                    kind: 'entry'
-                                    key: string
-                                    entry: (typeof conversationTimeline)[number]
-                                  }
-                                | {
-                                    kind: 'tool_run'
-                                    key: string
-                                    tools: TranscriptTool[]
-                                  }
-                              > = []
-                              let cursor = 0
-                              while (cursor < conversationTimeline.length) {
-                                const entry = conversationTimeline[cursor]
-                                if (entry.kind !== 'tool') {
-                                  items.push({
-                                    kind: 'entry',
-                                    key: `${entry.kind}-${cursor}`,
-                                    entry
-                                  })
-                                  cursor += 1
-                                  continue
-                                }
-                                const runTools: TranscriptTool[] = []
-                                while (
-                                  cursor < conversationTimeline.length &&
-                                  conversationTimeline[cursor].kind === 'tool'
-                                ) {
-                                  const toolEntry = conversationTimeline[cursor]
-                                  if (toolEntry.kind === 'tool') {
-                                    runTools.push(toolEntry.tool)
-                                  }
-                                  cursor += 1
-                                }
-                                if (runTools.length > TOOL_RUN_VISIBLE_COUNT) {
-                                  items.push({
-                                    kind: 'tool_run',
-                                    key: `tool-run-${
-                                      runTools[0]?.id || cursor
-                                    }`,
-                                    tools: runTools
-                                  })
-                                } else {
-                                  runTools.forEach((tool, index) => {
-                                    items.push({
-                                      kind: 'entry',
-                                      key: `tool-${tool.id}-${index}`,
-                                      entry: { kind: 'tool', tool }
-                                    })
-                                  })
-                                }
-                              }
-
-                              return items.map(timelineItem => {
-                                if (timelineItem.kind === 'tool_run') {
-                                  const isExpanded =
-                                    expandedToolRunKeys[timelineItem.key] ===
-                                    true
-                                  const visibleTools = isExpanded
-                                    ? timelineItem.tools
-                                    : timelineItem.tools.slice(
-                                        -TOOL_RUN_VISIBLE_COUNT
-                                      )
-                                  const hiddenCount = Math.max(
-                                    0,
-                                    timelineItem.tools.length -
-                                      TOOL_RUN_VISIBLE_COUNT
-                                  )
-                                  return (
-                                    <div
-                                      key={timelineItem.key}
-                                      className="space-y-1"
-                                    >
-                                      {hiddenCount > 0 ? (
-                                        <div className="mx-auto w-full max-w-[44rem] px-2">
-                                          <button
-                                            type="button"
-                                            className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs"
-                                            onClick={() => {
-                                              if (!sessionId) return
-                                              patchChat(sessionId, prev => ({
-                                                ...prev,
-                                                expandedToolRunKeys: {
-                                                  ...prev.expandedToolRunKeys,
-                                                  [timelineItem.key]:
-                                                    !isExpanded
-                                                }
-                                              }))
-                                            }}
-                                          >
-                                            {isExpanded ? (
-                                              <ChevronDown className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                                            ) : (
-                                              <ChevronRight className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                                            )}
-                                            <span>
-                                              {isExpanded
-                                                ? 'Show less'
-                                                : `Show more (${hiddenCount})`}
-                                            </span>
-                                          </button>
-                                        </div>
-                                      ) : null}
-                                      {visibleTools.map(tool => (
-                                        <div
-                                          key={tool.id}
-                                          className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150"
-                                        >
-                                          <ToolCard
-                                            tool={tool}
-                                            isRunning={runActive}
-                                            onStop={
-                                              sessionId
-                                                ? () =>
-                                                    void client.interrupt(
-                                                      sessionId
-                                                    )
-                                                : undefined
-                                            }
-                                          />
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )
-                                }
-
-                                const entry = timelineItem.entry
-                                if (entry.kind === 'thought') {
-                                  const turnTools = tools.filter(
-                                    tool =>
-                                      tool.messageId === entry.message.id ||
-                                      (runIdByMessageId[entry.message.id] &&
-                                        tool.runId ===
-                                          runIdByMessageId[entry.message.id])
-                                  )
-                                  const duration =
-                                    thoughtDurationForTools(turnTools)
-                                  return (
-                                    <div
-                                      key={timelineItem.key}
-                                      className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150"
-                                    >
-                                      <ReasoningGhost
-                                        id={entry.message.id}
-                                        label={
-                                          duration
-                                            ? `Thought for ${duration}`
-                                            : 'Thought'
-                                        }
-                                        thought={entry.thought}
-                                      />
-                                    </div>
-                                  )
-                                }
-
-                                if (entry.kind === 'tool') {
-                                  return (
-                                    <div
-                                      key={timelineItem.key}
-                                      className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150"
-                                    >
-                                      <ToolCard
-                                        tool={entry.tool}
-                                        isRunning={runActive}
-                                        onStop={
-                                          sessionId
-                                            ? () =>
-                                                void client.interrupt(sessionId)
-                                            : undefined
-                                        }
-                                      />
-                                    </div>
-                                  )
-                                }
-
-                                if (entry.kind === 'todos') {
-                                  return (
-                                    <div
-                                      key={timelineItem.key}
-                                      className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150"
-                                    >
-                                      <TodoListInline
-                                        todos={entry.todos}
-                                        className="mt-1"
-                                      />
-                                    </div>
-                                  )
-                                }
-
-                                const message = entry.message
-                                const isUser = message.role === 'user'
-                                const isAssistant = message.role === 'assistant'
-                                const messagePopoverDate =
-                                  formatMessagePopoverDate(message.createdAt)
-                                const messageRunId =
-                                  runIdByMessageId[message.id] || null
-                                const messageUsage =
-                                  (messageRunId &&
-                                    usageByRunId[messageRunId]) ||
-                                  null
-                                const hideActionsWhileStreaming =
-                                  runActive &&
-                                  isAssistant &&
-                                  message.id === messages.at(-1)?.id
-
-                                return (
-                                  <div
-                                    key={timelineItem.key}
-                                    className={cn(
-                                      'fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] duration-150',
-                                      isUser ? 'flex justify-end px-2' : ''
-                                    )}
-                                  >
-                                    {isUser ? (
-                                      <div className="relative min-w-0 max-w-[85%]">
-                                        <div className="bg-muted text-foreground peer inline-block w-auto max-w-full break-words rounded-xl px-4 py-2">
-                                          <UserMessageContent
-                                            content={entry.content}
-                                            onOpenFile={path => {
-                                              setFilesPanelCollapsed(false)
-                                              setPendingOpenPath(path)
-                                            }}
-                                          />
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div
-                                        className={cn(
-                                          'text-foreground min-w-0 break-words px-2 leading-relaxed',
-                                          message.role === 'system' &&
-                                            'border-border/70 text-muted-foreground rounded-xl border'
-                                        )}
-                                      >
-                                        {entry.content.trim() ? (
-                                          <MarkdownContent
-                                            content={entry.content}
-                                            streaming={
-                                              hideActionsWhileStreaming
-                                            }
-                                            className="max-w-full [&_*]:max-w-full [&_pre]:w-full [&_pre]:max-w-full [&_pre_code]:whitespace-pre-wrap [&_table]:w-full [&_table]:table-auto"
-                                          />
-                                        ) : null}
-                                        {isAssistant &&
-                                        entry.content &&
-                                        !hideActionsWhileStreaming ? (
-                                          <div className="text-zinc-300 dark:text-zinc-600 -mb-7.5 min-h-7.5 -ml-1 flex items-center gap-0.5 pt-1.5">
-                                            <button
-                                              type="button"
-                                              className="hover:bg-muted hover:text-zinc-400 dark:hover:text-zinc-500 inline-flex h-6 w-6 items-center justify-center rounded-md"
-                                              onClick={async () => {
-                                                await navigator.clipboard.writeText(
-                                                  message.content
-                                                )
-                                                setCopiedMessageId(message.id)
-                                                window.setTimeout(() => {
-                                                  setCopiedMessageId(current =>
-                                                    current === message.id
-                                                      ? null
-                                                      : current
-                                                  )
-                                                }, 1200)
-                                              }}
-                                              aria-label="Copy message"
-                                            >
-                                              {copiedMessageId ===
-                                              message.id ? (
-                                                <Check className="size-3.5" />
-                                              ) : (
-                                                <Copy className="size-3.5" />
-                                              )}
-                                            </button>
-                                            <Popover>
-                                              <PopoverTrigger asChild>
-                                                <button
-                                                  type="button"
-                                                  className="hover:bg-muted hover:text-zinc-400 dark:hover:text-zinc-500 inline-flex h-6 w-6 items-center justify-center rounded-md"
-                                                  aria-label="More actions"
-                                                >
-                                                  <MoreHorizontal className="size-3.5" />
-                                                </button>
-                                              </PopoverTrigger>
-                                              <PopoverContent
-                                                align="start"
-                                                className="w-48 p-1.5"
-                                              >
-                                                {messagePopoverDate ? (
-                                                  <div className="text-muted-foreground border-border/50 mb-1 border-b px-2 pb-1.5 pt-1 text-xs">
-                                                    {messagePopoverDate}
-                                                  </div>
-                                                ) : null}
-                                                <div className="text-muted-foreground border-border/50 mb-1 border-b px-2 pb-1.5 pt-1 text-xs tabular-nums">
-                                                  <div className="flex items-center justify-between gap-3">
-                                                    <span>↑ Input</span>
-                                                    <span className="text-foreground">
-                                                      {(
-                                                        messageUsage?.inputTokens ??
-                                                        0
-                                                      ).toLocaleString()}
-                                                    </span>
-                                                  </div>
-                                                  <div className="mt-0.5 flex items-center justify-between gap-3">
-                                                    <span>↓ Output</span>
-                                                    <span className="text-foreground">
-                                                      {(
-                                                        messageUsage?.outputTokens ??
-                                                        0
-                                                      ).toLocaleString()}
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                                <button
-                                                  type="button"
-                                                  className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-                                                  onClick={() =>
-                                                    downloadMarkdown(
-                                                      `${
-                                                        session?.title ||
-                                                        'assistant-reply'
-                                                      }-${message.id.slice(
-                                                        0,
-                                                        8
-                                                      )}.md`,
-                                                      message.content
-                                                    )
-                                                  }
-                                                >
-                                                  <Download className="size-4" />
-                                                  Export Markdown
-                                                </button>
-                                              </PopoverContent>
-                                            </Popover>
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              })
-                            })()}
-                            {activeRunTools.length > 0 ? (
-                              <div className="space-y-1">
-                                {activeRunTools.map(tool => (
-                                  <div
-                                    key={`active-${tool.id}`}
-                                    className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150"
-                                  >
-                                    <ToolCard
-                                      tool={tool}
-                                      isRunning={runActive}
-                                      onStop={
-                                        sessionId
-                                          ? () =>
-                                              void client.interrupt(sessionId)
-                                          : undefined
-                                      }
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            ) : null}
-                            {activeRunTodos.length > 0 ? (
-                              <div className="mx-auto w-full max-w-[44rem] px-2">
-                                <TodoListInline todos={activeRunTodos} />
-                              </div>
-                            ) : null}
-                            {liveDelta ? (
-                              <div className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150">
-                                <MarkdownContent
-                                  content={liveDelta}
-                                  streaming
-                                  className="max-w-full [&_*]:max-w-full"
-                                />
-                              </div>
-                            ) : null}
-                            {runActive && !liveDelta ? (
-                              <div className="text-muted-foreground mx-auto flex w-full max-w-[44rem] items-center gap-1 px-2 py-2 text-sm">
-                                <div className="bg-foreground/80 animate-breathe h-2.5 w-2.5 rounded-full" />
-                                <span className="sr-only">Generating</span>
-                              </div>
-                            ) : null}
-                            </div>
-                            <div
-                              ref={chatEndRef}
-                              aria-hidden
-                              className="h-px w-full shrink-0"
-                            />
-                          </div>
-                        </ScrollArea>
-                        {showScrollToBottom ? (
-                          <button
-                            type="button"
-                            onClick={() => scrollChatToBottom()}
-                            aria-label="Scroll to latest message"
-                            title="Scroll to latest message"
-                            className="bg-background text-foreground border-border/70 absolute bottom-3 left-1/2 z-20 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border shadow-[0_4px_16px_-4px_rgba(0,0,0,0.18)] transition-opacity hover:bg-background dark:shadow-[0_6px_20px_-6px_rgba(0,0,0,0.65)]"
-                          >
-                            <ArrowDown className="size-4" />
-                          </button>
-                        ) : null}
-                      </div>
+                      <ChatTranscript
+                        chatScrollRef={chatScrollRef}
+                        chatEndRef={chatEndRef}
+                        conversationTimeline={conversationTimeline}
+                        expandedToolRunKeys={expandedToolRunKeys}
+                        sessionId={sessionId}
+                        onToggleToolRunExpanded={key => {
+                          if (!sessionId) return
+                          patchChat(sessionId, prev => ({
+                            ...prev,
+                            expandedToolRunKeys: {
+                              ...prev.expandedToolRunKeys,
+                              [key]: !(prev.expandedToolRunKeys[key] === true)
+                            }
+                          }))
+                        }}
+                        runActive={runActive}
+                        tools={tools}
+                        runIdByMessageId={runIdByMessageId}
+                        usageByRunId={usageByRunId}
+                        messages={messages}
+                        copiedMessageId={copiedMessageId}
+                        setCopiedMessageId={setCopiedMessageId}
+                        session={session}
+                        onOpenFile={path => {
+                          setFilesPanelCollapsed(false)
+                          setPendingOpenPath(path)
+                        }}
+                        onInterrupt={
+                          sessionId
+                            ? () => void client.interrupt(sessionId)
+                            : undefined
+                        }
+                        activeRunTools={activeRunTools}
+                        activeRunTodos={activeRunTodos}
+                        liveDelta={liveDelta}
+                        showScrollToBottom={showScrollToBottom}
+                        onScrollToBottom={scrollChatToBottom}
+                      />
                       <div className="bg-background mx-auto w-full max-w-[44rem] shrink-0 px-5 pb-6 pt-2">
                         <QueuedMessages
                           messages={queuedMessages}
