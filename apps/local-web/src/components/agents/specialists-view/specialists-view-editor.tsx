@@ -11,11 +11,8 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
-  Plug,
   Search,
-  Sparkles,
-  Trash2,
-  X
+  Trash2
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -25,12 +22,10 @@ import {
   SPECIALIST_ICONS,
   SpecialistAvatar
 } from '@/components/agents/specialists-view/specialist-ui'
-import {
-  McpGlyph,
-  mcpMetaText,
-  SkillGlyph,
-  skillMetaText,
-  SpecialistToggle} from '@/components/agents/specialists-view/specialists-view-shared'
+import { SpecialistsEditorMcpsSection } from '@/components/agents/specialists-view/specialists-editor-mcps-section'
+import { SpecialistsEditorSkillsSection } from '@/components/agents/specialists-view/specialists-editor-skills-section'
+import { SpecialistsEditorToolsSection } from '@/components/agents/specialists-view/specialists-editor-tools-section'
+import { SpecialistToggle } from '@/components/agents/specialists-view/specialists-view-shared'
 import {
   emptySpecialistForm,
   resolveSkillInstallSource,
@@ -789,471 +784,51 @@ export function SpecialistsEditorView({
             />
           </section>
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-baseline gap-2">
-                <h2 className="text-sm font-medium">
-                  Skills ({form.skillNames.length})
-                </h2>
-                {onManageSkills ? (
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground text-xs transition-colors"
-                    onClick={onManageSkills}
-                  >
-                    Manage all skills
-                  </button>
-                ) : null}
-              </div>
-              <DropdownMenu
-                open={skillAddOpen}
-                onOpenChange={open => {
-                  setSkillAddOpen(open)
-                  if (!open) setSkillAddQuery('')
-                }}
-              >
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="bg-muted/40 hover:bg-muted/60 text-muted-foreground inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors"
-                  >
-                    Add a skill…
-                    <ChevronDown className="size-3.5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-80 p-0"
-                  onCloseAutoFocus={event => event.preventDefault()}
-                >
-                  <div className="border-b px-2 py-2">
-                    <div className="relative">
-                      <Search className="text-muted-foreground/70 pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2" />
-                      <Input
-                        value={skillAddQuery}
-                        onChange={event => setSkillAddQuery(event.target.value)}
-                        placeholder="Search"
-                        className="h-8 border-0 bg-transparent pl-7 shadow-none focus-visible:ring-0"
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-                  <div className="chat-scrollbar max-h-56 overflow-y-auto py-1">
-                    {availableSkills.length === 0 ? (
-                      <p className="text-muted-foreground px-3 py-3 text-xs">
-                        Nothing to add.
-                      </p>
-                    ) : (
-                      availableSkills.map(skill => {
-                        const meta = skillMetaText(skill)
-                        return (
-                          <DropdownMenuItem
-                            key={skill.name}
-                            className="gap-2 py-2"
-                            onClick={() => addSkill(skill.name)}
-                          >
-                            <SkillGlyph
-                              skill={skill}
-                              className="size-[18px]"
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm">
-                                {skill.name}
-                              </span>
-                              {skill.description ? (
-                                <span className="text-muted-foreground block truncate text-xs">
-                                  {skill.description}
-                                </span>
-                              ) : null}
-                              {meta ? (
-                                <span className="text-muted-foreground/70 block truncate text-[10px]">
-                                  {meta}
-                                </span>
-                              ) : null}
-                            </span>
-                          </DropdownMenuItem>
-                        )
-                      })
-                    )}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            {selectedSkillRows.length === 0 ? (
-              <p className="text-muted-foreground py-2 text-sm">
-                No skills selected.
-              </p>
-            ) : (
-              <div className="divide-border/40 divide-y">
-                {selectedSkillRows.map(row => {
-                  const meta = row.skill ? skillMetaText(row.skill) : null
-                  return (
-                    <div
-                      key={row.name}
-                      className="flex items-center gap-3 py-2.5"
-                    >
-                      <button
-                        type="button"
-                        className={cn(
-                          'flex min-w-0 flex-1 items-center gap-3 text-left',
-                          onOpenSkill &&
-                            'hover:opacity-90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-md'
-                        )}
-                        disabled={!onOpenSkill}
-                        onClick={() => onOpenSkill?.(row.name)}
-                      >
-                        {row.skill ? (
-                          <SkillGlyph skill={row.skill} />
-                        ) : (
-                          <span className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-md">
-                            <Sparkles className="text-muted-foreground size-3.5" />
-                          </span>
-                        )}
-                        <span className="min-w-0 flex-1">
-                          <span
-                            className={cn(
-                              'block truncate text-sm',
-                              onOpenSkill && 'hover:underline'
-                            )}
-                          >
-                            {row.name}
-                          </span>
-                          {meta || row.statusLabel ? (
-                            <span className="text-muted-foreground block truncate text-xs">
-                              {[meta, row.statusLabel]
-                                .filter(Boolean)
-                                .join(' · ')}
-                            </span>
-                          ) : null}
-                        </span>
-                      </button>
-                      {row.status !== 'ok' ? (
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <span className="text-amber-500/90 text-[11px] font-medium">
-                            {row.statusLabel}
-                          </span>
-                          {row.status === 'disabled' && onEnableSkill ? (
-                            <button
-                              type="button"
-                              className="bg-muted/50 hover:bg-muted text-foreground rounded-full px-2 py-0.5 text-[11px] transition-colors"
-                              disabled={skillActionPending === row.name}
-                              onClick={() => void handleEnableSkill(row.name)}
-                            >
-                              {skillActionPending === row.name
-                                ? '…'
-                                : 'Enable'}
-                            </button>
-                          ) : null}
-                          {row.status === 'missing' ? (
-                            <button
-                              type="button"
-                              className="bg-muted/50 hover:bg-muted text-foreground rounded-full px-2 py-0.5 text-[11px] transition-colors"
-                              disabled={skillActionPending === row.name}
-                              onClick={() => void handleInstallSkill(row.name)}
-                            >
-                              {skillActionPending === row.name
-                                ? '…'
-                                : resolveSkillInstallSource(row.name)
-                                  ? 'Install'
-                                  : 'Find'}
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors"
-                        aria-label={`Remove ${row.name}`}
-                        onClick={() => removeSkill(row.name)}
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </section>
+          <SpecialistsEditorSkillsSection
+            skillCount={form.skillNames.length}
+            onManageSkills={onManageSkills}
+            skillAddOpen={skillAddOpen}
+            onSkillAddOpenChange={setSkillAddOpen}
+            skillAddQuery={skillAddQuery}
+            onSkillAddQueryChange={setSkillAddQuery}
+            availableSkills={availableSkills}
+            onAddSkill={addSkill}
+            selectedSkillRows={selectedSkillRows}
+            onOpenSkill={onOpenSkill}
+            skillActionPending={skillActionPending}
+            onEnableSkill={onEnableSkill}
+            onEnableSkillClick={name => void handleEnableSkill(name)}
+            onInstallSkillClick={name => void handleInstallSkill(name)}
+            onRemoveSkill={removeSkill}
+          />
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <h2 className="text-sm font-medium">
-                  Tools ({form.toolNames.length})
-                </h2>
-                <p className="text-muted-foreground mt-0.5 text-xs">
-                  Allowlist for this specialist. Core tools are the usual
-                  defaults; Extra tools are opt-in.
-                </p>
-              </div>
-            </div>
-            <div className="relative">
-              <Search className="text-muted-foreground/70 pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2" />
-              <Input
-                value={toolQuery}
-                onChange={event => setToolQuery(event.target.value)}
-                placeholder="Search tools"
-                className="border-border/50 bg-muted/40 h-9 pl-9"
-              />
-            </div>
-            {toolsLoading && catalogTools.length === 0 ? (
-              <p className="text-muted-foreground py-2 text-sm">Loading tools…</p>
-            ) : catalogTools.length === 0 ? (
-              <p className="text-muted-foreground py-2 text-sm">
-                No tools available.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {(
-                  [
-                    { label: 'Core', tools: coreTools },
-                    { label: 'Extra', tools: extraTools }
-                  ] as const
-                ).map(group => (
-                  <div key={group.label} className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                        {group.label} ({group.tools.length})
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground text-[11px] transition-colors"
-                          onClick={() => setTierTools(group.tools, true)}
-                        >
-                          All
-                        </button>
-                        <span className="text-muted-foreground/40 text-[11px]">
-                          /
-                        </span>
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground text-[11px] transition-colors"
-                          onClick={() => setTierTools(group.tools, false)}
-                        >
-                          None
-                        </button>
-                      </div>
-                    </div>
-                    {group.tools.length === 0 ? (
-                      <p className="text-muted-foreground text-xs">
-                        No {group.label.toLowerCase()} tools match.
-                      </p>
-                    ) : (
-                      <div className="divide-border/40 max-h-56 divide-y overflow-y-auto rounded-xl border border-border/40">
-                        {group.tools.map(tool => {
-                          const checked = form.toolNames.includes(tool.id)
-                          return (
-                            <div
-                              key={tool.id}
-                              className="flex items-start justify-between gap-3 px-3 py-2"
-                            >
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate font-mono text-xs font-medium">
-                                  {tool.id}
-                                </p>
-                                <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">
-                                  {tool.description}
-                                </p>
-                              </div>
-                              <SpecialistToggle
-                                enabled={checked}
-                                label={`${checked ? 'Remove' : 'Allow'} ${tool.id}`}
-                                onToggle={() => toggleTool(tool.id)}
-                              />
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          <SpecialistsEditorToolsSection
+            toolCount={form.toolNames.length}
+            toolNames={form.toolNames}
+            toolQuery={toolQuery}
+            onToolQueryChange={setToolQuery}
+            toolsLoading={toolsLoading}
+            catalogToolCount={catalogTools.length}
+            coreTools={coreTools}
+            extraTools={extraTools}
+            onSetTierTools={setTierTools}
+            onToggleTool={toggleTool}
+          />
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-baseline gap-2">
-                <h2 className="text-sm font-medium">
-                  MCPs ({selectedMcpRows.length})
-                </h2>
-                {onManageMcps ? (
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground text-xs transition-colors"
-                    onClick={onManageMcps}
-                  >
-                    Manage all MCPs
-                  </button>
-                ) : null}
-              </div>
-              <DropdownMenu
-                open={mcpAddOpen}
-                onOpenChange={open => {
-                  setMcpAddOpen(open)
-                  if (!open) setMcpAddQuery('')
-                }}
-              >
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="bg-muted/40 hover:bg-muted/60 text-muted-foreground inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs transition-colors"
-                  >
-                    Add an MCP…
-                    <ChevronDown className="size-3.5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-80 p-0"
-                  onCloseAutoFocus={event => event.preventDefault()}
-                >
-                  <div className="border-b px-2 py-2">
-                    <div className="relative">
-                      <Search className="text-muted-foreground/70 pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2" />
-                      <Input
-                        value={mcpAddQuery}
-                        onChange={event => setMcpAddQuery(event.target.value)}
-                        placeholder="Search"
-                        className="h-8 border-0 bg-transparent pl-7 shadow-none focus-visible:ring-0"
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-                  <div className="chat-scrollbar max-h-56 overflow-y-auto py-1">
-                    {availableMcps.length === 0 ? (
-                      <p className="text-muted-foreground px-3 py-3 text-xs">
-                        Nothing to add.
-                      </p>
-                    ) : (
-                      availableMcps.map(server => {
-                        const meta = mcpMetaText(server)
-                        return (
-                          <DropdownMenuItem
-                            key={server.id}
-                            className="gap-2 py-2"
-                            onClick={() => addMcp(server.id)}
-                          >
-                            <McpGlyph
-                              server={server}
-                              className="size-[18px]"
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm">
-                                {server.name}
-                              </span>
-                              {server.description ? (
-                                <span className="text-muted-foreground block truncate text-xs">
-                                  {server.description}
-                                </span>
-                              ) : null}
-                              {meta ? (
-                                <span className="text-muted-foreground/70 block truncate text-[10px]">
-                                  {meta}
-                                </span>
-                              ) : null}
-                            </span>
-                          </DropdownMenuItem>
-                        )
-                      })
-                    )}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            {selectedMcpRows.length === 0 ? (
-              <p className="text-muted-foreground py-2 text-sm">
-                No MCPs selected.
-              </p>
-            ) : (
-              <div className="divide-border/40 divide-y">
-                {selectedMcpRows.map(row => {
-                  const meta = row.server ? mcpMetaText(row.server) : null
-                  const catalogMeta =
-                    row.kind === 'catalog'
-                      ? row.catalog?.id || row.key.replace(/^catalog:/, '')
-                      : null
-                  const openTarget =
-                    row.kind === 'catalog'
-                      ? {
-                          kind: 'catalog' as const,
-                          id: row.key.replace(/^catalog:/, '')
-                        }
-                      : {
-                          kind: 'server' as const,
-                          id: row.server?.id || row.key.replace(/^server:/, '')
-                        }
-                  return (
-                    <div
-                      key={row.key}
-                      className="flex items-center gap-3 py-2.5"
-                    >
-                      <button
-                        type="button"
-                        className={cn(
-                          'flex min-w-0 flex-1 items-center gap-3 text-left',
-                          onOpenMcp &&
-                            'hover:opacity-90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-md'
-                        )}
-                        disabled={!onOpenMcp || !openTarget.id}
-                        onClick={() => {
-                          if (!openTarget.id) return
-                          onOpenMcp?.(openTarget)
-                        }}
-                      >
-                        {row.server ? (
-                          <McpGlyph server={row.server} />
-                        ) : (
-                          <span className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-md">
-                            <Plug className="text-muted-foreground size-3.5" />
-                          </span>
-                        )}
-                        <span className="min-w-0 flex-1">
-                          <span
-                            className={cn(
-                              'block truncate text-sm',
-                              onOpenMcp && 'hover:underline'
-                            )}
-                          >
-                            {row.name}
-                          </span>
-                          <span className="text-muted-foreground block truncate text-xs">
-                            {[meta || catalogMeta, row.statusLabel]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </span>
-                        </span>
-                      </button>
-                      {row.status !== 'ok' ? (
-                        <span className="text-amber-500/90 shrink-0 text-[11px] font-medium">
-                          {row.statusLabel}
-                        </span>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors"
-                        aria-label={`Remove ${row.name}`}
-                        onClick={() => {
-                          if (row.kind === 'catalog') {
-                            removeMcpCatalog(
-                              row.key.replace(/^catalog:/, '')
-                            )
-                          } else if (row.server) {
-                            removeMcp(row.server.id)
-                          } else {
-                            removeMcp(row.key.replace(/^server:/, ''))
-                          }
-                        }}
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </section>
+          <SpecialistsEditorMcpsSection
+            mcpCount={selectedMcpRows.length}
+            onManageMcps={onManageMcps}
+            mcpAddOpen={mcpAddOpen}
+            onMcpAddOpenChange={setMcpAddOpen}
+            mcpAddQuery={mcpAddQuery}
+            onMcpAddQueryChange={setMcpAddQuery}
+            availableMcps={availableMcps}
+            onAddMcp={addMcp}
+            selectedMcpRows={selectedMcpRows}
+            onOpenMcp={onOpenMcp}
+            onRemoveMcp={removeMcp}
+            onRemoveMcpCatalog={removeMcpCatalog}
+          />
         </div>
       </div>
 
