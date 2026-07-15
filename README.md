@@ -24,9 +24,9 @@ A thinking path for open science.
 <br>
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-dark.jpg">
-    <source media="(prefers-color-scheme: light)" srcset="images/showcase-light.jpg">
-    <img alt="sandwalk dashboard: chat, structure viewers, skills, and terminal" src="images/showcase-light.jpg" style="max-width:100%; border-radius:8px;">
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-light.png">
+    <img alt="sandwalk dashboard: chat, structure viewers, skills, and terminal" src="images/showcase-light.png" style="max-width:100%; border-radius:8px;">
   </picture>
 </p>
 <br>
