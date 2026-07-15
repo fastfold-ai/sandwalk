@@ -9,8 +9,9 @@ import {
   Trash2,
   X
 } from 'lucide-react'
-import { type ReactNode,useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 
+import { useHorizontalWheelScroll } from '@/hooks/useHorizontalWheelScroll'
 import { cn } from '@/lib/utils'
 
 type TabContextMenuState = {
@@ -46,6 +47,9 @@ export function SessionTabs({
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const activeTabRef = useRef<HTMLDivElement | null>(null)
+  const scrollerRef = useRef<HTMLDivElement | null>(null)
+  useHorizontalWheelScroll(scrollerRef)
 
   useEffect(() => {
     if (!menu) return
@@ -68,6 +72,19 @@ export function SessionTabs({
     }
   }, [menu])
 
+  // Keep the selected chat tab in view when the bar overflows.
+  const tabIdsKey = tabs.map(tab => tab.id).join('\0')
+  useEffect(() => {
+    if (!activeId) return
+    const node = activeTabRef.current
+    if (!node) return
+    node.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'nearest',
+      block: 'nearest'
+    })
+  }, [activeId, tabIdsKey])
+
   const menuSession = menu
     ? tabs.find(tab => tab.id === menu.sessionId) || null
     : null
@@ -79,12 +96,16 @@ export function SessionTabs({
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
-      <div className="chat-scrollbar-x flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto">
+      <div
+        ref={scrollerRef}
+        className="chat-scrollbar-x flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto"
+      >
         {tabs.map(tab => {
           const active = tab.id === activeId
           return (
             <div
               key={tab.id}
+              ref={active ? activeTabRef : undefined}
               className={cn(
                 'group relative my-auto flex h-8 w-40 shrink-0 items-center rounded-md px-2.5',
                 active
