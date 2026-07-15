@@ -4901,6 +4901,9 @@ export default function App() {
                           onCreateSpecialist={() =>
                             navigate('/dashboard/specialists/new')
                           }
+                          onManageSpecialists={() =>
+                            navigate('/dashboard/specialists')
+                          }
                           onAddModels={() => navigate('/dashboard/models')}
                           onSandboxBackendSelect={selectSessionSandboxBackend}
                           onSandboxComputeChange={changes =>
@@ -5208,10 +5211,10 @@ export default function App() {
                                         {isAssistant &&
                                         entry.content &&
                                         !hideActionsWhileStreaming ? (
-                                          <div className="text-muted-foreground -mb-7.5 min-h-7.5 -ml-1 flex items-center gap-1 pt-1.5">
+                                          <div className="text-zinc-300 dark:text-zinc-600 -mb-7.5 min-h-7.5 -ml-1 flex items-center gap-0.5 pt-1.5">
                                             <button
                                               type="button"
-                                              className="hover:bg-muted inline-flex h-7 w-7 items-center justify-center rounded-md"
+                                              className="hover:bg-muted hover:text-zinc-400 dark:hover:text-zinc-500 inline-flex h-6 w-6 items-center justify-center rounded-md"
                                               onClick={async () => {
                                                 await navigator.clipboard.writeText(
                                                   message.content
@@ -5229,19 +5232,19 @@ export default function App() {
                                             >
                                               {copiedMessageId ===
                                               message.id ? (
-                                                <Check className="size-4" />
+                                                <Check className="size-3.5" />
                                               ) : (
-                                                <Copy className="size-4" />
+                                                <Copy className="size-3.5" />
                                               )}
                                             </button>
                                             <Popover>
                                               <PopoverTrigger asChild>
                                                 <button
                                                   type="button"
-                                                  className="hover:bg-muted inline-flex h-7 w-7 items-center justify-center rounded-md"
+                                                  className="hover:bg-muted hover:text-zinc-400 dark:hover:text-zinc-500 inline-flex h-6 w-6 items-center justify-center rounded-md"
                                                   aria-label="More actions"
                                                 >
-                                                  <MoreHorizontal className="size-4" />
+                                                  <MoreHorizontal className="size-3.5" />
                                                 </button>
                                               </PopoverTrigger>
                                               <PopoverContent
@@ -5419,6 +5422,9 @@ export default function App() {
                           onSpecialistSelect={selectSessionSpecialist}
                           onCreateSpecialist={() =>
                             navigate('/dashboard/specialists/new')
+                          }
+                          onManageSpecialists={() =>
+                            navigate('/dashboard/specialists')
                           }
                           onAddModels={() => navigate('/dashboard/models')}
                           onSandboxBackendSelect={selectSessionSandboxBackend}

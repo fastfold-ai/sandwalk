@@ -262,6 +262,7 @@ export function Composer({
   onReasoningSettingsChange,
   onSpecialistSelect,
   onCreateSpecialist,
+  onManageSpecialists,
   onAddModels,
   onSandboxBackendSelect,
   onSandboxComputeChange,
@@ -314,6 +315,7 @@ export function Composer({
   }) => Promise<void>
   onSpecialistSelect?: (specialistId: string | null) => void | Promise<void>
   onCreateSpecialist?: () => void
+  onManageSpecialists?: () => void
   onAddModels?: () => void
   onSandboxBackendSelect?: (
     backend: 'builtin' | 'modal'
@@ -2209,24 +2211,24 @@ export function Composer({
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
+                    className="text-muted-foreground hover:text-foreground inline-flex w-[8.5rem] shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
                   >
                     {selectedSpecialist ? (
                       <span
                         className={cn(
-                          'flex size-3.5 items-center justify-center rounded-full text-white',
+                          'flex size-3.5 shrink-0 items-center justify-center rounded-full text-white [&_svg]:text-white',
                           specialistColorClass(selectedSpecialist.color)
                         )}
                       >
                         <SpecialistGlyph
                           icon={selectedSpecialist.icon}
-                          className="size-2"
+                          className="size-2 text-white"
                         />
                       </span>
                     ) : (
-                      <span className="bg-muted-foreground/40 size-2 rounded-full" />
+                      <span className="bg-muted-foreground/40 size-1.5 shrink-0 rounded-full" />
                     )}
-                    <span className="max-w-[7rem] truncate font-medium">
+                    <span className="min-w-0 flex-1 truncate text-left font-medium">
                       {selectedSpecialist?.name || 'None'}
                     </span>
                     <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
@@ -2238,10 +2240,25 @@ export function Composer({
                   className="w-64 overflow-hidden p-0"
                   onCloseAutoFocus={event => event.preventDefault()}
                 >
-                  <div className="text-muted-foreground border-b px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
-                    Specialist
+                  <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+                    <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+                      Specialist
+                    </span>
+                    {onManageSpecialists ? (
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground text-[11px] font-normal"
+                        onClick={() => {
+                          setSpecialistPickerOpen(false)
+                          onManageSpecialists()
+                        }}
+                      >
+                        Manage
+                      </button>
+                    ) : null}
                   </div>
-                  <div className="max-h-72 overflow-y-auto overscroll-contain py-1">
+                  <ScrollArea className="h-72 w-full">
+                    <div className="py-1">
                     <button
                       type="button"
                       className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm"
@@ -2250,7 +2267,7 @@ export function Composer({
                         setSpecialistPickerOpen(false)
                       }}
                     >
-                      <span className="bg-muted-foreground/40 size-2.5 rounded-full" />
+                      <span className="bg-muted-foreground/40 size-2.5 shrink-0 rounded-full" />
                       <span className="truncate">None</span>
                       {!selectedSpecialistId ? (
                         <Check className="text-foreground ml-auto size-4 shrink-0" />
@@ -2272,23 +2289,24 @@ export function Composer({
                         >
                           <span
                             className={cn(
-                              'flex size-4 shrink-0 items-center justify-center rounded-full text-white',
+                              'flex size-4 shrink-0 items-center justify-center rounded-full text-white [&_svg]:text-white',
                               specialistColorClass(item.color)
                             )}
                           >
                             <SpecialistGlyph
                               icon={item.icon}
-                              className="size-2.5"
+                              className="size-2.5 text-white"
                             />
                           </span>
-                          <span className="truncate">{item.name}</span>
+                          <span className="min-w-0 flex-1 truncate">{item.name}</span>
                           {isSelected ? (
                             <Check className="text-foreground ml-auto size-4 shrink-0" />
                           ) : null}
                         </button>
                       )
                     })}
-                  </div>
+                    </div>
+                  </ScrollArea>
                   {onCreateSpecialist ? (
                     <div className="border-t p-1">
                       <button
