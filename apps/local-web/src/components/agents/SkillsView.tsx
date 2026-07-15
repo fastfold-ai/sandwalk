@@ -7,26 +7,19 @@ import type {
   AgentSkillSource
 } from '@sandwalk/agent-ui-core'
 
-import { DetailPageSkeleton } from '@/components/agents/PageSkeletons'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  catalogSkillInstallCommand,
-  catalogSkillInstallTarget,
-  type SkillsViewMode
-} from '@/lib/skills-catalog'
+import { type SkillsViewMode } from '@/lib/skills-catalog'
 
-import { SkillsCatalogDetailView } from './skills-view/skills-view-catalog-detail'
-import {
-  SkillsImportFileView,
-  SkillsImportGithubView,
-  SkillsTrustedSourcesView
-} from './skills-view/skills-view-import-views'
-import { SkillsInstalledDetailView } from './skills-view/skills-view-installed-detail'
 import {
   SkillsFeaturedOverview,
   SkillsMainListView
 } from './skills-view/skills-view-list'
-import { SkillsBreadcrumb } from './skills-view/skills-view-shared'
+import { SkillsViewDetailMode } from './skills-view/skills-view-mode-detail'
+import {
+  SkillsViewCatalogMode,
+  SkillsViewImportFileMode,
+  SkillsViewImportGithubMode,
+  SkillsViewTrustedSourcesMode
+} from './skills-view/skills-view-mode-views'
 import { useSkillsViewState } from './skills-view/use-skills-view-state'
 
 export function SkillsView({
@@ -120,131 +113,35 @@ export function SkillsView({
   })
 
   if (mode === 'import_github') {
-    return (
-      <SkillsImportGithubView
-        githubSource={state.githubSource}
-        onGithubSourceChange={state.setGithubSource}
-        installing={state.installing}
-        onBack={onBack}
-        onSubmit={() => void state.submitGithubInstall()}
-      />
-    )
+    return <SkillsViewImportGithubMode state={state} onBack={onBack} />
   }
 
   if (mode === 'import_file') {
-    return (
-      <SkillsImportFileView
-        uploadFile={state.uploadFile}
-        uploadInputRef={state.uploadInputRef}
-        onUploadFileChange={state.setUploadFile}
-        installing={state.installing}
-        onBack={onBack}
-        onSubmit={() => void state.submitFileInstall()}
-      />
-    )
+    return <SkillsViewImportFileMode state={state} onBack={onBack} />
   }
 
   if (mode === 'trusted_sources') {
-    return (
-      <SkillsTrustedSourcesView
-        trustedSources={state.trustedSources}
-        trustedSelected={state.trustedSelected}
-        onTrustedSelectedChange={state.setTrustedSelected}
-        trustedLoading={state.trustedLoading}
-        selectedTrustedSources={state.selectedTrustedSources}
-        installing={state.installing}
-        onBack={onBack}
-        onSubmit={() => void state.submitTrustedInstall()}
-      />
-    )
+    return <SkillsViewTrustedSourcesMode state={state} onBack={onBack} />
   }
 
   if (mode === 'catalog_detail') {
-    const catalogSource = String(
-      state.catalogDetail?.source || catalogSkillRoute?.source || ''
-    ).trim()
-    const catalogSlug = String(
-      state.catalogDetail?.slug || catalogSkillRoute?.skill || ''
-    ).trim()
-    const catalogFiles = state.catalogDetail?.files || []
-    const catalogInstallTarget =
-      catalogSource && catalogSlug
-        ? catalogSkillInstallTarget(catalogSource, catalogSlug, catalogFiles)
-        : ''
-    const catalogInstallCommand =
-      catalogSource && catalogSlug
-        ? catalogSkillInstallCommand(catalogSource, catalogSlug, catalogFiles)
-        : ''
-
     return (
-      <SkillsCatalogDetailView
+      <SkillsViewCatalogMode
+        state={state}
         catalogSkillRoute={catalogSkillRoute}
-        catalogDetail={state.catalogDetail}
-        catalogAudit={state.catalogAudit}
-        catalogDetailLoading={state.catalogDetailLoading}
-        catalogDetailError={state.catalogDetailError}
-        catalogInstallingId={state.catalogInstallingId}
-        installing={state.installing}
-        catalogInstallError={state.catalogInstallError}
-        copiedCatalogInstall={state.copiedCatalogInstall}
-        isInstalled={state.checkCatalogSkillInstalled}
         onBack={onBack}
-        onCopyInstall={() => {
-          if (!catalogInstallCommand) return
-          void navigator.clipboard.writeText(catalogInstallCommand).then(() => {
-            state.setCopiedCatalogInstall(true)
-          })
-        }}
-        onInstall={() =>
-          void state.submitCatalogInstallSource(
-            catalogInstallTarget,
-            String(state.catalogDetail?.id || catalogSkillRoute?.id || '').trim() ||
-              'catalog-detail',
-            catalogSlug
-          )
-        }
       />
     )
   }
 
-  if (mode === 'detail' && detail && state.detailPresentation) {
+  if (mode === 'detail' && detail) {
     return (
-      <SkillsInstalledDetailView
+      <SkillsViewDetailMode
         detail={detail}
         catalogSearchEnabled={catalogSearchEnabled}
-        localCatalogDetail={state.localCatalogDetail}
-        localCatalogAudit={state.localCatalogAudit}
-        localCatalogLoading={state.localCatalogLoading}
-        detailInstallCommand={state.detailInstallCommand}
-        detailGithubUrl={state.detailPresentation.detailGithubUrl}
-        detailAuthorUrl={state.detailPresentation.detailAuthorUrl}
-        detailIconSource={state.detailPresentation.detailIconSource}
-        detailIconInvert={state.detailPresentation.detailIconInvert}
-        detailVersionLabel={state.detailPresentation.detailVersionLabel}
-        detailUpdatedLabel={state.detailPresentation.detailUpdatedLabel}
-        copiedInstall={state.copiedInstall}
-        pendingEnabled={state.pendingEnabled}
-        pendingRemove={state.pendingRemove}
-        batchBusy={state.batchBusy}
-        removeTarget={state.removeTarget}
+        state={state}
         onBack={onBack}
-        onCopyInstall={state.handleCopyInstall}
-        onRemove={state.removeSkill}
-        onRemoveDialogOpenChange={state.handleRemoveDialogOpenChange}
-        onConfirmRemove={() => void state.confirmRemoveSkill()}
-        onToggleEnabled={(name, enabled) => void state.setSkillEnabled(name, enabled)}
       />
-    )
-  }
-
-  if (mode === 'detail') {
-    return (
-      <ScrollArea className="flex-1">
-        <div className="mx-auto w-full max-w-3xl px-6 py-8 md:px-10">
-          <SkillsBreadcrumb onBack={onBack} />
-          <DetailPageSkeleton bare />
-        </div>
-      </ScrollArea>
     )
   }
 

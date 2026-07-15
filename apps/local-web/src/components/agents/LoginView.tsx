@@ -1,91 +1,13 @@
-import { ArrowUpRight, Check, CircleHelp, Copy, Loader2, Terminal } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ErrorPage } from '@/components/ErrorPage'
 import { MirageBackground } from '@/components/MirageBackground'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 
-const SANDWALK_SECURITY_DEEP_LINK = 'sandwalk://settings/security'
-
-const HELP_COMMANDS = [
-  {
-    id: 'generate',
-    title: 'Generate an API key',
-    command: 'sandwalk auth generate',
-    description: 'Creates a new key and prints it once.'
-  },
-  {
-    id: 'enable',
-    title: 'Require login',
-    command: 'sandwalk auth enable',
-    description: 'Turns auth on so the local UI and API require a key.'
-  },
-  {
-    id: 'show',
-    title: 'Show your key',
-    command: 'sandwalk auth show',
-    description: 'Prints the current API key so you can paste it here.'
-  },
-  {
-    id: 'disable',
-    title: 'Disable login',
-    command: 'sandwalk auth disable',
-    description: 'Turns auth off so the local UI no longer requires a key.'
-  }
-] as const
-
-function CommandRow({
-  command,
-  copied,
-  onCopy
-}: {
-  command: string
-  copied: boolean
-  onCopy: () => void
-}) {
-  return (
-    <div className="bg-muted/60 border-border flex items-center gap-2 rounded-lg border p-2.5">
-      <Terminal className="text-muted-foreground size-4 shrink-0" />
-      <code className="text-foreground min-w-0 flex-1 truncate font-mono text-[13px]">
-        {command}
-      </code>
-      <button
-        type="button"
-        className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-md transition-colors"
-        onClick={onCopy}
-        aria-label={`Copy ${command}`}
-        title="Copy command"
-      >
-        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      </button>
-    </div>
-  )
-}
-
-function MacAppIcon({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        'flex size-11 shrink-0 items-center justify-center rounded-[11px] bg-white p-2 shadow-[0_1px_2px_rgba(0,0,0,0.12)] ring-1 ring-black/5',
-        className
-      )}
-      aria-hidden
-    >
-      <img src="/sandwalk-mark.svg" alt="" className="size-full" />
-    </div>
-  )
-}
+import { LoginHelpDialog } from './login-view-help-dialog'
 
 export function LoginView({
   onSubmit,
@@ -96,23 +18,12 @@ export function LoginView({
 }: {
   onSubmit: (apiKey: string, remember: boolean) => void | Promise<void>
   submitting?: boolean
-  /** Backend/network failure shown above the form — not a bad API key. */
   error?: unknown | null
   onRetry?: () => void
   className?: string
 }) {
   const [apiKey, setApiKey] = useState('')
   const [remember, setRemember] = useState(true)
-  const [helpOpen, setHelpOpen] = useState(false)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-
-  const copyCommand = (id: string, command: string) => {
-    void navigator.clipboard.writeText(command)
-    setCopiedId(id)
-    window.setTimeout(() => {
-      setCopiedId(current => (current === id ? null : current))
-    }, 2000)
-  }
 
   return (
     <div
@@ -150,161 +61,66 @@ export function LoginView({
               void onSubmit(apiKey.trim(), remember)
             }}
           >
-          <label
-            htmlFor="sandwalk-api-key"
-            className="text-muted-foreground mb-2 block text-[11px] font-medium tracking-[0.08em] uppercase"
-          >
-            API Key
-          </label>
-          <input
-            id="sandwalk-api-key"
-            type="password"
-            autoFocus
-            autoComplete="off"
-            spellCheck={false}
-            value={apiKey}
-            onChange={event => setApiKey(event.target.value)}
-            placeholder="Enter your API key"
-            className="border-input bg-background text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-ring/30 h-11 w-full rounded-lg border px-3 text-sm outline-none focus:ring-2"
-          />
-
-          <label className="text-muted-foreground mt-4 flex cursor-pointer items-center gap-2.5 text-sm select-none">
-            <input
-              type="checkbox"
-              className="border-input accent-primary size-4 shrink-0 rounded"
-              checked={remember}
-              onChange={event => setRemember(event.target.checked)}
-            />
-            <span>Stay signed in for 30 days</span>
-          </label>
-
-          <button
-            type="submit"
-            disabled={submitting || !apiKey.trim()}
-            className="bg-primary text-primary-foreground mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {submitting ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
-            Sign in
-          </button>
-
-          <div className="mt-4 flex justify-center">
-            <Dialog
-              open={helpOpen}
-              onOpenChange={open => {
-                setHelpOpen(open)
-                if (!open) setCopiedId(null)
-              }}
+            <label
+              htmlFor="sandwalk-api-key"
+              className="text-muted-foreground mb-2 block text-[11px] font-medium tracking-[0.08em] uppercase"
             >
-              <DialogTrigger asChild>
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
-                  aria-label="Help with API keys"
-                >
-                  <CircleHelp className="size-4" />
-                  Help
-                </button>
-              </DialogTrigger>
-              <DialogContent className="bg-card text-card-foreground border-border flex max-h-[min(90vh,44rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl p-0 shadow-xl sm:rounded-2xl">
-                <DialogHeader className="shrink-0 space-y-2 px-6 pt-6 pb-2 text-left">
-                  <DialogTitle className="text-lg font-semibold">
-                    How to get an API key
-                  </DialogTitle>
-                </DialogHeader>
+              API Key
+            </label>
+            <input
+              id="sandwalk-api-key"
+              type="password"
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+              value={apiKey}
+              onChange={event => setApiKey(event.target.value)}
+              placeholder="Enter your API key"
+              className="border-input bg-background text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-ring/30 h-11 w-full rounded-lg border px-3 text-sm outline-none focus:ring-2"
+            />
 
-                <ScrollArea className="h-[min(55vh,28rem)] px-6">
-                  <div className="space-y-4 py-2 pr-3">
-                    <div className="bg-muted/50 border-border rounded-xl border px-3.5 py-3">
-                      <div className="flex items-start gap-3">
-                        <MacAppIcon />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-foreground text-sm font-semibold">
-                            Mac app
-                          </p>
-                          <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
-                            Open sandwalk, then go to{' '}
-                            <span className="text-foreground font-medium">
-                              General
-                            </span>{' '}
-                            →{' '}
-                            <span className="text-foreground font-medium">
-                              Security
-                            </span>
-                            . Show, copy, or regenerate your key and turn login
-                            on or off — the app applies changes automatically.
-                          </p>
-                          <a
-                            href={SANDWALK_SECURITY_DEEP_LINK}
-                            className="bg-background text-foreground border-border hover:bg-muted mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors"
-                          >
-                            Open Security settings
-                            <ArrowUpRight className="size-3.5" />
-                          </a>
-                        </div>
-                      </div>
-                    </div>
+            <label className="text-muted-foreground mt-4 flex cursor-pointer items-center gap-2.5 text-sm select-none">
+              <input
+                type="checkbox"
+                className="border-input accent-primary size-4 shrink-0 rounded"
+                checked={remember}
+                onChange={event => setRemember(event.target.checked)}
+              />
+              <span>Stay signed in for 30 days</span>
+            </label>
 
-                    <div>
-                      <p className="text-foreground mb-3 text-sm font-semibold">
-                        CLI commands
-                      </p>
-                      <div className="space-y-3.5">
-                        {HELP_COMMANDS.map(item => (
-                          <div key={item.id}>
-                            <p className="text-muted-foreground mb-1.5 text-xs font-medium">
-                              {item.title}
-                            </p>
-                            <CommandRow
-                              command={item.command}
-                              copied={copiedId === item.id}
-                              onCopy={() =>
-                                copyCommand(item.id, item.command)
-                              }
-                            />
-                            <p className="text-muted-foreground mt-1.5 text-xs">
-                              {item.description}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </ScrollArea>
+            <button
+              type="submit"
+              disabled={submitting || !apiKey.trim()}
+              className="bg-primary text-primary-foreground mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              Sign in
+            </button>
 
-                <DialogFooter className="shrink-0 px-6 pt-2 pb-5 sm:justify-end">
-                  <button
-                    type="button"
-                    className="bg-primary text-primary-foreground h-10 rounded-lg px-4 text-sm font-semibold transition-opacity hover:opacity-90"
-                    onClick={() => setHelpOpen(false)}
-                  >
-                    Got it
-                  </button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <div className="mt-4 flex justify-center">
+              <LoginHelpDialog />
+            </div>
+          </form>
+
+          <div className="mt-10 flex flex-col items-center gap-2.5">
+            <p className="text-foreground/80 text-center text-sm font-medium [text-shadow:0_1px_6px_hsl(var(--background)/0.95),0_0_14px_hsl(var(--background)/0.85)]">
+              A thinking path for open science
+            </p>
+            <p className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+              <span>by</span>
+              <img
+                src="/logo_fastfold_black.svg"
+                alt="Fastfold"
+                className="h-3 w-auto dark:hidden"
+              />
+              <img
+                src="/logo_fastfold_white.svg"
+                alt="Fastfold"
+                className="hidden h-3 w-auto dark:block"
+              />
+            </p>
           </div>
-        </form>
-
-        <div className="mt-10 flex flex-col items-center gap-2.5">
-          <p className="text-foreground/80 text-center text-sm font-medium [text-shadow:0_1px_6px_hsl(var(--background)/0.95),0_0_14px_hsl(var(--background)/0.85)]">
-            A thinking path for open science
-          </p>
-          <p className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
-            <span>by</span>
-            <img
-              src="/logo_fastfold_black.svg"
-              alt="Fastfold"
-              className="h-3 w-auto dark:hidden"
-            />
-            <img
-              src="/logo_fastfold_white.svg"
-              alt="Fastfold"
-              className="hidden h-3 w-auto dark:block"
-            />
-          </p>
-        </div>
         </div>
       </main>
       <ThemeToggle />

@@ -47,7 +47,7 @@ export default [
       'no-unused-vars': 'off',
       'max-lines': [
         'error',
-        { max: 500, skipBlankLines: true, skipComments: true }
+        { max: 300, skipBlankLines: true, skipComments: true }
       ],
       'unused-imports/no-unused-imports': 'error',
       'unused-imports/no-unused-vars': [

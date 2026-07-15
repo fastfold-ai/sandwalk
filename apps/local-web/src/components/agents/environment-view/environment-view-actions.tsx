@@ -1,4 +1,3 @@
-import type { EnvironmentReport } from '@sandwalk/agent-ui-core'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -91,7 +90,7 @@ export function useEnvironmentViewActions({
   setPackageName,
   setError: _setError,
 }: {
-  onLoad: (signal?: AbortSignal) => Promise<EnvironmentReport>
+  onLoad: (signal?: AbortSignal) => Promise<void>
   onInstall: (
     name: string,
     options?: { allowUnlisted?: boolean; signal?: AbortSignal },

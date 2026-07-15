@@ -7,10 +7,15 @@ import type {
 import { useEffect, useState } from 'react'
 
 import {
-  catalogCoordsFromInstalledSkill,
   formatSkillInstallError,
   type SkillsViewMode
 } from '@/lib/skills-catalog'
+
+import {
+  useSkillsViewCatalogLocal,
+  useSkillsViewCatalogRoute
+} from './use-skills-view-catalog-fetch'
+import { useSkillsViewCatalogSearch } from './use-skills-view-catalog-search'
 
 type SkillsViewCatalogInput = {
   mode: SkillsViewMode
@@ -60,129 +65,38 @@ export function useSkillsViewCatalog({
   onGetCatalogDetail,
   onGetCatalogAudit
 }: SkillsViewCatalogInput) {
-  const [catalogResults, setCatalogResults] = useState<AgentCatalogSkill[]>([])
-  const [catalogLoading, setCatalogLoading] = useState(false)
-  const [catalogError, setCatalogError] = useState<string | null>(null)
   const [catalogSearchMode, setCatalogSearchMode] = useState(
     openCatalogSearchInitially && catalogSearchEnabled
   )
   const [catalogInstallingId, setCatalogInstallingId] = useState<string | null>(null)
-  const [catalogDetail, setCatalogDetail] = useState<AgentCatalogSkillDetail | null>(null)
-  const [catalogAudit, setCatalogAudit] = useState<AgentCatalogSkillAudit | null>(null)
-  const [catalogDetailLoading, setCatalogDetailLoading] = useState(false)
-  const [catalogDetailError, setCatalogDetailError] = useState<string | null>(null)
   const [copiedCatalogInstall, setCopiedCatalogInstall] = useState(false)
   const [catalogInstallError, setCatalogInstallError] = useState<string | null>(null)
-  const [localCatalogDetail, setLocalCatalogDetail] =
-    useState<AgentCatalogSkillDetail | null>(null)
-  const [localCatalogAudit, setLocalCatalogAudit] =
-    useState<AgentCatalogSkillAudit | null>(null)
-  const [localCatalogLoading, setLocalCatalogLoading] = useState(false)
+
+  const route = useSkillsViewCatalogRoute({
+    mode,
+    catalogSkillRoute,
+    onGetCatalogDetail,
+    onGetCatalogAudit
+  })
+
+  const local = useSkillsViewCatalogLocal({
+    mode,
+    detail,
+    catalogSearchEnabled,
+    onGetCatalogDetail,
+    onGetCatalogAudit
+  })
+
+  const search = useSkillsViewCatalogSearch({
+    catalogSearchMode,
+    query,
+    onSearchCatalog
+  })
 
   useEffect(() => {
-    if (mode !== 'catalog_detail' || !catalogSkillRoute) {
-      setCatalogDetail(null)
-      setCatalogAudit(null)
-      setCatalogDetailError(null)
-      setCatalogInstallError(null)
-      setCatalogDetailLoading(false)
-      return
-    }
-    const controller = new AbortController()
-    setCatalogDetailLoading(true)
-    setCatalogDetailError(null)
+    if (mode !== 'catalog_detail' || !catalogSkillRoute) return
     setCatalogInstallError(null)
-    setCatalogDetail(null)
-    setCatalogAudit(null)
-    void onGetCatalogDetail(
-      catalogSkillRoute.source,
-      catalogSkillRoute.skill,
-      controller.signal
-    )
-      .then(setCatalogDetail)
-      .catch(error => {
-        if (!controller.signal.aborted) {
-          setCatalogDetailError(
-            error instanceof Error
-              ? error.message
-              : 'Unable to load catalog skill details.'
-          )
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setCatalogDetailLoading(false)
-      })
-    void onGetCatalogAudit(
-      catalogSkillRoute.source,
-      catalogSkillRoute.skill,
-      controller.signal
-    )
-      .then(setCatalogAudit)
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setCatalogAudit({
-            id: catalogSkillRoute.id,
-            source: catalogSkillRoute.source,
-            slug: catalogSkillRoute.skill,
-            audits: []
-          })
-        }
-      })
-    return () => controller.abort()
-  }, [catalogSkillRoute, mode, onGetCatalogAudit, onGetCatalogDetail])
-
-  useEffect(() => {
-    if (mode !== 'detail' || !detail || !catalogSearchEnabled) {
-      setLocalCatalogDetail(null)
-      setLocalCatalogAudit(null)
-      setLocalCatalogLoading(false)
-      return
-    }
-    const coords = catalogCoordsFromInstalledSkill(detail)
-    if (!coords) {
-      setLocalCatalogDetail(null)
-      setLocalCatalogAudit(null)
-      setLocalCatalogLoading(false)
-      return
-    }
-    const controller = new AbortController()
-    setLocalCatalogLoading(true)
-    setLocalCatalogDetail(null)
-    setLocalCatalogAudit(null)
-    const detailPromise = onGetCatalogDetail(
-      coords.source,
-      coords.skill,
-      controller.signal
-    )
-      .then(result => {
-        if (!controller.signal.aborted) setLocalCatalogDetail(result)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setLocalCatalogDetail(null)
-      })
-    const auditPromise = onGetCatalogAudit(
-      coords.source,
-      coords.skill,
-      controller.signal
-    )
-      .then(result => {
-        if (!controller.signal.aborted) setLocalCatalogAudit(result)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setLocalCatalogAudit({
-            id: `${coords.source}/${coords.skill}`,
-            source: coords.source,
-            slug: coords.skill,
-            audits: []
-          })
-        }
-      })
-    void Promise.allSettled([detailPromise, auditPromise]).then(() => {
-      if (!controller.signal.aborted) setLocalCatalogLoading(false)
-    })
-    return () => controller.abort()
-  }, [catalogSearchEnabled, detail, mode, onGetCatalogAudit, onGetCatalogDetail])
+  }, [catalogSkillRoute, mode])
 
   useEffect(() => {
     if (!copiedCatalogInstall) return
@@ -205,51 +119,12 @@ export function useSkillsViewCatalog({
     setCatalogSearchMode(false)
   }, [catalogSearchEnabled])
 
-  useEffect(() => {
-    if (!catalogSearchMode) {
-      setCatalogResults([])
-      setCatalogError(null)
-      setCatalogLoading(false)
-      return
-    }
-    const text = query.trim()
-    if (text.length < 2) {
-      setCatalogResults([])
-      setCatalogError(null)
-      setCatalogLoading(false)
-      return
-    }
-    const controller = new AbortController()
-    const timer = window.setTimeout(() => {
-      setCatalogLoading(true)
-      setCatalogError(null)
-      void onSearchCatalog(text, controller.signal)
-        .then(items => {
-          if (!controller.signal.aborted) setCatalogResults(items)
-        })
-        .catch(error => {
-          if (controller.signal.aborted) return
-          setCatalogResults([])
-          setCatalogError(
-            error instanceof Error ? error.message : 'Unable to search skills.sh.'
-          )
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setCatalogLoading(false)
-        })
-    }, 220)
-    return () => {
-      window.clearTimeout(timer)
-      controller.abort()
-    }
-  }, [catalogSearchMode, onSearchCatalog, query])
-
   const enableCatalogSearchMode = () => {
     if (!catalogSearchEnabled) {
       onOpenCatalogSetup()
       return
     }
-    setCatalogError(null)
+    search.setCatalogError(null)
     setCatalogSearchMode(true)
   }
 
@@ -288,30 +163,30 @@ export function useSkillsViewCatalog({
 
   const showCatalogEmptyState =
     catalogSearchMode &&
-    !catalogLoading &&
-    !catalogError &&
+    !search.catalogLoading &&
+    !search.catalogError &&
     query.trim().length >= 2 &&
-    catalogResults.length === 0
+    search.catalogResults.length === 0
 
   return {
-    catalogResults,
-    catalogLoading,
-    catalogError,
+    catalogResults: search.catalogResults,
+    catalogLoading: search.catalogLoading,
+    catalogError: search.catalogError,
     catalogSearchMode,
     setCatalogSearchMode,
-    setCatalogResults,
-    setCatalogError,
+    setCatalogResults: search.setCatalogResults,
+    setCatalogError: search.setCatalogError,
     catalogInstallingId,
-    catalogDetail,
-    catalogAudit,
-    catalogDetailLoading,
-    catalogDetailError,
+    catalogDetail: route.catalogDetail,
+    catalogAudit: route.catalogAudit,
+    catalogDetailLoading: route.catalogDetailLoading,
+    catalogDetailError: route.catalogDetailError,
     copiedCatalogInstall,
     setCopiedCatalogInstall,
     catalogInstallError,
-    localCatalogDetail,
-    localCatalogAudit,
-    localCatalogLoading,
+    localCatalogDetail: local.localCatalogDetail,
+    localCatalogAudit: local.localCatalogAudit,
+    localCatalogLoading: local.localCatalogLoading,
     enableCatalogSearchMode,
     submitCatalogInstallSource,
     showCatalogEmptyState

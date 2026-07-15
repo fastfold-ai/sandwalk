@@ -16,21 +16,7 @@ import {
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  featuredSkillIcon,
-  isFeaturedSkill,
-  skillIcon,
-  skillIconInvertInDark
-} from '@/lib/skill-icons'
-import {
-  catalogCoordsFromInstalledSkill,
-  displaySkillVersion,
-  formatSkillUpdatedLabel,
-  skillAuthorUrl,
-  skillGithubUrl,
-  skillsShSkillUrl,
-  stripFrontmatter
-} from '@/lib/skills-catalog'
+import { catalogCoordsFromInstalledSkill, skillsShSkillUrl, stripFrontmatter } from '@/lib/skills-catalog'
 import { cn } from '@/lib/utils'
 
 import {
@@ -298,22 +284,4 @@ export function SkillsInstalledDetailView({
   )
 }
 
-export function resolveInstalledDetailPresentation(detail: AgentSkillDetail) {
-  const detailIconSource = isFeaturedSkill(detail)
-    ? featuredSkillIcon(detail)
-    : skillIcon(detail)
-  const detailIconInvert = skillIconInvertInDark(detail)
-  const detailVersionLabel = displaySkillVersion(detail.version)
-  const detailUpdatedLabel = formatSkillUpdatedLabel(detail.updatedAt)
-  const detailGithubUrl = skillGithubUrl(detail.name, detail.source)
-  const detailAuthorUrl = skillAuthorUrl(detail.source)
-
-  return {
-    detailIconSource,
-    detailIconInvert,
-    detailVersionLabel,
-    detailUpdatedLabel,
-    detailGithubUrl,
-    detailAuthorUrl
-  }
-}
+export { resolveInstalledDetailPresentation } from './skills-view-installed-detail-presentation'

@@ -1,39 +1,28 @@
 import type {
   EnvironmentPackageMutationResult,
-  EnvironmentReport,
+  EnvironmentReport
 } from '@sandwalk/agent-ui-core'
-import {
-  ArrowLeft,
-  ChevronDown,
-  Lock,
-  Package,
-  RefreshCw,
-} from 'lucide-react'
+import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { toast } from 'sonner'
 
 import { SettingsBlockSkeleton } from '@/components/agents/PageSkeletons'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 
 import {
-  EnvironmentGroupCard,
-  formatBytes,
-  mutationErrorMessage,
+  EnvironmentConfirmDialog,
+  useEnvironmentViewActions
+} from './environment-view/environment-view-actions'
+import {
+  EnvironmentCoreSection,
+  EnvironmentGroupsSection,
+  EnvironmentInstallForm,
+  EnvironmentPythonSection
+} from './environment-view/environment-view-body'
+import {
   normalizeName,
-  type EnvironmentConfirmState,
+  type EnvironmentConfirmState
 } from './environment-view/environment-view-shared'
 
 export function EnvironmentView({
@@ -43,16 +32,16 @@ export function EnvironmentView({
   title = 'Environment',
   description = 'Manage optional Python packages used by skills and tools. Core FastFold dependencies stay locked. Installs apply immediately — you usually do not need to restart the agent server.',
   onBack,
-  backLabel = 'Sandbox',
+  backLabel = 'Sandbox'
 }: {
   onLoad: (signal?: AbortSignal) => Promise<EnvironmentReport>
   onInstall: (
     name: string,
-    options?: { allowUnlisted?: boolean; signal?: AbortSignal },
+    options?: { allowUnlisted?: boolean; signal?: AbortSignal }
   ) => Promise<EnvironmentPackageMutationResult>
   onUninstall: (
     name: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ) => Promise<EnvironmentPackageMutationResult>
   title?: string
   description?: string
@@ -100,7 +89,7 @@ export function EnvironmentView({
         if (!signal?.aborted) setLoading(false)
       }
     },
-    [onLoad],
+    [onLoad]
   )
 
   useEffect(() => {
@@ -109,56 +98,17 @@ export function EnvironmentView({
     return () => controller.abort()
   }, [load])
 
-  const requestInstall = (
-    name: string,
-    options: { fromCatalog: boolean },
-  ) => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    const unlisted = !catalogNames.has(normalizeName(trimmed))
-    setConfirm({
-      action: 'install',
-      name: trimmed,
-      allowUnlisted: options.fromCatalog ? false : true,
-      unlisted: options.fromCatalog ? false : unlisted,
+  const { requestInstall, requestUninstall, runConfirmed } =
+    useEnvironmentViewActions({
+      onLoad: load,
+      onInstall,
+      onUninstall,
+      catalogNames,
+      setConfirm,
+      setPending,
+      setPackageName,
+      setError
     })
-  }
-
-  const requestUninstall = (name: string) => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    setConfirm({
-      action: 'uninstall',
-      name: trimmed,
-      allowUnlisted: false,
-      unlisted: false,
-    })
-  }
-
-  const runConfirmed = async () => {
-    if (!confirm) return
-    const { action, name, allowUnlisted } = confirm
-    setConfirm(null)
-    setPending(name)
-    try {
-      const result =
-        action === 'install'
-          ? await onInstall(name, { allowUnlisted })
-          : await onUninstall(name)
-      toast.success(result.message || `${action} ${name}`, {
-        description:
-          action === 'install'
-            ? 'No server restart needed — new imports work in the next tool run.'
-            : undefined,
-      })
-      if (action === 'install') setPackageName('')
-      await load()
-    } catch (err) {
-      toast.error(mutationErrorMessage(err))
-    } finally {
-      setPending(null)
-    }
-  }
 
   return (
     <ScrollArea className="flex-1">
@@ -210,178 +160,45 @@ export function EnvironmentView({
           <SettingsBlockSkeleton />
         ) : report ? (
           <>
-            <section className="space-y-3 border-b pb-8">
-              <h3 className="text-base font-semibold">Sandbox Python</h3>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Package className="text-muted-foreground size-4 shrink-0" />
-                  <code className="truncate font-mono text-sm">
-                    {report.envPath || report.pythonPath}
-                  </code>
-                </div>
-                <p className="text-muted-foreground text-sm">
-                  {formatBytes(report.envBytes)} on disk · interpreter{' '}
-                  <code className="font-mono text-xs">{report.pythonPath}</code>
-                </p>
-              </div>
-            </section>
-
-            <section className="space-y-3 border-b pb-8">
-              <h3 className="text-base font-semibold">Install by name</h3>
-              <p className="text-muted-foreground text-sm">
-                Type a PyPI package name. Catalog packages install normally;
-                other packages need an extra confirmation.
-              </p>
-              <form
-                className="flex flex-col gap-2 sm:flex-row"
-                onSubmit={event => {
-                  event.preventDefault()
-                  requestInstall(packageName, { fromCatalog: false })
-                }}
-              >
-                <Input
-                  value={packageName}
-                  onChange={event => setPackageName(event.target.value)}
-                  placeholder="e.g. torch, rdkit, gseapy"
-                  className="font-mono"
-                  disabled={pending !== null}
-                  autoComplete="off"
-                />
-                <Button
-                  type="submit"
-                  disabled={pending !== null || !packageName.trim()}
-                >
-                  {pending &&
-                  normalizeName(pending) === normalizeName(packageName)
-                    ? 'Installing…'
-                    : 'Install'}
-                </Button>
-              </form>
-            </section>
-
-            <section className="space-y-3">
-              <h3 className="text-base font-semibold">Skill & tool packages</h3>
-              <p className="text-muted-foreground text-sm">
-                Install or remove packages that power chemistry, single-cell,
-                ML, and other research tools. Large packages (e.g. torch) can
-                take several minutes.
-              </p>
-              <div className="space-y-2">
-                {report.groups.map(group => (
-                  <EnvironmentGroupCard
-                    key={group.id}
-                    group={group}
-                    open={Boolean(groupOpen[group.id])}
-                    pending={pending}
-                    onToggle={() =>
-                      setGroupOpen(current => ({
-                        ...current,
-                        [group.id]: !current[group.id],
-                      }))
-                    }
-                    onInstall={pkg =>
-                      requestInstall(pkg.name, { fromCatalog: true })
-                    }
-                    onUninstall={pkg => requestUninstall(pkg.name)}
-                  />
-                ))}
-              </div>
-            </section>
-
-            <section className="space-y-2 border-t pt-6">
-              <button
-                type="button"
-                className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left"
-                onClick={() => setCoreOpen(open => !open)}
-              >
-                <Lock className="text-muted-foreground size-3.5 shrink-0" />
-                <span className="flex-1 text-sm font-semibold">
-                  Core (locked)
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  {report.core.length} packages
-                </span>
-                <ChevronDown
-                  className={cn(
-                    'text-muted-foreground size-3.5 transition-transform',
-                    coreOpen && 'rotate-180',
-                  )}
-                />
-              </button>
-              {coreOpen ? (
-                <ScrollArea className="h-64 rounded-md border">
-                  <div className="space-y-0.5 p-2">
-                    {report.core.map(pkg => (
-                      <div
-                        key={pkg.name}
-                        className="text-muted-foreground flex items-center gap-3 px-2 py-1.5 text-sm"
-                      >
-                        <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                          {pkg.name}
-                        </span>
-                        <span className="shrink-0 font-mono text-xs">
-                          {pkg.version}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              ) : null}
-            </section>
+            <EnvironmentPythonSection report={report} />
+            <EnvironmentInstallForm
+              packageName={packageName}
+              pending={pending}
+              onPackageNameChange={setPackageName}
+              onSubmit={() =>
+                requestInstall(packageName, { fromCatalog: false })
+              }
+            />
+            <EnvironmentGroupsSection
+              report={report}
+              groupOpen={groupOpen}
+              pending={pending}
+              onToggleGroup={groupId =>
+                setGroupOpen(current => ({
+                  ...current,
+                  [groupId]: !current[groupId]
+                }))
+              }
+              onInstall={name => requestInstall(name, { fromCatalog: true })}
+              onUninstall={requestUninstall}
+            />
+            <EnvironmentCoreSection
+              core={report.core}
+              coreOpen={coreOpen}
+              onToggle={() => setCoreOpen(open => !open)}
+            />
           </>
         ) : null}
       </div>
 
-      <AlertDialog
-        open={confirm !== null}
-        onOpenChange={open => {
+      <EnvironmentConfirmDialog
+        confirm={confirm}
+        pending={pending}
+        onConfirmChange={open => {
           if (!open) setConfirm(null)
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirm?.action === 'uninstall'
-                ? `Remove ${confirm.name}?`
-                : `Install ${confirm?.name}?`}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirm?.action === 'uninstall' ? (
-                <>
-                  This uninstalls <code className="font-mono">{confirm.name}</code>{' '}
-                  from the sandbox Python environment.
-                </>
-              ) : confirm?.unlisted ? (
-                <>
-                  <code className="font-mono">{confirm.name}</code> is not in the
-                  skill/tool catalog. It will still be installed into the agent
-                  sandbox. Core FastFold packages cannot be changed.
-                </>
-              ) : (
-                <>
-                  Install <code className="font-mono">{confirm?.name}</code> into
-                  the sandbox Python environment. No server restart is required
-                  afterward in most cases.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending !== null}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={pending !== null}
-              onClick={event => {
-                event.preventDefault()
-                void runConfirmed()
-              }}
-            >
-              {confirm?.action === 'uninstall' ? 'Remove' : 'Install'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onRunConfirmed={() => runConfirmed(confirm)}
+      />
     </ScrollArea>
   )
 }

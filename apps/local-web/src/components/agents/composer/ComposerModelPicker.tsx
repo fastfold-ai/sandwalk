@@ -1,7 +1,8 @@
 import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
-import { Check, ChevronDown, Plus } from 'lucide-react'
+import { ChevronDown, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
+import { ComposerModelPickerOption } from '@/components/agents/composer/ComposerModelPickerOption'
 import { Input } from '@/components/ui/input'
 import {
   Popover,
@@ -12,10 +13,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   type ComposerModelOption,
   formatModelEffortBadge,
-  formatReasoningEffortLabel,
-  isComposerModelSelected,
-  resolveComposerModelOption} from '@/lib/composer-models'
-import { cn } from '@/lib/utils'
+  resolveComposerModelOption
+} from '@/lib/composer-models'
 
 export function ComposerModelPicker({
   modelOptions,
@@ -131,7 +130,6 @@ export function ComposerModelPicker({
         className="w-[min(28rem,calc(100vw-2rem))] overflow-visible p-0"
         onCloseAutoFocus={event => event.preventDefault()}
         onInteractOutside={event => {
-          // Nested Edit panel is portaled; don't dismiss the model list.
           if (effortMenuOpen) event.preventDefault()
         }}
         onFocusOutside={event => {
@@ -162,210 +160,19 @@ export function ComposerModelPicker({
                   No models match “{modelSearch.trim()}”.
                 </div>
               ) : (
-                filteredModelOptions.map(option => {
-                  const isSelected = isComposerModelSelected(
-                    option,
-                    runtimeSettings,
-                    modelOptions
-                  )
-                  const optionSupportsEffort = Boolean(
-                    option.supportsReasoningEffort ||
-                      (option.reasoningEffortOptions &&
-                        option.reasoningEffortOptions.length > 0)
-                  )
-                  const optionEffortOptions =
-                    option.reasoningEffortOptions &&
-                    option.reasoningEffortOptions.length > 0
-                      ? option.reasoningEffortOptions
-                      : ['low', 'medium', 'high']
-                  const optionEffort = String(
-                    option.reasoningEffort || 'medium'
-                  )
-                    .trim()
-                    .toLowerCase()
-                  const optionFast = Boolean(option.reasoningFast)
-                  const optionEffortLabel = formatModelEffortBadge({
-                    reasoningEffort: optionEffort,
-                    reasoningFast: optionFast
-                  })
-                  const selectModel = () => {
-                    void onModelSelect(
-                      option.provider,
-                      option.model,
-                      option.profileId
-                    )
-                    setModelSearch('')
-                    if (!optionSupportsEffort) {
-                      setEffortMenuOpen(false)
-                    }
-                  }
-                  return (
-                    <div
-                      key={`${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`}
-                      className={cn(
-                        'hover:bg-muted group relative flex w-full items-center gap-2 px-3 py-1.5 text-sm',
-                        isSelected && 'bg-muted'
-                      )}
-                    >
-                      <button
-                        type="button"
-                        title={`${option.label}${
-                          optionSupportsEffort
-                            ? ` ${optionEffortLabel}`
-                            : option.speed
-                              ? ` · ${option.speed}`
-                              : ''
-                        }`}
-                        className="absolute inset-0 z-0"
-                        aria-label={`Select ${option.label}`}
-                        onClick={selectModel}
-                      />
-                      <span className="pointer-events-none flex min-w-0 flex-1 items-baseline gap-1.5 truncate text-left">
-                        <span className="text-foreground truncate">
-                          {option.label}
-                        </span>
-                        {optionSupportsEffort ? (
-                          <span className="text-muted-foreground shrink-0 text-[11px]">
-                            {optionEffortLabel}
-                          </span>
-                        ) : null}
-                      </span>
-                      <div className="relative z-10 flex shrink-0 items-center gap-2">
-                        {optionSupportsEffort && onReasoningSettingsChange ? (
-                          isSelected ? (
-                            <Popover
-                              modal={false}
-                              open={effortMenuOpen}
-                              onOpenChange={setEffortMenuOpen}
-                            >
-                              <PopoverTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="text-muted-foreground hover:text-foreground text-xs font-medium opacity-100"
-                                  onClick={event => {
-                                    event.stopPropagation()
-                                  }}
-                                >
-                                  Edit
-                                </button>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                side="right"
-                                align="start"
-                                sideOffset={10}
-                                className="w-44 overflow-hidden p-0"
-                                onOpenAutoFocus={event =>
-                                  event.preventDefault()
-                                }
-                                onCloseAutoFocus={event =>
-                                  event.preventDefault()
-                                }
-                              >
-                                <div className="text-muted-foreground border-b px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
-                                  Effort
-                                </div>
-                                <div className="py-1">
-                                  {optionEffortOptions.map(level => {
-                                    const active = optionEffort === level
-                                    return (
-                                      <button
-                                        key={level}
-                                        type="button"
-                                        className="hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm"
-                                        onClick={event => {
-                                          event.preventDefault()
-                                          event.stopPropagation()
-                                          void onReasoningSettingsChange({
-                                            provider: option.provider,
-                                            model: option.model,
-                                            reasoningEffort: level
-                                          })
-                                        }}
-                                      >
-                                        <span className="truncate">
-                                          {formatReasoningEffortLabel(level)}
-                                        </span>
-                                        {active ? (
-                                          <Check className="text-foreground ml-auto size-4 shrink-0" />
-                                        ) : null}
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-                                <div className="text-muted-foreground border-t px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
-                                  Options
-                                </div>
-                                <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-                                  <span className="text-sm font-medium">
-                                    Fast
-                                  </span>
-                                  <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={optionFast}
-                                    aria-label="Fast mode"
-                                    className={cn(
-                                      'relative h-5 w-9 shrink-0 rounded-full transition-colors',
-                                      optionFast
-                                        ? 'bg-primary'
-                                        : 'bg-muted-foreground/30'
-                                    )}
-                                    onClick={event => {
-                                      event.preventDefault()
-                                      event.stopPropagation()
-                                      void onReasoningSettingsChange({
-                                        provider: option.provider,
-                                        model: option.model,
-                                        reasoningFast: !optionFast
-                                      })
-                                    }}
-                                  >
-                                    <span
-                                      className={cn(
-                                        'bg-background pointer-events-none absolute top-0.5 left-0.5 size-4 rounded-full border border-black/5 shadow-sm transition-transform',
-                                        optionFast && 'translate-x-4'
-                                      )}
-                                    />
-                                  </button>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
-                          ) : (
-                            <button
-                              type="button"
-                              className="text-muted-foreground hover:text-foreground text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100"
-                              onClick={event => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                void (async () => {
-                                  await onModelSelect(
-                                    option.provider,
-                                    option.model,
-                                    option.profileId
-                                  )
-                                  setModelSearch('')
-                                  setEffortMenuOpen(true)
-                                })()
-                              }}
-                            >
-                              Edit
-                            </button>
-                          )
-                        ) : null}
-                        {option.speed &&
-                        !isSelected &&
-                        !optionSupportsEffort ? (
-                          <span className="text-muted-foreground pointer-events-none text-xs whitespace-nowrap">
-                            {option.speed}
-                          </span>
-                        ) : null}
-                        {isSelected ? (
-                          <Check className="text-foreground pointer-events-none size-4 shrink-0" />
-                        ) : null}
-                      </div>
-                    </div>
-                  )
-                })
+                filteredModelOptions.map(option => (
+                  <ComposerModelPickerOption
+                    key={`${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`}
+                    option={option}
+                    modelOptions={modelOptions}
+                    runtimeSettings={runtimeSettings}
+                    effortMenuOpen={effortMenuOpen}
+                    onEffortMenuOpenChange={setEffortMenuOpen}
+                    onModelSelect={onModelSelect}
+                    onReasoningSettingsChange={onReasoningSettingsChange}
+                    onModelSearchClear={() => setModelSearch('')}
+                  />
+                ))
               )}
             </div>
           </ScrollArea>

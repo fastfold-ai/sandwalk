@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { ModalGlyph } from '@/components/agents/composer/ModalGlyph'
 import {
   formatSandboxBytes,
+  type SandboxActionPhase,
   type SandboxDraft
 } from '@/components/agents/composer/sandbox-utils'
 import { cn } from '@/lib/utils'
@@ -33,12 +34,14 @@ export function ComposerSandboxBackendToggle({
   sandboxDraft,
   sandboxPhase,
   sandboxConfirming,
+  onClose,
   onDraftChange
 }: {
   sandboxStatus: SessionSandboxStatus | null
   sandboxDraft: SandboxDraft
-  sandboxPhase: string
+  sandboxPhase: SandboxActionPhase
   sandboxConfirming: boolean
+  onClose: () => void
   onDraftChange: (updater: (current: SandboxDraft) => SandboxDraft) => void
 }) {
   return (
@@ -101,6 +104,7 @@ export function ComposerSandboxBackendToggle({
           <Link
             to="/dashboard/integrations/modal"
             className="text-foreground font-medium underline underline-offset-2"
+            onClick={onClose}
           >
             Set up
           </Link>

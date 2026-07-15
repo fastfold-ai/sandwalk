@@ -122,6 +122,7 @@ export function useIntegrationsDetailView({
 
   return {
     validationMessage,
+    setValidationMessage,
     validationBusy,
     overlay,
     setupResult,
