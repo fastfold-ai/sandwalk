@@ -22,7 +22,8 @@ import {
   Square,
   X
 } from 'lucide-react'
-import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type KeyboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { Link } from 'react-router-dom'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
@@ -245,6 +246,7 @@ export function Composer({
   sandboxPhase = 'idle',
   showAura = true,
   onChange,
+  onLiveDraftChange,
   onSkillChipsChange,
   onFileChipsChange,
   onSend,
@@ -280,9 +282,11 @@ export function Composer({
   sandboxPhase?: SandboxActionPhase
   showAura?: boolean
   onChange: (value: string) => void
+  /** Fires on every local keystroke without requiring a parent re-render. */
+  onLiveDraftChange?: (value: string) => void
   onSkillChipsChange: (skills: string[]) => void
   onFileChipsChange?: (files: string[]) => void
-  onSend: () => void
+  onSend: (value: string) => void
   onStop: () => void
   onUpload: (files: FileList) => Promise<void>
   onLoadSkill: (name: string) => Promise<AgentSkillDetail>
@@ -318,6 +322,12 @@ export function Composer({
   const textInputRefs = useRef<Map<number, HTMLInputElement>>(new Map())
   const [caretPos, setCaretPos] = useState(0)
   const [focusedPartIndex, setFocusedPartIndex] = useState(0)
+  // Local draft owns keystrokes. Parent `value` is only for external writes
+  // (session switch, workspace @-mention, send clear). Typing must NOT call
+  // onChange — App re-renders remount this composer and steal focus.
+  const [draft, setDraft] = useState(value)
+  const draftRef = useRef(value)
+  const emittedDraftRef = useRef(value)
   const [selectedSlashKey, setSelectedSlashKey] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -343,6 +353,91 @@ export function Composer({
   const slashListRootRef = useRef<HTMLDivElement | null>(null)
   const atListRootRef = useRef<HTMLDivElement | null>(null)
 
+  draftRef.current = draft
+
+  useEffect(() => {
+    // Ignore the echo of what we just emitted; accept real external writes.
+    if (value === emittedDraftRef.current) return
+    if (value === draftRef.current) {
+      emittedDraftRef.current = value
+      return
+    }
+    // Chip inserts stay local so the messages transcript doesn't re-render and
+    // steal focus. Ignore a stale parent value that hasn't caught up yet.
+    if (
+      emittedDraftRef.current === draftRef.current &&
+      draftRef.current.length > value.length
+    ) {
+      return
+    }
+    emittedDraftRef.current = value
+    draftRef.current = value
+    setDraft(value)
+    onLiveDraftChange?.(value)
+  }, [onLiveDraftChange, value])
+
+  const setLocalDraft = useCallback(
+    (nextValue: string) => {
+      draftRef.current = nextValue
+      setDraft(nextValue)
+      onLiveDraftChange?.(nextValue)
+    },
+    [onLiveDraftChange]
+  )
+
+  const pendingCaretRef = useRef<number | null>(null)
+
+  const applyComposerCaret = useCallback((absoluteCaret: number) => {
+    const value = draftRef.current
+    const parts = parseComposerParts(value)
+    let offset = 0
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index]
+      if (part.type !== 'text') {
+        offset += chipTokenLength(part)
+        continue
+      }
+      const tokenStart = offset
+      const tokenEnd = offset + part.text.length
+      if (absoluteCaret >= tokenStart && absoluteCaret <= tokenEnd) {
+        const input = textInputRefs.current.get(index)
+        if (!input) return false
+        const local = Math.min(
+          Math.max(0, absoluteCaret - tokenStart),
+          input.value.length
+        )
+        input.focus({ preventScroll: true })
+        input.setSelectionRange(local, local)
+        setCaretPos(tokenStart + local)
+        setFocusedPartIndex(index)
+        return true
+      }
+      offset = tokenEnd
+    }
+    const lastTextIndex = [...parts]
+      .map((part, index) => (part.type === 'text' ? index : -1))
+      .filter(index => index >= 0)
+      .at(-1)
+    if (lastTextIndex == null) return false
+    const last = textInputRefs.current.get(lastTextIndex)
+    if (!last) return false
+    const len = last.value.length
+    last.focus({ preventScroll: true })
+    last.setSelectionRange(len, len)
+    setCaretPos(value.length)
+    setFocusedPartIndex(lastTextIndex)
+    return true
+  }, [])
+
+  const commitDraft = useCallback(
+    (nextValue: string) => {
+      emittedDraftRef.current = nextValue
+      setLocalDraft(nextValue)
+      onChange(nextValue)
+    },
+    [onChange, setLocalDraft]
+  )
+
   const focusActiveComposerInput = useCallback(() => {
     const preferred =
       textInputRefs.current.get(focusedPartIndex) ||
@@ -351,6 +446,36 @@ export function Composer({
     if (document.activeElement === preferred) return
     preferred.focus({ preventScroll: true })
   }, [focusedPartIndex])
+
+  useLayoutEffect(() => {
+    const caret = pendingCaretRef.current
+    if (caret == null) return
+    if (applyComposerCaret(caret)) {
+      pendingCaretRef.current = null
+      return
+    }
+    let attempts = 0
+    let frame = 0
+    const retry = () => {
+      if (pendingCaretRef.current == null) return
+      if (applyComposerCaret(pendingCaretRef.current)) {
+        pendingCaretRef.current = null
+        return
+      }
+      attempts += 1
+      if (attempts < 16) frame = window.requestAnimationFrame(retry)
+    }
+    frame = window.requestAnimationFrame(retry)
+    return () => window.cancelAnimationFrame(frame)
+  }, [applyComposerCaret, draft])
+
+  function caretAfterInsertedToken(nextValue: string, token: string): number {
+    const index = nextValue.lastIndexOf(token)
+    if (index < 0) return nextValue.length
+    let caret = index + token.length
+    if (nextValue[caret] === ' ') caret += 1
+    return caret
+  }
 
   useEffect(() => {
     if (!sandboxPickerOpen) return
@@ -459,12 +584,12 @@ export function Composer({
   }, [])
 
   const slash = useMemo(
-    () => computeSlashSkillQuery(value, caretPos),
-    [caretPos, value]
+    () => computeSlashSkillQuery(draft, caretPos),
+    [caretPos, draft]
   )
   const atMention = useMemo(
-    () => computeAtFileQuery(value, caretPos),
-    [caretPos, value]
+    () => computeAtFileQuery(draft, caretPos),
+    [caretPos, draft]
   )
   const activeMention =
     slash && atMention
@@ -575,11 +700,11 @@ export function Composer({
 
   useEffect(() => {
     setSlashDismissed(false)
-  }, [slash?.start, slash?.query])
+  }, [slash?.start])
 
   useEffect(() => {
     setAtDismissed(false)
-  }, [atMention?.start, atMention?.query])
+  }, [atMention?.start])
 
   const selectedSlashItem =
     slashResults.find(item => item.key === selectedSlashKey) ||
@@ -589,6 +714,8 @@ export function Composer({
     selectedSlashItem?.kind === 'skill' ? selectedSlashItem.skill : null
   const selectedMcp =
     selectedSlashItem?.kind === 'mcp' ? selectedSlashItem.server : null
+  const selectedSkillName = selectedSkill?.name ?? null
+  const selectedMcpId = selectedMcp?.id ?? null
 
   const selectedFile =
     atResults.find(file => file.path === selectedFilePath) ||
@@ -606,7 +733,8 @@ export function Composer({
     ) {
       return
     }
-    setSelectedSlashKey(slashResults[0]?.key || null)
+    const nextKey = slashResults[0]?.key || null
+    setSelectedSlashKey(current => (current === nextKey ? current : nextKey))
   }, [selectedSlashKey, slashOpen, slashResults])
 
   useEffect(() => {
@@ -620,40 +748,42 @@ export function Composer({
     ) {
       return
     }
-    setSelectedFilePath(atResults[0]?.path || null)
+    const nextPath = atResults[0]?.path || null
+    setSelectedFilePath(current => (current === nextPath ? current : nextPath))
   }, [atOpen, atResults, selectedFilePath])
 
   useEffect(() => {
-    if (!slashOpen || !selectedSkill) {
-      if (!selectedMcp) {
+    if (!slashOpen || !selectedSkillName) {
+      if (!selectedMcpId) {
         setPreviewOverview(null)
         setPreviewLoading(false)
       }
       return
     }
-    const cached = previewCacheRef.current.get(selectedSkill.name)
+    const fallbackDescription = selectedSkill?.description
+    const cached = previewCacheRef.current.get(selectedSkillName)
     if (cached) {
-      setPreviewOverview(cached)
+      setPreviewOverview(current => (current === cached ? current : cached))
       setPreviewLoading(false)
       return
     }
     let active = true
     setPreviewLoading(true)
-    void onLoadSkill(selectedSkill.name)
+    void onLoadSkill(selectedSkillName)
       .then(detail => {
         if (!active) return
         const overview =
           extractSkillOverviewFromMarkdown(detail.content) ||
           cleanSkillDescription(detail.description) ||
           `Use /${detail.name} to run this skill.`
-        previewCacheRef.current.set(selectedSkill.name, overview)
+        previewCacheRef.current.set(selectedSkillName, overview)
         setPreviewOverview(overview)
       })
       .catch(() => {
         if (!active) return
         const fallback =
-          cleanSkillDescription(selectedSkill.description) ||
-          `Use /${selectedSkill.name} to run this skill.`
+          cleanSkillDescription(fallbackDescription || '') ||
+          `Use /${selectedSkillName} to run this skill.`
         setPreviewOverview(fallback)
       })
       .finally(() => {
@@ -662,16 +792,19 @@ export function Composer({
     return () => {
       active = false
     }
-  }, [onLoadSkill, selectedMcp, selectedSkill, slashOpen])
+    // selectedSkill identity changes every slashResults rebuild; key off name only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedSkillName gates the load
+  }, [onLoadSkill, selectedMcpId, selectedSkillName, slashOpen])
 
   useEffect(() => {
-    if (!slashOpen || !selectedMcp) return
-    setPreviewLoading(false)
-    setPreviewOverview(
+    if (!slashOpen || !selectedMcpId || !selectedMcp) return
+    const overview =
       String(selectedMcp.description || '').trim() ||
-        `Mention mcp:${selectedMcp.name} so the agent prefers tools from this MCP server.`
-    )
-  }, [selectedMcp, slashOpen])
+      `Mention mcp:${selectedMcp.name} so the agent prefers tools from this MCP server.`
+    setPreviewLoading(false)
+    setPreviewOverview(current => (current === overview ? current : overview))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedMcpId gates the preview
+  }, [selectedMcpId, slashOpen])
 
   const selectedModel =
     resolveComposerModelOption(modelOptions, runtimeSettings) ||
@@ -732,35 +865,55 @@ export function Composer({
     ? getSkillPromptExamples(selectedSkill.name)
     : []
 
+  const focusAfterChipInsert = (caret: number) => {
+    applyComposerCaret(caret)
+    // Messages view re-renders the transcript on parent updates and can blur
+    // the follow-up input. Keep restoring for a couple frames.
+    window.requestAnimationFrame(() => {
+      applyComposerCaret(caret)
+      window.requestAnimationFrame(() => {
+        applyComposerCaret(caret)
+        pendingCaretRef.current = null
+      })
+    })
+  }
+
   const insertSkillChip = (skill: AgentSkill) => {
     if (!slash) return
-    const before = value.slice(0, slash.start)
-    const after = value.slice(slash.end).replace(/^\s+/u, '')
+    const before = draft.slice(0, slash.start)
+    const after = draft.slice(slash.end).replace(/^\s+/u, '')
     const token = skillChipToken(skill.name)
     const nextValue = spaceAroundChips(
       after ? `${before}${token} ${after}` : `${before}${token}`
     )
-    onChange(nextValue)
-    onSkillChipsChange([])
-    setSelectedSlashKey(null)
-    window.requestAnimationFrame(() => {
-      focusComposerAt(nextValue, before.length + token.length)
+    const caret = caretAfterInsertedToken(nextValue, token)
+    pendingCaretRef.current = caret
+    // Keep chip insert local — syncing App state re-renders the message list
+    // and steals focus in sessions with history. Live draft ref covers send.
+    flushSync(() => {
+      emittedDraftRef.current = nextValue
+      setLocalDraft(nextValue)
     })
+    focusAfterChipInsert(caret)
+    setSelectedSlashKey(null)
   }
 
   const insertMcpChip = (server: McpServer) => {
     if (!slash) return
-    const before = value.slice(0, slash.start)
-    const after = value.slice(slash.end).replace(/^\s+/u, '')
+    const before = draft.slice(0, slash.start)
+    const after = draft.slice(slash.end).replace(/^\s+/u, '')
     const token = mcpChipToken(server.id, server.name)
     const nextValue = spaceAroundChips(
       after ? `${before}${token} ${after}` : `${before}${token}`
     )
-    onChange(nextValue)
-    setSelectedSlashKey(null)
-    window.requestAnimationFrame(() => {
-      focusComposerAt(nextValue, before.length + token.length)
+    const caret = caretAfterInsertedToken(nextValue, token)
+    pendingCaretRef.current = caret
+    flushSync(() => {
+      emittedDraftRef.current = nextValue
+      setLocalDraft(nextValue)
     })
+    focusAfterChipInsert(caret)
+    setSelectedSlashKey(null)
   }
 
   const insertSlashItem = (item: SlashItem) => {
@@ -770,95 +923,52 @@ export function Composer({
 
   const insertFileChip = (file: WorkspaceFile) => {
     if (!atMention) return
-    const before = value.slice(0, atMention.start)
-    const after = value.slice(atMention.end).replace(/^\s+/u, '')
+    const before = draft.slice(0, atMention.start)
+    const after = draft.slice(atMention.end).replace(/^\s+/u, '')
     const token = fileChipToken(file.path)
     const nextValue = spaceAroundChips(
       after ? `${before}${token} ${after}` : `${before}${token}`
     )
-    onChange(nextValue)
-    onFileChipsChange?.([])
-    setSelectedFilePath(null)
-    window.requestAnimationFrame(() => {
-      focusComposerAt(nextValue, before.length + token.length)
+    const caret = caretAfterInsertedToken(nextValue, token)
+    pendingCaretRef.current = caret
+    flushSync(() => {
+      emittedDraftRef.current = nextValue
+      setLocalDraft(nextValue)
     })
+    focusAfterChipInsert(caret)
+    setSelectedFilePath(null)
   }
 
   const insertExample = (skillName: string, prompt: string) => {
     if (!slash) return
-    const before = value.slice(0, slash.start)
-    const after = value.slice(slash.end).replace(/^\s+/u, '')
+    const before = draft.slice(0, slash.start)
+    const after = draft.slice(slash.end).replace(/^\s+/u, '')
     const token = skillChipToken(skillName)
     const spacedPrompt = prompt.replace(/^\s+/u, '')
     const nextValue = spaceAroundChips(
       `${before}${token} ${spacedPrompt}${after}`
     )
-    onSkillChipsChange([])
-    onChange(nextValue)
-    setSelectedSlashKey(null)
-    window.requestAnimationFrame(() => {
-      focusComposerAt(
-        nextValue,
-        before.length + token.length + 1 + spacedPrompt.length
-      )
+    const caret =
+      caretAfterInsertedToken(nextValue, token) + spacedPrompt.length
+    pendingCaretRef.current = caret
+    flushSync(() => {
+      emittedDraftRef.current = nextValue
+      setLocalDraft(nextValue)
     })
+    focusAfterChipInsert(caret)
+    setSelectedSlashKey(null)
   }
 
   const focusComposerAt = (nextValue: string, absoluteCaret: number) => {
-    const tryFocus = (attempts = 0) => {
-      const parts = parseComposerParts(nextValue)
-      let offset = 0
-      for (let index = 0; index < parts.length; index += 1) {
-        const part = parts[index]
-        if (part.type !== 'text') {
-          offset += chipTokenLength(part)
-          continue
-        }
-        const tokenStart = offset
-        const tokenEnd = offset + part.text.length
-        if (absoluteCaret >= tokenStart && absoluteCaret <= tokenEnd) {
-          const input = textInputRefs.current.get(index)
-          if (!input) {
-            if (attempts < 8) {
-              window.requestAnimationFrame(() => tryFocus(attempts + 1))
-            }
-            return
-          }
-          const local = Math.min(
-            Math.max(0, absoluteCaret - tokenStart),
-            input.value.length
-          )
-          input.focus({ preventScroll: true })
-          input.setSelectionRange(local, local)
-          setCaretPos(tokenStart + local)
-          setFocusedPartIndex(index)
-          return
-        }
-        offset = tokenEnd
-      }
-      const lastTextIndex = [...parts]
-        .map((part, index) => (part.type === 'text' ? index : -1))
-        .filter(index => index >= 0)
-        .at(-1)
-      if (lastTextIndex == null) return
-      const last = textInputRefs.current.get(lastTextIndex)
-      if (!last) {
-        if (attempts < 8) {
-          window.requestAnimationFrame(() => tryFocus(attempts + 1))
-        }
-        return
-      }
-      const len = last.value.length
-      last.focus({ preventScroll: true })
-      last.setSelectionRange(len, len)
-      setCaretPos(nextValue.length)
-      setFocusedPartIndex(lastTextIndex)
+    draftRef.current = nextValue
+    pendingCaretRef.current = absoluteCaret
+    if (!applyComposerCaret(absoluteCaret)) {
+      // useLayoutEffect / rAF retries will pick this up after mount.
     }
-    tryFocus()
   }
 
   const removeChipBeforeFocusedText = (partIndex: number) => {
-    const parts = parseComposerParts(value)
+    const parts = parseComposerParts(draft)
     if (partIndex <= 0) return false
     const prev = parts[partIndex - 1]
     if (!prev || prev.type === 'text') return false
@@ -866,8 +976,8 @@ export function Composer({
     for (let i = 0; i < partIndex; i += 1) {
       if (parts[i].type !== 'text') chipIndex += 1
     }
-    const nextValue = removeComposerChipAt(value, chipIndex)
-    onChange(nextValue)
+    const nextValue = removeComposerChipAt(draft, chipIndex)
+    commitDraft(nextValue)
     onSkillChipsChange([])
     onFileChipsChange?.([])
     window.requestAnimationFrame(() => {
@@ -893,11 +1003,11 @@ export function Composer({
     text: string,
     localCaret: number
   ) => {
-    const parts = parseComposerParts(value).map((part, index) =>
+    const parts = parseComposerParts(draft).map((part, index) =>
       index === partIndex && part.type === 'text' ? { ...part, text } : part
     )
     const nextValue = serializeComposerParts(parts)
-    onChange(nextValue)
+    setLocalDraft(nextValue)
     let absolute = 0
     for (let index = 0; index < parts.length; index += 1) {
       const part = parts[index]
@@ -916,15 +1026,20 @@ export function Composer({
   const handleSend = () => {
     if (running) return
     setAuraTick(tick => tick + 1)
-    onSend()
+    onSend(draftRef.current)
   }
 
+  const mentionMenuWasOpenRef = useRef(false)
   useEffect(() => {
-    if (!slashOpen && !atOpen) return
-    const frame = window.requestAnimationFrame(() => {
-      focusActiveComposerInput()
-    })
-    return () => window.cancelAnimationFrame(frame)
+    const open = slashOpen || atOpen
+    if (open && !mentionMenuWasOpenRef.current) {
+      const frame = window.requestAnimationFrame(() => {
+        focusActiveComposerInput()
+      })
+      mentionMenuWasOpenRef.current = true
+      return () => window.cancelAnimationFrame(frame)
+    }
+    if (!open) mentionMenuWasOpenRef.current = false
   }, [atOpen, focusActiveComposerInput, slashOpen])
 
   useEffect(() => {
@@ -937,12 +1052,14 @@ export function Composer({
     scrollFileIntoView(selectedFile.path)
   }, [atOpen, scrollFileIntoView, selectedFile?.path])
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (
+    event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const input = event.currentTarget
     const localCaret = input.selectionStart ?? 0
 
     if (event.key === 'Backspace') {
-      const parts = parseComposerParts(value)
+      const parts = parseComposerParts(draft)
       const textPart = parts[focusedPartIndex]
       if (textPart?.type === 'text') {
         const textBeforeCaret = textPart.text.slice(0, localCaret)
@@ -1032,15 +1149,8 @@ export function Composer({
     }
   }
 
-  const composerParts = useMemo(
-    () => parseComposerParts(spaceAroundChips(value)),
-    [value]
-  )
+  const composerParts = useMemo(() => parseComposerParts(draft), [draft])
 
-  useEffect(() => {
-    const next = spaceAroundChips(value)
-    if (next !== value) onChange(next)
-  }, [onChange, value])
   const hasInlineChips = composerParts.some(part => part.type !== 'text')
   let chipRenderIndex = -1
 
@@ -1078,9 +1188,6 @@ export function Composer({
                         onMouseEnter={() => setSelectedFilePath(file.path)}
                         onClick={() => {
                           insertFileChip(file)
-                          window.requestAnimationFrame(() => {
-                            focusActiveComposerInput()
-                          })
                         }}
                         className={cn(
                           'hover:bg-muted flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left',
@@ -1153,9 +1260,6 @@ export function Composer({
                             onMouseEnter={() => setSelectedSlashKey(item.key)}
                             onClick={() => {
                               insertMcpChip(server)
-                              window.requestAnimationFrame(() => {
-                                focusActiveComposerInput()
-                              })
                             }}
                             className={cn(
                               'hover:bg-muted flex w-full flex-col rounded-md px-2 py-1.5 text-left',
@@ -1212,9 +1316,6 @@ export function Composer({
                           onMouseEnter={() => setSelectedSlashKey(item.key)}
                           onClick={() => {
                             insertSkillChip(skill)
-                            window.requestAnimationFrame(() => {
-                              focusActiveComposerInput()
-                            })
                           }}
                           className={cn(
                             'hover:bg-muted flex w-full flex-col rounded-md px-2 py-1.5 text-left',
@@ -1437,7 +1538,7 @@ export function Composer({
                     type="button"
                     className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-4 items-center justify-center rounded-full"
                     onClick={() => {
-                      onChange(removeComposerChipAt(value, chipIndex))
+                      commitDraft(removeComposerChipAt(draft, chipIndex))
                       onFileChipsChange?.([])
                     }}
                     aria-label={`Remove @${name}`}
@@ -1467,13 +1568,13 @@ export function Composer({
                       )
                     }
                   >
-                    Skill: {part.name}
+                    {part.name}
                   </button>
                   <button
                     type="button"
                     className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-4 items-center justify-center rounded-full"
                     onClick={() => {
-                      onChange(removeComposerChipAt(value, chipIndex))
+                      commitDraft(removeComposerChipAt(draft, chipIndex))
                       onSkillChipsChange([])
                     }}
                     aria-label={`Remove skill ${part.name}`}
@@ -1500,13 +1601,13 @@ export function Composer({
                       window.open(href, '_blank', 'noopener,noreferrer')
                     }
                   >
-                    MCP: {part.name}
+                    {part.name}
                   </button>
                   <button
                     type="button"
                     className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-4 items-center justify-center rounded-full"
                     onClick={() => {
-                      onChange(removeComposerChipAt(value, chipIndex))
+                      commitDraft(removeComposerChipAt(draft, chipIndex))
                     }}
                     aria-label={`Remove MCP ${part.name}`}
                   >
@@ -1537,14 +1638,11 @@ export function Composer({
               setCaretPos(absolute + localCaret)
             }
 
-            // Size to glyphs via mirror span. Inputs default to size=20 which
-            // otherwise forces ~20ch of empty space before each chip.
+            // Only the empty composer (no chips, no text) shows a placeholder.
             const showPlaceholder =
-              isLastText &&
-              !part.text &&
-              (!hasInlineChips
+              isLastText && !part.text && !hasInlineChips
                 ? 'Ask Agent, @ for context, / for skills & MCPs'
-                : 'Add a follow-up…')
+                : undefined
 
             // Always render the same wrapper/input structure so React
             // reconciles (keeps focus) instead of remounting when the empty
@@ -1557,7 +1655,7 @@ export function Composer({
                   'relative inline-grid max-w-full align-middle',
                   emptyLastText &&
                     (hasInlineChips
-                      ? 'min-w-[11rem]'
+                      ? 'min-w-[0.5rem]'
                       : 'w-[min(100%,24rem)] min-w-[12rem]')
                 )}
               >
@@ -1569,8 +1667,43 @@ export function Composer({
                 </span>
                 <input
                   ref={node => {
-                    if (node) textInputRefs.current.set(partIndex, node)
-                    else textInputRefs.current.delete(partIndex)
+                    if (!node) {
+                      textInputRefs.current.delete(partIndex)
+                      return
+                    }
+                    textInputRefs.current.set(partIndex, node)
+                    const pending = pendingCaretRef.current
+                    if (pending == null) return
+                    // Focus as soon as the owning input mounts (chip insert).
+                    let absolute = 0
+                    for (let index = 0; index < partIndex; index += 1) {
+                      const item = composerParts[index]
+                      if (item.type === 'text') absolute += item.text.length
+                      else absolute += chipTokenLength(item)
+                    }
+                    const tokenStart = absolute
+                    const tokenEnd = absolute + part.text.length
+                    const isLastText =
+                      partIndex ===
+                      composerParts.reduce(
+                        (last, item, index) =>
+                          item.type === 'text' ? index : last,
+                        0
+                      )
+                    if (
+                      (pending >= tokenStart && pending <= tokenEnd) ||
+                      (isLastText && pending >= tokenStart)
+                    ) {
+                      const local = Math.min(
+                        Math.max(0, pending - tokenStart),
+                        node.value.length
+                      )
+                      node.focus({ preventScroll: true })
+                      node.setSelectionRange(local, local)
+                      pendingCaretRef.current = null
+                      setCaretPos(tokenStart + local)
+                      setFocusedPartIndex(partIndex)
+                    }
                   }}
                   value={part.text}
                   size={1}
@@ -1956,6 +2089,7 @@ export function Composer({
                   align="start"
                   side="top"
                   className="w-64 overflow-hidden p-0"
+                  onCloseAutoFocus={event => event.preventDefault()}
                 >
                   <div className="text-muted-foreground border-b px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
                     Specialist
@@ -2071,6 +2205,7 @@ export function Composer({
                   sideOffset={6}
                   className="w-[16.5rem] overflow-hidden p-0"
                   onOpenAutoFocus={event => event.preventDefault()}
+                  onCloseAutoFocus={event => event.preventDefault()}
                 >
                   <div className="flex items-center justify-between gap-2 border-b px-2.5 py-1.5">
                     <span className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">

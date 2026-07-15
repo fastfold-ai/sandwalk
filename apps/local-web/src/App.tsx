@@ -780,6 +780,11 @@ export default function App() {
   } = chat
 
   sessionIdRef.current = sessionId
+  // Live draft from Composer keystrokes (not lifted into React state on each type).
+  const composerLiveRef = useRef(composer)
+  useEffect(() => {
+    composerLiveRef.current = composer
+  }, [composer, sessionId])
 
   const patchChat = useCallback(
     (
@@ -2161,17 +2166,18 @@ export default function App() {
     if (sessionId !== keepId) navigate(`/agents/${keepId}`)
   }
 
-  const sendMessage = async () => {
+  const sendMessage = async (composerOverride?: string) => {
+    const composerText = composerOverride ?? composerLiveRef.current ?? composer
     const legacySkills = composerSkills
-      .filter(name => !composer.includes(`⟦/:${name}⟧`))
+      .filter(name => !composerText.includes(`⟦/:${name}⟧`))
       .map(name => `/${name}`)
     const legacyFiles = composerFiles
-      .filter(path => !composer.includes(`⟦@:${path}⟧`))
+      .filter(path => !composerText.includes(`⟦@:${path}⟧`))
       .map(path => `@${path}`)
     const content = [
       ...legacySkills,
       ...legacyFiles,
-      composerToMessage(composer)
+      composerToMessage(composerText)
     ]
       .filter(Boolean)
       .join(' ')
@@ -2191,9 +2197,10 @@ export default function App() {
       setConnectionLimitDismissed(false)
     }
     const targetSessionId = sessionId
-    const previousComposer = composer
+    const previousComposer = composerText
     const previousSkills = composerSkills
     const previousFiles = composerFiles
+    composerLiveRef.current = ''
     patchChat(targetSessionId, {
       composer: '',
       composerSkills: [],
@@ -2220,6 +2227,7 @@ export default function App() {
         messagesLoaded: true
       }))
     } catch (cause) {
+      composerLiveRef.current = previousComposer
       patchChat(targetSessionId, {
         composer: previousComposer,
         composerSkills: previousSkills,
@@ -2252,7 +2260,16 @@ export default function App() {
 
   const selectSessionSpecialist = async (specialistId: string | null) => {
     if (!session) return
-    await updateSession(session, { specialistId })
+    try {
+      const updated = await client.updateSession(session.id, { specialistId })
+      setSessions(current =>
+        current.map(item => (item.id === updated.id ? updated : item))
+      )
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to update agent'
+      )
+    }
   }
 
   const refreshSessionSandbox = useCallback(
@@ -2877,10 +2894,17 @@ export default function App() {
   const setComposer = useCallback(
     (value: string | ((current: string) => string)) => {
       if (!sessionId) return
-      patchChat(sessionId, prev => ({
-        ...prev,
-        composer: typeof value === 'function' ? value(prev.composer) : value
-      }))
+      patchChat(sessionId, prev => {
+        const next =
+          typeof value === 'function'
+            ? value(composerLiveRef.current)
+            : value
+        composerLiveRef.current = next
+        return {
+          ...prev,
+          composer: next
+        }
+      })
     },
     [patchChat, sessionId]
   )
@@ -4608,13 +4632,16 @@ export default function App() {
                           sandboxPhase={sessionSandboxPhase}
                           showAura={false}
                           onChange={setComposer}
+                          onLiveDraftChange={text => {
+                            composerLiveRef.current = text
+                          }}
                           onSkillChipsChange={setComposerSkills}
                           onFileChipsChange={setComposerFiles}
                           onOpenFile={path => {
                             setFilesPanelCollapsed(false)
                             setPendingOpenPath(path)
                           }}
-                          onSend={() => void sendMessage()}
+                          onSend={text => void sendMessage(text)}
                           onStop={() =>
                             sessionId && void client.interrupt(sessionId)
                           }
@@ -5091,13 +5118,16 @@ export default function App() {
                           sandboxPhase={sessionSandboxPhase}
                           showAura={false}
                           onChange={setComposer}
+                          onLiveDraftChange={text => {
+                            composerLiveRef.current = text
+                          }}
                           onSkillChipsChange={setComposerSkills}
                           onFileChipsChange={setComposerFiles}
                           onOpenFile={path => {
                             setFilesPanelCollapsed(false)
                             setPendingOpenPath(path)
                           }}
-                          onSend={() => void sendMessage()}
+                          onSend={text => void sendMessage(text)}
                           onStop={() =>
                             sessionId && void client.interrupt(sessionId)
                           }

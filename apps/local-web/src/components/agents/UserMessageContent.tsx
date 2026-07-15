@@ -89,7 +89,7 @@ export function UserMessageContent({
               className="border-border/70 bg-muted/40 text-foreground inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 align-middle text-xs hover:underline"
             >
               <Plug className="text-muted-foreground size-3.5 shrink-0" />
-              <span className="max-w-[200px] truncate">MCP: {part.name}</span>
+              <span className="max-w-[200px] truncate">{part.name}</span>
             </a>
           )
         }
@@ -102,7 +102,7 @@ export function UserMessageContent({
             className="border-primary/30 bg-primary/5 text-foreground inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 align-middle text-xs hover:underline"
           >
             <Sparkles className="text-primary/80 size-3.5 shrink-0" />
-            <span className="max-w-[200px] truncate">Skill: {part.name}</span>
+            <span className="max-w-[200px] truncate">{part.name}</span>
           </a>
         )
       })}
