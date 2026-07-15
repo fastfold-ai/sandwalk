@@ -19,7 +19,7 @@ from typing import Any
 
 from rich.table import Table
 
-from agent.config import CONFIG_DIR, CONFIG_FILE, Config, OPENAI_COMPATIBLE_PROVIDERS
+from agent.config import CONFIG_DIR, CONFIG_FILE, OPENAI_COMPATIBLE_PROVIDERS, Config
 from tools import EXPERIMENTAL_CATEGORIES, ensure_loaded, tool_load_errors
 
 logger = logging.getLogger("doctor")
@@ -650,8 +650,8 @@ def _check_sandbox_backend(cfg: Config) -> DoctorCheck:
             category="runtime",
             fix="sandwalk config set sandbox.backend builtin",
         )
-    from agent.sandbox_probe import modal_tokens_present
     from agent.sandbox_deps import ensure_modal_deps
+    from agent.sandbox_probe import modal_tokens_present
 
     present, detail = modal_tokens_present(cfg)
     if not present:

@@ -17,9 +17,10 @@ import subprocess
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from deepagents.backends import CompositeBackend, FilesystemBackend
 
@@ -34,7 +35,7 @@ from agent.sandbox_sync import (
 logger = logging.getLogger(__name__)
 
 _SESSION_LOCK = threading.RLock()
-_ACTIVE_SESSIONS: dict[str, "SandboxHandle"] = {}
+_ACTIVE_SESSIONS: dict[str, SandboxHandle] = {}
 _SEED_LOCKS: dict[str, threading.Lock] = {}
 _SEED_LOCKS_GUARD = threading.Lock()
 # Modal sync APIs must not run on a thread that already has an asyncio loop

@@ -738,7 +738,7 @@ class PromptBudgetBucket(ApiModel):
     tokens: int = 0
     chars: int = 0
     count: int | None = None
-    children: list["PromptBudgetBucket"] = Field(default_factory=list)
+    children: list[PromptBudgetBucket] = Field(default_factory=list)
 
 
 class PromptBudgetToolCounts(ApiModel):

@@ -20,6 +20,7 @@ expect.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -370,8 +371,9 @@ def build_skills_index_text(
     Mirrors ``SkillsMiddleware`` formatting (name, description, path hint) so
     Prompts estimates match first-turn input context.
     """
-    from agent.skills import list_skills, skill_info
     from deepagents.middleware.skills import SKILLS_SYSTEM_PROMPT
+
+    from agent.skills import list_skills, skill_info
 
     if allowed_skill_names is not None:
         skills = []

@@ -22,6 +22,7 @@ from agent_server.models import (
     EventEnvelope,
     McpServer,
     MessageRole,
+    SandboxBackendChoice,
     SessionStatus,
     Specialist,
 )
@@ -36,6 +37,24 @@ except ImportError:  # pragma: no cover - Windows
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def _parse_sandbox_backend(raw: str | None) -> SandboxBackendChoice | None:
+    if raw is None:
+        return None
+    candidate = str(raw).strip().lower()
+    if candidate == "builtin":
+        return "builtin"
+    if candidate == "modal":
+        return "modal"
+    return None
+
+
+def _require_sandbox_backend(raw: str | None) -> SandboxBackendChoice:
+    parsed = _parse_sandbox_backend(raw)
+    if parsed is None:
+        raise ValueError("sandbox_backend must be 'builtin' or 'modal'")
+    return parsed
 
 
 class AgentStoreError(RuntimeError):
@@ -361,13 +380,13 @@ class AgentStore:
                 """
             )
 
+        from agent.config import Config
+        from agent.tool_tiers import apply_core_tool_defaults
         from agent_server.default_specialists import (
             ensure_default_specialist_tool_names,
             ensure_default_specialists,
             ensure_fast_computational_scientist,
         )
-        from agent.config import Config
-        from agent.tool_tiers import apply_core_tool_defaults
 
         ensure_default_specialists(self)
         ensure_fast_computational_scientist(self)
@@ -398,11 +417,9 @@ class AgentStore:
     def _session(row: sqlite3.Row) -> AgentSession:
         keys = set(row.keys())
         raw_backend = row["sandbox_backend"] if "sandbox_backend" in keys else None
-        sandbox_backend = None
-        if raw_backend is not None:
-            normalized = str(raw_backend).strip().lower()
-            if normalized in {"builtin", "modal"}:
-                sandbox_backend = normalized
+        sandbox_backend = _parse_sandbox_backend(
+            None if raw_backend is None else str(raw_backend)
+        )
         return AgentSession(
             id=row["id"],
             title=row["title"],
@@ -533,10 +550,7 @@ class AgentStore:
             raise ValueError(f"Specialist not found: {specialist_id}")
         normalized_backend = None
         if sandbox_backend is not None:
-            candidate = str(sandbox_backend).strip().lower()
-            if candidate not in {"builtin", "modal"}:
-                raise ValueError("sandbox_backend must be 'builtin' or 'modal'")
-            normalized_backend = candidate
+            normalized_backend = _require_sandbox_backend(sandbox_backend)
 
         now = utc_now()
         created = created_at or now
@@ -658,10 +672,7 @@ class AgentStore:
         next_sandbox_backend = current.sandbox_backend
         if update_sandbox_backend:
             if sandbox_backend is not None:
-                candidate = str(sandbox_backend).strip().lower()
-                if candidate not in {"builtin", "modal"}:
-                    raise ValueError("sandbox_backend must be 'builtin' or 'modal'")
-                next_sandbox_backend = candidate
+                next_sandbox_backend = _require_sandbox_backend(sandbox_backend)
             else:
                 next_sandbox_backend = None
         now = utc_now()

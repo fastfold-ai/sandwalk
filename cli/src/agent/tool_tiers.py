@@ -6,7 +6,7 @@ not in the registry and are always available — they are not listed here.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 # Registry tool IDs that stay enabled by default so the agent can run skills,
 # sandbox workflows, and common ID lookups without the full ~190-tool surface.

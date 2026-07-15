@@ -16,10 +16,11 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from agent.model_catalog import (
     REASONING_EFFORT_LEVELS,
@@ -156,7 +157,7 @@ class BenchmarkRun:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def default_questions() -> list[BenchmarkQuestion]:
@@ -388,9 +389,10 @@ def invoke_case(
     config: Any | None = None,
 ) -> BenchmarkCaseResult:
     """Run a single benchmark case against a live (or injected) model."""
+    from langchain_core.messages import HumanMessage
+
     from agent.config import Config
     from agent.deepagents_runtime import build_chat_model
-    from langchain_core.messages import HumanMessage
 
     cfg = config if config is not None else Config.load()
     factory = build_model or build_chat_model

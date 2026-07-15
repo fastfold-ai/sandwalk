@@ -7,7 +7,7 @@ import logging
 import shutil
 import subprocess
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 
