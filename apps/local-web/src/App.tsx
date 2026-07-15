@@ -145,18 +145,14 @@ import {
   toComposerModelOptions
 } from '@/lib/composer-models'
 import { useChatScroll } from '@/hooks/useChatScroll'
+import { useSessionChatState } from '@/hooks/useSessionChatState'
+import { useSessionChatSend } from '@/hooks/useSessionChatSend'
+import { useSessionChatStream } from '@/hooks/useSessionChatStream'
 import { validateIntegrationOrProbeModal } from '@/lib/app-helpers'
 import {
-  applyChatPatch,
-  buildSendContent,
-  reduceChatOnAgentEvent
-} from '@/lib/chat-actions'
-import {
   AUTO_TITLE_FIRST_RESPONSE_THRESHOLD,
-  emptySessionChatState,
   groupSessions,
   isLowSignalTitle,
-  type SessionChatState,
   visibleSessionIds
 } from '@/lib/sessions'
 import {
@@ -257,8 +253,6 @@ const ToolsView = lazy(() =>
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8787'
 /** Soft warn: live SSE streams start crowding the browser's ~6 conn/host limit. */
 const CONCURRENT_RUN_SOFT_LIMIT = 3
-/** Hard confirm: starting another run is likely to stall files/chat. */
-const CONCURRENT_RUN_HARD_LIMIT = 5
 
 export default function App() {
   const location = useLocation()
@@ -305,9 +299,6 @@ export default function App() {
   )
   const [sessionPreviews, setSessionPreviews] = useState<
     Record<string, string>
-  >({})
-  const [chatBySessionId, setChatBySessionId] = useState<
-    Record<string, SessionChatState>
   >({})
   const [skills, setSkills] = useState<AgentSkill[]>([])
   const [skillDetail, setSkillDetail] = useState<AgentSkillDetail | null>(null)
@@ -384,7 +375,6 @@ export default function App() {
     Record<string, string>
   >({})
   const onboardingAutoOpenedRef = useRef(false)
-  const streamControllersRef = useRef<Map<string, AbortController>>(new Map())
   const sessionIdRef = useRef<string | null>(null)
   const loadSessionsRef = useRef<(() => Promise<void>) | null>(null)
   const createSessionInFlightRef = useRef(false)
@@ -650,6 +640,36 @@ export default function App() {
       : null
   const session = sessions.find(item => item.id === sessionId) || null
 
+  const {
+    chatBySessionId,
+    setChatBySessionId,
+    chatBySessionIdRef,
+    patchChat,
+    messages,
+    tools,
+    todosByRunId,
+    runIdByMessageId,
+    usageByRunId,
+    tokenUsage,
+    activeRunId,
+    runActive,
+    liveDelta,
+    composer,
+    composerSkills,
+    composerFiles,
+    queuedMessages,
+    expandedToolRunKeys,
+    messagesLoaded,
+    setComposer,
+    setComposerSkills,
+    setComposerFiles,
+    composerLiveRef,
+    editingQueuedId,
+    setEditingQueuedId,
+    pendingImmediateSendRef,
+    drainingQueueRef
+  } = useSessionChatState(sessionId)
+
   const patchOpenTabs = useCallback(
     (scopeKey: string, updater: (current: string[]) => string[]) => {
       setOpenTabsByProject(current => {
@@ -697,64 +717,50 @@ export default function App() {
     : 0
   const showConnectionLimitWarning =
     runningCount >= CONCURRENT_RUN_SOFT_LIMIT && !connectionLimitDismissed
-  const chat = sessionId
-    ? chatBySessionId[sessionId] ?? emptySessionChatState()
-    : emptySessionChatState()
+
+  useSessionChatStream({
+    client,
+    health,
+    sessionId,
+    sessionIdRef,
+    sessions,
+    runningSessionIdsKey,
+    chatBySessionIdRef,
+    patchChat,
+    setSessions,
+    setWorkspaceVersion,
+    setError,
+    loadSessionsRef
+  })
+
   const {
-    messages,
-    tools,
-    todosByRunId,
-    runIdByMessageId,
-    usageByRunId,
-    tokenUsage,
-    activeRunId,
+    handleComposerSend,
+    editQueuedMessage,
+    cancelEditQueuedMessage,
+    removeQueuedMessage,
+    sendQueuedMessageNow
+  } = useSessionChatSend({
+    client,
+    sessionId,
+    sessions,
     runActive,
-    liveDelta,
     composer,
     composerSkills,
     composerFiles,
+    composerLiveRef,
     queuedMessages,
-    expandedToolRunKeys,
-    messagesLoaded
-  } = chat
+    editingQueuedId,
+    setEditingQueuedId,
+    pendingImmediateSendRef,
+    drainingQueueRef,
+    chatBySessionIdRef,
+    patchChat,
+    setSessions,
+    setError,
+    setConnectionLimitDismissed
+  })
 
   sessionIdRef.current = sessionId
-  // Live draft from Composer keystrokes (not lifted into React state on each type).
-  const composerLiveRef = useRef(composer)
-  useEffect(() => {
-    composerLiveRef.current = composer
-  }, [composer, sessionId])
-
-  const [editingQueuedId, setEditingQueuedId] = useState<string | null>(null)
-  const pendingImmediateSendRef = useRef<{
-    sessionId: string
-    text: string
-  } | null>(null)
-  const drainingQueueRef = useRef(false)
-
-  useEffect(() => {
-    setEditingQueuedId(null)
-  }, [sessionId])
-
-  const patchChat = useCallback(
-    (
-      id: string,
-      patch:
-        | Partial<SessionChatState>
-        | ((prev: SessionChatState) => SessionChatState)
-    ) => {
-      setChatBySessionId(current => {
-        const prev = current[id] ?? emptySessionChatState()
-        const next = applyChatPatch(prev, patch)
-        if (next === prev) return current
-        return { ...current, [id]: next }
-      })
-    },
-    []
-  )
-
-  const chatBySessionIdRef = useRef(chatBySessionId)
-  chatBySessionIdRef.current = chatBySessionId
 
   const prefetchSessionMessages = useCallback(
     async (id: string, signal?: AbortSignal) => {
@@ -1658,41 +1664,6 @@ export default function App() {
     }
   }, [location.pathname, routeProjectId])
 
-  useEffect(() => {
-    if (!health || !sessionId) return
-    if (chatBySessionIdRef.current[sessionId]?.messagesLoaded) return
-
-    // Empty/new sessions: show the empty composer immediately, hydrate in background.
-    const meta = sessions.find(item => item.id === sessionId)
-    if (meta && !meta.lastMessageAt && meta.status === 'idle') {
-      patchChat(sessionId, prev =>
-        prev.messagesLoaded
-          ? prev
-          : { ...prev, messages: [], messagesLoaded: true }
-      )
-    }
-
-    const controller = new AbortController()
-    void client
-      .listMessages(sessionId, controller.signal)
-      .then(history => {
-        patchChat(sessionId, prev => ({
-          ...prev,
-          messages: history,
-          messagesLoaded: true
-        }))
-      })
-      .catch((cause: unknown) => {
-        if (!controller.signal.aborted) {
-          setError(
-            cause instanceof Error ? cause.message : 'Unable to load messages'
-          )
-        }
-      })
-    return () => controller.abort()
-    // Intentionally omit `sessions` — only re-hydrate when the active session changes.
-  }, [client, health, patchChat, sessionId])
-
   const [showChatSkeleton, setShowChatSkeleton] = useState(false)
   useEffect(() => {
     if (messagesLoaded || runActive || !sessionId) {
@@ -1702,106 +1673,6 @@ export default function App() {
     const timer = window.setTimeout(() => setShowChatSkeleton(true), 180)
     return () => window.clearTimeout(timer)
   }, [messagesLoaded, runActive, sessionId])
-
-  useEffect(() => {
-    if (!health) {
-      for (const controller of streamControllersRef.current.values()) {
-        controller.abort()
-      }
-      streamControllersRef.current.clear()
-      return
-    }
-
-    // Only stream the active session + any currently running sessions.
-    // An SSE per open tab exhausts the browser's ~6 HTTP/1.1 connections/host,
-    // which leaves file content fetches stuck in (pending).
-    const wanted = new Set<string>()
-    if (sessionId) wanted.add(sessionId)
-    for (const id of runningSessionIdsKey.split(',').filter(Boolean)) {
-      wanted.add(id)
-    }
-
-    for (const [id, controller] of [...streamControllersRef.current]) {
-      if (!wanted.has(id)) {
-        controller.abort()
-        streamControllersRef.current.delete(id)
-      }
-    }
-
-    for (const id of wanted) {
-      if (streamControllersRef.current.has(id)) continue
-      const controller = new AbortController()
-      streamControllersRef.current.set(id, controller)
-
-      void client
-        .streamEvents(id, {
-          signal: controller.signal,
-          onEvent: (event: AgentEvent) => {
-            patchChat(id, prev => reduceChatOnAgentEvent(prev, event))
-
-            if (event.type === 'run.started') {
-              setSessions(current =>
-                current.map(item =>
-                  item.id === id
-                    ? { ...item, status: 'running' as const }
-                    : item
-                )
-              )
-              void client.listMessages(id).then(history => {
-                patchChat(id, prev => ({
-                  ...prev,
-                  messages: history,
-                  messagesLoaded: true
-                }))
-              })
-            } else if (event.type === 'session.updated') {
-              void loadSessionsRef.current?.()
-            } else if (
-              event.type === 'run.completed' ||
-              event.type === 'run.failed' ||
-              event.type === 'run.interrupted'
-            ) {
-              const nextStatus =
-                event.type === 'run.failed'
-                  ? ('error' as const)
-                  : event.type === 'run.interrupted'
-                  ? ('interrupted' as const)
-                  : ('idle' as const)
-              setSessions(current =>
-                current.map(item =>
-                  item.id === id ? { ...item, status: nextStatus } : item
-                )
-              )
-              if (event.type === 'run.completed') {
-                setWorkspaceVersion(current => current + 1)
-              }
-              void client.listMessages(id).then(history => {
-                patchChat(id, prev => ({
-                  ...prev,
-                  messages: history,
-                  messagesLoaded: true
-                }))
-              })
-              void loadSessionsRef.current?.()
-            }
-          }
-        })
-        .catch((cause: unknown) => {
-          if (!controller.signal.aborted && sessionIdRef.current === id) {
-            setError(
-              cause instanceof Error
-                ? cause.message
-                : 'Event stream disconnected'
-            )
-          }
-        })
-        .finally(() => {
-          if (streamControllersRef.current.get(id) === controller) {
-            streamControllersRef.current.delete(id)
-          }
-        })
-    }
-  }, [client, health, patchChat, runningSessionIdsKey, sessionId])
 
   useEffect(() => {
     if (!sessionId) return
@@ -1993,200 +1864,6 @@ export default function App() {
     setOpenTabIds(current => current.filter(id => id === keepId))
     if (sessionId !== keepId) navigate(`/agents/${keepId}`)
   }
-
-  const sendMessage = async (composerOverride?: string) => {
-    const composerText = composerOverride ?? composerLiveRef.current ?? composer
-    const content = buildSendContent({
-      composerText,
-      composerSkills,
-      composerFiles
-    })
-    if (!sessionId || !content || runActive) return
-    const othersRunning = sessions.filter(
-      item => item.status === 'running' && item.id !== sessionId
-    ).length
-    if (othersRunning + 1 >= CONCURRENT_RUN_HARD_LIMIT) {
-      const proceed = window.confirm(
-        `You already have ${othersRunning} agent${
-          othersRunning === 1 ? '' : 's'
-        } running. Browsers allow about 6 live connections to the local API, so files and chat can freeze with this many concurrent runs.\n\nStart another run anyway?`
-      )
-      if (!proceed) return
-    } else if (othersRunning + 1 >= CONCURRENT_RUN_SOFT_LIMIT) {
-      setConnectionLimitDismissed(false)
-    }
-    const targetSessionId = sessionId
-    const previousComposer = composerText
-    const previousSkills = composerSkills
-    const previousFiles = composerFiles
-    composerLiveRef.current = ''
-    patchChat(targetSessionId, {
-      composer: '',
-      composerSkills: [],
-      composerFiles: []
-    })
-    setError(null)
-    try {
-      await client.sendMessage(targetSessionId, content)
-      patchChat(targetSessionId, prev => ({
-        ...prev,
-        runActive: true
-      }))
-      setSessions(current =>
-        current.map(item =>
-          item.id === targetSessionId
-            ? { ...item, status: 'running' as const }
-            : item
-        )
-      )
-      const history = await client.listMessages(targetSessionId)
-      patchChat(targetSessionId, prev => ({
-        ...prev,
-        messages: history,
-        messagesLoaded: true
-      }))
-    } catch (cause) {
-      composerLiveRef.current = previousComposer
-      patchChat(targetSessionId, {
-        composer: previousComposer,
-        composerSkills: previousSkills,
-        composerFiles: previousFiles
-      })
-      setError(
-        cause instanceof Error ? cause.message : 'Unable to send message'
-      )
-    }
-  }
-
-  const clearComposerDraft = useCallback(
-    (id: string) => {
-      composerLiveRef.current = ''
-      patchChat(id, {
-        composer: '',
-        composerSkills: [],
-        composerFiles: []
-      })
-    },
-    [patchChat]
-  )
-
-  const handleComposerSend = (text: string) => {
-    if (!sessionId) return
-    const trimmed = text.trim()
-    if (!trimmed) return
-
-    if (editingQueuedId) {
-      patchChat(sessionId, prev => ({
-        ...prev,
-        queuedMessages: prev.queuedMessages.map(item =>
-          item.id === editingQueuedId ? { ...item, text } : item
-        )
-      }))
-      setEditingQueuedId(null)
-      clearComposerDraft(sessionId)
-      return
-    }
-
-    if (runActive) {
-      patchChat(sessionId, prev => ({
-        ...prev,
-        queuedMessages: [
-          ...prev.queuedMessages,
-          { id: crypto.randomUUID(), text }
-        ]
-      }))
-      clearComposerDraft(sessionId)
-      return
-    }
-
-    void sendMessage(text)
-  }
-
-  const editQueuedMessage = (id: string) => {
-    if (!sessionId) return
-    const item = queuedMessages.find(message => message.id === id)
-    if (!item) return
-    setEditingQueuedId(id)
-    composerLiveRef.current = item.text
-    patchChat(sessionId, {
-      composer: item.text,
-      composerSkills: [],
-      composerFiles: []
-    })
-  }
-
-  const cancelEditQueuedMessage = () => {
-    if (!sessionId) {
-      setEditingQueuedId(null)
-      return
-    }
-    setEditingQueuedId(null)
-    clearComposerDraft(sessionId)
-  }
-
-  const removeQueuedMessage = (id: string) => {
-    if (!sessionId) return
-    if (editingQueuedId === id) {
-      setEditingQueuedId(null)
-      clearComposerDraft(sessionId)
-    }
-    patchChat(sessionId, prev => ({
-      ...prev,
-      queuedMessages: prev.queuedMessages.filter(item => item.id !== id)
-    }))
-  }
-
-  const sendQueuedMessageNow = (id: string) => {
-    if (!sessionId) return
-    const item = queuedMessages.find(message => message.id === id)
-    if (!item) return
-    if (editingQueuedId === id) {
-      setEditingQueuedId(null)
-      clearComposerDraft(sessionId)
-    }
-    patchChat(sessionId, prev => ({
-      ...prev,
-      queuedMessages: prev.queuedMessages.filter(message => message.id !== id)
-    }))
-    if (runActive) {
-      pendingImmediateSendRef.current = {
-        sessionId,
-        text: item.text
-      }
-      void client.interrupt(sessionId)
-      return
-    }
-    void sendMessage(item.text)
-  }
-
-  useEffect(() => {
-    if (!sessionId || runActive || drainingQueueRef.current) return
-
-    const pending = pendingImmediateSendRef.current
-    if (pending && pending.sessionId === sessionId) {
-      pendingImmediateSendRef.current = null
-      drainingQueueRef.current = true
-      void sendMessage(pending.text).finally(() => {
-        drainingQueueRef.current = false
-      })
-      return
-    }
-
-    const queued =
-      chatBySessionIdRef.current[sessionId]?.queuedMessages ?? []
-    if (queued.length === 0) return
-    const next = queued[0]
-    drainingQueueRef.current = true
-    patchChat(sessionId, prev => ({
-      ...prev,
-      queuedMessages: prev.queuedMessages.filter(item => item.id !== next.id)
-    }))
-    void sendMessage(next.text).finally(() => {
-      drainingQueueRef.current = false
-    })
-    // Drain when a run finishes or when the queue gains items while idle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sendMessage closes over session state
-  }, [runActive, sessionId, queuedMessages.length])
 
   const loadSkillDetail = useCallback(
     (name: string) => client.getSkill(name),
@@ -2839,48 +2516,6 @@ export default function App() {
       setBatchBusy(false)
     }
   }
-
-  const setComposer = useCallback(
-    (value: string | ((current: string) => string)) => {
-      if (!sessionId) return
-      patchChat(sessionId, prev => {
-        const next =
-          typeof value === 'function'
-            ? value(composerLiveRef.current)
-            : value
-        composerLiveRef.current = next
-        return {
-          ...prev,
-          composer: next
-        }
-      })
-    },
-    [patchChat, sessionId]
-  )
-
-  const setComposerSkills = useCallback(
-    (value: string[] | ((current: string[]) => string[])) => {
-      if (!sessionId) return
-      patchChat(sessionId, prev => ({
-        ...prev,
-        composerSkills:
-          typeof value === 'function' ? value(prev.composerSkills) : value
-      }))
-    },
-    [patchChat, sessionId]
-  )
-
-  const setComposerFiles = useCallback(
-    (value: string[] | ((current: string[]) => string[])) => {
-      if (!sessionId) return
-      patchChat(sessionId, prev => ({
-        ...prev,
-        composerFiles:
-          typeof value === 'function' ? value(prev.composerFiles) : value
-      }))
-    },
-    [patchChat, sessionId]
-  )
 
   useEffect(() => {
     const path = pendingMentionRef.current
