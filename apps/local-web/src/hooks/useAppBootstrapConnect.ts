@@ -17,6 +17,7 @@ import {
   nextFromSearch,
   sanitizeAuthReturnTo
 } from '@/lib/auth-routing'
+import { dedupeAsync } from '@/lib/dedupe-async'
 import {
   clampOnboardingStep,
   isOnboardingPath,
@@ -54,9 +55,9 @@ export function useAppBootstrapConnect({
   const [error, setError] = useState<string | null>(null)
   const [errorStack, setErrorStack] = useState<string | null>(null)
   const onboardingAutoOpenedRef = useRef(false)
+  const locationRef = useRef(location)
+  locationRef.current = location
 
-  // Depend on stable loader callbacks — never the whole `loaders` object
-  // (it is a new reference every render and would retrigger connect forever).
   const {
     loadSessions,
     loadProjects,
@@ -74,19 +75,20 @@ export function useAppBootstrapConnect({
     setConnecting(true)
     setError(null)
     setErrorStack(null)
+    const loc = locationRef.current
+    const scope = backendUrl
+
     const goToLogin = () => {
-      const alreadyNext = nextFromSearch(location.search)
+      const alreadyNext = nextFromSearch(loc.search)
       const deepLink =
-        location.pathname === '/'
+        loc.pathname === '/'
           ? null
-          : sanitizeAuthReturnTo(
-              `${location.pathname}${location.search}${location.hash}`
-            )
+          : sanitizeAuthReturnTo(`${loc.pathname}${loc.search}${loc.hash}`)
       needsAuthLoginRef.current = true
       setHealth(null)
       setNeedsAuthLogin(true)
       const target = loginPathWithNext(alreadyNext || deepLink)
-      if (`${location.pathname}${location.search}` !== target) {
+      if (`${loc.pathname}${loc.search}` !== target) {
         navigate(target, { replace: true })
       }
     }
@@ -95,14 +97,18 @@ export function useAppBootstrapConnect({
       if (needsAuthLoginRef.current) {
         return
       }
-      const nextHealth = await client.health()
+      const nextHealth = await dedupeAsync(`health:${scope}`, () =>
+        client.health()
+      )
       if (needsAuthLoginRef.current) return
       localStorage.setItem('fastfold.backend.url', backendUrl)
 
       let authEnabled = false
       let authenticated: boolean | null = null
       try {
-        const status = await client.authStatus()
+        const status = await dedupeAsync(`auth-status:${scope}`, () =>
+          client.authStatus()
+        )
         authEnabled = Boolean(status.authEnabled)
         authenticated =
           typeof status.authenticated === 'boolean'
@@ -121,7 +127,9 @@ export function useAppBootstrapConnect({
         }
         if (authenticated === null) {
           try {
-            await client.getRuntimeSettings()
+            await dedupeAsync(`runtime:${scope}`, () =>
+              client.getRuntimeSettings()
+            )
           } catch (cause) {
             if (isAuthCredentialError(cause)) {
               goToLogin()
@@ -144,19 +152,23 @@ export function useAppBootstrapConnect({
         loadMcpServers(),
         loadMcpCatalog(),
         loadSpecialists(),
-        client.getRuntimeSettings(),
-        client.getSandboxSettings().catch(() => null),
+        dedupeAsync(`runtime:${scope}`, () => client.getRuntimeSettings()),
+        dedupeAsync(`sandbox:${scope}`, () =>
+          client.getSandboxSettings().catch(() => null)
+        ),
         loadModelOptions()
       ])
       if (needsAuthLoginRef.current) return
       setRuntimeSettings(settings as RuntimeSettings)
       setSandboxSettings(sandbox as SandboxSettings | null)
       try {
-        const onboarding = await client.getOnboardingSettings()
+        const onboarding = await dedupeAsync(`onboarding:${scope}`, () =>
+          client.getOnboardingSettings()
+        )
         const step = clampOnboardingStep(onboarding.step)
         if (!onboarding.completed && !onboardingAutoOpenedRef.current) {
           onboardingAutoOpenedRef.current = true
-          if (!isOnboardingPath(location.pathname)) {
+          if (!isOnboardingPath(loc.pathname)) {
             navigate(onboardingPath(step), { replace: true })
             return
           }
@@ -164,7 +176,7 @@ export function useAppBootstrapConnect({
       } catch {
         // Older backends may not expose onboarding settings yet.
       }
-      const returnTo = nextFromSearch(location.search)
+      const returnTo = nextFromSearch(loc.search)
       if (returnTo) {
         navigate(returnTo, { replace: true })
       }
@@ -210,9 +222,6 @@ export function useAppBootstrapConnect({
     loadSessions,
     loadSkills,
     loadSpecialists,
-    location.hash,
-    location.pathname,
-    location.search,
     navigate,
     setRuntimeSettings,
     setSandboxSettings

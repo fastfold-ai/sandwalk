@@ -17,6 +17,7 @@ import {
   type ComposerModelOption,
   toComposerModelOptions
 } from '@/lib/composer-models'
+import { dedupeAsync } from '@/lib/dedupe-async'
 import type { SessionChatState } from '@/lib/sessions'
 
 type UseAppBootstrapLoadersArgs = {
@@ -53,7 +54,8 @@ export function useAppBootstrapLoaders({
   sessionPreviewsRef.current = sessionPreviews
 
   const loadSessions = useCallback(async () => {
-    const nextSessions = await client.listSessions()
+    const key = `sessions:${client.baseUrl}`
+    const nextSessions = await dedupeAsync(key, () => client.listSessions())
     setSessions(nextSessions)
     setChatBySessionId(current => {
       let changed = false
@@ -68,9 +70,7 @@ export function useAppBootstrapLoaders({
       }
       return changed ? next : current
     })
-    // Intentionally skip message-preview fetches here — bootstrap used to fan
-    // out listMessages for 12 sessions on every connect (including /). Home
-    // loads previews lazily via loadSessionPreviews for visible cards only.
+    // Previews load lazily from Home via loadSessionPreviews.
   }, [client, setChatBySessionId])
 
   loadSessionsRef.current = loadSessions
@@ -98,7 +98,13 @@ export function useAppBootstrapLoaders({
             cursor += 1
             const id = missing[index]
             try {
-              const history = await client.listMessages(id, signal)
+              // Dedupe concurrent StrictMode remounts for the same session.
+              // Avoid binding AbortSignal into the shared promise — remount aborts
+              // would cancel the coalesced fetch for every waiter.
+              const history = await dedupeAsync(
+                `preview:${client.baseUrl}:${id}`,
+                () => client.listMessages(id)
+              )
               if (signal?.aborted) return
               entries.push([
                 id,
@@ -130,11 +136,16 @@ export function useAppBootstrapLoaders({
   )
 
   const loadProjects = useCallback(async () => {
-    setProjects(await client.listProjects())
+    const items = await dedupeAsync(`projects:${client.baseUrl}`, () =>
+      client.listProjects()
+    )
+    setProjects(items)
   }, [client])
 
   const loadSkills = useCallback(async () => {
-    const items = await client.listSkills()
+    const items = await dedupeAsync(`skills:${client.baseUrl}`, () =>
+      client.listSkills()
+    )
     const seen = new Set<string>()
     const unique = items.filter(skill => {
       const key = skill.name.trim().toLowerCase()
@@ -146,17 +157,29 @@ export function useAppBootstrapLoaders({
   }, [client])
 
   const loadIntegrations = useCallback(async () => {
-    setIntegrations(await client.listIntegrations())
+    setIntegrations(
+      await dedupeAsync(`integrations:${client.baseUrl}`, () =>
+        client.listIntegrations()
+      )
+    )
   }, [client])
 
   const loadMcpServers = useCallback(async () => {
-    setMcpServers(await client.listMcpServers())
+    setMcpServers(
+      await dedupeAsync(`mcp-servers:${client.baseUrl}`, () =>
+        client.listMcpServers()
+      )
+    )
   }, [client])
 
   const loadMcpCatalog = useCallback(async () => {
     setMcpCatalogLoading(true)
     try {
-      setMcpCatalog(await client.listMcpCatalog())
+      setMcpCatalog(
+        await dedupeAsync(`mcp-catalog:${client.baseUrl}`, () =>
+          client.listMcpCatalog()
+        )
+      )
     } finally {
       setMcpCatalogLoading(false)
     }
@@ -169,7 +192,11 @@ export function useAppBootstrapLoaders({
   const loadSpecialists = useCallback(async () => {
     setSpecialistsLoading(true)
     try {
-      setSpecialists(await client.listSpecialists())
+      setSpecialists(
+        await dedupeAsync(`specialists:${client.baseUrl}`, () =>
+          client.listSpecialists()
+        )
+      )
     } catch {
       setSpecialists([])
     } finally {
@@ -179,13 +206,17 @@ export function useAppBootstrapLoaders({
 
   const loadModelOptions = useCallback(async () => {
     try {
-      const [models, profiles] = await Promise.all([
-        client.listModels({
-          enabledOnly: true,
-          discover: true
-        }),
-        client.listModelProfiles().catch(() => [])
-      ])
+      const [models, profiles] = await dedupeAsync(
+        `models:${client.baseUrl}`,
+        () =>
+          Promise.all([
+            client.listModels({
+              enabledOnly: true,
+              discover: true
+            }),
+            client.listModelProfiles().catch(() => [])
+          ])
+      )
       const backendsByProfileId = Object.fromEntries(
         (profiles || []).map(profile => [profile.id, profile.backend])
       )

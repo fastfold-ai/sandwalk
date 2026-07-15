@@ -62,12 +62,9 @@ export function HomeView({
 
   useEffect(() => {
     if (!recentIdsKey) return
-    const controller = new AbortController()
-    void onLoadPreviews(
-      recentIdsKey.split(',').filter(Boolean),
-      controller.signal
-    )
-    return () => controller.abort()
+    // Do not AbortController here — React StrictMode remounts abort in-flight
+    // previews and show noisy canceled requests. In-flight + cache dedupe is enough.
+    void onLoadPreviews(recentIdsKey.split(',').filter(Boolean))
   }, [onLoadPreviews, recentIdsKey])
 
   const projectNames = new Map(
