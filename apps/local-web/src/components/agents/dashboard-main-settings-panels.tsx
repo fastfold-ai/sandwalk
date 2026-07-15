@@ -1,6 +1,5 @@
 import { onboardingPath } from '@/lib/onboarding'
 
-import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 import {
   AgentPromptsView,
   AgentRuntimeView,
@@ -15,6 +14,7 @@ import {
   StorageView,
   ToolsView
 } from './dashboard-main-views-lazy'
+import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 
 export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
   const {
@@ -43,6 +43,8 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     loadServerStatus,
     loadAccountForUi,
     logoutAccount,
+    changeBackend,
+    disconnectBackend,
     loadStorage,
     loadEnvironment,
     loadIntegrations,
@@ -67,6 +69,8 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         connected={Boolean(health)}
         onLoadAccount={loadAccountForUi}
         onLogoutAccount={logoutAccount}
+        onChangeBackend={changeBackend}
+        onDisconnectBackend={disconnectBackend}
         onOpenSetupWizard={() => {
           navigate(onboardingPath('welcome'))
         }}

@@ -96,6 +96,8 @@ export type DashboardMainViewsProps = {
     signal?: AbortSignal
   }) => ReturnType<LocalAgentClient['getAccount']>
   logoutAccount: (signal?: AbortSignal) => ReturnType<LocalAgentClient['logoutAccount']>
+  changeBackend: (url: string, apiKey?: string) => void | Promise<void>
+  disconnectBackend: () => void | Promise<void>
   loadStorage: (signal?: AbortSignal) => ReturnType<LocalAgentClient['getStorage']>
   loadEnvironment: (signal?: AbortSignal) => ReturnType<LocalAgentClient['getEnvironment']>
   refreshSessionSandbox: (

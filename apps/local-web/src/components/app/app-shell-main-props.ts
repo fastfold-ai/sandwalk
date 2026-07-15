@@ -111,6 +111,8 @@ export type AppShellMainProps = {
   loadServerStatus: DashboardMainViewsProps['loadServerStatus']
   loadAccountForUi: DashboardMainViewsProps['loadAccountForUi']
   logoutAccount: DashboardMainViewsProps['logoutAccount']
+  changeBackend: DashboardMainViewsProps['changeBackend']
+  disconnectBackend: DashboardMainViewsProps['disconnectBackend']
   loadStorage: DashboardMainViewsProps['loadStorage']
   loadEnvironment: DashboardMainViewsProps['loadEnvironment']
   refreshSessionSandbox: DashboardMainViewsProps['refreshSessionSandbox']

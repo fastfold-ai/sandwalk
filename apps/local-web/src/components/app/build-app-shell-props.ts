@@ -168,6 +168,8 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     loadServerStatus: input.bootstrap.loadServerStatus,
     loadAccountForUi: input.bootstrap.loadAccountForUi,
     logoutAccount: input.bootstrap.logoutAccount,
+    changeBackend: input.bootstrap.changeBackend,
+    disconnectBackend: input.bootstrap.disconnectBackend,
     loadStorage: input.bootstrap.loadStorage,
     loadEnvironment: input.bootstrap.loadEnvironment,
     refreshSessionSandbox: input.sandbox.refreshSessionSandbox,

@@ -12,7 +12,8 @@ export function SandwalkServerCard({
   compact = false,
   flat = false,
   title,
-  trailing
+  trailing,
+  actions
 }: {
   version?: string | null
   running: boolean
@@ -21,6 +22,8 @@ export function SandwalkServerCard({
   flat?: boolean
   title?: string | null
   trailing?: ReactNode
+  /** Extra controls rendered beside Help (non-compact card). */
+  actions?: ReactNode
 }) {
   const statusBadge = (
     <span
@@ -109,7 +112,10 @@ export function SandwalkServerCard({
         </div>
         <p className="text-muted-foreground text-sm">{subtitle}</p>
       </div>
-      <SandwalkServerHelpDialog />
+      <div className="flex shrink-0 flex-wrap items-center gap-1">
+        {actions}
+        <SandwalkServerHelpDialog />
+      </div>
     </section>
   )
 }

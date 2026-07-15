@@ -1,14 +1,14 @@
 import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-import { AppGates } from '@/components/AppGates'
-import { AppShellConnected } from '@/components/app/AppShellConnected'
 import {
   buildSessionSidebarModel,
   computeShowSessionTabs,
   resolveActiveTitle
 } from '@/components/app/app-display'
+import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
+import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
 import {
@@ -227,6 +227,7 @@ export default function App() {
     setAuthLoginError: bootstrap.setAuthLoginError,
     connect: bootstrap.connect,
     submitAuthLogin: bootstrap.submitAuthLogin,
+    changeBackend: bootstrap.changeBackend,
     health: bootstrap.health,
     backendUrl: bootstrap.backendUrl,
     setBackendUrl: bootstrap.setBackendUrl,

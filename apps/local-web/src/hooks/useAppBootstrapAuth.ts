@@ -10,6 +10,11 @@ import {
   isBackendUnavailableError,
   normalizeAppError
 } from '@/lib/app-error'
+import {
+  DEFAULT_BACKEND_URL,
+  normalizeBackendUrl,
+  persistBackendUrl
+} from '@/lib/backend-url'
 import { cloudAccountDisplayName } from '@/lib/skills-catalog'
 
 type UseAppBootstrapAuthArgs = {
@@ -18,12 +23,15 @@ type UseAppBootstrapAuthArgs = {
   location: Location
   health: BackendHealth | null
   setHealth: (value: BackendHealth | null) => void
+  setBackendUrl: (value: string) => void
   setBackendApiKey: (value: string) => void
   setClientApiKey: (value: string | undefined) => void
   setRuntimeSettings: (value: RuntimeSettings | null) => void
+  setError: (value: string | null) => void
   needsAuthLoginRef: MutableRefObject<boolean>
   setNeedsAuthLogin: (value: boolean) => void
   setAuthBootstrapped: (value: boolean) => void
+  setConnectionPaused: (value: boolean) => void
   connectRef: MutableRefObject<(() => Promise<void>) | null>
 }
 
@@ -33,12 +41,15 @@ export function useAppBootstrapAuth({
   location,
   health,
   setHealth,
+  setBackendUrl,
   setBackendApiKey,
   setClientApiKey,
   setRuntimeSettings,
+  setError,
   needsAuthLoginRef,
   setNeedsAuthLogin,
   setAuthBootstrapped,
+  setConnectionPaused,
   connectRef
 }: UseAppBootstrapAuthArgs) {
   const [cloudUserName, setCloudUserName] = useState<string | null>(null)
@@ -149,6 +160,83 @@ export function useAppBootstrapAuth({
     ]
   )
 
+  const clearBackendSession = useCallback(() => {
+    needsAuthLoginRef.current = false
+    setNeedsAuthLogin(false)
+    setAuthLoginError(null)
+    setHealth(null)
+    setError(null)
+    setAuthBootstrapped(true)
+    setBackendApiKey('')
+    setClientApiKey(undefined)
+    setRuntimeSettings(null)
+    setCloudUserName(null)
+  }, [
+    needsAuthLoginRef,
+    setAuthBootstrapped,
+    setBackendApiKey,
+    setClientApiKey,
+    setError,
+    setHealth,
+    setNeedsAuthLogin,
+    setRuntimeSettings
+  ])
+
+  /** Drop the current backend session and show the connect gate again. */
+  const disconnectBackend = useCallback(async () => {
+    setConnectionPaused(true)
+    clearBackendSession()
+    if (location.pathname !== '/' || location.search) {
+      navigate('/', { replace: true })
+    }
+    try {
+      await client.logout()
+    } catch {
+      // Best-effort; UI already returned to the connect gate.
+    }
+  }, [
+    clearBackendSession,
+    client,
+    location.pathname,
+    location.search,
+    navigate,
+    setConnectionPaused
+  ])
+
+  /**
+   * Switch agent API URL (and optional key), clear session state, and reconnect.
+   * Pass an empty string to reset to the local default.
+   */
+  const changeBackend = useCallback(
+    async (nextUrl: string, nextApiKey?: string) => {
+      const normalized = normalizeBackendUrl(nextUrl || DEFAULT_BACKEND_URL)
+      persistBackendUrl(normalized)
+      setConnectionPaused(false)
+      clearBackendSession()
+      setBackendUrl(normalized)
+      setBackendApiKey(nextApiKey?.trim() || '')
+      if (location.pathname !== '/' || location.search) {
+        navigate('/', { replace: true })
+      }
+      try {
+        await client.logout()
+      } catch {
+        // Best-effort against the previous host.
+      }
+      // connect() re-runs via useEffect when client/backendUrl identity updates.
+    },
+    [
+      clearBackendSession,
+      client,
+      location.pathname,
+      location.search,
+      navigate,
+      setBackendApiKey,
+      setBackendUrl,
+      setConnectionPaused
+    ]
+  )
+
   const logoutSession = useCallback(async () => {
     needsAuthLoginRef.current = true
     setNeedsAuthLogin(true)
@@ -191,6 +279,8 @@ export function useAppBootstrapAuth({
     logoutAccount,
     refreshCloudUserName,
     submitAuthLogin,
-    logoutSession
+    logoutSession,
+    disconnectBackend,
+    changeBackend
   }
 }

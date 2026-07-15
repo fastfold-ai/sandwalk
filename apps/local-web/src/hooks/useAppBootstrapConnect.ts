@@ -17,6 +17,7 @@ import {
   nextFromSearch,
   sanitizeAuthReturnTo
 } from '@/lib/auth-routing'
+import { isLocalBackendUrl,persistBackendUrl } from '@/lib/backend-url'
 import { dedupeAsync } from '@/lib/dedupe-async'
 import {
   clampOnboardingStep,
@@ -52,6 +53,8 @@ export function useAppBootstrapConnect({
   const needsAuthLoginRef = useRef(false)
   const [authBootstrapped, setAuthBootstrapped] = useState(false)
   const [connecting, setConnecting] = useState(false)
+  /** User chose Disconnect — stay on the connect gate until Connect/Retry. */
+  const [connectionPaused, setConnectionPaused] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorStack, setErrorStack] = useState<string | null>(null)
   const onboardingAutoOpenedRef = useRef(false)
@@ -72,6 +75,7 @@ export function useAppBootstrapConnect({
   } = loaders
 
   const connect = useCallback(async () => {
+    setConnectionPaused(false)
     setConnecting(true)
     setError(null)
     setErrorStack(null)
@@ -101,7 +105,7 @@ export function useAppBootstrapConnect({
         client.health()
       )
       if (needsAuthLoginRef.current) return
-      localStorage.setItem('fastfold.backend.url', backendUrl)
+      persistBackendUrl(backendUrl)
 
       let authEnabled = false
       let authenticated: boolean | null = null
@@ -184,7 +188,7 @@ export function useAppBootstrapConnect({
       if (needsAuthLoginRef.current) return
       const message =
         cause instanceof Error ? cause.message : 'Unable to connect'
-      const isLocalBackend = /127\.0\.0\.1|localhost/i.test(backendUrl)
+      const isLocalBackend = isLocalBackendUrl(backendUrl)
       if (isAuthCredentialError(cause)) {
         try {
           const status = await client.authStatus()
@@ -230,20 +234,28 @@ export function useAppBootstrapConnect({
   connectRef.current = connect
 
   useEffect(() => {
-    if (needsAuthLogin) return
+    if (needsAuthLogin || connectionPaused) return
     void connect()
-  }, [connect, needsAuthLogin])
+  }, [connect, connectionPaused, needsAuthLogin])
 
   useEffect(() => {
-    if (needsAuthLogin || health || connecting) return
+    if (needsAuthLogin || connectionPaused || health || connecting) return
     if (!error) return
-    if (!/127\.0\.0\.1|localhost/i.test(backendUrl)) return
+    if (!isLocalBackendUrl(backendUrl)) return
     if (!isBackendUnavailableError(error)) return
     const timer = window.setInterval(() => {
       void connect()
     }, 5000)
     return () => window.clearInterval(timer)
-  }, [backendUrl, connect, connecting, error, health, needsAuthLogin])
+  }, [
+    backendUrl,
+    connect,
+    connecting,
+    connectionPaused,
+    error,
+    health,
+    needsAuthLogin
+  ])
 
   useEffect(() => {
     if (isDashboardModels || !health) return
@@ -259,6 +271,8 @@ export function useAppBootstrapConnect({
     authBootstrapped,
     setAuthBootstrapped,
     connecting,
+    connectionPaused,
+    setConnectionPaused,
     error,
     errorStack,
     setError,

@@ -1,12 +1,16 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { useMemo, useState } from 'react'
 
-const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8787'
+import {
+  normalizeBackendUrl,
+  readStoredBackendUrl
+} from '@/lib/backend-url'
 
 export function useAppBootstrapClient() {
-  const [backendUrl, setBackendUrl] = useState(
-    () => localStorage.getItem('fastfold.backend.url') || DEFAULT_BACKEND_URL
-  )
+  const [backendUrl, setBackendUrlState] = useState(readStoredBackendUrl)
+  const setBackendUrl = (value: string) => {
+    setBackendUrlState(normalizeBackendUrl(value))
+  }
   const [backendApiKey, setBackendApiKey] = useState('')
   const [clientApiKey, setClientApiKey] = useState<string | undefined>()
   const client = useMemo(

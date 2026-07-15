@@ -1,9 +1,10 @@
 import { Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ErrorPage } from '@/components/ErrorPage'
 import { MirageBackground } from '@/components/MirageBackground'
+import { ServerToggle } from '@/components/ServerToggle'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { cn } from '@/lib/utils'
 
@@ -14,16 +15,25 @@ export function LoginView({
   submitting = false,
   error = null,
   onRetry,
+  backendUrl,
+  onChangeBackend,
   className
 }: {
   onSubmit: (apiKey: string, remember: boolean) => void | Promise<void>
   submitting?: boolean
   error?: unknown | null
   onRetry?: () => void
+  backendUrl?: string
+  onChangeBackend?: (url: string) => void | Promise<void>
   className?: string
 }) {
   const [apiKey, setApiKey] = useState('')
   const [remember, setRemember] = useState(true)
+
+  // Different host → different key; don't keep a stale value in the form.
+  useEffect(() => {
+    setApiKey('')
+  }, [backendUrl])
 
   return (
     <div
@@ -123,6 +133,13 @@ export function LoginView({
           </div>
         </div>
       </main>
+      {backendUrl && onChangeBackend ? (
+        <ServerToggle
+          backendUrl={backendUrl}
+          onChangeBackend={onChangeBackend}
+          disabled={submitting}
+        />
+      ) : null}
       <ThemeToggle />
     </div>
   )

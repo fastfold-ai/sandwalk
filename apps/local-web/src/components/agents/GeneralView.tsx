@@ -2,10 +2,6 @@ import type { AccountSummary } from '@sandwalk/agent-ui-core'
 import { useCallback, useEffect, useState } from 'react'
 
 import {
-  listenSubtitle,
-  SandwalkServerCard
-} from '@/components/agents/SandwalkServerCard'
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -25,6 +21,7 @@ import {
 
 import { GeneralViewAboutSection } from './general-view-about'
 import { GeneralViewAccountSection } from './general-view-account'
+import { GeneralViewServerSection } from './general-view-server'
 import { GeneralViewThemesSection } from './general-view-themes'
 
 export function GeneralView({
@@ -33,7 +30,9 @@ export function GeneralView({
   connected,
   onLoadAccount,
   onLogoutAccount,
-  onOpenSetupWizard
+  onOpenSetupWizard,
+  onChangeBackend,
+  onDisconnectBackend
 }: {
   backendUrl: string
   backendVersion: string | null
@@ -44,6 +43,8 @@ export function GeneralView({
   }) => Promise<AccountSummary>
   onLogoutAccount: (signal?: AbortSignal) => Promise<AccountSummary>
   onOpenSetupWizard?: () => void
+  onChangeBackend: (url: string, apiKey?: string) => void | Promise<void>
+  onDisconnectBackend: () => void | Promise<void>
 }) {
   const [account, setAccount] = useState<AccountSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -113,7 +114,7 @@ export function GeneralView({
         <div>
           <h2 className="text-2xl font-semibold">General</h2>
           <p className="text-muted-foreground mt-2 text-sm">
-            Account, themes, local server, and app details.
+            Account, themes, agent server, and app details.
           </p>
         </div>
 
@@ -123,13 +124,12 @@ export function GeneralView({
           </div>
         ) : null}
 
-        <SandwalkServerCard
-          version={backendVersion}
-          running={connected}
-          subtitle={listenSubtitle({
-            running: connected,
-            backendUrl
-          })}
+        <GeneralViewServerSection
+          backendUrl={backendUrl}
+          backendVersion={backendVersion}
+          connected={connected}
+          onChangeBackend={onChangeBackend}
+          onDisconnectBackend={onDisconnectBackend}
         />
 
         <GeneralViewAccountSection

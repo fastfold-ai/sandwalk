@@ -45,12 +45,15 @@ export function useAppBootstrap({
     location,
     health: connectBundle.health,
     setHealth: connectBundle.setHealth,
+    setBackendUrl: clientBundle.setBackendUrl,
     setBackendApiKey: clientBundle.setBackendApiKey,
     setClientApiKey: clientBundle.setClientApiKey,
     setRuntimeSettings: loaders.setRuntimeSettings,
+    setError: connectBundle.setError,
     needsAuthLoginRef: connectBundle.needsAuthLoginRef,
     setNeedsAuthLogin: connectBundle.setNeedsAuthLogin,
     setAuthBootstrapped: connectBundle.setAuthBootstrapped,
+    setConnectionPaused: connectBundle.setConnectionPaused,
     connectRef
   })
 
@@ -110,6 +113,8 @@ export function useAppBootstrap({
     loadServerStatus: loaders.loadServerStatus,
     connect: connectBundle.connect,
     submitAuthLogin: auth.submitAuthLogin,
-    logoutSession: auth.logoutSession
+    logoutSession: auth.logoutSession,
+    disconnectBackend: auth.disconnectBackend,
+    changeBackend: auth.changeBackend
   }
 }

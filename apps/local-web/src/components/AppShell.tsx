@@ -154,6 +154,8 @@ export function AppShell(props: AppShellProps) {
           loadServerStatus={props.loadServerStatus}
           loadAccountForUi={props.loadAccountForUi}
           logoutAccount={props.logoutAccount}
+          changeBackend={props.changeBackend}
+          disconnectBackend={props.disconnectBackend}
           loadStorage={props.loadStorage}
           loadEnvironment={props.loadEnvironment}
           refreshSessionSandbox={props.refreshSessionSandbox}
