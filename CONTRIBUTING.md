@@ -6,7 +6,7 @@ Thanks for helping improve Sandwalk. This monorepo contains:
 |------|---------|
 | `cli/` | Python CLI + local agent server |
 | `apps/local-web/` | Dashboard (Vite + React) |
-| `apps/sandwalk-mac/` | macOS menubar app (Swift) |
+| `apps/sandwalk-mac/` | macOS app (Swift) |
 
 ## Prerequisites
 
