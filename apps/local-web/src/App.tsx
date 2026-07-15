@@ -55,10 +55,7 @@ import {
   Composer,
   type SandboxActionPhase
 } from '@/components/agents/Composer'
-import {
-  composerToMessage,
-  fileChipToken
-} from '@/components/agents/composer-parts'
+import { fileChipToken } from '@/components/agents/composer-parts'
 import {
   type DashboardSection,
   DashboardSidebar
@@ -176,6 +173,11 @@ import {
   toComposerModelOptions
 } from '@/lib/composer-models'
 import { validateIntegrationOrProbeModal } from '@/lib/app-helpers'
+import {
+  applyChatPatch,
+  buildSendContent,
+  reduceChatOnAgentEvent
+} from '@/lib/chat-actions'
 import {
   AUTO_TITLE_FIRST_RESPONSE_THRESHOLD,
   emptySessionChatState,
@@ -774,8 +776,7 @@ export default function App() {
     ) => {
       setChatBySessionId(current => {
         const prev = current[id] ?? emptySessionChatState()
-        const next =
-          typeof patch === 'function' ? patch(prev) : { ...prev, ...patch }
+        const next = applyChatPatch(prev, patch)
         if (next === prev) return current
         return { ...current, [id]: next }
       })
@@ -1767,13 +1768,9 @@ export default function App() {
         .streamEvents(id, {
           signal: controller.signal,
           onEvent: (event: AgentEvent) => {
+            patchChat(id, prev => reduceChatOnAgentEvent(prev, event))
+
             if (event.type === 'run.started') {
-              patchChat(id, prev => ({
-                ...prev,
-                runActive: true,
-                activeRunId: event.runId,
-                liveDelta: ''
-              }))
               setSessions(current =>
                 current.map(item =>
                   item.id === id
@@ -1790,105 +1787,6 @@ export default function App() {
               })
             } else if (event.type === 'session.updated') {
               void loadSessionsRef.current?.()
-            } else if (event.type === 'assistant.delta') {
-              patchChat(id, prev => ({
-                ...prev,
-                liveDelta: prev.liveDelta + event.payload.delta
-              }))
-            } else if (event.type === 'tool.started') {
-              const toolId = event.payload.toolCallId || event.id
-              patchChat(id, prev => {
-                if (prev.tools.some(tool => tool.id === toolId)) return prev
-                return {
-                  ...prev,
-                  tools: [
-                    ...prev.tools,
-                    {
-                      id: toolId,
-                      runId: event.runId,
-                      messageId: null,
-                      name: event.payload.name,
-                      status: 'pending' as const,
-                      args: event.payload.arguments,
-                      startedAt: event.timestamp
-                    }
-                  ]
-                }
-              })
-            } else if (event.type === 'tool.completed') {
-              patchChat(id, prev => ({
-                ...prev,
-                tools: prev.tools.map(tool =>
-                  tool.id === event.payload.toolCallId
-                    ? {
-                        ...tool,
-                        status: event.payload.isError
-                          ? ('error' as const)
-                          : ('completed' as const),
-                        result: event.payload.output,
-                        durationSeconds: event.payload.durationSeconds,
-                        endedAt: event.timestamp
-                      }
-                    : tool
-                )
-              }))
-            } else if (event.type === 'todos.updated') {
-              if (!event.runId) return
-              patchChat(id, prev => ({
-                ...prev,
-                todosByRunId: {
-                  ...prev.todosByRunId,
-                  [event.runId as string]: event.payload.todos
-                }
-              }))
-            } else if (event.type === 'run.usage') {
-              const payload = event.payload as Record<string, unknown>
-              const nextUsage = {
-                inputTokens: Number(
-                  payload.inputTokens ?? payload.input_tokens ?? 0
-                ),
-                outputTokens: Number(
-                  payload.outputTokens ?? payload.output_tokens ?? 0
-                )
-              }
-              patchChat(id, prev => ({
-                ...prev,
-                tokenUsage: nextUsage,
-                usageByRunId: event.runId
-                  ? {
-                      ...prev.usageByRunId,
-                      [event.runId as string]: nextUsage
-                    }
-                  : prev.usageByRunId
-              }))
-            } else if (event.type === 'assistant.message') {
-              patchChat(id, prev => {
-                const message = event.payload.message
-                const messages = prev.messages.some(
-                  item => item.id === message.id
-                )
-                  ? prev.messages
-                  : [...prev.messages, message]
-                return {
-                  ...prev,
-                  liveDelta: '',
-                  messages,
-                  messagesLoaded: true,
-                  runIdByMessageId: event.runId
-                    ? {
-                        ...prev.runIdByMessageId,
-                        [message.id]: event.runId as string
-                      }
-                    : prev.runIdByMessageId,
-                  tools: event.runId
-                    ? prev.tools.map(tool =>
-                        tool.runId === event.runId
-                          ? { ...tool, messageId: message.id }
-                          : tool
-                      )
-                    : prev.tools
-                }
-              })
             } else if (
               event.type === 'run.completed' ||
               event.type === 'run.failed' ||
@@ -1900,24 +1798,6 @@ export default function App() {
                   : event.type === 'run.interrupted'
                   ? ('interrupted' as const)
                   : ('idle' as const)
-              patchChat(id, prev => ({
-                ...prev,
-                runActive: false,
-                activeRunId: null,
-                liveDelta: '',
-                todosByRunId:
-                  event.runId && prev.todosByRunId[event.runId]
-                    ? {
-                        ...prev.todosByRunId,
-                        [event.runId]: prev.todosByRunId[event.runId].map(
-                          todo =>
-                            todo.status === 'in_progress'
-                              ? { ...todo, status: 'completed' as const }
-                              : todo
-                        )
-                      }
-                    : prev.todosByRunId
-              }))
               setSessions(current =>
                 current.map(item =>
                   item.id === id ? { ...item, status: nextStatus } : item
@@ -2147,20 +2027,11 @@ export default function App() {
 
   const sendMessage = async (composerOverride?: string) => {
     const composerText = composerOverride ?? composerLiveRef.current ?? composer
-    const legacySkills = composerSkills
-      .filter(name => !composerText.includes(`⟦/:${name}⟧`))
-      .map(name => `/${name}`)
-    const legacyFiles = composerFiles
-      .filter(path => !composerText.includes(`⟦@:${path}⟧`))
-      .map(path => `@${path}`)
-    const content = [
-      ...legacySkills,
-      ...legacyFiles,
-      composerToMessage(composerText)
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .trim()
+    const content = buildSendContent({
+      composerText,
+      composerSkills,
+      composerFiles
+    })
     if (!sessionId || !content || runActive) return
     const othersRunning = sessions.filter(
       item => item.status === 'running' && item.id !== sessionId
