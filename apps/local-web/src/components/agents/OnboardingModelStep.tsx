@@ -155,10 +155,12 @@ export function OnboardingModelStep({
   const [cloudSaved, setCloudSaved] = useState(false)
 
   const [localBackend, setLocalBackend] = useState<BackendValue>('ollama')
-  const [localUrl, setLocalUrl] = useState(PROFILE_BACKENDS[0]!.baseUrl)
+  const [localUrl, setLocalUrl] = useState<string>(PROFILE_BACKENDS[0]!.baseUrl)
   const [localKey, setLocalKey] = useState('')
   const [showLocalKey, setShowLocalKey] = useState(false)
-  const [localLabel, setLocalLabel] = useState(PROFILE_BACKENDS[0]!.defaultLabel)
+  const [localLabel, setLocalLabel] = useState<string>(
+    PROFILE_BACKENDS[0]!.defaultLabel
+  )
   const [discoverBusy, setDiscoverBusy] = useState(false)
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([])
   const [discoverSource, setDiscoverSource] = useState<string | null>(null)
