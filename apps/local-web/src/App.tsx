@@ -1,25 +1,18 @@
-import { Loader2, PanelLeft } from 'lucide-react'
+import { PanelLeft } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
 import { AgentSessionMainPanel } from '@/components/agents/AgentSessionMainPanel'
 import { AgentSessionSidebar } from '@/components/agents/AgentSessionSidebar'
-import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { fileChipToken } from '@/components/agents/composer-parts'
 import { DashboardMainViews } from '@/components/agents/DashboardMainViews'
 import {
   type DashboardSection,
   DashboardSidebar
 } from '@/components/agents/DashboardSidebar'
-import { LoginView } from '@/components/agents/LoginView'
-import { OnboardingWizardHost } from '@/components/agents/OnboardingWizardHost'
 import {
-  clampOnboardingStep,
   isOnboardingPath,
-  ONBOARDING_MAX_STEP,
-  onboardingPath,
-  onboardingStepDef,
   onboardingStepFromSlug
 } from '@/lib/onboarding'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
@@ -27,10 +20,8 @@ import {
   buildConversationTimeline
 } from '@/components/agents/transcript'
 import { AppDialogs } from '@/components/AppDialogs'
-import { ErrorPage } from '@/components/ErrorPage'
-import { SandwalkMark } from '@/components/SandwalkMark'
+import { AppGates } from '@/components/AppGates'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -47,12 +38,12 @@ import {
   SHELL_PANELS_AUTO_SAVE_ID,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   TERMINAL_OPEN_STORAGE_KEY,
-  writeCollapsedSidebarSections,
   writeLastSessionByScope,
   writeOpenTabsByProject,
   writeProjectScopeId
 } from '@/lib/app-storage'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
+import { useAppShellEffects } from '@/hooks/useAppShellEffects'
 import { useChatScroll } from '@/hooks/useChatScroll'
 import { useSessionActions } from '@/hooks/useSessionActions'
 import { useSessionChatState } from '@/hooks/useSessionChatState'
@@ -60,9 +51,7 @@ import { useSessionChatSend } from '@/hooks/useSessionChatSend'
 import { useSessionChatStream } from '@/hooks/useSessionChatStream'
 import { useSessionSandbox } from '@/hooks/useSessionSandbox'
 import {
-  AUTO_TITLE_FIRST_RESPONSE_THRESHOLD,
   groupSessions,
-  isLowSignalTitle,
   type SessionChatState,
   visibleSessionIds
 } from '@/lib/sessions'
@@ -70,7 +59,6 @@ import {
   parseCatalogSkillId,
   type SkillsViewMode
 } from '@/lib/skills-catalog'
-import { isBackendUnavailableError } from '@/lib/app-error'
 import { cn } from '@/lib/utils'
 import type {
   AgentSession,
@@ -139,9 +127,6 @@ export default function App() {
     Record<string, string>
   >({})
   const sessionIdRef = useRef<string | null>(null)
-  const autoTitlePassCountRef = useRef<Record<string, number>>({})
-  const autoTitleInFlightRef = useRef<Record<string, boolean>>({})
-  const prevRunActiveForTitleRef = useRef<Record<string, boolean>>({})
 
   const detailRoute = matchPath(
     '/dashboard/skills/:skillName',
@@ -695,174 +680,52 @@ export default function App() {
     setCollapsedSidebarSections
   })
 
-  useEffect(() => {
-    // Legacy /login URL → root (login renders under / when unauthenticated).
-    if (location.pathname === '/login') {
-      navigate('/', { replace: true })
-      return
-    }
-    if (location.pathname === '/agents/home') {
-      navigate('/', { replace: true })
-      return
-    }
-    if (location.pathname === '/dashboard/settings') {
-      navigate('/dashboard/general', { replace: true })
-      return
-    }
-    if (location.pathname === '/agents/skills') {
-      navigate('/dashboard/skills', { replace: true })
-      return
-    }
-    if (legacySkillRoute?.params.skillName) {
-      navigate(
-        `/dashboard/skills/${legacySkillRoute.params.skillName}`,
-        { replace: true }
-      )
-      return
-    }
-    if (location.pathname === '/agents/integrations') {
-      navigate('/dashboard/integrations', { replace: true })
-      return
-    }
-    if (legacyIntegrationRoute?.params.integrationKey) {
-      navigate(
-        `/dashboard/integrations/${legacyIntegrationRoute.params.integrationKey}`,
-        { replace: true }
-      )
-      return
-    }
-    if (onOnboardingPath) {
-      const canonical = onboardingPath(onboardingStep)
-      if (location.pathname !== canonical) {
-        navigate(canonical, { replace: true })
-      }
-    }
-  }, [
-    legacyIntegrationRoute?.params.integrationKey,
-    legacySkillRoute?.params.skillName,
-    location.pathname,
+  const { showChatSkeleton } = useAppShellEffects({
+    locationPathname: location.pathname,
     navigate,
+    legacySkillRouteName: legacySkillRoute?.params.skillName,
+    legacyIntegrationRouteKey: legacyIntegrationRoute?.params.integrationKey,
     onOnboardingPath,
-    onboardingStep
-  ])
-
-  useEffect(() => {
-    const base = 'sandwalk'
-    if (onOnboardingPath) {
-      const stepTitle = onboardingStepDef(onboardingStep).title
-      document.title = `Onboarding ${stepTitle} - ${base}`
-      return
-    }
-    if (session?.title) {
-      document.title = `${session.title} · ${base}`
-      return
-    }
-    if (isDashboardOverview) {
-      document.title = `Dashboard · ${base}`
-      return
-    }
-    if (isDashboardStatus) {
-      document.title = `Status · ${base}`
-      return
-    }
-    if (isDashboardGeneral) {
-      document.title = `General · ${base}`
-      return
-    }
-    if (isDashboardModels) {
-      document.title = `Models · ${base}`
-      return
-    }
-    if (isDashboardTools) {
-      document.title = `Tools · ${base}`
-      return
-    }
-    if (isDashboardDoctor) {
-      document.title = `Doctor · ${base}`
-      return
-    }
-    if (isDashboardStorage) {
-      document.title = `Storage · ${base}`
-      return
-    }
-    if (isDashboardEnvironment) {
-      document.title = `Environment · ${base}`
-      return
-    }
-    if (isSkills) {
-      document.title = `Skills · ${base}`
-      return
-    }
-    if (isDashboardSpecialists) {
-      document.title = `Specialists · ${base}`
-      return
-    }
-    if (isIntegrations) {
-      if (activeIntegration) {
-        document.title = `${activeIntegration.name} · Integrations · ${base}`
-        return
-      }
-      document.title = `Integrations · ${base}`
-      return
-    }
-    if (isDashboardData) {
-      document.title = `Datasets · ${base}`
-      return
-    }
-    if (isDashboardAgentSandbox) {
-      if (isSandboxLocalDetail) {
-        document.title = `Local Sandbox · ${base}`
-        return
-      }
-      if (isSandboxModalDetail) {
-        document.title = `Modal Sandbox · ${base}`
-        return
-      }
-      document.title = `Sandbox · ${base}`
-      return
-    }
-    if (isDashboardAgentPrompts) {
-      document.title = `Prompts · ${base}`
-      return
-    }
-    if (isDashboardAgentRuntime) {
-      document.title = `Runtime · ${base}`
-      return
-    }
-    if (isDashboardMcp) {
-      document.title = `MCP · ${base}`
-      return
-    }
-    if (activeProject) {
-      document.title = `${activeProject.name} · ${base}`
-      return
-    }
-    document.title = base
-  }, [
+    onboardingStep,
+    sessionTitle: session?.title,
     activeIntegration,
     activeProject,
-    isDashboardDoctor,
-    isDashboardStorage,
-    isDashboardEnvironment,
-    isDashboardAgentSandbox,
-    isDashboardAgentPrompts,
-    isDashboardAgentRuntime,
-    isSandboxLocalDetail,
-    isSandboxModalDetail,
-    isDashboardMcp,
     isDashboardOverview,
     isDashboardStatus,
     isDashboardGeneral,
     isDashboardModels,
-    isDashboardData,
     isDashboardTools,
+    isDashboardDoctor,
+    isDashboardStorage,
+    isDashboardEnvironment,
+    isSkills,
     isDashboardSpecialists,
     isIntegrations,
-    isSkills,
-    onOnboardingPath,
-    onboardingStep,
-    session?.title
-  ])
+    isDashboardData,
+    isDashboardAgentSandbox,
+    isSandboxLocalDetail,
+    isSandboxModalDetail,
+    isDashboardAgentPrompts,
+    isDashboardAgentRuntime,
+    isDashboardMcp,
+    sidebarCollapsed,
+    filesPanelCollapsed,
+    terminalOpen,
+    sidebarPanelRef,
+    filesPanelRef,
+    collapsedSidebarSections,
+    runningCount,
+    concurrentRunSoftLimit: CONCURRENT_RUN_SOFT_LIMIT,
+    setConnectionLimitDismissed,
+    routeProjectId,
+    setProjectScopeId,
+    messagesLoaded,
+    runActive,
+    sessionId,
+    client,
+    messages,
+    setSessions
+  })
 
   useEffect(() => {
     setIntegrationValues({})
@@ -968,130 +831,6 @@ export default function App() {
       cancelled = true
     }
   }, [client, sessionId, workspaceVersion])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        SIDEBAR_COLLAPSED_STORAGE_KEY,
-        sidebarCollapsed ? '1' : '0'
-      )
-    } catch {
-      // ignore storage failures
-    }
-  }, [sidebarCollapsed])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        FILES_PANEL_COLLAPSED_STORAGE_KEY,
-        filesPanelCollapsed ? '1' : '0'
-      )
-    } catch {
-      // ignore storage failures
-    }
-  }, [filesPanelCollapsed])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(TERMINAL_OPEN_STORAGE_KEY, terminalOpen ? '1' : '0')
-    } catch {
-      // ignore storage failures
-    }
-  }, [terminalOpen])
-
-  useEffect(() => {
-    const panel = sidebarPanelRef.current
-    if (!panel) return
-    if (sidebarCollapsed) {
-      if (!panel.isCollapsed()) panel.collapse()
-    } else if (panel.isCollapsed()) {
-      panel.expand()
-    }
-  }, [sidebarCollapsed])
-
-  useEffect(() => {
-    const panel = filesPanelRef.current
-    if (!panel) return
-    if (filesPanelCollapsed) {
-      if (!panel.isCollapsed()) panel.collapse()
-    } else if (panel.isCollapsed()) {
-      panel.expand()
-    }
-  }, [filesPanelCollapsed, sessionId])
-
-  useEffect(() => {
-    writeCollapsedSidebarSections(collapsedSidebarSections)
-  }, [collapsedSidebarSections])
-
-  useEffect(() => {
-    if (runningCount < CONCURRENT_RUN_SOFT_LIMIT) {
-      setConnectionLimitDismissed(false)
-    }
-  }, [runningCount])
-
-  useEffect(() => {
-    if (routeProjectId) {
-      setProjectScopeId(routeProjectId)
-      return
-    }
-    if (
-      location.pathname === '/' ||
-      location.pathname === '/agents/home'
-    ) {
-      setProjectScopeId(null)
-    }
-  }, [location.pathname, routeProjectId])
-
-  const [showChatSkeleton, setShowChatSkeleton] = useState(false)
-  useEffect(() => {
-    if (messagesLoaded || runActive || !sessionId) {
-      setShowChatSkeleton(false)
-      return
-    }
-    const timer = window.setTimeout(() => setShowChatSkeleton(true), 180)
-    return () => window.clearTimeout(timer)
-  }, [messagesLoaded, runActive, sessionId])
-
-  useEffect(() => {
-    if (!sessionId) return
-    const justFinished =
-      Boolean(prevRunActiveForTitleRef.current[sessionId]) && !runActive
-    prevRunActiveForTitleRef.current[sessionId] = runActive
-    if (!justFinished || autoTitleInFlightRef.current[sessionId]) return
-    const conversationCount = messages.filter(
-      message => message.role === 'user' || message.role === 'assistant'
-    ).length
-    if (conversationCount < AUTO_TITLE_FIRST_RESPONSE_THRESHOLD) return
-    if (!isLowSignalTitle(session?.title || '')) return
-    // Keep retrying while the stored title is still a placeholder (e.g. after
-    // a bad overwrite). Cap attempts so intentional untitled chats settle.
-    if ((autoTitlePassCountRef.current[sessionId] || 0) >= 3) return
-
-    autoTitleInFlightRef.current[sessionId] = true
-    const titledSessionId = sessionId
-    void (async () => {
-      try {
-        const updated = await client.autoTitleSession(titledSessionId, {
-          force: true
-        })
-        const title = String(updated.title || '').trim()
-        if (!title) return
-        setSessions(current =>
-          current.map(item =>
-            item.id === titledSessionId
-              ? { ...item, title, updatedAt: updated.updatedAt }
-              : item
-          )
-        )
-        autoTitlePassCountRef.current[titledSessionId] =
-          (autoTitlePassCountRef.current[titledSessionId] || 0) + 1
-      } catch {
-        // Best effort; retry on a later completed run.
-      } finally {
-        autoTitleInFlightRef.current[titledSessionId] = false
-      }
-    })()
-  }, [client, messages, runActive, session?.title, sessionId])
 
   useEffect(() => {
     const name = skillRouteName
@@ -1253,169 +992,33 @@ export default function App() {
     ? tools.filter(tool => tool.runId === activeRunId && !tool.messageId)
     : []
 
-  if (!authBootstrapped && !needsAuthLogin) {
-    return (
-      <main className="grid min-h-full place-items-center bg-[#f5f5f5] dark:bg-neutral-950">
-        <AuraIconPulse className="text-muted-foreground/50 h-12 w-12" />
-      </main>
-    )
-  }
-
-  if (needsAuthLogin) {
-    return (
-      <LoginView
-        submitting={authLoggingIn || connecting}
-        error={authLoginError}
-        onRetry={() => {
-          setAuthLoginError(null)
-          void connect()
-        }}
-        onSubmit={submitAuthLogin}
-      />
-    )
-  }
-
-  if (!health) {
-    const isLocalBackend = /127\.0\.0\.1|localhost/i.test(backendUrl)
-    const backendDown = Boolean(error) && isBackendUnavailableError(error)
-    const connectError = error
-      ? errorStack
-        ? Object.assign(new Error(error), { stack: errorStack })
-        : error
-      : null
-
-    // Local Mac / Vite dashboard: don't show the remote "Connect to backend"
-    // form. Wait for the API, then connect() sends you to Login when auth is on.
-    if (isLocalBackend) {
-      return (
-        <main className="bg-background grid h-full place-items-center p-6">
-          <div className="bg-card w-full max-w-md space-y-4 rounded-xl border p-6 text-center">
-            <div className="flex flex-col items-center gap-3">
-              <div className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-lg">
-                <SandwalkMark className="h-6 w-6" />
-              </div>
-              <div>
-                <h1 className="font-semibold">sandwalk</h1>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {backendDown
-                    ? 'Local agent API error'
-                    : connecting
-                      ? 'Waiting for the local agent API…'
-                      : 'Connecting…'}
-                </p>
-              </div>
-              {(connecting && !connectError) && (
-                <Loader2 className="text-muted-foreground size-5 animate-spin" />
-              )}
-            </div>
-            {connectError ? (
-              <ErrorPage
-                className="text-left"
-                variant="inline"
-                error={connectError}
-                onRetry={() => void connect()}
-                retryLabel="Retry"
-              />
-            ) : null}
-            {!connectError ? (
-              <Button
-                className="w-full"
-                disabled={connecting}
-                onClick={() => void connect()}
-              >
-                {connecting ? <Loader2 className="animate-spin" /> : null}
-                Retry
-              </Button>
-            ) : null}
-          </div>
-        </main>
-      )
-    }
-
-    return (
-      <main className="bg-background grid h-full place-items-center p-6">
-        <form
-          className="bg-card w-full max-w-lg rounded-xl border p-6"
-          onSubmit={event => {
-            event.preventDefault()
-            void connect()
-          }}
-        >
-          <div className="mb-6 flex items-center gap-3">
-            <div className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-lg">
-              <SandwalkMark className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="font-semibold">sandwalk</h1>
-              <p className="text-muted-foreground text-sm">
-                Connect to an agent backend
-              </p>
-            </div>
-          </div>
-          <Input
-            value={backendUrl}
-            onChange={event => setBackendUrl(event.target.value)}
-          />
-          <Input
-            className="mt-2"
-            type="password"
-            value={backendApiKey}
-            onChange={event => setBackendApiKey(event.target.value)}
-            placeholder="Backend API key (remote servers only)"
-          />
-          {error ? (
-            <ErrorPage
-              className="mt-3"
-              variant="inline"
-              error={
-                errorStack
-                  ? Object.assign(new Error(error), { stack: errorStack })
-                  : error
-              }
-            />
-          ) : null}
-          <Button className="mt-4 w-full" disabled={connecting}>
-            {connecting ? <Loader2 className="animate-spin" /> : null}
-            Connect
-          </Button>
-        </form>
-      </main>
-    )
-  }
-
-  // Dedicated setup pages — no dashboard chrome.
-  if (onOnboardingPath) {
-    return (
-      <div className="h-full min-h-0 overflow-hidden">
-        <OnboardingWizardHost
-          step={onboardingStep}
-          client={client}
-          onStepChange={next => {
-            const clamped = clampOnboardingStep(next)
-            void client
-              .updateOnboardingSettings({ step: clamped })
-              .catch(() => {})
-            navigate(onboardingPath(clamped))
-          }}
-          onFinish={() => {
-            void client
-              .updateOnboardingSettings({
-                completed: true,
-                step: ONBOARDING_MAX_STEP
-              })
-              .catch(() => {})
-            void loadModelOptions()
-            void loadIntegrations()
-            void loadSkills()
-            void loadMcpServers()
-            void loadMcpCatalog()
-            navigate('/', { replace: true })
-          }}
-          onExit={() => navigate('/')}
-        />
-      </div>
-    )
-  }
+  const gate = AppGates({
+    authBootstrapped,
+    needsAuthLogin,
+    authLoggingIn,
+    connecting,
+    authLoginError,
+    setAuthLoginError,
+    connect,
+    submitAuthLogin,
+    health,
+    backendUrl,
+    setBackendUrl,
+    backendApiKey,
+    setBackendApiKey,
+    error,
+    errorStack,
+    onOnboardingPath,
+    onboardingStep,
+    client,
+    navigate,
+    loadModelOptions,
+    loadIntegrations,
+    loadSkills,
+    loadMcpServers,
+    loadMcpCatalog
+  })
+  if (gate) return gate
 
   return (
     <>
