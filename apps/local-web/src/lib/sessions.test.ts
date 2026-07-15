@@ -25,6 +25,7 @@ describe('emptySessionChatState', () => {
     expect(state.messages).toEqual([])
     expect(state.runActive).toBe(false)
     expect(state.messagesLoaded).toBe(false)
+    expect(state.queuedMessages).toEqual([])
     expect(state.tokenUsage).toEqual({ inputTokens: 0, outputTokens: 0 })
   })
 })

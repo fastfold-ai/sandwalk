@@ -268,7 +268,9 @@ export function Composer({
   onSandboxStart,
   onSandboxStop,
   onSandboxRestart,
-  onLoadLocalSystem
+  onLoadLocalSystem,
+  editingQueued = false,
+  onCancelEditQueued
 }: {
   value: string
   running: boolean
@@ -323,6 +325,9 @@ export function Composer({
   onSandboxStop?: () => void | Promise<void>
   onSandboxRestart?: () => void | Promise<void>
   onLoadLocalSystem?: () => Promise<ServerSystemInfo | null>
+  /** When true, composer is editing a queued follow-up. */
+  editingQueued?: boolean
+  onCancelEditQueued?: () => void
 }) {
   const uploadRef = useRef<HTMLInputElement | null>(null)
   const textInputRefs = useRef<Map<number, HTMLInputElement>>(new Map())
@@ -1116,16 +1121,19 @@ export function Composer({
   }
 
   const handleSend = () => {
-    if (running) return
     const text = draftRef.current
     if (!text.trim()) return
     setAuraTick(tick => tick + 1)
     // Clear immediately — parent value may already be "" so the sync effect
     // would otherwise treat this as a no-op echo and leave the draft in place.
+    // While a run is active, parent queues instead of sending.
     emittedDraftRef.current = ''
     setLocalDraft('')
     onSend(text)
   }
+
+  const hasDraft = Boolean(draft.trim())
+  const showStopButton = running && !hasDraft
 
   const mentionMenuWasOpenRef = useRef(false)
   useEffect(() => {
@@ -1588,13 +1596,37 @@ export function Composer({
         </div>
       ) : null}
 
-      <form
-        onSubmit={event => {
-          event.preventDefault()
-          handleSend()
-        }}
-        className="bg-card focus-within:border-muted-foreground/40 border-border rounded-3xl border p-2 shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]"
+      <div
+        className={cn(
+          editingQueued &&
+            'overflow-hidden rounded-3xl border border-sky-500/40 bg-sky-500/5'
+        )}
       >
+        {editingQueued ? (
+          <div className="flex items-center justify-between px-3 py-1.5 text-[12px]">
+            <span className="text-sky-700 dark:text-sky-300">
+              Editing queued message
+            </span>
+            <button
+              type="button"
+              onClick={() => onCancelEditQueued?.()}
+              className="text-sky-700 hover:text-sky-900 dark:text-sky-300 dark:hover:text-sky-100 font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : null}
+        <form
+          onSubmit={event => {
+            event.preventDefault()
+            handleSend()
+          }}
+          className={cn(
+            'bg-card focus-within:border-muted-foreground/40 border-border rounded-3xl border p-2 shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',
+            editingQueued &&
+              'rounded-t-none border-x-0 border-b-0 border-t border-sky-500/25 shadow-none focus-within:border-sky-500/40'
+          )}
+        >
         <div
           className="min-h-12 max-h-32 overflow-y-auto px-2 py-1 text-[15px] leading-7"
           onClick={event => {
@@ -1739,7 +1771,9 @@ export function Composer({
             // Only the empty composer (no chips, no text) shows a placeholder.
             const showPlaceholder =
               isLastText && !part.text && !hasInlineChips
-                ? 'Ask Agent, @ for context, / for skills & MCPs'
+                ? running
+                  ? 'Add a follow-up'
+                  : 'Ask Agent, @ for context, / for skills & MCPs'
                 : undefined
 
             // Always render the same wrapper/input structure so React
@@ -2786,13 +2820,18 @@ export function Composer({
               </Tooltip>
             </TooltipProvider>
             <Button
-              type={running ? 'button' : 'submit'}
+              type={showStopButton ? 'button' : 'submit'}
               size="icon"
               className="bg-foreground text-background hover:bg-foreground/90 size-7 rounded-full shadow-none [&_svg]:text-background"
-              onClick={running ? onStop : undefined}
-              aria-label={running ? 'Stop' : 'Send'}
+              onClick={showStopButton ? onStop : undefined}
+              aria-label={
+                showStopButton ? 'Stop' : running ? 'Queue message' : 'Send'
+              }
+              title={
+                showStopButton ? 'Stop' : running ? 'Queue' : 'Send'
+              }
             >
-              {running ? (
+              {showStopButton ? (
                 <Square className="size-3 fill-current" />
               ) : (
                 <ArrowUp className="size-4" strokeWidth={2.5} />
@@ -2801,6 +2840,7 @@ export function Composer({
           </div>
         </div>
       </form>
+      </div>
     </div>
   )
 }

@@ -89,6 +89,7 @@ import {
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { ProjectSettingsDialog } from '@/components/agents/ProjectSettingsDialog'
+import { QueuedMessages } from '@/components/agents/QueuedMessages'
 import { ReasoningGhost } from '@/components/agents/ReasoningGhost'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
@@ -780,6 +781,7 @@ export default function App() {
     composer,
     composerSkills,
     composerFiles,
+    queuedMessages,
     expandedToolRunKeys,
     messagesLoaded
   } = chat
@@ -790,6 +792,17 @@ export default function App() {
   useEffect(() => {
     composerLiveRef.current = composer
   }, [composer, sessionId])
+
+  const [editingQueuedId, setEditingQueuedId] = useState<string | null>(null)
+  const pendingImmediateSendRef = useRef<{
+    sessionId: string
+    text: string
+  } | null>(null)
+  const drainingQueueRef = useRef(false)
+
+  useEffect(() => {
+    setEditingQueuedId(null)
+  }, [sessionId])
 
   const patchChat = useCallback(
     (
@@ -2243,6 +2256,136 @@ export default function App() {
       )
     }
   }
+
+  const clearComposerDraft = useCallback(
+    (id: string) => {
+      composerLiveRef.current = ''
+      patchChat(id, {
+        composer: '',
+        composerSkills: [],
+        composerFiles: []
+      })
+    },
+    [patchChat]
+  )
+
+  const handleComposerSend = (text: string) => {
+    if (!sessionId) return
+    const trimmed = text.trim()
+    if (!trimmed) return
+
+    if (editingQueuedId) {
+      patchChat(sessionId, prev => ({
+        ...prev,
+        queuedMessages: prev.queuedMessages.map(item =>
+          item.id === editingQueuedId ? { ...item, text } : item
+        )
+      }))
+      setEditingQueuedId(null)
+      clearComposerDraft(sessionId)
+      return
+    }
+
+    if (runActive) {
+      patchChat(sessionId, prev => ({
+        ...prev,
+        queuedMessages: [
+          ...prev.queuedMessages,
+          { id: crypto.randomUUID(), text }
+        ]
+      }))
+      clearComposerDraft(sessionId)
+      return
+    }
+
+    void sendMessage(text)
+  }
+
+  const editQueuedMessage = (id: string) => {
+    if (!sessionId) return
+    const item = queuedMessages.find(message => message.id === id)
+    if (!item) return
+    setEditingQueuedId(id)
+    composerLiveRef.current = item.text
+    patchChat(sessionId, {
+      composer: item.text,
+      composerSkills: [],
+      composerFiles: []
+    })
+  }
+
+  const cancelEditQueuedMessage = () => {
+    if (!sessionId) {
+      setEditingQueuedId(null)
+      return
+    }
+    setEditingQueuedId(null)
+    clearComposerDraft(sessionId)
+  }
+
+  const removeQueuedMessage = (id: string) => {
+    if (!sessionId) return
+    if (editingQueuedId === id) {
+      setEditingQueuedId(null)
+      clearComposerDraft(sessionId)
+    }
+    patchChat(sessionId, prev => ({
+      ...prev,
+      queuedMessages: prev.queuedMessages.filter(item => item.id !== id)
+    }))
+  }
+
+  const sendQueuedMessageNow = (id: string) => {
+    if (!sessionId) return
+    const item = queuedMessages.find(message => message.id === id)
+    if (!item) return
+    if (editingQueuedId === id) {
+      setEditingQueuedId(null)
+      clearComposerDraft(sessionId)
+    }
+    patchChat(sessionId, prev => ({
+      ...prev,
+      queuedMessages: prev.queuedMessages.filter(message => message.id !== id)
+    }))
+    if (runActive) {
+      pendingImmediateSendRef.current = {
+        sessionId,
+        text: item.text
+      }
+      void client.interrupt(sessionId)
+      return
+    }
+    void sendMessage(item.text)
+  }
+
+  useEffect(() => {
+    if (!sessionId || runActive || drainingQueueRef.current) return
+
+    const pending = pendingImmediateSendRef.current
+    if (pending && pending.sessionId === sessionId) {
+      pendingImmediateSendRef.current = null
+      drainingQueueRef.current = true
+      void sendMessage(pending.text).finally(() => {
+        drainingQueueRef.current = false
+      })
+      return
+    }
+
+    const queued =
+      chatBySessionIdRef.current[sessionId]?.queuedMessages ?? []
+    if (queued.length === 0) return
+    const next = queued[0]
+    drainingQueueRef.current = true
+    patchChat(sessionId, prev => ({
+      ...prev,
+      queuedMessages: prev.queuedMessages.filter(item => item.id !== next.id)
+    }))
+    void sendMessage(next.text).finally(() => {
+      drainingQueueRef.current = false
+    })
+    // Drain when a run finishes or when the queue gains items while idle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sendMessage closes over session state
+  }, [runActive, sessionId, queuedMessages.length])
 
   const loadSkillDetail = useCallback(
     (name: string) => client.getSkill(name),
@@ -4702,6 +4845,13 @@ export default function App() {
                             }}
                           />
                         </div>
+                        <QueuedMessages
+                          messages={queuedMessages}
+                          editingId={editingQueuedId}
+                          onEdit={editQueuedMessage}
+                          onSendNow={sendQueuedMessageNow}
+                          onRemove={removeQueuedMessage}
+                        />
                         <Composer
                           key={sessionId ?? 'empty-composer'}
                           value={composer}
@@ -4719,6 +4869,8 @@ export default function App() {
                           showAura={false}
                           autoFocus
                           focusKey={sessionId}
+                          editingQueued={Boolean(editingQueuedId)}
+                          onCancelEditQueued={cancelEditQueuedMessage}
                           onChange={setComposer}
                           onLiveDraftChange={text => {
                             composerLiveRef.current = text
@@ -4729,7 +4881,7 @@ export default function App() {
                             setFilesPanelCollapsed(false)
                             setPendingOpenPath(path)
                           }}
-                          onSend={text => void sendMessage(text)}
+                          onSend={handleComposerSend}
                           onStop={() =>
                             sessionId && void client.interrupt(sessionId)
                           }
@@ -5212,6 +5364,13 @@ export default function App() {
                         ) : null}
                       </div>
                       <div className="bg-background mx-auto w-full max-w-[44rem] shrink-0 px-5 pb-6 pt-2">
+                        <QueuedMessages
+                          messages={queuedMessages}
+                          editingId={editingQueuedId}
+                          onEdit={editQueuedMessage}
+                          onSendNow={sendQueuedMessageNow}
+                          onRemove={removeQueuedMessage}
+                        />
                         <Composer
                           key={sessionId ?? 'empty-composer'}
                           value={composer}
@@ -5229,6 +5388,8 @@ export default function App() {
                           showAura={false}
                           autoFocus
                           focusKey={sessionId}
+                          editingQueued={Boolean(editingQueuedId)}
+                          onCancelEditQueued={cancelEditQueuedMessage}
                           onChange={setComposer}
                           onLiveDraftChange={text => {
                             composerLiveRef.current = text
@@ -5239,7 +5400,7 @@ export default function App() {
                             setFilesPanelCollapsed(false)
                             setPendingOpenPath(path)
                           }}
-                          onSend={text => void sendMessage(text)}
+                          onSend={handleComposerSend}
                           onStop={() =>
                             sessionId && void client.interrupt(sessionId)
                           }

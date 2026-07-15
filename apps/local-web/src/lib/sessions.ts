@@ -15,8 +15,14 @@ export type SessionChatState = {
   composer: string
   composerSkills: string[]
   composerFiles: string[]
+  queuedMessages: QueuedMessage[]
   expandedToolRunKeys: Record<string, boolean>
   messagesLoaded: boolean
+}
+
+export type QueuedMessage = {
+  id: string
+  text: string
 }
 
 export function emptySessionChatState(): SessionChatState {
@@ -33,6 +39,7 @@ export function emptySessionChatState(): SessionChatState {
     composer: '',
     composerSkills: [],
     composerFiles: [],
+    queuedMessages: [],
     expandedToolRunKeys: {},
     messagesLoaded: false
   }

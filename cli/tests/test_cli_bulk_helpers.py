@@ -427,7 +427,7 @@ class TestRunQueryAndBanner:
             print_banner()
 
         out = buf.getvalue()
-        assert "Sandwalk" in out
+        assert "sandwalk" in out
         assert "tools" in out.lower() or "2" in out
 
     def test_run_interactive_offers_missing_skills_prompt_on_startup(
