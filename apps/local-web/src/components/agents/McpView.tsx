@@ -3,265 +3,25 @@ import type {
   McpCatalogEntry,
   McpServer,
 } from '@sandwalk/agent-ui-core'
-import {
-  ArrowRight,
-  ChevronDown,
-  ExternalLink,
-  KeyRound,
-  Loader2,
-  Plug,
-  Plus,
-  Trash2,
-} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { CardGridSkeleton } from '@/components/agents/PageSkeletons'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { cn } from '@/lib/utils'
 
-type HeaderRow = { id: string; name: string; value: string }
-type CustomMode = 'remote' | 'local'
-
-function newHeaderRow(): HeaderRow {
-  return { id: crypto.randomUUID(), name: '', value: '' }
-}
-
-function headersFromRows(rows: HeaderRow[]): Record<string, string> | null {
-  const out: Record<string, string> = {}
-  for (const row of rows) {
-    const name = row.name.trim()
-    const value = row.value
-    if (!name || !value) continue
-    out[name] = value
-  }
-  return Object.keys(out).length > 0 ? out : null
-}
-
-const MCP_ICONS: Record<string, { src: string; invertInDark?: boolean }> = {
-  tamarind: { src: '/integrations/tamarind.png' },
-  latch: { src: '/integrations/latch.png' },
-  neurosnap: { src: '/integrations/neurosnap.png' },
-  paperclip: { src: '/integrations/paperclip.png' },
-  linear: { src: '/integrations/linear.png' },
-}
-
-function McpToggle({
-  enabled,
-  pending,
-  label,
-  onToggle,
-}: {
-  enabled: boolean
-  pending?: boolean
-  label: string
-  onToggle: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      aria-label={label}
-      disabled={pending}
-      className={cn(
-        'relative inline-flex h-4 w-8 shrink-0 items-center rounded-full transition-colors',
-        enabled
-          ? 'bg-black/75 dark:bg-zinc-300/50'
-          : 'bg-zinc-200 dark:bg-zinc-700',
-        pending && 'cursor-not-allowed opacity-60',
-      )}
-      onClick={event => {
-        event.preventDefault()
-        event.stopPropagation()
-        onToggle()
-      }}
-    >
-      <span
-        className={cn(
-          'inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
-          enabled ? 'translate-x-4' : 'translate-x-0.5',
-        )}
-      />
-    </button>
-  )
-}
-
-function McpIcon({
-  id,
-  name,
-  size = 'sm',
-}: {
-  id: string
-  name: string
-  size?: 'sm' | 'lg'
-}) {
-  const icon = MCP_ICONS[id]
-  const box = size === 'lg' ? 'size-9' : 'size-6'
-  if (icon) {
-    return (
-      <img
-        src={icon.src}
-        alt=""
-        className={cn(
-          box,
-          'shrink-0 rounded object-contain',
-          icon.invertInDark && 'dark:invert',
-        )}
-      />
-    )
-  }
-  return (
-    <span
-      className={cn(
-        'bg-muted text-muted-foreground grid shrink-0 place-items-center rounded',
-        box,
-      )}
-    >
-      <Plug className={size === 'lg' ? 'size-5' : 'size-3.5'} />
-      <span className="sr-only">{name}</span>
-    </span>
-  )
-}
-
-function formatConnectError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err)
-  const jsonStart = raw.indexOf('{')
-  if (jsonStart >= 0) {
-    try {
-      const parsed = JSON.parse(raw.slice(jsonStart)) as { detail?: unknown }
-      if (typeof parsed.detail === 'string' && parsed.detail.trim()) {
-        return parsed.detail
-      }
-    } catch {
-      // fall through
-    }
-  }
-  return raw.replace(/^FastFold Agent API \d+:\s*/, '').trim() || raw
-}
-
-function authMeta(entry: McpCatalogEntry) {
-  const keysHref = entry.integrationKey
-    ? `/dashboard/integrations/${entry.integrationKey}`
-    : null
-  const apiKeyLabel = keysHref ? (
-    <a
-      href={keysHref}
-      className="text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
-    >
-      API key
-    </a>
-  ) : (
-    <span>API key</span>
-  )
-
-  if (entry.preferredAuth === 'oauth') {
-    if (entry.authMode === 'api_key_or_oauth') {
-      return (
-        <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-          OAuth · {apiKeyLabel}
-        </span>
-      )
-    }
-    return <span className="text-muted-foreground text-xs">OAuth</span>
-  }
-  return (
-    <span className="text-muted-foreground inline-flex items-center text-xs">
-      {apiKeyLabel}
-    </span>
-  )
-}
-
-function statusBadge(
-  entry: McpCatalogEntry,
-  onOpen?: (entry: McpCatalogEntry) => void,
-) {
-  if (entry.connected) {
-    const count =
-      typeof entry.toolCount === 'number' ? ` (${entry.toolCount})` : ''
-    if (onOpen) {
-      return (
-        <button
-          type="button"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-2 hover:underline"
-          onClick={event => {
-            event.preventDefault()
-            event.stopPropagation()
-            onOpen(entry)
-          }}
-        >
-          <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
-          Connected{count}
-        </button>
-      )
-    }
-    return (
-      <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
-        <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
-        Connected{count}
-      </span>
-    )
-  }
-  if (entry.statusMessage) {
-    const needsReconnect = /expired|reconnect|invalid_token|unauthorized/i.test(
-      entry.statusMessage,
-    )
-    return (
-      <span
-        className={cn(
-          'inline-flex items-center gap-1.5 text-xs',
-          needsReconnect
-            ? 'text-amber-700 dark:text-amber-300'
-            : 'text-red-600 dark:text-red-400',
-        )}
-        title={entry.statusMessage}
-      >
-        <span
-          className={cn(
-            'size-1.5 shrink-0 rounded-full',
-            needsReconnect ? 'bg-amber-500' : 'bg-red-500',
-          )}
-        />
-        {needsReconnect ? 'Needs reconnect' : 'Error'}
-      </span>
-    )
-  }
-  return null
-}
-
-type CatalogStatusPatch = {
-  connected?: boolean
-  enabled?: boolean
-  toolCount?: number | null
-  statusMessage?: string | null
-}
-
-function withStatusPatch(
-  entry: McpCatalogEntry,
-  patch?: CatalogStatusPatch,
-): McpCatalogEntry {
-  if (!patch) return entry
-  return {
-    ...entry,
-    connected: patch.connected ?? entry.connected,
-    enabled: patch.enabled ?? entry.enabled,
-    toolCount:
-      patch.toolCount !== undefined ? patch.toolCount : entry.toolCount,
-    statusMessage:
-      patch.statusMessage !== undefined
-        ? patch.statusMessage
-        : entry.statusMessage,
-  }
-}
+import {
+  McpFeaturedSection,
+  McpMoreCatalogSection,
+} from './mcp-view/mcp-view-catalog'
+import { McpCustomSection } from './mcp-view/mcp-view-custom'
+import {
+  CustomMode,
+  formatConnectError,
+  headersFromRows,
+  HeaderRow,
+  newHeaderRow,
+  type CatalogStatusPatch,
+} from './mcp-view/mcp-view-shared'
 
 export function McpView({
   mcpServers,
@@ -413,7 +173,6 @@ export function McpView({
   }, [location.hash])
 
   useEffect(() => {
-    // Drop optimistic patches once the catalog reflects the latest server state.
     setStatusPatch(prev => {
       if (Object.keys(prev).length === 0) return prev
       const next = { ...prev }
@@ -458,7 +217,6 @@ export function McpView({
             ...prev,
             [catalogId]: {
               connected: true,
-              // Connect must not flip the enable toggle.
               statusMessage: null,
               toolCount: null,
             },
@@ -550,7 +308,6 @@ export function McpView({
             ...prev,
             [entry.id]: {
               connected: true,
-              // Connect must not flip the enable toggle.
               statusMessage: null,
               toolCount:
                 typeof result.toolCount === 'number' ? result.toolCount : 0,
@@ -586,293 +343,51 @@ export function McpView({
     [apiKeyDraft, onConnectCatalog, onRefresh],
   )
 
-  const renderCatalogCard = (entry: McpCatalogEntry) => {
-    const view = withStatusPatch(entry, statusPatch[entry.id])
-    const pending = pendingId === view.id
-    const supportsApiKey = view.authMode !== 'oauth'
-    const supportsOAuth = view.authMode !== 'api_key'
-    const hasBoth = supportsApiKey && supportsOAuth
-    const isSetup = view.configured || view.connected || view.enabled
-    const label = isSetup ? 'Reconnect' : 'Connect'
-
-    const primaryConnect = () => {
-      if (supportsOAuth && view.preferredAuth === 'oauth') {
-        void connectOAuth(view)
-        return
-      }
-      if (supportsApiKey && !supportsOAuth) {
-        setShowApiKey(prev => ({ ...prev, [view.id]: true }))
-        return
-      }
-      if (supportsOAuth) {
-        void connectOAuth(view)
-        return
-      }
-      setShowApiKey(prev => ({ ...prev, [view.id]: true }))
-    }
-
-    return (
-      <div
-        id={`mcp-catalog-${view.id}`}
-        key={view.id}
-        role={onOpenCatalog ? 'button' : undefined}
-        tabIndex={onOpenCatalog ? 0 : undefined}
-        onClick={() => onOpenCatalog?.(view)}
-        onKeyDown={event => {
-          if (!onOpenCatalog) return
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            onOpenCatalog(view)
-          }
-        }}
-        className={cn(
-          'bg-background/60 hover:bg-muted/40 flex h-full flex-col rounded-lg p-3 transition-colors',
-          onOpenCatalog && 'cursor-pointer',
-          focusedMcpKey === `catalog-${view.id}` &&
-            'ring-ring ring-2 ring-offset-2 ring-offset-background',
-        )}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <McpIcon id={view.id} name={view.name} />
-              <span className="truncate text-sm font-medium">{view.name}</span>
-              {authMeta(view)}
-              {statusBadge(view, onOpenCatalog)}
-            </div>
-            <p className="text-muted-foreground mt-1 line-clamp-2 min-h-10 text-sm">
-              {view.description}
-            </p>
-          </div>
-          {isSetup ? (
-            <McpToggle
-              enabled={view.enabled}
-              pending={pending}
-              label={
-                view.enabled
-                  ? `Disable ${view.name}`
-                  : `Enable ${view.name}`
-              }
-              onToggle={() => {
-                if (!view.configured && !view.enabled) {
-                  toast.error(
-                    'Connect with OAuth or API key first, then enable.',
-                    { description: view.name },
-                  )
-                  return
-                }
-                const nextEnabled = !view.enabled
-                setPendingId(view.id)
-                setStatusPatch(prev => ({
-                  ...prev,
-                  [view.id]: {
-                    enabled: nextEnabled,
-                    connected: nextEnabled ? view.connected : false,
-                    statusMessage: nextEnabled ? view.statusMessage : null,
-                    toolCount: nextEnabled ? view.toolCount : view.toolCount,
-                  },
-                }))
-                void onToggleCatalog(view, nextEnabled)
-                  .then(() =>
-                    toast.success(nextEnabled ? 'Enabled' : 'Disabled', {
-                      description: view.name,
-                    }),
-                  )
-                  .catch((err: unknown) => {
-                    setStatusPatch(prev => {
-                      const next = { ...prev }
-                      delete next[view.id]
-                      return next
-                    })
-                    toast.error(formatConnectError(err), {
-                      description: view.name,
-                    })
-                  })
-                  .finally(() => setPendingId(null))
-              }}
-            />
-          ) : null}
-        </div>
-
-        <div className="mt-auto flex w-full items-center gap-2 pt-2">
-          {hasBoth ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs"
-                  disabled={pending}
-                  onClick={event => event.stopPropagation()}
-                >
-                  {pending ? (
-                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                  ) : null}
-                  {label}
-                  <ChevronDown className="ml-1 size-3.5 opacity-70" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-44">
-                <DropdownMenuItem
-                  disabled={pending}
-                  onSelect={() => void connectOAuth(view)}
-                >
-                  With OAuth
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={pending}
-                  onSelect={() =>
-                    setShowApiKey(prev => ({ ...prev, [view.id]: true }))
-                  }
-                >
-                  <KeyRound className="mr-2 size-3.5" />
-                  With API key
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              disabled={pending}
-              onClick={event => {
-                event.stopPropagation()
-                primaryConnect()
-              }}
-            >
-              {pending ? (
-                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-              ) : null}
-              {label}
-            </Button>
-          )}
-          {view.docsUrl ? (
-            <a
-              href={view.docsUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-muted-foreground hover:text-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-xs"
-              onClick={event => event.stopPropagation()}
-            >
-              Docs <ExternalLink className="size-3" />
-            </a>
-          ) : null}
-        </div>
-
-        {showApiKey[view.id] && supportsApiKey ? (
-          <div
-            className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3"
-            onClick={event => event.stopPropagation()}
-          >
-            <Input
-              type="password"
-              className="max-w-md"
-              placeholder={view.apiKeyEnvVar || 'API key'}
-              autoFocus
-              value={apiKeyDraft[view.id] || ''}
-              onChange={event =>
-                setApiKeyDraft(prev => ({
-                  ...prev,
-                  [view.id]: event.target.value,
-                }))
-              }
-              onKeyDown={event => {
-                if (event.key === 'Enter') void connectApiKey(view)
-              }}
-            />
-            <Button
-              size="sm"
-              disabled={pending || !(apiKeyDraft[view.id] || '').trim()}
-              onClick={() => void connectApiKey(view)}
-            >
-              Save & enable
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() =>
-                setShowApiKey(prev => ({ ...prev, [view.id]: false }))
-              }
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    )
-  }
-
   const featuredCatalog = useMemo(
     () => catalog.filter(entry => entry.featured !== false),
-    [catalog]
+    [catalog],
   )
   const moreCatalog = useMemo(
     () => catalog.filter(entry => entry.featured === false),
-    [catalog]
+    [catalog],
   )
 
   const featuredVisible = (() => {
-    // Full MCP page: show every featured catalog entry.
     if (!featuredOnly) return featuredCatalog
-    // Onboarding / overview: show all when limit is null, else cap (default 2).
     if (featuredLimit === null) return featuredCatalog
     const limit = featuredLimit === undefined ? 2 : featuredLimit
     return featuredCatalog.slice(0, limit)
   })()
 
+  const catalogCardProps = {
+    statusPatch,
+    pendingId,
+    focusedMcpKey,
+    showApiKey,
+    apiKeyDraft,
+    onOpenCatalog,
+    onConnectOAuth: (entry: McpCatalogEntry) => void connectOAuth(entry),
+    onConnectApiKey: (entry: McpCatalogEntry) => void connectApiKey(entry),
+    onToggleCatalog,
+    onPendingIdChange: setPendingId,
+    onStatusPatchChange: setStatusPatch,
+    onShowApiKeyChange: (id: string, show: boolean) =>
+      setShowApiKey(prev => ({ ...prev, [id]: show })),
+    onApiKeyDraftChange: (id: string, value: string) =>
+      setApiKeyDraft(prev => ({ ...prev, [id]: value })),
+  }
+
   const featuredSection = (
-    <section className={featuredOnly ? 'space-y-3' : 'space-y-2'}>
-      <div
-        className={cn(
-          'flex gap-2',
-          featuredOnly ? 'items-end justify-between' : 'items-center justify-between',
-        )}
-      >
-        {featuredOnly ? (
-          onShowAll ? (
-            <div>
-              <h3 className="text-base font-semibold tracking-tight">
-                {featuredLabel}
-              </h3>
-              <p className="text-muted-foreground text-xs font-medium">
-                Featured ({featuredCatalog.length})
-              </p>
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-sm">{featuredLabel}</p>
-          )
-        ) : (
-          <p className="text-muted-foreground text-xs font-medium">
-            Featured ({featuredCatalog.length})
-          </p>
-        )}
-        {featuredOnly && onShowAll ? (
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium transition-colors"
-            onClick={onShowAll}
-          >
-            Show all
-            <ArrowRight className="size-3.5" />
-          </button>
-        ) : null}
-      </div>
-      {catalogLoading && featuredCatalog.length === 0 ? (
-        <CardGridSkeleton
-          cards={
-            featuredOnly && featuredLimit !== null
-              ? Math.min(featuredLimit ?? 2, 4)
-              : 4
-          }
-          columns={2}
-        />
-      ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {featuredVisible.map(entry => renderCatalogCard(entry))}
-        </div>
-      )}
-    </section>
+    <McpFeaturedSection
+      featuredOnly={featuredOnly}
+      featuredLabel={featuredLabel}
+      featuredCatalog={featuredCatalog}
+      featuredVisible={featuredVisible}
+      catalogLoading={catalogLoading}
+      featuredLimit={featuredLimit}
+      onShowAll={onShowAll}
+      {...catalogCardProps}
+    />
   )
 
   if (featuredOnly) {
@@ -901,368 +416,39 @@ export function McpView({
         <div className="space-y-6 pb-4">
           {featuredSection}
 
-          {moreCatalog.length > 0 ? (
-            <section className="space-y-2">
-              <p className="text-muted-foreground text-xs font-medium">
-                More ({moreCatalog.length})
-              </p>
-              <div className="grid gap-3 md:grid-cols-2">
-                {moreCatalog.map(entry => renderCatalogCard(entry))}
-              </div>
-            </section>
-          ) : null}
+          <McpMoreCatalogSection moreCatalog={moreCatalog} {...catalogCardProps} />
 
-          <section className="space-y-2">
-            <p className="text-muted-foreground text-xs font-medium">
-              Custom ({customServers.length})
-            </p>
-            <p className="text-muted-foreground text-sm">
-              Add a remote HTTP/SSE MCP or a local stdio command. Custom headers
-              and a headers helper cover API keys and other auth schemes.
-            </p>
-
-            <div className="bg-background/60 space-y-3 rounded-lg border p-4">
-              <div className="inline-flex rounded-md border p-0.5">
-                <button
-                  type="button"
-                  className={cn(
-                    'rounded px-3 py-1.5 text-sm transition-colors',
-                    mcpMode === 'remote'
-                      ? 'bg-muted font-medium'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                  onClick={() => setMcpMode('remote')}
-                >
-                  Remote
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'rounded px-3 py-1.5 text-sm transition-colors',
-                    mcpMode === 'local'
-                      ? 'bg-muted font-medium'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                  onClick={() => setMcpMode('local')}
-                >
-                  Local command
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-muted-foreground text-xs font-medium">
-                  Name
-                </label>
-                <Input
-                  value={mcpName}
-                  onChange={event => setMcpName(event.target.value)}
-                  placeholder="My MCP server"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-muted-foreground text-xs font-medium">
-                  {mcpMode === 'local'
-                    ? 'Command'
-                    : 'Remote MCP server URL'}
-                </label>
-                <Input
-                  value={mcpTarget}
-                  onChange={event => setMcpTarget(event.target.value)}
-                  placeholder={
-                    mcpMode === 'local'
-                      ? 'npx -y @example/mcp-server'
-                      : 'https://mcp.example.com/mcp'
-                  }
-                  className="font-mono text-sm"
-                />
-              </div>
-
-              {mcpMode === 'remote' ? (
-                <div className="space-y-2">
-                  <label className="text-muted-foreground text-xs font-medium">
-                    Transport
-                  </label>
-                  <select
-                    value={mcpTransport}
-                    onChange={event =>
-                      setMcpTransport(
-                        event.target.value as 'sse' | 'streamable_http',
-                      )
-                    }
-                    className="bg-background h-9 w-full rounded-md border px-3 text-sm"
-                  >
-                    <option value="streamable_http">Streamable HTTP</option>
-                    <option value="sse">SSE (legacy)</option>
-                  </select>
-                </div>
-              ) : null}
-
-              <div className="space-y-2">
-                <label className="text-muted-foreground text-xs font-medium">
-                  Description (optional)
-                </label>
-                <Input
-                  value={mcpDescription}
-                  onChange={event => setMcpDescription(event.target.value)}
-                  placeholder="What this server is for"
-                />
-              </div>
-
-              <div className="rounded-md border">
-                <button
-                  type="button"
-                  className="hover:bg-muted/40 flex w-full items-center justify-between px-3 py-2 text-left text-sm"
-                  onClick={() => setMcpAdvancedOpen(open => !open)}
-                >
-                  <span className="font-medium">Advanced settings</span>
-                  <ChevronDown
-                    className={cn(
-                      'text-muted-foreground size-4 transition-transform',
-                      mcpAdvancedOpen && 'rotate-180',
-                    )}
-                  />
-                </button>
-                {mcpAdvancedOpen ? (
-                  <div className="space-y-3 border-t px-3 py-3">
-                    {mcpMode === 'remote' ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <label className="text-muted-foreground text-xs font-medium">
-                            Custom headers
-                          </label>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 gap-1 px-2 text-xs"
-                            onClick={() =>
-                              setMcpHeaderRows(rows => [...rows, newHeaderRow()])
-                            }
-                          >
-                            <Plus className="size-3.5" />
-                            Add header
-                          </Button>
-                        </div>
-                        <div className="space-y-2">
-                          {mcpHeaderRows.map(row => (
-                            <div
-                              key={row.id}
-                              className="grid grid-cols-[1fr_1fr_auto] gap-2"
-                            >
-                              <Input
-                                value={row.name}
-                                onChange={event =>
-                                  setMcpHeaderRows(rows =>
-                                    rows.map(item =>
-                                      item.id === row.id
-                                        ? { ...item, name: event.target.value }
-                                        : item,
-                                    ),
-                                  )
-                                }
-                                placeholder="Header name"
-                                className="font-mono text-sm"
-                              />
-                              <Input
-                                type="password"
-                                value={row.value}
-                                onChange={event =>
-                                  setMcpHeaderRows(rows =>
-                                    rows.map(item =>
-                                      item.id === row.id
-                                        ? { ...item, value: event.target.value }
-                                        : item,
-                                    ),
-                                  )
-                                }
-                                placeholder="Value"
-                                className="font-mono text-sm"
-                                autoComplete="off"
-                              />
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="ghost"
-                                className="size-9"
-                                disabled={mcpHeaderRows.length <= 1}
-                                onClick={() =>
-                                  setMcpHeaderRows(rows =>
-                                    rows.length <= 1
-                                      ? rows
-                                      : rows.filter(item => item.id !== row.id),
-                                  )
-                                }
-                              >
-                                <Trash2 className="size-3.5" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-muted-foreground text-xs">
-                          Example: Authorization / Bearer sk-… or X-API-Key /
-                          your-key. Values are stored as secrets.
-                        </p>
-                      </div>
-                    ) : null}
-
-                    <div className="space-y-2">
-                      <label className="text-muted-foreground text-xs font-medium">
-                        OAuth Client ID (optional)
-                      </label>
-                      <Input
-                        value={mcpOauthClientId}
-                        onChange={event =>
-                          setMcpOauthClientId(event.target.value)
-                        }
-                        placeholder="Stored for future OAuth connect"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-muted-foreground text-xs font-medium">
-                        OAuth Server URL (optional)
-                      </label>
-                      <Input
-                        value={mcpOauthServerUrl}
-                        onChange={event =>
-                          setMcpOauthServerUrl(event.target.value)
-                        }
-                        placeholder="https://auth.example.com"
-                        className="font-mono text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-muted-foreground text-xs font-medium">
-                        Scopes (optional)
-                      </label>
-                      <Input
-                        value={mcpOauthScopes}
-                        onChange={event => setMcpOauthScopes(event.target.value)}
-                        placeholder="openid profile"
-                      />
-                    </div>
-                    {mcpMode === 'remote' ? (
-                      <div className="space-y-2">
-                        <label className="text-muted-foreground text-xs font-medium">
-                          Headers helper command (optional)
-                        </label>
-                        <Input
-                          value={mcpHeadersHelper}
-                          onChange={event =>
-                            setMcpHeadersHelper(event.target.value)
-                          }
-                          placeholder={`echo '{"Authorization":"Bearer …"}'`}
-                          className="font-mono text-sm"
-                        />
-                        <p className="text-muted-foreground text-xs">
-                          Shell command that prints a JSON object of headers on
-                          stdout. When set and successful, it replaces static
-                          headers.
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  disabled={
-                    creatingCustom || !mcpName.trim() || !mcpTarget.trim()
-                  }
-                  onClick={() => void submitCustomMcp()}
-                >
-                  {creatingCustom ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : null}
-                  Add server
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-3 space-y-2">
-              {customServers.map(server => (
-                <div
-                  id={`mcp-server-${server.id}`}
-                  key={server.id}
-                  role={onOpenServer ? 'button' : undefined}
-                  tabIndex={onOpenServer ? 0 : undefined}
-                  onClick={() => onOpenServer?.(server)}
-                  onKeyDown={event => {
-                    if (!onOpenServer) return
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      onOpenServer(server)
-                    }
-                  }}
-                  className={cn(
-                    'bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors',
-                    onOpenServer && 'cursor-pointer',
-                    focusedMcpKey === `server-${server.id}` &&
-                      'ring-ring ring-2 ring-offset-2 ring-offset-background',
-                  )}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-muted text-muted-foreground grid size-6 shrink-0 place-items-center rounded">
-                        <Plug className="size-3.5" />
-                      </span>
-                      <span className="truncate text-sm font-medium">
-                        {server.name}
-                      </span>
-                      <span className="text-muted-foreground text-xs">
-                        {server.transport === 'streamable_http'
-                          ? 'Streamable HTTP'
-                          : server.transport === 'sse'
-                            ? 'SSE'
-                            : 'stdio'}
-                      </span>
-                      {server.headersConfigured ? (
-                        <span className="text-muted-foreground text-xs">
-                          · headers
-                        </span>
-                      ) : null}
-                    </div>
-                    {server.description ? (
-                      <p className="text-muted-foreground mt-1 truncate text-xs">
-                        {server.description}
-                      </p>
-                    ) : null}
-                    <p className="text-muted-foreground mt-1 truncate font-mono text-xs">
-                      {server.command
-                        ? `${server.command} ${server.args.join(' ')}`.trim()
-                        : server.url}
-                    </p>
-                  </div>
-                  <div
-                    className="flex items-center gap-2"
-                    onClick={event => event.stopPropagation()}
-                  >
-                    <McpToggle
-                      enabled={server.enabled}
-                      label={`Enable ${server.name}`}
-                      onToggle={() =>
-                        void onToggleCustom(server.id, !server.enabled)
-                      }
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      onClick={() => void onDeleteMcp(server.id)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {customServers.length === 0 ? (
-                <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
-                  No custom MCP servers yet.
-                </p>
-              ) : null}
-            </div>
-          </section>
+          <McpCustomSection
+            customServers={customServers}
+            mcpMode={mcpMode}
+            mcpName={mcpName}
+            mcpTransport={mcpTransport}
+            mcpTarget={mcpTarget}
+            mcpDescription={mcpDescription}
+            mcpAdvancedOpen={mcpAdvancedOpen}
+            mcpOauthClientId={mcpOauthClientId}
+            mcpOauthServerUrl={mcpOauthServerUrl}
+            mcpOauthScopes={mcpOauthScopes}
+            mcpHeadersHelper={mcpHeadersHelper}
+            mcpHeaderRows={mcpHeaderRows}
+            creatingCustom={creatingCustom}
+            focusedMcpKey={focusedMcpKey}
+            onMcpModeChange={setMcpMode}
+            onMcpNameChange={setMcpName}
+            onMcpTransportChange={setMcpTransport}
+            onMcpTargetChange={setMcpTarget}
+            onMcpDescriptionChange={setMcpDescription}
+            onMcpAdvancedOpenChange={setMcpAdvancedOpen}
+            onMcpOauthClientIdChange={setMcpOauthClientId}
+            onMcpOauthServerUrlChange={setMcpOauthServerUrl}
+            onMcpOauthScopesChange={setMcpOauthScopes}
+            onMcpHeadersHelperChange={setMcpHeadersHelper}
+            onMcpHeaderRowsChange={updater => setMcpHeaderRows(updater)}
+            onSubmitCustomMcp={() => void submitCustomMcp()}
+            onOpenServer={onOpenServer}
+            onToggleCustom={(id, enabled) => void onToggleCustom(id, enabled)}
+            onDeleteMcp={id => void onDeleteMcp(id)}
+          />
         </div>
       </div>
     </ScrollArea>
