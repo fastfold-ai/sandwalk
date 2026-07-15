@@ -10,9 +10,8 @@ import {
   LLM_API_KEY_COPY,
   LLM_API_KEY_ORDER,
   primaryMaskedPreview,
-  profileBackend,
-  PROFILE_BACKENDS
-} from './models-view-utils'
+  PROFILE_BACKENDS,
+  profileBackend} from './models-view-utils'
 
 export function ModelsApiKeysSection({
   open,

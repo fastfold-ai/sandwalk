@@ -2,9 +2,9 @@ import { ArrowUpRight, Check, CircleHelp, Copy, Loader2, Terminal } from 'lucide
 import { useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
+import { ErrorPage } from '@/components/ErrorPage'
 import { MirageBackground } from '@/components/MirageBackground'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { ErrorPage } from '@/components/ErrorPage'
 import {
   Dialog,
   DialogContent,

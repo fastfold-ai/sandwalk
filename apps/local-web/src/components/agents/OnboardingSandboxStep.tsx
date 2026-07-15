@@ -1,9 +1,9 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   EnvironmentReport,
   IntegrationSummary,
   SandboxSettings
 } from '@sandwalk/agent-ui-core'
-import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { Check, ChevronDown, Loader2, Monitor, Package } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 

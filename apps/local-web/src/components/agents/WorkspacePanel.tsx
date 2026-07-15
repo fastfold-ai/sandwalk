@@ -37,17 +37,16 @@ import {
   TabContextSeparator
 } from './tab-context-menu'
 import { TerminalPanel } from './TerminalPanel'
-import { WorkspaceArtifactsModal } from './WorkspaceArtifactsModal'
-import { WorkspaceFileTabsColumn } from './WorkspaceFileTabsColumn'
 import {
   AUTOSAVE_DELAY_MS,
   groupArtifacts,
   isStructure,
   normalizeFileContent,
   readOpenFileTabs,
-  writeOpenFileTabs,
-  type ViewMode
-} from './workspace-utils'
+  type ViewMode,
+  writeOpenFileTabs} from './workspace-utils'
+import { WorkspaceArtifactsModal } from './WorkspaceArtifactsModal'
+import { WorkspaceFileTabsColumn } from './WorkspaceFileTabsColumn'
 
 export function WorkspacePanel({
   client,

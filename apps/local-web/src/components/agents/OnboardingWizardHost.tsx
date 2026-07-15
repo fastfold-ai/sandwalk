@@ -1,5 +1,5 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import { useEffect, useState, type ReactNode } from 'react'
+import { type ReactNode,useEffect, useState } from 'react'
 
 import { OnboardingDoneStep } from '@/components/agents/OnboardingDoneStep'
 import { OnboardingIntegrationsStep } from '@/components/agents/OnboardingIntegrationsStep'

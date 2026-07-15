@@ -1,8 +1,8 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   IntegrationSetupResult,
   IntegrationSummary
 } from '@sandwalk/agent-ui-core'
-import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { Check, CircleCheck, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 

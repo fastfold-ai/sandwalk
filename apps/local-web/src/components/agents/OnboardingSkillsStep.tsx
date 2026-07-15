@@ -1,10 +1,10 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentSkill,
   AgentSkillSource,
   McpCatalogEntry,
   McpServer
 } from '@sandwalk/agent-ui-core'
-import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { Check, GitBranch, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 

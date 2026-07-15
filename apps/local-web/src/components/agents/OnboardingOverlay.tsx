@@ -1,7 +1,8 @@
+import './onboarding.css'
+
 import { ArrowLeft, ArrowRight, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-import './onboarding.css'
 import { MirageWalkPath } from '@/components/MirageWalkPath'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'

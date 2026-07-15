@@ -10,12 +10,11 @@ import {
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
+  type ComposerModelOption,
   formatModelEffortBadge,
   formatReasoningEffortLabel,
   isComposerModelSelected,
-  resolveComposerModelOption,
-  type ComposerModelOption
-} from '@/lib/composer-models'
+  resolveComposerModelOption} from '@/lib/composer-models'
 import { cn } from '@/lib/utils'
 
 export function ComposerModelPicker({

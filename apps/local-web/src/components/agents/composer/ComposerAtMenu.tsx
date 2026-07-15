@@ -2,13 +2,12 @@ import { Icon } from '@iconify/react'
 import type { WorkspaceFile } from '@sandwalk/agent-ui-core'
 import {
   forwardRef,
+  type KeyboardEvent,
   useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
-  useState,
-  type KeyboardEvent
-} from 'react'
+  useState} from 'react'
 
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { getFileIcon } from '@/lib/file-icons'

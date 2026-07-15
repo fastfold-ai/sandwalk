@@ -6,25 +6,23 @@ import type {
   ToolCatalog
 } from '@sandwalk/agent-ui-core'
 
-import { SpecialistsEditorView } from '@/components/agents/specialists-view/specialists-view-editor'
-import { SpecialistsListView } from '@/components/agents/specialists-view/specialists-view-list'
 import {
   SPECIALIST_COLORS,
   SPECIALIST_ICONS,
   SpecialistAvatar,
-  SpecialistGlyph,
-  specialistColorClass
-} from '@/components/agents/specialists-view/specialist-ui'
+  specialistColorClass,
+  SpecialistGlyph} from '@/components/agents/specialists-view/specialist-ui'
+import { SpecialistsEditorView } from '@/components/agents/specialists-view/specialists-view-editor'
+import { SpecialistsListView } from '@/components/agents/specialists-view/specialists-view-list'
 import { resolveSkillInstallSource } from '@/components/agents/specialists-view/specialists-view-utils'
 
 export {
+  resolveSkillInstallSource,
   SPECIALIST_COLORS,
   SPECIALIST_ICONS,
   SpecialistAvatar,
-  SpecialistGlyph,
   specialistColorClass,
-  resolveSkillInstallSource
-}
+  SpecialistGlyph}
 
 export function SpecialistsView({
   mode,

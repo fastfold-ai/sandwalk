@@ -12,22 +12,16 @@ import type {
   Specialist
 } from '@sandwalk/agent-ui-core'
 import {
+  type Dispatch,
+  type SetStateAction,
   useCallback,
   useEffect,
   useMemo,
   useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction
-} from 'react'
+  useState} from 'react'
 import type { Location, NavigateFunction } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import {
-  clampOnboardingStep,
-  isOnboardingPath,
-  onboardingPath
-} from '@/lib/onboarding'
 import {
   isAuthCredentialError,
   isBackendUnavailableError,
@@ -42,8 +36,13 @@ import {
   type ComposerModelOption,
   toComposerModelOptions
 } from '@/lib/composer-models'
-import { cloudAccountDisplayName } from '@/lib/skills-catalog'
+import {
+  clampOnboardingStep,
+  isOnboardingPath,
+  onboardingPath
+} from '@/lib/onboarding'
 import type { SessionChatState } from '@/lib/sessions'
+import { cloudAccountDisplayName } from '@/lib/skills-catalog'
 
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8787'
 

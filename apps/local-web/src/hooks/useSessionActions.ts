@@ -1,14 +1,13 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentEvent, AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import {
+  type Dispatch,
+  type SetStateAction,
   useCallback,
   useEffect,
   useMemo,
   useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction
-} from 'react'
+  useState} from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { formatSessionExportMarkdown } from '@/components/agents/transcript'

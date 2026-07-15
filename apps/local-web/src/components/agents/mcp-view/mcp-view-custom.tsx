@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 import {
-  CustomMode,
-  HeaderRow,
+  type CustomMode,
+  type HeaderRow,
   McpToggle,
   newHeaderRow,
 } from './mcp-view-shared'

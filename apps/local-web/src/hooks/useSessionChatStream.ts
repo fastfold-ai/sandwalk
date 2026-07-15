@@ -4,7 +4,7 @@ import type {
   AgentSession,
   BackendHealth
 } from '@sandwalk/agent-ui-core'
-import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
+import { type Dispatch, type MutableRefObject, type SetStateAction,useEffect, useRef } from 'react'
 
 import { reduceChatOnAgentEvent } from '@/lib/chat-actions'
 import type { SessionChatState } from '@/lib/sessions'

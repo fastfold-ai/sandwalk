@@ -12,15 +12,15 @@ import type {
   SandboxSettings,
   Specialist
 } from '@sandwalk/agent-ui-core'
-import { lazy, Suspense, type Dispatch, type SetStateAction } from 'react'
+import { type Dispatch, lazy, type SetStateAction,Suspense } from 'react'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
-import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 import { type DashboardSection } from '@/components/agents/DashboardSidebar'
 import {
   DashboardPageSkeleton,
   type DashboardSkeletonKind
 } from '@/components/agents/PageSkeletons'
+import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 import { validateIntegrationOrProbeModal } from '@/lib/app-helpers'
 import { onboardingPath } from '@/lib/onboarding'
 import {
@@ -931,7 +931,7 @@ export function DashboardMainViews({
           projects={projects}
           sessions={sessions}
           previews={sessionPreviews}
-          userName={health.userName}
+          userName={health?.userName ?? null}
           activeProjectId={activeProjectId}
           onCreateProject={onCreateProject}
           onCreateSession={projectId => void createSession(projectId)}

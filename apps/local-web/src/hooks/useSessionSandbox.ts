@@ -6,14 +6,13 @@ import type {
   SessionSandboxStatus
 } from '@sandwalk/agent-ui-core'
 import {
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
   useCallback,
   useEffect,
   useRef,
-  useState,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction
-} from 'react'
+  useState} from 'react'
 
 import { type SandboxActionPhase } from '@/components/agents/Composer'
 

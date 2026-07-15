@@ -1,12 +1,11 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentSession } from '@sandwalk/agent-ui-core'
 import {
-  useCallback,
-  useEffect,
   type Dispatch,
   type MutableRefObject,
-  type SetStateAction
-} from 'react'
+  type SetStateAction,
+  useCallback,
+  useEffect} from 'react'
 
 import { buildSendContent } from '@/lib/chat-actions'
 import type { SessionChatState } from '@/lib/sessions'
@@ -256,7 +255,7 @@ export function useSessionChatSend({
       drainingQueueRef.current = false
     })
     // Drain when a run finishes or when the queue gains items while idle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sendMessage closes over session state
+    // sendMessage intentionally omitted from deps (closes over session state).
   }, [runActive, sessionId, queuedMessages.length])
 
   return {

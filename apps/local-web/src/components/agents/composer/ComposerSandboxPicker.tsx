@@ -10,12 +10,11 @@ import { ModalGlyph } from '@/components/agents/composer/ModalGlyph'
 import {
   draftFromSandboxStatus,
   formatSandboxBytes,
+  type SandboxActionPhase,
+  type SandboxComputeChange,
   sandboxStatusDotClass,
   sandboxStatusLabel,
-  selectClassName,
-  type SandboxActionPhase,
-  type SandboxComputeChange
-} from '@/components/agents/composer/sandbox-utils'
+  selectClassName} from '@/components/agents/composer/sandbox-utils'
 import { Button } from '@/components/ui/button'
 import {
   Popover,

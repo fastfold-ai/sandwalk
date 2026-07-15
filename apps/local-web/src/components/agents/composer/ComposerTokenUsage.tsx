@@ -1,11 +1,10 @@
+import { formatTokenCount } from '@/components/agents/composer/sandbox-utils'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip'
-
-import { formatTokenCount } from '@/components/agents/composer/sandbox-utils'
 
 export function ComposerTokenUsage({
   tokenUsage

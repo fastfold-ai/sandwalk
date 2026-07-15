@@ -11,13 +11,12 @@ import {
   Terminal
 } from 'lucide-react'
 import {
-  lazy,
-  Suspense,
   type ComponentProps,
   type Dispatch,
+  lazy,
   type RefObject,
-  type SetStateAction
-} from 'react'
+  type SetStateAction,
+  Suspense} from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import type { NavigateFunction } from 'react-router-dom'
 
@@ -31,8 +30,8 @@ import {
 } from '@/components/agents/PageSkeletons'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { SessionTabs } from '@/components/agents/SessionTabs'
-import { type TranscriptEntry } from '@/components/agents/transcript'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
+import { type TranscriptEntry } from '@/components/agents/transcript'
 import { WorkspacePanel } from '@/components/agents/WorkspacePanel'
 import { Button } from '@/components/ui/button'
 import {

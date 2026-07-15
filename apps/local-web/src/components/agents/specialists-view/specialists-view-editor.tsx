@@ -27,18 +27,17 @@ import {
 } from '@/components/agents/specialists-view/specialist-ui'
 import {
   McpGlyph,
-  SkillGlyph,
-  SpecialistToggle,
   mcpMetaText,
-  skillMetaText
-} from '@/components/agents/specialists-view/specialists-view-shared'
+  SkillGlyph,
+  skillMetaText,
+  SpecialistToggle} from '@/components/agents/specialists-view/specialists-view-shared'
 import {
   emptySpecialistForm,
   resolveSkillInstallSource,
   slugify,
+  type SpecialistCapabilityIssue,
   specialistFieldClassName,
   specialistFormFromRecord,
-  type SpecialistCapabilityIssue,
   type SpecialistFormState
 } from '@/components/agents/specialists-view/specialists-view-utils'
 import { Button } from '@/components/ui/button'

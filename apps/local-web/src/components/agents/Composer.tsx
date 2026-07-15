@@ -15,16 +15,6 @@ import { flushSync } from 'react-dom'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import {
-  chipTokenLength,
-  fileChipToken,
-  mcpChipToken,
-  parseComposerParts,
-  removeComposerChipAt,
-  serializeComposerParts,
-  skillChipToken,
-  spaceAroundChips
-} from '@/components/agents/composer-parts'
-import {
   ComposerAtMenu,
   type ComposerAtMenuHandle
 } from '@/components/agents/composer/ComposerAtMenu'
@@ -40,6 +30,16 @@ import {
   type SandboxActionPhase,
   type SandboxComputeChange
 } from '@/components/agents/composer/sandbox-utils'
+import {
+  chipTokenLength,
+  fileChipToken,
+  mcpChipToken,
+  parseComposerParts,
+  removeComposerChipAt,
+  serializeComposerParts,
+  skillChipToken,
+  spaceAroundChips
+} from '@/components/agents/composer-parts'
 import {
   computeAtFileQuery,
   computeSlashSkillQuery
@@ -508,14 +508,6 @@ export function Composer({
       setLocalDraft(nextValue)
     })
     focusAfterChipInsert(caret)
-  }
-
-  const focusComposerAt = (nextValue: string, absoluteCaret: number) => {
-    draftRef.current = nextValue
-    pendingCaretRef.current = absoluteCaret
-    if (!applyComposerCaret(absoluteCaret)) {
-      // useLayoutEffect / rAF retries will pick this up after mount.
-    }
   }
 
   const removeChipBeforeFocusedText = (partIndex: number) => {

@@ -7,14 +7,13 @@ import type {
 import { CornerDownLeft, Plug, Sparkles } from 'lucide-react'
 import {
   forwardRef,
+  type KeyboardEvent,
   useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
-  useState,
-  type KeyboardEvent
-} from 'react'
+  useState} from 'react'
 
 import {
   buildSlashResults,
@@ -169,7 +168,6 @@ export const ComposerSlashMenu = forwardRef<
       active = false
     }
     // selectedSkill identity changes every slashResults rebuild; key off name only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedSkillName gates the load
   }, [onLoadSkill, selectedMcpId, selectedSkillName, open])
 
   useEffect(() => {
@@ -179,7 +177,7 @@ export const ComposerSlashMenu = forwardRef<
       `Mention mcp:${selectedMcp.name} so the agent prefers tools from this MCP server.`
     setPreviewLoading(false)
     setPreviewOverview(current => (current === overview ? current : overview))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedMcpId gates the preview
+    // selectedMcpId gates the preview (selectedMcp object identity is unstable).
   }, [selectedMcpId, open])
 
   useEffect(() => {

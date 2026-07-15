@@ -16,8 +16,8 @@ import {
   Composer,
   type SandboxActionPhase
 } from '@/components/agents/Composer'
-import { QueuedMessages } from '@/components/agents/QueuedMessages'
 import { type SandboxComputeChange } from '@/components/agents/composer/sandbox-utils'
+import { QueuedMessages } from '@/components/agents/QueuedMessages'
 import { type ComposerModelOption } from '@/lib/composer-models'
 import type { QueuedMessage } from '@/lib/sessions'
 

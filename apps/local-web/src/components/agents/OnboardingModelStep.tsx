@@ -1,5 +1,5 @@
-import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
 import { Check, Cpu, Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 

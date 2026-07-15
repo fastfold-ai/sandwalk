@@ -1,14 +1,14 @@
 import type { AgentCatalogSkill, AgentSkill } from '@sandwalk/agent-ui-core'
 
+import { isFeaturedSkill } from '@/lib/skill-icons'
 import { compareSkillsBySearchRank, skillMatchesSearch } from '@/lib/skill-search'
 import {
-  categorizeSkill,
   catalogSkillInstallSource,
+  categorizeSkill,
   normalizeSkillMatchKey,
   skillAuthorLabel,
   splitSkillSourceSpec
 } from '@/lib/skills-catalog'
-import { isFeaturedSkill } from '@/lib/skill-icons'
 
 export function buildInstalledSkillIndex(skills: AgentSkill[]) {
   const index = new Map<string, Set<string>>()

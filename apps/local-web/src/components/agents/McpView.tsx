@@ -15,12 +15,12 @@ import {
 } from './mcp-view/mcp-view-catalog'
 import { McpCustomSection } from './mcp-view/mcp-view-custom'
 import {
-  CustomMode,
-  formatConnectError,
-  headersFromRows,
-  HeaderRow,
-  newHeaderRow,
   type CatalogStatusPatch,
+  type CustomMode,
+  formatConnectError,
+  type HeaderRow,
+  headersFromRows,
+  newHeaderRow,
 } from './mcp-view/mcp-view-shared'
 
 export function McpView({

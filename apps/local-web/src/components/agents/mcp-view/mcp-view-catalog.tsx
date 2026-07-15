@@ -21,11 +21,11 @@ import { cn } from '@/lib/utils'
 
 import {
   authMeta,
+  type CatalogStatusPatch,
   formatConnectError,
   McpIcon,
   McpToggle,
   statusBadge,
-  type CatalogStatusPatch,
   withStatusPatch,
 } from './mcp-view-shared'
 

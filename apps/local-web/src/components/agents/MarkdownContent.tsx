@@ -2,8 +2,8 @@ import { Check, Copy, Maximize2, X } from 'lucide-react'
 import { memo, useEffect, useMemo, useState } from 'react'
 import type { Components } from 'react-markdown'
 import ReactMarkdown from 'react-markdown'
-import { useNavigate } from 'react-router-dom'
 import type { NavigateFunction } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
 
 import {
