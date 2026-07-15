@@ -1,0 +1,290 @@
+import { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
+import {
+  Check,
+  ChevronDown,
+  MoreHorizontal,
+  Pin
+} from 'lucide-react'
+import type { Dispatch, MouseEvent, SetStateAction } from 'react'
+import type { NavigateFunction } from 'react-router-dom'
+
+import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
+import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { groupSessions, relativeTime, type SessionChatState } from '@/lib/sessions'
+import { cn } from '@/lib/utils'
+
+type SessionSection = ReturnType<typeof groupSessions>[number]
+
+export type SidebarSessionListProps = {
+  sections: SessionSection[]
+  collapsedSidebarSections: Record<string, boolean>
+  sessionId: string | null
+  chatBySessionId: Record<string, SessionChatState>
+  orderedVisibleSessionIds: string[]
+  selectedSessionIds: Set<string>
+  threadMenuOpenId: string | null
+  projects: AgentProject[]
+  navigate: NavigateFunction
+  setCollapsedSidebarSections: Dispatch<SetStateAction<Record<string, boolean>>>
+  selectSessionRange: (orderedIds: string[], targetId: string) => void
+  toggleSessionSelected: (targetId: string) => void
+  setSelectionAnchorId: (targetId: string) => void
+  openSessionTab: (sessionId: string) => void
+  prefetchSessionMessages: (sessionId: string) => void | Promise<void>
+  setThreadMenuOpenId: Dispatch<SetStateAction<string | null>>
+  openRenameDialog: (target: AgentSession) => void
+  updateSession: (
+    target: AgentSession,
+    changes: Parameters<LocalAgentClient['updateSession']>[1]
+  ) => void | Promise<void>
+  exportTranscript: (target: AgentSession) => void | Promise<void>
+  setDeleteTarget: Dispatch<SetStateAction<AgentSession | null>>
+  onClearSessionSelection: () => void
+}
+
+export function SidebarSessionList({
+  sections,
+  collapsedSidebarSections,
+  sessionId,
+  chatBySessionId,
+  orderedVisibleSessionIds,
+  selectedSessionIds,
+  threadMenuOpenId,
+  projects,
+  navigate,
+  setCollapsedSidebarSections,
+  selectSessionRange,
+  toggleSessionSelected,
+  setSelectionAnchorId,
+  openSessionTab,
+  prefetchSessionMessages,
+  setThreadMenuOpenId,
+  openRenameDialog,
+  updateSession,
+  exportTranscript,
+  setDeleteTarget,
+  onClearSessionSelection
+}: SidebarSessionListProps) {
+  return (
+    <ScrollArea className="flex-1">
+      <div className="space-y-3 p-3">
+        {sections.length === 0 ? (
+          <p className="text-muted-foreground px-1.5 py-2 text-[13px]">
+            No Agents Yet
+          </p>
+        ) : (
+          sections.map(section => {
+            const collapsed = Boolean(collapsedSidebarSections[section.id])
+            return (
+              <div key={section.id} className="space-y-1">
+                <button
+                  type="button"
+                  className="text-muted-foreground/80 hover:text-foreground flex w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-[13px]"
+                  aria-expanded={!collapsed}
+                  onClick={() =>
+                    setCollapsedSidebarSections(current => ({
+                      ...current,
+                      [section.id]: !current[section.id]
+                    }))
+                  }
+                >
+                  <ChevronDown
+                    className={cn(
+                      'size-3.5 shrink-0 transition-transform',
+                      collapsed && '-rotate-90'
+                    )}
+                  />
+                  <span className="min-w-0 flex-1 truncate">
+                    {section.title}
+                  </span>
+                  <span className="text-muted-foreground/60 shrink-0 text-[11px] tabular-nums">
+                    {section.items.length}
+                  </span>
+                </button>
+                {!collapsed ? (
+                  <ul className="space-y-0.5">
+                    {section.items.map(item => {
+                      const isSelected = selectedSessionIds.has(item.id)
+                      return (
+                        <li key={item.id}>
+                          <div
+                            className={cn(
+                              'hover:bg-sidebar-accent/70 group grid grid-cols-[minmax(0,1fr)_2.75rem] items-center rounded px-1.5 py-1.5',
+                              item.id === sessionId && 'bg-sidebar-accent',
+                              isSelected &&
+                                'bg-sidebar-accent ring-primary/30 ring-1'
+                            )}
+                          >
+                            <button
+                              type="button"
+                              className="flex min-w-0 items-center gap-1.5 text-left"
+                              onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                                if (event.shiftKey) {
+                                  event.preventDefault()
+                                  selectSessionRange(
+                                    orderedVisibleSessionIds,
+                                    item.id
+                                  )
+                                  return
+                                }
+                                if (event.metaKey || event.ctrlKey) {
+                                  event.preventDefault()
+                                  toggleSessionSelected(item.id)
+                                  return
+                                }
+                                if (selectedSessionIds.size > 0) {
+                                  onClearSessionSelection()
+                                }
+                                setSelectionAnchorId(item.id)
+                                openSessionTab(item.id)
+                                void prefetchSessionMessages(item.id)
+                                navigate(`/agents/${item.id}`)
+                              }}
+                            >
+                              {isSelected || selectedSessionIds.size > 0 ? (
+                                <span
+                                  className={cn(
+                                    'grid size-3.5 shrink-0 place-items-center rounded-[4px] border',
+                                    isSelected
+                                      ? 'border-primary bg-primary text-primary-foreground'
+                                      : 'border-muted-foreground/40'
+                                  )}
+                                  aria-hidden
+                                >
+                                  {isSelected ? (
+                                    <Check
+                                      className="size-2.5"
+                                      strokeWidth={3}
+                                    />
+                                  ) : null}
+                                </span>
+                              ) : (
+                                <SessionStatusIcon
+                                  status={
+                                    chatBySessionId[item.id]?.runActive
+                                      ? 'running'
+                                      : item.status
+                                  }
+                                />
+                              )}
+                              {item.organizeLabel === 'pinned' ? (
+                                <Pin className="text-muted-foreground/70 size-3 shrink-0" />
+                              ) : null}
+                              <span className="text-foreground/90 group-hover:text-foreground truncate text-[13px]">
+                                {item.title || 'Untitled'}
+                              </span>
+                            </button>
+                            <div className="relative h-7 w-11 justify-self-end">
+                              <span
+                                className={cn(
+                                  'text-muted-foreground/70 pointer-events-none absolute inset-0 flex items-center justify-end pr-0.5 text-[11px] transition-opacity',
+                                  threadMenuOpenId === item.id
+                                    ? 'opacity-0'
+                                    : 'opacity-100 group-hover:opacity-0'
+                                )}
+                              >
+                                {relativeTime(
+                                  item.lastMessageAt || item.updatedAt
+                                )}
+                              </span>
+                              <Popover
+                                open={threadMenuOpenId === item.id}
+                                onOpenChange={open => {
+                                  setThreadMenuOpenId(open ? item.id : null)
+                                }}
+                              >
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className={cn(
+                                      'text-muted-foreground hover:bg-muted absolute right-0 top-0 inline-flex h-7 w-7 items-center justify-center rounded-md',
+                                      threadMenuOpenId === item.id
+                                        ? 'opacity-100'
+                                        : 'opacity-0 group-hover:opacity-100'
+                                    )}
+                                    aria-label="Thread options"
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  align="start"
+                                  className="w-44 p-1.5"
+                                >
+                                  <SessionActionsMenu
+                                    session={item}
+                                    projects={projects}
+                                    onRename={() => {
+                                      setThreadMenuOpenId(null)
+                                      openRenameDialog(item)
+                                    }}
+                                    onTogglePin={() => {
+                                      setThreadMenuOpenId(null)
+                                      void updateSession(item, {
+                                        organizeLabel:
+                                          item.organizeLabel === 'pinned'
+                                            ? null
+                                            : 'pinned'
+                                      })
+                                    }}
+                                    onMoveToProject={projectId => {
+                                      setThreadMenuOpenId(null)
+                                      void updateSession(item, { projectId })
+                                    }}
+                                    onExport={() => {
+                                      setThreadMenuOpenId(null)
+                                      void exportTranscript(item)
+                                    }}
+                                    onInspect={() => {
+                                      setThreadMenuOpenId(null)
+                                      navigate(
+                                        `/agents/${item.id}?inspect=1`
+                                      )
+                                    }}
+                                    onArchive={() => {
+                                      setThreadMenuOpenId(null)
+                                      const nextLabel =
+                                        item.organizeLabel === 'archive'
+                                          ? null
+                                          : 'archive'
+                                      void updateSession(item, {
+                                        organizeLabel: nextLabel
+                                      })
+                                      if (nextLabel === 'archive') {
+                                        setCollapsedSidebarSections(
+                                          current => ({
+                                            ...current,
+                                            archive: false
+                                          })
+                                        )
+                                      }
+                                    }}
+                                    onDelete={() => {
+                                      setThreadMenuOpenId(null)
+                                      setDeleteTarget(item)
+                                    }}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+            )
+          })
+        )}
+      </div>
+    </ScrollArea>
+  )
+}

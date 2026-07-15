@@ -4,7 +4,6 @@ import type {
   McpServer,
   Specialist
 } from '@sandwalk/agent-ui-core'
-import { CornerDownLeft, Plug, Sparkles } from 'lucide-react'
 import {
   forwardRef,
   type KeyboardEvent,
@@ -13,21 +12,20 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
-  useState} from 'react'
+  useState
+} from 'react'
 
 import {
   buildSlashResults,
   cleanSkillDescription,
-  mcpIconForServer,
   type SlashItem
 } from '@/components/agents/composer/composer-mention-utils'
+import { ComposerSlashList } from '@/components/agents/composer/ComposerSlashList'
+import { ComposerSlashPreview } from '@/components/agents/composer/ComposerSlashPreview'
 import {
   extractSkillOverviewFromMarkdown,
   getSkillPromptExamples
 } from '@/components/agents/skill-examples'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { composerSkillIcon, skillIconInvertInDark } from '@/lib/skill-icons'
-import { cn } from '@/lib/utils'
 
 export type ComposerSlashMenuHandle = {
   handleKeyDown: (event: KeyboardEvent) => boolean
@@ -167,7 +165,6 @@ export const ComposerSlashMenu = forwardRef<
     return () => {
       active = false
     }
-    // selectedSkill identity changes every slashResults rebuild; key off name only.
   }, [onLoadSkill, selectedMcpId, selectedSkillName, open])
 
   useEffect(() => {
@@ -177,8 +174,7 @@ export const ComposerSlashMenu = forwardRef<
       `Mention mcp:${selectedMcp.name} so the agent prefers tools from this MCP server.`
     setPreviewLoading(false)
     setPreviewOverview(current => (current === overview ? current : overview))
-    // selectedMcpId gates the preview (selectedMcp object identity is unstable).
-  }, [selectedMcpId, open])
+  }, [selectedMcpId, open, selectedMcp])
 
   useEffect(() => {
     if (!open || !selectedSlashItem) return
@@ -255,259 +251,25 @@ export const ComposerSlashMenu = forwardRef<
         </div>
       ) : null}
       <div className="grid h-72 grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div ref={listRootRef} className="min-h-0 min-w-0">
-          <ScrollArea className="border-border/60 h-72 border-r">
-            <div className="p-1" role="listbox" aria-label="Skills and MCPs">
-              {slashResults.length > 0 ? (
-                slashResults.map(item => {
-                  const isSelected = selectedSlashItem?.key === item.key
-                  if (item.kind === 'mcp') {
-                    const { server } = item
-                    const description =
-                      String(server.description || '').trim() ||
-                      server.transport
-                    const icon = mcpIconForServer(server)
-                    return (
-                      <button
-                        key={item.key}
-                        type="button"
-                        tabIndex={-1}
-                        role="option"
-                        aria-selected={isSelected}
-                        ref={node => {
-                          if (node) slashItemRefs.current.set(item.key, node)
-                          else slashItemRefs.current.delete(item.key)
-                        }}
-                        onMouseDown={event => event.preventDefault()}
-                        onMouseEnter={() => setSelectedSlashKey(item.key)}
-                        onClick={() => {
-                          onPickMcp(server)
-                        }}
-                        className={cn(
-                          'hover:bg-muted flex w-full flex-col rounded-md px-2 py-1.5 text-left',
-                          isSelected && 'bg-muted'
-                        )}
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          {icon ? (
-                            <img
-                              src={icon.src}
-                              alt=""
-                              className={cn(
-                                'size-[18px] shrink-0 rounded object-contain',
-                                icon.invertInDark && 'dark:invert'
-                              )}
-                            />
-                          ) : (
-                            <span className="bg-muted text-muted-foreground inline-flex size-[18px] shrink-0 items-center justify-center rounded">
-                              <Plug className="size-3" />
-                            </span>
-                          )}
-                          <span className="truncate text-sm font-medium">
-                            {server.name}
-                          </span>
-                        </span>
-                        <span className="text-muted-foreground truncate text-xs">
-                          {description}
-                        </span>
-                        <span className="text-muted-foreground/70 truncate text-[10px]">
-                          {[server.transport, server.catalogId || 'custom']
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </span>
-                      </button>
-                    )
-                  }
-
-                  const { skill } = item
-                  const description =
-                    cleanSkillDescription(skill.description) || skill.name
-                  const iconSource = composerSkillIcon(skill)
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      tabIndex={-1}
-                      role="option"
-                      aria-selected={isSelected}
-                      ref={node => {
-                        if (node) slashItemRefs.current.set(item.key, node)
-                        else slashItemRefs.current.delete(item.key)
-                      }}
-                      onMouseDown={event => event.preventDefault()}
-                      onMouseEnter={() => setSelectedSlashKey(item.key)}
-                      onClick={() => {
-                        onPickSkill(skill)
-                      }}
-                      className={cn(
-                        'hover:bg-muted flex w-full flex-col rounded-md px-2 py-1.5 text-left',
-                        isSelected && 'bg-muted'
-                      )}
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        {iconSource ? (
-                          <img
-                            src={iconSource}
-                            alt=""
-                            className={cn(
-                              'size-[18px] shrink-0 rounded object-contain',
-                              skillIconInvertInDark(skill) && 'dark:invert'
-                            )}
-                          />
-                        ) : (
-                          <span className="bg-primary/10 text-primary inline-flex size-[18px] shrink-0 items-center justify-center rounded">
-                            <Sparkles className="size-3" />
-                          </span>
-                        )}
-                        <span className="truncate text-sm font-medium">
-                          {skill.name}
-                        </span>
-                      </span>
-                      <span className="text-muted-foreground truncate text-xs">
-                        {description}
-                      </span>
-                      {(skill.author || skill.version) && (
-                        <span className="text-muted-foreground/70 truncate text-[10px]">
-                          {[skill.author, skill.version]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </span>
-                      )}
-                    </button>
-                  )
-                })
-              ) : (
-                <div className="text-muted-foreground px-2 py-1.5 text-xs">
-                  {selectedSpecialist
-                    ? `No matching skills or MCPs for ${selectedSpecialist.name}`
-                    : 'No skills or MCPs found'}
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-        <ScrollArea className="h-72">
-          <div className="px-1 py-1">
-            {selectedMcp ? (
-              <div className="space-y-3 px-2 py-1">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="truncate text-sm font-semibold">
-                    {selectedMcp.name}
-                  </span>
-                  <a
-                    href={
-                      selectedMcp.catalogId
-                        ? `/dashboard/mcp/catalog/${encodeURIComponent(
-                            selectedMcp.catalogId
-                          )}`
-                        : `/dashboard/mcp/server/${encodeURIComponent(
-                            selectedMcp.id
-                          )}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary shrink-0 text-[11px] font-medium hover:underline"
-                    onMouseDown={event => event.preventDefault()}
-                  >
-                    Read more
-                  </a>
-                </div>
-                <p className="text-muted-foreground line-clamp-5 text-[11px] leading-relaxed">
-                  {previewOverview ||
-                    `Mention mcp:${selectedMcp.name} so the agent prefers tools from this MCP server.`}
-                </p>
-                <div className="border-border/60 border-t pt-2">
-                  <p className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">
-                    Insert
-                  </p>
-                  <button
-                    type="button"
-                    tabIndex={-1}
-                    onMouseDown={event => event.preventDefault()}
-                    onClick={() => onPickMcp(selectedMcp)}
-                    className="hover:bg-muted/50 border-border/60 bg-background w-full rounded-md border px-2 py-1.5 text-left"
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="block truncate text-[11px] font-medium">
-                        Mention this MCP
-                      </span>
-                      <span className="border-primary/30 text-primary inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-                        Insert
-                        <CornerDownLeft className="h-3 w-3" />
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground mt-0.5 line-clamp-2 block text-[10px]">
-                      Adds mcp:{selectedMcp.name} so the agent can prioritize
-                      its tools.
-                    </span>
-                  </button>
-                </div>
-              </div>
-            ) : selectedSkill ? (
-              <div className="space-y-3 px-2 py-1">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="truncate text-sm font-semibold">
-                    {selectedSkill.name}
-                  </span>
-                  <a
-                    href={`/dashboard/skills/${encodeURIComponent(
-                      selectedSkill.name
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary shrink-0 text-[11px] font-medium hover:underline"
-                    onMouseDown={event => event.preventDefault()}
-                  >
-                    Read more
-                  </a>
-                </div>
-                <p className="text-muted-foreground line-clamp-3 text-[11px] leading-relaxed">
-                  {previewLoading
-                    ? 'Loading preview…'
-                    : previewOverview ||
-                      cleanSkillDescription(selectedSkill.description) ||
-                      `Use /${selectedSkill.name} to run this skill.`}
-                </p>
-                <div className="border-border/60 border-t pt-2">
-                  <p className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">
-                    Examples
-                  </p>
-                  <div className="space-y-1">
-                    {selectedExamples.map(example => (
-                      <button
-                        key={`${selectedSkill.name}-${example.title}`}
-                        type="button"
-                        tabIndex={-1}
-                        onMouseDown={event => event.preventDefault()}
-                        onClick={() =>
-                          onPickExample(selectedSkill.name, example.prompt)
-                        }
-                        className="hover:bg-muted/50 border-border/60 bg-background w-full rounded-md border px-2 py-1.5 text-left"
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="block truncate text-[11px] font-medium">
-                            {example.title}
-                          </span>
-                          <span className="border-primary/30 text-primary inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-                            Try
-                            <CornerDownLeft className="h-3 w-3" />
-                          </span>
-                        </span>
-                        <span className="text-muted-foreground mt-0.5 line-clamp-2 block text-[10px]">
-                          {example.prompt}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-muted-foreground p-3 text-xs">
-                Select a skill or MCP to preview.
-              </div>
-            )}
-          </div>
-        </ScrollArea>
+        <ComposerSlashList
+          slashResults={slashResults}
+          selectedSlashKey={selectedSlashKey}
+          selectedSpecialist={selectedSpecialist}
+          listRootRef={listRootRef}
+          slashItemRefs={slashItemRefs}
+          onSelectKey={setSelectedSlashKey}
+          onPickSkill={onPickSkill}
+          onPickMcp={onPickMcp}
+        />
+        <ComposerSlashPreview
+          selectedMcp={selectedMcp}
+          selectedSkill={selectedSkill}
+          previewLoading={previewLoading}
+          previewOverview={previewOverview}
+          selectedExamples={selectedExamples}
+          onPickMcp={onPickMcp}
+          onPickExample={onPickExample}
+        />
       </div>
     </div>
   )

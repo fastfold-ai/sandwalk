@@ -1,22 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import type { NavigateFunction } from 'react-router-dom'
 
 import {
-  FILES_PANEL_COLLAPSED_STORAGE_KEY,
-  SIDEBAR_COLLAPSED_STORAGE_KEY,
-  TERMINAL_OPEN_STORAGE_KEY,
-  writeCollapsedSidebarSections
-} from '@/lib/app-storage'
-import {
-  onboardingPath,
-  onboardingStepDef
-} from '@/lib/onboarding'
-import {
-  AUTO_TITLE_FIRST_RESPONSE_THRESHOLD,
-  isLowSignalTitle
-} from '@/lib/sessions'
+  useAppAutoTitle,
+  useAppChatSkeleton,
+  useAppDocumentTitle,
+  useAppLegacyRouteRedirects,
+  useAppPanelPersistence
+} from '@/hooks/useAppShellEffectHelpers'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentMessage,
@@ -71,349 +64,89 @@ type UseAppShellEffectsArgs = {
   setSessions: Dispatch<SetStateAction<AgentSession[]>>
 }
 
-export function useAppShellEffects({
-  locationPathname,
-  navigate,
-  legacySkillRouteName,
-  legacyIntegrationRouteKey,
-  onOnboardingPath,
-  onboardingStep,
-  sessionTitle,
-  activeIntegration,
-  activeProject,
-  isDashboardOverview,
-  isDashboardStatus,
-  isDashboardGeneral,
-  isDashboardModels,
-  isDashboardTools,
-  isDashboardDoctor,
-  isDashboardStorage,
-  isDashboardEnvironment,
-  isSkills,
-  isDashboardSpecialists,
-  isIntegrations,
-  isDashboardData,
-  isDashboardAgentSandbox,
-  isSandboxLocalDetail,
-  isSandboxModalDetail,
-  isDashboardAgentPrompts,
-  isDashboardAgentRuntime,
-  isDashboardMcp,
-  sidebarCollapsed,
-  filesPanelCollapsed,
-  terminalOpen,
-  sidebarPanelRef,
-  filesPanelRef,
-  collapsedSidebarSections,
-  runningCount,
-  concurrentRunSoftLimit,
-  setConnectionLimitDismissed,
-  routeProjectId,
-  setProjectScopeId,
-  messagesLoaded,
-  runActive,
-  sessionId,
-  client,
-  messages,
-  setSessions
-}: UseAppShellEffectsArgs) {
-  const autoTitlePassCountRef = useRef<Record<string, number>>({})
-  const autoTitleInFlightRef = useRef<Record<string, boolean>>({})
-  const prevRunActiveForTitleRef = useRef<Record<string, boolean>>({})
+export function useAppShellEffects(args: UseAppShellEffectsArgs) {
+  useAppLegacyRouteRedirects({
+    locationPathname: args.locationPathname,
+    navigate: args.navigate,
+    legacySkillRouteName: args.legacySkillRouteName,
+    legacyIntegrationRouteKey: args.legacyIntegrationRouteKey,
+    onOnboardingPath: args.onOnboardingPath,
+    onboardingStep: args.onboardingStep
+  })
 
-  const [showChatSkeleton, setShowChatSkeleton] = useState(false)
+  useAppDocumentTitle({
+    onOnboardingPath: args.onOnboardingPath,
+    onboardingStep: args.onboardingStep,
+    sessionTitle: args.sessionTitle,
+    activeIntegration: args.activeIntegration,
+    activeProject: args.activeProject,
+    isDashboardOverview: args.isDashboardOverview,
+    isDashboardStatus: args.isDashboardStatus,
+    isDashboardGeneral: args.isDashboardGeneral,
+    isDashboardModels: args.isDashboardModels,
+    isDashboardTools: args.isDashboardTools,
+    isDashboardDoctor: args.isDashboardDoctor,
+    isDashboardStorage: args.isDashboardStorage,
+    isDashboardEnvironment: args.isDashboardEnvironment,
+    isSkills: args.isSkills,
+    isDashboardSpecialists: args.isDashboardSpecialists,
+    isIntegrations: args.isIntegrations,
+    isDashboardData: args.isDashboardData,
+    isDashboardAgentSandbox: args.isDashboardAgentSandbox,
+    isSandboxLocalDetail: args.isSandboxLocalDetail,
+    isSandboxModalDetail: args.isSandboxModalDetail,
+    isDashboardAgentPrompts: args.isDashboardAgentPrompts,
+    isDashboardAgentRuntime: args.isDashboardAgentRuntime,
+    isDashboardMcp: args.isDashboardMcp
+  })
+
+  useAppPanelPersistence({
+    sidebarCollapsed: args.sidebarCollapsed,
+    filesPanelCollapsed: args.filesPanelCollapsed,
+    terminalOpen: args.terminalOpen,
+    sidebarPanelRef: args.sidebarPanelRef,
+    filesPanelRef: args.filesPanelRef,
+    collapsedSidebarSections: args.collapsedSidebarSections,
+    sessionId: args.sessionId
+  })
 
   useEffect(() => {
-    // Legacy /login URL → root (login renders under / when unauthenticated).
-    if (locationPathname === '/login') {
-      navigate('/', { replace: true })
-      return
-    }
-    if (locationPathname === '/agents/home') {
-      navigate('/', { replace: true })
-      return
-    }
-    if (locationPathname === '/dashboard/settings') {
-      navigate('/dashboard/general', { replace: true })
-      return
-    }
-    if (locationPathname === '/agents/skills') {
-      navigate('/dashboard/skills', { replace: true })
-      return
-    }
-    if (legacySkillRouteName) {
-      navigate(
-        `/dashboard/skills/${legacySkillRouteName}`,
-        { replace: true }
-      )
-      return
-    }
-    if (locationPathname === '/agents/integrations') {
-      navigate('/dashboard/integrations', { replace: true })
-      return
-    }
-    if (legacyIntegrationRouteKey) {
-      navigate(
-        `/dashboard/integrations/${legacyIntegrationRouteKey}`,
-        { replace: true }
-      )
-      return
-    }
-    if (onOnboardingPath) {
-      const canonical = onboardingPath(onboardingStep)
-      if (locationPathname !== canonical) {
-        navigate(canonical, { replace: true })
-      }
+    if (args.runningCount < args.concurrentRunSoftLimit) {
+      args.setConnectionLimitDismissed(false)
     }
   }, [
-    legacyIntegrationRouteKey,
-    legacySkillRouteName,
-    locationPathname,
-    navigate,
-    onOnboardingPath,
-    onboardingStep
+    args.concurrentRunSoftLimit,
+    args.runningCount,
+    args.setConnectionLimitDismissed
   ])
 
   useEffect(() => {
-    const base = 'sandwalk'
-    if (onOnboardingPath) {
-      const stepTitle = onboardingStepDef(onboardingStep).title
-      document.title = `Onboarding ${stepTitle} - ${base}`
-      return
-    }
-    if (sessionTitle) {
-      document.title = `${sessionTitle} · ${base}`
-      return
-    }
-    if (isDashboardOverview) {
-      document.title = `Dashboard · ${base}`
-      return
-    }
-    if (isDashboardStatus) {
-      document.title = `Status · ${base}`
-      return
-    }
-    if (isDashboardGeneral) {
-      document.title = `General · ${base}`
-      return
-    }
-    if (isDashboardModels) {
-      document.title = `Models · ${base}`
-      return
-    }
-    if (isDashboardTools) {
-      document.title = `Tools · ${base}`
-      return
-    }
-    if (isDashboardDoctor) {
-      document.title = `Doctor · ${base}`
-      return
-    }
-    if (isDashboardStorage) {
-      document.title = `Storage · ${base}`
-      return
-    }
-    if (isDashboardEnvironment) {
-      document.title = `Environment · ${base}`
-      return
-    }
-    if (isSkills) {
-      document.title = `Skills · ${base}`
-      return
-    }
-    if (isDashboardSpecialists) {
-      document.title = `Specialists · ${base}`
-      return
-    }
-    if (isIntegrations) {
-      if (activeIntegration) {
-        document.title = `${activeIntegration.name} · Integrations · ${base}`
-        return
-      }
-      document.title = `Integrations · ${base}`
-      return
-    }
-    if (isDashboardData) {
-      document.title = `Datasets · ${base}`
-      return
-    }
-    if (isDashboardAgentSandbox) {
-      if (isSandboxLocalDetail) {
-        document.title = `Local Sandbox · ${base}`
-        return
-      }
-      if (isSandboxModalDetail) {
-        document.title = `Modal Sandbox · ${base}`
-        return
-      }
-      document.title = `Sandbox · ${base}`
-      return
-    }
-    if (isDashboardAgentPrompts) {
-      document.title = `Prompts · ${base}`
-      return
-    }
-    if (isDashboardAgentRuntime) {
-      document.title = `Runtime · ${base}`
-      return
-    }
-    if (isDashboardMcp) {
-      document.title = `MCP · ${base}`
-      return
-    }
-    if (activeProject) {
-      document.title = `${activeProject.name} · ${base}`
-      return
-    }
-    document.title = base
-  }, [
-    activeIntegration,
-    activeProject,
-    isDashboardDoctor,
-    isDashboardStorage,
-    isDashboardEnvironment,
-    isDashboardAgentSandbox,
-    isDashboardAgentPrompts,
-    isDashboardAgentRuntime,
-    isSandboxLocalDetail,
-    isSandboxModalDetail,
-    isDashboardMcp,
-    isDashboardOverview,
-    isDashboardStatus,
-    isDashboardGeneral,
-    isDashboardModels,
-    isDashboardData,
-    isDashboardTools,
-    isDashboardSpecialists,
-    isIntegrations,
-    isSkills,
-    onOnboardingPath,
-    onboardingStep,
-    sessionTitle
-  ])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        SIDEBAR_COLLAPSED_STORAGE_KEY,
-        sidebarCollapsed ? '1' : '0'
-      )
-    } catch {
-      // ignore storage failures
-    }
-  }, [sidebarCollapsed])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        FILES_PANEL_COLLAPSED_STORAGE_KEY,
-        filesPanelCollapsed ? '1' : '0'
-      )
-    } catch {
-      // ignore storage failures
-    }
-  }, [filesPanelCollapsed])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(TERMINAL_OPEN_STORAGE_KEY, terminalOpen ? '1' : '0')
-    } catch {
-      // ignore storage failures
-    }
-  }, [terminalOpen])
-
-  useEffect(() => {
-    const panel = sidebarPanelRef.current
-    if (!panel) return
-    if (sidebarCollapsed) {
-      if (!panel.isCollapsed()) panel.collapse()
-    } else if (panel.isCollapsed()) {
-      panel.expand()
-    }
-  }, [sidebarCollapsed])
-
-  useEffect(() => {
-    const panel = filesPanelRef.current
-    if (!panel) return
-    if (filesPanelCollapsed) {
-      if (!panel.isCollapsed()) panel.collapse()
-    } else if (panel.isCollapsed()) {
-      panel.expand()
-    }
-  }, [filesPanelCollapsed, sessionId])
-
-  useEffect(() => {
-    writeCollapsedSidebarSections(collapsedSidebarSections)
-  }, [collapsedSidebarSections])
-
-  useEffect(() => {
-    if (runningCount < concurrentRunSoftLimit) {
-      setConnectionLimitDismissed(false)
-    }
-  }, [concurrentRunSoftLimit, runningCount, setConnectionLimitDismissed])
-
-  useEffect(() => {
-    if (routeProjectId) {
-      setProjectScopeId(routeProjectId)
+    if (args.routeProjectId) {
+      args.setProjectScopeId(args.routeProjectId)
       return
     }
     if (
-      locationPathname === '/' ||
-      locationPathname === '/agents/home'
+      args.locationPathname === '/' ||
+      args.locationPathname === '/agents/home'
     ) {
-      setProjectScopeId(null)
+      args.setProjectScopeId(null)
     }
-  }, [locationPathname, routeProjectId, setProjectScopeId])
+  }, [args.locationPathname, args.routeProjectId, args.setProjectScopeId])
 
-  useEffect(() => {
-    if (messagesLoaded || runActive || !sessionId) {
-      setShowChatSkeleton(false)
-      return
-    }
-    const timer = window.setTimeout(() => setShowChatSkeleton(true), 180)
-    return () => window.clearTimeout(timer)
-  }, [messagesLoaded, runActive, sessionId])
+  const showChatSkeleton = useAppChatSkeleton(
+    args.messagesLoaded,
+    args.runActive,
+    args.sessionId
+  )
 
-  useEffect(() => {
-    if (!sessionId) return
-    const justFinished =
-      Boolean(prevRunActiveForTitleRef.current[sessionId]) && !runActive
-    prevRunActiveForTitleRef.current[sessionId] = runActive
-    if (!justFinished || autoTitleInFlightRef.current[sessionId]) return
-    const conversationCount = messages.filter(
-      message => message.role === 'user' || message.role === 'assistant'
-    ).length
-    if (conversationCount < AUTO_TITLE_FIRST_RESPONSE_THRESHOLD) return
-    if (!isLowSignalTitle(sessionTitle || '')) return
-    // Keep retrying while the stored title is still a placeholder (e.g. after
-    // a bad overwrite). Cap attempts so intentional untitled chats settle.
-    if ((autoTitlePassCountRef.current[sessionId] || 0) >= 3) return
-
-    autoTitleInFlightRef.current[sessionId] = true
-    const titledSessionId = sessionId
-    void (async () => {
-      try {
-        const updated = await client.autoTitleSession(titledSessionId, {
-          force: true
-        })
-        const title = String(updated.title || '').trim()
-        if (!title) return
-        setSessions(current =>
-          current.map(item =>
-            item.id === titledSessionId
-              ? { ...item, title, updatedAt: updated.updatedAt }
-              : item
-          )
-        )
-        autoTitlePassCountRef.current[titledSessionId] =
-          (autoTitlePassCountRef.current[titledSessionId] || 0) + 1
-      } catch {
-        // Best effort; retry on a later completed run.
-      } finally {
-        autoTitleInFlightRef.current[titledSessionId] = false
-      }
-    })()
-  }, [client, messages, runActive, sessionTitle, sessionId, setSessions])
+  useAppAutoTitle({
+    sessionId: args.sessionId,
+    runActive: args.runActive,
+    sessionTitle: args.sessionTitle,
+    messages: args.messages,
+    client: args.client,
+    setSessions: args.setSessions
+  })
 
   return { showChatSkeleton }
 }

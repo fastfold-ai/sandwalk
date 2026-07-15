@@ -45,6 +45,10 @@ export default [
     rules: {
       'no-undef': 'off',
       'no-unused-vars': 'off',
+      'max-lines': [
+        'error',
+        { max: 500, skipBlankLines: true, skipComments: true }
+      ],
       'unused-imports/no-unused-imports': 'error',
       'unused-imports/no-unused-vars': [
         'warn',
@@ -58,6 +62,12 @@ export default [
       ],
       'simple-import-sort/imports': 'warn',
       'simple-import-sort/exports': 'warn'
+    }
+  },
+  {
+    files: ['**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      'max-lines': 'off'
     }
   },
   eslintConfigPrettier

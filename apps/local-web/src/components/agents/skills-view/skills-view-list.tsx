@@ -1,7 +1,6 @@
 import type { AgentCatalogSkill, AgentSkill } from '@sandwalk/agent-ui-core'
 import {
   ArrowRight,
-  Box,
   Check,
   ChevronDown,
   GitBranch,
@@ -10,10 +9,7 @@ import {
   Upload
 } from 'lucide-react'
 
-import {
-  CardGridSkeleton,
-  ListRowsSkeleton
-} from '@/components/agents/PageSkeletons'
+import { CardGridSkeleton } from '@/components/agents/PageSkeletons'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -23,22 +19,24 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   featuredSkillIcon,
   isFeaturedSkill,
-  skillIcon,
   skillIconInvertInDark
 } from '@/lib/skill-icons'
-import { categorizeSkill, skillMetaText } from '@/lib/skills-catalog'
+import { skillMetaText } from '@/lib/skills-catalog'
 import { cn } from '@/lib/utils'
 
+import {
+  SkillsCatalogResultsSection,
+  SkillsInstalledGridSection
+} from './skills-view-list-content'
+import { SkillsListSidebar } from './skills-view-list-sidebar'
 import {
   SkillEnabledToggle,
   SkillRemoveButton,
   SkillsRemoveDialog
 } from './skills-view-shared'
-import { formatCatalogInstallCount } from './skills-view-utils'
 
 export function SkillsFeaturedOverview({
   skills,
@@ -395,393 +393,53 @@ export function SkillsMainListView({
               </DropdownMenu>
             </div>
             {catalogSearchMode ? (
-              <div className="space-y-4 pb-4">
-                <section className="space-y-2">
-                  <p className="text-muted-foreground text-xs font-medium">
-                    Skills.sh
-                    {query.trim().length >= 2
-                      ? ` · ${catalogResults.length} result${catalogResults.length === 1 ? '' : 's'}`
-                      : ''}
-                  </p>
-                  {catalogLoading ? (
-                    <ListRowsSkeleton rows={5} withToggle={false} />
-                  ) : null}
-                  {catalogError ? (
-                    <p className="text-destructive text-sm">{catalogError}</p>
-                  ) : null}
-                  {!catalogLoading && !catalogError && query.trim().length < 2 ? (
-                    <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-sm">
-                      Type at least 2 characters to search skills.sh.
-                    </div>
-                  ) : null}
-                  {showCatalogEmptyState ? (
-                    <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-sm">
-                      No skills.sh results match “{query.trim()}”.
-                    </div>
-                  ) : null}
-                  {!catalogLoading && !catalogError && catalogResults.length > 0 ? (
-                    <div className="space-y-2">
-                      {catalogResults.map(skill => {
-                        const isInstalled = isCatalogSkillInstalled(skill)
-                        const title = skill.name || skill.slug
-                        return (
-                          <div
-                            key={skill.id}
-                            className="bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors"
-                          >
-                            <button
-                              type="button"
-                              className="min-w-0 flex-1 text-left"
-                              onClick={() => onOpenCatalogDetail(skill)}
-                            >
-                              <div className="flex items-center gap-2">
-                                <img
-                                  src="/suggestions/skills-sh.png"
-                                  alt=""
-                                  className="size-6 rounded object-contain dark:invert"
-                                />
-                                <span className="truncate text-sm font-medium">
-                                  {title}
-                                </span>
-                                <span className="text-muted-foreground truncate text-xs">
-                                  {skill.source}
-                                </span>
-                                {skill.installs > 0 ? (
-                                  <span className="text-muted-foreground shrink-0 text-xs">
-                                    {formatCatalogInstallCount(skill.installs)} installs
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="text-muted-foreground mt-1 line-clamp-2 text-sm">
-                                {skill.source}
-                                {skill.sourceType ? ` · ${skill.sourceType}` : ''}
-                              </p>
-                            </button>
-                            <div className="flex items-center gap-1 pt-0.5">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 text-xs"
-                                onClick={() => onOpenCatalogDetail(skill)}
-                              >
-                                {isInstalled ? 'Update' : 'View'}
-                              </Button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : null}
-                </section>
-              </div>
-            ) : loading ? (
-              <div className="space-y-4 pb-4">
-                <section className="space-y-2">
-                  <Skeleton className="h-3 w-24" />
-                  <CardGridSkeleton cards={6} columns={3} />
-                </section>
-                <section className="space-y-2">
-                  <Skeleton className="h-3 w-16" />
-                  <ListRowsSkeleton rows={5} />
-                </section>
-              </div>
-            ) : visible.length === 0 ? (
-              <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-sm">
-                No skills match the current search/filter.
-              </div>
+              <SkillsCatalogResultsSection
+                query={query}
+                catalogLoading={catalogLoading}
+                catalogError={catalogError}
+                catalogResults={catalogResults}
+                showCatalogEmptyState={showCatalogEmptyState}
+                isCatalogSkillInstalled={isCatalogSkillInstalled}
+                onOpenCatalogDetail={onOpenCatalogDetail}
+              />
             ) : (
-              <div className="space-y-4 pb-4">
-                {featuredVisible.length > 0 ? (
-                  <section className="space-y-2">
-                    <p className="text-muted-foreground text-xs font-medium">
-                      Featured ({featuredVisible.length})
-                    </p>
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {featuredVisible.map(skill => {
-                        const iconSource = featuredSkillIcon(skill)
-                        const metaText = skillMetaText(skill)
-                        return (
-                          <div
-                            key={skill.name}
-                            className={cn(
-                              'bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors',
-                              !skill.enabled && 'opacity-60'
-                            )}
-                          >
-                            <button
-                              type="button"
-                              className="min-w-0 flex-1 text-left"
-                              onClick={() => onOpen(skill.name)}
-                            >
-                              <div className="flex items-center gap-2">
-                                <img
-                                  src={iconSource}
-                                  alt=""
-                                  className={cn(
-                                    'size-7 rounded object-contain',
-                                    skillIconInvertInDark(skill) && 'dark:invert'
-                                  )}
-                                />
-                                <span className="truncate text-sm font-medium">
-                                  {skill.name}
-                                </span>
-                              </div>
-                              {metaText ? (
-                                <p className="text-muted-foreground mt-0.5 text-xs">
-                                  {metaText}
-                                </p>
-                              ) : null}
-                              <p className="text-muted-foreground mt-1 line-clamp-2 text-sm">
-                                {skill.description}
-                              </p>
-                            </button>
-                            <div className="flex flex-col items-end gap-1 pt-0.5">
-                              <SkillEnabledToggle
-                                skill={skill}
-                                pending={Boolean(pendingEnabled[skill.name])}
-                                onToggle={onToggleEnabled}
-                              />
-                              <SkillRemoveButton
-                                skill={skill}
-                                pending={
-                                  Boolean(pendingRemove[skill.name]) || batchBusy
-                                }
-                                onRemove={onRemove}
-                              />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </section>
-                ) : null}
-                {categoryFilter !== 'featured' ? (
-                  <section className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-muted-foreground text-xs font-medium">
-                        All ({nonFeaturedVisible.length})
-                      </p>
-                      <div className="flex flex-wrap items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground h-7 text-xs"
-                          disabled={disableEligibleCount === 0 || batchBusy}
-                          onClick={() => onSetFilteredEnabled(false)}
-                        >
-                          Disable ({disableEligibleCount})
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground h-7 text-xs"
-                          disabled={enableEligibleCount === 0 || batchBusy}
-                          onClick={() => onSetFilteredEnabled(true)}
-                        >
-                          Enable ({enableEligibleCount})
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground h-7 text-xs"
-                          disabled={removeEligibleCount === 0 || batchBusy}
-                          onClick={onRemoveFiltered}
-                        >
-                          Remove ({removeEligibleCount})
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {nonFeaturedVisible.map(skill => {
-                        const iconSource = skillIcon(skill)
-                        const metaText = skillMetaText(skill)
-                        return (
-                          <div
-                            key={skill.name}
-                            className={cn(
-                              'bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors',
-                              !skill.enabled && 'opacity-60'
-                            )}
-                          >
-                            <button
-                              type="button"
-                              className="min-w-0 flex-1 text-left"
-                              onClick={() => onOpen(skill.name)}
-                            >
-                              <div className="flex items-center gap-2">
-                                {iconSource ? (
-                                  <img
-                                    src={iconSource}
-                                    alt=""
-                                    className={cn(
-                                      'size-6 rounded object-contain',
-                                      skillIconInvertInDark(skill) && 'dark:invert'
-                                    )}
-                                  />
-                                ) : (
-                                  <span className="bg-muted/30 text-muted-foreground grid size-6 shrink-0 place-items-center rounded">
-                                    <Box className="size-4" />
-                                  </span>
-                                )}
-                                <span className="truncate text-sm font-medium">
-                                  {skill.name}
-                                </span>
-                                <span className="text-muted-foreground text-xs">
-                                  {categorizeSkill(skill)}
-                                </span>
-                                {metaText ? (
-                                  <span className="text-muted-foreground text-xs">
-                                    {metaText}
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="text-muted-foreground mt-1 line-clamp-2 text-sm">
-                                {skill.description}
-                              </p>
-                            </button>
-                            <div className="flex flex-col items-end gap-1 pt-0.5">
-                              <SkillEnabledToggle
-                                skill={skill}
-                                pending={Boolean(pendingEnabled[skill.name])}
-                                onToggle={onToggleEnabled}
-                              />
-                              <SkillRemoveButton
-                                skill={skill}
-                                pending={
-                                  Boolean(pendingRemove[skill.name]) || batchBusy
-                                }
-                                onRemove={onRemove}
-                              />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </section>
-                ) : null}
-              </div>
+              <SkillsInstalledGridSection
+                loading={loading}
+                visible={visible}
+                featuredVisible={featuredVisible}
+                nonFeaturedVisible={nonFeaturedVisible}
+                categoryFilter={categoryFilter}
+                disableEligibleCount={disableEligibleCount}
+                enableEligibleCount={enableEligibleCount}
+                removeEligibleCount={removeEligibleCount}
+                batchBusy={batchBusy}
+                pendingEnabled={pendingEnabled}
+                pendingRemove={pendingRemove}
+                onOpen={onOpen}
+                onToggleEnabled={onToggleEnabled}
+                onRemove={onRemove}
+                onSetFilteredEnabled={onSetFilteredEnabled}
+                onRemoveFiltered={onRemoveFiltered}
+              />
             )}
           </div>
           {!catalogSearchMode ? (
-            <aside className="flex w-full shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:self-start xl:w-[320px]">
-              <section className="bg-background/70 rounded-lg p-2">
-                <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
-                  Status
-                </div>
-                <button
-                  type="button"
-                  className={cn(
-                    'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
-                    statusFilter === 'all'
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                  onClick={() => onStatusFilterChange('all')}
-                >
-                  All ({skills.length})
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
-                    statusFilter === 'enabled'
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                  onClick={() => onStatusFilterChange('enabled')}
-                >
-                  Enabled ({enabledCount})
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
-                    statusFilter === 'disabled'
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                  onClick={() => onStatusFilterChange('disabled')}
-                >
-                  Disabled ({disabledCount})
-                </button>
-              </section>
-              <section className="bg-background/70 rounded-lg p-2">
-                <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
-                  Categories
-                </div>
-                <button
-                  type="button"
-                  className={cn(
-                    'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
-                    categoryFilter === 'all'
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                  onClick={() => onCategoryFilterChange('all')}
-                >
-                  All ({skills.length})
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
-                    categoryFilter === 'featured'
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                  onClick={() => onCategoryFilterChange('featured')}
-                >
-                  Featured ({featuredCount})
-                </button>
-                {categories.map(category => (
-                  <button
-                    key={category}
-                    type="button"
-                    className={cn(
-                      'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
-                      categoryFilter === category
-                        ? 'bg-muted text-foreground'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    )}
-                    onClick={() => onCategoryFilterChange(category)}
-                  >
-                    {category} ({categoryCounts[category] || 0})
-                  </button>
-                ))}
-              </section>
-              <section className="bg-background/70 rounded-lg p-2">
-                <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
-                  Authors
-                </div>
-                <button
-                  type="button"
-                  className={cn(
-                    'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
-                    authorFilter === 'all'
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                  onClick={() => onAuthorFilterChange('all')}
-                >
-                  All ({skills.length})
-                </button>
-                {authors.map(author => (
-                  <button
-                    key={author}
-                    type="button"
-                    className={cn(
-                      'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
-                      authorFilter === author
-                        ? 'bg-muted text-foreground'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    )}
-                    onClick={() => onAuthorFilterChange(author)}
-                  >
-                    {author} ({authorCounts[author] || 0})
-                  </button>
-                ))}
-              </section>
-            </aside>
+            <SkillsListSidebar
+              skills={skills}
+              statusFilter={statusFilter}
+              categoryFilter={categoryFilter}
+              authorFilter={authorFilter}
+              categories={categories}
+              authors={authors}
+              categoryCounts={categoryCounts}
+              authorCounts={authorCounts}
+              featuredCount={featuredCount}
+              enabledCount={enabledCount}
+              disabledCount={disabledCount}
+              onStatusFilterChange={onStatusFilterChange}
+              onCategoryFilterChange={onCategoryFilterChange}
+              onAuthorFilterChange={onAuthorFilterChange}
+            />
           ) : null}
         </div>
       </ScrollArea>

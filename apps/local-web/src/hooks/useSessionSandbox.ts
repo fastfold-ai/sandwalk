@@ -12,9 +12,13 @@ import {
   useCallback,
   useEffect,
   useRef,
-  useState} from 'react'
+  useState
+} from 'react'
 
 import { type SandboxActionPhase } from '@/components/agents/Composer'
+
+import { syncSandboxPhaseFromStatus } from './session-sandbox-status-sync'
+import { useSessionSandboxStream } from './use-session-sandbox-stream'
 
 type UseSessionSandboxArgs = {
   client: LocalAgentClient
@@ -45,121 +49,15 @@ export function useSessionSandbox({
     useState<SandboxActionPhase>('idle')
   const sandboxActionSessionRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (!sessionId || !health) {
-      setSessionSandboxStatus(null)
-      setSessionSandboxPhase('idle')
-      sandboxActionSessionRef.current = null
-      return
-    }
-    if (sandboxActionSessionRef.current !== sessionId) {
-      setSessionSandboxPhase('idle')
-    }
-    let cancelled = false
-    let socket: WebSocket | null = null
-    let reconnectTimer: number | null = null
-    let reconnectDelayMs = 1000
-    let hardFailures = 0
-
-    const applyStatus = (status: SessionSandboxStatus) => {
-      if (cancelled) return
-      setSessionSandboxStatus(status)
-      if (status.status === 'starting') {
-        setSessionSandboxPhase('starting')
-        sandboxActionSessionRef.current = sessionId
-      } else if (status.status === 'stopping') {
-        setSessionSandboxPhase('stopping')
-        sandboxActionSessionRef.current = sessionId
-      } else if (status.status === 'running') {
-        if (sandboxActionSessionRef.current === sessionId) {
-          sandboxActionSessionRef.current = null
-        }
-        setSessionSandboxPhase('idle')
-      } else if (
-        (status.status === 'stopped' ||
-          status.status === 'unavailable' ||
-          status.status === 'ready') &&
-        sandboxActionSessionRef.current !== sessionId
-      ) {
-        setSessionSandboxPhase('idle')
-      }
-    }
-
-    const refresh = () => {
-      void client
-        .getSessionSandbox(sessionId)
-        .then(status => {
-          if (!cancelled) applyStatus(status)
-        })
-        .catch(() => {
-          if (!cancelled) setSessionSandboxStatus(null)
-        })
-    }
-
-    const connect = () => {
-      if (cancelled) return
-      try {
-        socket?.close()
-      } catch {
-        // ignore
-      }
-      const ws = new WebSocket(client.sandboxStreamUrl(sessionId))
-      socket = ws
-      ws.onopen = () => {
-        reconnectDelayMs = 1000
-        hardFailures = 0
-        refresh()
-      }
-      ws.onmessage = event => {
-        try {
-          const payload = JSON.parse(String(event.data)) as SessionSandboxStatus & {
-            type?: string
-          }
-          if (payload?.sessionId) applyStatus(payload)
-        } catch {
-          // ignore malformed frames
-        }
-      }
-      ws.onclose = event => {
-        if (cancelled) return
-        // 1006 = abnormal close (refused / failed handshake). Back off harder
-        // so a down API does not reconnect-storm the console.
-        if (event.code === 1006 || event.code === 4401 || event.code === 1011) {
-          hardFailures += 1
-          reconnectDelayMs = Math.min(
-            Math.max(reconnectDelayMs, 2000) * 2,
-            hardFailures >= 5 ? 30000 : 15000
-          )
-        }
-        reconnectTimer = window.setTimeout(() => {
-          reconnectTimer = null
-          connect()
-        }, reconnectDelayMs)
-        if (!(event.code === 1006 || event.code === 4401 || event.code === 1011)) {
-          reconnectDelayMs = Math.min(reconnectDelayMs * 2, 8000)
-        }
-      }
-      ws.onerror = () => {
-        try {
-          ws.close()
-        } catch {
-          // ignore
-        }
-      }
-    }
-
-    refresh()
-    connect()
-    return () => {
-      cancelled = true
-      if (reconnectTimer != null) window.clearTimeout(reconnectTimer)
-      try {
-        socket?.close()
-      } catch {
-        // ignore
-      }
-    }
-  }, [client, health, sessionId, session?.sandboxBackend])
+  useSessionSandboxStream({
+    client,
+    health,
+    sessionId,
+    sandboxBackend: session?.sandboxBackend,
+    sandboxActionSessionRef,
+    setSessionSandboxStatus,
+    setSessionSandboxPhase
+  })
 
   const refreshSessionSandbox = useCallback(
     async (targetSessionId?: string | null) => {
@@ -172,25 +70,12 @@ export function useSessionSandbox({
         const status = await client.getSessionSandbox(id)
         if ((targetSessionId ?? sessionIdRef.current) === id) {
           setSessionSandboxStatus(status)
-          if (status.status === 'starting') {
-            setSessionSandboxPhase('starting')
-            sandboxActionSessionRef.current = id
-          } else if (status.status === 'stopping') {
-            setSessionSandboxPhase('stopping')
-            sandboxActionSessionRef.current = id
-          } else if (status.status === 'running') {
-            if (sandboxActionSessionRef.current === id) {
-              sandboxActionSessionRef.current = null
-            }
-            setSessionSandboxPhase('idle')
-          } else if (
-            (status.status === 'stopped' ||
-              status.status === 'unavailable' ||
-              status.status === 'ready') &&
-            sandboxActionSessionRef.current !== id
-          ) {
-            setSessionSandboxPhase('idle')
-          }
+          syncSandboxPhaseFromStatus(
+            status,
+            id,
+            sandboxActionSessionRef,
+            setSessionSandboxPhase
+          )
         }
         return status
       } catch {
@@ -203,7 +88,6 @@ export function useSessionSandbox({
     [client, sessionId, sessionIdRef]
   )
 
-  // Safety-net poll while provisioning, matching cloud agent-ide behavior.
   useEffect(() => {
     if (!sessionId || !health) return
     const pending =

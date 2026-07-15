@@ -20,91 +20,12 @@ import {
 } from '@/lib/skills-catalog'
 import { cn } from '@/lib/utils'
 
-const DEFAULT_SKILLS_REPO = 'fastfold-ai/skills'
-
-/** Featured FastFold skills shown before install (matches catalog names). */
-const FEATURED_SKILL_CATALOG: Array<{
-  name: string
-  description: string
-  source: string
-}> = [
-  {
-    name: 'fold',
-    description: 'Protein structure prediction with FastFold Cloud jobs.',
-    source: 'fastfold-ai/skills@skills/fold'
-  },
-  {
-    name: 'boltz',
-    description: 'Boltz structure prediction workflows.',
-    source: 'fastfold-ai/skills@skills/boltz'
-  },
-  {
-    name: 'protein_design_boltzgen',
-    description: 'Protein design with BoltzGen.',
-    source: 'fastfold-ai/skills@skills/protein_design_boltzgen'
-  },
-  {
-    name: 'md_openmm_calvados',
-    description: 'Molecular dynamics with OpenMM / CALVADOS.',
-    source: 'fastfold-ai/skills@skills/md_openmm_calvados'
-  },
-  {
-    name: 'md_openmmdl',
-    description: 'MD analysis with OpenMMDL.',
-    source: 'fastfold-ai/skills@skills/md_openmmdl'
-  },
-  {
-    name: 'diagrams_mermaid',
-    description: 'Diagrams and flowcharts with Mermaid.',
-    source: 'fastfold-ai/skills@skills/diagrams_mermaid'
-  },
-  {
-    name: 'slack_report',
-    description: 'Share research updates to Slack.',
-    source: 'fastfold-ai/skills@skills/slack_report'
-  }
-]
-
-function SkillToggle({
-  enabled,
-  pending,
-  label,
-  onToggle
-}: {
-  enabled: boolean
-  pending?: boolean
-  label: string
-  onToggle: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      aria-label={label}
-      disabled={pending}
-      className={cn(
-        'relative inline-flex h-4 w-8 shrink-0 items-center rounded-full transition-colors',
-        enabled
-          ? 'bg-black/75 dark:bg-zinc-300/50'
-          : 'bg-zinc-200 dark:bg-zinc-700',
-        pending && 'cursor-not-allowed opacity-60'
-      )}
-      onClick={event => {
-        event.preventDefault()
-        event.stopPropagation()
-        onToggle()
-      }}
-    >
-      <span
-        className={cn(
-          'inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
-          enabled ? 'translate-x-4' : 'translate-x-0.5'
-        )}
-      />
-    </button>
-  )
-}
+import {
+  DEFAULT_SKILLS_REPO,
+  FEATURED_SKILL_CATALOG,
+  OnboardingFeaturedSkillCard,
+  OnboardingSkillToggle
+} from './onboarding/onboarding-skills-shared'
 
 export function OnboardingSkillsStep({
   client
@@ -209,8 +130,6 @@ export function OnboardingSkillsStep({
 
   const hasFeaturedInstalled = featuredInstalled.length > 0
 
-  // When featured skills are already installed, the selection toggles are hidden —
-  // do not silently queue leftover default selections for install.
   const selectedFeatured = hasFeaturedInstalled
     ? []
     : FEATURED_SKILL_CATALOG.filter(
@@ -314,45 +233,14 @@ export function OnboardingSkillsStep({
 
         {hasFeaturedInstalled ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            {featuredInstalled.map(skill => {
-              const iconSource = featuredSkillIcon(skill)
-              return (
-                <div
-                  key={skill.name}
-                  className={cn(
-                    'bg-background/60 flex items-start justify-between gap-3 rounded-lg border p-3',
-                    !skill.enabled && 'opacity-60'
-                  )}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <img
-                        src={iconSource}
-                        alt=""
-                        className={cn(
-                          'size-7 rounded object-contain',
-                          skillIconInvertInDark(skill) && 'dark:invert'
-                        )}
-                      />
-                      <span className="truncate text-sm font-medium">
-                        {skill.name}
-                      </span>
-                    </div>
-                    {skill.description ? (
-                      <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">
-                        {skill.description}
-                      </p>
-                    ) : null}
-                  </div>
-                  <SkillToggle
-                    enabled={skill.enabled}
-                    pending={pendingEnabled[skill.name]}
-                    label={`${skill.enabled ? 'Disable' : 'Enable'} ${skill.name}`}
-                    onToggle={() => void setEnabled(skill.name, !skill.enabled)}
-                  />
-                </div>
-              )
-            })}
+            {featuredInstalled.map(skill => (
+              <OnboardingFeaturedSkillCard
+                key={skill.name}
+                skill={skill}
+                pending={pendingEnabled[skill.name]}
+                onToggle={() => void setEnabled(skill.name, !skill.enabled)}
+              />
+            ))}
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -397,7 +285,7 @@ export function OnboardingSkillsStep({
                       </p>
                     ) : null}
                   </div>
-                  <SkillToggle
+                  <OnboardingSkillToggle
                     enabled={on}
                     label={`${on ? 'Exclude' : 'Include'} ${item.name}`}
                     onToggle={() =>
@@ -485,7 +373,7 @@ export function OnboardingSkillsStep({
                       <Check className="size-4" />
                     </span>
                   ) : (
-                    <SkillToggle
+                    <OnboardingSkillToggle
                       enabled={on}
                       pending={installBusy}
                       label={`${on ? 'Exclude' : 'Include'} ${suggestionSourceLabel(item)}`}

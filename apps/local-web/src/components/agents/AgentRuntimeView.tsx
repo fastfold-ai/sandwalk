@@ -4,132 +4,16 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { BusyConfirmOverlay } from '@/components/BusyConfirmOverlay'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 
-type Draft = {
-  recursionLimit: string
-  maxSdkTurns: string
-  toolMode: 'ptc' | 'native'
-  groupToolTraces: boolean
-  toolTraceDetailLimit: string
-  backgroundWatchTimeoutS: string
-  interruptDrainTimeoutS: string
-  parallelMaxThreads: string
-  toolHealthEnabled: boolean
-  toolHealthFailThreshold: string
-  toolHealthSuppressSeconds: string
-}
-
-function settingsToDraft(settings: RuntimeSettings | null): Draft {
-  return {
-    recursionLimit: String(settings?.recursionLimit ?? 120),
-    maxSdkTurns: String(settings?.maxSdkTurns ?? 30),
-    toolMode: settings?.toolMode === 'native' ? 'native' : 'ptc',
-    groupToolTraces: settings?.groupToolTraces ?? true,
-    toolTraceDetailLimit: String(settings?.toolTraceDetailLimit ?? 1),
-    backgroundWatchTimeoutS: String(settings?.backgroundWatchTimeoutS ?? 7200),
-    interruptDrainTimeoutS: String(settings?.interruptDrainTimeoutS ?? 10),
-    parallelMaxThreads: String(settings?.parallelMaxThreads ?? 5),
-    toolHealthEnabled: settings?.toolHealthEnabled ?? true,
-    toolHealthFailThreshold: String(settings?.toolHealthFailThreshold ?? 2),
-    toolHealthSuppressSeconds: String(
-      settings?.toolHealthSuppressSeconds ?? 900
-    )
-  }
-}
-
-function clampInt(
-  value: string,
-  minimum: number,
-  maximum: number,
-  fallback: number
-) {
-  const n = Math.round(Number(value))
-  if (!Number.isFinite(n)) return fallback
-  return Math.max(minimum, Math.min(maximum, n))
-}
-
-function Toggle({
-  enabled,
-  disabled,
-  label,
-  onToggle
-}: {
-  enabled: boolean
-  disabled?: boolean
-  label: string
-  onToggle: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      aria-label={label}
-      disabled={disabled}
-      className={cn(
-        'relative inline-flex h-4 w-8 shrink-0 items-center rounded-full transition-colors',
-        enabled
-          ? 'bg-black/75 dark:bg-zinc-300/50'
-          : 'bg-zinc-200 dark:bg-zinc-700',
-        disabled && 'cursor-not-allowed opacity-60'
-      )}
-      onClick={event => {
-        event.preventDefault()
-        event.stopPropagation()
-        onToggle()
-      }}
-    >
-      <span
-        className={cn(
-          'inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
-          enabled ? 'translate-x-4' : 'translate-x-0.5'
-        )}
-      />
-    </button>
-  )
-}
-
-function NumberField({
-  label,
-  hint,
-  value,
-  min,
-  max,
-  step,
-  disabled,
-  onChange
-}: {
-  label: string
-  hint?: string
-  value: string
-  min: number
-  max: number
-  step?: number
-  disabled?: boolean
-  onChange: (value: string) => void
-}) {
-  return (
-    <label className="space-y-1.5 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <Input
-        type="number"
-        min={min}
-        max={max}
-        step={step ?? 1}
-        className="w-40"
-        value={value}
-        disabled={disabled}
-        onChange={event => onChange(event.target.value)}
-      />
-      {hint ? (
-        <p className="text-muted-foreground text-xs leading-relaxed">{hint}</p>
-      ) : null}
-    </label>
-  )
-}
+import {
+  clampInt,
+  RuntimeNumberField,
+  RuntimeToggle,
+  settingsToDraft,
+  type RuntimeDraft
+} from './runtime-view/runtime-view-fields'
 
 export function AgentRuntimeView({
   connected,
@@ -142,7 +26,7 @@ export function AgentRuntimeView({
     changes: Partial<RuntimeSettings>
   ) => Promise<RuntimeSettings>
 }) {
-  const [draft, setDraft] = useState<Draft>(() =>
+  const [draft, setDraft] = useState<RuntimeDraft>(() =>
     settingsToDraft(runtimeSettings)
   )
   const [saving, setSaving] = useState(false)
@@ -253,7 +137,7 @@ export function AgentRuntimeView({
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <NumberField
+            <RuntimeNumberField
               label="Recursion limit"
               hint="Max model↔tool graph steps (agent.recursion_limit)."
               value={draft.recursionLimit}
@@ -265,7 +149,7 @@ export function AgentRuntimeView({
                 setDraft(current => ({ ...current, recursionLimit: value }))
               }
             />
-            <NumberField
+            <RuntimeNumberField
               label="Max SDK turns"
               hint="Soft turn budget used when recursion limit is unset."
               value={draft.maxSdkTurns}
@@ -326,7 +210,7 @@ export function AgentRuntimeView({
               )
             })}
           </div>
-          <NumberField
+          <RuntimeNumberField
             label="Parallel max threads"
             hint="Cap for parallel specialist / fan-out work."
             value={draft.parallelMaxThreads}
@@ -353,7 +237,7 @@ export function AgentRuntimeView({
                 Collapse older calls; keep the latest ones detailed.
               </p>
             </div>
-            <Toggle
+            <RuntimeToggle
               enabled={draft.groupToolTraces}
               disabled={!connected || saving}
               label="Group tool traces"
@@ -365,7 +249,7 @@ export function AgentRuntimeView({
               }
             />
           </div>
-          <NumberField
+          <RuntimeNumberField
             label="Trace detail limit"
             hint="How many recent tool calls keep full args/output."
             value={draft.toolTraceDetailLimit}
@@ -390,7 +274,7 @@ export function AgentRuntimeView({
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <NumberField
+            <RuntimeNumberField
               label="Background watch (seconds)"
               hint="Max wait for background job watches."
               value={draft.backgroundWatchTimeoutS}
@@ -405,7 +289,7 @@ export function AgentRuntimeView({
                 }))
               }
             />
-            <NumberField
+            <RuntimeNumberField
               label="Interrupt drain (seconds)"
               hint="Time allowed to finish in-flight work after stop."
               value={draft.interruptDrainTimeoutS}
@@ -436,7 +320,7 @@ export function AgentRuntimeView({
                 Auto-suppress flaky tools after repeated failures.
               </p>
             </div>
-            <Toggle
+            <RuntimeToggle
               enabled={draft.toolHealthEnabled}
               disabled={!connected || saving}
               label="Enable tool health"
@@ -449,7 +333,7 @@ export function AgentRuntimeView({
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <NumberField
+            <RuntimeNumberField
               label="Fail threshold"
               hint="Failures before a tool is suppressed."
               value={draft.toolHealthFailThreshold}
@@ -463,7 +347,7 @@ export function AgentRuntimeView({
                 }))
               }
             />
-            <NumberField
+            <RuntimeNumberField
               label="Suppress for (seconds)"
               hint="How long a suppressed tool stays unavailable."
               value={draft.toolHealthSuppressSeconds}
