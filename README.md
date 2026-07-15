@@ -17,7 +17,8 @@ A thinking path for open science.
 <p align="center">
   <a href="#features">Features</a> •
   <a href="#install">Install</a> •
-  <a href="#first-time-setup">Setup</a> •
+  <a href="#quickstart">Quickstart</a> •
+  <a href="#web-dashboard">Web Dashboard</a> •
   <a href="#usage">Usage</a> •
   <a href="#contributing--from-source">Contributing</a>
 </p>
@@ -31,7 +32,7 @@ A thinking path for open science.
 </p>
 <br>
 
-**sandwalk** is a local science agent for open research: ask questions in natural language and it plans multi-step workflows across 190+ tools, database APIs, skills, MCPs, and sandboxes. Think of it as a coding agent, but for biology and drug discovery.
+**sandwalk** is a local science agent for ambitious researchers doing frontier science work: ask questions in natural language and it plans multi-step workflows across 190+ tools, database APIs, skills, MCPs, and sandboxes. Built for people who want the best tools and a clean research flow. Think of it as a coding agent, but for biology and drug discovery.
 
 Includes a CLI, local agent server, web dashboard with viewers, and a Mac app that starts everything for you. Run fully on your machine, or reach cloud GPUs when the work needs it.
 
@@ -163,23 +164,170 @@ open ~/Applications/Sandwalk.app
 
 Or download a release from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases) when published.
 
-## First-time setup
+## Quickstart
+
+### macOS App
+
+Launch **Sandwalk.app** from Applications. The menu bar controls the local agent server: start / stop / restart, open the web dashboard, jump into pinned or recent agents, and open Settings for ports, models, tools, skills, and more.
+
+<p align="center">
+  <img src="images/showcase-mac-app-1.png" alt="Sandwalk macOS menu bar" width="280" />
+  &nbsp;&nbsp;
+  <img src="images/showcase-mac-app-2.png" alt="Sandwalk macOS Settings status" width="420" />
+</p>
+
+### CLI
 
 ```bash
-sandwalk setup          # interactive wizard (models, keys, skills)
-sandwalk doctor         # health check
+# First-time wizard (models, keys, skills)
+sandwalk setup
+sandwalk doctor
+
+# Interactive agent (shares sessions with the web dashboard)
+sandwalk
+
+# Single query
+sandwalk "What is known about KRAS G12C inhibitors?"
+
+# Local server + dashboard (or use Sandwalk.app on macOS)
+sandwalk serve
 ```
 
-Set an API key for your model provider (Anthropic, OpenAI, or an OpenAI-compatible endpoint) when prompted, or later with `sandwalk config`.
+Defaults when serving:
 
-Optional:
+| Service   | URL                   |
+|-----------|-----------------------|
+| Agent API | http://127.0.0.1:8787 |
+| Dashboard | http://127.0.0.1:8969 |
+
+Optional next steps:
 
 ```bash
-sandwalk auth generate  # protect the local server / web UI
+sandwalk auth generate   # protect the local server / web UI
 sandwalk auth enable
 sandwalk skills add fastfold-ai/skills
-sandwalk data pull-all  # optional local datasets
+sandwalk data pull-all   # optional local datasets
 ```
+
+## Web Dashboard
+
+Open the local dashboard after `sandwalk serve` or **Open Web Dashboard** from Sandwalk.app (`http://127.0.0.1:8969`). Same agent sessions as the CLI: chat, files, viewers, and terminal in one place.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-web-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-web-light.png">
+    <img alt="sandwalk web dashboard overview" src="images/showcase-web-light.png" width="820" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+### Overview
+
+Track agent session activity with a year-long heatmap, streaks, and totals. Featured skills, MCPs, and integrations surface on Overview so you can enable what you need without digging through settings.
+
+### Projects
+
+Organize research into projects. Switch the active project from the sidebar, open existing workspaces, or create a new project for a campaign (indication, target family, or paper series). Sessions, files, and tabs stay scoped to the project you are in, while the CLI can still open the same shared agent sessions.
+
+When you create a project you set a name, an optional description for your own reference, and **Agent Context**: background, conventions, and instructions that every agent in that project inherits in its system prompt.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-projects-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-projects-light.png">
+    <img alt="Create a project with name, description, and agent context" src="images/showcase-projects-light.png" width="520" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+### Composer
+
+The chat composer is the control surface for every turn. Pick how the agent thinks, which specialist profile to use, and where code runs, without leaving the message box. Use `@` for files and `/` for skills and MCPs; chips show what is attached to the turn.
+
+**Models, effort, and fast mode.** Choose a frontier or local OpenAI-compatible model, then set reasoning depth (Low / Medium / High) and optionally turn on Fast when you want quicker turns.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-composer-models-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-composer-models-light.png">
+    <img alt="Model picker with effort and fast mode" src="images/showcase-composer-models-light.png" width="640" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+**Specialists.** Apply a saved skill + MCP + instruction pack for a focused research mode (genomics, single-cell, target discovery, MD, structure prediction, screening, protein design, and more), or create your own.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-composer-specialist-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-composer-specialist-light.png">
+    <img alt="Specialist profile picker in the composer" src="images/showcase-composer-specialist-light.png" width="640" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+**Sandbox.** Run on this machine (Local Sandbox, with live chip / RAM / GPU specs) or switch to Modal for isolated cloud CPU/GPU compute.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-composer-sandbox-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-composer-sandbox-light.png">
+    <img alt="Sandbox picker: Local or Modal with machine specs" src="images/showcase-composer-sandbox-light.png" width="640" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+### Artifact viewers
+
+When the agent produces structures, plots, reports, or other files, open them in the Artifacts panel beside the chat. Search and switch grid/list views; preview JSON, SVG plots (PAE, pLDDT), and CIF/PDB structures in an interactive 3D viewer while you keep chatting.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-artifacts-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-artifacts-light.png">
+    <img alt="Artifacts grid with PAE heatmap, pLDDT plot, and structure viewer" src="images/showcase-artifacts-light.png" width="720" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+### Terminal
+
+An integrated multi-tab terminal sits under the workspace. Run shell commands in the session environment, keep several tabs color-coded, rename tabs, and stay in flow next to chat and artifacts. Theme-aware: the terminal follows your light/dark mode and color palette (Default, Mirage, Mahal, Darwin).
+
+The CLI tab matches interactive `sandwalk`: type `/` for slash-command autocomplete (`/help`, `/tools`, `/data`, `/skills`, …), with model, specialist, and sandbox shown in the status bar.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-terminal-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-terminal-light.png">
+    <img alt="CLI terminal with slash-command autocomplete" src="images/showcase-terminal-light.png" width="720" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+### Agent chat and workspace
+
+- Multi-tab research sessions shared with the CLI
+- File tree for the session workspace
+- Bidirectional history: pick up a CLI chat in the browser (and the reverse)
+
+### Capabilities
+
+Configure everything the agent can use from the sidebar:
+
+| Area | What you can do |
+|------|-----------------|
+| **Models** | Frontier cloud providers and local OpenAI-compatible endpoints (Ollama, Unsloth, oMLX, LM Studio, and more) |
+| **Tools** | Browse and enable the 190+ science tool registry |
+| **Skills** | Install and toggle guided workflows (folding, MD, protein design, diagrams, …) |
+| **Datasets** | Pull and manage local corpora (DepMap, PRISM, L1000, …) |
+| **Specialists** | Save skill + MCP + instruction packs for repeatable research modes |
+| **MCPs** | Connect Tamarind, Paperclip, Latch, Neurosnap, Linear, or custom servers |
+| **Integrations** | Keys and connectors for Modal, Boltz, Fastfold Cloud, LangSmith, Tavily, Slack, Vercel, and more |
+
+### Agent runtime
+
+- **Runtime** and **Prompts**: model defaults and system behavior
+- **Sandbox**: Local Sandbox on your machine, or cloud GPU / serverless jobs (Modal, Lambda, Fastfold Cloud)
+- **Doctor**, **Storage**, **Environment**: health checks, disk usage, and env diagnostics
+
+### Server and security
+
+Status, network bind, auth, and logs for the supervised local API. Generate and enable an API key when you want the dashboard protected (`sandwalk auth`).
 
 ## Usage
 
