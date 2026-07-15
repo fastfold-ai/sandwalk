@@ -17,6 +17,7 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import {
   Archive,
+  ArrowDown,
   Check,
   ChevronDown,
   ChevronRight,
@@ -41,6 +42,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
@@ -398,6 +400,9 @@ export default function App() {
   const pendingMentionRef = useRef<string | null>(null)
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null)
   const filesPanelRef = useRef<ImperativePanelHandle>(null)
+  const chatScrollRef = useRef<HTMLDivElement | null>(null)
+  const chatEndRef = useRef<HTMLDivElement | null>(null)
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [copiedResumeCommand, setCopiedResumeCommand] = useState(false)
   const [cliMenuOpen, setCliMenuOpen] = useState(false)
@@ -3007,6 +3012,86 @@ export default function App() {
       }),
     [activeRunId, messages, runIdByMessageId, todosByRunId, tools]
   )
+
+  const scrollChatToBottom = useCallback(() => {
+    const root = chatScrollRef.current
+    const viewport = root?.querySelector(
+      '[data-radix-scroll-area-viewport]'
+    ) as HTMLElement | null
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight
+      setShowScrollToBottom(false)
+      return
+    }
+    chatEndRef.current?.scrollIntoView({ block: 'end' })
+    setShowScrollToBottom(false)
+  }, [])
+
+  const updateScrollToBottomVisibility = useCallback(() => {
+    const root = chatScrollRef.current
+    const viewport = root?.querySelector(
+      '[data-radix-scroll-area-viewport]'
+    ) as HTMLElement | null
+    if (!viewport) {
+      setShowScrollToBottom(false)
+      return
+    }
+    const distanceFromBottom =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
+    setShowScrollToBottom(distanceFromBottom > 96)
+  }, [])
+
+  useEffect(() => {
+    if (!sessionId || !messagesLoaded || messages.length === 0) {
+      setShowScrollToBottom(false)
+      return
+    }
+    const root = chatScrollRef.current
+    const viewport = root?.querySelector(
+      '[data-radix-scroll-area-viewport]'
+    ) as HTMLElement | null
+    if (!viewport) return
+
+    updateScrollToBottomVisibility()
+    viewport.addEventListener('scroll', updateScrollToBottomVisibility, {
+      passive: true
+    })
+    const observer = new ResizeObserver(() => updateScrollToBottomVisibility())
+    observer.observe(viewport)
+    const content = viewport.firstElementChild
+    if (content) observer.observe(content)
+
+    return () => {
+      viewport.removeEventListener('scroll', updateScrollToBottomVisibility)
+      observer.disconnect()
+    }
+  }, [
+    conversationTimeline.length,
+    messages.length,
+    messagesLoaded,
+    sessionId,
+    updateScrollToBottomVisibility
+  ])
+
+  const chatPinnedSessionRef = useRef<string | null>(null)
+
+  // Show the latest message when opening/loading a session with history.
+  // Only pin once per session — do not keep forcing scroll while streaming.
+  useLayoutEffect(() => {
+    if (!sessionId || !messagesLoaded || messages.length === 0) return
+    if (chatPinnedSessionRef.current === sessionId) return
+    chatPinnedSessionRef.current = sessionId
+    scrollChatToBottom()
+    const frame = window.requestAnimationFrame(() => scrollChatToBottom())
+    const timers = [80, 250, 600].map(ms =>
+      window.setTimeout(() => scrollChatToBottom(), ms)
+    )
+    return () => {
+      window.cancelAnimationFrame(frame)
+      for (const timer of timers) window.clearTimeout(timer)
+    }
+  }, [messages.length, messagesLoaded, scrollChatToBottom, sessionId])
+
   const activeRunTodos = activeRunId ? todosByRunId[activeRunId] || [] : []
   const activeRunTools = activeRunId
     ? tools.filter(tool => tool.runId === activeRunId && !tool.messageId)
@@ -4717,9 +4802,13 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="animate-in fade-in flex min-h-0 flex-1 flex-col duration-200">
-                      <ScrollArea className="chat-scrollbar min-h-0 flex-1">
-                        <div className="mx-auto flex w-full max-w-[44rem] flex-col px-5 py-6">
-                          <div className="mb-4 flex min-w-0 flex-1 flex-col gap-y-2 empty:hidden">
+                      <div className="relative min-h-0 flex-1">
+                        <ScrollArea
+                          ref={chatScrollRef}
+                          className="chat-scrollbar h-full min-h-0"
+                        >
+                          <div className="mx-auto flex w-full max-w-[44rem] flex-col px-5 py-6">
+                            <div className="mb-4 flex min-w-0 flex-1 flex-col gap-y-2 empty:hidden">
                             {(() => {
                               const items: Array<
                                 | {
@@ -5102,9 +5191,26 @@ export default function App() {
                                 <span className="sr-only">Generating</span>
                               </div>
                             ) : null}
+                            </div>
+                            <div
+                              ref={chatEndRef}
+                              aria-hidden
+                              className="h-px w-full shrink-0"
+                            />
                           </div>
-                        </div>
-                      </ScrollArea>
+                        </ScrollArea>
+                        {showScrollToBottom ? (
+                          <button
+                            type="button"
+                            onClick={() => scrollChatToBottom()}
+                            aria-label="Scroll to latest message"
+                            title="Scroll to latest message"
+                            className="bg-background text-foreground border-border/70 absolute bottom-3 left-1/2 z-20 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border shadow-[0_4px_16px_-4px_rgba(0,0,0,0.18)] transition-opacity hover:bg-background dark:shadow-[0_6px_20px_-6px_rgba(0,0,0,0.65)]"
+                          >
+                            <ArrowDown className="size-4" />
+                          </button>
+                        ) : null}
+                      </div>
                       <div className="bg-background mx-auto w-full max-w-[44rem] shrink-0 px-5 pb-6 pt-2">
                         <Composer
                           key={sessionId ?? 'empty-composer'}

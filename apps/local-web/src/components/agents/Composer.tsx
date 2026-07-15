@@ -368,6 +368,14 @@ export function Composer({
       emittedDraftRef.current = value
       return
     }
+    // Parent cleared after send — always accept (do not treat as stale).
+    if (value === '') {
+      emittedDraftRef.current = ''
+      draftRef.current = ''
+      setDraft('')
+      onLiveDraftChange?.('')
+      return
+    }
     // Chip inserts stay local so the messages transcript doesn't re-render and
     // steal focus. Ignore a stale parent value that hasn't caught up yet.
     if (
@@ -1109,8 +1117,14 @@ export function Composer({
 
   const handleSend = () => {
     if (running) return
+    const text = draftRef.current
+    if (!text.trim()) return
     setAuraTick(tick => tick + 1)
-    onSend(draftRef.current)
+    // Clear immediately — parent value may already be "" so the sync effect
+    // would otherwise treat this as a no-op echo and leave the draft in place.
+    emittedDraftRef.current = ''
+    setLocalDraft('')
+    onSend(text)
   }
 
   const mentionMenuWasOpenRef = useRef(false)
