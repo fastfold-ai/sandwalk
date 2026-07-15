@@ -87,6 +87,11 @@ PROVIDER_METADATA = {
         "category": "MCP",
         "description": "Neurosnap MCP API key for computational biology jobs.",
     },
+    "paperclip": {
+        "name": "Paperclip",
+        "category": "MCP",
+        "description": "Paperclip MCP API key for biomedical literature search and synthesis.",
+    },
     "linear": {
         "name": "Linear",
         "category": "MCP",

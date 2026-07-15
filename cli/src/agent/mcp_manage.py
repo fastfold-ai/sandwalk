@@ -382,7 +382,7 @@ def handle_mcp_argv(args: list[str], console: Console) -> int:
   mcp remove <id|name>
 
 Uses langchain-mcp-adapters MultiServerMCPClient (stdio / sse / streamable_http + headers).
-Suggested servers: tamarind, latch, neurosnap, linear
+Suggested servers: tamarind, latch, neurosnap, paperclip, linear
 """
         )
         return 0

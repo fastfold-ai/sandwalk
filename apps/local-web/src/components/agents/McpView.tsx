@@ -51,6 +51,7 @@ const MCP_ICONS: Record<string, { src: string; invertInDark?: boolean }> = {
   tamarind: { src: '/integrations/tamarind.png' },
   latch: { src: '/integrations/latch.png' },
   neurosnap: { src: '/integrations/neurosnap.png' },
+  paperclip: { src: '/integrations/paperclip.png' },
   linear: { src: '/integrations/linear.png' },
 }
 
@@ -235,26 +236,6 @@ function statusBadge(
     )
   }
   return null
-}
-
-function statusCallout(entry: McpCatalogEntry) {
-  if (!entry.statusMessage || entry.connected) return null
-  const needsReconnect = /expired|reconnect|invalid_token|unauthorized/i.test(
-    entry.statusMessage,
-  )
-  return (
-    <div
-      className={cn(
-        'mt-2 rounded-md border px-2.5 py-2 text-xs leading-relaxed',
-        needsReconnect
-          ? 'border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200'
-          : 'border-red-500/30 bg-red-500/10 text-red-800 dark:text-red-300',
-      )}
-      title={entry.statusMessage}
-    >
-      {entry.statusMessage}
-    </div>
-  )
 }
 
 type CatalogStatusPatch = {
@@ -662,7 +643,6 @@ export function McpView({
             <p className="text-muted-foreground mt-1 line-clamp-2 min-h-10 text-sm">
               {view.description}
             </p>
-            {statusCallout(view)}
           </div>
           {isSetup ? (
             <McpToggle
@@ -823,11 +803,22 @@ export function McpView({
     )
   }
 
+  const featuredCatalog = useMemo(
+    () => catalog.filter(entry => entry.featured !== false),
+    [catalog]
+  )
+  const moreCatalog = useMemo(
+    () => catalog.filter(entry => entry.featured === false),
+    [catalog]
+  )
+
   const featuredVisible = (() => {
-    if (!featuredOnly) return catalog
-    if (featuredLimit === null) return catalog
+    // Full MCP page: show every featured catalog entry.
+    if (!featuredOnly) return featuredCatalog
+    // Onboarding / overview: show all when limit is null, else cap (default 2).
+    if (featuredLimit === null) return featuredCatalog
     const limit = featuredLimit === undefined ? 2 : featuredLimit
-    return catalog.slice(0, limit)
+    return featuredCatalog.slice(0, limit)
   })()
 
   const featuredSection = (
@@ -845,7 +836,7 @@ export function McpView({
                 {featuredLabel}
               </h3>
               <p className="text-muted-foreground text-xs font-medium">
-                Featured ({catalog.length})
+                Featured ({featuredCatalog.length})
               </p>
             </div>
           ) : (
@@ -853,7 +844,7 @@ export function McpView({
           )
         ) : (
           <p className="text-muted-foreground text-xs font-medium">
-            Featured ({catalog.length})
+            Featured ({featuredCatalog.length})
           </p>
         )}
         {featuredOnly && onShowAll ? (
@@ -867,7 +858,7 @@ export function McpView({
           </button>
         ) : null}
       </div>
-      {catalogLoading && catalog.length === 0 ? (
+      {catalogLoading && featuredCatalog.length === 0 ? (
         <CardGridSkeleton
           cards={
             featuredOnly && featuredLimit !== null
@@ -909,6 +900,17 @@ export function McpView({
 
         <div className="space-y-6 pb-4">
           {featuredSection}
+
+          {moreCatalog.length > 0 ? (
+            <section className="space-y-2">
+              <p className="text-muted-foreground text-xs font-medium">
+                More ({moreCatalog.length})
+              </p>
+              <div className="grid gap-3 md:grid-cols-2">
+                {moreCatalog.map(entry => renderCatalogCard(entry))}
+              </div>
+            </section>
+          ) : null}
 
           <section className="space-y-2">
             <p className="text-muted-foreground text-xs font-medium">

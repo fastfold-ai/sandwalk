@@ -1047,11 +1047,13 @@ def mcp_catalog_cmd():
 
 @mcp_app.command("connect")
 def mcp_connect_cmd(
-    catalog_id: str = typer.Argument(..., help="Catalog id (tamarind|latch|neurosnap|linear)"),
+    catalog_id: str = typer.Argument(
+        ..., help="Catalog id (tamarind|latch|neurosnap|paperclip|linear)"
+    ),
     api_key: str | None = typer.Option(
         None,
         "--api-key",
-        help="API key (required for neurosnap/tamarind; optional for linear)",
+        help="API key (required for neurosnap/tamarind; optional for paperclip/linear)",
         hide_input=True,
     ),
 ):

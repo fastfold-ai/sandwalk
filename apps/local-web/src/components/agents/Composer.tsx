@@ -1178,7 +1178,7 @@ export function Composer({
                                 </span>
                               )}
                               <span className="truncate text-sm font-medium">
-                                MCP: {server.name}
+                                {server.name}
                               </span>
                             </span>
                             <span className="text-muted-foreground truncate text-xs">
@@ -1237,7 +1237,7 @@ export function Composer({
                               </span>
                             )}
                             <span className="truncate text-sm font-medium">
-                              Skill: {skill.name}
+                              {skill.name}
                             </span>
                           </span>
                           <span className="text-muted-foreground truncate text-xs">
@@ -1269,7 +1269,7 @@ export function Composer({
                   <div className="space-y-3 px-2 py-1">
                     <div className="flex items-start justify-between gap-2">
                       <span className="truncate text-sm font-semibold">
-                        MCP: {selectedMcp.name}
+                        {selectedMcp.name}
                       </span>
                       <a
                         href={
@@ -1324,7 +1324,7 @@ export function Composer({
                   <div className="space-y-3 px-2 py-1">
                     <div className="flex items-start justify-between gap-2">
                       <span className="truncate text-sm font-semibold">
-                        Skill: {selectedSkill.name}
+                        {selectedSkill.name}
                       </span>
                       <a
                         href={`/dashboard/skills/${encodeURIComponent(

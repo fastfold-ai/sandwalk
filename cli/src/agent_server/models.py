@@ -862,6 +862,7 @@ class McpCatalogEntryStatus(ApiModel):
     docs_url: str | None = None
     setup_url: str | None = None
     integration_key: str | None = None
+    featured: bool = True
     default_enabled: bool = False
     configured: bool = False
     auth_method: str | None = None

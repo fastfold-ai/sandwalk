@@ -731,6 +731,8 @@ export type McpCatalogEntry = {
   docsUrl: string | null
   setupUrl: string | null
   integrationKey: string | null
+  /** Featured cards (dashboard / onboarding). Non-featured stay in the full MCP list. */
+  featured?: boolean
   defaultEnabled: boolean
   configured: boolean
   authMethod: 'oauth' | 'api_key' | null

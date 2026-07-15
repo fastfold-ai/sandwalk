@@ -187,13 +187,39 @@ export function OnboardingSkillsStep({
     [skills]
   )
 
+  const installedSuggestionSources = useMemo(() => {
+    const sources = new Set<string>()
+    for (const skill of skills) {
+      const raw = String(skill.source || '')
+        .trim()
+        .toLowerCase()
+      if (!raw) continue
+      for (const item of suggestions) {
+        const needle = String(item.source || '')
+          .trim()
+          .toLowerCase()
+        if (!needle) continue
+        if (raw === needle || raw.includes(needle) || needle.includes(raw)) {
+          sources.add(item.source)
+        }
+      }
+    }
+    return sources
+  }, [skills, suggestions])
+
   const hasFeaturedInstalled = featuredInstalled.length > 0
 
-  const selectedFeatured = FEATURED_SKILL_CATALOG.filter(
-    item => selected[item.name] && !installedNames.has(item.name)
-  )
+  // When featured skills are already installed, the selection toggles are hidden —
+  // do not silently queue leftover default selections for install.
+  const selectedFeatured = hasFeaturedInstalled
+    ? []
+    : FEATURED_SKILL_CATALOG.filter(
+        item => selected[item.name] && !installedNames.has(item.name)
+      )
   const selectedSuggestions = suggestions.filter(
-    item => suggestionSelected[item.source]
+    item =>
+      suggestionSelected[item.source] &&
+      !installedSuggestionSources.has(item.source)
   )
   const installCount = selectedFeatured.length + selectedSuggestions.length
 
@@ -206,28 +232,42 @@ export function OnboardingSkillsStep({
     setError(null)
     setNotice(null)
     try {
+      const installedNamesAcc: string[] = []
       let installedPacks = 0
       if (
+        !hasFeaturedInstalled &&
         selectedFeatured.length === FEATURED_SKILL_CATALOG.length &&
         FEATURED_SKILL_CATALOG.every(item => selected[item.name])
       ) {
-        await client.installSkill(DEFAULT_SKILLS_REPO)
+        const installed = await client.installSkill(DEFAULT_SKILLS_REPO)
+        installedNamesAcc.push(...(installed || []))
         installedPacks += 1
       } else {
         for (const item of selectedFeatured) {
-          await client.installSkill(item.source)
+          const installed = await client.installSkill(item.source)
+          installedNamesAcc.push(...(installed || []))
           installedPacks += 1
         }
       }
       for (const item of selectedSuggestions) {
-        await client.installSkill(item.source)
+        const installed = await client.installSkill(item.source)
+        installedNamesAcc.push(...(installed || []))
         installedPacks += 1
       }
       await refresh()
+      const unique = Array.from(new Set(installedNamesAcc.filter(Boolean)))
       setNotice(
-        `Installed ${installedPacks} source${installedPacks === 1 ? '' : 's'}.`
+        unique.length > 0
+          ? `Installed ${unique.length} skill${unique.length === 1 ? '' : 's'} from ${installedPacks} source${installedPacks === 1 ? '' : 's'}.`
+          : `Installed ${installedPacks} source${installedPacks === 1 ? '' : 's'}.`
       )
-      setSuggestionSelected({})
+      setSuggestionSelected(prev => {
+        const next = { ...prev }
+        for (const item of selectedSuggestions) {
+          next[item.source] = false
+        }
+        return next
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not install skills.')
     } finally {
@@ -386,19 +426,26 @@ export function OnboardingSkillsStep({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {suggestions.map(item => {
-              const on = Boolean(suggestionSelected[item.source])
+              const alreadyInstalled = installedSuggestionSources.has(
+                item.source
+              )
+              const on =
+                alreadyInstalled || Boolean(suggestionSelected[item.source])
               const icon = suggestionSourceIcon(item)
-              const toggle = () =>
+              const toggle = () => {
+                if (alreadyInstalled || installBusy) return
                 setSuggestionSelected(prev => ({
                   ...prev,
                   [item.source]: !prev[item.source]
                 }))
+              }
               return (
                 <div
                   key={item.source}
                   className={cn(
                     'bg-background/60 flex items-start gap-3 rounded-lg border p-3',
-                    on && 'border-foreground bg-muted/40',
+                    on && !alreadyInstalled && 'border-foreground bg-muted/40',
+                    alreadyInstalled && 'border-emerald-500/40 bg-emerald-500/5',
                     !on && 'opacity-60'
                   )}
                 >
@@ -423,12 +470,28 @@ export function OnboardingSkillsStep({
                     <span className="text-muted-foreground mt-1 block truncate font-mono text-[11px]">
                       {item.source}
                     </span>
+                    {alreadyInstalled ? (
+                      <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                        <Check className="size-3" />
+                        Installed
+                      </p>
+                    ) : null}
                   </div>
-                  <SkillToggle
-                    enabled={on}
-                    label={`${on ? 'Exclude' : 'Include'} ${suggestionSourceLabel(item)}`}
-                    onToggle={toggle}
-                  />
+                  {alreadyInstalled ? (
+                    <span
+                      className="text-emerald-700 dark:text-emerald-300 mt-0.5 grid size-8 shrink-0 place-items-center"
+                      title="Installed"
+                    >
+                      <Check className="size-4" />
+                    </span>
+                  ) : (
+                    <SkillToggle
+                      enabled={on}
+                      pending={installBusy}
+                      label={`${on ? 'Exclude' : 'Include'} ${suggestionSourceLabel(item)}`}
+                      onToggle={toggle}
+                    />
+                  )}
                 </div>
               )
             })}

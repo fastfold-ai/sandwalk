@@ -67,6 +67,7 @@ _CATEGORY_BY_NAME: dict[str, str] = {
     "mcp_tamarind": "mcp",
     "mcp_latch": "mcp",
     "mcp_neurosnap": "mcp",
+    "mcp_paperclip": "mcp",
     "mcp_linear": "mcp",
 }
 

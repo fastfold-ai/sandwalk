@@ -28,6 +28,7 @@ export const INTEGRATION_ICONS: Record<
   tamarind: { src: '/integrations/tamarind.png' },
   latch: { src: '/integrations/latch.png' },
   neurosnap: { src: '/integrations/neurosnap.png' },
+  paperclip: { src: '/integrations/paperclip.png' },
   linear: { src: '/integrations/linear.png' },
 }
 

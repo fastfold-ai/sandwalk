@@ -26,6 +26,8 @@ class McpCatalogEntry:
     docs_url: str | None = None
     setup_url: str | None = None
     integration_key: str | None = None  # Integrations provider key
+    # Shown in Featured / onboarding MCP grids. Non-featured stay in the full list.
+    featured: bool = True
 
 
 MCP_CATALOG: list[McpCatalogEntry] = [
@@ -42,6 +44,25 @@ MCP_CATALOG: list[McpCatalogEntry] = [
         docs_url="https://app.tamarind.bio/api-docs/mcp-server",
         setup_url="https://app.tamarind.bio",
         integration_key="tamarind",
+        featured=True,
+    ),
+    McpCatalogEntry(
+        id="paperclip",
+        name="Paperclip",
+        description=(
+            "Search and synthesize 11M+ biomedical papers, regulatory docs, "
+            "clinical trials, and biology databases (UniProt, PDB, ChEMBL)."
+        ),
+        url="https://paperclip.gxl.ai/mcp",
+        auth_mode="api_key_or_oauth",
+        preferred_auth="oauth",
+        api_key_config_key="mcp.paperclip_api_key",
+        api_key_env_var="PAPERCLIP_API_KEY",
+        api_key_header="X-API-Key",
+        docs_url="https://paperclip.gxl.ai/install",
+        setup_url="https://paperclip.gxl.ai/keys",
+        integration_key="paperclip",
+        featured=True,
     ),
     McpCatalogEntry(
         id="latch",
@@ -53,6 +74,7 @@ MCP_CATALOG: list[McpCatalogEntry] = [
         docs_url="https://wiki.latch.bio/agent/latch-mcp",
         setup_url="https://latch.bio",
         integration_key="latch",
+        featured=True,
     ),
     McpCatalogEntry(
         id="neurosnap",
@@ -68,6 +90,7 @@ MCP_CATALOG: list[McpCatalogEntry] = [
         docs_url="https://neurosnap.ai/overview?view=api",
         setup_url="https://neurosnap.ai",
         integration_key="neurosnap",
+        featured=True,
     ),
     McpCatalogEntry(
         id="linear",
@@ -83,6 +106,7 @@ MCP_CATALOG: list[McpCatalogEntry] = [
         docs_url="https://linear.app/docs/mcp",
         setup_url="https://linear.app/settings/account/security",
         integration_key="linear",
+        featured=False,
     ),
 ]
 
@@ -108,6 +132,7 @@ def catalog_as_dicts() -> list[dict[str, Any]]:
             "docsUrl": e.docs_url,
             "setupUrl": e.setup_url,
             "integrationKey": e.integration_key,
+            "featured": e.featured,
             "defaultEnabled": False,
         }
         for e in MCP_CATALOG

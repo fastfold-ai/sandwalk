@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils'
 
 /** Shared shell width so chrome / nav don’t jump between steps. */
-const SHELL_CLASS = 'mx-auto flex w-full max-w-3xl flex-col'
+const SHELL_CLASS = 'mx-auto flex w-full max-w-5xl flex-col'
 
 /** Dedicated onboarding page shell (not a modal overlay). */
 export function OnboardingPage({

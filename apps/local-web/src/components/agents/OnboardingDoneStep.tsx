@@ -130,14 +130,16 @@ export function OnboardingDoneStep({
           <p className="text-base font-medium tracking-tight">
             You&apos;re ready
           </p>
-          <p className="text-muted-foreground max-w-sm text-sm">
-            {coreOk
-              ? 'Core checks passed. Open a chat and ask something.'
-              : 'Setup finished with some issues — you can still chat, or fix them in Dashboard → Doctor.'}
-          </p>
-          <p className="text-muted-foreground text-xs">
-            Rerun setup anytime from Settings → General.
-          </p>
+          {coreOk ? (
+            <p className="text-muted-foreground max-w-sm text-sm">
+              All checks passed
+            </p>
+          ) : (
+            <p className="text-muted-foreground max-w-sm text-sm">
+              Setup finished with some issues — you can still chat, or fix them
+              in Dashboard → Doctor.
+            </p>
+          )}
         </div>
       ) : null}
 
@@ -154,7 +156,7 @@ export function OnboardingDoneStep({
             return (
               <li
                 key={check.name}
-                className="flex items-start gap-2.5 rounded-md border border-border/50 px-3 py-2"
+                className="flex items-start gap-2.5 rounded-md px-3 py-2"
               >
                 <Icon
                   className={cn(

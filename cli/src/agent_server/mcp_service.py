@@ -490,6 +490,8 @@ def discover_oauth(entry: McpCatalogEntry) -> dict[str, Any]:
         candidates.insert(0, "https://mcp.latch.bio/.well-known/oauth-protected-resource/mcp")
     if entry.id == "linear":
         candidates.insert(0, "https://mcp.linear.app/.well-known/oauth-protected-resource/mcp")
+    if entry.id == "paperclip":
+        candidates.insert(0, "https://paperclip.gxl.ai/.well-known/oauth-protected-resource")
 
     resource_meta: dict[str, Any] | None = None
     for url in candidates:
@@ -515,6 +517,10 @@ def discover_oauth(entry: McpCatalogEntry) -> dict[str, Any]:
         if entry.id == "linear":
             as_meta_urls.insert(
                 0, "https://mcp.linear.app/.well-known/oauth-authorization-server"
+            )
+        if entry.id == "paperclip":
+            as_meta_urls.insert(
+                0, "https://paperclip.gxl.ai/.well-known/oauth-authorization-server"
             )
         for url in as_meta_urls:
             status, data = _http_json(url)
@@ -605,6 +611,7 @@ class McpService:
                     "docs_url": entry.docs_url,
                     "setup_url": entry.setup_url,
                     "integration_key": entry.integration_key,
+                    "featured": entry.featured,
                     "default_enabled": False,
                     "configured": configured,
                     "auth_method": auth_method_in_use(entry, cfg),
@@ -706,6 +713,9 @@ class McpService:
         if entry.id == "neurosnap":
             header_candidates.append({"X-API-KEY": key})
             header_candidates.append({"Authorization": f"Bearer {key}"})
+        if entry.id == "paperclip":
+            header_candidates.append({"X-API-Key": key})
+            header_candidates.append({"x-api-key": key})
 
         result: dict[str, Any] | None = None
         seen: set[str] = set()

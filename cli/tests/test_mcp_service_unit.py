@@ -31,6 +31,29 @@ from agent_server.mcp_service import (
 from agent_server.store import AgentStore
 
 
+def test_paperclip_catalog_entry_featured_over_linear():
+    from agent.mcp_catalog import MCP_CATALOG, get_catalog_entry
+
+    paperclip = get_catalog_entry("paperclip")
+    linear = get_catalog_entry("linear")
+    assert paperclip is not None
+    assert linear is not None
+    assert paperclip.featured is True
+    assert linear.featured is False
+    assert paperclip.auth_mode == "api_key_or_oauth"
+    assert paperclip.preferred_auth == "oauth"
+    assert paperclip.url == "https://paperclip.gxl.ai/mcp"
+    assert paperclip.api_key_header == "X-API-Key"
+    assert paperclip.api_key_config_key == "mcp.paperclip_api_key"
+    assert {e.id for e in MCP_CATALOG} >= {
+        "tamarind",
+        "latch",
+        "neurosnap",
+        "paperclip",
+        "linear",
+    }
+
+
 def test_get_custom_headers_dict_and_json_string():
     cfg = MagicMock()
     cfg.get.return_value = {"X-Key": "value"}
@@ -219,6 +242,11 @@ def test_mcp_service_catalog_statuses(tmp_path: Path, monkeypatch):
     assert len(statuses) >= 3
     ids = {item["id"] for item in statuses}
     assert "tamarind" in ids
+    assert "paperclip" in ids
+    by_id = {item["id"]: item for item in statuses}
+    assert by_id["paperclip"]["featured"] is True
+    assert by_id["linear"]["featured"] is False
+    assert by_id["paperclip"]["auth_mode"] == "api_key_or_oauth"
 
 
 def test_mcp_service_ensure_and_disconnect(tmp_path: Path, monkeypatch):
