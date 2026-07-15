@@ -1,0 +1,22 @@
+# SwiftLint for Sandwalk macOS app.
+# Pin the binary version in `.swiftlint-version` and install via
+# `./scripts/install-swiftlint.sh` (local + CI).
+
+only_rules:
+  - file_length
+
+file_length:
+  # Enforced at 300 (same soft cap as local-web ESLint max-lines).
+  warning: 300
+  error: 300
+  ignore_comment_only_lines: true
+
+included:
+  - Sources
+
+excluded:
+  - .build
+  - .tools
+  - Tests
+  - scripts
+  - Package.swift

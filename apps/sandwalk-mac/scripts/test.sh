@@ -5,6 +5,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
 
+echo "==> SwiftLint (pinned file_length gate)"
+"${ROOT}/scripts/lint.sh"
+
 COVERAGE_THRESHOLD="${COVERAGE_THRESHOLD:-80}"
 
 # Pure logic included in the coverage gate (mirrors local-web vitest include set).

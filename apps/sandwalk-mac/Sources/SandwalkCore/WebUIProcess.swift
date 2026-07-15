@@ -33,16 +33,16 @@ final class WebUIProcess: @unchecked Sendable {
     private(set) var config: AppConfig
     private(set) var state: State = .stopped
 
-    private var process: Process?
+    var process: Process?
     /// Listener we did not spawn (orphan / external) but are supervising.
-    private var adoptedPid: Int32?
+    var adoptedPid: Int32?
     private var logHandle: FileHandle?
-    private var healthTask: Task<Void, Never>?
-    private var expectingExit = false
-    private var consecutiveFailures = 0
+    var healthTask: Task<Void, Never>?
+    var expectingExit = false
+    var consecutiveFailures = 0
 
-    private let startupHealthInterval: TimeInterval = 2
-    private let maxHealthFailures = 45 // Vite cold start can be slow
+    let startupHealthInterval: TimeInterval = 2
+    let maxHealthFailures = 45 // Vite cold start can be slow
     private let stopGraceSeconds: TimeInterval = 8
 
     init(config: AppConfig) {
@@ -64,17 +64,6 @@ final class WebUIProcess: @unchecked Sendable {
             startHealthLoop()
         default:
             break
-        }
-    }
-
-    private var healthSleepInterval: TimeInterval {
-        switch state {
-        case .starting:
-            return startupHealthInterval
-        default:
-            return TimeInterval(
-                AppConfig.clampHealthCheckInterval(config.healthCheckIntervalSeconds)
-            )
         }
     }
 
@@ -241,74 +230,7 @@ final class WebUIProcess: @unchecked Sendable {
         }
     }
 
-    private func startHealthLoop() {
-        cancelHealthLoop()
-        healthTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                guard let self else { return }
-                await self.tickHealth()
-                try? await Task.sleep(for: .seconds(self.healthSleepInterval))
-            }
-        }
-    }
-
-    private func cancelHealthLoop() {
-        healthTask?.cancel()
-        healthTask = nil
-    }
-
-    @MainActor
-    private func tickHealth() async {
-        switch state {
-        case .starting, .running:
-            break
-        default:
-            return
-        }
-        let ok = await probeHealth()
-        if ok {
-            consecutiveFailures = 0
-            let pid = process?.processIdentifier ?? adoptedPid
-                ?? PortSupport.listenerPid(port: config.dashboardPort) ?? 0
-            if case .starting = state {
-                update(.running(pid: pid))
-            } else if case .running = state, process == nil, adoptedPid == nil, pid != 0 {
-                adoptedPid = pid
-                update(.running(pid: pid))
-            }
-        } else if process == nil, adoptedPid != nil || PortSupport.listenerPid(port: config.dashboardPort) == nil {
-            consecutiveFailures += 1
-            if consecutiveFailures >= 5 {
-                adoptedPid = nil
-                update(.failed(message: "Web UI stopped responding on \(config.webHealthURL.absoluteString)"))
-                cancelHealthLoop()
-            }
-        } else if case .starting = state {
-            consecutiveFailures += 1
-            if consecutiveFailures >= maxHealthFailures {
-                update(.failed(message: "Web UI health timed out on \(config.webHealthURL.absoluteString)"))
-                expectingExit = true
-                if let pid = process?.processIdentifier {
-                    PortSupport.killProcessTree(pid: pid)
-                }
-            }
-        }
-    }
-
-    private func probeHealth() async -> Bool {
-        var request = URLRequest(url: config.webHealthURL)
-        request.timeoutInterval = 2
-        request.httpMethod = "GET"
-        do {
-            let (_, response) = try await URLSession.shared.data(for: request)
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            return (200..<500).contains(code)
-        } catch {
-            return false
-        }
-    }
-
-    private func update(_ next: State) {
+    func update(_ next: State) {
         state = next
         NotificationCenter.default.post(name: Self.stateDidChangeNotification, object: self)
     }

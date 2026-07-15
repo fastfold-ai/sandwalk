@@ -63,6 +63,21 @@ Env wins over `settings.json` when set at launch:
 
 Logs: `~/Library/Application Support/Sandwalk/logs/{server,web}.log`
 
+## Lint (file length)
+
+SwiftLint is **pinned** in `.swiftlint-version` (portable binary under `.tools/`,
+gitignored). Install + lint:
+
+```bash
+cd apps/sandwalk-mac
+./scripts/lint.sh
+# or from repo root:
+pnpm lint:mac
+```
+
+`file_length` is enforced at **300 lines** on `Sources/` (tests/scripts excluded;
+comment-only lines ignored). `./scripts/test.sh` runs lint before XCTest.
+
 ## Tests & coverage
 
 Requires full **Xcode** (not Command Line Tools alone) so `XCTest` is available.

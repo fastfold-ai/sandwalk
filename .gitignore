@@ -32,6 +32,7 @@ outputs/
 # Swift
 apps/sandwalk-mac/.build/
 apps/sandwalk-mac/.swiftpm/
+apps/sandwalk-mac/.tools/
 *.xcodeproj/
 xcuserdata/
 DerivedData/

@@ -16,6 +16,7 @@
     "test": "pnpm --filter @sandwalk/agent-local-web test",
     "test:coverage": "pnpm --filter @sandwalk/agent-local-web test:coverage",
     "test:mac": "cd apps/sandwalk-mac && ./scripts/test.sh",
+    "lint:mac": "cd apps/sandwalk-mac && ./scripts/lint.sh",
     "test:cli": "cd cli && .venv/bin/python -m pytest tests/ -q -m \"not data_smoke and not integration and not modal_e2e\"",
     "test:cli:coverage": "cd cli && .venv/bin/python -m pytest tests/ -q -m \"not data_smoke and not integration and not modal_e2e\" --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models --cov=reports --cov=skills --cov=tools --cov=ui --cov-report=term-missing:skip-covered --cov-fail-under=80",
     "test:all": "pnpm test:coverage && pnpm test:cli:coverage && pnpm test:mac"
