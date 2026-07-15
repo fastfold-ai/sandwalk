@@ -1,23 +1,7 @@
-import { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type {
-  AgentProject,
-  AgentSession,
-  AgentSkill,
-  AgentSkillDetail,
-  BackendHealth,
-  IntegrationSummary,
-  McpCatalogEntry,
-  McpServer,
-  RuntimeSettings,
-  SandboxSettings,
-  Specialist,
-  WorkspaceFile
-} from '@sandwalk/agent-ui-core'
 import { Loader2, PanelLeft } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 
 import { AgentSessionMainPanel } from '@/components/agents/AgentSessionMainPanel'
 import { AgentSessionSidebar } from '@/components/agents/AgentSessionSidebar'
@@ -28,10 +12,6 @@ import {
   type DashboardSection,
   DashboardSidebar
 } from '@/components/agents/DashboardSidebar'
-import {
-  GlobalSearchDialog,
-  useGlobalSearchHotkey
-} from '@/components/agents/GlobalSearchDialog'
 import { LoginView } from '@/components/agents/LoginView'
 import { OnboardingWizardHost } from '@/components/agents/OnboardingWizardHost'
 import {
@@ -42,38 +22,14 @@ import {
   onboardingStepDef,
   onboardingStepFromSlug
 } from '@/lib/onboarding'
-import { NewProjectDialog } from '@/components/agents/NewProjectDialog'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
-import { ProjectSettingsDialog } from '@/components/agents/ProjectSettingsDialog'
 import {
   buildConversationTimeline
 } from '@/components/agents/transcript'
+import { AppDialogs } from '@/components/AppDialogs'
 import { ErrorPage } from '@/components/ErrorPage'
-import {
-  isAuthCredentialError,
-  isBackendUnavailableError,
-  normalizeAppError
-} from '@/lib/app-error'
 import { SandwalkMark } from '@/components/SandwalkMark'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   ResizableHandle,
@@ -96,15 +52,7 @@ import {
   writeOpenTabsByProject,
   writeProjectScopeId
 } from '@/lib/app-storage'
-import {
-  loginPathWithNext,
-  nextFromSearch,
-  sanitizeAuthReturnTo
-} from '@/lib/auth-routing'
-import {
-  type ComposerModelOption,
-  toComposerModelOptions
-} from '@/lib/composer-models'
+import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useChatScroll } from '@/hooks/useChatScroll'
 import { useSessionActions } from '@/hooks/useSessionActions'
 import { useSessionChatState } from '@/hooks/useSessionChatState'
@@ -115,51 +63,28 @@ import {
   AUTO_TITLE_FIRST_RESPONSE_THRESHOLD,
   groupSessions,
   isLowSignalTitle,
+  type SessionChatState,
   visibleSessionIds
 } from '@/lib/sessions'
 import {
-  cloudAccountDisplayName,
   parseCatalogSkillId,
   type SkillsViewMode
 } from '@/lib/skills-catalog'
+import { isBackendUnavailableError } from '@/lib/app-error'
 import { cn } from '@/lib/utils'
+import type {
+  AgentSession,
+  AgentSkillDetail,
+  WorkspaceFile
+} from '@sandwalk/agent-ui-core'
 
-const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8787'
-/** Soft warn: live SSE streams start crowding the browser's ~6 conn/host limit. */
 const CONCURRENT_RUN_SOFT_LIMIT = 3
 
 export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [backendUrl, setBackendUrl] = useState(
-    () => localStorage.getItem('fastfold.backend.url') || DEFAULT_BACKEND_URL
-  )
-  const [backendApiKey, setBackendApiKey] = useState('')
-  // Kept after login so WebSocket URLs can pass ?token= (cookies are not always
-  // attached cross-port). Cleared on logout. Login input itself is cleared.
-  const [clientApiKey, setClientApiKey] = useState<string | undefined>()
-  const client = useMemo(
-    () =>
-      new LocalAgentClient({
-        baseUrl: backendUrl,
-        apiKey: clientApiKey || backendApiKey || undefined
-      }),
-    [backendApiKey, backendUrl, clientApiKey]
-  )
-  const [health, setHealth] = useState<BackendHealth | null>(null)
-  const [cloudUserName, setCloudUserName] = useState<string | null>(null)
-  const [needsAuthLogin, setNeedsAuthLogin] = useState(false)
-  const needsAuthLoginRef = useRef(false)
-  const [authBootstrapped, setAuthBootstrapped] = useState(false)
-  const [authLoggingIn, setAuthLoggingIn] = useState(false)
-  const [authLoginError, setAuthLoginError] = useState<unknown>(null)
-  const [connecting, setConnecting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [errorStack, setErrorStack] = useState<string | null>(null)
   const [connectionLimitDismissed, setConnectionLimitDismissed] =
     useState(false)
-  const [sessions, setSessions] = useState<AgentSession[]>([])
-  const [projects, setProjects] = useState<AgentProject[]>([])
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false)
   const [projectScopeId, setProjectScopeId] = useState<string | null>(() =>
@@ -171,26 +96,7 @@ export default function App() {
   const [recentProjectIds, setRecentProjectIds] = useState<string[]>(() =>
     readRecentProjectIds()
   )
-  const [sessionPreviews, setSessionPreviews] = useState<
-    Record<string, string>
-  >({})
-  const [skills, setSkills] = useState<AgentSkill[]>([])
   const [skillDetail, setSkillDetail] = useState<AgentSkillDetail | null>(null)
-  const [integrations, setIntegrations] = useState<IntegrationSummary[]>([])
-  const catalogSearchEnabled = useMemo(
-    () => integrations.find(item => item.key === 'skills-sh')?.configured ?? false,
-    [integrations]
-  )
-  const [mcpServers, setMcpServers] = useState<McpServer[]>([])
-  const [mcpCatalog, setMcpCatalog] = useState<McpCatalogEntry[]>([])
-  const [mcpCatalogLoading, setMcpCatalogLoading] = useState(false)
-  const [specialists, setSpecialists] = useState<Specialist[]>([])
-  const [specialistsLoading, setSpecialistsLoading] = useState(false)
-  const [runtimeSettings, setRuntimeSettings] =
-    useState<RuntimeSettings | null>(null)
-  const [sandboxSettings, setSandboxSettings] =
-    useState<SandboxSettings | null>(null)
-  const [modelOptions, setModelOptions] = useState<ComposerModelOption[]>([])
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
   const [pendingOpenPath, setPendingOpenPath] = useState<string | null>(null)
   const pendingMentionRef = useRef<string | null>(null)
@@ -232,9 +138,7 @@ export default function App() {
   const [integrationValues, setIntegrationValues] = useState<
     Record<string, string>
   >({})
-  const onboardingAutoOpenedRef = useRef(false)
   const sessionIdRef = useRef<string | null>(null)
-  const loadSessionsRef = useRef<(() => Promise<void>) | null>(null)
   const autoTitlePassCountRef = useRef<Record<string, number>>({})
   const autoTitleInFlightRef = useRef<Record<string, boolean>>({})
   const prevRunActiveForTitleRef = useRef<Record<string, boolean>>({})
@@ -321,17 +225,6 @@ export default function App() {
   const normalizedIntegrationRouteName = decodedIntegrationRouteName
     ? decodedIntegrationRouteName.toLowerCase().replace(/[_\s]+/g, '-')
     : null
-  const selectedIntegrationKey = decodedIntegrationRouteName
-    ? integrations.find(item => {
-        const normalizedKey = item.key.toLowerCase().replace(/[_\s]+/g, '-')
-        const normalizedName = item.name.toLowerCase().replace(/[_\s]+/g, '-')
-        return (
-          item.key === decodedIntegrationRouteName ||
-          normalizedKey === normalizedIntegrationRouteName ||
-          normalizedName === normalizedIntegrationRouteName
-        )
-      })?.key ?? decodedIntegrationRouteName
-    : null
   const sessionRoute = matchPath('/agents/:sessionId', location.pathname)
   const projectRoute = matchPath('/projects/:projectId', location.pathname)
   const specialistNewRoute = matchPath(
@@ -356,10 +249,6 @@ export default function App() {
   const activeProjectId = projectScopeId
   const tabsScopeKey = projectTabsKey(activeProjectId)
   const openTabIds = openTabsByProject[tabsScopeKey] || []
-  const activeProject =
-    projects.find(project => project.id === activeProjectId) || null
-  const activeIntegration =
-    integrations.find(item => item.key === selectedIntegrationKey) || null
   const isDashboard =
     location.pathname === '/dashboard' ||
     location.pathname.startsWith('/dashboard/')
@@ -423,6 +312,92 @@ export default function App() {
   const isDashboardAgentSandbox = dashboardSection === 'agent_sandbox'
   const isDashboardAgentPrompts = dashboardSection === 'agent_prompts'
   const isDashboardModels = dashboardSection === 'models'
+  const setChatBySessionIdRef = useRef(
+    (_value: SetStateAction<Record<string, SessionChatState>>) => {}
+  )
+  const setChatBySessionIdBridge = useCallback(
+    (value: SetStateAction<Record<string, SessionChatState>>) => {
+      setChatBySessionIdRef.current(value)
+    },
+    []
+  )
+  const {
+    backendUrl,
+    setBackendUrl,
+    backendApiKey,
+    setBackendApiKey,
+    client,
+    health,
+    sidebarUserName,
+    needsAuthLogin,
+    authBootstrapped,
+    authLoggingIn,
+    authLoginError,
+    setAuthLoginError,
+    connecting,
+    error,
+    errorStack,
+    setError,
+    sessions,
+    setSessions,
+    projects,
+    sessionPreviews,
+    skills,
+    integrations,
+    mcpServers,
+    mcpCatalog,
+    mcpCatalogLoading,
+    specialists,
+    specialistsLoading,
+    runtimeSettings,
+    setRuntimeSettings,
+    sandboxSettings,
+    setSandboxSettings,
+    modelOptions,
+    loadSessionsRef,
+    loadSessions,
+    loadProjects,
+    loadSkills,
+    loadIntegrations,
+    loadMcpServers,
+    loadMcpCatalog,
+    refreshMcp,
+    loadSpecialists,
+    loadModelOptions,
+    loadAccountForUi,
+    logoutAccount,
+    refreshCloudUserName,
+    loadStorage,
+    loadEnvironment,
+    loadServerStatus,
+    connect,
+    submitAuthLogin,
+    logoutSession
+  } = useAppBootstrap({
+    navigate,
+    location,
+    setChatBySessionId: setChatBySessionIdBridge,
+    isDashboardModels
+  })
+  const catalogSearchEnabled = useMemo(
+    () => integrations.find(item => item.key === 'skills-sh')?.configured ?? false,
+    [integrations]
+  )
+  const selectedIntegrationKey = decodedIntegrationRouteName
+    ? integrations.find(item => {
+        const normalizedKey = item.key.toLowerCase().replace(/[_\s]+/g, '-')
+        const normalizedName = item.name.toLowerCase().replace(/[_\s]+/g, '-')
+        return (
+          item.key === decodedIntegrationRouteName ||
+          normalizedKey === normalizedIntegrationRouteName ||
+          normalizedName === normalizedIntegrationRouteName
+        )
+      })?.key ?? decodedIntegrationRouteName
+    : null
+  const activeProject =
+    projects.find(project => project.id === activeProjectId) || null
+  const activeIntegration =
+    integrations.find(item => item.key === selectedIntegrationKey) || null
   const isDashboardData = dashboardSection === 'datasets'
   const isDashboardTools = dashboardSection === 'tools'
   const isDashboardDoctor = dashboardSection === 'doctor'
@@ -526,6 +501,7 @@ export default function App() {
     pendingImmediateSendRef,
     drainingQueueRef
   } = useSessionChatState(sessionId)
+  setChatBySessionIdRef.current = setChatBySessionId
 
   const patchOpenTabs = useCallback(
     (scopeKey: string, updater: (current: string[]) => string[]) => {
@@ -638,43 +614,6 @@ export default function App() {
     [client, patchChat]
   )
 
-  const loadSessions = useCallback(async () => {
-    const nextSessions = await client.listSessions()
-    setSessions(nextSessions)
-    setChatBySessionId(current => {
-      let changed = false
-      const next = { ...current }
-      for (const item of nextSessions) {
-        const prev = next[item.id]
-        if (!prev) continue
-        const shouldRun = item.status === 'running'
-        if (prev.runActive === shouldRun) continue
-        next[item.id] = { ...prev, runActive: shouldRun }
-        changed = true
-      }
-      return changed ? next : current
-    })
-    void Promise.all(
-      nextSessions.slice(0, 12).map(async item => {
-        try {
-          const history = await client.listMessages(item.id)
-          return [
-            item.id,
-            history.at(-1)?.content || 'No messages yet.'
-          ] as const
-        } catch {
-          return [item.id, 'No messages yet.'] as const
-        }
-      })
-    ).then(entries => setSessionPreviews(Object.fromEntries(entries)))
-  }, [client])
-
-  loadSessionsRef.current = loadSessions
-
-  const loadProjects = useCallback(async () => {
-    setProjects(await client.listProjects())
-  }, [client])
-
   const {
     sessionSandboxStatus,
     sessionSandboxPhase,
@@ -755,366 +694,6 @@ export default function App() {
     setError,
     setCollapsedSidebarSections
   })
-
-  const loadSkills = useCallback(async () => {
-    const items = await client.listSkills()
-    const seen = new Set<string>()
-    const unique = items.filter(skill => {
-      const key = skill.name.trim().toLowerCase()
-      if (!key || seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-    setSkills(unique)
-  }, [client])
-
-  const loadIntegrations = useCallback(async () => {
-    setIntegrations(await client.listIntegrations())
-  }, [client])
-
-  const loadMcpServers = useCallback(async () => {
-    setMcpServers(await client.listMcpServers())
-  }, [client])
-
-  const loadMcpCatalog = useCallback(async () => {
-    setMcpCatalogLoading(true)
-    try {
-      setMcpCatalog(await client.listMcpCatalog())
-    } finally {
-      setMcpCatalogLoading(false)
-    }
-  }, [client])
-
-  const refreshMcp = useCallback(async () => {
-    await Promise.all([loadMcpServers(), loadMcpCatalog()])
-  }, [loadMcpCatalog, loadMcpServers])
-
-  const loadSpecialists = useCallback(async () => {
-    setSpecialistsLoading(true)
-    try {
-      setSpecialists(await client.listSpecialists())
-    } catch {
-      // Optional capability — older backends may not expose /v1/specialists yet.
-      setSpecialists([])
-    } finally {
-      setSpecialistsLoading(false)
-    }
-  }, [client])
-
-  const loadModelOptions = useCallback(async () => {
-    try {
-      const [models, profiles] = await Promise.all([
-        client.listModels({
-          enabledOnly: true,
-          discover: true
-        }),
-        client.listModelProfiles().catch(() => [])
-      ])
-      const backendsByProfileId = Object.fromEntries(
-        (profiles || []).map(profile => [profile.id, profile.backend])
-      )
-      setModelOptions(
-        toComposerModelOptions(
-          models.map(model => ({
-            ...model,
-            backend:
-              model.backend ??
-              (model.profileId
-                ? backendsByProfileId[model.profileId] || null
-                : null)
-          }))
-        )
-      )
-    } catch {
-      // Keep the last known selector list if the catalog request fails.
-    }
-  }, [client])
-
-  const loadAccount = useCallback(
-    (options?: { checkUpdates?: boolean; signal?: AbortSignal }) =>
-      client.getAccount(options),
-    [client]
-  )
-
-  const refreshCloudUserName = useCallback(
-    async (signal?: AbortSignal) => {
-      try {
-        const account = await loadAccount({ signal })
-        if (signal?.aborted) return
-        setCloudUserName(cloudAccountDisplayName(account))
-      } catch {
-        if (!signal?.aborted) setCloudUserName(null)
-      }
-    },
-    [loadAccount]
-  )
-
-  const loadAccountForUi = useCallback(
-    async (options?: { checkUpdates?: boolean; signal?: AbortSignal }) => {
-      const account = await loadAccount(options)
-      if (!options?.signal?.aborted) {
-        setCloudUserName(cloudAccountDisplayName(account))
-      }
-      return account
-    },
-    [loadAccount]
-  )
-
-  const logoutAccount = useCallback(
-    async (signal?: AbortSignal) => {
-      const account = await client.logoutAccount(signal)
-      if (!signal?.aborted) {
-        setCloudUserName(cloudAccountDisplayName(account))
-      }
-      return account
-    },
-    [client]
-  )
-
-  useEffect(() => {
-    if (!health) {
-      setCloudUserName(null)
-      return
-    }
-    const controller = new AbortController()
-    void refreshCloudUserName(controller.signal)
-    return () => controller.abort()
-  }, [health, refreshCloudUserName])
-
-  // Cloud account name when linked; otherwise Mac/local GECOS name from health.
-  const sidebarUserName =
-    cloudUserName?.trim() || health?.userName?.trim() || null
-
-  const loadStorage = useCallback(
-    (signal?: AbortSignal) => client.getStorage(signal),
-    [client]
-  )
-  const loadEnvironment = useCallback(
-    (signal?: AbortSignal) => client.getEnvironment(signal),
-    [client]
-  )
-  const loadServerStatus = useCallback(
-    (signal?: AbortSignal) => client.getServerStatus(signal),
-    [client]
-  )
-
-  const connect = useCallback(async () => {
-    setConnecting(true)
-    setError(null)
-    setErrorStack(null)
-    const goToLogin = () => {
-      const alreadyNext = nextFromSearch(location.search)
-      const deepLink =
-        location.pathname === '/'
-          ? null
-          : sanitizeAuthReturnTo(
-              `${location.pathname}${location.search}${location.hash}`
-            )
-      needsAuthLoginRef.current = true
-      setHealth(null)
-      setNeedsAuthLogin(true)
-      const target = loginPathWithNext(alreadyNext || deepLink)
-      if (`${location.pathname}${location.search}` !== target) {
-        navigate(target, { replace: true })
-      }
-    }
-
-    try {
-      // If we already decided login is required (e.g. logout), do not remount
-      // the shell from a stale reconnect.
-      if (needsAuthLoginRef.current) {
-        return
-      }
-      const nextHealth = await client.health()
-      if (needsAuthLoginRef.current) return
-      localStorage.setItem('fastfold.backend.url', backendUrl)
-
-      let authEnabled = false
-      let authenticated: boolean | null = null
-      try {
-        const status = await client.authStatus()
-        authEnabled = Boolean(status.authEnabled)
-        authenticated =
-          typeof status.authenticated === 'boolean'
-            ? status.authenticated
-            : null
-      } catch {
-        authEnabled = false
-        authenticated = null
-      }
-      if (needsAuthLoginRef.current) return
-
-      if (authEnabled) {
-        if (authenticated === false) {
-          // Auth on, no session — show login without probing protected routes.
-          goToLogin()
-          return
-        }
-        if (authenticated === null) {
-          // Legacy servers without `authenticated` — keep the old probe.
-          try {
-            await client.getRuntimeSettings()
-          } catch (cause) {
-            if (isAuthCredentialError(cause)) {
-              goToLogin()
-              return
-            }
-            throw cause
-          }
-        }
-      }
-      if (needsAuthLoginRef.current) return
-
-      // Only mount the app shell after auth is confirmed.
-      needsAuthLoginRef.current = false
-      setNeedsAuthLogin(false)
-      setHealth(nextHealth)
-      const [, , , , , , , settings, sandbox] = await Promise.all([
-        loadSessions(),
-        loadProjects(),
-        loadSkills(),
-        loadIntegrations(),
-        loadMcpServers(),
-        loadMcpCatalog(),
-        loadSpecialists(),
-        client.getRuntimeSettings(),
-        // Older backends may not have /settings/sandbox yet — don't block connect.
-        client.getSandboxSettings().catch(() => null),
-        loadModelOptions()
-      ])
-      if (needsAuthLoginRef.current) return
-      setRuntimeSettings(settings)
-      setSandboxSettings(sandbox)
-      try {
-        const onboarding = await client.getOnboardingSettings()
-        const step = clampOnboardingStep(onboarding.step)
-        if (!onboarding.completed && !onboardingAutoOpenedRef.current) {
-          onboardingAutoOpenedRef.current = true
-          if (!isOnboardingPath(location.pathname)) {
-            navigate(onboardingPath(step), { replace: true })
-            return
-          }
-        }
-      } catch {
-        // Older backends may not expose onboarding settings yet.
-      }
-      const returnTo = nextFromSearch(location.search)
-      if (returnTo) {
-        navigate(returnTo, { replace: true })
-      }
-    } catch (cause) {
-      if (needsAuthLoginRef.current) return
-      const message =
-        cause instanceof Error ? cause.message : 'Unable to connect'
-      const isLocalBackend = /127\.0\.0\.1|localhost/i.test(backendUrl)
-      // Only credential failures belong on the login screen. Network / CORS /
-      // 5xx must surface as a backend error — not a fake "enter API key" page.
-      if (isAuthCredentialError(cause)) {
-        try {
-          const status = await client.authStatus()
-          if (status.authEnabled) {
-            goToLogin()
-            return
-          }
-        } catch {
-          // Fall through to backend-error UI below.
-        }
-      }
-      if (isLocalBackend && isBackendUnavailableError(cause)) {
-        needsAuthLoginRef.current = false
-        setNeedsAuthLogin(false)
-        setHealth(null)
-        setError(message)
-        setErrorStack(cause instanceof Error ? cause.stack || null : null)
-        return
-      }
-      setHealth(null)
-      setError(message)
-      setErrorStack(cause instanceof Error ? cause.stack || null : null)
-    } finally {
-      setConnecting(false)
-      setAuthBootstrapped(true)
-    }
-  }, [
-    backendUrl,
-    client,
-    loadIntegrations,
-    loadMcpCatalog,
-    loadMcpServers,
-    loadModelOptions,
-    loadProjects,
-    loadSessions,
-    loadSkills,
-    loadSpecialists,
-    location.hash,
-    location.pathname,
-    location.search,
-    navigate
-  ])
-
-  const submitAuthLogin = useCallback(
-    async (apiKey: string, remember: boolean) => {
-      setAuthLoggingIn(true)
-      setAuthLoginError(null)
-      try {
-        await client.login(apiKey, { remember })
-        setClientApiKey(apiKey.trim())
-        setBackendApiKey('')
-        needsAuthLoginRef.current = false
-        // Keep login UI until connect() confirms the session.
-        await connect()
-      } catch (cause) {
-        needsAuthLoginRef.current = true
-        setNeedsAuthLogin(true)
-        if (isBackendUnavailableError(cause) || !isAuthCredentialError(cause)) {
-          setAuthLoginError(cause)
-          const info = normalizeAppError(cause)
-          toast.error(info.title)
-        } else {
-          const raw = cause instanceof Error ? cause.message : 'Invalid API key'
-          let message = 'Invalid API key'
-          try {
-            const jsonMatch = raw.match(/\{.*\}/s)
-            if (jsonMatch) {
-              const parsed = JSON.parse(jsonMatch[0]) as { detail?: string }
-              if (parsed.detail) message = parsed.detail
-            } else if (/invalid api key/i.test(raw)) {
-              message = 'Invalid API key'
-            } else if (raw && !raw.startsWith('FastFold Agent API')) {
-              message = raw
-            }
-          } catch {
-            // keep friendly default
-          }
-          toast.error(message)
-        }
-      } finally {
-        setAuthLoggingIn(false)
-      }
-    },
-    [client, connect]
-  )
-
-  const logoutSession = useCallback(async () => {
-    // Gate the UI immediately so a reconnect effect cannot remount the app
-    // before the logout request finishes / cookie is cleared.
-    needsAuthLoginRef.current = true
-    setNeedsAuthLogin(true)
-    setAuthLoginError(null)
-    setHealth(null)
-    setAuthBootstrapped(true)
-    setBackendApiKey('')
-    setClientApiKey(undefined)
-    setRuntimeSettings(null)
-    if (location.pathname !== '/' || location.search) {
-      navigate('/', { replace: true })
-    }
-    try {
-      await client.logout()
-    } catch {
-      // Cookie clear may have failed; UI is already on login.
-    }
-  }, [client, location.pathname, location.search, navigate])
 
   useEffect(() => {
     // Legacy /login URL → root (login renders under / when unauthenticated).
@@ -1284,29 +863,6 @@ export default function App() {
     onboardingStep,
     session?.title
   ])
-
-  useEffect(() => {
-    if (needsAuthLogin) return
-    void connect()
-  }, [connect, needsAuthLogin])
-
-  // Local dashboard: when the API is temporarily down or returning 5xx,
-  // keep retrying until health/bootstrap succeeds.
-  useEffect(() => {
-    if (needsAuthLogin || health || connecting) return
-    if (!error) return
-    if (!/127\.0\.0\.1|localhost/i.test(backendUrl)) return
-    if (!isBackendUnavailableError(error)) return
-    const timer = window.setInterval(() => {
-      void connect()
-    }, 5000)
-    return () => window.clearInterval(timer)
-  }, [backendUrl, connect, connecting, error, health, needsAuthLogin])
-
-  useEffect(() => {
-    if (isDashboardModels || !health) return
-    void loadModelOptions()
-  }, [health, isDashboardModels, loadModelOptions])
 
   useEffect(() => {
     setIntegrationValues({})
@@ -1556,8 +1112,6 @@ export default function App() {
       })
     return () => controller.abort()
   }, [client, skillRouteName])
-
-  useGlobalSearchHotkey(globalSearchOpen, setGlobalSearchOpen)
 
   const loadSkillDetail = useCallback(
     (name: string) => client.getSkill(name),
@@ -2187,160 +1741,44 @@ export default function App() {
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      <GlobalSearchDialog
-        open={globalSearchOpen}
-        onOpenChange={setGlobalSearchOpen}
+      <AppDialogs
         client={client}
+        navigate={navigate}
+        globalSearchOpen={globalSearchOpen}
+        setGlobalSearchOpen={setGlobalSearchOpen}
         sessions={sessions}
-        currentSessionId={sessionId}
-        currentSessionTitle={session?.title || activeProject?.name}
+        sessionId={sessionId}
+        sessionTitle={session?.title}
+        activeProject={activeProject}
+        activeProjectId={activeProjectId}
         workspaceFiles={workspaceFiles}
-        onOpenSession={id => {
-          openSessionTab(id)
-          navigate(`/agents/${id}`)
-        }}
-        onOpenArtifact={(targetSessionId, path) => {
-          openSessionTab(targetSessionId)
-          setFilesPanelCollapsed(false)
-          setPendingOpenPath(path)
-          navigate(`/agents/${targetSessionId}`)
-        }}
-        onMentionArtifact={(targetSessionId, path) => {
-          pendingMentionRef.current = path
-          openSessionTab(targetSessionId)
-          if (targetSessionId === sessionId) {
-            setComposer(current => `${current}${fileChipToken(path)}`)
-            setComposerFiles([])
-            pendingMentionRef.current = null
-          } else {
-            navigate(`/agents/${targetSessionId}`)
-          }
-        }}
-        onCreateSession={() => void createSession(activeProjectId)}
-        onNavigate={path => navigate(path)}
+        openSessionTab={openSessionTab}
+        setFilesPanelCollapsed={setFilesPanelCollapsed}
+        setPendingOpenPath={setPendingOpenPath}
+        pendingMentionRef={pendingMentionRef}
+        setComposer={setComposer}
+        setComposerFiles={setComposerFiles}
+        createSession={createSession}
+        newProjectOpen={newProjectOpen}
+        setNewProjectOpen={setNewProjectOpen}
+        createProject={createProject}
+        projectSettingsOpen={projectSettingsOpen}
+        setProjectSettingsOpen={setProjectSettingsOpen}
+        saveProjectSettings={saveProjectSettings}
+        renameTarget={renameTarget}
+        renameValue={renameValue}
+        setRenameTarget={setRenameTarget}
+        setRenameValue={setRenameValue}
+        submitRename={submitRename}
+        deleteTarget={deleteTarget}
+        setDeleteTarget={setDeleteTarget}
+        confirmDelete={confirmDelete}
+        batchDeletePending={batchDeletePending}
+        setBatchDeletePending={setBatchDeletePending}
+        batchBusy={batchBusy}
+        selectedSessionIds={selectedSessionIds}
+        confirmBatchDelete={confirmBatchDelete}
       />
-
-      <NewProjectDialog
-        open={newProjectOpen}
-        onOpenChange={setNewProjectOpen}
-        onCreate={createProject}
-      />
-
-      <ProjectSettingsDialog
-        project={activeProject}
-        open={projectSettingsOpen}
-        onOpenChange={setProjectSettingsOpen}
-        onSave={saveProjectSettings}
-      />
-
-      <Dialog
-        open={Boolean(renameTarget)}
-        onOpenChange={open => {
-          if (!open) {
-            setRenameTarget(null)
-            setRenameValue('')
-          }
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Rename chat</DialogTitle>
-            <DialogDescription>
-              Choose a clearer name for this agent session.
-            </DialogDescription>
-          </DialogHeader>
-          <Input
-            value={renameValue}
-            onChange={event => setRenameValue(event.target.value)}
-            placeholder="Chat name"
-            autoFocus
-            maxLength={140}
-            onKeyDown={event => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                void submitRename()
-              }
-            }}
-          />
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setRenameTarget(null)
-                setRenameValue('')
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => void submitRename()}
-              disabled={!renameValue.trim()}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={Boolean(deleteTarget)}
-        onOpenChange={open => {
-          if (!open) setDeleteTarget(null)
-        }}
-      >
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete chat?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Delete “{deleteTarget?.title || 'Untitled session'}”? This cannot
-              be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => void confirmDelete()}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={batchDeletePending}
-        onOpenChange={open => {
-          if (!open && !batchBusy) setBatchDeletePending(false)
-        }}
-      >
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete {selectedSessionIds.size} chats?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently deletes the selected sessions and cannot be
-              undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={batchBusy}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={batchBusy}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={event => {
-                event.preventDefault()
-                void confirmBatchDelete()
-              }}
-            >
-              {batchBusy ? 'Deleting…' : 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   )
 }
