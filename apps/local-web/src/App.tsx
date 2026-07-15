@@ -40,7 +40,6 @@ import {
   Suspense,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState
@@ -49,12 +48,10 @@ import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ChatTranscript } from '@/components/agents/ChatTranscript'
-import {
-  Composer,
-  type SandboxActionPhase
-} from '@/components/agents/Composer'
+import { type SandboxActionPhase } from '@/components/agents/Composer'
 import { fileChipToken } from '@/components/agents/composer-parts'
 import {
   type DashboardSection,
@@ -84,7 +81,6 @@ import {
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { ProjectSettingsDialog } from '@/components/agents/ProjectSettingsDialog'
-import { QueuedMessages } from '@/components/agents/QueuedMessages'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
 import { SessionTabs } from '@/components/agents/SessionTabs'
@@ -172,6 +168,7 @@ import {
   type ComposerModelOption,
   toComposerModelOptions
 } from '@/lib/composer-models'
+import { useChatScroll } from '@/hooks/useChatScroll'
 import { validateIntegrationOrProbeModal } from '@/lib/app-helpers'
 import {
   applyChatPatch,
@@ -364,9 +361,6 @@ export default function App() {
   const pendingMentionRef = useRef<string | null>(null)
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null)
   const filesPanelRef = useRef<ImperativePanelHandle>(null)
-  const chatScrollRef = useRef<HTMLDivElement | null>(null)
-  const chatEndRef = useRef<HTMLDivElement | null>(null)
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [copiedResumeCommand, setCopiedResumeCommand] = useState(false)
   const [cliMenuOpen, setCliMenuOpen] = useState(false)
@@ -2988,84 +2982,60 @@ export default function App() {
     [activeRunId, messages, runIdByMessageId, todosByRunId, tools]
   )
 
-  const scrollChatToBottom = useCallback(() => {
-    const root = chatScrollRef.current
-    const viewport = root?.querySelector(
-      '[data-radix-scroll-area-viewport]'
-    ) as HTMLElement | null
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight
-      setShowScrollToBottom(false)
-      return
-    }
-    chatEndRef.current?.scrollIntoView({ block: 'end' })
-    setShowScrollToBottom(false)
-  }, [])
-
-  const updateScrollToBottomVisibility = useCallback(() => {
-    const root = chatScrollRef.current
-    const viewport = root?.querySelector(
-      '[data-radix-scroll-area-viewport]'
-    ) as HTMLElement | null
-    if (!viewport) {
-      setShowScrollToBottom(false)
-      return
-    }
-    const distanceFromBottom =
-      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
-    setShowScrollToBottom(distanceFromBottom > 96)
-  }, [])
-
-  useEffect(() => {
-    if (!sessionId || !messagesLoaded || messages.length === 0) {
-      setShowScrollToBottom(false)
-      return
-    }
-    const root = chatScrollRef.current
-    const viewport = root?.querySelector(
-      '[data-radix-scroll-area-viewport]'
-    ) as HTMLElement | null
-    if (!viewport) return
-
-    updateScrollToBottomVisibility()
-    viewport.addEventListener('scroll', updateScrollToBottomVisibility, {
-      passive: true
-    })
-    const observer = new ResizeObserver(() => updateScrollToBottomVisibility())
-    observer.observe(viewport)
-    const content = viewport.firstElementChild
-    if (content) observer.observe(content)
-
-    return () => {
-      viewport.removeEventListener('scroll', updateScrollToBottomVisibility)
-      observer.disconnect()
-    }
-  }, [
-    conversationTimeline.length,
-    messages.length,
-    messagesLoaded,
+  const {
+    chatScrollRef,
+    chatEndRef,
+    showScrollToBottom,
+    scrollChatToBottom
+  } = useChatScroll({
     sessionId,
-    updateScrollToBottomVisibility
-  ])
+    messagesLoaded,
+    messagesLength: messages.length,
+    conversationTimelineLength: conversationTimeline.length
+  })
 
-  const chatPinnedSessionRef = useRef<string | null>(null)
-
-  // Show the latest message when opening/loading a session with history.
-  // Only pin once per session — do not keep forcing scroll while streaming.
-  useLayoutEffect(() => {
-    if (!sessionId || !messagesLoaded || messages.length === 0) return
-    if (chatPinnedSessionRef.current === sessionId) return
-    chatPinnedSessionRef.current = sessionId
-    scrollChatToBottom()
-    const frame = window.requestAnimationFrame(() => scrollChatToBottom())
-    const timers = [80, 250, 600].map(ms =>
-      window.setTimeout(() => scrollChatToBottom(), ms)
-    )
-    return () => {
-      window.cancelAnimationFrame(frame)
-      for (const timer of timers) window.clearTimeout(timer)
-    }
-  }, [messages.length, messagesLoaded, scrollChatToBottom, sessionId])
+  const agentComposerSlotProps = {
+    sessionId,
+    session,
+    client,
+    navigate,
+    composerLiveRef,
+    queuedMessages,
+    editingQueuedId,
+    editQueuedMessage,
+    sendQueuedMessageNow,
+    removeQueuedMessage,
+    cancelEditQueuedMessage,
+    composer,
+    runActive,
+    skills,
+    mcpServers,
+    composerSkills,
+    composerFiles,
+    workspaceFiles,
+    modelOptions,
+    specialists,
+    sessionSandboxStatus,
+    sessionSandboxPhase,
+    setComposer,
+    setComposerSkills,
+    setComposerFiles,
+    setFilesPanelCollapsed,
+    setPendingOpenPath,
+    handleComposerSend,
+    loadSkillDetail,
+    setWorkspaceVersion,
+    runtimeSettings,
+    tokenUsage,
+    selectSessionSpecialist,
+    selectSessionSandboxBackend,
+    updateSessionSandboxCompute,
+    startSessionSandbox,
+    stopSessionSandbox,
+    restartSessionSandbox,
+    setRuntimeSettings,
+    loadModelOptions
+  }
 
   const activeRunTodos = activeRunId ? todosByRunId[activeRunId] || [] : []
   const activeRunTools = activeRunId
@@ -4677,114 +4647,7 @@ export default function App() {
                             }}
                           />
                         </div>
-                        <QueuedMessages
-                          messages={queuedMessages}
-                          editingId={editingQueuedId}
-                          onEdit={editQueuedMessage}
-                          onSendNow={sendQueuedMessageNow}
-                          onRemove={removeQueuedMessage}
-                        />
-                        <Composer
-                          key={sessionId ?? 'empty-composer'}
-                          value={composer}
-                          running={runActive}
-                          skills={skills}
-                          mcpServers={mcpServers}
-                          skillChips={composerSkills}
-                          fileChips={composerFiles}
-                          workspaceFiles={workspaceFiles}
-                          modelOptions={modelOptions}
-                          specialists={specialists}
-                          selectedSpecialistId={session?.specialistId ?? null}
-                          sandboxStatus={sessionSandboxStatus}
-                          sandboxPhase={sessionSandboxPhase}
-                          showAura={false}
-                          autoFocus
-                          focusKey={sessionId}
-                          editingQueued={Boolean(editingQueuedId)}
-                          onCancelEditQueued={cancelEditQueuedMessage}
-                          onChange={setComposer}
-                          onLiveDraftChange={text => {
-                            composerLiveRef.current = text
-                          }}
-                          onSkillChipsChange={setComposerSkills}
-                          onFileChipsChange={setComposerFiles}
-                          onOpenFile={path => {
-                            setFilesPanelCollapsed(false)
-                            setPendingOpenPath(path)
-                          }}
-                          onSend={handleComposerSend}
-                          onStop={() =>
-                            sessionId && void client.interrupt(sessionId)
-                          }
-                          onLoadSkill={loadSkillDetail}
-                          onUpload={async files => {
-                            if (!sessionId) return
-                            await Promise.all(
-                              Array.from(files).map(file =>
-                                client.uploadFile(sessionId, file)
-                              )
-                            )
-                            setWorkspaceVersion(current => current + 1)
-                          }}
-                          runtimeSettings={runtimeSettings}
-                          tokenUsage={tokenUsage}
-                          onSpecialistSelect={selectSessionSpecialist}
-                          onCreateSpecialist={() =>
-                            navigate('/dashboard/specialists/new')
-                          }
-                          onManageSpecialists={() =>
-                            navigate('/dashboard/specialists')
-                          }
-                          onAddModels={() => navigate('/dashboard/models')}
-                          onSandboxBackendSelect={selectSessionSandboxBackend}
-                          onSandboxComputeChange={changes =>
-                            void updateSessionSandboxCompute(changes)
-                          }
-                          onSandboxStart={() => void startSessionSandbox()}
-                          onSandboxStop={() => void stopSessionSandbox()}
-                          onSandboxRestart={() => void restartSessionSandbox()}
-                          onLoadLocalSystem={async () => {
-                            const report = await client.getServerStatus()
-                            return report.system
-                          }}
-                          onModelSelect={async (provider, model, profileId) => {
-                            if (profileId) {
-                              try {
-                                await client.updateModelProfile(profileId, {
-                                  setActive: true
-                                })
-                              } catch {
-                                // Profile activation is best-effort for local models.
-                              }
-                            }
-                            // Local profile models are labeled provider=local in the
-                            // catalog, but the runtime still speaks OpenAI-compatible.
-                            const runtimeProvider =
-                              provider === 'local' || profileId ? 'openai' : provider
-                            setRuntimeSettings(
-                              await client.updateRuntimeSettings({
-                                provider: runtimeProvider,
-                                model
-                              })
-                            )
-                          }}
-                          onReasoningSettingsChange={async changes => {
-                            const runtimeProvider =
-                              changes.provider === 'local'
-                                ? 'openai'
-                                : changes.provider
-                            setRuntimeSettings(
-                              await client.updateRuntimeSettings({
-                                provider: runtimeProvider,
-                                model: changes.model,
-                                reasoningEffort: changes.reasoningEffort,
-                                reasoningFast: changes.reasoningFast
-                              })
-                            )
-                            await loadModelOptions()
-                          }}
-                        />
+                        <AgentComposerSlot {...agentComposerSlotProps} />
                       </div>
                     </div>
                   ) : (
@@ -4829,112 +4692,7 @@ export default function App() {
                         onScrollToBottom={scrollChatToBottom}
                       />
                       <div className="bg-background mx-auto w-full max-w-[44rem] shrink-0 px-5 pb-6 pt-2">
-                        <QueuedMessages
-                          messages={queuedMessages}
-                          editingId={editingQueuedId}
-                          onEdit={editQueuedMessage}
-                          onSendNow={sendQueuedMessageNow}
-                          onRemove={removeQueuedMessage}
-                        />
-                        <Composer
-                          key={sessionId ?? 'empty-composer'}
-                          value={composer}
-                          running={runActive}
-                          skills={skills}
-                          mcpServers={mcpServers}
-                          skillChips={composerSkills}
-                          fileChips={composerFiles}
-                          workspaceFiles={workspaceFiles}
-                          modelOptions={modelOptions}
-                          specialists={specialists}
-                          selectedSpecialistId={session?.specialistId ?? null}
-                          sandboxStatus={sessionSandboxStatus}
-                          sandboxPhase={sessionSandboxPhase}
-                          showAura={false}
-                          autoFocus
-                          focusKey={sessionId}
-                          editingQueued={Boolean(editingQueuedId)}
-                          onCancelEditQueued={cancelEditQueuedMessage}
-                          onChange={setComposer}
-                          onLiveDraftChange={text => {
-                            composerLiveRef.current = text
-                          }}
-                          onSkillChipsChange={setComposerSkills}
-                          onFileChipsChange={setComposerFiles}
-                          onOpenFile={path => {
-                            setFilesPanelCollapsed(false)
-                            setPendingOpenPath(path)
-                          }}
-                          onSend={handleComposerSend}
-                          onStop={() =>
-                            sessionId && void client.interrupt(sessionId)
-                          }
-                          onLoadSkill={loadSkillDetail}
-                          onUpload={async files => {
-                            if (!sessionId) return
-                            await Promise.all(
-                              Array.from(files).map(file =>
-                                client.uploadFile(sessionId, file)
-                              )
-                            )
-                            setWorkspaceVersion(current => current + 1)
-                          }}
-                          runtimeSettings={runtimeSettings}
-                          tokenUsage={tokenUsage}
-                          onSpecialistSelect={selectSessionSpecialist}
-                          onCreateSpecialist={() =>
-                            navigate('/dashboard/specialists/new')
-                          }
-                          onManageSpecialists={() =>
-                            navigate('/dashboard/specialists')
-                          }
-                          onAddModels={() => navigate('/dashboard/models')}
-                          onSandboxBackendSelect={selectSessionSandboxBackend}
-                          onSandboxComputeChange={changes =>
-                            void updateSessionSandboxCompute(changes)
-                          }
-                          onSandboxStart={() => void startSessionSandbox()}
-                          onSandboxStop={() => void stopSessionSandbox()}
-                          onSandboxRestart={() => void restartSessionSandbox()}
-                          onLoadLocalSystem={async () => {
-                            const report = await client.getServerStatus()
-                            return report.system
-                          }}
-                          onModelSelect={async (provider, model, profileId) => {
-                            if (profileId) {
-                              try {
-                                await client.updateModelProfile(profileId, {
-                                  setActive: true
-                                })
-                              } catch {
-                                // Profile activation is best-effort for local models.
-                              }
-                            }
-                            const runtimeProvider =
-                              provider === 'local' || profileId ? 'openai' : provider
-                            setRuntimeSettings(
-                              await client.updateRuntimeSettings({
-                                provider: runtimeProvider,
-                                model
-                              })
-                            )
-                          }}
-                          onReasoningSettingsChange={async changes => {
-                            const runtimeProvider =
-                              changes.provider === 'local'
-                                ? 'openai'
-                                : changes.provider
-                            setRuntimeSettings(
-                              await client.updateRuntimeSettings({
-                                provider: runtimeProvider,
-                                model: changes.model,
-                                reasoningEffort: changes.reasoningEffort,
-                                reasoningFast: changes.reasoningFast
-                              })
-                            )
-                            await loadModelOptions()
-                          }}
-                        />
+                        <AgentComposerSlot {...agentComposerSlotProps} />
                       </div>
                     </div>
                   )}
