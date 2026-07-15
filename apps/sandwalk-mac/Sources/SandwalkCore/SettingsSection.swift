@@ -19,6 +19,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
     case doctor
     case storage
     case environment
+    case general
     case about
 
     var id: String { rawValue }
@@ -43,6 +44,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
         case .advanced: return "Advanced"
         case .logs: return "Logs"
         case .security: return "Security"
+        case .general: return "Settings"
         case .about: return "About"
         }
     }
@@ -67,6 +69,7 @@ enum SettingsSection: String, Hashable, CaseIterable, Identifiable {
         case .advanced: return "gearshape.2"
         case .logs: return "scroll"
         case .security: return "lock"
+        case .general: return "gearshape"
         case .about: return "info.circle"
         }
     }

@@ -53,13 +53,15 @@ export function useMcpCustomForm(
       const isLocal = mcpMode === 'local'
       const parts = isLocal ? target.split(/\s+/).filter(Boolean) : []
       const headers = isLocal ? null : headersFromRows(mcpHeaderRows)
+      const hasRemoteAuth = Boolean(headers)
       await onCreateMcp({
         name,
         transport: isLocal ? 'stdio' : mcpTransport,
         command: isLocal ? parts[0] || null : null,
         args: isLocal ? parts.slice(1) : [],
         url: isLocal ? null : target,
-        enabled: true,
+        // Remote servers stay off until authenticated (headers / connect).
+        enabled: isLocal || hasRemoteAuth,
         description: mcpDescription.trim() || null,
         oauthClientId: mcpOauthClientId.trim() || null,
         oauthServerUrl: mcpOauthServerUrl.trim() || null,

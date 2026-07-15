@@ -8,6 +8,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var supervisor: SandwalkSupervisor?
     private var menubar: MenubarController?
+    private var cmdQMonitor: Any?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -20,6 +21,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             supervisor: supervisor,
             requestQuit: { [weak self] in
                 Task { @MainActor in
+                    SandwalkRuntime.allowTerminate = true
                     await self?.supervisor?.stopAll()
                     NSApp.terminate(nil)
                 }
@@ -28,6 +30,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 SettingsWindowController.shared.show()
             }
         )
+
+        // Prefer swallowing ⌘Q over canceling terminate — AppKit leaves the
+        // status item dead after `.terminateCancel` unless we reinstall it.
+        cmdQMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.shouldInterceptCmdQ(event) else { return event }
+            self.dismissToMenubarOnly()
+            return nil
+        }
 
         if config.autoStartOnLaunch {
             do {
@@ -54,7 +64,49 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
+        if let cmdQMonitor {
+            NSEvent.removeMonitor(cmdQMonitor)
+            self.cmdQMonitor = nil
+        }
         supervisor?.reapSync()
+    }
+
+    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if SandwalkRuntime.allowTerminate {
+            return .terminateNow
+        }
+        if AppConfig.load().keepMenubarOnCmdQ {
+            // App menu Quit / other terminate paths — cancel and repair the
+            // status item (click handling often breaks after cancel).
+            dismissToMenubarOnly()
+            return .terminateCancel
+        }
+        return .terminateNow
+    }
+
+    private func shouldInterceptCmdQ(_ event: NSEvent) -> Bool {
+        guard !SandwalkRuntime.allowTerminate else { return false }
+        guard AppConfig.load().keepMenubarOnCmdQ else { return false }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard flags == .command else { return false }
+        return event.charactersIgnoringModifiers?.lowercased() == "q"
+    }
+
+    /// Close Settings / hide UI and stay as a menu-bar accessory.
+    private func dismissToMenubarOnly() {
+        SettingsWindowController.shared.close()
+        for window in NSApp.windows where window.isVisible {
+            window.orderOut(nil)
+        }
+        // Defer policy flip + status-item repair so we are outside AppKit's
+        // terminate/key handling critical section. Switching activation policy
+        // (and canceling terminate) often leaves NSStatusItem unclickable.
+        DispatchQueue.main.async { [weak self] in
+            if NSApp.activationPolicy() != .accessory {
+                NSApp.setActivationPolicy(.accessory)
+            }
+            self?.menubar?.reinstallStatusItem()
+        }
     }
 
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

@@ -152,6 +152,19 @@ final class SandwalkSupervisor {
         }
     }
 
+    /// Persist launch / menu-bar preferences without restarting API/web.
+    func applyGeneralPreferences(_ next: AppConfig) throws {
+        var updated = config
+        updated.autoStartOnLaunch = next.autoStartOnLaunch
+        updated.keepMenubarOnCmdQ = next.keepMenubarOnCmdQ
+        // Preserve discovery paths from the running supervisor.
+        updated.agentCliRoot = config.agentCliRoot
+        updated.repoRoot = config.repoRoot
+        try updated.saveNetworkSettings()
+        config = updated
+        NotificationCenter.default.post(name: Self.configDidChangeNotification, object: self)
+    }
+
     /// Persist health-check interval without restarting API/web.
     func applyHealthCheckInterval(_ seconds: Int) throws {
         var updated = config

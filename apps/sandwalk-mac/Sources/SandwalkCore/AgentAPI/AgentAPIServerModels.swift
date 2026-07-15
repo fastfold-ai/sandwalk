@@ -66,11 +66,12 @@ struct DoctorReportDTO: Codable {
 }
 
 struct StorageCategoryDTO: Codable, Identifiable, Hashable {
-    var id: String { label + String(bytes) }
+    var id: String { label + String(bytes) + (path ?? "") }
     let label: String
     let color: String?
     let bytes: Int64
     let path: String?
+    let children: [StorageCategoryDTO]?
 }
 
 struct StorageLocationDTO: Codable {
@@ -79,12 +80,32 @@ struct StorageLocationDTO: Codable {
     let bytes: Int64?
 }
 
+struct StorageDatabaseProbeDTO: Codable, Hashable {
+    let path: String
+    let exists: Bool
+    let bytes: Int64
+    let walBytes: Int64
+    let shmBytes: Int64
+    let integrity: String
+    let pageCount: Int?
+    let pageSize: Int?
+    let journalMode: String?
+    let sessionCount: Int?
+    let messageCount: Int?
+    let backupPath: String?
+    let backupBytes: Int64
+    let backupIntegrity: String?
+    let autoHealEnabled: Bool
+    let quarantineCount: Int
+}
+
 struct StorageReportDTO: Codable {
     let location: StorageLocationDTO?
     let categories: [StorageCategoryDTO]
     let totalBytes: Int64
     let availableBytes: Int64?
     let checkedAt: String?
+    let database: StorageDatabaseProbeDTO?
 }
 
 struct EnvPackageDTO: Codable, Identifiable, Hashable {

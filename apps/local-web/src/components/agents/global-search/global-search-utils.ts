@@ -8,13 +8,14 @@ import {
   GitBranch,
   HardDrive,
   LayoutDashboard,
-  Network,
   Plug,
   Settings2,
   Sparkles,
   Stethoscope,
   Wrench
 } from 'lucide-react'
+
+import { McpMark } from '@/components/McpMark'
 
 export type SearchScope = 'all' | 'artifacts' | 'sessions'
 
@@ -177,6 +178,6 @@ export const DASHBOARD_COMMANDS = [
     label: 'MCPs',
     path: '/dashboard/mcp',
     value: 'command mcp servers',
-    icon: Network
+    icon: McpMark
   }
 ] as const

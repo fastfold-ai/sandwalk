@@ -94,4 +94,13 @@ final class SettingsSectionTests: XCTestCase {
     func testFromDeepLinkRejectsSectionHostWithExtraPath() {
         XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://security/extra")!))
     }
+
+    func testGeneralSettingsSection() {
+        XCTAssertEqual(SettingsSection.general.title, "Settings")
+        XCTAssertEqual(SettingsSection.general.symbol, "gearshape")
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/general")!),
+            .general
+        )
+    }
 }

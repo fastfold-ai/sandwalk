@@ -36,6 +36,10 @@ struct AppConfig: Equatable, Sendable {
     var healthCheckIntervalSeconds: Int
     /// Production (API-hosted UI) vs Development (Vite).
     var dashboardServeMode: DashboardServeMode
+    /// Quarantine + recover corrupt `agent-server.db` on serve start (default on).
+    var dbAutoHeal: Bool
+    /// When true, ⌘Q closes windows only; menu bar + agent keep running.
+    var keepMenubarOnCmdQ: Bool
     /// Monorepo `cli/` directory (Python package).
     var agentCliRoot: URL?
     /// Monorepo root (contains `apps/`, `cli/`, `package.json`).
@@ -47,6 +51,8 @@ struct AppConfig: Equatable, Sendable {
     static let defaultDashboardPort = 8969
     static let defaultHealthCheckIntervalSeconds = 60
     static let defaultDashboardServeMode: DashboardServeMode = .production
+    static let defaultDbAutoHeal = true
+    static let defaultKeepMenubarOnCmdQ = true
     static let minHealthCheckIntervalSeconds = 5
     static let maxHealthCheckIntervalSeconds = 300
 
@@ -167,6 +173,18 @@ struct AppConfig: Equatable, Sendable {
             }
             return saved.dashboardServeMode ?? defaultDashboardServeMode
         }()
+        let dbAutoHeal: Bool = {
+            if let raw = env["SANDWALK_DB_AUTO_HEAL"]?.lowercased() {
+                return !["0", "false", "no", "off"].contains(raw)
+            }
+            return saved.dbAutoHeal ?? defaultDbAutoHeal
+        }()
+        let keepMenubarOnCmdQ: Bool = {
+            if let raw = env["SANDWALK_KEEP_MENUBAR_ON_CMDQ"]?.lowercased() {
+                return !["0", "false", "no", "off"].contains(raw)
+            }
+            return saved.keepMenubarOnCmdQ ?? defaultKeepMenubarOnCmdQ
+        }()
         let repoRoot = env["SANDWALK_REPO_ROOT"].map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
         } ?? discoverRepoRoot()
@@ -183,6 +201,8 @@ struct AppConfig: Equatable, Sendable {
             autoStartOnLaunch: autoStart,
             healthCheckIntervalSeconds: healthInterval,
             dashboardServeMode: serveMode,
+            dbAutoHeal: dbAutoHeal,
+            keepMenubarOnCmdQ: keepMenubarOnCmdQ,
             agentCliRoot: cliRoot,
             repoRoot: repoRoot
         )
@@ -198,7 +218,9 @@ struct AppConfig: Equatable, Sendable {
                 dashboardPort: dashboardPort,
                 autoStartOnLaunch: autoStartOnLaunch,
                 healthCheckIntervalSeconds: healthCheckIntervalSeconds,
-                dashboardServeMode: dashboardServeMode
+                dashboardServeMode: dashboardServeMode,
+                dbAutoHeal: dbAutoHeal,
+                keepMenubarOnCmdQ: keepMenubarOnCmdQ
             )
         )
     }

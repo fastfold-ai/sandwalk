@@ -14,6 +14,7 @@ final class AppConfigTests: XCTestCase {
         "SANDWALK_DASHBOARD_URL",
         "SANDWALK_DASHBOARD_MODE",
         "SANDWALK_AUTO_START",
+        "SANDWALK_DB_AUTO_HEAL",
         "SANDWALK_REPO_ROOT",
         "SANDWALK_AGENT_CLI",
     ]
@@ -46,6 +47,8 @@ final class AppConfigTests: XCTestCase {
             autoStartOnLaunch: true,
             healthCheckIntervalSeconds: healthCheckIntervalSeconds,
             dashboardServeMode: dashboardServeMode,
+            dbAutoHeal: true,
+            keepMenubarOnCmdQ: true,
             agentCliRoot: nil,
             repoRoot: nil
         )

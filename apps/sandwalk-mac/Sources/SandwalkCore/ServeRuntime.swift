@@ -71,6 +71,7 @@ struct ServeRuntime {
         var env = PathSupport.processEnvironment(merging: [
             "SANDWALK_SUPERVISED": "menubar",
             "SANDWALK_SETTINGS_PATH": AuthSettingsStore.settingsFileURL().path,
+            "SANDWALK_DB_AUTO_HEAL": config.dbAutoHeal ? "1" : "0",
         ])
         // Pin to Application Support; ignore stale shell overrides (e.g. /tmp).
         env.removeValue(forKey: "SANDWALK_HOME")

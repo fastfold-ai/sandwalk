@@ -54,6 +54,7 @@ struct SettingsRootView: View {
                 }
 
                 Section {
+                    SidebarRow(section: .general)
                     SidebarRow(section: .about)
                 } header: {
                     Text("General")
@@ -170,6 +171,7 @@ private struct SettingsDetailScaffold: View {
         case .network: NetworkSettingsView()
         case .advanced: AdvancedSettingsView()
         case .security: SecuritySettingsView()
+        case .general: GeneralSettingsView()
         case .about: AboutSettingsView()
         case .logs: EmptyView()
         }
@@ -220,6 +222,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         win.setFrameAutosaveName("SandwalkSettingsWindow")
         win.makeKeyAndOrderFront(nil)
         self.window = win
+    }
+
+    func close() {
+        window?.close()
     }
 
     func windowWillClose(_ notification: Notification) {

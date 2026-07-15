@@ -15,7 +15,6 @@ struct NetworkSettingsView: View {
             || draft.port != liveConfig.port
             || draft.dashboardHost != liveConfig.dashboardHost
             || draft.dashboardPort != liveConfig.dashboardPort
-            || draft.autoStartOnLaunch != liveConfig.autoStartOnLaunch
     }
 
     private var portsValid: Bool {
@@ -88,18 +87,11 @@ struct NetworkSettingsView: View {
                 }
             }
 
-            SettingsSectionHeader("LAUNCH")
-            SettingsListGroup {
-                SettingsRow(
-                    label: "Start on launch",
-                    sublabel: "Automatically start API + web when the menubar app opens.",
-                    isLast: true
-                ) {
-                    Toggle("", isOn: $draft.autoStartOnLaunch)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-            }
+            Text("Startup and menu bar options moved to General → Settings.")
+                .font(.sandwalk(11))
+                .foregroundStyle(theme.textTertiary)
+                .padding(.horizontal, 18)
+                .padding(.top, 10)
 
             HStack {
                 if let statusMessage {

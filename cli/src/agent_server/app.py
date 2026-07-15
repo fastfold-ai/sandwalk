@@ -37,8 +37,14 @@ from agent_server.integrations_service import IntegrationsService
 from agent_server.mcp_service import (
     McpService,
     clear_custom_headers,
+    custom_server_credentials_configured,
     enrich_mcp_server,
     set_custom_headers,
+)
+from agent_server.mcp_json_config import (
+    apply_mcp_json,
+    get_or_export_mcp_json,
+    mcp_json_path,
 )
 from agent_server.models import (
     AccountSummary,
@@ -85,6 +91,8 @@ from agent_server.models import (
     InterruptRunResponse,
     McpCatalogEntryStatus,
     McpCatalogList,
+    McpJsonConfigRequest,
+    McpJsonConfigResponse,
     McpServer,
     McpServerList,
     McpToolDetail,
@@ -190,6 +198,10 @@ def create_app(
     allowed_hosts: list[str] | None = None,
 ) -> FastAPI:
     store = AgentStore(store_path, exclusive=True)
+    if store.last_heal_note:
+        import logging
+
+        logging.getLogger("agent_server").warning("%s", store.last_heal_note)
     service = AgentService(store)
     skills_service = SkillsService()
     specialists_service = SpecialistsService(store)
@@ -566,9 +578,54 @@ def create_app(
     @app.get("/v1/mcp-servers", response_model=McpServerList)
     async def list_mcp_servers() -> McpServerList:
         def _list() -> list[McpServer]:
-            return [enrich_mcp_server(server) for server in store.list_mcp_servers()]
+            out: list[McpServer] = []
+            for server in store.list_mcp_servers():
+                enriched = enrich_mcp_server(server)
+                # Persist force-off for stale remotes that were saved as enabled.
+                if (
+                    not enriched.catalog_id
+                    and enriched.transport != "stdio"
+                    and not enriched.headers_configured
+                    and server.enabled
+                ):
+                    updated = store.update_mcp_server(server.id, enabled=False)
+                    if updated is not None:
+                        enriched = enrich_mcp_server(updated)
+                out.append(enriched)
+            return out
 
         return McpServerList(data=await asyncio.to_thread(_list))
+
+    @app.get("/v1/mcp-servers/config", response_model=McpJsonConfigResponse)
+    async def get_mcp_json_config() -> McpJsonConfigResponse:
+        """Export custom MCP servers as mcp.json."""
+
+        def _get() -> McpJsonConfigResponse:
+            document = get_or_export_mcp_json(store)
+            return McpJsonConfigResponse(
+                path=str(mcp_json_path()),
+                document=document,
+            )
+
+        return await asyncio.to_thread(_get)
+
+    @app.put("/v1/mcp-servers/config", response_model=McpJsonConfigResponse)
+    async def put_mcp_json_config(
+        payload: McpJsonConfigRequest,
+    ) -> McpJsonConfigResponse:
+        """Replace custom MCP servers from an mcp.json document."""
+
+        def _put() -> McpJsonConfigResponse:
+            try:
+                document = apply_mcp_json(store, payload.document)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            return McpJsonConfigResponse(
+                path=str(mcp_json_path()),
+                document=document,
+            )
+
+        return await asyncio.to_thread(_put)
 
     @app.get("/v1/mcp-servers/catalog", response_model=McpCatalogList)
     async def list_mcp_catalog() -> McpCatalogList:
@@ -725,6 +782,7 @@ def create_app(
                 "type": "fastfold-mcp-oauth",
                 "ok": bool(result.get("ok")),
                 "catalogId": result.get("catalogId"),
+                "serverId": result.get("serverId"),
                 "enabled": result.get("enabled"),
                 "toolCount": result.get("toolCount"),
                 "message": result.get("message"),
@@ -746,13 +804,25 @@ def create_app(
             raise HTTPException(status_code=400, detail="Remote MCP servers require a URL.")
 
         def _create() -> McpServer:
+            enabled = payload.enabled
+            # Remote custom servers without credentials stay off until Connect.
+            if (
+                not payload.catalog_id
+                and payload.transport != "stdio"
+                and not payload.headers
+                and not (payload.headers_helper_command or "").strip()
+            ):
+                enabled = False
+            url = payload.url
+            if url and "://" not in url:
+                url = f"https://{url}"
             server = store.create_mcp_server(
                 name=payload.name,
                 transport=payload.transport,
                 command=payload.command,
                 args=payload.args,
-                url=payload.url,
-                enabled=payload.enabled,
+                url=url,
+                enabled=enabled,
                 catalog_id=payload.catalog_id,
                 description=payload.description,
                 oauth_client_id=payload.oauth_client_id,
@@ -762,9 +832,57 @@ def create_app(
             )
             if payload.headers is not None:
                 set_custom_headers(server.id, payload.headers)
+            if not payload.catalog_id:
+                get_or_export_mcp_json(store)
             return enrich_mcp_server(server)
 
         return await asyncio.to_thread(_create)
+
+    @app.post(
+        "/v1/mcp-servers/{server_id}/connect",
+        response_model=ConnectMcpCatalogResponse,
+    )
+    async def connect_mcp_server(
+        server_id: str,
+        payload: ConnectMcpCatalogRequest,
+    ) -> ConnectMcpCatalogResponse:
+        """OAuth or API-key connect for a custom remote MCP (Cursor-style)."""
+        try:
+            if payload.method == "oauth":
+                result = await asyncio.to_thread(
+                    mcp_service.start_oauth_custom,
+                    server_id,
+                )
+                return ConnectMcpCatalogResponse(
+                    ok=True,
+                    authorize_url=result.get("authorizeUrl"),
+                    state=result.get("state"),
+                    redirect_uri=result.get("redirectUri"),
+                    server_id=result.get("serverId") or server_id,
+                    message="Open authorizeUrl in a browser to finish OAuth",
+                )
+            if not payload.api_key:
+                raise HTTPException(
+                    status_code=400,
+                    detail="apiKey is required for API key connect",
+                )
+            result = await asyncio.to_thread(
+                mcp_service.connect_custom_api_key,
+                server_id,
+                payload.api_key,
+            )
+            return ConnectMcpCatalogResponse(
+                ok=bool(result.get("ok")),
+                server_id=server_id,
+                enabled=False,
+                tool_count=result.get("toolCount"),
+                message=result.get("message"),
+                tools=list(result.get("tools") or []),
+            )
+        except KeyError:
+            raise HTTPException(status_code=404, detail="MCP server not found") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
 
     @app.patch("/v1/mcp-servers/{server_id}", response_model=McpServer)
     async def update_mcp_server(
@@ -775,14 +893,44 @@ def create_app(
             changes = payload.model_dump(exclude_unset=True)
             headers = changes.pop("headers", None)
             headers_provided = "headers" in payload.model_fields_set
+            existing = next(
+                (s for s in store.list_mcp_servers() if s.id == server_id),
+                None,
+            )
+            if existing is None:
+                return None
+            # Apply headers first so enable checks see new credentials.
+            if headers_provided:
+                set_custom_headers(existing.id, headers)
+            will_enable = bool(changes.get("enabled", existing.enabled))
+            if (
+                will_enable
+                and not existing.catalog_id
+                and existing.transport != "stdio"
+            ):
+                probe = existing.model_copy(
+                    update={
+                        "headers_helper_command": changes.get(
+                            "headers_helper_command",
+                            existing.headers_helper_command,
+                        ),
+                    }
+                )
+                if not custom_server_credentials_configured(probe):
+                    raise ValueError(
+                        "Authenticate this MCP server before enabling it."
+                    )
             server = store.update_mcp_server(server_id, **changes)
             if server is None:
                 return None
-            if headers_provided:
-                set_custom_headers(server.id, headers)
+            if not server.catalog_id:
+                get_or_export_mcp_json(store)
             return enrich_mcp_server(server)
 
-        server = await asyncio.to_thread(_update)
+        try:
+            server = await asyncio.to_thread(_update)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
         if server is None:
             raise HTTPException(status_code=404, detail="MCP server not found.")
         return server
@@ -822,6 +970,7 @@ def create_app(
             deleted = store.delete_mcp_server(server_id)
             if deleted:
                 clear_custom_headers(server_id)
+                get_or_export_mcp_json(store)
             return deleted
 
         if not await asyncio.to_thread(_delete):

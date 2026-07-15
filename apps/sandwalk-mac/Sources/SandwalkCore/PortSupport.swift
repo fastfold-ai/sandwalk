@@ -25,11 +25,26 @@ enum PortSupport {
     }
 
     static func freePort(_ port: Int) {
+        // Prefer a graceful SIGTERM window before SIGKILL. Instant kill -9 while
+        // sandwalk serve is mid-WAL write is a common cause of agent-server.db
+        // corruption and the menubar restart loop that follows.
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/zsh")
         task.arguments = [
             "-c",
-            "pids=$(lsof -tiTCP:\(port) -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill $pids 2>/dev/null; sleep 0.2; pids=$(lsof -tiTCP:\(port) -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null; true",
+            """
+            pids=$(lsof -tiTCP:\(port) -sTCP:LISTEN 2>/dev/null)
+            if [ -z "$pids" ]; then exit 0; fi
+            kill -TERM $pids 2>/dev/null
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              sleep 0.3
+              pids=$(lsof -tiTCP:\(port) -sTCP:LISTEN 2>/dev/null)
+              [ -z "$pids" ] && exit 0
+            done
+            pids=$(lsof -tiTCP:\(port) -sTCP:LISTEN 2>/dev/null)
+            [ -n "$pids" ] && kill -9 $pids 2>/dev/null
+            true
+            """,
         ]
         try? task.run()
         task.waitUntilExit()

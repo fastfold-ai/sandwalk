@@ -10,7 +10,6 @@ import {
   HardDrive,
   LayoutDashboard,
   MessageSquareText,
-  Network,
   PanelLeft,
   Plug,
   Settings2,
@@ -22,6 +21,7 @@ import type { ComponentType } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
+import { McpMark } from '@/components/McpMark'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
@@ -132,7 +132,7 @@ const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
         path: '/dashboard/integrations',
         icon: Plug
       },
-      { id: 'mcp', label: 'MCPs', path: '/dashboard/mcp', icon: Network }
+      { id: 'mcp', label: 'MCPs', path: '/dashboard/mcp', icon: McpMark }
     ]
   },
   {

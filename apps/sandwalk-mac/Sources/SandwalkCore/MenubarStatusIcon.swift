@@ -74,8 +74,13 @@ extension MenubarController {
             return ("Sandwalk is partially running", .systemOrange)
         case .stopping:
             return ("Sandwalk is stopping…", .systemOrange)
-        case .failed:
-            return ("Sandwalk failed to start", .systemRed)
+        case .failed(let message):
+            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                return ("Sandwalk failed to start", .systemRed)
+            }
+            let short = trimmed.count > 72 ? String(trimmed.prefix(69)) + "…" : trimmed
+            return ("Failed — \(short)", .systemRed)
         }
     }
 

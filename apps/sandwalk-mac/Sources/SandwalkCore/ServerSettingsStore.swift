@@ -9,6 +9,10 @@ struct ServerNetworkSettings: Equatable, Sendable {
     var autoStartOnLaunch: Bool?
     var healthCheckIntervalSeconds: Int?
     var dashboardServeMode: DashboardServeMode?
+    /// When true, agent server auto-quarantines/recovers a corrupt SQLite DB.
+    var dbAutoHeal: Bool?
+    /// When true, ⌘Q closes windows only (menu bar stays up).
+    var keepMenubarOnCmdQ: Bool?
 }
 
 enum ServerSettingsStore {
@@ -40,7 +44,9 @@ enum ServerSettingsStore {
             dashboardPort: server["dashboard_port"] as? Int,
             autoStartOnLaunch: server["auto_start"] as? Bool,
             healthCheckIntervalSeconds: server["health_check_interval_seconds"] as? Int,
-            dashboardServeMode: mode
+            dashboardServeMode: mode,
+            dbAutoHeal: server["db_auto_heal"] as? Bool,
+            keepMenubarOnCmdQ: server["keep_menubar_on_cmdq"] as? Bool
         )
     }
 
@@ -68,6 +74,8 @@ enum ServerSettingsStore {
             "dashboard_serve_mode": (
                 settings.dashboardServeMode ?? AppConfig.defaultDashboardServeMode
             ).rawValue,
+            "db_auto_heal": settings.dbAutoHeal ?? AppConfig.defaultDbAutoHeal,
+            "keep_menubar_on_cmdq": settings.keepMenubarOnCmdQ ?? AppConfig.defaultKeepMenubarOnCmdQ,
         ]
         let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: url, options: .atomic)

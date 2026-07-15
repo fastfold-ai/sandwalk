@@ -84,12 +84,45 @@ def test_set_and_clear_custom_headers(tmp_path: Path, monkeypatch):
 def test_enrich_mcp_server_attaches_header_metadata():
     server = MagicMock()
     server.id = "s1"
-    server.model_copy = lambda update: MagicMock(**{**server.__dict__, **update})
+    server.catalog_id = None
+    server.transport = "streamable_http"
+    server.enabled = True
+    server.headers_helper_command = None
+    server.model_copy = lambda update: MagicMock(
+        **{**{k: getattr(server, k) for k in ("id", "catalog_id", "transport", "enabled", "headers_helper_command")}, **update}
+    )
     cfg = MagicMock()
-    cfg.get.return_value = {"Authorization": "Bearer x"}
+
+    def _get(key, default=None):
+        if key == "mcp.custom_s1_headers":
+            return {"Authorization": "Bearer x"}
+        return default
+
+    cfg.get.side_effect = _get
     enriched = enrich_mcp_server(server, config=cfg)
     assert enriched.headers_configured is True
     assert enriched.header_names == ["Authorization"]
+
+
+def test_enrich_mcp_server_forces_unauthenticated_remote_off():
+    server = MagicMock()
+    server.id = "s2"
+    server.catalog_id = None
+    server.transport = "streamable_http"
+    server.enabled = True
+    server.headers_helper_command = None
+    captured = {}
+
+    def _copy(update):
+        captured.update(update)
+        return MagicMock(**{**server.__dict__, **update})
+
+    server.model_copy = _copy
+    cfg = MagicMock()
+    cfg.get.return_value = None
+    enrich_mcp_server(server, config=cfg)
+    assert captured.get("enabled") is False
+    assert captured.get("headers_configured") is False
 
 
 def test_resolve_auth_headers_api_key(tmp_path: Path, monkeypatch):

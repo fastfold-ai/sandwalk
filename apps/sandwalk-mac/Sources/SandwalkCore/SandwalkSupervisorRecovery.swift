@@ -12,6 +12,10 @@ extension SandwalkSupervisor {
             }
             return
         }
+        // Fatal startup (corrupt DB, etc.) — don't keep poking Start.
+        if api.suppressAutoRecovery {
+            return
+        }
         guard partialRecoveryTask == nil else { return }
         guard partialRecoveryAttempts < maxPartialRecoveries else {
             NSLog(

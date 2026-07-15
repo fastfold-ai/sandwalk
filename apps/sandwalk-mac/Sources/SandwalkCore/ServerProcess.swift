@@ -47,12 +47,20 @@ final class ServerProcess: @unchecked Sendable {
     var expectingExit = false
     var consecutiveFailures = 0
     var consecutiveRecoveries = 0
+    /// True after at least one successful /v1/health while this child was live.
+    var everHealthy = false
+    /// When true, skip auto-respawn (fatal startup / user must Start manually).
+    var suppressAutoRecovery = false
+    /// Exits before first healthy probe during the current start attempt streak.
+    var consecutiveStartupFailures = 0
 
     /// Fast probes while starting; configured interval once running.
     let startupHealthInterval: TimeInterval = 2
     let maxHealthFailures = 5
     let stopGraceSeconds: TimeInterval = 8
     let maxAutoRecoveries = 8
+    /// Cap respawns that never reach healthy (avoids thrashing on bad config).
+    let maxStartupRecoveries = 1
 
     init(config: AppConfig) {
         self.config = config
@@ -98,8 +106,11 @@ final class ServerProcess: @unchecked Sendable {
         case .stopped, .failed:
             break
         }
+        suppressAutoRecovery = false
+        consecutiveStartupFailures = 0
         if tryAdoptHealthyListener() {
             consecutiveRecoveries = 0
+            everHealthy = true
             return .alreadyRunning
         }
         // Stale binder on the port would make a fresh spawn exit(1).
@@ -137,6 +148,9 @@ final class ServerProcess: @unchecked Sendable {
         adoptedPid = nil
         closeLog()
         consecutiveRecoveries = 0
+        consecutiveStartupFailures = 0
+        suppressAutoRecovery = false
+        everHealthy = false
         update(.stopped)
     }
 
@@ -164,6 +178,9 @@ final class ServerProcess: @unchecked Sendable {
         adoptedPid = nil
         closeLog()
         consecutiveRecoveries = 0
+        consecutiveStartupFailures = 0
+        suppressAutoRecovery = false
+        everHealthy = false
         update(.stopped)
     }
 

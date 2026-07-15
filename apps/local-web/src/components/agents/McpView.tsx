@@ -1,14 +1,15 @@
 import type {
   ConnectMcpResult,
   McpCatalogEntry,
-  McpServer,
+  McpJsonDocument,
+  McpServer
 } from '@sandwalk/agent-ui-core'
 
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 import {
   McpFeaturedSection,
-  McpMoreCatalogSection,
+  McpMoreCatalogSection
 } from './mcp-view/mcp-view-catalog'
 import { McpCustomSection } from './mcp-view/mcp-view-custom'
 import { useMcpView } from './mcp-view/use-mcp-view'
@@ -29,6 +30,9 @@ export function McpView({
   onToggleCustom,
   onOpenCatalog,
   onOpenServer,
+  onConnectCustom,
+  onLoadMcpJson,
+  onSaveMcpJson,
   embedded = false
 }: {
   mcpServers: McpServer[]
@@ -44,16 +48,22 @@ export function McpView({
   onRefresh: () => Promise<void>
   onConnectCatalog: (
     catalogId: string,
-    input: { method: 'oauth' | 'api_key'; apiKey?: string },
+    input: { method: 'oauth' | 'api_key'; apiKey?: string }
   ) => Promise<ConnectMcpResult>
   onToggleCatalog: (entry: McpCatalogEntry, enabled: boolean) => Promise<void>
   onCreateMcp: (
-    input: Omit<McpServer, 'id' | 'createdAt' | 'updatedAt'>,
+    input: Omit<McpServer, 'id' | 'createdAt' | 'updatedAt'>
   ) => Promise<void>
   onDeleteMcp: (id: string) => Promise<void>
   onToggleCustom: (id: string, enabled: boolean) => Promise<void>
   onOpenCatalog?: (entry: McpCatalogEntry) => void
   onOpenServer?: (server: McpServer) => void
+  onConnectCustom?: (
+    server: McpServer,
+    input: { method: 'oauth' | 'api_key'; apiKey?: string }
+  ) => Promise<ConnectMcpResult>
+  onLoadMcpJson?: () => Promise<{ path: string; document: McpJsonDocument }>
+  onSaveMcpJson?: (document: McpJsonDocument) => Promise<void>
   embedded?: boolean
 }) {
   const view = useMcpView({
@@ -143,6 +153,9 @@ export function McpView({
             onOpenServer={onOpenServer}
             onToggleCustom={(id, enabled) => void onToggleCustom(id, enabled)}
             onDeleteMcp={id => void onDeleteMcp(id)}
+            onConnectCustom={onConnectCustom}
+            onLoadMcpJson={onLoadMcpJson}
+            onSaveMcpJson={onSaveMcpJson}
           />
         </div>
       </div>

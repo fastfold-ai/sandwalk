@@ -920,7 +920,8 @@ class CreateMcpServerRequest(ApiModel):
     command: str | None = None
     args: list[str] = Field(default_factory=list)
     url: str | None = None
-    enabled: bool = True
+    # Remotes without auth are forced off in the create handler regardless.
+    enabled: bool = False
     catalog_id: str | None = None
     description: str | None = None
     oauth_client_id: str | None = None
@@ -943,6 +944,17 @@ class UpdateMcpServerRequest(ApiModel):
     oauth_scopes: str | None = None
     headers_helper_command: str | None = None
     headers: dict[str, str] | None = None
+
+
+class McpJsonConfigResponse(ApiModel):
+    """mcp.json document plus on-disk path."""
+
+    path: str
+    document: dict[str, Any]
+
+
+class McpJsonConfigRequest(ApiModel):
+    document: dict[str, Any]
 
 
 class MessageFeedbackRequest(ApiModel):
@@ -1022,12 +1034,34 @@ class StorageCategory(ApiModel):
     children: list[StorageCategory] = Field(default_factory=list)
 
 
+class StorageDatabaseProbe(ApiModel):
+    """Integrity / size snapshot for ~/.sandwalk/agent-server.db."""
+
+    path: str
+    exists: bool = False
+    bytes: int = 0
+    wal_bytes: int = 0
+    shm_bytes: int = 0
+    integrity: str = "missing"
+    page_count: int | None = None
+    page_size: int | None = None
+    journal_mode: str | None = None
+    session_count: int | None = None
+    message_count: int | None = None
+    backup_path: str | None = None
+    backup_bytes: int = 0
+    backup_integrity: str | None = None
+    auto_heal_enabled: bool = True
+    quarantine_count: int = 0
+
+
 class StorageReport(ApiModel):
     location: StorageLocation
     categories: list[StorageCategory] = Field(default_factory=list)
     total_bytes: int = 0
     available_bytes: int = 0
     checked_at: str
+    database: StorageDatabaseProbe | None = None
 
 
 class EnvironmentPackage(ApiModel):

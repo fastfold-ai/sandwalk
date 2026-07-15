@@ -30,6 +30,8 @@ import type {
   McpProvider,
   McpServer,
   McpCatalogEntry,
+  McpJsonConfig,
+  McpJsonDocument,
   ConnectMcpResult,
   ValidateMcpResult,
   McpToolDetail,
@@ -1368,6 +1370,22 @@ export class LocalAgentClient
     return result.data
   }
 
+  getMcpJsonConfig(signal?: AbortSignal): Promise<McpJsonConfig> {
+    return this.request<McpJsonConfig>('/mcp-servers/config', { signal })
+  }
+
+  putMcpJsonConfig(
+    document: McpJsonDocument,
+    signal?: AbortSignal,
+  ): Promise<McpJsonConfig> {
+    return this.request<McpJsonConfig>('/mcp-servers/config', {
+      method: 'PUT',
+      body: JSON.stringify({ document }),
+      headers: { 'content-type': 'application/json' },
+      signal,
+    })
+  }
+
   async listMcpCatalog(signal?: AbortSignal): Promise<McpCatalogEntry[]> {
     const result = await this.request<{ data: McpCatalogEntry[] }>(
       '/mcp-servers/catalog',
@@ -1383,6 +1401,22 @@ export class LocalAgentClient
   ): Promise<ConnectMcpResult> {
     return this.request<ConnectMcpResult>(
       `/mcp-servers/catalog/${encodeURIComponent(catalogId)}/connect`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+        headers: { 'content-type': 'application/json' },
+        signal,
+      },
+    )
+  }
+
+  connectMcpServer(
+    serverId: string,
+    input: { method: 'oauth' | 'api_key'; apiKey?: string },
+    signal?: AbortSignal,
+  ): Promise<ConnectMcpResult> {
+    return this.request<ConnectMcpResult>(
+      `/mcp-servers/${encodeURIComponent(serverId)}/connect`,
       {
         method: 'POST',
         body: JSON.stringify(input),

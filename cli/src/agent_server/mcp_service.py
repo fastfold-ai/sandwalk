@@ -80,16 +80,53 @@ def clear_custom_headers(server_id: str, *, config: Config | None = None) -> Non
     set_custom_headers(server_id, None, config=config)
 
 
+def custom_oauth_token_key(server_id: str, kind: str) -> str:
+    """Config key for custom-server OAuth tokens (access / refresh / expires / client)."""
+    return f"mcp.custom_{server_id}_{kind}"
+
+
+def custom_server_credentials_configured(
+    server,
+    *,
+    config: Config | None = None,
+) -> bool:
+    """True when a custom remote MCP has headers, helper, or OAuth token."""
+    helper = getattr(server, "headers_helper_command", None)
+    if helper and str(helper).strip():
+        return True
+    cfg = config or Config.load()
+    if get_custom_headers(cfg, server.id):
+        return True
+    access = str(cfg.get(custom_oauth_token_key(server.id, "access_token")) or "").strip()
+    return bool(access)
+
+
 def enrich_mcp_server(server, *, config: Config | None = None):
-    """Attach non-secret header metadata to an MCP server model."""
-    headers = get_custom_headers(config, server.id)
+    """Attach non-secret header metadata; force unauthenticated remotes off in the payload."""
+    cfg = config or Config.load()
+    headers = get_custom_headers(cfg, server.id)
     names = sorted(headers.keys())
-    return server.model_copy(
-        update={
-            "header_names": names,
-            "headers_configured": bool(names),
-        }
+    has_oauth = bool(
+        str(cfg.get(custom_oauth_token_key(server.id, "access_token")) or "").strip()
     )
+    if has_oauth and "Authorization" not in names:
+        names = sorted([*names, "Authorization"])
+    helper = getattr(server, "headers_helper_command", None)
+    configured = bool(names) or bool(helper and str(helper).strip())
+    updates: dict[str, Any] = {
+        "header_names": names,
+        "headers_configured": configured,
+    }
+    # Catalog servers manage enable via catalog APIs; custom remotes stay off
+    # until Connect / headers are present (even if the DB still says enabled).
+    if (
+        not getattr(server, "catalog_id", None)
+        and getattr(server, "transport", None) != "stdio"
+        and not configured
+        and bool(getattr(server, "enabled", False))
+    ):
+        updates["enabled"] = False
+    return server.model_copy(update=updates)
 
 
 def run_headers_helper_command(command: str) -> dict[str, str] | None:
@@ -142,14 +179,18 @@ def run_headers_helper_command(command: str) -> dict[str, str] | None:
 def resolve_custom_server_headers(server, *, config: Config | None = None) -> dict[str, str] | None:
     """Resolve auth headers for a custom (non-catalog) remote MCP server.
 
-    Precedence: headers helper command (if set and succeeds) → static custom headers.
+    Precedence: headers helper → OAuth access token → static custom headers.
     """
+    cfg = config or Config.load()
     helper = getattr(server, "headers_helper_command", None)
     if helper and str(helper).strip():
         dynamic = run_headers_helper_command(str(helper).strip())
         if dynamic:
             return dynamic
-    static = get_custom_headers(config, server.id)
+    access = str(cfg.get(custom_oauth_token_key(server.id, "access_token")) or "").strip()
+    if access:
+        return {"Authorization": f"Bearer {access}"}
+    static = get_custom_headers(cfg, server.id)
     return static or None
 
 
@@ -478,33 +519,40 @@ def _http_json(
             return exc.code, raw
 
 
-def discover_oauth(entry: McpCatalogEntry) -> dict[str, Any]:
-    """Fetch OAuth protected-resource + authorization-server metadata."""
+def discover_oauth_for_url(
+    url: str,
+    *,
+    label: str = "mcp",
+    catalog_id: str | None = None,
+) -> dict[str, Any]:
+    """Fetch OAuth protected-resource + authorization-server metadata for a URL."""
+    parsed = urllib.parse.urlparse(url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
     candidates = [
-        f"{urllib.parse.urlparse(entry.url).scheme}://{urllib.parse.urlparse(entry.url).netloc}/.well-known/oauth-protected-resource",
-        f"{urllib.parse.urlparse(entry.url).scheme}://{urllib.parse.urlparse(entry.url).netloc}/.well-known/oauth-protected-resource/mcp",
-        entry.url.rstrip("/") + "/.well-known/oauth-protected-resource",
+        f"{origin}/.well-known/oauth-protected-resource",
+        f"{origin}/.well-known/oauth-protected-resource/mcp",
+        url.rstrip("/") + "/.well-known/oauth-protected-resource",
     ]
-    # Known overrides from smoke tests
-    if entry.id == "latch":
+    # Known overrides from smoke tests / catalog quirks
+    if catalog_id == "latch":
         candidates.insert(0, "https://mcp.latch.bio/.well-known/oauth-protected-resource/mcp")
-    if entry.id == "linear":
+    if catalog_id == "linear":
         candidates.insert(0, "https://mcp.linear.app/.well-known/oauth-protected-resource/mcp")
-    if entry.id == "paperclip":
+    if catalog_id == "paperclip":
         candidates.insert(0, "https://paperclip.gxl.ai/.well-known/oauth-protected-resource")
 
     resource_meta: dict[str, Any] | None = None
-    for url in candidates:
-        status, data = _http_json(url)
+    for candidate in candidates:
+        status, data = _http_json(candidate)
         if status == 200 and isinstance(data, dict) and data.get("authorization_servers"):
             resource_meta = data
             break
     if not resource_meta:
-        raise ValueError(f"Could not discover OAuth resource metadata for {entry.id}")
+        raise ValueError(f"Could not discover OAuth resource metadata for {label}")
 
     as_list = [str(item).rstrip("/") for item in (resource_meta.get("authorization_servers") or [])]
     if not as_list:
-        raise ValueError(f"No authorization servers listed for {entry.id}")
+        raise ValueError(f"No authorization servers listed for {label}")
 
     # Prefer an AS that advertises dynamic client registration when available.
     discovered: list[dict[str, Any]] = []
@@ -513,17 +561,16 @@ def discover_oauth(entry: McpCatalogEntry) -> dict[str, Any]:
             f"{issuer}/.well-known/oauth-authorization-server",
             f"{issuer}/.well-known/openid-configuration",
         ]
-        # Linear hosts AS metadata on mcp.linear.app
-        if entry.id == "linear":
+        if catalog_id == "linear":
             as_meta_urls.insert(
                 0, "https://mcp.linear.app/.well-known/oauth-authorization-server"
             )
-        if entry.id == "paperclip":
+        if catalog_id == "paperclip":
             as_meta_urls.insert(
                 0, "https://paperclip.gxl.ai/.well-known/oauth-authorization-server"
             )
-        for url in as_meta_urls:
-            status, data = _http_json(url)
+        for meta_url in as_meta_urls:
+            status, data = _http_json(meta_url)
             if status == 200 and isinstance(data, dict) and data.get("authorization_endpoint"):
                 discovered.append(
                     {
@@ -536,18 +583,23 @@ def discover_oauth(entry: McpCatalogEntry) -> dict[str, Any]:
                 break
 
     if not discovered:
-        raise ValueError(f"Could not discover OAuth authorization server for {entry.id}")
+        raise ValueError(f"Could not discover OAuth authorization server for {label}")
 
     as_meta = next((row for row in discovered if row.get("registration_endpoint")), discovered[0])
 
     return {
-        "resource": resource_meta.get("resource") or entry.url,
+        "resource": resource_meta.get("resource") or url,
         "scopes": resource_meta.get("scopes_supported") or ["openid", "offline_access"],
         "authorization_endpoint": as_meta["authorization_endpoint"],
         "token_endpoint": as_meta["token_endpoint"],
         "registration_endpoint": as_meta.get("registration_endpoint"),
         "issuer": as_meta.get("issuer"),
     }
+
+
+def discover_oauth(entry: McpCatalogEntry) -> dict[str, Any]:
+    """Fetch OAuth protected-resource + authorization-server metadata."""
+    return discover_oauth_for_url(entry.url, label=entry.id, catalog_id=entry.id)
 
 
 @dataclass
@@ -875,14 +927,16 @@ class McpService:
 
         raise ValueError("catalog_id or server_id required")
 
-    def start_oauth(self, catalog_id: str) -> dict[str, Any]:
-        entry = get_catalog_entry(catalog_id)
-        if entry is None:
-            raise KeyError(catalog_id)
-        if entry.auth_mode == "api_key":
-            raise ValueError(f"{entry.name} uses API key auth, not OAuth")
-
-        meta = discover_oauth(entry)
+    def _begin_oauth_flow(
+        self,
+        *,
+        meta: dict[str, Any],
+        resource_url: str,
+        label: str,
+        client_id_key: str,
+        client_secret_key: str,
+        state_extra: dict[str, Any],
+    ) -> dict[str, Any]:
         redirect_uri = f"{self.public_base_url.rstrip('/')}/v1/mcp-servers/oauth/callback"
         verifier, challenge = _pkce_pair()
         state = secrets.token_urlsafe(24)
@@ -890,15 +944,15 @@ class McpService:
         client_id: str | None = None
         client_secret: str | None = None
         cfg = Config.load()
-        stored_client = str(cfg.get(f"mcp.{catalog_id}_client_id") or "").strip()
-        stored_secret = str(cfg.get(f"mcp.{catalog_id}_client_secret") or "").strip() or None
+        stored_client = str(cfg.get(client_id_key) or "").strip()
+        stored_secret = str(cfg.get(client_secret_key) or "").strip() or None
 
         if stored_client:
             client_id = stored_client
             client_secret = stored_secret
         elif meta.get("registration_endpoint"):
             reg_body = {
-                "client_name": "FastFold Agent",
+                "client_name": "Sandwalk",
                 "redirect_uris": [redirect_uri],
                 "grant_types": ["authorization_code", "refresh_token"],
                 "response_types": ["code"],
@@ -913,17 +967,18 @@ class McpService:
                 raise ValueError(f"OAuth client registration failed: {data}")
             client_id = str(data["client_id"])
             client_secret = str(data["client_secret"]) if data.get("client_secret") else None
-            cfg.set(f"mcp.{catalog_id}_client_id", client_id)
+            cfg.set(client_id_key, client_id)
             if client_secret:
-                cfg.set(f"mcp.{catalog_id}_client_secret", client_secret)
+                cfg.set(client_secret_key, client_secret)
             cfg.save()
         else:
             raise ValueError(
-                f"No OAuth registration endpoint for {entry.name}. "
-                "Use API key Connect if available, or complete OAuth from Cursor first."
+                f"No OAuth registration endpoint for {label}. "
+                "Use API key Connect if available."
             )
 
         scope = " ".join(str(s) for s in (meta.get("scopes") or [])[:6])
+        resource = meta.get("resource") or resource_url
         params = {
             "response_type": "code",
             "client_id": client_id,
@@ -932,7 +987,7 @@ class McpService:
             "code_challenge": challenge,
             "code_challenge_method": "S256",
             "scope": scope,
-            "resource": meta.get("resource") or entry.url,
+            "resource": resource,
         }
         authorize_url = (
             str(meta["authorization_endpoint"])
@@ -941,20 +996,113 @@ class McpService:
         )
         with _oauth_lock:
             _oauth_states[state] = {
-                "catalog_id": catalog_id,
+                **state_extra,
                 "verifier": verifier,
                 "redirect_uri": redirect_uri,
                 "client_id": client_id,
                 "client_secret": client_secret,
                 "token_endpoint": meta["token_endpoint"],
-                "resource": meta.get("resource") or entry.url,
+                "resource": resource,
                 "created_at": time.time(),
             }
         return {
             "authorizeUrl": authorize_url,
             "state": state,
             "redirectUri": redirect_uri,
+            **{k: v for k, v in state_extra.items() if k in ("catalog_id", "server_id")},
+        }
+
+    def start_oauth(self, catalog_id: str) -> dict[str, Any]:
+        entry = get_catalog_entry(catalog_id)
+        if entry is None:
+            raise KeyError(catalog_id)
+        if entry.auth_mode == "api_key":
+            raise ValueError(f"{entry.name} uses API key auth, not OAuth")
+
+        meta = discover_oauth(entry)
+        result = self._begin_oauth_flow(
+            meta=meta,
+            resource_url=entry.url,
+            label=entry.name,
+            client_id_key=f"mcp.{catalog_id}_client_id",
+            client_secret_key=f"mcp.{catalog_id}_client_secret",
+            state_extra={"catalog_id": catalog_id},
+        )
+        return {
+            "authorizeUrl": result["authorizeUrl"],
+            "state": result["state"],
+            "redirectUri": result["redirectUri"],
             "catalogId": catalog_id,
+        }
+
+    def start_oauth_custom(self, server_id: str) -> dict[str, Any]:
+        """Start URL-based OAuth for a custom (non-catalog) remote MCP server."""
+        server = next(
+            (s for s in self.store.list_mcp_servers() if s.id == server_id),
+            None,
+        )
+        if server is None:
+            raise KeyError(server_id)
+        if getattr(server, "catalog_id", None):
+            raise ValueError("Use catalog connect for featured MCP servers")
+        if server.transport == "stdio" or not server.url:
+            raise ValueError("OAuth is only available for remote MCP servers")
+
+        meta = discover_oauth_for_url(server.url, label=server.name)
+        result = self._begin_oauth_flow(
+            meta=meta,
+            resource_url=server.url,
+            label=server.name,
+            client_id_key=custom_oauth_token_key(server_id, "client_id"),
+            client_secret_key=custom_oauth_token_key(server_id, "client_secret"),
+            state_extra={"server_id": server_id, "mcp_url": server.url},
+        )
+        return {
+            "authorizeUrl": result["authorizeUrl"],
+            "state": result["state"],
+            "redirectUri": result["redirectUri"],
+            "serverId": server_id,
+        }
+
+    def connect_custom_api_key(self, server_id: str, api_key: str) -> dict[str, Any]:
+        """Store Bearer auth for a custom remote MCP — does not enable the toggle."""
+        server = next(
+            (s for s in self.store.list_mcp_servers() if s.id == server_id),
+            None,
+        )
+        if server is None:
+            raise KeyError(server_id)
+        if getattr(server, "catalog_id", None):
+            raise ValueError("Use catalog connect for featured MCP servers")
+        if server.transport == "stdio" or not server.url:
+            raise ValueError("API key connect is only for remote MCP servers")
+        key = api_key.strip()
+        if not key:
+            raise ValueError("API key is required")
+        value = key if key.lower().startswith("bearer ") else f"Bearer {key}"
+        # Drop stale OAuth so the new key wins at runtime.
+        cfg = Config.load()
+        for kind in ("access_token", "refresh_token", "token_expires_at"):
+            oauth_key = custom_oauth_token_key(server_id, kind)
+            if cfg.get(oauth_key) is not None:
+                cfg.unset(oauth_key)
+        cfg.save()
+        set_custom_headers(server_id, {"Authorization": value}, config=cfg)
+        # Authenticate only — leave enabled off (Cursor-style).
+        if server.enabled:
+            server = self.store.update_mcp_server(server_id, enabled=False) or server
+        result = probe_mcp_server(url=server.url, headers={"Authorization": value})
+        return {
+            "ok": bool(result.get("ok")),
+            "serverId": server_id,
+            "enabled": False,
+            "toolCount": result.get("toolCount"),
+            "message": result.get("message") or (
+                f"Connected · {result.get('toolCount') or 0} tools"
+                if result.get("ok")
+                else "Connection failed"
+            ),
+            "tools": list(result.get("tools") or []),
         }
 
     def complete_oauth(self, *, code: str, state: str) -> dict[str, Any]:
@@ -962,10 +1110,6 @@ class McpService:
             pending = _oauth_states.pop(state, None)
         if not pending:
             raise ValueError("Unknown or expired OAuth state")
-        catalog_id = str(pending["catalog_id"])
-        entry = get_catalog_entry(catalog_id)
-        if entry is None:
-            raise KeyError(catalog_id)
 
         form = {
             "grant_type": "authorization_code",
@@ -995,7 +1139,56 @@ class McpService:
             raise ValueError(f"Token exchange failed: {data}")
 
         cfg = Config.load()
-        cfg.set(f"mcp.{catalog_id}_access_token", str(data["access_token"]))
+        access_token = str(data["access_token"])
+        custom_server_id = pending.get("server_id")
+        catalog_id = pending.get("catalog_id")
+
+        if custom_server_id:
+            server_id = str(custom_server_id)
+            cfg.set(custom_oauth_token_key(server_id, "access_token"), access_token)
+            if data.get("refresh_token"):
+                cfg.set(
+                    custom_oauth_token_key(server_id, "refresh_token"),
+                    str(data["refresh_token"]),
+                )
+            expires_in = data.get("expires_in")
+            if expires_in:
+                cfg.set(
+                    custom_oauth_token_key(server_id, "token_expires_at"),
+                    str(int(time.time()) + int(expires_in)),
+                )
+            cfg.save()
+            mcp_url = str(pending.get("mcp_url") or "")
+            server = next(
+                (s for s in self.store.list_mcp_servers() if s.id == server_id),
+                None,
+            )
+            if server is None:
+                raise KeyError(server_id)
+            if not mcp_url:
+                mcp_url = str(server.url or "")
+            # OAuth finish authenticates only — never flip the enable toggle.
+            if server.enabled:
+                self.store.update_mcp_server(server_id, enabled=False)
+            result = probe_mcp_server(
+                url=mcp_url,
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            return {
+                "ok": result["ok"],
+                "serverId": server_id,
+                "enabled": False,
+                **result,
+            }
+
+        if not catalog_id:
+            raise ValueError("OAuth state missing catalog_id or server_id")
+        catalog_id = str(catalog_id)
+        entry = get_catalog_entry(catalog_id)
+        if entry is None:
+            raise KeyError(catalog_id)
+
+        cfg.set(f"mcp.{catalog_id}_access_token", access_token)
         if data.get("refresh_token"):
             cfg.set(f"mcp.{catalog_id}_refresh_token", str(data["refresh_token"]))
         expires_in = data.get("expires_in")
@@ -1008,7 +1201,7 @@ class McpService:
 
         result = probe_mcp_server(
             url=entry.url,
-            headers={"Authorization": f"Bearer {data['access_token']}"},
+            headers={"Authorization": f"Bearer {access_token}"},
         )
         # OAuth finish authenticates only — never flip the enable toggle.
         server = self.ensure_catalog_server(catalog_id, enabled=False)
@@ -1033,6 +1226,10 @@ class McpService:
         cfg = Config.load()
         out: list[dict[str, Any]] = []
         for server in self.store.list_mcp_servers(enabled_only=True):
+            # Skip custom remotes that somehow stayed enabled without credentials.
+            if not getattr(server, "catalog_id", None) and server.transport != "stdio":
+                if not custom_server_credentials_configured(server, config=cfg):
+                    continue
             payload = server.model_dump(mode="json")
             # Never leak header secrets into the agent context dump.
             payload.pop("header_names", None)

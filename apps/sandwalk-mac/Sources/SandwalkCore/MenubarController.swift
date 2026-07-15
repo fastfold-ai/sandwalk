@@ -8,7 +8,7 @@ final class MenubarController: NSObject, NSMenuDelegate {
     private let requestQuit: () -> Void
     private let openSettingsHandler: () -> Void
 
-    let statusItem: NSStatusItem
+    private(set) var statusItem: NSStatusItem
     let menu = NSMenu()
 
     var statusHeader: NSMenuItem!
@@ -69,6 +69,7 @@ final class MenubarController: NSObject, NSMenuDelegate {
         button.wantsLayer = true
         button.imageScaling = .scaleProportionallyDown
 
+        iconLayer?.removeFromSuperlayer()
         let layer = CALayer()
         layer.contentsGravity = .resizeAspect
         layer.frame = CGRect(
@@ -87,6 +88,19 @@ final class MenubarController: NSObject, NSMenuDelegate {
         iconLayer = layer
 
         button.image = SandwalkIcon.menubarMark()
+    }
+
+    /// AppKit often leaves `NSStatusItem` unclickable after canceling
+    /// `applicationShouldTerminate` (⌘Q keep-alive). Drop and recreate it.
+    func reinstallStatusItem() {
+        stopPulse()
+        NSStatusBar.system.removeStatusItem(statusItem)
+        statusItem = NSStatusBar.system.statusItem(withLength: SandwalkIcon.pointSize + 6)
+        configureStatusButton()
+        statusItem.menu = menu
+        menu.delegate = self
+        statusItem.isVisible = true
+        refreshMenuState()
     }
 
     func menuWillOpen(_ menu: NSMenu) {

@@ -73,12 +73,15 @@ class AgentStore:
     """Small durable store shared by CLI and web transports.
 
     Durability rules:
-    - Never auto-quarantine / restore / wipe the DB on open (that rewound user
-      settings and could race with a live writer).
-    - ``exclusive=True`` (agent server) takes a process lock so a second serve
-      cannot open the same file, and checkpoints WAL on ``close()``.
+    - Exclusive serve takes a process lock so a second serve cannot open the
+      same file, and checkpoints WAL on ``close()``.
     - Short-lived CLI opens leave ``exclusive=False`` so they can share the DB
       with a running server via SQLite WAL.
+    - On exclusive open, a corrupt DB is auto-healed when enabled (default):
+      quarantine → ``sqlite3 .recover`` → last ``*.recovered`` backup. Set
+      ``SANDWALK_DB_AUTO_HEAL=0`` to refuse and fail loud instead.
+    - Hard ``kill -9`` / crash mid-write is the usual corruption cause (menubar
+      restart loops historically SIGKILL'd the API after ~0.2s).
     """
 
     def __init__(
@@ -96,6 +99,7 @@ class AgentStore:
         self._lock_path = self.path.with_name(f"{self.path.name}.lock")
         self._closed = False
         self._atexit_registered = False
+        self.last_heal_note: str | None = None
 
         if exclusive:
             self._acquire_exclusive_lock()
@@ -103,8 +107,12 @@ class AgentStore:
         try:
             check = verify_integrity if verify_integrity is not None else exclusive
             if check:
-                self._assert_healthy_database()
+                self._assert_healthy_database(allow_heal=exclusive)
             self._initialize()
+            if exclusive and self.path.exists():
+                from agent_server.store_heal import refresh_healthy_backup
+
+                refresh_healthy_backup(self.path)
         except Exception:
             self._release_exclusive_lock()
             raise
@@ -203,8 +211,8 @@ class AgentStore:
         connection.execute("PRAGMA busy_timeout = 30000")
         return connection
 
-    def _assert_healthy_database(self) -> None:
-        """Fail loud on a malformed DB — never rewrite or restore silently."""
+    def _assert_healthy_database(self, *, allow_heal: bool = False) -> None:
+        """Fail loud on a malformed DB — optionally self-heal under exclusive lock."""
         if not self.path.exists():
             return
         try:
@@ -215,6 +223,21 @@ class AgentStore:
                 detail = str(row[0]) if row else "integrity_check failed"
         except sqlite3.DatabaseError as exc:
             detail = str(exc)
+
+        if allow_heal:
+            from agent_server.store_heal import attempt_self_heal
+
+            try:
+                self.last_heal_note = attempt_self_heal(self.path, detail=detail)
+                # Re-check after heal.
+                with sqlite3.connect(self.path, timeout=5) as connection:
+                    row = connection.execute("PRAGMA integrity_check").fetchone()
+                    if row and str(row[0]) == "ok":
+                        return
+                    detail = str(row[0]) if row else "integrity_check failed after heal"
+            except Exception as heal_exc:  # noqa: BLE001
+                raise AgentStoreCorruptedError(str(heal_exc)) from heal_exc
+
         raise AgentStoreCorruptedError(
             f"Agent store database is corrupt ({detail}): {self.path}. "
             "Refusing to auto-repair so settings are not silently rewritten. "

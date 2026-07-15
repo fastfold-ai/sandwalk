@@ -113,12 +113,32 @@ export type StorageCategory = {
   children?: StorageCategory[]
 }
 
+export type StorageDatabaseProbe = {
+  path: string
+  exists: boolean
+  bytes: number
+  walBytes: number
+  shmBytes: number
+  integrity: string
+  pageCount?: number | null
+  pageSize?: number | null
+  journalMode?: string | null
+  sessionCount?: number | null
+  messageCount?: number | null
+  backupPath?: string | null
+  backupBytes: number
+  backupIntegrity?: string | null
+  autoHealEnabled: boolean
+  quarantineCount: number
+}
+
 export type StorageReport = {
   location: StorageLocation
   categories: StorageCategory[]
   totalBytes: number
   availableBytes: number
   checkedAt: string
+  database?: StorageDatabaseProbe | null
 }
 
 export type EnvironmentPackage = {
@@ -771,6 +791,16 @@ export type ValidateMcpResult = {
   toolDetails?: McpToolDetail[]
 }
 
+/** mcp.json document (`{ mcpServers: { ... } }`). */
+export type McpJsonDocument = {
+  mcpServers: Record<string, Record<string, unknown>>
+}
+
+export type McpJsonConfig = {
+  path: string
+  document: McpJsonDocument
+}
+
 export type PtySessionInfo = {
   id: string
   sessionId: string
@@ -790,6 +820,11 @@ export interface McpProvider {
     input: { method: 'oauth' | 'api_key'; apiKey?: string },
     signal?: AbortSignal,
   ): Promise<ConnectMcpResult>
+  connectMcpServer?(
+    serverId: string,
+    input: { method: 'oauth' | 'api_key'; apiKey?: string },
+    signal?: AbortSignal,
+  ): Promise<ConnectMcpResult>
   disconnectMcpCatalog(catalogId: string, signal?: AbortSignal): Promise<ConnectMcpResult>
   setMcpCatalogEnabled(
     catalogId: string,
@@ -798,6 +833,11 @@ export interface McpProvider {
   ): Promise<ConnectMcpResult>
   validateMcpCatalog(catalogId: string, signal?: AbortSignal): Promise<ValidateMcpResult>
   validateMcpServer(serverId: string, signal?: AbortSignal): Promise<ValidateMcpResult>
+  getMcpJsonConfig?(signal?: AbortSignal): Promise<McpJsonConfig>
+  putMcpJsonConfig?(
+    document: McpJsonDocument,
+    signal?: AbortSignal,
+  ): Promise<McpJsonConfig>
   createMcpServer(
     input: Omit<McpServer, 'id' | 'createdAt' | 'updatedAt'>,
     signal?: AbortSignal,

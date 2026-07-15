@@ -1,5 +1,5 @@
-import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 import { McpDetailView, McpView } from './dashboard-main-views-lazy'
+import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 
 export function DashboardMainMcpPanel({
   client,
@@ -128,12 +128,30 @@ export function DashboardMainMcpPanel({
         await client.updateMcpServer(id, { enabled })
         await loadMcpServers()
       }}
+      onConnectCustom={async (server, input) => {
+        const result = await client.connectMcpServer(server.id, input)
+        if (input.method === 'api_key' || !result.authorizeUrl) {
+          await loadMcpServers()
+        }
+        return result
+      }}
       onOpenCatalog={entry =>
         navigate(`/dashboard/mcp/catalog/${encodeURIComponent(entry.id)}`)
       }
       onOpenServer={server =>
         navigate(`/dashboard/mcp/server/${encodeURIComponent(server.id)}`)
       }
+      onLoadMcpJson={async () => {
+        const result = await client.getMcpJsonConfig()
+        return {
+          path: result.path,
+          document: result.document
+        }
+      }}
+      onSaveMcpJson={async document => {
+        await client.putMcpJsonConfig(document)
+        await loadMcpServers()
+      }}
     />
   )
 }

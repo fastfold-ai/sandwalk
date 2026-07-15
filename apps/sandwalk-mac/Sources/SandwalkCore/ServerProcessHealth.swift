@@ -24,12 +24,17 @@ extension ServerProcess {
 
     /// After an unexpected API death, adopt a healthy listener on our port or respawn.
     func scheduleRecovery(reason: String) {
+        if suppressAutoRecovery {
+            NSLog("Sandwalk: API recovery skipped (fatal startup) (%@)", reason)
+            return
+        }
         cancelRecovery()
         recoveryTask = Task { @MainActor [weak self] in
             guard let self else { return }
             // Brief pause so a replacement `sandwalk serve` can bind first.
             try? await Task.sleep(for: .milliseconds(900))
             guard !Task.isCancelled else { return }
+            if self.suppressAutoRecovery { return }
             switch self.state {
             case .failed, .stopped:
                 break
@@ -38,11 +43,24 @@ extension ServerProcess {
             }
             if self.tryAdoptHealthyListener() {
                 self.consecutiveRecoveries = 0
+                self.consecutiveStartupFailures = 0
+                self.everHealthy = true
                 NSLog("Sandwalk: API recovered by adopting listener (%@)", reason)
                 return
             }
             if self.consecutiveRecoveries >= self.maxAutoRecoveries {
+                self.suppressAutoRecovery = true
                 NSLog("Sandwalk: API recovery gave up after %d attempts (%@)", self.maxAutoRecoveries, reason)
+                return
+            }
+            // Don't thrash forever on cold-start failures that never become healthy.
+            if !self.everHealthy, self.consecutiveStartupFailures > self.maxStartupRecoveries {
+                self.suppressAutoRecovery = true
+                NSLog(
+                    "Sandwalk: API recovery stopped after %d startup failures (%@)",
+                    self.consecutiveStartupFailures,
+                    reason
+                )
                 return
             }
             self.consecutiveRecoveries += 1
@@ -72,6 +90,8 @@ extension ServerProcess {
         if ok {
             consecutiveFailures = 0
             consecutiveRecoveries = 0
+            consecutiveStartupFailures = 0
+            everHealthy = true
             let pid = process?.processIdentifier ?? adoptedPid
                 ?? PortSupport.listenerPid(port: config.port) ?? 0
             if case .starting = state {
@@ -94,7 +114,9 @@ extension ServerProcess {
                     adoptedPid = nil
                     update(.failed(message: "API stopped responding on \(config.healthURL.absoluteString)"))
                     cancelHealthLoop()
-                    scheduleRecovery(reason: "health-lost")
+                    if !suppressAutoRecovery {
+                        scheduleRecovery(reason: "health-lost")
+                    }
                 }
                 return
             }
@@ -104,7 +126,9 @@ extension ServerProcess {
                 process = nil
                 update(.failed(message: "API process ended while unhealthy"))
                 cancelHealthLoop()
-                scheduleRecovery(reason: "stale-child")
+                if !suppressAutoRecovery {
+                    scheduleRecovery(reason: "stale-child")
+                }
                 return
             }
             if case .starting = state, consecutiveFailures >= maxHealthFailures {
@@ -113,7 +137,9 @@ extension ServerProcess {
                     update(.failed(message: "Health check timed out on \(config.healthURL.absoluteString)"))
                     expectingExit = true
                     process?.terminate()
-                    scheduleRecovery(reason: "start-timeout")
+                    if !suppressAutoRecovery {
+                        scheduleRecovery(reason: "start-timeout")
+                    }
                 }
             }
         }

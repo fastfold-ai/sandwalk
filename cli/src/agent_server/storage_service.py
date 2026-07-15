@@ -15,6 +15,7 @@ from pathlib import Path
 from agent.config import CONFIG_DIR, Config
 from agent_server.models import (
     StorageCategory,
+    StorageDatabaseProbe,
     StorageLocation,
     StorageReport,
 )
@@ -192,6 +193,107 @@ def _python_env_category() -> StorageCategory | None:
     )
 
 
+def _category_path_label(paths: tuple[Path, ...]) -> str | None:
+    if not paths:
+        return None
+    if len(paths) == 1:
+        return str(paths[0])
+    return f"{paths[0]} (+{len(paths) - 1} more)"
+
+
+def _path_children(spec: _CategorySpec) -> list[StorageCategory]:
+    """Break multi-path categories into labeled children so Storage shows paths."""
+    if len(spec.paths) <= 1:
+        return []
+    children: list[StorageCategory] = []
+    for path in spec.paths:
+        resolved = path.expanduser()
+        label = resolved.name or str(resolved)
+        children.append(
+            StorageCategory(
+                id=f"{spec.id}:{label}",
+                label=label,
+                color=spec.color,
+                bytes=_path_size_bytes(resolved),
+                path=str(resolved),
+            )
+        )
+    return children
+
+
+def probe_agent_database(home: Path) -> StorageDatabaseProbe:
+    """Measure size + integrity for the exclusive agent SQLite store."""
+    import sqlite3
+
+    from agent_server.store_heal import auto_heal_enabled, backup_path_for, integrity_ok
+
+    db_path = (home / "agent-server.db").expanduser()
+    wal_path = Path(f"{db_path}-wal")
+    shm_path = Path(f"{db_path}-shm")
+    backup = backup_path_for(db_path)
+    quarantine_count = len(
+        [p for p in home.glob("agent-server.db.corrupt-*") if p.is_file() and "-wal" not in p.name and "-shm" not in p.name]
+    )
+
+    integrity = "missing"
+    page_count: int | None = None
+    page_size: int | None = None
+    journal_mode: str | None = None
+    session_count: int | None = None
+    message_count: int | None = None
+
+    if db_path.exists():
+        try:
+            with sqlite3.connect(db_path, timeout=5) as connection:
+                row = connection.execute("PRAGMA integrity_check").fetchone()
+                integrity = str(row[0]) if row else "unknown"
+                page_count_row = connection.execute("PRAGMA page_count").fetchone()
+                page_size_row = connection.execute("PRAGMA page_size").fetchone()
+                journal_row = connection.execute("PRAGMA journal_mode").fetchone()
+                page_count = int(page_count_row[0]) if page_count_row else None
+                page_size = int(page_size_row[0]) if page_size_row else None
+                journal_mode = str(journal_row[0]) if journal_row else None
+                try:
+                    session_count = int(
+                        connection.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+                    )
+                    message_count = int(
+                        connection.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+                    )
+                except sqlite3.Error:
+                    session_count = None
+                    message_count = None
+        except sqlite3.DatabaseError as exc:
+            integrity = str(exc)
+
+    backup_integrity: str | None
+    if not backup.exists():
+        backup_integrity = "missing"
+    elif integrity_ok(backup):
+        backup_integrity = "ok"
+    else:
+        backup_integrity = "corrupt"
+
+    return StorageDatabaseProbe(
+        path=str(db_path),
+        exists=db_path.exists(),
+        bytes=_path_size_bytes(db_path) if db_path.exists() else 0,
+        wal_bytes=_path_size_bytes(wal_path) if wal_path.exists() else 0,
+        shm_bytes=_path_size_bytes(shm_path) if shm_path.exists() else 0,
+        integrity=integrity,
+        page_count=page_count,
+        page_size=page_size,
+        journal_mode=journal_mode,
+        session_count=session_count,
+        message_count=message_count,
+        backup_path=str(backup) if backup.exists() else None,
+        backup_bytes=_path_size_bytes(backup) if backup.exists() else 0,
+        backup_integrity=backup_integrity,
+        auto_heal_enabled=auto_heal_enabled(),
+        quarantine_count=quarantine_count,
+    )
+
+
 def _category_specs(home: Path, cfg: Config) -> list[_CategorySpec]:
     data_base = Path(
         str(cfg.get("data.base", str(home / "data")) or home / "data")
@@ -273,7 +375,7 @@ class StorageService:
                 elif root in abs_path.parents:
                     claimed_names.add(abs_path.relative_to(root).parts[0])
 
-            children: list[StorageCategory] = []
+            children: list[StorageCategory] = _path_children(spec)
             if spec.children_from and spec.children_from.is_dir():
                 try:
                     entries = sorted(
@@ -304,7 +406,7 @@ class StorageService:
                     label=spec.label,
                     color=spec.color,
                     bytes=bytes_used,
-                    path=str(spec.paths[0]) if len(spec.paths) == 1 else None,
+                    path=_category_path_label(spec.paths),
                     children=children,
                 )
             )
@@ -357,4 +459,5 @@ class StorageService:
             total_bytes=total_bytes,
             available_bytes=available_bytes,
             checked_at=datetime.now(UTC).isoformat(),
+            database=probe_agent_database(root),
         )

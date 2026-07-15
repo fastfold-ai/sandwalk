@@ -56,6 +56,7 @@ extension ServerProcess {
 
         consecutiveFailures = 0
         expectingExit = false
+        everHealthy = false
         update(.starting)
         do {
             try proc.run()
@@ -76,12 +77,36 @@ extension ServerProcess {
         cancelHealthLoop()
         if wasExpecting {
             update(.stopped)
-        } else {
-            // External kill / crash — recover by adopting a replacement listener
-            // or respawning. Staying in .failed leaves the menubar "partially
-            // running" whenever tools restart the API out-of-band.
-            update(.failed(message: "Exited with code \(code)"))
-            scheduleRecovery(reason: "process-exit")
+            return
         }
+
+        if !everHealthy {
+            consecutiveStartupFailures += 1
+        }
+
+        let classification = ServerStartupDiagnostics.classifyExit(
+            code: code,
+            everHealthy: everHealthy,
+            consecutiveStartupFailures: consecutiveStartupFailures,
+            logURL: config.serverLogURL
+        )
+        update(.failed(message: classification.message))
+
+        let startupExhausted =
+            !everHealthy && consecutiveStartupFailures > maxStartupRecoveries
+        if classification.isFatal || suppressAutoRecovery || startupExhausted {
+            suppressAutoRecovery = true
+            cancelRecovery()
+            NSLog(
+                "Sandwalk: API fatal/startup exit — not auto-restarting (%@)",
+                classification.message
+            )
+            return
+        }
+
+        // External kill / crash — recover by adopting a replacement listener
+        // or respawning. Staying in .failed leaves the menubar "partially
+        // running" whenever tools restart the API out-of-band.
+        scheduleRecovery(reason: "process-exit")
     }
 }
