@@ -12,16 +12,7 @@ const ScrollArea = React.forwardRef<
     className={cn('relative overflow-hidden', className)}
     {...props}
   >
-    <ScrollAreaPrimitive.Viewport
-      tabIndex={-1}
-      onFocus={event => {
-        // Keep page-load focus on the chat composer, not the transcript scroller.
-        if (event.target === event.currentTarget) {
-          event.currentTarget.blur()
-        }
-      }}
-      className="h-full w-full rounded-[inherit] [&>div]:!block [&>div]:!min-w-0"
-    >
+    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:!block [&>div]:!min-w-0">
       {children}
     </ScrollAreaPrimitive.Viewport>
     <ScrollBar />
