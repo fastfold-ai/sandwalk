@@ -51,7 +51,7 @@ def methylation_cluster(
         except Exception as exc:
             return {"error": f"Failed to load h5ad: {str(exc)[:200]}", "summary": f"Load error: {str(exc)[:100]}"}
     else:
-        # Tabular: load as AnnData
+        # Tabular: load as AnnData when available; otherwise keep a matrix for sklearn.
         import pandas as pd
 
         df, error = _omics._load_tabular(str(filepath))
@@ -61,9 +61,23 @@ def methylation_cluster(
             import anndata
 
             # Transpose so samples are obs and CpGs are var
-            adata = anndata.AnnData(X=df.T.values, obs=pd.DataFrame(index=df.columns), var=pd.DataFrame(index=df.index))
+            adata = anndata.AnnData(
+                X=df.T.values,
+                obs=pd.DataFrame(index=df.columns),
+                var=pd.DataFrame(index=df.index),
+            )
         except ImportError:
-            return {"error": "anndata required: pip install anndata", "summary": "Install anndata"}
+            if epi is not None or sc is not None:
+                return {
+                    "error": "anndata required: pip install anndata",
+                    "summary": "Install anndata",
+                }
+            # sklearn-only fallback — no AnnData / scanpy / episcanpy needed.
+            return _methylation_cluster_sklearn(
+                X=df.T.values,
+                n_obs=df.shape[1],
+                n_vars=df.shape[0],
+            )
 
     n_obs, n_vars = adata.n_obs, adata.n_vars
 
@@ -134,19 +148,23 @@ def methylation_cluster(
             logger.warning("scanpy fallback failed: %s", exc)
 
     # Last resort: sklearn KMeans
+    return _methylation_cluster_sklearn(X=adata.X, n_obs=n_obs, n_vars=n_vars)
+
+
+def _methylation_cluster_sklearn(*, X, n_obs: int, n_vars: int) -> dict:
+    """Cluster a samples×features matrix with sklearn (no AnnData required)."""
+    import numpy as np
+    import pandas as pd
     from sklearn.cluster import KMeans
     from sklearn.decomposition import PCA
     from sklearn.preprocessing import StandardScaler
 
-    X = adata.X
-    X = np.nan_to_num(X, nan=0.0)
-    X = StandardScaler().fit_transform(X)
-    n_comps = min(50, X.shape[0] - 1, X.shape[1] - 1)
-    X_pca = PCA(n_components=n_comps).fit_transform(X)
-    n_k = min(10, X.shape[0] // 2)
-    labels = KMeans(n_clusters=max(n_k, 2), random_state=42, n_init=3).fit_predict(X_pca)
-
-    import pandas as pd
+    matrix = np.nan_to_num(np.asarray(X, dtype=float), nan=0.0)
+    matrix = StandardScaler().fit_transform(matrix)
+    n_comps = min(50, matrix.shape[0] - 1, matrix.shape[1] - 1)
+    x_pca = PCA(n_components=max(n_comps, 1)).fit_transform(matrix)
+    n_k = min(10, matrix.shape[0] // 2)
+    labels = KMeans(n_clusters=max(n_k, 2), random_state=42, n_init=3).fit_predict(x_pca)
 
     cluster_counts = pd.Series(labels).value_counts().to_dict()
     return {

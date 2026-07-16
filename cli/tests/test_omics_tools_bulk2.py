@@ -22,6 +22,7 @@ from tools.omics import (
 
 def _run_kegg_ora(gene_ids, all_kegg_genes, path2genes, path_names, min_size=5, max_size=500):
     """Inline copy of the KEGG ORA helper from the omics prompt template."""
+    pytest.importorskip("statsmodels")
     from scipy.stats import fisher_exact
     from statsmodels.stats.multitest import multipletests
 

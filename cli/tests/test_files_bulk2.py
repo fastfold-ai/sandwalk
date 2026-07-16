@@ -73,6 +73,7 @@ class TestExtractArchive:
 
 class TestReadFileBinaryFormats:
     def test_read_excel_preview(self, tmp_path, monkeypatch):
+        pytest.importorskip("openpyxl")
         monkeypatch.chdir(tmp_path)
         xlsx = tmp_path / "table.xlsx"
         pd.DataFrame({"gene": ["TP53"], "value": [1.0]}).to_excel(xlsx, index=False)
