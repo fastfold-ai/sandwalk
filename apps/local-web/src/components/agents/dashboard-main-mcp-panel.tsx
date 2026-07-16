@@ -122,7 +122,7 @@ export function DashboardMainMcpPanel({
       }}
       onDeleteMcp={async id => {
         await client.deleteMcpServer(id)
-        await loadMcpServers()
+        await refreshMcp()
       }}
       onToggleCustom={async (id, enabled) => {
         await client.updateMcpServer(id, { enabled })
@@ -135,12 +135,22 @@ export function DashboardMainMcpPanel({
         }
         return result
       }}
+      onInstallCatalog={async catalogId => {
+        await client.installMcpCatalog(catalogId)
+        await refreshMcp()
+      }}
       onOpenCatalog={entry =>
         navigate(`/dashboard/mcp/catalog/${encodeURIComponent(entry.id)}`)
       }
-      onOpenServer={server =>
+      onOpenServer={server => {
+        if (server.catalogId) {
+          navigate(
+            `/dashboard/mcp/catalog/${encodeURIComponent(server.catalogId)}`
+          )
+          return
+        }
         navigate(`/dashboard/mcp/server/${encodeURIComponent(server.id)}`)
-      }
+      }}
       onLoadMcpJson={async () => {
         const result = await client.getMcpJsonConfig()
         return {

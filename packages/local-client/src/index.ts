@@ -1394,6 +1394,19 @@ export class LocalAgentClient
     return result.data
   }
 
+  installMcpCatalog(
+    catalogId: string,
+    signal?: AbortSignal,
+  ): Promise<McpServer> {
+    return this.request<McpServer>(
+      `/mcp-servers/catalog/${encodeURIComponent(catalogId)}/install`,
+      {
+        method: 'POST',
+        signal,
+      },
+    )
+  }
+
   connectMcpCatalog(
     catalogId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string },

@@ -13,25 +13,35 @@ struct MCPsSettingsView: View {
     @State var connectKey = ""
     @State var connectingId: String?
 
-    /// Custom / hand-added servers only — catalog-backed ones live under Featured.
-    private var customServers: [McpServerDTO] {
-        let customs = servers.filter { server in
-            let cid = server.catalogId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return cid.isEmpty
-        }
+    private var catalogById: [String: McpCatalogEntryDTO] {
+        Dictionary(uniqueKeysWithValues: catalog.map { ($0.id, $0) })
+    }
+
+    /// Every installed server (seeded catalog + custom) — mirrors local-web.
+    private var installedServers: [McpServerDTO] {
         let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return customs }
-        return customs.filter {
-            $0.name.lowercased().contains(q) || $0.id.lowercased().contains(q)
+        guard !q.isEmpty else { return servers }
+        return servers.filter { server in
+            server.name.lowercased().contains(q)
+                || server.id.lowercased().contains(q)
+                || (server.catalogId?.lowercased().contains(q) ?? false)
+                || (server.url?.lowercased().contains(q) ?? false)
+                || (server.command?.lowercased().contains(q) ?? false)
         }
     }
 
-    private var filteredCatalog: [McpCatalogEntryDTO] {
+    /// Catalog templates not currently installed (typically user-removed).
+    private var suggestedCatalog: [McpCatalogEntryDTO] {
+        let base = catalog.filter { entry in
+            let sid = entry.serverId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return sid.isEmpty
+        }
         let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return catalog }
-        return catalog.filter {
+        guard !q.isEmpty else { return base }
+        return base.filter {
             $0.name.lowercased().contains(q)
                 || $0.description.lowercased().contains(q)
+                || $0.id.lowercased().contains(q)
         }
     }
 
@@ -43,30 +53,34 @@ struct MCPsSettingsView: View {
                 AgentSearchField(text: $search)
 
                 SettingsSectionHeader(
-                    "SUGGESTED",
-                    subtitle: "\(filteredCatalog.count) catalog providers — open for tools"
+                    "INSTALLED",
+                    subtitle: "\(installedServers.count) servers from ~/.sandwalk/mcp.json"
                 )
                 SettingsListGroup {
-                    if filteredCatalog.isEmpty {
+                    if installedServers.isEmpty {
                         SettingsRow(
-                            label: busy ? "Loading…" : "No catalog entries",
+                            label: busy ? "Loading…" : "No MCP servers installed",
                             isLast: true
-                        ) { EmptyView() }
+                        ) {
+                            Button("Add custom") { showAdd = true }
+                                .buttonStyle(.sandwalk(.normal))
+                        }
                     } else {
-                        ForEach(Array(filteredCatalog.enumerated()), id: \.element.id) { index, entry in
+                        ForEach(Array(installedServers.enumerated()), id: \.element.id) { index, server in
                             SettingsRow(
-                                label: entry.name,
-                                sublabel: catalogSublabel(entry),
-                                isLast: index == filteredCatalog.count - 1
+                                label: server.name,
+                                sublabel: installedSublabel(server),
+                                isLast: index == installedServers.count - 1
                             ) {
-                                HStack(spacing: 8) {
-                                    catalogTrailing(entry)
-                                    NavigationLink {
-                                        McpDetailSettingsView(kind: .catalog(entry))
+                                HStack(spacing: 6) {
+                                    installedTrailing(server)
+                                    installedOpenLink(server)
+                                    Button {
+                                        Task { await remove(server) }
                                     } label: {
-                                        Text("Open")
+                                        Image(systemName: "trash")
                                     }
-                                    .buttonStyle(.sandwalk(.normal))
+                                    .buttonStyle(.sandwalk(.destructive))
                                 }
                                 .disabled(busy)
                             }
@@ -74,45 +88,29 @@ struct MCPsSettingsView: View {
                     }
                 }
 
-                SettingsSectionHeader(
-                    "CUSTOM",
-                    subtitle: "\(customServers.count) stdio / hand-configured servers"
-                )
-                SettingsListGroup {
-                    if customServers.isEmpty {
-                        SettingsRow(
-                            label: busy ? "Loading…" : "No custom MCP servers",
-                            isLast: true
-                        ) {
-                            Button("Add") { showAdd = true }
-                                .buttonStyle(.sandwalk(.normal))
-                        }
-                    } else {
-                        ForEach(Array(customServers.enumerated()), id: \.element.id) { index, server in
+                if !suggestedCatalog.isEmpty {
+                    SettingsSectionHeader(
+                        "SUGGESTED",
+                        subtitle: "\(suggestedCatalog.count) catalog templates you can add back"
+                    )
+                    SettingsListGroup {
+                        ForEach(Array(suggestedCatalog.enumerated()), id: \.element.id) { index, entry in
                             SettingsRow(
-                                label: server.name,
-                                sublabel: "\(server.transport)\(server.enabled ? "" : " · disabled")",
-                                isLast: index == customServers.count - 1
+                                label: entry.name,
+                                sublabel: suggestedSublabel(entry),
+                                isLast: index == suggestedCatalog.count - 1
                             ) {
-                                HStack(spacing: 6) {
-                                    Toggle("", isOn: Binding(
-                                        get: { server.enabled },
-                                        set: { enabled in Task { await setEnabled(server, enabled) } }
-                                    ))
-                                    .labelsHidden()
-                                    .toggleStyle(.switch)
+                                HStack(spacing: 8) {
+                                    Button("Add") {
+                                        Task { await installCatalog(entry) }
+                                    }
+                                    .buttonStyle(.sandwalk(.normal))
                                     NavigationLink {
-                                        McpDetailSettingsView(kind: .server(server))
+                                        McpDetailSettingsView(kind: .catalog(entry))
                                     } label: {
                                         Text("Open")
                                     }
                                     .buttonStyle(.sandwalk(.normal))
-                                    Button {
-                                        Task { await remove(server) }
-                                    } label: {
-                                        Image(systemName: "trash")
-                                    }
-                                    .buttonStyle(.sandwalk(.destructive))
                                 }
                                 .disabled(busy)
                             }
@@ -181,32 +179,90 @@ struct MCPsSettingsView: View {
         }
     }
 
-    private func catalogSublabel(_ entry: McpCatalogEntryDTO) -> String {
-        var parts: [String] = []
-        if entry.connected == true {
-            parts.append("Connected")
+    private func catalogId(of server: McpServerDTO) -> String? {
+        let cid = server.catalogId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return cid.isEmpty ? nil : cid
+    }
+
+    private func catalogEntry(for server: McpServerDTO) -> McpCatalogEntryDTO? {
+        guard let cid = catalogId(of: server) else { return nil }
+        return catalogById[cid]
+    }
+
+    private func needsAuth(_ server: McpServerDTO) -> Bool {
+        if let entry = catalogEntry(for: server) {
+            return entry.configured != true
+        }
+        // Custom remotes without credentials.
+        if server.transport == "stdio" { return false }
+        if server.headersConfigured == true { return false }
+        return true
+    }
+
+    private func installedSublabel(_ server: McpServerDTO) -> String {
+        var parts: [String] = [server.transport]
+        if catalogId(of: server) != nil {
+            parts.append("catalog")
+        }
+        if needsAuth(server) {
+            parts.append("needs auth")
+        } else if server.enabled {
+            if let count = server.toolCount, count > 0 {
+                parts.append("Connected (\(count))")
+            } else if let entry = catalogEntry(for: server),
+                      let count = entry.toolCount,
+                      count > 0 {
+                parts.append("Connected (\(count))")
+            } else {
+                parts.append("enabled")
+            }
         } else {
-            parts.append("Not connected")
+            parts.append("disabled")
         }
-        if let count = entry.toolCount, count > 0 {
-            parts.append("\(count) tools")
-        }
-        let desc = entry.description.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !desc.isEmpty {
-            parts.append(desc)
+        if let url = server.url, !url.isEmpty {
+            parts.append(url)
+        } else if let command = server.command, !command.isEmpty {
+            parts.append(command)
         }
         return parts.joined(separator: " · ")
     }
 
+    private func suggestedSublabel(_ entry: McpCatalogEntryDTO) -> String {
+        let desc = entry.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        if desc.isEmpty { return entry.id }
+        return desc
+    }
+
     @ViewBuilder
-    private func catalogTrailing(_ entry: McpCatalogEntryDTO) -> some View {
-        if entry.connected == true {
-            Button("Disconnect") {
-                Task { await disconnect(entry) }
+    private func installedTrailing(_ server: McpServerDTO) -> some View {
+        if let entry = catalogEntry(for: server) {
+            if needsAuth(server) {
+                catalogConnectControls(entry)
+            } else {
+                Toggle("", isOn: Binding(
+                    get: { server.enabled },
+                    set: { enabled in Task { await setCatalogEnabled(entry, enabled) } }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
             }
-            .buttonStyle(.sandwalk(.destructive))
-            .disabled(busy)
-        } else if entry.preferredAuth == "oauth" || entry.authMode == "oauth" {
+        } else if needsAuth(server) {
+            Text("Connect in Web UI")
+                .font(.sandwalk(11))
+                .foregroundStyle(.secondary)
+        } else {
+            Toggle("", isOn: Binding(
+                get: { server.enabled },
+                set: { enabled in Task { await setEnabled(server, enabled) } }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+        }
+    }
+
+    @ViewBuilder
+    private func catalogConnectControls(_ entry: McpCatalogEntryDTO) -> some View {
+        if entry.preferredAuth == "oauth" || entry.authMode == "oauth" {
             Text("OAuth in Web UI")
                 .font(.sandwalk(11))
                 .foregroundStyle(.secondary)
@@ -216,7 +272,25 @@ struct MCPsSettingsView: View {
                 connectKey = ""
             }
             .buttonStyle(.sandwalk(.normal))
-            .disabled(busy)
+        }
+    }
+
+    @ViewBuilder
+    private func installedOpenLink(_ server: McpServerDTO) -> some View {
+        if let entry = catalogEntry(for: server) {
+            NavigationLink {
+                McpDetailSettingsView(kind: .catalog(entry))
+            } label: {
+                Text("Open")
+            }
+            .buttonStyle(.sandwalk(.normal))
+        } else {
+            NavigationLink {
+                McpDetailSettingsView(kind: .server(server))
+            } label: {
+                Text("Open")
+            }
+            .buttonStyle(.sandwalk(.normal))
         }
     }
 }

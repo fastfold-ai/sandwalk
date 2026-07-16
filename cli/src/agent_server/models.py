@@ -842,6 +842,7 @@ class McpServer(ApiModel):
     headers_helper_command: str | None = None
     header_names: list[str] = Field(default_factory=list)
     headers_configured: bool = False
+    tool_count: int | None = None
     created_at: datetime
     updated_at: datetime
 

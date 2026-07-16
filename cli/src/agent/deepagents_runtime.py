@@ -577,10 +577,15 @@ async def create_external_mcp_tools(servers: list[dict] | None) -> list[Any]:
                 "url": url,
             }
             headers = server.get("headers")
+            merged: dict[str, str] = {}
             if isinstance(headers, dict) and headers:
-                connection["headers"] = {
-                    str(key): str(value) for key, value in headers.items()
-                }
+                merged = {str(key): str(value) for key, value in headers.items()}
+            # Cloudflare blocks Python default UAs (e.g. Better Stack Error 1010).
+            if not any(k.lower() == "user-agent" for k in merged):
+                merged["User-Agent"] = (
+                    "Sandwalk/0.1 (MCP; +https://github.com/fastfold-ai/sandwalk)"
+                )
+            connection["headers"] = merged
             connections[name] = connection
     if not connections:
         return []

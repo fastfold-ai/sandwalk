@@ -733,6 +733,8 @@ export type McpServer = {
   headersHelperCommand?: string | null
   headerNames?: string[]
   headersConfigured?: boolean
+  /** Cached tools/list count when enabled (from last successful probe). */
+  toolCount?: number | null
   /** Write-only on create/update — never returned by the API. */
   headers?: Record<string, string> | null
   createdAt: string
@@ -815,6 +817,8 @@ export type PtySessionInfo = {
 export interface McpProvider {
   listMcpServers(signal?: AbortSignal): Promise<McpServer[]>
   listMcpCatalog(signal?: AbortSignal): Promise<McpCatalogEntry[]>
+  /** Re-add a removed catalog template to the installed list. */
+  installMcpCatalog?(catalogId: string, signal?: AbortSignal): Promise<McpServer>
   connectMcpCatalog(
     catalogId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string },

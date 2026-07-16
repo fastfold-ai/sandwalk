@@ -31,12 +31,38 @@ extension MCPsSettingsView {
     }
 
     @MainActor
+    func setCatalogEnabled(_ entry: McpCatalogEntryDTO, _ enabled: Bool) async {
+        busy = true
+        defer { busy = false }
+        do {
+            _ = try await SandwalkAPIClient.setMcpCatalogEnabled(id: entry.id, enabled: enabled)
+            await reload()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    @MainActor
     func remove(_ server: McpServerDTO) async {
         busy = true
         defer { busy = false }
         do {
             try await SandwalkAPIClient.deleteMcpServer(id: server.id)
-            servers.removeAll { $0.id == server.id }
+            // Full reload so Suggested picks up removed catalog templates.
+            await reload()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func installCatalog(_ entry: McpCatalogEntryDTO) async {
+        busy = true
+        defer { busy = false }
+        do {
+            _ = try await SandwalkAPIClient.installMcpCatalog(id: entry.id)
+            status = "Added \(entry.name)."
+            await reload()
         } catch {
             self.error = error.localizedDescription
         }
@@ -72,18 +98,6 @@ extension MCPsSettingsView {
             _ = try await SandwalkAPIClient.connectMcpCatalog(id: id, apiKey: connectKey)
             connectingId = nil
             status = "Connected \(id)."
-            await reload()
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    @MainActor
-    func disconnect(_ entry: McpCatalogEntryDTO) async {
-        busy = true
-        defer { busy = false }
-        do {
-            try await SandwalkAPIClient.disconnectMcpCatalog(id: entry.id)
             await reload()
         } catch {
             self.error = error.localizedDescription

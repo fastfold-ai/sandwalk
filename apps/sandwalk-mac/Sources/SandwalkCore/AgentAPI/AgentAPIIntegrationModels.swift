@@ -43,6 +43,8 @@ struct McpServerDTO: Codable, Identifiable, Hashable {
     let enabled: Bool
     let catalogId: String?
     let description: String?
+    let toolCount: Int?
+    let headersConfigured: Bool?
 }
 
 struct McpCatalogEntryDTO: Codable, Identifiable, Hashable {

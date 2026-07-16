@@ -1,20 +1,21 @@
 import type {
   ConnectMcpResult,
-  McpJsonDocument,
+  McpCatalogEntry,
   McpServer
 } from '@sandwalk/agent-ui-core'
-import { Code2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 
 import { McpCustomAddForm } from './mcp-custom-add-form'
 import { McpCustomServerList } from './mcp-custom-server-list'
-import { McpJsonEditorDialog } from './mcp-json-editor-dialog'
+import { McpSuggestedStrip } from './mcp-suggested-strip'
 import { type CustomMode, type HeaderRow } from './mcp-view-shared'
 
 export function McpCustomSection({
-  customServers,
+  installedServers,
+  suggestedCatalog,
+  catalogById,
   mcpMode,
   mcpName,
   mcpTransport,
@@ -41,13 +42,17 @@ export function McpCustomSection({
   onMcpHeaderRowsChange,
   onSubmitCustomMcp,
   onOpenServer,
+  onOpenCatalog,
   onToggleCustom,
+  onToggleCatalog,
   onDeleteMcp,
   onConnectCustom,
-  onLoadMcpJson,
-  onSaveMcpJson
+  onConnectCatalog,
+  onInstallCatalog
 }: {
-  customServers: McpServer[]
+  installedServers: McpServer[]
+  suggestedCatalog: McpCatalogEntry[]
+  catalogById: Map<string, McpCatalogEntry>
   mcpMode: CustomMode
   mcpName: string
   mcpTransport: 'sse' | 'streamable_http'
@@ -74,54 +79,45 @@ export function McpCustomSection({
   onMcpHeaderRowsChange: (updater: (rows: HeaderRow[]) => HeaderRow[]) => void
   onSubmitCustomMcp: () => void
   onOpenServer?: (server: McpServer) => void
+  onOpenCatalog?: (entry: McpCatalogEntry) => void
   onToggleCustom: (id: string, enabled: boolean) => void
+  onToggleCatalog: (entry: McpCatalogEntry, enabled: boolean) => void
   onDeleteMcp: (id: string) => void
   onConnectCustom?: (
     server: McpServer,
     input: { method: 'oauth' | 'api_key'; apiKey?: string }
   ) => Promise<ConnectMcpResult>
-  onLoadMcpJson?: () => Promise<{ path: string; document: McpJsonDocument }>
-  onSaveMcpJson?: (document: McpJsonDocument) => Promise<void>
+  onConnectCatalog: (
+    catalogId: string,
+    input: { method: 'oauth' | 'api_key'; apiKey?: string }
+  ) => Promise<ConnectMcpResult>
+  onInstallCatalog?: (catalogId: string) => void | Promise<void>
 }) {
-  const [jsonOpen, setJsonOpen] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
-  const canEditJson = Boolean(onLoadMcpJson && onSaveMcpJson)
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-foreground text-sm font-semibold">
-            Installed MCP servers
-          </p>
-          <p className="text-muted-foreground mt-0.5 text-sm">
-            Custom servers from{' '}
-            <span className="font-mono text-xs">~/.sandwalk/mcp.json</span>.
-            Catalog MCPs stay above.
-          </p>
-        </div>
-        {canEditJson ? (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setJsonOpen(true)}
-          >
-            <Code2 className="size-3.5" />
-            Edit mcp.json
-          </Button>
-        ) : null}
-      </div>
-
       <McpCustomServerList
-        customServers={customServers}
+        installedServers={installedServers}
+        catalogById={catalogById}
         focusedMcpKey={focusedMcpKey}
         onOpenServer={onOpenServer}
+        onOpenCatalog={onOpenCatalog}
         onToggleCustom={onToggleCustom}
+        onToggleCatalog={onToggleCatalog}
         onDeleteMcp={onDeleteMcp}
-        onConnect={onConnectCustom}
+        onConnectCustom={onConnectCustom}
+        onConnectCatalog={onConnectCatalog}
         onAddNew={() => setShowAddForm(true)}
       />
+
+      {onInstallCatalog && suggestedCatalog.length > 0 ? (
+        <McpSuggestedStrip
+          suggested={suggestedCatalog}
+          onInstall={onInstallCatalog}
+          onOpenCatalog={onOpenCatalog}
+        />
+      ) : null}
 
       {showAddForm ? (
         <div className="bg-card space-y-3 rounded-xl border p-4">
@@ -166,15 +162,6 @@ export function McpCustomSection({
             }}
           />
         </div>
-      ) : null}
-
-      {canEditJson ? (
-        <McpJsonEditorDialog
-          open={jsonOpen}
-          onOpenChange={setJsonOpen}
-          onLoad={onLoadMcpJson!}
-          onSave={onSaveMcpJson!}
-        />
       ) : null}
     </section>
   )

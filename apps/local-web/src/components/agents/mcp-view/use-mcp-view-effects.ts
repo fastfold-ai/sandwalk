@@ -84,8 +84,10 @@ export function useMcpOAuthMessage(
             ...prev,
             [catalogId]: {
               connected: true,
+              enabled: data.enabled !== false,
               statusMessage: null,
-              toolCount: null
+              toolCount:
+                typeof data.toolCount === 'number' ? data.toolCount : null
             }
           }))
         }

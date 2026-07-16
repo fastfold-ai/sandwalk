@@ -1,4 +1,8 @@
-import type { ConnectMcpResult, McpServer } from '@sandwalk/agent-ui-core'
+import type {
+  ConnectMcpResult,
+  McpCatalogEntry,
+  McpServer
+} from '@sandwalk/agent-ui-core'
 import { KeyRound, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -8,7 +12,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
-import { formatConnectError, McpToggle } from './mcp-view-shared'
+import { formatConnectError, McpToggle, MCP_ICONS } from './mcp-view-shared'
+import { faviconCandidatesForUrl } from './mcp-favicon'
 
 function transportLabel(server: McpServer): string {
   if (server.transport === 'streamable_http') return 'HTTP'
@@ -31,52 +36,103 @@ export function customServerNeedsAuth(server: McpServer): boolean {
   return true
 }
 
-function faviconUrlForServer(server: McpServer): string | null {
-  const raw = server.url?.trim()
-  if (!raw) return null
-  try {
-    const withScheme = raw.includes('://') ? raw : `https://${raw}`
-    const host = new URL(withScheme).hostname
-    if (!host) return null
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`
-  } catch {
-    return null
+function serverNeedsAuth(
+  server: McpServer,
+  catalogEntry: McpCatalogEntry | undefined
+): boolean {
+  if (server.catalogId) {
+    return !(catalogEntry?.configured)
   }
+  return customServerNeedsAuth(server)
 }
 
-function CustomServerIcon({ server }: { server: McpServer }) {
-  const favicon = faviconUrlForServer(server)
-  const [failed, setFailed] = useState(false)
+function isAuthReconnectMessage(message: string | null | undefined): boolean {
+  if (!message) return false
+  return /expired|reconnect|invalid_token|unauthorized|401/i.test(message)
+}
 
-  if (favicon && !failed) {
+function authStatusLabel(
+  server: McpServer,
+  catalogEntry: McpCatalogEntry | undefined,
+  options: { waiting: boolean; needsAuth: boolean }
+): { text: string; tone: 'muted' | 'amber' | 'waiting' } {
+  if (options.waiting) {
+    return { text: 'Waiting for callback…', tone: 'waiting' }
+  }
+  const statusMessage = catalogEntry?.statusMessage?.trim()
+  if (statusMessage && isAuthReconnectMessage(statusMessage)) {
+    return { text: 'Needs reconnect', tone: 'amber' }
+  }
+  if (options.needsAuth) {
+    return { text: 'Needs authentication', tone: 'amber' }
+  }
+  return { text: subtitle(server), tone: 'muted' }
+}
+
+/**
+ * Featured catalog MCPs use bundled first-party icons.
+ * Everything else (custom remotes) uses favicon in the fixed layout box.
+ */
+function CustomServerIcon({ server }: { server: McpServer }) {
+  const catalogKey = server.catalogId?.trim().toLowerCase() || ''
+  const bundled = catalogKey ? MCP_ICONS[catalogKey] : undefined
+  const candidates = bundled ? [] : faviconCandidatesForUrl(server.url)
+  const [index, setIndex] = useState(0)
+
+  if (bundled) {
     return (
       <img
-        src={favicon}
+        src={bundled.src}
         alt=""
-        className="size-5 rounded-sm object-contain"
-        onError={() => setFailed(true)}
+        className={cn(
+          'block size-full max-h-full max-w-full object-contain p-px',
+          bundled.invertInDark && 'dark:invert'
+        )}
       />
     )
   }
-  return <McpMark className="size-4" />
+
+  if (candidates.length > 0 && index < candidates.length) {
+    return (
+      <img
+        key={candidates[index]}
+        src={candidates[index]}
+        alt=""
+        className="block size-full max-h-full max-w-full object-contain p-px"
+        onError={() => setIndex(prev => prev + 1)}
+      />
+    )
+  }
+  return <McpMark className="size-3.5" />
 }
 
 export function McpCustomServerList({
-  customServers,
+  installedServers,
+  catalogById,
   focusedMcpKey,
   onOpenServer,
+  onOpenCatalog,
   onToggleCustom,
+  onToggleCatalog,
   onDeleteMcp,
-  onConnect,
+  onConnectCustom,
+  onConnectCatalog,
   onAddNew
 }: {
-  customServers: McpServer[]
+  installedServers: McpServer[]
+  catalogById: Map<string, McpCatalogEntry>
   focusedMcpKey: string | null
   onOpenServer?: (server: McpServer) => void
+  onOpenCatalog?: (entry: McpCatalogEntry) => void
   onToggleCustom: (id: string, enabled: boolean) => void
+  onToggleCatalog: (entry: McpCatalogEntry, enabled: boolean) => void
   onDeleteMcp: (id: string) => void
-  onConnect?: (
+  onConnectCustom?: (
     server: McpServer,
+    input: { method: 'oauth' | 'api_key'; apiKey?: string }
+  ) => Promise<ConnectMcpResult>
+  onConnectCatalog: (
+    catalogId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string }
   ) => Promise<ConnectMcpResult>
   onAddNew?: () => void
@@ -85,32 +141,51 @@ export function McpCustomServerList({
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [waitingId, setWaitingId] = useState<string | null>(null)
+  const [waitingCatalogId, setWaitingCatalogId] = useState<string | null>(null)
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const data = event.data
       if (!data || data.type !== 'fastfold-mcp-oauth') return
-      if (!waitingId) return
-      // Catalog OAuth includes catalogId — ignore for custom Connect waiting.
-      if (data.catalogId) return
+      if (!waitingId && !waitingCatalogId) return
+
+      const catalogId = String(data.catalogId || '')
       const serverId = String(data.serverId || '')
-      if (serverId !== waitingId) return
+
+      if (waitingCatalogId) {
+        if (catalogId && catalogId !== waitingCatalogId) return
+        if (!catalogId && serverId && serverId !== waitingId) return
+      } else if (waitingId) {
+        // Custom Connect waiting — ignore catalog OAuth messages.
+        if (catalogId) return
+        if (serverId !== waitingId) return
+      }
+
       setWaitingId(null)
+      setWaitingCatalogId(null)
       setPendingId(null)
-      if (!data.ok) {
+      if (data.ok) {
+        toast.dismiss()
+        toast.success(data.message || 'Connected via OAuth')
+      } else {
         setApiKeyServerId(prev => prev || waitingId)
+        toast.error(data.error || 'OAuth failed')
       }
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [waitingId])
+  }, [waitingId, waitingCatalogId])
 
   const connectOAuth = async (server: McpServer) => {
-    if (!onConnect) return
     setPendingId(server.id)
     setApiKeyServerId(null)
     try {
-      const result = await onConnect(server, { method: 'oauth' })
+      const result = server.catalogId
+        ? await onConnectCatalog(server.catalogId, { method: 'oauth' })
+        : onConnectCustom
+          ? await onConnectCustom(server, { method: 'oauth' })
+          : null
+      if (!result) return
       if (result.authorizeUrl) {
         window.open(
           result.authorizeUrl,
@@ -118,6 +193,7 @@ export function McpCustomServerList({
           'width=560,height=720'
         )
         setWaitingId(server.id)
+        setWaitingCatalogId(server.catalogId || null)
         toast.message('Complete sign-in in the browser window…', {
           description: server.name
         })
@@ -146,13 +222,21 @@ export function McpCustomServerList({
   }
 
   const connectApiKey = async (server: McpServer) => {
-    if (!onConnect || !apiKeyDraft.trim()) return
+    if (!apiKeyDraft.trim()) return
     setPendingId(server.id)
     try {
-      const result = await onConnect(server, {
-        method: 'api_key',
-        apiKey: apiKeyDraft.trim()
-      })
+      const result = server.catalogId
+        ? await onConnectCatalog(server.catalogId, {
+            method: 'api_key',
+            apiKey: apiKeyDraft.trim()
+          })
+        : onConnectCustom
+          ? await onConnectCustom(server, {
+              method: 'api_key',
+              apiKey: apiKeyDraft.trim()
+            })
+          : null
+      if (!result) return
       if (result.ok) {
         toast.success(result.message || 'Authenticated')
         setApiKeyServerId(null)
@@ -167,47 +251,88 @@ export function McpCustomServerList({
     }
   }
 
+  const openRow = (server: McpServer) => {
+    if (server.catalogId) {
+      const entry = catalogById.get(server.catalogId)
+      if (entry && onOpenCatalog) {
+        onOpenCatalog(entry)
+        return
+      }
+    }
+    onOpenServer?.(server)
+  }
+
+  const canOpen = (server: McpServer) => {
+    if (server.catalogId && catalogById.get(server.catalogId) && onOpenCatalog) {
+      return true
+    }
+    return Boolean(onOpenServer)
+  }
+
+  if (installedServers.length === 0 && !onAddNew) {
+    return (
+      <p className="text-muted-foreground mt-3 rounded-xl border border-dashed p-4 text-sm">
+        No MCP servers installed yet.
+      </p>
+    )
+  }
+
   return (
-    <div className="mt-3 space-y-2">
-      {customServers.map(server => {
-        const needsAuth = customServerNeedsAuth(server)
+    <div className="bg-card mt-3 divide-y overflow-hidden rounded-xl border">
+      {installedServers.map(server => {
+        const catalogEntry = server.catalogId
+          ? catalogById.get(server.catalogId)
+          : undefined
+        const needsAuth = serverNeedsAuth(server, catalogEntry)
+        const needsReconnect = isAuthReconnectMessage(
+          catalogEntry?.statusMessage
+        )
+        const needsConnect = needsAuth || needsReconnect
+        const canConnect = Boolean(
+          server.catalogId ? onConnectCatalog : onConnectCustom
+        )
         // Always show off while unauthenticated (matches Cursor).
-        const shownEnabled = needsAuth ? false : server.enabled
+        const shownEnabled = needsConnect ? false : server.enabled
         const waiting = waitingId === server.id
         const pending = pendingId === server.id
         const showApiKey = apiKeyServerId === server.id
+        const openable = canOpen(server)
+        const status = authStatusLabel(server, catalogEntry, {
+          waiting,
+          needsAuth: needsConnect
+        })
 
         return (
-          <div key={server.id} className="space-y-2">
+          <div key={server.id}>
             <div
               id={`mcp-server-${server.id}`}
-              role={onOpenServer ? 'button' : undefined}
-              tabIndex={onOpenServer ? 0 : undefined}
-              onClick={() => onOpenServer?.(server)}
+              role={openable ? 'button' : undefined}
+              tabIndex={openable ? 0 : undefined}
+              onClick={() => openable && openRow(server)}
               onKeyDown={event => {
-                if (!onOpenServer) return
+                if (!openable) return
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault()
-                  onOpenServer(server)
+                  openRow(server)
                 }
               }}
               className={cn(
-                'bg-card hover:bg-muted/40 flex items-center gap-3 rounded-xl border px-3 py-3 transition-colors',
-                onOpenServer && 'cursor-pointer',
+                'hover:bg-muted/40 flex items-center gap-3 px-3 py-3 transition-colors',
+                openable && 'cursor-pointer',
                 focusedMcpKey === `server-${server.id}` &&
-                  'ring-ring ring-2 ring-offset-2 ring-offset-background'
+                  'ring-ring ring-2 ring-inset'
               )}
             >
               <div className="relative shrink-0">
-                <span className="bg-muted text-foreground grid size-9 place-items-center rounded-lg border">
+                <span className="bg-muted text-foreground grid size-6 place-items-center overflow-hidden rounded-md border">
                   <CustomServerIcon server={server} />
                 </span>
                 <span
                   className={cn(
-                    'border-background absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2',
+                    'border-card absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2',
                     shownEnabled
                       ? 'bg-emerald-500'
-                      : needsAuth || waiting
+                      : needsConnect || waiting
                         ? 'bg-amber-500'
                         : 'bg-muted-foreground/40'
                   )}
@@ -220,16 +345,31 @@ export function McpCustomServerList({
                   <span className="truncate text-sm font-semibold">
                     {server.name}
                   </span>
-                  <span className="text-muted-foreground text-xs">
-                    {transportLabel(server)}
-                  </span>
+                  {shownEnabled &&
+                  typeof server.toolCount === 'number' &&
+                  !needsConnect &&
+                  !waiting ? (
+                    <span className="text-muted-foreground text-xs">
+                      Tools ({server.toolCount})
+                    </span>
+                  ) : null}
                 </div>
-                <p className="text-muted-foreground mt-0.5 truncate text-xs">
-                  {waiting
-                    ? 'Waiting for callback…'
-                    : needsAuth
-                      ? 'Needs authentication'
-                      : subtitle(server)}
+                <p
+                  className={cn(
+                    'mt-0.5 truncate text-xs',
+                    status.tone === 'amber'
+                      ? 'text-amber-700 dark:text-amber-300'
+                      : status.tone === 'waiting'
+                        ? 'text-amber-700/80 dark:text-amber-300/80'
+                        : 'text-muted-foreground'
+                  )}
+                  title={
+                    needsReconnect
+                      ? catalogEntry?.statusMessage || status.text
+                      : undefined
+                  }
+                >
+                  {status.text}
                 </p>
               </div>
 
@@ -246,6 +386,7 @@ export function McpCustomServerList({
                       className="h-7 px-2 text-xs"
                       onClick={() => {
                         setWaitingId(null)
+                        setWaitingCatalogId(null)
                         toast.message('OAuth cancelled')
                       }}
                     >
@@ -261,7 +402,7 @@ export function McpCustomServerList({
                       Waiting for callback…
                     </Button>
                   </>
-                ) : needsAuth && onConnect ? (
+                ) : needsConnect && canConnect ? (
                   <>
                     <Button
                       type="button"
@@ -294,8 +435,12 @@ export function McpCustomServerList({
                     enabled={shownEnabled}
                     label={`Enable ${server.name}`}
                     onToggle={() => {
-                      if (!server.enabled && needsAuth) {
+                      if (!server.enabled && needsConnect) {
                         toast.message('Connect this server before enabling')
+                        return
+                      }
+                      if (server.catalogId && catalogEntry) {
+                        onToggleCatalog(catalogEntry, !server.enabled)
                         return
                       }
                       onToggleCustom(server.id, !server.enabled)
@@ -314,9 +459,9 @@ export function McpCustomServerList({
               </div>
             </div>
 
-            {showApiKey && onConnect && !waiting ? (
+            {showApiKey && canConnect && !waiting ? (
               <div
-                className="bg-muted/20 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2.5"
+                className="bg-muted/20 flex flex-wrap items-center gap-2 border-t px-3 py-2.5"
                 onClick={event => event.stopPropagation()}
               >
                 <Input
@@ -353,10 +498,10 @@ export function McpCustomServerList({
         <button
           type="button"
           onClick={onAddNew}
-          className="bg-card hover:bg-muted/40 flex w-full items-center gap-3 rounded-xl border border-dashed px-3 py-3 text-left transition-colors"
+          className="hover:bg-muted/40 flex w-full items-center gap-3 px-3 py-3 text-left transition-colors"
         >
-          <span className="bg-muted text-muted-foreground grid size-9 place-items-center rounded-lg border">
-            <Plus className="size-4" />
+          <span className="bg-muted text-muted-foreground grid size-6 place-items-center rounded-md border">
+            <Plus className="size-3.5" />
           </span>
           <span className="min-w-0">
             <span className="text-foreground block text-sm font-semibold">
@@ -367,12 +512,6 @@ export function McpCustomServerList({
             </span>
           </span>
         </button>
-      ) : null}
-
-      {customServers.length === 0 && !onAddNew ? (
-        <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
-          No custom MCP servers yet.
-        </p>
       ) : null}
     </div>
   )

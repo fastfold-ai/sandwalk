@@ -44,7 +44,10 @@ from agent_server.mcp_service import (
 from agent_server.mcp_json_config import (
     apply_mcp_json,
     get_or_export_mcp_json,
+    install_catalog_server,
+    mark_catalog_removed,
     mcp_json_path,
+    seed_catalog_defaults,
 )
 from agent_server.models import (
     AccountSummary,
@@ -578,6 +581,8 @@ def create_app(
     @app.get("/v1/mcp-servers", response_model=McpServerList)
     async def list_mcp_servers() -> McpServerList:
         def _list() -> list[McpServer]:
+            # Seed catalog templates into DB + mcp.json before listing.
+            get_or_export_mcp_json(store)
             out: list[McpServer] = []
             for server in store.list_mcp_servers():
                 enriched = enrich_mcp_server(server)
@@ -598,7 +603,7 @@ def create_app(
 
     @app.get("/v1/mcp-servers/config", response_model=McpJsonConfigResponse)
     async def get_mcp_json_config() -> McpJsonConfigResponse:
-        """Export custom MCP servers as mcp.json."""
+        """Export MCP servers (custom + seeded catalog) as mcp.json."""
 
         def _get() -> McpJsonConfigResponse:
             document = get_or_export_mcp_json(store)
@@ -613,7 +618,7 @@ def create_app(
     async def put_mcp_json_config(
         payload: McpJsonConfigRequest,
     ) -> McpJsonConfigResponse:
-        """Replace custom MCP servers from an mcp.json document."""
+        """Replace MCP servers from an mcp.json document (custom + catalog)."""
 
         def _put() -> McpJsonConfigResponse:
             try:
@@ -629,10 +634,33 @@ def create_app(
 
     @app.get("/v1/mcp-servers/catalog", response_model=McpCatalogList)
     async def list_mcp_catalog() -> McpCatalogList:
-        rows = await asyncio.to_thread(mcp_service.catalog_statuses)
+        def _list() -> list:
+            seed_catalog_defaults(store)
+            return mcp_service.catalog_statuses()
+
+        rows = await asyncio.to_thread(_list)
         return McpCatalogList(
             data=[McpCatalogEntryStatus.model_validate(row) for row in rows]
         )
+
+    @app.post(
+        "/v1/mcp-servers/catalog/{catalog_id}/install",
+        response_model=McpServer,
+        status_code=201,
+    )
+    async def install_mcp_catalog(catalog_id: str) -> McpServer:
+        """Re-add a removed catalog template into the installed MCP list."""
+
+        def _install() -> McpServer:
+            server = install_catalog_server(store, catalog_id)
+            return enrich_mcp_server(server)
+
+        try:
+            return await asyncio.to_thread(_install)
+        except KeyError:
+            raise HTTPException(
+                status_code=404, detail="Unknown MCP catalog entry"
+            ) from None
 
     @app.post(
         "/v1/mcp-servers/catalog/{catalog_id}/connect",
@@ -832,8 +860,7 @@ def create_app(
             )
             if payload.headers is not None:
                 set_custom_headers(server.id, payload.headers)
-            if not payload.catalog_id:
-                get_or_export_mcp_json(store)
+            get_or_export_mcp_json(store)
             return enrich_mcp_server(server)
 
         return await asyncio.to_thread(_create)
@@ -923,8 +950,15 @@ def create_app(
             server = store.update_mcp_server(server_id, **changes)
             if server is None:
                 return None
-            if not server.catalog_id:
-                get_or_export_mcp_json(store)
+            if (
+                will_enable
+                and not server.catalog_id
+                and server.transport != "stdio"
+                and server.url
+            ):
+                # Refresh cached tool count so the list can show Connected (N).
+                mcp_service.validate(server_id=server_id)
+            get_or_export_mcp_json(store)
             return enrich_mcp_server(server)
 
         try:
@@ -967,9 +1001,18 @@ def create_app(
     @app.delete("/v1/mcp-servers/{server_id}", response_model=DeleteSessionResponse)
     async def delete_mcp_server(server_id: str) -> DeleteSessionResponse:
         def _delete() -> bool:
+            existing = next(
+                (s for s in store.list_mcp_servers() if s.id == server_id),
+                None,
+            )
+            if existing is None:
+                return False
+            catalog_id = getattr(existing, "catalog_id", None)
             deleted = store.delete_mcp_server(server_id)
             if deleted:
                 clear_custom_headers(server_id)
+                if catalog_id:
+                    mark_catalog_removed(str(catalog_id))
                 get_or_export_mcp_json(store)
             return deleted
 

@@ -21,6 +21,14 @@ export function McpDetailInfoAside({ state }: { state: McpDetailViewState }) {
         <McpIcon
           id={kind === 'catalog' ? catalogEntry?.id || '' : ''}
           name={title}
+          url={
+            kind === 'catalog'
+              ? catalogEntry?.url
+              : typeof state.endpoint === 'string' &&
+                  state.endpoint.includes('://')
+                ? state.endpoint
+                : null
+          }
           size="lg"
         />
         <div className="min-w-0 space-y-0.5">

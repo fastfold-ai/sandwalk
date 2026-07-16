@@ -4,14 +4,15 @@ import type {
   McpJsonDocument,
   McpServer
 } from '@sandwalk/agent-ui-core'
+import { Code2 } from 'lucide-react'
+import { useState } from 'react'
 
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
-import {
-  McpFeaturedSection,
-  McpMoreCatalogSection
-} from './mcp-view/mcp-view-catalog'
+import { McpFeaturedSection } from './mcp-view/mcp-view-catalog'
 import { McpCustomSection } from './mcp-view/mcp-view-custom'
+import { McpJsonEditorDialog } from './mcp-view/mcp-json-editor-dialog'
 import { useMcpView } from './mcp-view/use-mcp-view'
 
 export function McpView({
@@ -31,6 +32,7 @@ export function McpView({
   onOpenCatalog,
   onOpenServer,
   onConnectCustom,
+  onInstallCatalog,
   onLoadMcpJson,
   onSaveMcpJson,
   embedded = false
@@ -38,7 +40,7 @@ export function McpView({
   mcpServers: McpServer[]
   catalog: McpCatalogEntry[]
   catalogLoading?: boolean
-  /** Overview: only the Featured catalog grid (same cards as MCP page). */
+  /** Overview / onboarding: only the Featured catalog grid. */
   featuredOnly?: boolean
   /** When featuredOnly, how many cards to show. Omit for 2; null = all. */
   featuredLimit?: number | null
@@ -62,10 +64,15 @@ export function McpView({
     server: McpServer,
     input: { method: 'oauth' | 'api_key'; apiKey?: string }
   ) => Promise<ConnectMcpResult>
+  /** Re-add a removed catalog template (Suggested strip). */
+  onInstallCatalog?: (catalogId: string) => Promise<void>
   onLoadMcpJson?: () => Promise<{ path: string; document: McpJsonDocument }>
   onSaveMcpJson?: (document: McpJsonDocument) => Promise<void>
   embedded?: boolean
 }) {
+  const [jsonOpen, setJsonOpen] = useState(false)
+  const canEditJson = Boolean(onLoadMcpJson && onSaveMcpJson)
+
   const view = useMcpView({
     mcpServers,
     catalog,
@@ -74,7 +81,7 @@ export function McpView({
     onRefresh,
     onConnectCatalog,
     onToggleCatalog,
-    onCreateMcp,
+    onCreateMcp
   })
 
   const featuredSection = (
@@ -105,26 +112,47 @@ export function McpView({
         }
       >
         {!embedded ? (
-          <div>
-            <h2 className="text-2xl font-semibold">MCP servers</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Connect featured cloud MCPs (off by default). Credentials save under
-              Integrations / keys. Add custom stdio, SSE, or HTTP servers below.
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold">MCP servers</h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Manage installed servers in{' '}
+                <span className="font-mono text-xs">~/.sandwalk/mcp.json</span>.
+                Catalog templates seed here by default; connect credentials under
+                Integrations / keys.
+              </p>
+            </div>
+            {canEditJson ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setJsonOpen(true)}
+              >
+                <Code2 className="size-3.5" />
+                Edit mcp.json
+              </Button>
+            ) : null}
+          </div>
+        ) : canEditJson ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setJsonOpen(true)}
+            >
+              <Code2 className="size-3.5" />
+              Edit mcp.json
+            </Button>
           </div>
         ) : null}
 
         <div className="space-y-6 pb-4">
-          {featuredSection}
-
-          <McpMoreCatalogSection
-            moreCatalog={view.moreCatalog}
-            onOpenCatalog={onOpenCatalog}
-            {...view.catalogCardProps}
-          />
-
           <McpCustomSection
-            customServers={view.customServers}
+            installedServers={view.installedServers}
+            suggestedCatalog={view.suggestedCatalog}
+            catalogById={view.catalogById}
             mcpMode={view.mcpMode}
             mcpName={view.mcpName}
             mcpTransport={view.mcpTransport}
@@ -151,14 +179,27 @@ export function McpView({
             onMcpHeaderRowsChange={updater => view.setMcpHeaderRows(updater)}
             onSubmitCustomMcp={() => void view.submitCustomMcp()}
             onOpenServer={onOpenServer}
+            onOpenCatalog={onOpenCatalog}
             onToggleCustom={(id, enabled) => void onToggleCustom(id, enabled)}
+            onToggleCatalog={(entry, enabled) =>
+              void onToggleCatalog(entry, enabled)
+            }
             onDeleteMcp={id => void onDeleteMcp(id)}
             onConnectCustom={onConnectCustom}
-            onLoadMcpJson={onLoadMcpJson}
-            onSaveMcpJson={onSaveMcpJson}
+            onConnectCatalog={onConnectCatalog}
+            onInstallCatalog={onInstallCatalog}
           />
         </div>
       </div>
+
+      {canEditJson ? (
+        <McpJsonEditorDialog
+          open={jsonOpen}
+          onOpenChange={setJsonOpen}
+          onLoad={onLoadMcpJson!}
+          onSave={onSaveMcpJson!}
+        />
+      ) : null}
     </ScrollArea>
   )
 }

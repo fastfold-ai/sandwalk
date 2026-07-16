@@ -25,6 +25,8 @@ def test_run_headers_helper_command_rejects_non_json():
 
 
 def test_resolve_custom_prefers_helper_over_static():
+    from agent_server.mcp_service import MCP_HTTP_USER_AGENT
+
     cfg = MagicMock()
     cfg.get.return_value = {"Authorization": "Bearer static"}
     server = MagicMock()
@@ -32,16 +34,30 @@ def test_resolve_custom_prefers_helper_over_static():
     server.headers_helper_command = (
         "python3 -c 'import json; print(json.dumps({\"X-Dyn\": \"1\"}))'"
     )
-    assert resolve_custom_server_headers(server, config=cfg) == {"X-Dyn": "1"}
+    assert resolve_custom_server_headers(server, config=cfg) == {
+        "X-Dyn": "1",
+        "User-Agent": MCP_HTTP_USER_AGENT,
+    }
 
 
 def test_resolve_custom_falls_back_to_static_headers():
+    from agent_server.mcp_service import MCP_HTTP_USER_AGENT
+
     cfg = MagicMock()
-    cfg.get.return_value = {"X-API-Key": "secret"}
+
+    def fake_get(key, default=None):
+        if key == "mcp.custom_abc_headers":
+            return {"X-API-Key": "secret"}
+        return default
+
+    cfg.get.side_effect = fake_get
     server = MagicMock()
     server.id = "abc"
     server.headers_helper_command = None
-    assert resolve_custom_server_headers(server, config=cfg) == {"X-API-Key": "secret"}
+    assert resolve_custom_server_headers(server, config=cfg) == {
+        "X-API-Key": "secret",
+        "User-Agent": MCP_HTTP_USER_AGENT,
+    }
     assert get_custom_headers(cfg, "abc") == {"X-API-Key": "secret"}
 
 

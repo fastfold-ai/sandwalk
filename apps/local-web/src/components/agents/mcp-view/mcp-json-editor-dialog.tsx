@@ -1,5 +1,6 @@
 import Editor from '@monaco-editor/react'
 import type { McpJsonDocument } from '@sandwalk/agent-ui-core'
+import { Maximize2, Minimize2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -12,6 +13,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { resolveDark } from '@/lib/theme'
+import { cn } from '@/lib/utils'
 
 export function McpJsonEditorDialog({
   open,
@@ -29,10 +31,14 @@ export function McpJsonEditorDialog({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const dark = resolveDark()
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setExpanded(false)
+      return
+    }
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -79,8 +85,28 @@ export function McpJsonEditorDialog({
         onOpenChange(next)
       }}
     >
-      <DialogContent className="bg-card text-card-foreground border-border flex max-h-[min(90vh,44rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl p-0 shadow-xl sm:rounded-2xl">
-        <DialogHeader className="space-y-1.5 px-6 pt-6 pb-3 text-left">
+      <DialogContent
+        className={cn(
+          'bg-card text-card-foreground border-border flex flex-col gap-0 overflow-hidden p-0 shadow-xl',
+          expanded
+            ? 'h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-[-50%] translate-y-[-50%] rounded-none sm:rounded-none'
+            : 'max-h-[min(90vh,44rem)] max-w-3xl rounded-2xl sm:rounded-2xl'
+        )}
+      >
+        <button
+          type="button"
+          className="ring-offset-background focus:ring-ring text-muted-foreground absolute top-4 right-12 z-10 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none"
+          aria-label={expanded ? 'Exit full screen' : 'Expand to full screen'}
+          onClick={() => setExpanded(current => !current)}
+        >
+          {expanded ? (
+            <Minimize2 className="size-4" />
+          ) : (
+            <Maximize2 className="size-4" />
+          )}
+        </button>
+
+        <DialogHeader className="shrink-0 space-y-1.5 px-6 pt-6 pr-20 pb-3 text-left">
           <DialogTitle>Edit mcp.json</DialogTitle>
           <DialogDescription>
             MCP config
@@ -90,24 +116,29 @@ export function McpJsonEditorDialog({
                 · <span className="font-mono text-[11px]">{path}</span>
               </>
             ) : null}
-            . Saving replaces custom (non-catalog) servers.
+            .
           </DialogDescription>
         </DialogHeader>
 
-        <div className="border-border mx-6 mb-3 overflow-hidden rounded-xl border">
+        <div
+          className={cn(
+            'border-border mx-6 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border',
+            !expanded && 'h-[22rem] flex-none'
+          )}
+        >
           {loading ? (
-            <div className="text-muted-foreground grid h-[22rem] place-items-center text-sm">
+            <div className="text-muted-foreground grid h-full min-h-[22rem] place-items-center text-sm">
               Loading…
             </div>
           ) : (
             <Editor
-              height="22rem"
+              height={expanded ? '100%' : '22rem'}
               language="json"
               theme={dark ? 'vs-dark' : 'light'}
               value={draft}
               onChange={value => setDraft(value ?? '')}
               options={{
-                minimap: { enabled: false },
+                minimap: { enabled: expanded },
                 fontSize: 12,
                 lineNumbers: 'on',
                 scrollBeyondLastLine: false,
@@ -120,10 +151,10 @@ export function McpJsonEditorDialog({
         </div>
 
         {error ? (
-          <p className="text-destructive px-6 pb-2 text-sm">{error}</p>
+          <p className="text-destructive shrink-0 px-6 pb-2 text-sm">{error}</p>
         ) : null}
 
-        <DialogFooter className="bg-muted/30 border-t px-6 py-4 sm:justify-end">
+        <DialogFooter className="bg-muted/30 shrink-0 border-t px-6 py-4 sm:justify-end">
           <Button
             type="button"
             variant="ghost"

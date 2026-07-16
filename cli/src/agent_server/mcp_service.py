@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 import threading
 import time
@@ -27,6 +28,19 @@ _oauth_states: dict[str, dict[str, Any]] = {}
 _oauth_lock = threading.Lock()
 
 _HEADERS_HELPER_TIMEOUT_S = 10
+
+# Cloudflare (Better Stack and others) ban Python-urllib's default UA (Error 1010).
+MCP_HTTP_USER_AGENT = (
+    "Sandwalk/0.1 (MCP; +https://github.com/fastfold-ai/sandwalk)"
+)
+
+
+def ensure_mcp_http_headers(headers: dict[str, str] | None = None) -> dict[str, str]:
+    """Merge caller headers with defaults Cloudflare-friendly MCP clients need."""
+    out = {str(k): str(v) for k, v in (headers or {}).items() if str(k).strip()}
+    if not any(k.lower() == "user-agent" for k in out):
+        out["User-Agent"] = MCP_HTTP_USER_AGENT
+    return out
 
 
 def custom_headers_config_key(server_id: str) -> str:
@@ -101,6 +115,11 @@ def custom_server_credentials_configured(
     return bool(access)
 
 
+def custom_tool_count_id(server_id: str) -> str:
+    """Config namespace for custom (non-catalog) MCP tool-count cache."""
+    return f"custom_{server_id}"
+
+
 def enrich_mcp_server(server, *, config: Config | None = None):
     """Attach non-secret header metadata; force unauthenticated remotes off in the payload."""
     cfg = config or Config.load()
@@ -113,9 +132,17 @@ def enrich_mcp_server(server, *, config: Config | None = None):
         names = sorted([*names, "Authorization"])
     helper = getattr(server, "headers_helper_command", None)
     configured = bool(names) or bool(helper and str(helper).strip())
+    tool_count: int | None = None
+    if bool(getattr(server, "enabled", False)):
+        catalog_id = getattr(server, "catalog_id", None)
+        if catalog_id:
+            tool_count = read_tool_count(str(catalog_id), cfg)
+        else:
+            tool_count = read_tool_count(custom_tool_count_id(server.id), cfg)
     updates: dict[str, Any] = {
         "header_names": names,
         "headers_configured": configured,
+        "tool_count": tool_count,
     }
     # Catalog servers manage enable via catalog APIs; custom remotes stay off
     # until Connect / headers are present (even if the DB still says enabled).
@@ -126,6 +153,7 @@ def enrich_mcp_server(server, *, config: Config | None = None):
         and bool(getattr(server, "enabled", False))
     ):
         updates["enabled"] = False
+        updates["tool_count"] = None
     return server.model_copy(update=updates)
 
 
@@ -180,18 +208,19 @@ def resolve_custom_server_headers(server, *, config: Config | None = None) -> di
     """Resolve auth headers for a custom (non-catalog) remote MCP server.
 
     Precedence: headers helper → OAuth access token → static custom headers.
+    Always includes a Cloudflare-safe User-Agent when any auth header is present.
     """
     cfg = config or Config.load()
     helper = getattr(server, "headers_helper_command", None)
     if helper and str(helper).strip():
         dynamic = run_headers_helper_command(str(helper).strip())
         if dynamic:
-            return dynamic
+            return ensure_mcp_http_headers(dynamic)
     access = str(cfg.get(custom_oauth_token_key(server.id, "access_token")) or "").strip()
     if access:
-        return {"Authorization": f"Bearer {access}"}
+        return ensure_mcp_http_headers({"Authorization": f"Bearer {access}"})
     static = get_custom_headers(cfg, server.id)
-    return static or None
+    return ensure_mcp_http_headers(static) if static else None
 
 
 def _cfg_secret(config: Config, config_key: str | None, env_var: str | None) -> str | None:
@@ -217,13 +246,15 @@ def resolve_auth_headers(
     if entry.auth_mode != "api_key":
         access = _cfg_secret(cfg, f"mcp.{entry.id}_access_token", None)
         if access:
-            return {"Authorization": f"Bearer {access}"}
+            return ensure_mcp_http_headers({"Authorization": f"Bearer {access}"})
 
     if entry.api_key_config_key and entry.api_key_header:
         api_key = _cfg_secret(cfg, entry.api_key_config_key, entry.api_key_env_var)
         if api_key:
             prefix = entry.api_key_header_prefix or ""
-            return {entry.api_key_header: f"{prefix}{api_key}"}
+            return ensure_mcp_http_headers(
+                {entry.api_key_header: f"{prefix}{api_key}"}
+            )
     return None
 
 
@@ -375,11 +406,13 @@ def probe_mcp_server(
     """MCP initialize + tools/list smoke test. Returns ok/toolCount/message/tools."""
 
     def request(body: dict[str, Any], session: str | None = None) -> tuple[int, dict[str, str], str]:
-        req_headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream",
-            **(headers or {}),
-        }
+        req_headers = ensure_mcp_http_headers(
+            {
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
+                **(headers or {}),
+            }
+        )
         if session:
             req_headers["mcp-session-id"] = session
         data = json.dumps(body).encode()
@@ -494,7 +527,12 @@ def _http_json(
     form: dict[str, str] | None = None,
 ) -> tuple[int, Any]:
     data: bytes | None = None
-    req_headers = {"Accept": "application/json", **(headers or {})}
+    # Cloudflare (and many MCP hosts) ban Python-urllib's default UA — without
+    # a real client string, OAuth discovery returns 403 and looks like "no OAuth".
+    req_headers = {
+        "Accept": "application/json",
+        **ensure_mcp_http_headers(headers),
+    }
     if form is not None:
         data = urllib.parse.urlencode(form).encode()
         req_headers["Content-Type"] = "application/x-www-form-urlencoded"
@@ -517,6 +555,62 @@ def _http_json(
             return exc.code, json.loads(raw) if raw else {}
         except json.JSONDecodeError:
             return exc.code, raw
+    except urllib.error.URLError as exc:
+        return 0, {"error": str(exc.reason if hasattr(exc, "reason") else exc)}
+
+
+def _resource_metadata_url_from_www_authenticate(header: str | None) -> str | None:
+    """Parse RFC 9728 resource_metadata from a WWW-Authenticate challenge."""
+    if not header:
+        return None
+    match = re.search(
+        r'resource_metadata=(?:"([^"]+)"|([^\s,]+))',
+        header,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return (match.group(1) or match.group(2) or "").strip() or None
+
+
+def _probe_resource_metadata_url(mcp_url: str) -> str | None:
+    """Unauthenticated MCP call → WWW-Authenticate resource_metadata (MCP spec)."""
+    parsed = urllib.parse.urlparse(mcp_url)
+    if parsed.scheme not in ("http", "https"):
+        return None
+    body = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "sandwalk", "version": "0.1.0"},
+            },
+        }
+    ).encode()
+    req = urllib.request.Request(
+        mcp_url,
+        data=body,
+        method="POST",
+        headers=ensure_mcp_http_headers(
+            {
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+            }
+        ),
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            _ = resp.read()
+            return None
+    except urllib.error.HTTPError as exc:
+        return _resource_metadata_url_from_www_authenticate(
+            exc.headers.get("WWW-Authenticate") if exc.headers else None
+        )
+    except Exception:
+        return None
 
 
 def discover_oauth_for_url(
@@ -541,6 +635,11 @@ def discover_oauth_for_url(
     if catalog_id == "paperclip":
         candidates.insert(0, "https://paperclip.gxl.ai/.well-known/oauth-protected-resource")
 
+    # MCP clients MUST prefer WWW-Authenticate resource_metadata when present.
+    challenged = _probe_resource_metadata_url(url)
+    if challenged:
+        candidates.insert(0, challenged)
+
     resource_meta: dict[str, Any] | None = None
     for candidate in candidates:
         status, data = _http_json(candidate)
@@ -561,6 +660,20 @@ def discover_oauth_for_url(
             f"{issuer}/.well-known/oauth-authorization-server",
             f"{issuer}/.well-known/openid-configuration",
         ]
+        # RFC 8414 path insertion when issuer has a path component.
+        issuer_parsed = urllib.parse.urlparse(issuer)
+        if issuer_parsed.path and issuer_parsed.path != "/":
+            path = issuer_parsed.path.rstrip("/")
+            as_meta_urls.insert(
+                0,
+                f"{issuer_parsed.scheme}://{issuer_parsed.netloc}"
+                f"/.well-known/oauth-authorization-server{path}",
+            )
+            as_meta_urls.insert(
+                1,
+                f"{issuer_parsed.scheme}://{issuer_parsed.netloc}"
+                f"/.well-known/openid-configuration{path}",
+            )
         if catalog_id == "linear":
             as_meta_urls.insert(
                 0, "https://mcp.linear.app/.well-known/oauth-authorization-server"
@@ -677,9 +790,16 @@ class McpService:
         return out
 
     def ensure_catalog_server(self, catalog_id: str, *, enabled: bool = False):
+        from agent_server.mcp_json_config import (
+            clear_catalog_removed,
+            get_or_export_mcp_json,
+        )
+
         entry = get_catalog_entry(catalog_id)
         if entry is None:
             raise KeyError(catalog_id)
+        # Connect / enable after delete should re-install the template.
+        clear_catalog_removed(catalog_id)
         existing = next(
             (
                 s
@@ -690,7 +810,7 @@ class McpService:
         )
         if existing:
             return existing
-        return self.store.create_mcp_server(
+        server = self.store.create_mcp_server(
             name=entry.name,
             transport=entry.transport,
             command=None,
@@ -698,7 +818,10 @@ class McpService:
             url=entry.url,
             enabled=enabled,
             catalog_id=entry.id,
+            description=entry.description,
         )
+        get_or_export_mcp_json(self.store)
+        return server
 
     def save_api_key(self, catalog_id: str, api_key: str) -> None:
         entry = get_catalog_entry(catalog_id)
@@ -923,7 +1046,14 @@ class McpService:
                     "tools": [],
                     "toolDetails": [],
                 }
-            return probe_mcp_server(url=server.url, headers=headers)
+            result = probe_mcp_server(url=server.url, headers=headers)
+            if not getattr(server, "catalog_id", None):
+                count_id = custom_tool_count_id(server_id)
+                if result.get("ok"):
+                    save_tool_count(count_id, int(result.get("toolCount") or 0))
+                else:
+                    clear_tool_count(count_id)
+            return result
 
         raise ValueError("catalog_id or server_id required")
 
@@ -1088,10 +1218,18 @@ class McpService:
                 cfg.unset(oauth_key)
         cfg.save()
         set_custom_headers(server_id, {"Authorization": value}, config=cfg)
-        # Authenticate only — leave enabled off (Cursor-style).
+        # Authenticate only — leave enabled off (Cursor-style for API key).
         if server.enabled:
             server = self.store.update_mcp_server(server_id, enabled=False) or server
-        result = probe_mcp_server(url=server.url, headers={"Authorization": value})
+        result = probe_mcp_server(
+            url=server.url,
+            headers=ensure_mcp_http_headers({"Authorization": value}),
+        )
+        count_id = custom_tool_count_id(server_id)
+        if result.get("ok"):
+            save_tool_count(count_id, int(result.get("toolCount") or 0))
+        else:
+            clear_tool_count(count_id)
         return {
             "ok": bool(result.get("ok")),
             "serverId": server_id,
@@ -1167,17 +1305,24 @@ class McpService:
                 raise KeyError(server_id)
             if not mcp_url:
                 mcp_url = str(server.url or "")
-            # OAuth finish authenticates only — never flip the enable toggle.
-            if server.enabled:
-                self.store.update_mcp_server(server_id, enabled=False)
             result = probe_mcp_server(
                 url=mcp_url,
-                headers={"Authorization": f"Bearer {access_token}"},
+                headers=ensure_mcp_http_headers(
+                    {"Authorization": f"Bearer {access_token}"}
+                ),
             )
+            # Successful OAuth → turn the server on automatically.
+            enabled = bool(result.get("ok"))
+            self.store.update_mcp_server(server_id, enabled=enabled)
+            count_id = custom_tool_count_id(server_id)
+            if result.get("ok"):
+                save_tool_count(count_id, int(result.get("toolCount") or 0))
+            else:
+                clear_tool_count(count_id)
             return {
                 "ok": result["ok"],
                 "serverId": server_id,
-                "enabled": False,
+                "enabled": enabled,
                 **result,
             }
 
@@ -1201,10 +1346,15 @@ class McpService:
 
         result = probe_mcp_server(
             url=entry.url,
-            headers={"Authorization": f"Bearer {access_token}"},
+            headers=ensure_mcp_http_headers(
+                {"Authorization": f"Bearer {access_token}"}
+            ),
         )
-        # OAuth finish authenticates only — never flip the enable toggle.
-        server = self.ensure_catalog_server(catalog_id, enabled=False)
+        # Successful OAuth → turn the catalog server on automatically.
+        enabled = bool(result.get("ok"))
+        server = self.ensure_catalog_server(catalog_id, enabled=enabled)
+        if bool(server.enabled) != enabled:
+            server = self.store.update_mcp_server(server.id, enabled=enabled) or server
         if result["ok"]:
             save_tool_count(catalog_id, int(result.get("toolCount") or 0))
         else:

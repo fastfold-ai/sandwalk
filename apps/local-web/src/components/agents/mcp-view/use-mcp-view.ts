@@ -66,10 +66,20 @@ export function useMcpView({
     setShowApiKey
   })
 
-  const customServers = useMemo(
-    () => mcpServers.filter(server => !server.catalogId),
-    [mcpServers]
+  /** Full MCP page: every DB server (seeded catalog + custom). */
+  const installedServers = mcpServers
+
+  /** Templates the user removed — offer re-add without a permanent Featured grid. */
+  const suggestedCatalog = useMemo(
+    () => catalog.filter(entry => !entry.serverId),
+    [catalog]
   )
+
+  const catalogById = useMemo(() => {
+    const map = new Map<string, McpCatalogEntry>()
+    for (const entry of catalog) map.set(entry.id, entry)
+    return map
+  }, [catalog])
 
   const { featuredCatalog, moreCatalog } = useMcpCatalogLists(catalog)
   const featuredVisible = featuredCatalogVisible(
@@ -109,7 +119,9 @@ export function useMcpView({
     mcpHeadersHelper: customForm.mcpHeadersHelper,
     mcpHeaderRows: customForm.mcpHeaderRows,
     creatingCustom: customForm.creatingCustom,
-    customServers,
+    installedServers,
+    suggestedCatalog,
+    catalogById,
     featuredCatalog,
     moreCatalog,
     featuredVisible,

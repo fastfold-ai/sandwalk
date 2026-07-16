@@ -73,6 +73,13 @@ extension SandwalkAPIClient {
         try await delete("/v1/mcp-servers/catalog/\(enc(id))/connect")
     }
 
+    static func installMcpCatalog(id: String) async throws -> McpServerDTO {
+        try await post(
+            "/v1/mcp-servers/catalog/\(enc(id))/install",
+            body: [:] as [String: Any]
+        )
+    }
+
     // MARK: - Specialists
 
     static func listSpecialists() async throws -> [SpecialistDTO] {

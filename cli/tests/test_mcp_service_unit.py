@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -50,8 +51,137 @@ def test_paperclip_catalog_entry_featured_over_linear():
         "latch",
         "neurosnap",
         "paperclip",
+        "betterstack",
         "linear",
     }
+
+
+def test_betterstack_catalog_entry_oauth_preferred():
+    from agent.mcp_catalog import get_catalog_entry
+
+    entry = get_catalog_entry("betterstack")
+    assert entry is not None
+    assert entry.featured is True
+    assert entry.auth_mode == "api_key_or_oauth"
+    assert entry.preferred_auth == "oauth"
+    assert entry.url == "https://mcp.betterstack.com"
+
+
+def test_resource_metadata_url_from_www_authenticate():
+    from agent_server.mcp_service import _resource_metadata_url_from_www_authenticate
+
+    assert (
+        _resource_metadata_url_from_www_authenticate(
+            'Bearer realm="mcp", resource_metadata="https://mcp.betterstack.com/.well-known/oauth-protected-resource"'
+        )
+        == "https://mcp.betterstack.com/.well-known/oauth-protected-resource"
+    )
+    assert _resource_metadata_url_from_www_authenticate(None) is None
+    assert _resource_metadata_url_from_www_authenticate('Bearer realm="mcp"') is None
+
+
+def test_ensure_mcp_http_headers_adds_user_agent():
+    from agent_server.mcp_service import MCP_HTTP_USER_AGENT, ensure_mcp_http_headers
+
+    assert ensure_mcp_http_headers(None)["User-Agent"] == MCP_HTTP_USER_AGENT
+    assert ensure_mcp_http_headers({})["User-Agent"] == MCP_HTTP_USER_AGENT
+    with_auth = ensure_mcp_http_headers({"Authorization": "Bearer x"})
+    assert with_auth["Authorization"] == "Bearer x"
+    assert with_auth["User-Agent"] == MCP_HTTP_USER_AGENT
+    custom = ensure_mcp_http_headers({"User-Agent": "CustomAgent/1"})
+    assert custom["User-Agent"] == "CustomAgent/1"
+
+
+def test_http_json_sends_user_agent(monkeypatch):
+    from agent_server import mcp_service as mod
+
+    captured: dict[str, str] = {}
+
+    class FakeResp:
+        status = 200
+
+        def read(self):
+            return b'{"ok":true}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def fake_urlopen(req, timeout=None):
+        captured["ua"] = req.get_header("User-agent")
+        return FakeResp()
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+    status, data = mod._http_json("https://example.com/.well-known/oauth-protected-resource")
+    assert status == 200
+    assert data == {"ok": True}
+    assert captured["ua"]
+    assert "Sandwalk" in captured["ua"]
+    assert "Python-urllib" not in captured["ua"]
+
+
+def test_probe_mcp_server_sends_user_agent(monkeypatch):
+    from agent_server import mcp_service as mod
+
+    seen: list[str] = []
+
+    class Err(urllib.error.HTTPError):
+        def __init__(self, req):
+            super().__init__(req.full_url, 401, "Unauthorized", hdrs={}, fp=None)
+
+        def read(self):
+            return b'{"error":"unauthorized"}'
+
+    def fake_urlopen(req, timeout=None):
+        seen.append(req.get_header("User-agent") or "")
+        raise Err(req)
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+    result = mod.probe_mcp_server(url="https://mcp.betterstack.com")
+    assert result["ok"] is False
+    assert seen
+    assert all("Sandwalk" in ua for ua in seen)
+    assert "401" in result["message"]
+
+
+def test_discover_oauth_for_url_betterstack_shape(monkeypatch):
+    from agent_server import mcp_service as mod
+
+    responses = {
+        "https://mcp.betterstack.com/.well-known/oauth-protected-resource": (
+            200,
+            {
+                "resource": "https://mcp.betterstack.com",
+                "authorization_servers": ["https://betterstack.com"],
+                "scopes_supported": ["read", "write"],
+            },
+        ),
+        "https://betterstack.com/.well-known/oauth-authorization-server": (
+            200,
+            {
+                "issuer": "https://betterstack.com",
+                "authorization_endpoint": "https://betterstack.com/oauth/authorize",
+                "token_endpoint": "https://betterstack.com/oauth/token",
+                "registration_endpoint": "https://betterstack.com/oauth/register",
+            },
+        ),
+    }
+
+    monkeypatch.setattr(mod, "_probe_resource_metadata_url", lambda url: None)
+
+    def fake_http_json(url, **kwargs):
+        if url in responses:
+            return responses[url]
+        return 404, {}
+
+    monkeypatch.setattr(mod, "_http_json", fake_http_json)
+    meta = mod.discover_oauth_for_url("https://mcp.betterstack.com", label="betterstack")
+    assert meta["authorization_endpoint"] == "https://betterstack.com/oauth/authorize"
+    assert meta["registration_endpoint"] == "https://betterstack.com/oauth/register"
+    assert meta["scopes"] == ["read", "write"]
+    assert meta["resource"] == "https://mcp.betterstack.com"
 
 
 def test_get_custom_headers_dict_and_json_string():
@@ -136,7 +266,9 @@ def test_resolve_auth_headers_api_key(tmp_path: Path, monkeypatch):
     entry = get_catalog_entry("tamarind")
     assert entry is not None
     headers = resolve_auth_headers(entry, Config.load())
-    assert headers == {"x-api-key": "tam-key"}
+    assert headers is not None
+    assert headers.get("x-api-key") == "tam-key"
+    assert "Sandwalk" in (headers.get("User-Agent") or "")
     assert credentials_configured(entry, Config.load()) is True
     assert auth_method_in_use(entry, Config.load()) == "api_key"
 
@@ -152,7 +284,9 @@ def test_resolve_auth_headers_oauth_token(tmp_path: Path, monkeypatch):
     entry = get_catalog_entry("latch")
     assert entry is not None
     headers = resolve_auth_headers(entry, Config.load())
-    assert headers == {"Authorization": "Bearer oauth-access"}
+    assert headers is not None
+    assert headers.get("Authorization") == "Bearer oauth-access"
+    assert "Sandwalk" in (headers.get("User-Agent") or "")
     assert auth_method_in_use(entry, Config.load()) == "oauth"
 
 
@@ -323,13 +457,120 @@ def test_mcp_service_connect_with_api_key(tmp_path: Path, monkeypatch):
     )
     result = svc.connect_with_api_key("tamarind", "my-api-key")
     assert result["ok"] is True
-    # Connect must not auto-enable — toggle is UI/CLI only.
+    # API-key Connect must not auto-enable — toggle is UI/CLI only.
     assert result["enabled"] is False
     assert read_tool_count("tamarind") == 3
 
     enabled = svc.set_enabled("tamarind", True)
     assert enabled["ok"] is True
     assert enabled["enabled"] is True
+
+
+def test_complete_oauth_enables_catalog_on_success(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
+    (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
+    Config({}).save()
+
+    store = AgentStore(tmp_path / "agent.db")
+    svc = McpService(store)
+
+    from agent_server import mcp_service as mod
+
+    state = "oauth-state-1"
+    with mod._oauth_lock:
+        mod._oauth_states[state] = {
+            "catalog_id": "latch",
+            "verifier": "v",
+            "redirect_uri": "http://127.0.0.1/callback",
+            "client_id": "cid",
+            "client_secret": None,
+            "token_endpoint": "https://example.com/token",
+            "resource": "https://mcp.latch.bio/mcp",
+            "created_at": 0,
+        }
+
+    monkeypatch.setattr(
+        mod,
+        "_http_json",
+        lambda *a, **k: (200, {"access_token": "tok", "expires_in": 3600}),
+    )
+    monkeypatch.setattr(
+        mod,
+        "probe_mcp_server",
+        lambda **kwargs: {
+            "ok": True,
+            "toolCount": 2,
+            "message": "Connected — 2 tools available",
+            "tools": ["a", "b"],
+            "toolDetails": [],
+        },
+    )
+
+    result = svc.complete_oauth(code="abc", state=state)
+    assert result["ok"] is True
+    assert result["enabled"] is True
+    assert result["catalogId"] == "latch"
+    server = next(s for s in store.list_mcp_servers() if s.catalog_id == "latch")
+    assert server.enabled is True
+
+
+def test_complete_oauth_enables_custom_on_success(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
+    (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
+    Config({}).save()
+
+    store = AgentStore(tmp_path / "agent.db")
+    server = store.create_mcp_server(
+        name="betterstack",
+        transport="streamable_http",
+        command=None,
+        args=[],
+        url="https://mcp.betterstack.com",
+        enabled=False,
+    )
+    svc = McpService(store)
+
+    from agent_server import mcp_service as mod
+
+    state = "oauth-state-custom"
+    with mod._oauth_lock:
+        mod._oauth_states[state] = {
+            "server_id": server.id,
+            "mcp_url": "https://mcp.betterstack.com",
+            "verifier": "v",
+            "redirect_uri": "http://127.0.0.1/callback",
+            "client_id": "cid",
+            "client_secret": None,
+            "token_endpoint": "https://betterstack.com/oauth/token",
+            "resource": "https://mcp.betterstack.com",
+            "created_at": 0,
+        }
+
+    monkeypatch.setattr(
+        mod,
+        "_http_json",
+        lambda *a, **k: (200, {"access_token": "tok", "refresh_token": "rt"}),
+    )
+    monkeypatch.setattr(
+        mod,
+        "probe_mcp_server",
+        lambda **kwargs: {
+            "ok": True,
+            "toolCount": 5,
+            "message": "Connected — 5 tools available",
+            "tools": ["t1"],
+            "toolDetails": [],
+        },
+    )
+
+    result = svc.complete_oauth(code="abc", state=state)
+    assert result["ok"] is True
+    assert result["enabled"] is True
+    assert result["serverId"] == server.id
+    updated = next(s for s in store.list_mcp_servers() if s.id == server.id)
+    assert updated.enabled is True
 
 
 def test_mcp_service_set_enabled_requires_credentials(tmp_path: Path, monkeypatch):

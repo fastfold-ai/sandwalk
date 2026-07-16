@@ -1,7 +1,10 @@
 import type { McpCatalogEntry } from '@sandwalk/agent-ui-core'
 import { Plug } from 'lucide-react'
+import { useState } from 'react'
 
 import { cn } from '@/lib/utils'
+
+import { faviconCandidatesForUrl } from './mcp-favicon'
 
 export type HeaderRow = { id: string; name: string; value: string }
 export type CustomMode = 'remote' | 'local'
@@ -73,14 +76,20 @@ export function McpToggle({
 export function McpIcon({
   id,
   name,
+  url,
   size = 'sm',
 }: {
   id: string
   name: string
+  /** When set and no bundled icon exists, resolve favicon from this MCP URL. */
+  url?: string | null
   size?: 'sm' | 'lg'
 }) {
   const icon = MCP_ICONS[id]
   const box = size === 'lg' ? 'size-9' : 'size-6'
+  const candidates = icon ? [] : faviconCandidatesForUrl(url)
+  const [faviconIndex, setFaviconIndex] = useState(0)
+
   if (icon) {
     return (
       <img
@@ -88,12 +97,32 @@ export function McpIcon({
         alt=""
         className={cn(
           box,
-          'shrink-0 rounded object-contain',
+          'bg-muted shrink-0 rounded object-contain p-0.5',
           icon.invertInDark && 'dark:invert',
         )}
       />
     )
   }
+
+  if (candidates.length > 0 && faviconIndex < candidates.length) {
+    return (
+      <span
+        className={cn(
+          box,
+          'bg-muted shrink-0 overflow-hidden rounded grid place-items-center',
+        )}
+      >
+        <img
+          key={candidates[faviconIndex]}
+          src={candidates[faviconIndex]}
+          alt=""
+          className="block size-full max-h-full max-w-full object-contain p-0.5"
+          onError={() => setFaviconIndex(prev => prev + 1)}
+        />
+      </span>
+    )
+  }
+
   return (
     <span
       className={cn(
@@ -159,7 +188,10 @@ export function statusBadge(
   entry: McpCatalogEntry,
   onOpen?: (entry: McpCatalogEntry) => void,
 ) {
-  if (entry.connected) {
+  const showConnected =
+    entry.connected ||
+    (entry.enabled && typeof entry.toolCount === 'number')
+  if (showConnected) {
     const count =
       typeof entry.toolCount === 'number' ? ` (${entry.toolCount})` : ''
     if (onOpen) {

@@ -181,7 +181,7 @@ struct McpDetailSettingsView: View {
     private var metaRows: some View {
         switch kind {
         case .catalog(let entry):
-            SettingsRow(label: "Type", sublabel: "Featured") { EmptyView() }
+            SettingsRow(label: "Type", sublabel: "Catalog") { EmptyView() }
             if let transport = entry.transport {
                 SettingsRow(label: "Transport", sublabel: transport) { EmptyView() }
             }

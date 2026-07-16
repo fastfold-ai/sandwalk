@@ -110,7 +110,7 @@ export function McpCatalogCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <McpIcon id={view.id} name={view.name} />
+            <McpIcon id={view.id} name={view.name} url={view.url} />
             <span className="truncate text-sm font-medium">{view.name}</span>
             {authMeta(view)}
             {statusBadge(view, onOpenCatalog)}
@@ -138,12 +138,18 @@ export function McpCatalogCard({
               onPendingIdChange(view.id)
               onStatusPatchChange(prev => ({
                 ...prev,
-                [view.id]: {
-                  enabled: nextEnabled,
-                  connected: nextEnabled ? view.connected : false,
-                  statusMessage: nextEnabled ? view.statusMessage : null,
-                  toolCount: nextEnabled ? view.toolCount : view.toolCount,
-                },
+                [view.id]: nextEnabled
+                  ? {
+                      // Only flip enabled optimistically — connected/toolCount
+                      // come from the enable probe response after refresh.
+                      enabled: true,
+                    }
+                  : {
+                      enabled: false,
+                      connected: false,
+                      statusMessage: null,
+                      toolCount: null,
+                    },
               }))
               void onToggleCatalog(view, nextEnabled)
                 .then(() =>
