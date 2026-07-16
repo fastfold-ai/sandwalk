@@ -1,0 +1,201 @@
+"""Per-model multimodal input capability checks (image / PDF / audio / video).
+
+LangChain exposes a beta ``ModelProfile`` with keys like ``image_inputs`` and
+``pdf_inputs`` (from models.dev tables). Coverage is incomplete for new catalog
+ids and all local/OpenAI-compatible profiles, so we combine:
+
+1. Live ``chat_model.profile`` when available
+2. Provider/model allowlist heuristics (default False for unknown/local)
+"""
+
+from __future__ import annotations
+
+from typing import Any, Literal
+
+ModalityKind = Literal["image", "file", "audio", "video"]
+
+# Deep Agents multimodal extension table → content-block type.
+IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic", ".heif"})
+FILE_EXTENSIONS = frozenset({".pdf", ".ppt", ".pptx"})
+AUDIO_EXTENSIONS = frozenset({".wav", ".mp3", ".aiff", ".aac", ".ogg", ".flac"})
+VIDEO_EXTENSIONS = frozenset(
+    {".mp4", ".mpeg", ".mov", ".avi", ".flv", ".mpg", ".webm", ".wmv", ".3gpp"}
+)
+
+_PROFILE_KEY: dict[ModalityKind, str] = {
+    "image": "image_inputs",
+    "file": "pdf_inputs",
+    "audio": "audio_inputs",
+    "video": "video_inputs",
+}
+
+
+def modality_for_extension(suffix: str) -> ModalityKind | None:
+    """Return the multimodal block kind for a file suffix, or None if not multimodal."""
+    ext = str(suffix or "").strip().lower()
+    if not ext.startswith("."):
+        ext = f".{ext}" if ext else ""
+    if ext in IMAGE_EXTENSIONS:
+        return "image"
+    if ext in FILE_EXTENSIONS:
+        return "file"
+    if ext in AUDIO_EXTENSIONS:
+        return "audio"
+    if ext in VIDEO_EXTENSIONS:
+        return "video"
+    return None
+
+
+def profile_supports_modality(profile: Any, kind: ModalityKind) -> bool | None:
+    """Return True/False from a LangChain ModelProfile, or None if unknown."""
+    if profile is None:
+        return None
+    key = _PROFILE_KEY[kind]
+    try:
+        if hasattr(profile, "get"):
+            value = profile.get(key)
+        else:
+            value = getattr(profile, key, None)
+    except Exception:  # noqa: BLE001
+        return None
+    if value is None:
+        return None
+    return bool(value)
+
+
+def _is_local_or_compatible(provider: str | None) -> bool:
+    provider_norm = str(provider or "").strip().lower()
+    return provider_norm in {"local", "compatible", "openai-compatible", ""}
+
+
+def _openai_cloud_multimodal(model_id: str) -> set[ModalityKind]:
+    value = model_id.lower()
+    kinds: set[ModalityKind] = set()
+    # GPT-4o / 4.1 / 5 families and o-series generally accept images; many also PDF.
+    if (
+        value.startswith("gpt-4o")
+        or value.startswith("gpt-4.1")
+        or value.startswith("gpt-5")
+        or value.startswith("o1")
+        or value.startswith("o3")
+        or value.startswith("o4")
+    ):
+        kinds.update({"image", "file"})
+    return kinds
+
+
+def _anthropic_multimodal(model_id: str) -> set[ModalityKind]:
+    value = model_id.lower()
+    if value.startswith("claude-"):
+        # Modern Claude models accept images + PDFs as document/file blocks.
+        return {"image", "file"}
+    return set()
+
+
+def _google_multimodal(model_id: str) -> set[ModalityKind]:
+    value = model_id.lower()
+    if not value.startswith("gemini-"):
+        return set()
+    # Gemini multimodal family — image/PDF widely; audio/video on many flash/pro.
+    kinds: set[ModalityKind] = {"image", "file", "audio", "video"}
+    return kinds
+
+
+def _xai_multimodal(model_id: str) -> set[ModalityKind]:
+    value = model_id.lower()
+    if value.startswith("grok-"):
+        return {"image"}
+    return set()
+
+
+def allowlist_modalities(
+    provider: str | None,
+    model_id: str | None,
+) -> set[ModalityKind]:
+    """Static allowlist of modalities for a provider/model pair."""
+    provider_norm = str(provider or "").strip().lower()
+    value = str(model_id or "").strip()
+    if not value:
+        return set()
+    # Local / unknown compatible endpoints: never inject unless LC profile says so.
+    if provider_norm in {"local"}:
+        return set()
+
+    if provider_norm in {"openai", "opencode", "nvidia"}:
+        kinds = _openai_cloud_multimodal(value)
+        # OpenCode may host Claude behind an OpenAI-compatible proxy.
+        if provider_norm == "opencode" and value.lower().startswith("claude-"):
+            kinds |= _anthropic_multimodal(value)
+        return kinds
+    if provider_norm == "anthropic":
+        return _anthropic_multimodal(value)
+    if provider_norm == "google":
+        return _google_multimodal(value)
+    if provider_norm == "xai":
+        return _xai_multimodal(value)
+    return set()
+
+
+def model_supports_modality(
+    provider: str | None,
+    model_id: str | None,
+    kind: ModalityKind,
+    *,
+    profile: Any = None,
+) -> bool:
+    """Return True when user-turn content blocks of ``kind`` may be injected."""
+    from_profile = profile_supports_modality(profile, kind)
+    if from_profile is True:
+        return True
+    if from_profile is False and not _is_local_or_compatible(provider):
+        # Explicit profile denial for a known cloud model.
+        # Still allow allowlist to override missing/stale profiles for new ids.
+        pass
+    return kind in allowlist_modalities(provider, model_id)
+
+
+def model_supports_image_inputs(
+    provider: str | None, model_id: str | None, *, profile: Any = None
+) -> bool:
+    return model_supports_modality(provider, model_id, "image", profile=profile)
+
+
+def model_supports_pdf_inputs(
+    provider: str | None, model_id: str | None, *, profile: Any = None
+) -> bool:
+    return model_supports_modality(provider, model_id, "file", profile=profile)
+
+
+def model_supports_audio_inputs(
+    provider: str | None, model_id: str | None, *, profile: Any = None
+) -> bool:
+    return model_supports_modality(provider, model_id, "audio", profile=profile)
+
+
+def model_supports_video_inputs(
+    provider: str | None, model_id: str | None, *, profile: Any = None
+) -> bool:
+    return model_supports_modality(provider, model_id, "video", profile=profile)
+
+
+def modality_capability_fields(
+    provider: str | None,
+    model_id: str | None,
+    *,
+    profile: Any = None,
+) -> dict[str, bool]:
+    """API/catalog snake_case fields for multimodal capabilities."""
+    return {
+        "supports_image_inputs": model_supports_image_inputs(
+            provider, model_id, profile=profile
+        ),
+        "supports_pdf_inputs": model_supports_pdf_inputs(
+            provider, model_id, profile=profile
+        ),
+        "supports_audio_inputs": model_supports_audio_inputs(
+            provider, model_id, profile=profile
+        ),
+        "supports_video_inputs": model_supports_video_inputs(
+            provider, model_id, profile=profile
+        ),
+    }

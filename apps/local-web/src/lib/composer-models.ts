@@ -10,6 +10,10 @@ export type ComposerModelOption = {
   reasoningEffortOptions?: string[]
   reasoningEffort?: string | null
   reasoningFast?: boolean
+  supportsImageInputs?: boolean
+  supportsPdfInputs?: boolean
+  supportsAudioInputs?: boolean
+  supportsVideoInputs?: boolean
 }
 
 const CLOUD_PROVIDER_LABELS: Record<string, string> = {
@@ -80,6 +84,10 @@ export function toComposerModelOptions(
     reasoningEffortOptions?: string[]
     reasoningEffort?: string | null
     reasoningFast?: boolean
+    supportsImageInputs?: boolean
+    supportsPdfInputs?: boolean
+    supportsAudioInputs?: boolean
+    supportsVideoInputs?: boolean
   }>
 ): ComposerModelOption[] {
   return models
@@ -95,7 +103,11 @@ export function toComposerModelOptions(
       supportsReasoningEffort: Boolean(model.supportsReasoningEffort),
       reasoningEffortOptions: model.reasoningEffortOptions || [],
       reasoningEffort: model.reasoningEffort ?? 'medium',
-      reasoningFast: Boolean(model.reasoningFast)
+      reasoningFast: Boolean(model.reasoningFast),
+      supportsImageInputs: Boolean(model.supportsImageInputs),
+      supportsPdfInputs: Boolean(model.supportsPdfInputs),
+      supportsAudioInputs: Boolean(model.supportsAudioInputs),
+      supportsVideoInputs: Boolean(model.supportsVideoInputs)
     }))
 }
 

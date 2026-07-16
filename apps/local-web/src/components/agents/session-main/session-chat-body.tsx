@@ -164,6 +164,7 @@ export function SessionChatBody({
               conversationTimeline={conversationTimeline}
               expandedToolRunKeys={expandedToolRunKeys}
               sessionId={sessionId}
+              client={client}
               onToggleToolRunExpanded={key => {
                 if (!sessionId) return
                 patchChat(sessionId, prev => ({

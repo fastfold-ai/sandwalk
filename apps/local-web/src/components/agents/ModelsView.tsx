@@ -7,12 +7,16 @@ import type {
   ModelProfileProbeResult,
   UpsertModelProfileInput
 } from '@sandwalk/agent-ui-core'
+import { Info } from 'lucide-react'
+import { useState } from 'react'
 
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 
 import {
   ModelsCustomDialog,
+  ModelsMultimodalGuideDialog,
   ModelsProfileDialog
 } from './models-view/models-view-dialogs'
 import { ModelsListSection } from './models-view/models-view-list'
@@ -101,6 +105,7 @@ export function ModelsView({
     onSaveProviderKey,
     onClearProviderKey
   })
+  const [multimodalGuideOpen, setMultimodalGuideOpen] = useState(false)
 
   return (
     <ScrollArea className={embedded ? 'h-[min(28rem,55vh)]' : 'flex-1'}>
@@ -151,6 +156,19 @@ export function ModelsView({
           onToggleModel={model => void state.toggleModel(model)}
           onRemoveCustomModel={model => void state.removeCustomModel(model)}
         />
+
+        <div className="-mt-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground h-8 gap-1.5 px-2"
+            onClick={() => setMultimodalGuideOpen(true)}
+          >
+            <Info className="size-3.5" />
+            Multimodal support
+          </Button>
+        </div>
 
         <ModelsApiKeysSection
           open={state.apiKeysOpen}
@@ -228,6 +246,12 @@ export function ModelsView({
         onOpenChange={state.setCustomDialogOpen}
         onCustomFormChange={state.setCustomForm}
         onSaveCustomModel={() => void state.saveCustomModel()}
+      />
+
+      <ModelsMultimodalGuideDialog
+        open={multimodalGuideOpen}
+        onOpenChange={setMultimodalGuideOpen}
+        models={state.models}
       />
     </ScrollArea>
   )

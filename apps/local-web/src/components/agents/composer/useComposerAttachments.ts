@@ -53,9 +53,12 @@ export function useComposerAttachments(
         id: crypto.randomUUID(),
         name: file.name,
         contentType: file.type || 'application/octet-stream',
-        previewUrl: file.type.startsWith('image/')
-          ? URL.createObjectURL(file)
-          : undefined,
+        previewUrl:
+          file.type.startsWith('image/') ||
+          file.type.startsWith('video/') ||
+          file.type.startsWith('audio/')
+            ? URL.createObjectURL(file)
+            : undefined,
         status: 'uploading'
       }))
 

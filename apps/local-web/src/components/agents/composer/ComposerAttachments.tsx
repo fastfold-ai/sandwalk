@@ -1,4 +1,4 @@
-import { FileText, Loader2, X } from 'lucide-react'
+import { FileText, Loader2, Music2, X } from 'lucide-react'
 import { useState } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -17,13 +17,33 @@ export type ComposerAttachmentItem = {
 function isImageAttachment(item: ComposerAttachmentItem) {
   return (
     item.contentType.startsWith('image/') ||
-    Boolean(item.previewUrl?.startsWith('blob:') || item.previewUrl?.startsWith('data:image'))
+    Boolean(
+      item.previewUrl?.startsWith('data:image') ||
+        (item.previewUrl?.startsWith('blob:') &&
+          item.contentType.startsWith('image/'))
+    )
+  )
+}
+
+function isVideoAttachment(item: ComposerAttachmentItem) {
+  return (
+    item.contentType.startsWith('video/') ||
+    /\.(mp4|webm|mov|avi|mpeg|mpg|wmv|flv|3gpp)$/i.test(item.name)
+  )
+}
+
+function isAudioAttachment(item: ComposerAttachmentItem) {
+  return (
+    item.contentType.startsWith('audio/') ||
+    /\.(mp3|wav|aiff|aif|aac|ogg|flac|m4a)$/i.test(item.name)
   )
 }
 
 function AttachmentThumb({ item }: { item: ComposerAttachmentItem }) {
   const [loaded, setLoaded] = useState(false)
   const image = isImageAttachment(item)
+  const video = isVideoAttachment(item)
+  const audio = isAudioAttachment(item)
 
   if (image && item.previewUrl) {
     return (
@@ -37,6 +57,28 @@ function AttachmentThumb({ item }: { item: ComposerAttachmentItem }) {
           )}
           onLoad={() => setLoaded(true)}
         />
+      </div>
+    )
+  }
+
+  if (video && item.previewUrl) {
+    return (
+      <div className="bg-muted relative size-14 overflow-hidden rounded-xl">
+        <video
+          src={item.previewUrl}
+          muted
+          playsInline
+          preload="metadata"
+          className="size-full object-cover"
+        />
+      </div>
+    )
+  }
+
+  if (audio) {
+    return (
+      <div className="bg-muted relative flex size-14 items-center justify-center overflow-hidden rounded-xl">
+        <Music2 className="text-muted-foreground size-6" strokeWidth={1.5} />
       </div>
     )
   }

@@ -3,9 +3,12 @@ import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { useEffect, useState } from 'react'
 
 import { getFileIcon } from '@/lib/file-icons'
+import { mediaObjectUrlFromFile } from '@/lib/media-src'
 import { cn } from '@/lib/utils'
 
+import { AudioPlayPreview } from './AudioPlayPreview'
 import { StructureViewer } from './StructureViewer'
+import { VideoPlayPreview } from './VideoPlayPreview'
 import { decodeContent, structureFormat } from './artifact-grid-thumb-utils'
 
 export function IconFallback({
@@ -85,6 +88,100 @@ export function ImageThumb({
       src={src}
       alt={name}
       className="h-full w-full object-contain p-1.5"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+export function VideoThumb({
+  client,
+  sessionId,
+  path,
+  name
+}: {
+  client: LocalAgentClient
+  sessionId: string
+  path: string
+  name: string
+}) {
+  const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let objectUrl: string | null = null
+    void client
+      .readFile(sessionId, path, controller.signal)
+      .then(file => {
+        if (controller.signal.aborted) return
+        objectUrl = mediaObjectUrlFromFile({ ...file, name })
+        setSrc(objectUrl)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true)
+      })
+    return () => {
+      controller.abort()
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [client, name, path, sessionId])
+
+  if (failed) return <IconFallback name={name} />
+  if (!src) {
+    return <div className="bg-muted/30 h-full w-full animate-pulse" />
+  }
+  return (
+    <VideoPlayPreview
+      src={src}
+      mode="thumb"
+      muted
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+export function AudioThumb({
+  client,
+  sessionId,
+  path,
+  name
+}: {
+  client: LocalAgentClient
+  sessionId: string
+  path: string
+  name: string
+}) {
+  const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let objectUrl: string | null = null
+    void client
+      .readFile(sessionId, path, controller.signal)
+      .then(file => {
+        if (controller.signal.aborted) return
+        objectUrl = mediaObjectUrlFromFile({ ...file, name })
+        setSrc(objectUrl)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true)
+      })
+    return () => {
+      controller.abort()
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [client, name, path, sessionId])
+
+  if (failed) return <IconFallback name={name} />
+  if (!src) {
+    return <div className="bg-muted/30 h-full w-full animate-pulse" />
+  }
+  return (
+    <AudioPlayPreview
+      src={src}
+      title={name}
+      mode="thumb"
       onError={() => setFailed(true)}
     />
   )

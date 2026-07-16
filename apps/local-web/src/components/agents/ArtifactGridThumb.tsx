@@ -2,11 +2,13 @@ import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { WorkspaceFile } from '@sandwalk/agent-ui-core'
 
 import {
+  AudioThumb,
   IconFallback,
   ImageThumb,
   StructureThumb,
   TableThumb,
-  TextThumb
+  TextThumb,
+  VideoThumb
 } from './artifact-grid-thumb-parts'
 import { classify } from './artifact-grid-thumb-utils'
 
@@ -27,6 +29,20 @@ export function ArtifactGridThumb({
         <IconFallback name={file.name} />
       ) : kind === 'image' ? (
         <ImageThumb
+          client={client}
+          sessionId={sessionId}
+          path={file.path}
+          name={file.name}
+        />
+      ) : kind === 'video' ? (
+        <VideoThumb
+          client={client}
+          sessionId={sessionId}
+          path={file.path}
+          name={file.name}
+        />
+      ) : kind === 'audio' ? (
+        <AudioThumb
           client={client}
           sessionId={sessionId}
           path={file.path}

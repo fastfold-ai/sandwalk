@@ -506,6 +506,11 @@ export type AgentModel = {
   reasoningEffort?: string | null
   /** Per-model Fast toggle. */
   reasoningFast?: boolean
+  /** Multimodal user-input capabilities (image / PDF / audio / video content blocks). */
+  supportsImageInputs?: boolean
+  supportsPdfInputs?: boolean
+  supportsAudioInputs?: boolean
+  supportsVideoInputs?: boolean
 }
 
 export type CreateAgentModelInput = {

@@ -13,9 +13,31 @@ from typing import Any
 
 from deepagents.backends import FilesystemBackend
 
-from agent.sandbox_backend.handle import SandboxHandle, get_active_handle, register_handle
+from agent.sandbox_backend.handle import (
+    SandboxHandle,
+    get_active_handle,
+    register_handle,
+    unregister_handle,
+)
 from agent.sandbox_backend.provisioning import sandbox_backend_from_config
+from agent.sandbox_backend.runtime import _run_modal_blocking
 from agent.sandbox_backend.skills_route import _compose_modal_with_local_skills
+
+
+def _modal_handle_is_alive(handle: SandboxHandle) -> bool:
+    """Return False when the cached Modal sandbox has already shut down."""
+    sandbox = handle.modal_sandbox
+    if sandbox is None:
+        return False
+    try:
+        def _probe() -> None:
+            proc = sandbox.exec("bash", "-c", "exit 0")
+            proc.wait()
+
+        _run_modal_blocking(_probe)
+        return True
+    except Exception:  # noqa: BLE001 — treat any probe failure as dead
+        return False
 
 
 def resolve_deepagents_backend(
@@ -65,25 +87,31 @@ def resolve_deepagents_backend(
         and existing.kind == "modal"
         and existing.workspace_root == workspace_root
     ):
-        # Refresh skills route sources if callers pass new dirs (specialist scope).
-        if sources and existing.extras.get("skills_root") is None:
-            composed, skill_paths, skills_root = _compose_modal_with_local_skills(
-                getattr(existing.backend, "default", existing.backend),
-                sources,
-            )
-            if skills_root is not None:
-                existing.backend = composed
-                existing.skills_sources = skill_paths
-                existing.extras["skills_root"] = str(skills_root)
-        if sync_workspace and not existing.seeded:
-            # Never block the agent on workspace sync.
-            threading.Thread(
-                target=_seed_modal_workspace,
-                args=(existing,),
-                name=f"modal-seed-{session_id or 'default'}",
-                daemon=True,
-            ).start()
-        return existing
+        # Idle TTL / external terminate leaves a stale in-memory handle that
+        # surfaces as "Modal Sandbox … not found" on the next tool call.
+        if not _modal_handle_is_alive(existing):
+            unregister_handle(session_id)
+            existing = None
+        else:
+            # Refresh skills route sources if callers pass new dirs (specialist scope).
+            if sources and existing.extras.get("skills_root") is None:
+                composed, skill_paths, skills_root = _compose_modal_with_local_skills(
+                    getattr(existing.backend, "default", existing.backend),
+                    sources,
+                )
+                if skills_root is not None:
+                    existing.backend = composed
+                    existing.skills_sources = skill_paths
+                    existing.extras["skills_root"] = str(skills_root)
+            if sync_workspace and not existing.seeded:
+                # Never block the agent on workspace sync.
+                threading.Thread(
+                    target=_seed_modal_workspace,
+                    args=(existing,),
+                    name=f"modal-seed-{session_id or 'default'}",
+                    daemon=True,
+                ).start()
+            return existing
 
     modal_backend, modal_sandbox, name, _created = _create_or_reuse_modal_sandbox(
         config, session_id=session_id

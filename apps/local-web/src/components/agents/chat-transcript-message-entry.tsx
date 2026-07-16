@@ -1,3 +1,4 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentMessage, AgentSession } from '@sandwalk/agent-ui-core'
 import {
   Check,
@@ -27,7 +28,9 @@ export function ChatTranscriptMessageEntry({
   copiedMessageId,
   setCopiedMessageId,
   session,
-  onOpenFile
+  onOpenFile,
+  client,
+  sessionId
 }: {
   entry: Extract<TranscriptEntry, { kind: 'message' }>
   runActive: boolean
@@ -38,6 +41,8 @@ export function ChatTranscriptMessageEntry({
   setCopiedMessageId: Dispatch<SetStateAction<string | null>>
   session: AgentSession | null | undefined
   onOpenFile: (path: string) => void
+  client?: LocalAgentClient | null
+  sessionId?: string | null
 }) {
   const message = entry.message
   const isUser = message.role === 'user'
@@ -58,7 +63,12 @@ export function ChatTranscriptMessageEntry({
       {isUser ? (
         <div className="relative min-w-0 max-w-[85%]">
           <div className="bg-muted text-foreground peer inline-block w-auto max-w-full break-words rounded-xl px-4 py-2">
-            <UserMessageContent content={entry.content} onOpenFile={onOpenFile} />
+            <UserMessageContent
+              content={entry.content}
+              onOpenFile={onOpenFile}
+              client={client}
+              sessionId={sessionId}
+            />
           </div>
         </div>
       ) : (

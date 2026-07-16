@@ -7,8 +7,10 @@ import { planModeAccent } from '@/components/agents/composer/ComposerModeMenu'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+import { AudioPlayPreview } from './AudioPlayPreview'
 import { MarkdownContent } from './MarkdownContent'
 import { StructureViewer } from './StructureViewer'
+import { VideoPlayPreview } from './VideoPlayPreview'
 import {
   fileTextContent,
   isMarkdown,
@@ -294,6 +296,49 @@ export function FilePreview({
           alt={active.path}
           className="max-h-full max-w-full object-contain"
         />
+      </div>
+    )
+  }
+  if (
+    active.mimeType.startsWith('video/') ||
+    /\.(mp4|webm|mov|avi|mpeg|mpg|wmv|flv|3gpp)$/i.test(active.path)
+  ) {
+    const src =
+      active.encoding === 'base64'
+        ? `data:${active.mimeType.startsWith('video/') ? active.mimeType : 'video/mp4'};base64,${active.content}`
+        : undefined
+    if (!src) {
+      return (
+        <div className="text-muted-foreground grid h-full place-items-center text-sm">
+          Video preview unavailable
+        </div>
+      )
+    }
+    return (
+      <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden p-4">
+        <VideoPlayPreview src={src} mode="panel" />
+      </div>
+    )
+  }
+  if (
+    active.mimeType.startsWith('audio/') ||
+    /\.(mp3|wav|aiff|aif|aac|ogg|flac|m4a)$/i.test(active.path)
+  ) {
+    const src =
+      active.encoding === 'base64'
+        ? `data:${active.mimeType.startsWith('audio/') ? active.mimeType : 'audio/mpeg'};base64,${active.content}`
+        : undefined
+    if (!src) {
+      return (
+        <div className="text-muted-foreground grid h-full place-items-center text-sm">
+          Audio preview unavailable
+        </div>
+      )
+    }
+    const name = active.path.split('/').at(-1) || active.path
+    return (
+      <div className="flex h-full min-h-0 w-full items-center justify-center p-6">
+        <AudioPlayPreview src={src} title={name} mode="panel" />
       </div>
     )
   }

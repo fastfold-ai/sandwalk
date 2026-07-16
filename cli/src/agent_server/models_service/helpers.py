@@ -7,6 +7,7 @@ from typing import Any
 from agent.config import Config
 from agent.model_catalog import (
     get_model_reasoning,
+    modality_capability_fields,
     model_supports_reasoning_effort,
     reasoning_effort_options,
 )
@@ -59,4 +60,5 @@ def _reasoning_fields(cfg: Config, provider: str, model_id: str) -> dict[str, An
         ),
         "reasoning_effort": effort if supports else None,
         "reasoning_fast": bool(fast) if supports else False,
+        **modality_capability_fields(provider, model_id),
     }

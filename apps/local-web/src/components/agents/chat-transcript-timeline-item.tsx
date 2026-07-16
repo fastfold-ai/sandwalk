@@ -1,3 +1,4 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentMessage,
   AgentPlanCard,
@@ -20,6 +21,7 @@ import { type ChatTimelineItem } from '@/components/agents/chat-transcript-timel
 type TimelineItemProps = {
   timelineItem: ChatTimelineItem
   sessionId: string | null
+  client?: LocalAgentClient | null
   expandedToolRunKeys: Record<string, boolean>
   onToggleToolRunExpanded: (key: string) => void
   runActive: boolean
@@ -40,6 +42,7 @@ type TimelineItemProps = {
 export function ChatTranscriptTimelineItem({
   timelineItem,
   sessionId,
+  client,
   expandedToolRunKeys,
   onToggleToolRunExpanded,
   runActive,
@@ -183,6 +186,8 @@ export function ChatTranscriptTimelineItem({
       setCopiedMessageId={setCopiedMessageId}
       session={session}
       onOpenFile={onOpenFile}
+      client={client}
+      sessionId={sessionId}
     />
   )
 }

@@ -193,8 +193,23 @@ class DeepAgentsRunMixin:
                 "claude-sonnet-4-5-20250929" if provider == "anthropic" else "gpt-5.6-sol"
             )
 
+            # Expand @path multimodal attachments into standard content blocks
+            # when the model supports that modality (LangChain/Deep Agents).
+            from agent.runner.multimodal_user_message import (
+                build_multimodal_user_content,
+            )
+
+            workspace_root = str(ctx.get("workspace_path") or "").strip()
+            user_content = build_multimodal_user_content(
+                user_prompt,
+                workspace_root=workspace_root or None,
+                provider=provider,
+                model_id=str(model_name or ""),
+                profile=getattr(model, "profile", None),
+            )
+
             events = agent.astream_events(
-                {"messages": [{"role": "user", "content": user_prompt}]},
+                {"messages": [{"role": "user", "content": user_content}]},
                 version="v2",
                 config={"recursion_limit": recursion_limit},
             )

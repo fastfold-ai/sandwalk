@@ -107,7 +107,11 @@ describe('toComposerModelOptions', () => {
         supportsReasoningEffort: false,
         reasoningEffortOptions: [],
         reasoningEffort: 'medium',
-        reasoningFast: false
+        reasoningFast: false,
+        supportsImageInputs: false,
+        supportsPdfInputs: false,
+        supportsAudioInputs: false,
+        supportsVideoInputs: false
       },
       {
         provider: 'local',
@@ -120,7 +124,11 @@ describe('toComposerModelOptions', () => {
         supportsReasoningEffort: false,
         reasoningEffortOptions: [],
         reasoningEffort: 'medium',
-        reasoningFast: false
+        reasoningFast: false,
+        supportsImageInputs: false,
+        supportsPdfInputs: false,
+        supportsAudioInputs: false,
+        supportsVideoInputs: false
       }
     ])
   })

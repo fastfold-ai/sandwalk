@@ -22,6 +22,11 @@ class AgentModel(ApiModel):
     # Per-model Effort/Fast (only meaningful when supports_reasoning_effort).
     reasoning_effort: str | None = None
     reasoning_fast: bool = False
+    # Multimodal user-input capabilities (LangChain/Deep Agents content blocks).
+    supports_image_inputs: bool = False
+    supports_pdf_inputs: bool = False
+    supports_audio_inputs: bool = False
+    supports_video_inputs: bool = False
 
 
 class AgentModelList(ApiModel):

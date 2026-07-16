@@ -44,6 +44,7 @@
     "date-fns": "4.1.0",
     "lucide-react": "^1.24.0",
     "molstar": "5.2.0",
+    "pdfjs-dist": "4.10.38",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",

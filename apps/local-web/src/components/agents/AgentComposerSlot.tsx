@@ -18,8 +18,17 @@ import {
 } from '@/components/agents/Composer'
 import { type SandboxComputeChange } from '@/components/agents/composer/sandbox-utils'
 import { QueuedMessages } from '@/components/agents/QueuedMessages'
-import { type ComposerModelOption } from '@/lib/composer-models'
+import {
+  resolveComposerModelOption,
+  type ComposerModelOption
+} from '@/lib/composer-models'
+import {
+  modelSupportsMultimodalKind,
+  multimodalKindForFile,
+  unsupportedMultimodalHint
+} from '@/lib/multimodal-attach'
 import type { QueuedMessage } from '@/lib/sessions'
+import { toast } from 'sonner'
 
 type AgentComposerSlotProps = {
   sessionId: string | null
@@ -155,6 +164,20 @@ export function AgentComposerSlot({
         onLoadSkill={loadSkillDetail}
         onUpload={async files => {
           if (!sessionId) return []
+          const activeModel = resolveComposerModelOption(modelOptions, {
+            provider: runtimeSettings?.provider || '',
+            model: runtimeSettings?.model || '',
+            openaiProfileId: runtimeSettings?.openaiProfileId ?? null
+          })
+          for (const file of files) {
+            const kind = multimodalKindForFile(file)
+            if (
+              kind &&
+              !modelSupportsMultimodalKind(activeModel, kind)
+            ) {
+              toast.message(unsupportedMultimodalHint(kind))
+            }
+          }
           const uploaded = await Promise.all(
             files.map(file => client.uploadFile(sessionId, file))
           )

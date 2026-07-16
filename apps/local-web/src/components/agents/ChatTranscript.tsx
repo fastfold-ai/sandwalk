@@ -1,3 +1,4 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentMessage,
   AgentPlanCard,
@@ -23,6 +24,7 @@ type ChatTranscriptProps = {
   conversationTimeline: TranscriptEntry[]
   expandedToolRunKeys: Record<string, boolean>
   sessionId: string | null
+  client?: LocalAgentClient | null
   onToggleToolRunExpanded: (key: string) => void
   runActive: boolean
   tools: TranscriptTool[]
@@ -50,6 +52,7 @@ export function ChatTranscript({
   conversationTimeline,
   expandedToolRunKeys,
   sessionId,
+  client,
   onToggleToolRunExpanded,
   runActive,
   tools,
@@ -93,6 +96,7 @@ export function ChatTranscript({
                 key={timelineItem.key}
                 timelineItem={timelineItem}
                 sessionId={sessionId}
+                client={client}
                 expandedToolRunKeys={expandedToolRunKeys}
                 onToggleToolRunExpanded={onToggleToolRunExpanded}
                 runActive={runActive}
