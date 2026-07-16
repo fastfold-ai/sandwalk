@@ -1,6 +1,7 @@
-"""Slash command registry for the interactive terminal."""
+"""Slash command reference (name -> one-line description)."""
 
-# Slash commands available in the interactive terminal
+from __future__ import annotations
+
 SLASH_COMMANDS = {
     "/help": "Show command reference with examples",
     "/tools": "List all tools with status (stable/experimental)",

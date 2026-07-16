@@ -1,4 +1,6 @@
-"""Rich rendering of a research plan for user approval."""
+"""Rendering a research Plan as a Rich Panel for user approval."""
+
+from __future__ import annotations
 
 from rich.console import Console
 from rich.panel import Panel

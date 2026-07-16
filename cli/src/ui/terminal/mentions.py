@@ -1,12 +1,28 @@
-"""@ mention parsing and related helpers for the interactive terminal.
+"""Parsing @ mentions (tools/datasets/workflows) out of user input."""
 
-Covers dataset/workflow mention extraction, mention-derived planner context,
-and small LLM-output helpers (base-url classification, follow-up suggestion
-extraction) used while building the terminal's mention experience.
-"""
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+
+from ui.terminal.dataset_catalog import (
+    DATASET_CANDIDATES,
+    KNOWN_DATASETS,
+    _get_workflow_names,
+)
+from ui.terminal.model_ids import _is_openai_managed_base_url
+
+# Re-export for package consumers / tests that patch ui.terminal.*
+__all__ = [
+    "DATASET_CANDIDATES",
+    "KNOWN_DATASETS",
+    "MentionCandidate",
+    "_extract_llm_suggestions",
+    "_get_workflow_names",
+    "_is_openai_managed_base_url",
+    "build_mention_context",
+    "extract_mentions",
+]
 
 
 @dataclass
@@ -18,59 +34,14 @@ class MentionCandidate:
     description: str   # truncated for display
 
 
-def _is_openai_managed_base_url(base_url: str | None) -> bool:
-    """Return True for OpenAI-managed API hosts."""
-    from urllib.parse import urlparse
-
-    value = str(base_url or "").strip()
-    if not value:
-        return True
-    try:
-        host = (urlparse(value).hostname or "").strip().lower()
-    except Exception:
-        return False
-    if not host:
-        return False
-    return host == "api.openai.com" or host.endswith(".openai.com")
-
-
-# ---------------------------------------------------------------------------
-# @ Mention: datasets and completer
-# ---------------------------------------------------------------------------
-
-DATASET_CANDIDATES = [
-    ("depmap", "dataset", "DepMap CRISPR/model data"),
-    ("prism", "dataset", "PRISM drug sensitivity"),
-    ("l1000", "dataset", "L1000 gene expression signatures"),
-    ("proteomics", "dataset", "Proteomics log2FC matrix"),
-    ("msigdb", "dataset", "MSigDB gene sets"),
-    ("string", "dataset", "STRING protein interaction network"),
-]
-
-KNOWN_DATASETS = frozenset(d[0] for d in DATASET_CANDIDATES)
-
-
-def _get_workflow_names() -> frozenset[str]:
-    """Lazily load workflow names."""
-    try:
-        from agent.workflows import WORKFLOWS
-        return frozenset(WORKFLOWS.keys())
-    except Exception:
-        return frozenset()
-
-
 def extract_mentions(text: str):
     """Parse @mentions from input text.
 
     Returns:
         tuple of (cleaned_query, tool_names, dataset_names, workflow_names)
     """
-    # Imported from the package namespace (rather than called directly) so
-    # that tests can monkeypatch `ui.terminal._get_workflow_names`.
-    from ui.terminal import _get_workflow_names as get_workflow_names
-
     dataset_names_set = {d[0] for d in DATASET_CANDIDATES}
-    workflow_names_set = get_workflow_names()
+    workflow_names_set = _get_workflow_names()
     tool_pattern = re.compile(r"@(\w+\.\w+)")
     word_pattern = re.compile(r"@(\w+)")
 

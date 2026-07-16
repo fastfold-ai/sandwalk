@@ -1,11 +1,13 @@
-"""prompt_toolkit completers for slash commands and @ mentions."""
+"""prompt_toolkit style + completers for slash commands and @ mentions."""
+
+from __future__ import annotations
 
 from collections.abc import Callable
 
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.styles import Style
 
-from .slash_commands import SLASH_COMMANDS
+from ui.terminal.slash_commands import SLASH_COMMANDS
 
 # prompt_toolkit style — dim ghost text, colored prompt, dark completion menu
 PT_STYLE = Style.from_dict({

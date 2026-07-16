@@ -1,4 +1,6 @@
-"""Custom prompt_toolkit key bindings for the interactive terminal."""
+"""Key bindings: Tab ghost-suggestion accept, double Ctrl+C exit, mention tabs."""
+
+from __future__ import annotations
 
 import threading
 import time
