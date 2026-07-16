@@ -33,28 +33,28 @@ A thinking path for open science.
 </p>
 <br>
 
-**sandwalk** is a self-hosted science agent for researchers: multi-step workflows across 190+ tools, database APIs, skills, MCPs, and sandboxes. Built for biology and drug discovery, and extensible beyond them.
+**sandwalk** is a self-hosted science agent for researchers. Ask a question, attach files, install skills, and let the agent walk the research path with you: multi-step workflows, sandboxes, and results in one place. Built for biology and drug discovery, and happy to stretch beyond them.
 
-Use the CLI or the web dashboard — both share the same sessions, workspace, and history. A macOS app can supervise the local stack. Run on your machine by default; send heavy jobs to cloud GPUs when you need them.
+Use the CLI or the web dashboard: same sessions, workspace, and history. A macOS app can keep the local stack warm. Run on your machine by default; send heavy jobs to cloud GPUs when you need them.
 
 ## Features
 
-- **CLI ↔ web** — one agent session, two surfaces (terminal and dashboard).
-- **Plan mode** — draft `plans/*.md` with todos and a Mermaid flowchart, then **Build** when ready.
-- **Multimodal** — `@`-attach images, PDFs, audio, and video (Gemini takes the full set).
-- **190+ science tools** — chemistry, targets, structures, omics, clinical, literature, and more.
-- **Live databases** — PubChem, ChEMBL, UniProt, PDB, Open Targets, ClinicalTrials.gov, GTEx, STRING, Ensembl, NCBI, …
-- **Local datasets** — optional DepMap, PRISM, L1000, proteomics, MSigDB, STRING (`sandwalk data pull-all`).
-- **Local + cloud compute** — Local Sandbox on your machine, or Modal / Lambda / Fastfold Cloud for GPU jobs.
-- **Skills & MCPs** — install from GitHub or [skills.sh](https://skills.sh); connect remote MCPs via Cursor-compatible `~/.sandwalk/mcp.json`.
-- **Specialists** — reusable skill + MCP + instruction packs for focused research modes.
-- **Viewers** — structures, plots, and artifacts beside the chat.
+- **CLI ↔ web**: one agent session, two surfaces (terminal and dashboard).
+- **Plan mode**: draft `plans/*.md` with todos and a Mermaid flowchart, then **Build** when ready.
+- **Multimodal**: `@`-attach images, PDFs, audio, and video (Gemini takes the full set).
+- **Tools you can grow**: install as many as you want; we curate a starter set for chemistry, targets, structures, omics, clinical, literature, and more.
+- **Live databases**: PubChem, ChEMBL, UniProt, PDB, Open Targets, ClinicalTrials.gov, GTEx, STRING, Ensembl, NCBI, …
+- **Local datasets**: optional DepMap, PRISM, L1000, proteomics, MSigDB, STRING (`sandwalk data pull-all`).
+- **Local + cloud compute**: Local Sandbox on your machine, or Modal / Lambda / Fastfold Cloud for GPU jobs.
+- **Skills & MCPs**: install from GitHub or [skills.sh](https://skills.sh); connect remote MCPs via Cursor-compatible `~/.sandwalk/mcp.json`.
+- **Specialists**: reusable skill + MCP + instruction packs for focused research modes.
+- **Viewers**: structures, plots, and artifacts beside the chat.
 
 ### Tools, data, and models
 
-Tool areas include targets and genetics, chemistry, protein structure and design, expression / single-cell, clinical and translational, literature, and safety / PK / stats. List tools and corpora with `sandwalk tool list` and `sandwalk data list`.
+We ship a curated toolkit out of the box (targets and genetics, chemistry, protein structure and design, expression / single-cell, clinical and translational, literature, safety / PK / stats), and you can keep installing more. Browse what you have with `sandwalk tool list` and `sandwalk data list`.
 
-**Models** (via `sandwalk setup`, the dashboard, or `sandwalk config`): Anthropic, OpenAI, Google Gemini, xAI (Grok), NVIDIA, OpenCode Zen, plus local OpenAI-compatible endpoints — Ollama, Unsloth, oMLX, DS4, llama.cpp, LM Studio.
+**Models** (via `sandwalk setup`, the dashboard, or `sandwalk config`): Anthropic, OpenAI, Google Gemini, xAI (Grok), NVIDIA, OpenCode Zen, plus local OpenAI-compatible endpoints like Ollama, Unsloth, oMLX, DS4, llama.cpp, and LM Studio.
 
 **Integrations** (`sandwalk keys` / Dashboard → Integrations): Modal, LangSmith, Tavily, Slack, Vercel, NVIDIA, OpenCode Zen, custom webhooks.
 
@@ -185,7 +185,7 @@ The composer drives every turn: model and effort, specialist, sandbox, plus `@` 
   </picture>
 </p>
 
-**Plan mode.** Switch the composer from **Agent** to **Plan** when you want a campaign design first. The agent writes `plans/<slug>.md` (steps + Mermaid), fills todos, and surfaces a **Build** action — no Y/n gate. Edit in chat, then Build or flip back to Agent. In the CLI: `/plan`.
+**Plan mode.** Switch the composer from **Agent** to **Plan** when you want a campaign design first. The agent writes `plans/<slug>.md` (steps + Mermaid), fills todos, and surfaces a **Build** action with no Y/n gate. Edit in chat, then Build or flip back to Agent. In the CLI: `/plan`.
 
 <p align="center">
   <picture>
@@ -219,7 +219,7 @@ Manage those servers under Dashboard → **MCPs**: toggle catalog entries, conne
   </picture>
 </p>
 
-Config is stored as standard `mcpServers` JSON in `~/.sandwalk/mcp.json` — the same shape Cursor and other MCP clients use. Edit from **Edit mcp.json** and **Save MCPs**, or hand-edit the file.
+Config is stored as standard `mcpServers` JSON in `~/.sandwalk/mcp.json`, the same shape Cursor and other MCP clients use. Edit from **Edit mcp.json** and **Save MCPs**, or hand-edit the file.
 
 <p align="center">
   <picture>
@@ -229,7 +229,7 @@ Config is stored as standard `mcpServers` JSON in `~/.sandwalk/mcp.json` — the
   </picture>
 </p>
 
-For packaged workflows, open Dashboard → **Skills**. Toggle **Skills.sh** to search the [skills.sh](https://skills.sh) registry (results show install counts), or import from GitHub (`owner/repo`, `owner/repo@path`, or a URL — same as `sandwalk skills add`).
+For packaged workflows, open Dashboard → **Skills**. Toggle **Skills.sh** to search the [skills.sh](https://skills.sh) registry (results show install counts), or import from GitHub (`owner/repo`, `owner/repo@path`, or a URL, same as `sandwalk skills add`).
 
 <p align="center">
   <picture>
@@ -251,7 +251,7 @@ Open a skill for the install command, enable/disable toggle, links to Skills.sh 
 
 ### Artifacts and terminal
 
-When the agent produces structures, plots, or reports, open them in **Artifacts** beside the chat — JSON, SVG (PAE, pLDDT), and CIF/PDB in a 3D viewer.
+When the agent produces structures, plots, or reports, open them in **Artifacts** beside the chat: JSON, SVG (PAE, pLDDT), and CIF/PDB in a 3D viewer.
 
 <p align="center">
   <picture>
@@ -276,7 +276,7 @@ Below the workspace, a multi-tab terminal follows your theme. The CLI tab mirror
 | Area | What you configure |
 |------|--------------------|
 | **Models** | Cloud providers and local OpenAI-compatible endpoints |
-| **Tools** | Enable tools from the science registry |
+| **Tools** | Browse and enable curated tools; install more anytime |
 | **Skills / MCPs** | Installs, skills.sh, GitHub import, `mcp.json` |
 | **Datasets** | Local corpora (DepMap, PRISM, L1000, …) |
 | **Specialists** | Skill + MCP + instruction packs |

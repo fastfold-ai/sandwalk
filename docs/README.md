@@ -1,6 +1,6 @@
 # sandwalk docs (`@sandwalk/docs`)
 
-Hosted documentation site for sandwalk — [Fumadocs](https://fumadocs.dev) + Next.js, same stack as [fastfold-docs](https://github.com/fastfold-ai/fastfold-docs).
+Hosted documentation site for sandwalk: [Fumadocs](https://fumadocs.dev) + Next.js, same stack as [fastfold-docs](https://github.com/fastfold-ai/fastfold-docs).
 
 Lives at the repo-root `docs/` package (not under `apps/`), so Vercel can point at this directory the same way as the Fastfold Cloud docs repo.
 
@@ -25,7 +25,7 @@ Open [http://localhost:3001](http://localhost:3001).
 
 ## Content
 
-MDX lives in [`content/`](./content/). Sidebar order is [`content/meta.json`](./content/meta.json).
+MDX lives in [`content/`](./content/). Sidebar tree: Introduction → Get started → Apps → Web UI → CLI → Skills → MCPs → Models.
 
 ## Deploy
 

@@ -1,14 +1,13 @@
 {
   "pages": [
     "index",
-    "---Get started---",
     "quickstart",
-    "configuration",
-    "---Product---",
-    "ui",
+    "apps",
+    "web",
     "cli",
-    "mac",
-    "---Extensibility---",
-    "skills-and-mcps"
+    "skills",
+    "mcps",
+    "models",
+    "configuration"
   ]
 }

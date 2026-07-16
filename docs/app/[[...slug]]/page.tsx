@@ -23,15 +23,15 @@ export default async function Page({
   const resolved = await params;
   const page = source.getPage(resolved.slug);
   if (!page) notFound();
-  const isHomePage = !resolved.slug || resolved.slug.length === 0;
+  const isHome = !resolved.slug || resolved.slug.length === 0;
 
   const MDX = page.data.body;
   const lastModified = page.data.lastModified;
 
   return (
     <DocsPage toc={page.data.toc} full={page.data.full}>
-      {!isHomePage && <DocsTitle>{page.data.title}</DocsTitle>}
-      {!isHomePage && <DocsDescription>{page.data.description}</DocsDescription>}
+      {!isHome && <DocsTitle>{page.data.title}</DocsTitle>}
+      {!isHome && <DocsDescription>{page.data.description}</DocsDescription>}
       <DocsBody>
         <MDX
           components={getMDXComponents({

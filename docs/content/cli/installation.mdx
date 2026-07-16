@@ -1,0 +1,36 @@
+---
+title: Installation
+description: Install or upgrade the sandwalk CLI.
+---
+
+For the shortest path to a running stack, use the root [Quick Start](/quickstart).
+
+Requires Python 3.11+.
+
+## One-liner
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fastfold-ai/sandwalk/main/cli/install.sh | bash
+```
+
+## uv / PyPI
+
+```bash
+uv tool install sandwalk
+sandwalk --version
+```
+
+Optional science extras:
+
+```bash
+uv tool install "sandwalk[all]"
+# or: uv tool install "sandwalk[chemistry]"
+```
+
+## Upgrade
+
+```bash
+sandwalk upgrade
+```
+
+Then: [Terminal](/cli/terminal), [Serve](/cli/serve), or [Command reference](/cli/commands).

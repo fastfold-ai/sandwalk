@@ -1,41 +1,28 @@
 ---
-title: Quickstart
-description: Install sandwalk and run your first research session.
+title: Quick Start
+description: Install sandwalk and get everything running in minutes.
 ---
 
-## CLI (recommended)
+Choose one path, finish the short steps, and you are ready to research.
 
-Requires [uv](https://docs.astral.sh/uv/) and Python 3.11+.
+## 1. Pick how to install
 
-```bash
-uv tool install sandwalk
-sandwalk --version
+<Cards>
+  <Card
+    title="macOS app"
+    description="Menu bar start/stop, opens the Web UI for you."
+    href="#macos-app"
+  />
+  <Card
+    title="CLI"
+    description="Install with a one-liner script or uv (PyPI)."
+    href="#cli"
+  />
+</Cards>
 
-sandwalk setup
-sandwalk doctor
-sandwalk
-```
+## 2a. macOS app
 
-Optional science extras:
-
-```bash
-uv tool install "sandwalk[all]"
-```
-
-## Local server + dashboard
-
-```bash
-sandwalk serve
-```
-
-| Service   | Default URL             |
-|-----------|-------------------------|
-| Agent API | http://127.0.0.1:8787   |
-| Dashboard | http://127.0.0.1:8969   |
-
-## macOS app
-
-Package from the monorepo, or download a release when published:
+1. Install **Sandwalk.app** from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases) when published, or build from source:
 
 ```bash
 cd apps/sandwalk-mac
@@ -43,10 +30,63 @@ cd apps/sandwalk-mac
 open ~/Applications/Sandwalk.app
 ```
 
-See [macOS](/mac) for menu-bar controls.
+2. From the menu bar: **Start** the agent server.
+3. Click **Open Web Dashboard**.
+4. In Settings, add a model provider key if prompted.
+5. Ask something in the composer, for example: `What is known about KRAS G12C inhibitors?`
 
-## Next steps
+Done. Details: [macOS app](/apps/macos).
 
-- [Configuration](/configuration) — `~/.sandwalk/`, API keys, auth
-- [UI](/ui) — dashboard tour
-- [Skills and MCPs](/skills-and-mcps) — install workflows
+## 2b. CLI
+
+Requires Python 3.11+.
+
+**Option A: one-liner** (installs [uv](https://docs.astral.sh/uv/) if needed, then sandwalk):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fastfold-ai/sandwalk/main/cli/install.sh | bash
+```
+
+**Option B: uv / PyPI:**
+
+```bash
+uv tool install sandwalk
+sandwalk --version
+```
+
+Optional science extras later: `uv tool install "sandwalk[all]"`.
+
+### Get running
+
+```bash
+sandwalk setup          # models, keys, skills
+sandwalk doctor         # quick health check
+sandwalk serve          # API + Web UI
+```
+
+Open the dashboard: [http://127.0.0.1:8969](http://127.0.0.1:8969)
+
+Or chat in the terminal:
+
+```bash
+sandwalk
+```
+
+| Service   | URL                     |
+|-----------|-------------------------|
+| Dashboard | http://127.0.0.1:8969   |
+| Agent API | http://127.0.0.1:8787   |
+
+## 3. First things to try
+
+- Attach a file with `@` in the composer
+- Type `/` for skills and MCPs
+- Toggle **Plan** to draft a campaign before heavy tools
+- Install skills: `sandwalk skills add fastfold-ai/skills`
+
+## Where next
+
+- [Web UI](/web/composer): composer, plan mode, artifacts
+- [CLI](/cli/terminal): interactive, one-shot, serve, commands
+- [Skills](/skills) · [MCPs](/mcps) · [Models](/models)
+- [Configuration](/configuration): `~/.sandwalk/`, auth

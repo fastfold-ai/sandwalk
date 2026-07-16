@@ -16,10 +16,10 @@ export const metadata: Metadata = {
       : new URL('http://localhost:3001'),
   title: {
     default: 'sandwalk docs',
-    template: 'sandwalk docs — %s',
+    template: 'sandwalk docs · %s',
   },
   description:
-    'Documentation for sandwalk: self-hosted science agent with CLI, web dashboard, and macOS app.',
+    'sandwalk docs: a thinking path for open science. Self-hosted agent with CLI, web dashboard, and macOS app.',
   icons: {
     icon: [
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
