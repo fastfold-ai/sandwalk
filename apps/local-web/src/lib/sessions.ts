@@ -1,4 +1,9 @@
-import type { AgentMessage, AgentSession, AgentTodo } from '@sandwalk/agent-ui-core'
+import type {
+  AgentMessage,
+  AgentPlanCard,
+  AgentSession,
+  AgentTodo
+} from '@sandwalk/agent-ui-core'
 
 import type { TranscriptTool } from '@/components/agents/ToolCard'
 
@@ -6,6 +11,7 @@ export type SessionChatState = {
   messages: AgentMessage[]
   tools: TranscriptTool[]
   todosByRunId: Record<string, AgentTodo[]>
+  plansByRunId: Record<string, AgentPlanCard[]>
   runIdByMessageId: Record<string, string>
   usageByRunId: Record<string, { inputTokens: number; outputTokens: number }>
   tokenUsage: { inputTokens: number; outputTokens: number }
@@ -18,6 +24,10 @@ export type SessionChatState = {
   queuedMessages: QueuedMessage[]
   expandedToolRunKeys: Record<string, boolean>
   messagesLoaded: boolean
+  /** Plan currently being built/executed (set by Build action). */
+  activeBuildPlan: AgentPlanCard | null
+  /** Plan paths the user already started building — hide Created Plan cards. */
+  builtPlanPaths: string[]
 }
 
 export type QueuedMessage = {
@@ -30,6 +40,7 @@ export function emptySessionChatState(): SessionChatState {
     messages: [],
     tools: [],
     todosByRunId: {},
+    plansByRunId: {},
     runIdByMessageId: {},
     usageByRunId: {},
     tokenUsage: { inputTokens: 0, outputTokens: 0 },
@@ -41,7 +52,9 @@ export function emptySessionChatState(): SessionChatState {
     composerFiles: [],
     queuedMessages: [],
     expandedToolRunKeys: {},
-    messagesLoaded: false
+    messagesLoaded: false,
+    activeBuildPlan: null,
+    builtPlanPaths: []
   }
 }
 

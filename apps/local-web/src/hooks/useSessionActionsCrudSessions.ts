@@ -136,10 +136,26 @@ export function useSessionActionsCrudSessions({
     target: AgentSession,
     changes: Parameters<typeof client.updateSession>[1]
   ) => {
+    // Optimistic patch so project-scope / tab filtering does not flicker while
+    // the API + reload round-trip completes.
+    setSessions(current =>
+      current.map(item =>
+        item.id === target.id
+          ? {
+              ...item,
+              ...changes,
+              updatedAt: new Date().toISOString()
+            }
+          : item
+      )
+    )
     try {
       await client.updateSession(target.id, changes)
       await Promise.all([loadSessions(), loadProjects()])
     } catch (cause) {
+      setSessions(current =>
+        current.map(item => (item.id === target.id ? target : item))
+      )
       setError(
         cause instanceof Error ? cause.message : 'Unable to update agent'
       )

@@ -197,11 +197,27 @@ class DeepAgentsBuildMixin:
             Path(workspace_path).joinpath("outputs").mkdir(
                 parents=True, exist_ok=True
             )
+            Path(workspace_path).joinpath("plans").mkdir(
+                parents=True, exist_ok=True
+            )
             context_parts.append(
                 "Internal session workspace path (do not recite in replies "
                 "unless the user asks where files are; still use this absolute "
                 f"path for all downloads/writes): {workspace_path}"
             )
+            try:
+                from agent.system_prompt.mode_section import list_recent_plan_files
+
+                recent_plans = list_recent_plan_files(workspace_path)
+            except Exception:
+                recent_plans = []
+            cfg = getattr(self.session, "config", None)
+            plan_mode = bool(cfg.get("agent.plan_preview", False)) if cfg else False
+            if recent_plans and not plan_mode:
+                context_parts.append(
+                    "Pending plan files (newest first): "
+                    + ", ".join(recent_plans)
+                )
         if ctx.get("compound_smiles"):
             context_parts.append(f"Compound SMILES: {ctx['compound_smiles']}")
         if ctx.get("target"):

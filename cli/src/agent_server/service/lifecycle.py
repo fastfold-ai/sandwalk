@@ -17,10 +17,35 @@ class SessionBusyError(RuntimeError):
 
 class _LifecycleMixin:
     def interrupt(self, session_id: str) -> bool:
+        """Cancel an active run and/or clear orphaned ``running`` status.
+
+        Past plan-mode approval hangs and crashed workers can leave sessions
+        marked ``running`` with no live task. Stop must still unstick them.
+        """
         task = self._active_runs.get(session_id)
-        if task is None or task.done():
-            return False
-        task.cancel()
+        cancelled = False
+        if task is not None and not task.done():
+            task.cancel()
+            cancelled = True
+
+        session = self.store.get_session(session_id)
+        if session is None:
+            return cancelled
+
+        if session.status != "running":
+            return cancelled
+
+        # Always clear stuck running status so Stop is reliable even when the
+        # worker is gone or CancelledError never surfaces from a hung thread.
+        self.store.set_session_status(session_id, "interrupted")
+        if not cancelled:
+            run_id = self._run_ids.get(session_id)
+            self.store.append_event(
+                session_id=session_id,
+                run_id=run_id,
+                event_type="run.interrupted",
+                payload={"reason": "Run interrupted"},
+            )
         return True
 
     async def delete_session(self, session_id: str) -> bool:

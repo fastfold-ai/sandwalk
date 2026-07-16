@@ -77,10 +77,10 @@ export function ChatTranscriptMessageEntry({
             />
           ) : null}
           {isAssistant && entry.content && !hideActionsWhileStreaming ? (
-            <div className="text-zinc-300 dark:text-zinc-600 -mb-7.5 min-h-7.5 -ml-1 flex items-center gap-0.5 pt-1.5">
+            <div className="text-muted-foreground -mb-7.5 min-h-7.5 -ml-1 flex items-center gap-0.5 pt-1.5">
               <button
                 type="button"
-                className="hover:bg-muted hover:text-zinc-400 dark:hover:text-zinc-500 inline-flex h-6 w-6 items-center justify-center rounded-md"
+                className="hover:bg-muted hover:text-foreground inline-flex h-6 w-6 items-center justify-center rounded-md"
                 onClick={async () => {
                   await navigator.clipboard.writeText(message.content)
                   setCopiedMessageId(message.id)
@@ -102,7 +102,7 @@ export function ChatTranscriptMessageEntry({
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="hover:bg-muted hover:text-zinc-400 dark:hover:text-zinc-500 inline-flex h-6 w-6 items-center justify-center rounded-md"
+                    className="hover:bg-muted hover:text-foreground inline-flex h-6 w-6 items-center justify-center rounded-md"
                     aria-label="More actions"
                   >
                     <MoreHorizontal className="size-3.5" />

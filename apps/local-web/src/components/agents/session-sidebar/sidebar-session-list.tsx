@@ -6,7 +6,14 @@ import {
   MoreHorizontal,
   Pin
 } from 'lucide-react'
-import type { Dispatch, MouseEvent, SetStateAction } from 'react'
+import {
+  type Dispatch,
+  type MouseEvent,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState
+} from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
@@ -24,6 +31,8 @@ type SessionSection = ReturnType<typeof groupSessions>[number]
 
 export type SidebarSessionListProps = {
   sections: SessionSection[]
+  /** When this changes, the list cross-fades instead of hard-swapping. */
+  scopeKey?: string | null
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
   chatBySessionId: Record<string, SessionChatState>
@@ -51,6 +60,7 @@ export type SidebarSessionListProps = {
 
 export function SidebarSessionList({
   sections,
+  scopeKey = null,
   collapsedSidebarSections,
   sessionId,
   chatBySessionId,
@@ -72,15 +82,49 @@ export function SidebarSessionList({
   setDeleteTarget,
   onClearSessionSelection
 }: SidebarSessionListProps) {
+  const [displayedSections, setDisplayedSections] = useState(sections)
+  const [listOpacity, setListOpacity] = useState(1)
+  const previousScopeRef = useRef(scopeKey)
+  const sectionsRef = useRef(sections)
+  sectionsRef.current = sections
+
+  useEffect(() => {
+    if (previousScopeRef.current === scopeKey) return
+    previousScopeRef.current = scopeKey
+    // Soft cross-fade when the project scope filter changes.
+    let cancelled = false
+    setListOpacity(0)
+    const timer = window.setTimeout(() => {
+      if (cancelled) return
+      setDisplayedSections(sectionsRef.current)
+      requestAnimationFrame(() => {
+        if (!cancelled) setListOpacity(1)
+      })
+    }, 90)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [scopeKey])
+
+  useEffect(() => {
+    // Keep the list fresh for pin/rename/status updates without fading.
+    if (listOpacity < 1) return
+    setDisplayedSections(sections)
+  }, [sections, listOpacity])
+
   return (
     <ScrollArea className="flex-1">
-      <div className="space-y-3 p-3">
-        {sections.length === 0 ? (
+      <div
+        className="space-y-3 p-3 transition-opacity duration-150 ease-out"
+        style={{ opacity: listOpacity }}
+      >
+        {displayedSections.length === 0 ? (
           <p className="text-muted-foreground px-1.5 py-2 text-[13px]">
             No Agents Yet
           </p>
         ) : (
-          sections.map(section => {
+          displayedSections.map(section => {
             const collapsed = Boolean(collapsedSidebarSections[section.id])
             return (
               <div key={section.id} className="space-y-1">

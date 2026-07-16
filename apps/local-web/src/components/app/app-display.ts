@@ -98,6 +98,8 @@ export function buildSessionSidebarModel(input: {
   sessions: AgentSession[]
   activeProjectId: string | null
   openTabIds: string[]
+  /** Keep the open chat visible in the tab strip while its project assignment catches up. */
+  activeSessionId?: string | null
 }) {
   const displayedSessions = input.activeProjectId
     ? input.sessions.filter(item => item.projectId === input.activeProjectId)
@@ -107,7 +109,10 @@ export function buildSessionSidebarModel(input: {
     .map(id => input.sessions.find(item => item.id === id))
     .filter((item): item is AgentSession => Boolean(item))
     .filter(
-      item => !input.activeProjectId || item.projectId === input.activeProjectId
+      item =>
+        !input.activeProjectId ||
+        item.projectId === input.activeProjectId ||
+        item.id === input.activeSessionId
     )
   return { displayedSessions, sections, openTabs }
 }

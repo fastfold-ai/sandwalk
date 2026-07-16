@@ -74,8 +74,29 @@ export function isSpreadsheet(path: string) {
   return /\.(csv|tsv)$/i.test(path)
 }
 
+export function isMarkdown(path: string) {
+  return /\.(md|mdx|markdown)$/i.test(path)
+}
+
+/** Workspace plan markdown under a `plans/` directory (matches server plan events). */
+export function isPlansMarkdown(path: string) {
+  const normalized = path.replace(/\\/g, '/')
+  if (!/(^|\/)plans\//i.test(normalized)) return false
+  return isMarkdown(normalized)
+}
+
+export function titleFromPlanPath(path: string) {
+  const name = path.replace(/\\/g, '/').split('/').at(-1) || path
+  const stem = name.replace(/\.(md|mdx|markdown)$/i, '')
+  const titled = stem
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .join(' ')
+  return titled.trim() || 'Plan'
+}
+
 export function isTextLike(path: string) {
-  return /\.(json|md|txt|ya?ml|py|ts|tsx|js|jsx|css|html?|xml|cif|mmcif|pdb|sdf)$/i.test(
+  return /\.(json|md|mdx|markdown|txt|ya?ml|py|ts|tsx|js|jsx|css|html?|xml|cif|mmcif|pdb|sdf)$/i.test(
     path
   )
 }

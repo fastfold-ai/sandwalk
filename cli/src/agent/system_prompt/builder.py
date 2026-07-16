@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from .knowledge_section import build_knowledge_sections
+from .mode_section import build_mode_section
 from .skills_section import build_skills_section
 from .text_blocks import _IDENTITY, _SYNTHESIS_INSTRUCTIONS
 from .tools_section import build_tools_section
@@ -59,6 +60,11 @@ def build_system_prompt(
     parts: list[str] = [_IDENTITY]
 
     parts.append(build_workspace_section(workspace_path, sandbox_backend))
+
+    plan_mode = bool(getattr(session, "config", None) and session.config.get("agent.plan_preview", False))
+    parts.append(
+        build_mode_section(plan_mode=plan_mode, workspace_path=workspace_path)
+    )
 
     if project_context and str(project_context).strip():
         parts.append("\n## Project Context\n")

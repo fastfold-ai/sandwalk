@@ -251,6 +251,11 @@ omit = [
     "*/agent_server/service.py",
     # Static specialist catalog payload (data, not behavior).
     "*/agent_server/default_specialists.py",
+    # Live Modal create/reuse — needs Modal credentials + network.
+    "*/agent/sandbox_backend/lifecycle.py",
+    # Optional DESeq2 backends — need pyDESeq2 / R runtime; covered via omics_deseq2 facade tests.
+    "*/tools/omics_deseq2_py.py",
+    "*/tools/omics_deseq2_r.py",
 ]
 
 [tool.coverage.report]

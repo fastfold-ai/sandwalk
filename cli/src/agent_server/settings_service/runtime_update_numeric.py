@@ -72,3 +72,5 @@ def apply_numeric_updates(config: Config, payload: UpdateRuntimeSettingsRequest)
                 default=900,
             ),
         )
+    if payload.plan_mode is not None:
+        config.set("agent.plan_preview", bool(payload.plan_mode))

@@ -96,6 +96,7 @@ describe('buildConversationTimeline', () => {
       messages,
       tools: [],
       todosByRunId: {},
+      plansByRunId: {},
       runIdByMessageId: {}
     })
     expect(timeline).toEqual([
@@ -121,6 +122,7 @@ describe('buildConversationTimeline', () => {
       messages: [assistant],
       tools,
       todosByRunId: { 'run-1': todos },
+      plansByRunId: {},
       runIdByMessageId: { a1: 'run-1' }
     })
 
@@ -153,6 +155,7 @@ describe('buildConversationTimeline', () => {
       messages: [assistant],
       tools,
       todosByRunId: {},
+      plansByRunId: {},
       runIdByMessageId: {}
     })
     expect(timeline.map(e => e.kind)).toEqual(['tool'])
@@ -164,6 +167,7 @@ describe('buildConversationTimeline', () => {
       messages: [assistant],
       tools: [],
       todosByRunId: {},
+      plansByRunId: {},
       runIdByMessageId: {}
     })
     expect(timeline).toHaveLength(1)
@@ -179,10 +183,60 @@ describe('buildConversationTimeline', () => {
       messages: [],
       tools,
       todosByRunId: {},
+      plansByRunId: {},
       runIdByMessageId: {},
       activeRunId: 'active-run'
     })
     expect(timeline).toEqual([{ kind: 'tool', tool: tools[0] }])
+  })
+
+  it('tolerates missing plansByRunId / todosByRunId maps', () => {
+    const assistant = msg({ id: 'a1', role: 'assistant', content: 'Done.' })
+    const timeline = buildConversationTimeline({
+      messages: [assistant],
+      tools: [],
+      // Simulate in-memory state from before plan fields existed.
+      todosByRunId: undefined,
+      plansByRunId: undefined,
+      runIdByMessageId: { a1: '73c557e0-ef76-41fb-82d7-493f75725533' }
+    })
+    expect(timeline).toEqual([
+      { kind: 'message', message: assistant, content: 'Done.' }
+    ])
+  })
+
+  it('shows each plan path once on the first creating run', () => {
+    const first = msg({ id: 'a1', role: 'assistant', content: 'Drafting.' })
+    const second = msg({ id: 'a2', role: 'assistant', content: 'Ready.' })
+    const followUp = msg({ id: 'a3', role: 'assistant', content: 'Updated.' })
+    const plan = {
+      path: 'plans/demo.md',
+      title: 'Demo',
+      summary: 'Overview'
+    }
+    const timeline = buildConversationTimeline({
+      messages: [first, second, followUp],
+      tools: [],
+      todosByRunId: {
+        'run-1': [{ id: 't1', content: 'Step', status: 'completed' }],
+        'run-2': [{ id: 't2', content: 'Next', status: 'pending' }]
+      },
+      plansByRunId: {
+        'run-1': [plan],
+        // Same path on a later run must not re-render the Created Plan card.
+        'run-2': [{ ...plan, title: 'Demo v2' }]
+      },
+      runIdByMessageId: { a1: 'run-1', a2: 'run-1', a3: 'run-2' }
+    })
+
+    const plans = timeline.filter(e => e.kind === 'plan')
+    expect(plans).toHaveLength(1)
+    expect(plans[0]).toMatchObject({
+      kind: 'plan',
+      messageId: 'a2',
+      plan: { path: 'plans/demo.md', title: 'Demo' }
+    })
+    expect(timeline.filter(e => e.kind === 'todos')).toHaveLength(2)
   })
 })
 
@@ -234,6 +288,11 @@ describe('toolsFromEvents', () => {
       envelope('todos.updated', {
         todos: [{ id: 't1', content: 'Next', status: 'completed' }]
       }),
+      envelope('plan.created', {
+        path: 'plans/demo.md',
+        title: 'Demo',
+        summary: 'Overview'
+      }),
       envelope(
         'tool.completed',
         {
@@ -250,6 +309,10 @@ describe('toolsFromEvents', () => {
     const result = toolsFromEvents(events)
     expect(result.runIdByMessageId).toEqual({ u1: 'run-1', a1: 'run-1' })
     expect(result.todosByRunId['run-1']?.[0]?.content).toBe('Next')
+    expect(result.plansByRunId['run-1']?.[0]).toMatchObject({
+      path: 'plans/demo.md',
+      title: 'Demo'
+    })
     expect(result.tools).toHaveLength(2)
     expect(result.tools.find(t => t.id === 'tc1')).toMatchObject({
       status: 'completed',

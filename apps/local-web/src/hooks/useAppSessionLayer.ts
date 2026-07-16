@@ -170,12 +170,14 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
         messages: chat.messages,
         tools: chat.tools,
         todosByRunId: chat.todosByRunId,
+        plansByRunId: chat.plansByRunId,
         runIdByMessageId: chat.runIdByMessageId,
         activeRunId: chat.activeRunId
       }),
     [
       chat.activeRunId,
       chat.messages,
+      chat.plansByRunId,
       chat.runIdByMessageId,
       chat.todosByRunId,
       chat.tools
@@ -218,6 +220,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     setFilesPanelCollapsed: args.setFilesPanelCollapsed,
     setPendingOpenPath: args.setPendingOpenPath,
     handleComposerSend: send.handleComposerSend,
+    handleStop: send.handleStop,
     setWorkspaceVersion: args.setWorkspaceVersion,
     runtimeSettings: args.runtimeSettings,
     tokenUsage: chat.tokenUsage,
@@ -239,6 +242,8 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
         tool => tool.runId === chat.activeRunId && !tool.messageId
       )
     : []
+  const activeBuildPlan = chat.activeBuildPlan
+  const builtPlanPaths = chat.builtPlanPaths
 
   return {
     chat,
@@ -251,6 +256,8 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     agentComposerSlotProps,
     activeRunTodos,
     activeRunTools,
+    activeBuildPlan,
+    builtPlanPaths,
     runningCount,
     runningSessionIdsKey,
     concurrentRunSoftLimit: CONCURRENT_RUN_SOFT_LIMIT

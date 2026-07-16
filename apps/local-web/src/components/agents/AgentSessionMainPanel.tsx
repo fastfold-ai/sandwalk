@@ -20,6 +20,7 @@ import {
   ResizablePanelGroup
 } from '@/components/ui/resizable'
 import { SESSION_PANELS_AUTO_SAVE_ID } from '@/lib/app-storage'
+import { planCardFromPath, startPlanBuild } from '@/lib/plan-build'
 import { type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
@@ -80,6 +81,8 @@ export type AgentSessionMainPanelProps = {
   setCopiedMessageId: Dispatch<SetStateAction<string | null>>
   activeRunTools: TranscriptTool[]
   activeRunTodos: import('@sandwalk/agent-ui-core').AgentTodo[]
+  activeBuildPlan: import('@sandwalk/agent-ui-core').AgentPlanCard | null
+  builtPlanPaths: string[]
   liveDelta: string
   showScrollToBottom: boolean
   scrollChatToBottom: () => void
@@ -142,6 +145,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     setCopiedMessageId,
     activeRunTools,
     activeRunTodos,
+    activeBuildPlan,
+    builtPlanPaths,
     liveDelta,
     showScrollToBottom,
     scrollChatToBottom,
@@ -225,6 +230,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             setCopiedMessageId={setCopiedMessageId}
             activeRunTools={activeRunTools}
             activeRunTodos={activeRunTodos}
+            activeBuildPlan={activeBuildPlan}
+            builtPlanPaths={builtPlanPaths}
             liveDelta={liveDelta}
             showScrollToBottom={showScrollToBottom}
             scrollChatToBottom={scrollChatToBottom}
@@ -266,6 +273,19 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 onAddToChat={path => {
                   setComposer(current => `${current}${fileChipToken(path)}`)
                   setComposerFiles([])
+                }}
+                onBuildPlan={path => {
+                  if (!sessionId) return
+                  void startPlanBuild({
+                    sessionId,
+                    plan: planCardFromPath(path),
+                    patchChat,
+                    client,
+                    setRuntimeSettings:
+                      agentComposerSlotProps.setRuntimeSettings,
+                    handleComposerSend:
+                      agentComposerSlotProps.handleComposerSend
+                  })
                 }}
                 onTogglePanel={() => setFilesPanelCollapsed(true)}
                 terminalOpen={terminalOpen}

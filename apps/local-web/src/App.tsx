@@ -181,7 +181,8 @@ export default function App() {
   const { sections, openTabs } = buildSessionSidebarModel({
     sessions: bootstrap.sessions,
     activeProjectId: context.activeProjectId,
-    openTabIds: tabs.openTabIds
+    openTabIds: tabs.openTabIds,
+    activeSessionId: route.sessionId
   })
   const orderedVisibleSessionIds = useMemo(
     () => visibleSessionIds(sections, ui.collapsedSidebarSections),
@@ -271,6 +272,8 @@ export default function App() {
         agentComposerSlotProps: layer.agentComposerSlotProps,
         activeRunTodos: layer.activeRunTodos,
         activeRunTools: layer.activeRunTools,
+        activeBuildPlan: layer.activeBuildPlan,
+        builtPlanPaths: layer.builtPlanPaths,
         showConnectionLimitWarning,
         runningCount: layer.runningCount,
         prefetchSessionMessages: layer.prefetchSessionMessages,

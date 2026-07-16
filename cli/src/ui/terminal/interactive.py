@@ -16,6 +16,7 @@ from .key_bindings import _build_key_bindings
 from .model_ids import AVAILABLE_MODELS  # noqa: F401 — re-exported via ui.terminal
 from .slash_commands import SLASH_COMMANDS
 # Staged mixins — method bodies live in sibling modules.
+from .agent_bootstrap import _AgentBootstrapMixin
 from .agents_and_case_study import _AgentsAndCaseStudyMixin
 from .boltz_setup import _BoltzSetupMixin
 from .bottom_toolbar import _BottomToolbarMixin
@@ -57,6 +58,7 @@ from .usage_tracking import _UsageTrackingMixin
 
 class InteractiveTerminal(
     _SwitchModelMixin,
+    _AgentBootstrapMixin,
     _AgentsAndCaseStudyMixin,
     _BoltzSetupMixin,
     _BottomToolbarMixin,
@@ -193,34 +195,13 @@ class InteractiveTerminal(
 
     def run(self, initial_context: dict = None, resume_id: str = None):
         """Run the interactive session."""
-        from agent.loop import AgentLoop
-
         # Imported from the package namespace so tests can monkeypatch
         # `ui.terminal.patch_stdout`.
         from ui.terminal import patch_stdout
 
         context = initial_context or {}
         term_width = self.console.width
-
-        # AgentLoop persists across queries — holds trajectory for multi-turn memory
-        if resume_id:
-            try:
-                if resume_id == "last":
-                    self.agent = AgentLoop.resume_latest(self.session)
-                else:
-                    self.agent = AgentLoop.resume(self.session, resume_id)
-                self._restore_usage_from_trajectory()
-                n = len(self.agent.trajectory.turns)
-                title = self.agent.trajectory.title or "untitled"
-                self.console.print(f"  [green]Resumed session[/green] [bold]{self.agent.trajectory.session_id}[/bold] — {title} ({n} turns)")
-                self._render_resumed_history(term_width, turns=self.agent.trajectory.turns)
-                self.console.print()
-            except FileNotFoundError as e:
-                self.console.print(f"  [yellow]{e}[/yellow]")
-                self.console.print("  [dim]Use /sessions to list available session IDs.[/dim]")
-                self.agent = AgentLoop(self.session)
-        else:
-            self.agent = AgentLoop(self.session)
+        self._bootstrap_agent_loop(resume_id)
 
         while True:
             try:

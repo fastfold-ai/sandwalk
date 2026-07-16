@@ -50,6 +50,7 @@ type AgentComposerSlotProps = {
   setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
   setPendingOpenPath: Dispatch<SetStateAction<string | null>>
   handleComposerSend: (text: string) => void
+  handleStop: () => void | Promise<void>
   loadSkillDetail: (name: string) => Promise<AgentSkillDetail>
   setWorkspaceVersion: Dispatch<SetStateAction<number>>
   runtimeSettings: RuntimeSettings | null
@@ -97,6 +98,7 @@ export function AgentComposerSlot({
   setFilesPanelCollapsed,
   setPendingOpenPath,
   handleComposerSend,
+  handleStop,
   loadSkillDetail,
   setWorkspaceVersion,
   runtimeSettings,
@@ -149,14 +151,19 @@ export function AgentComposerSlot({
           setPendingOpenPath(path)
         }}
         onSend={handleComposerSend}
-        onStop={() => sessionId && void client.interrupt(sessionId)}
+        onStop={() => void handleStop()}
         onLoadSkill={loadSkillDetail}
         onUpload={async files => {
-          if (!sessionId) return
-          await Promise.all(
-            Array.from(files).map(file => client.uploadFile(sessionId, file))
+          if (!sessionId) return []
+          const uploaded = await Promise.all(
+            files.map(file => client.uploadFile(sessionId, file))
           )
           setWorkspaceVersion(current => current + 1)
+          return uploaded.map(item => ({
+            path: item.path,
+            name: item.path.split('/').at(-1) || item.path,
+            mimeType: item.mimeType
+          }))
         }}
         runtimeSettings={runtimeSettings}
         tokenUsage={tokenUsage}
@@ -208,6 +215,11 @@ export function AgentComposerSlot({
             })
           )
           await loadModelOptions()
+        }}
+        onPlanModeChange={async planMode => {
+          setRuntimeSettings(
+            await client.updateRuntimeSettings({ planMode })
+          )
         }}
       />
     </>

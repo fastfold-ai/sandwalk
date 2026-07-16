@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from agent_server.service.plan_events import plan_created_payload_from_tool_call
 from agent_server.store import AgentStore
 
 _EVENT_TYPES = {
@@ -78,6 +79,18 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
                     run_id=run_id,
                     event_type="todos.updated",
                     payload={"todos": todos},
+                )
+        if event == "tool_start":
+            plan_payload = plan_created_payload_from_tool_call(
+                name=str(event_payload.get("name") or ""),
+                arguments=event_payload.get("arguments"),
+            )
+            if plan_payload is not None:
+                store.append_event(
+                    session_id=session_id,
+                    run_id=run_id,
+                    event_type="plan.created",
+                    payload=plan_payload,
                 )
 
     return emit_runtime_event

@@ -4338,11 +4338,14 @@ all = [
     { name = "celltypist" },
     { name = "cellxgene-census" },
     { name = "fair-esm" },
+    { name = "openpyxl" },
+    { name = "pyarrow" },
     { name = "rdkit" },
     { name = "scanpy", version = "1.11.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scanpy", version = "1.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "scikit-learn" },
     { name = "seaborn" },
+    { name = "statsmodels" },
     { name = "tiledbsoma" },
     { name = "torch" },
     { name = "transformers" },
@@ -4353,6 +4356,7 @@ analysis = [
 ]
 api = [
     { name = "duckdb" },
+    { name = "pyarrow" },
 ]
 biology = [
     { name = "biopython" },
@@ -4362,9 +4366,12 @@ chemistry = [
 ]
 dev = [
     { name = "mypy" },
+    { name = "openpyxl" },
+    { name = "pyarrow" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "statsmodels" },
     { name = "types-requests" },
 ]
 ml = [
@@ -4442,9 +4449,14 @@ requires-dist = [
     { name = "nbformat", specifier = ">=5.7" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "openai", specifier = ">=1.0" },
+    { name = "openpyxl", marker = "extra == 'all'", specifier = ">=3.1" },
+    { name = "openpyxl", marker = "extra == 'dev'", specifier = ">=3.1" },
     { name = "pandas", specifier = ">=2.0" },
     { name = "pillow", specifier = ">=10.0" },
     { name = "prompt-toolkit", specifier = ">=3.0" },
+    { name = "pyarrow", marker = "extra == 'all'", specifier = ">=14.0" },
+    { name = "pyarrow", marker = "extra == 'api'", specifier = ">=14.0" },
+    { name = "pyarrow", marker = "extra == 'dev'", specifier = ">=14.0" },
     { name = "pydantic", specifier = ">=2.8" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
@@ -4467,6 +4479,8 @@ requires-dist = [
     { name = "seaborn", marker = "extra == 'all'", specifier = ">=0.13" },
     { name = "seaborn", marker = "extra == 'analysis'", specifier = ">=0.13" },
     { name = "seaborn", marker = "extra == 'win-build'", specifier = ">=0.13" },
+    { name = "statsmodels", marker = "extra == 'all'", specifier = ">=0.14" },
+    { name = "statsmodels", marker = "extra == 'dev'", specifier = ">=0.14" },
     { name = "termaid", specifier = ">=0.7.1" },
     { name = "tiledbsoma", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "tiledbsoma", marker = "extra == 'singlecell'", specifier = ">=1.0" },

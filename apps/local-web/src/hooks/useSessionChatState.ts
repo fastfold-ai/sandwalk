@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { applyChatPatch } from '@/lib/chat-actions'
+import {
+  applyChatPatch,
+  normalizeSessionChatState
+} from '@/lib/chat-actions'
 import { emptySessionChatState, type SessionChatState } from '@/lib/sessions'
 
 export function useSessionChatState(sessionId: string | null) {
@@ -8,13 +11,16 @@ export function useSessionChatState(sessionId: string | null) {
     Record<string, SessionChatState>
   >({})
 
-  const chat = sessionId
-    ? chatBySessionId[sessionId] ?? emptySessionChatState()
-    : emptySessionChatState()
+  const chat = normalizeSessionChatState(
+    sessionId
+      ? chatBySessionId[sessionId] ?? emptySessionChatState()
+      : emptySessionChatState()
+  )
   const {
     messages,
     tools,
     todosByRunId,
+    plansByRunId,
     runIdByMessageId,
     usageByRunId,
     tokenUsage,
@@ -26,7 +32,9 @@ export function useSessionChatState(sessionId: string | null) {
     composerFiles,
     queuedMessages,
     expandedToolRunKeys,
-    messagesLoaded
+    messagesLoaded,
+    activeBuildPlan,
+    builtPlanPaths
   } = chat
 
   const composerLiveRef = useRef(composer)
@@ -116,6 +124,7 @@ export function useSessionChatState(sessionId: string | null) {
     messages,
     tools,
     todosByRunId,
+    plansByRunId,
     runIdByMessageId,
     usageByRunId,
     tokenUsage,
@@ -128,6 +137,8 @@ export function useSessionChatState(sessionId: string | null) {
     queuedMessages,
     expandedToolRunKeys,
     messagesLoaded,
+    activeBuildPlan,
+    builtPlanPaths,
     setComposer,
     setComposerSkills,
     setComposerFiles,

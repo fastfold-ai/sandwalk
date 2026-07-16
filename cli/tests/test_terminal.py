@@ -145,6 +145,16 @@ class TestTerminalMethods:
         toolbar = str(terminal._bottom_toolbar())
         assert "Modal Sandbox" in toolbar
         assert "Protein Designer" in toolbar
+        assert "#7fee64" in toolbar
+
+        terminal.session.config.get.side_effect = lambda key, default=None: {
+            "llm.provider": "openai",
+            "llm.openai_base_url": "http://localhost:8888/v1",
+            "agent.plan_preview": True,
+        }.get(key, default)
+        toolbar = str(terminal._bottom_toolbar())
+        assert "plan mode" in toolbar
+        assert "#9a7429" in toolbar
 
     def test_switch_model_header_shows_compatible_backend_next_to_model(self, terminal):
         def _cfg_get(key, default=None):

@@ -70,11 +70,13 @@ export function formatSessionExportMarkdown({
   messages: AgentMessage[]
   events: AgentEvent[]
 }): string {
-  const { tools, todosByRunId, runIdByMessageId } = toolsFromEvents(events)
+  const { tools, todosByRunId, plansByRunId, runIdByMessageId } =
+    toolsFromEvents(events)
   const timeline = buildConversationTimeline({
     messages,
     tools,
     todosByRunId,
+    plansByRunId,
     runIdByMessageId
   })
 

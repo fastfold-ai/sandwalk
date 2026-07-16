@@ -40,7 +40,10 @@ export type ComposerProps = {
   onFileChipsChange?: (files: string[]) => void
   onSend: (value: string) => void
   onStop: () => void
-  onUpload: (files: FileList) => Promise<void>
+  /** Upload files into the session workspace; returns paths used for send. */
+  onUpload: (
+    files: File[]
+  ) => Promise<Array<{ path: string; name: string; mimeType?: string }>>
   onLoadSkill: (name: string) => Promise<AgentSkillDetail>
   onOpenFile?: (path: string) => void
   runtimeSettings: RuntimeSettings | null
@@ -70,6 +73,7 @@ export type ComposerProps = {
   onSandboxStop?: () => void | Promise<void>
   onSandboxRestart?: () => void | Promise<void>
   onLoadLocalSystem?: () => Promise<ServerSystemInfo | null>
+  onPlanModeChange?: (planMode: boolean) => Promise<void>
   editingQueued?: boolean
   onCancelEditQueued?: () => void
 }

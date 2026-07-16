@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { startTransition } from 'react'
 
 import {
   projectTabsKey,
@@ -15,12 +15,12 @@ type UseSessionActionsTabsArgs = Pick<
   | 'tabsScopeKey'
   | 'sessionId'
   | 'sessions'
-  | 'openTabsByProject'
   | 'lastSessionByScope'
   | 'setLastSessionByScope'
   | 'setProjectScopeId'
   | 'setRecentProjectIds'
   | 'setOpenTabIds'
+  | 'patchOpenTabs'
 >
 
 export function useSessionActionsTabs({
@@ -29,33 +29,12 @@ export function useSessionActionsTabs({
   tabsScopeKey,
   sessionId,
   sessions,
-  openTabsByProject,
-  lastSessionByScope,
   setLastSessionByScope,
   setProjectScopeId,
   setRecentProjectIds,
-  setOpenTabIds
+  setOpenTabIds,
+  patchOpenTabs
 }: UseSessionActionsTabsArgs) {
-  const landingPathForScope = useCallback(
-    (scopeId: string | null) => {
-      const key = projectTabsKey(scopeId)
-      const tabs = (openTabsByProject[key] || []).filter(id => {
-        const item = sessions.find(session => session.id === id)
-        if (!item) return false
-        if (!scopeId) return true
-        return item.projectId === scopeId
-      })
-      if (tabs.length === 0) {
-        return scopeId ? `/projects/${scopeId}` : '/'
-      }
-      const last = lastSessionByScope[key]
-      const target =
-        last && tabs.includes(last) ? last : tabs[tabs.length - 1]
-      return `/agents/${target}`
-    },
-    [lastSessionByScope, openTabsByProject, sessions]
-  )
-
   const closeSessionTab = (id: string) => {
     const scopeProjectId = activeProjectId
     const tabIsInScope = (tabId: string) => {
@@ -114,13 +93,27 @@ export function useSessionActionsTabs({
     if (sessionId !== keepId) navigate(`/agents/${keepId}`)
   }
 
+  const retainActiveTabInScope = (scopeId: string | null) => {
+    // Keep the current chat in the destination scope's tab strip so switching
+    // projects does not blank the tab bar / remount the main panel.
+    if (!sessionId) return
+    const scopeKey = projectTabsKey(scopeId)
+    patchOpenTabs(scopeKey, current =>
+      current.includes(sessionId) ? current : [...current, sessionId]
+    )
+  }
+
   const selectAllProjects = () => {
-    setProjectScopeId(null)
-    navigate(landingPathForScope(null))
+    // Scope filter only — do not navigate to a project landing page.
+    retainActiveTabInScope(null)
+    startTransition(() => {
+      setProjectScopeId(null)
+    })
   }
 
   const selectProjectScope = (projectId: string) => {
-    setProjectScopeId(projectId)
+    // Scope filter only — do not open `/projects/:id` when picking a project.
+    retainActiveTabInScope(projectId)
     setRecentProjectIds(current => {
       const next = [
         projectId,
@@ -129,11 +122,12 @@ export function useSessionActionsTabs({
       writeRecentProjectIds(next)
       return next
     })
-    navigate(landingPathForScope(projectId))
+    startTransition(() => {
+      setProjectScopeId(projectId)
+    })
   }
 
   return {
-    landingPathForScope,
     closeSessionTab,
     closeOtherSessionTabs,
     selectAllProjects,

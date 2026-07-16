@@ -258,8 +258,35 @@ export function useSessionChatSend({
     // sendMessage intentionally omitted from deps (closes over session state).
   }, [runActive, sessionId, queuedMessages.length])
 
+  const handleStop = useCallback(async () => {
+    if (!sessionId) return
+    // Optimistic clear — do not wait for SSE / live worker (orphaned runs).
+    patchChat(sessionId, prev => ({
+      ...prev,
+      runActive: false,
+      activeRunId: null,
+      liveDelta: '',
+      activeBuildPlan: null
+    }))
+    setSessions(current =>
+      current.map(item =>
+        item.id === sessionId && item.status === 'running'
+          ? { ...item, status: 'interrupted' as const }
+          : item
+      )
+    )
+    try {
+      await client.interrupt(sessionId)
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to stop the agent'
+      )
+    }
+  }, [client, patchChat, sessionId, setError, setSessions])
+
   return {
     handleComposerSend,
+    handleStop,
     editQueuedMessage,
     cancelEditQueuedMessage,
     removeQueuedMessage,

@@ -26,7 +26,8 @@ export function WorkspaceFileContentArea({
   onOpenModal,
   onDraftChange,
   onSave,
-  onAddToChat
+  onAddToChat,
+  onBuildPlan
 }: {
   filesTabActive: boolean
   activePath: string | null
@@ -46,6 +47,7 @@ export function WorkspaceFileContentArea({
   onDraftChange: (value: string) => void
   onSave: () => void
   onAddToChat: (path: string) => void
+  onBuildPlan?: (path: string) => void
 }) {
   if (filesTabActive) {
     return (
@@ -81,6 +83,7 @@ export function WorkspaceFileContentArea({
             editorDark={editorDark}
             onDraftChange={onDraftChange}
             onSave={onSave}
+            onBuildPlan={onBuildPlan}
           />
         </div>
         {status ? (

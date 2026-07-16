@@ -29,6 +29,7 @@ export function WorkspaceArtifactsModal({
   onUpload,
   onRefresh,
   onAddToChat,
+  onBuildPlan,
   onDraftChange,
   onSave
 }: {
@@ -45,6 +46,7 @@ export function WorkspaceArtifactsModal({
   onUpload: () => void
   onRefresh: () => void
   onAddToChat: (path: string) => void
+  onBuildPlan?: (path: string) => void
   onDraftChange: (value: string) => void
   onSave: () => void
 }) {
@@ -138,6 +140,7 @@ export function WorkspaceArtifactsModal({
                         ? onSave
                         : undefined
                     }
+                    onBuildPlan={onBuildPlan}
                   />
                 </div>
               </>

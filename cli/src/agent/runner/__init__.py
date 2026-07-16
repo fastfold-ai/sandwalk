@@ -11,7 +11,7 @@ mixins, each covering one slice of behavior:
 - ``sync_loop``: blocking event-loop bridge + Ctrl+C/interrupt handling
 - ``deepagents_run`` / ``deepagents_build``: the deepagents (LangGraph) query
   path — dispatch/orchestration vs. tool/prompt/agent construction
-- ``plan_preview``: freeform-plan parsing, Mermaid rendering, approval prompt
+- ``plan_preview``: freeform-plan parsing + Mermaid flowchart helpers for plan md
 - ``background_watch``: background task notifications + output-file polling
 - ``usage_ui``: usage footer, friendly error rendering, error results
 
@@ -38,7 +38,7 @@ from typing import Any
 from agent.runner.background_watch import BackgroundWatchMixin
 from agent.runner.deepagents_build import DeepAgentsBuildMixin
 from agent.runner.deepagents_run import DeepAgentsRunMixin
-from agent.runner.plan_preview import PlanPreviewMixin
+from agent.runner.plan_preview import PlanMermaidMixin, PlanPreviewMixin
 from agent.runner.sync_loop import SyncLoopMixin
 from agent.runner.usage_ui import UsageUIMixin
 from agent.runner_helpers import (
@@ -77,7 +77,7 @@ class AgentRunner(
     SyncLoopMixin,
     DeepAgentsRunMixin,
     DeepAgentsBuildMixin,
-    PlanPreviewMixin,
+    PlanMermaidMixin,
     BackgroundWatchMixin,
     UsageUIMixin,
 ):

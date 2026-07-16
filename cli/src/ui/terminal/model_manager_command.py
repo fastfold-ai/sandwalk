@@ -131,11 +131,41 @@ class _ModelManagerCommandMixin:
         self._handle_model_manager_command(query)
 
     def _toggle_plan_mode(self):
-        """Toggle plan mode — agent shows plan for approval before executing."""
+        """Toggle Plan mode vs Agent mode (writes plans/*.md; no approval gate)."""
         cfg = self.session.config
         current = bool(cfg.get("agent.plan_preview", False))
         cfg.set("agent.plan_preview", not current)
         if not current:
-            self.console.print("  [#ff79c6]Plan mode ON[/] — agent will preview its plan before executing")
+            self.console.print(
+                "  [#ff79c6]Plan mode ON[/] — write plans under workspace/plans/; "
+                "no execution until you switch to agent mode"
+            )
         else:
-            self.console.print("  [dim]Plan mode OFF[/dim] — agent will execute directly")
+            self.console.print(
+                "  [green]Agent mode ON[/green] — will execute "
+                "(use plans/*.md if present)"
+            )
+            self._print_pending_plans()
+
+    def _print_pending_plans(self) -> None:
+        """List newest plan markdown files in the active session workspace."""
+        workspace = ""
+        try:
+            ensure = getattr(getattr(self, "agent", None), "ensure_workspace_path", None)
+            if callable(ensure):
+                workspace = str(ensure() or "").strip()
+        except Exception:
+            workspace = ""
+        if not workspace:
+            return
+        try:
+            from agent.system_prompt.mode_section import list_recent_plan_files
+
+            plans = list_recent_plan_files(workspace)
+        except Exception:
+            plans = []
+        if not plans:
+            return
+        self.console.print("  [dim]Pending plans:[/dim]")
+        for rel in plans:
+            self.console.print(f"    [cyan]{rel}[/cyan]")

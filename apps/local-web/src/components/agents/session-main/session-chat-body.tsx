@@ -6,6 +6,7 @@ import type { NavigateFunction } from 'react-router-dom'
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ChatTranscript } from '@/components/agents/ChatTranscript'
+import { startPlanBuild } from '@/lib/plan-build'
 import {
   ChatPageSkeleton,
   DetailPageSkeleton
@@ -58,6 +59,8 @@ export type SessionChatBodyProps = {
   setCopiedMessageId: Dispatch<SetStateAction<string | null>>
   activeRunTools: TranscriptTool[]
   activeRunTodos: import('@sandwalk/agent-ui-core').AgentTodo[]
+  activeBuildPlan: import('@sandwalk/agent-ui-core').AgentPlanCard | null
+  builtPlanPaths: string[]
   liveDelta: string
   showScrollToBottom: boolean
   scrollChatToBottom: () => void
@@ -96,6 +99,8 @@ export function SessionChatBody({
   setCopiedMessageId,
   activeRunTools,
   activeRunTodos,
+  activeBuildPlan,
+  builtPlanPaths,
   liveDelta,
   showScrollToBottom,
   scrollChatToBottom,
@@ -122,14 +127,14 @@ export function SessionChatBody({
       >
         {!messagesLoaded && !runActive ? (
           showChatSkeleton ? (
-            <div className="animate-in fade-in flex min-h-0 flex-1 flex-col overflow-hidden duration-200">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <ChatPageSkeleton />
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col" />
           )
         ) : messages.length === 0 && !runActive ? (
-          <div className="animate-in fade-in flex min-h-0 flex-1 flex-col items-center justify-center px-5 pb-20 duration-200">
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 pb-20">
             <AuraIconPulse className="text-muted-foreground/70 mb-6 h-12 w-12" />
             <div className="bg-background w-full max-w-[44rem]">
               <div className="mb-2 flex items-center px-1">
@@ -152,7 +157,7 @@ export function SessionChatBody({
             </div>
           </div>
         ) : (
-          <div className="animate-in fade-in flex min-h-0 flex-1 flex-col duration-200">
+          <div className="flex min-h-0 flex-1 flex-col">
             <ChatTranscript
               chatScrollRef={chatScrollRef}
               chatEndRef={chatEndRef}
@@ -181,13 +186,26 @@ export function SessionChatBody({
                 setFilesPanelCollapsed(false)
                 setPendingOpenPath(path)
               }}
+              onBuildPlan={plan => {
+                if (!sessionId) return
+                void startPlanBuild({
+                  sessionId,
+                  plan,
+                  patchChat,
+                  client,
+                  setRuntimeSettings: agentComposerSlotProps.setRuntimeSettings,
+                  handleComposerSend: agentComposerSlotProps.handleComposerSend
+                })
+              }}
               onInterrupt={
                 sessionId
-                  ? () => void client.interrupt(sessionId)
+                  ? () => void agentComposerSlotProps.handleStop()
                   : undefined
               }
               activeRunTools={activeRunTools}
               activeRunTodos={activeRunTodos}
+              activeBuildPlan={activeBuildPlan}
+              builtPlanPaths={builtPlanPaths}
               liveDelta={liveDelta}
               showScrollToBottom={showScrollToBottom}
               onScrollToBottom={scrollChatToBottom}

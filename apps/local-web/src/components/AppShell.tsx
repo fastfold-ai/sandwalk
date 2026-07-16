@@ -204,6 +204,8 @@ export function AppShell(props: AppShellProps) {
           setCopiedMessageId={props.setCopiedMessageId}
           activeRunTools={props.activeRunTools}
           activeRunTodos={props.activeRunTodos}
+          activeBuildPlan={props.activeBuildPlan}
+          builtPlanPaths={props.builtPlanPaths}
           liveDelta={props.liveDelta}
           showScrollToBottom={props.showScrollToBottom}
           scrollChatToBottom={props.scrollChatToBottom}

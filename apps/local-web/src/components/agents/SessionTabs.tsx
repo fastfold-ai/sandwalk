@@ -98,7 +98,7 @@ export function SessionTabs({
     <div className="flex min-w-0 flex-1 items-center gap-1">
       <div
         ref={scrollerRef}
-        className="chat-scrollbar-x flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto"
+        className="chat-scrollbar-x flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto transition-opacity duration-150"
       >
         {tabs.map(tab => {
           const active = tab.id === activeId

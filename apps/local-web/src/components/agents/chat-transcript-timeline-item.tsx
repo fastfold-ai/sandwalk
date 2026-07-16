@@ -1,7 +1,12 @@
-import type { AgentMessage, AgentSession } from '@sandwalk/agent-ui-core'
+import type {
+  AgentMessage,
+  AgentPlanCard,
+  AgentSession
+} from '@sandwalk/agent-ui-core'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 
+import { CreatedPlanCard } from '@/components/agents/CreatedPlanCard'
 import { ReasoningGhost } from '@/components/agents/ReasoningGhost'
 import { TodoListInline } from '@/components/agents/TodoListInline'
 import { ToolCard, type TranscriptTool } from '@/components/agents/ToolCard'
@@ -26,7 +31,10 @@ type TimelineItemProps = {
   setCopiedMessageId: Dispatch<SetStateAction<string | null>>
   session: AgentSession | null | undefined
   onOpenFile: (path: string) => void
+  onBuildPlan?: (plan: AgentPlanCard) => void
   onInterrupt: (() => void) | undefined
+  /** Hide Created Plan UI after Build (and while that plan is running). */
+  hiddenPlanPaths?: ReadonlySet<string> | string[]
 }
 
 export function ChatTranscriptTimelineItem({
@@ -43,8 +51,14 @@ export function ChatTranscriptTimelineItem({
   setCopiedMessageId,
   session,
   onOpenFile,
-  onInterrupt
+  onBuildPlan,
+  onInterrupt,
+  hiddenPlanPaths = []
 }: TimelineItemProps) {
+  const hiddenPlans =
+    hiddenPlanPaths instanceof Set
+      ? hiddenPlanPaths
+      : new Set(hiddenPlanPaths)
   if (timelineItem.kind === 'tool_run') {
     const isExpanded = expandedToolRunKeys[timelineItem.key] === true
     const visibleTools = isExpanded
@@ -134,6 +148,25 @@ export function ChatTranscriptTimelineItem({
         className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150"
       >
         <TodoListInline todos={entry.todos} className="mt-1" />
+      </div>
+    )
+  }
+
+  if (entry.kind === 'plan') {
+    if (hiddenPlans.has(entry.plan.path)) {
+      return null
+    }
+    return (
+      <div
+        key={timelineItem.key}
+        className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150"
+      >
+        <CreatedPlanCard
+          plan={entry.plan}
+          onViewPlan={onOpenFile}
+          onBuild={plan => onBuildPlan?.(plan)}
+          className="mt-1"
+        />
       </div>
     )
   }

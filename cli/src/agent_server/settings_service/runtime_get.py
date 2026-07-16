@@ -76,4 +76,5 @@ def get_runtime_settings(config: Config) -> RuntimeSettings:
             maximum=86400,
             default=900,
         ),
+        plan_mode=bool_from_config(config, "agent.plan_preview", False),
     )

@@ -22,6 +22,7 @@ import type {
   AgentSession,
   AgentSkill,
   AgentSkillDetail,
+  AgentPlanCard,
   AgentTodo,
   BackendHealth,
   IntegrationSummary,
@@ -167,6 +168,8 @@ export type AppShellMainProps = {
   setCopiedMessageId: (value: string | null | ((current: string | null) => string | null)) => void
   activeRunTools: TranscriptTool[]
   activeRunTodos: AgentTodo[]
+  activeBuildPlan: AgentPlanCard | null
+  builtPlanPaths: string[]
   liveDelta: string
   showScrollToBottom: boolean
   scrollChatToBottom: () => void

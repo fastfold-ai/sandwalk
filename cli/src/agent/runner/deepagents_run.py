@@ -163,19 +163,6 @@ class DeepAgentsRunMixin:
             # ----- User prompt -----
             user_prompt, ctx = self._build_deepagents_user_prompt(query, ctx)
 
-            # ----- Plan preview (optional) -----
-            plan_preview = bool(config.get("agent.plan_preview", False))
-            if plan_preview and not self._headless:
-                if thinking_status is not None:
-                    thinking_status.stop()
-                    thinking_status = None
-                    self._active_spinner = None
-                approved = await self._deepagents_plan_preview(model, user_prompt)
-                if not approved:
-                    return self._make_error_result(
-                        query, "User rejected plan preview.", time.time() - t0
-                    )
-
             # ----- Build agent -----
             agent, sandbox_handle = await self._build_deepagents_agent(
                 config,

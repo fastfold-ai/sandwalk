@@ -7,6 +7,11 @@ import type {
 import { ArrowUp, Plus, Square } from 'lucide-react'
 import { useRef } from 'react'
 
+import {
+  ComposerModeMenu,
+  planModeAccent
+} from '@/components/agents/composer/ComposerModeMenu'
+import { cn } from '@/lib/utils'
 import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelPicker'
 import { ComposerSandboxPicker } from '@/components/agents/composer/ComposerSandboxPicker'
 import { ComposerSpecialistPicker } from '@/components/agents/composer/ComposerSpecialistPicker'
@@ -21,6 +26,7 @@ import { type ComposerModelOption } from '@/lib/composer-models'
 export function ComposerToolbar({
   running,
   showStopButton,
+  sendDisabled = false,
   modelOptions,
   runtimeSettings,
   specialists,
@@ -41,10 +47,12 @@ export function ComposerToolbar({
   onSandboxStop,
   onSandboxRestart,
   onLoadLocalSystem,
+  onPlanModeChange,
   onStop
 }: {
   running: boolean
   showStopButton: boolean
+  sendDisabled?: boolean
   modelOptions: ComposerModelOption[]
   runtimeSettings: RuntimeSettings | null
   specialists: Specialist[]
@@ -52,7 +60,7 @@ export function ComposerToolbar({
   sandboxStatus: SessionSandboxStatus | null
   sandboxPhase: SandboxActionPhase
   tokenUsage: { inputTokens: number; outputTokens: number }
-  onUpload: (files: FileList) => Promise<void>
+  onUpload: (files: FileList) => void
   onModelSelect: (
     provider: string,
     model: string,
@@ -78,9 +86,11 @@ export function ComposerToolbar({
   onSandboxStop?: () => void | Promise<void>
   onSandboxRestart?: () => void | Promise<void>
   onLoadLocalSystem?: () => Promise<ServerSystemInfo | null>
+  onPlanModeChange?: (planMode: boolean) => Promise<void>
   onStop: () => void
 }) {
   const uploadRef = useRef<HTMLInputElement | null>(null)
+  const planMode = Boolean(runtimeSettings?.planMode)
 
   return (
     <div className="flex min-w-0 items-center justify-between gap-2 px-0.5">
@@ -91,7 +101,7 @@ export function ComposerToolbar({
           multiple
           hidden
           onChange={event => {
-            if (event.target.files) void onUpload(event.target.files)
+            if (event.target.files) onUpload(event.target.files)
             event.target.value = ''
           }}
         />
@@ -104,6 +114,12 @@ export function ComposerToolbar({
         >
           <Plus className="size-4" />
         </Button>
+        {onPlanModeChange ? (
+          <ComposerModeMenu
+            runtimeSettings={runtimeSettings}
+            onPlanModeChange={onPlanModeChange}
+          />
+        ) : null}
         <ComposerModelPicker
           modelOptions={modelOptions}
           runtimeSettings={runtimeSettings}
@@ -138,7 +154,13 @@ export function ComposerToolbar({
         <Button
           type={showStopButton ? 'button' : 'submit'}
           size="icon"
-          className="bg-foreground text-background hover:bg-foreground/90 size-7 rounded-full shadow-none [&_svg]:text-background"
+          disabled={!showStopButton && sendDisabled}
+          className={cn(
+            'size-7 rounded-full shadow-none',
+            planMode
+              ? planModeAccent.send
+              : 'bg-foreground text-background hover:bg-foreground/90 [&_svg]:text-background'
+          )}
           onClick={showStopButton ? onStop : undefined}
           aria-label={
             showStopButton ? 'Stop' : running ? 'Queue message' : 'Send'

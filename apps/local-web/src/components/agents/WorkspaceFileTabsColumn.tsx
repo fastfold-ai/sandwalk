@@ -38,6 +38,7 @@ export function WorkspaceFileTabsColumn({
   onDraftChange,
   onSave,
   onAddToChat,
+  onBuildPlan,
   onUploadChange
 }: {
   tabs: WorkspaceFileContent[]
@@ -72,6 +73,7 @@ export function WorkspaceFileTabsColumn({
   onDraftChange: (value: string) => void
   onSave: () => void
   onAddToChat: (path: string) => void
+  onBuildPlan?: (path: string) => void
   onUploadChange: (files: FileList | null) => void
 }) {
   return (
@@ -118,6 +120,7 @@ export function WorkspaceFileTabsColumn({
         onDraftChange={onDraftChange}
         onSave={onSave}
         onAddToChat={onAddToChat}
+        onBuildPlan={onBuildPlan}
       />
     </>
   )

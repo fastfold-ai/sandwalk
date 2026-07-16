@@ -35,7 +35,7 @@ SLASH_COMMANDS = {
     "/sync": "Import legacy CLI sessions into the shared UI database",
     "/resume": "Resume a previous session by id/index",
     "/case-study": "Run/list curated case studies (/case-study list)",
-    "/plan": "Toggle plan mode — preview & approve before executing",
+    "/plan": "Toggle Plan mode vs Agent mode (plans/*.md; no approval gate)",
     "/clear": "Clear the screen",
     "/exit": "Exit the terminal",
 }

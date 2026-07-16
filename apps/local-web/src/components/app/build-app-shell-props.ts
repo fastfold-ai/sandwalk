@@ -44,6 +44,8 @@ type AppShellBridgeInput = {
   agentComposerSlotProps: ReturnType<typeof buildAgentComposerSlotProps>
   activeRunTodos: AppShellProps['activeRunTodos']
   activeRunTools: AppShellProps['activeRunTools']
+  activeBuildPlan: AppShellProps['activeBuildPlan']
+  builtPlanPaths: AppShellProps['builtPlanPaths']
   showConnectionLimitWarning: boolean
   runningCount: number
   prefetchSessionMessages: AppShellProps['prefetchSessionMessages']
@@ -204,6 +206,8 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     setCopiedMessageId: input.ui.setCopiedMessageId,
     activeRunTools: input.activeRunTools,
     activeRunTodos: input.activeRunTodos,
+    activeBuildPlan: input.activeBuildPlan,
+    builtPlanPaths: input.builtPlanPaths,
     liveDelta: input.chat.liveDelta,
     showScrollToBottom: input.scroll.showScrollToBottom,
     scrollChatToBottom: input.scroll.scrollChatToBottom,

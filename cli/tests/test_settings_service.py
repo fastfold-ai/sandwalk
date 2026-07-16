@@ -54,9 +54,11 @@ def test_settings_service_update_runtime_knobs(tmp_path: Path, monkeypatch):
             tool_health_enabled=False,
             tool_health_fail_threshold=5,
             tool_health_suppress_seconds=600,
+            plan_mode=True,
         )
     )
     assert updated.tool_mode == "native"
+    assert updated.plan_mode is True
     assert updated.reasoning_effort == "high"
     assert updated.reasoning_fast is True
     assert updated.recursion_limit == 200
@@ -69,6 +71,7 @@ def test_settings_service_update_runtime_knobs(tmp_path: Path, monkeypatch):
     assert updated.tool_health_enabled is False
     assert updated.tool_health_fail_threshold == 5
     assert updated.tool_health_suppress_seconds == 600
+    assert Config.load().get("agent.plan_preview") is True
 
     cfg = Config.load()
     assert cfg.get("agent.tool_mode") == "native"

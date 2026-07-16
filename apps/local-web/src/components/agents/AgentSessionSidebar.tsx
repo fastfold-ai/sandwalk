@@ -221,6 +221,7 @@ export function AgentSessionSidebar({
       />
       <SidebarSessionList
         sections={sections}
+        scopeKey={activeProjectId}
         collapsedSidebarSections={collapsedSidebarSections}
         sessionId={sessionId}
         chatBySessionId={chatBySessionId}

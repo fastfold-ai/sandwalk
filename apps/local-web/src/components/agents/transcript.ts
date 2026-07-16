@@ -1,4 +1,9 @@
-import type { AgentEvent, AgentMessage, AgentTodo } from '@sandwalk/agent-ui-core'
+import type {
+  AgentEvent,
+  AgentMessage,
+  AgentPlanCard,
+  AgentTodo
+} from '@sandwalk/agent-ui-core'
 
 import type { TranscriptTool } from './ToolCard'
 import { formatToolExecutionTime } from './ToolCard'
@@ -26,22 +31,53 @@ export type TranscriptEntry =
   | { kind: 'thought'; message: AgentMessage; thought: string }
   | { kind: 'tool'; tool: TranscriptTool }
   | { kind: 'todos'; messageId: string; todos: AgentTodo[] }
+  | { kind: 'plan'; messageId: string; plan: AgentPlanCard }
 
 export function buildConversationTimeline({
   messages,
   tools,
   todosByRunId,
+  plansByRunId,
   runIdByMessageId,
   activeRunId = null
 }: {
   messages: AgentMessage[]
   tools: TranscriptTool[]
-  todosByRunId: Record<string, AgentTodo[]>
-  runIdByMessageId: Record<string, string>
+  todosByRunId?: Record<string, AgentTodo[]> | null
+  plansByRunId?: Record<string, AgentPlanCard[]> | null
+  runIdByMessageId?: Record<string, string> | null
   activeRunId?: string | null
 }): TranscriptEntry[] {
   const timeline: TranscriptEntry[] = []
   const usedToolIds = new Set<string>()
+  const todosMap = todosByRunId ?? {}
+  const plansMap = plansByRunId ?? {}
+  const runMap = runIdByMessageId ?? {}
+
+  // Attach each plan path once on the first run that created it (last assistant
+  // message of that run). Later runs that rewrite the same path (follow-ups /
+  // Build) must not spawn another Created Plan card.
+  const lastAssistantByRun = new Map<string, string>()
+  const planPathFirstRun = new Map<string, { plan: AgentPlanCard; runId: string }>()
+  for (const message of messages) {
+    if (message.role !== 'assistant') continue
+    const runId = runMap[message.id]
+    if (!runId) continue
+    lastAssistantByRun.set(runId, message.id)
+    for (const plan of plansMap[runId] || []) {
+      if (!planPathFirstRun.has(plan.path)) {
+        planPathFirstRun.set(plan.path, { plan, runId })
+      }
+    }
+  }
+  const planPathOwnerMessageId = new Map<string, string>()
+  const planPathToCard = new Map<string, AgentPlanCard>()
+  for (const [path, { plan, runId }] of planPathFirstRun) {
+    const ownerMessageId = lastAssistantByRun.get(runId)
+    if (!ownerMessageId) continue
+    planPathOwnerMessageId.set(path, ownerMessageId)
+    planPathToCard.set(path, plan)
+  }
 
   for (const message of messages) {
     if (message.role === 'user' || message.role === 'system') {
@@ -49,8 +85,9 @@ export function buildConversationTimeline({
       continue
     }
 
-    const runId = runIdByMessageId[message.id] || null
+    const runId = runMap[message.id] || null
     const turnTools = tools.filter(tool => {
+      if (usedToolIds.has(tool.id)) return false
       if (tool.messageId === message.id) return true
       if (runId && tool.runId === runId) return true
       return false
@@ -79,12 +116,26 @@ export function buildConversationTimeline({
       })
     }
 
-    const todos = runId ? todosByRunId[runId] : undefined
-    if (todos && todos.length > 0) {
+    for (const [path, ownerMessageId] of planPathOwnerMessageId) {
+      if (ownerMessageId !== message.id) continue
+      const plan = planPathToCard.get(path)
+      if (!plan) continue
+      timeline.push({
+        kind: 'plan',
+        messageId: message.id,
+        plan
+      })
+    }
+
+    if (
+      runId &&
+      lastAssistantByRun.get(runId) === message.id &&
+      (todosMap[runId]?.length ?? 0) > 0
+    ) {
       timeline.push({
         kind: 'todos',
         messageId: message.id,
-        todos
+        todos: todosMap[runId]!
       })
     }
   }
@@ -118,10 +169,12 @@ export const TOOL_RUN_VISIBLE_COUNT = 1
 export function toolsFromEvents(events: AgentEvent[]): {
   tools: TranscriptTool[]
   todosByRunId: Record<string, AgentTodo[]>
+  plansByRunId: Record<string, AgentPlanCard[]>
   runIdByMessageId: Record<string, string>
 } {
   const toolsById = new Map<string, TranscriptTool>()
   const todosByRunId: Record<string, AgentTodo[]> = {}
+  const plansByRunId: Record<string, AgentPlanCard[]> = {}
   const runIdByMessageId: Record<string, string> = {}
 
   for (const event of events) {
@@ -134,6 +187,18 @@ export function toolsFromEvents(events: AgentEvent[]): {
       event.payload.message?.id
     ) {
       runIdByMessageId[event.payload.message.id] = event.runId
+    }
+    if (event.type === 'plan.created' && event.runId) {
+      const existing = plansByRunId[event.runId] || []
+      const next = {
+        path: event.payload.path,
+        title: event.payload.title,
+        summary: event.payload.summary
+      }
+      plansByRunId[event.runId] = [
+        ...existing.filter(plan => plan.path !== next.path),
+        next
+      ]
     }
     if (event.type === 'tool.started') {
       const id = event.payload.toolCallId || event.id
@@ -169,6 +234,7 @@ export function toolsFromEvents(events: AgentEvent[]): {
   return {
     tools: [...toolsById.values()],
     todosByRunId,
+    plansByRunId,
     runIdByMessageId
   }
 }

@@ -27,6 +27,7 @@ export function WorkspacePanel({
   openPathRequest = null,
   onOpenPathRequestHandled,
   onAddToChat,
+  onBuildPlan,
   onFilesChange,
   onTogglePanel,
   terminalOpen = false,
@@ -40,6 +41,7 @@ export function WorkspacePanel({
   openPathRequest?: string | null
   onOpenPathRequestHandled?: () => void
   onAddToChat: (path: string) => void
+  onBuildPlan?: (path: string) => void
   onFilesChange?: (count: number) => void
   onTogglePanel?: () => void
   terminalOpen?: boolean
@@ -138,6 +140,7 @@ export function WorkspacePanel({
       onDraftChange={workspace.setDraft}
       onSave={() => void workspace.save()}
       onAddToChat={onAddToChat}
+      onBuildPlan={onBuildPlan}
       onUploadChange={workspace.handleUploadChange}
     />
   )
@@ -207,6 +210,7 @@ export function WorkspacePanel({
         onUpload={() => workspace.uploadRef.current?.click()}
         onRefresh={() => void workspace.refresh()}
         onAddToChat={onAddToChat}
+        onBuildPlan={onBuildPlan}
         onDraftChange={workspace.setDraft}
         onSave={() => void workspace.save()}
       />

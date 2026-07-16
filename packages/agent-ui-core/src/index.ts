@@ -305,6 +305,10 @@ export type AgentEvent =
   | EventEnvelope<'run.progress', { text?: string }>
   | EventEnvelope<'todos.updated', { todos: AgentTodo[] }>
   | EventEnvelope<
+      'plan.created',
+      { path: string; title: string; summary: string }
+    >
+  | EventEnvelope<
       'run.usage',
       {
         inputTokens: number
@@ -394,6 +398,14 @@ export type RuntimeSettings = {
   toolHealthEnabled: boolean
   toolHealthFailThreshold: number
   toolHealthSuppressSeconds: number
+  /** True = Plan mode (author plans/*.md); false = Agent mode. */
+  planMode?: boolean
+}
+
+export type AgentPlanCard = {
+  path: string
+  title: string
+  summary: string
 }
 
 export type OnboardingSettings = {

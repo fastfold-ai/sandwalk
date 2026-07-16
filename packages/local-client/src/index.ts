@@ -1069,6 +1069,7 @@ export class LocalAgentClient
         tool_health_enabled: changes.toolHealthEnabled,
         tool_health_fail_threshold: changes.toolHealthFailThreshold,
         tool_health_suppress_seconds: changes.toolHealthSuppressSeconds,
+        plan_mode: changes.planMode,
       }),
       headers: { 'content-type': 'application/json' },
       signal,

@@ -24,6 +24,7 @@ class RuntimeSettings(ApiModel):
     tool_health_enabled: bool = True
     tool_health_fail_threshold: int = 2
     tool_health_suppress_seconds: int = 900
+    plan_mode: bool = False
 
 
 class UpdateRuntimeSettingsRequest(ApiModel):
@@ -44,6 +45,7 @@ class UpdateRuntimeSettingsRequest(ApiModel):
     tool_health_enabled: bool | None = None
     tool_health_fail_threshold: int | None = None
     tool_health_suppress_seconds: int | None = None
+    plan_mode: bool | None = None
 
 
 class OnboardingSettings(ApiModel):

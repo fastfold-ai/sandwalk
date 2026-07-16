@@ -1,17 +1,30 @@
 import type { AgentEvent } from '@sandwalk/agent-ui-core'
 
 import { composerToMessage } from '@/components/agents/composer-parts'
-import type { SessionChatState } from '@/lib/sessions'
+import {
+  emptySessionChatState,
+  type SessionChatState
+} from '@/lib/sessions'
 
 export type ChatPatch =
   | Partial<SessionChatState>
   | ((prev: SessionChatState) => SessionChatState)
 
+/** Fill fields added after a session was already in memory (HMR / old patches). */
+export function normalizeSessionChatState(
+  state: Partial<SessionChatState> | SessionChatState
+): SessionChatState {
+  return { ...emptySessionChatState(), ...state }
+}
+
 export function applyChatPatch(
   prev: SessionChatState,
   patch: ChatPatch
 ): SessionChatState {
-  return typeof patch === 'function' ? patch(prev) : { ...prev, ...patch }
+  const base = normalizeSessionChatState(prev)
+  const next =
+    typeof patch === 'function' ? patch(base) : { ...base, ...patch }
+  return normalizeSessionChatState(next)
 }
 
 export type BuildSendContentInput = {
@@ -102,8 +115,28 @@ export function reduceChatOnAgentEvent(
     return {
       ...prev,
       todosByRunId: {
-        ...prev.todosByRunId,
+        ...(prev.todosByRunId ?? {}),
         [event.runId as string]: event.payload.todos
+      }
+    }
+  }
+
+  if (event.type === 'plan.created') {
+    if (!event.runId) return prev
+    const runId = event.runId as string
+    const nextPlan = {
+      path: event.payload.path,
+      title: event.payload.title,
+      summary: event.payload.summary
+    }
+    const plansByRunId = prev.plansByRunId ?? {}
+    const existing = plansByRunId[runId] || []
+    const deduped = existing.filter(plan => plan.path !== nextPlan.path)
+    return {
+      ...prev,
+      plansByRunId: {
+        ...plansByRunId,
+        [runId]: [...deduped, nextPlan]
       }
     }
   }
@@ -162,6 +195,7 @@ export function reduceChatOnAgentEvent(
       runActive: false,
       activeRunId: null,
       liveDelta: '',
+      activeBuildPlan: null,
       todosByRunId:
         event.runId && prev.todosByRunId[event.runId]
           ? {

@@ -73,6 +73,22 @@ class LoopProgressMixin:
                 event_type=event_type,
                 payload=event_payload,
             )
+            if event == "tool_start":
+                from agent_server.service.plan_events import (
+                    plan_created_payload_from_tool_call,
+                )
+
+                plan_payload = plan_created_payload_from_tool_call(
+                    name=str(event_payload.get("name") or ""),
+                    arguments=event_payload.get("arguments"),
+                )
+                if plan_payload is not None:
+                    self.store.append_event(
+                        session_id=session_id,
+                        run_id=run_id,
+                        event_type="plan.created",
+                        payload=plan_payload,
+                    )
         except Exception:
             logger.debug(
                 "Failed to dual-write CLI progress event",

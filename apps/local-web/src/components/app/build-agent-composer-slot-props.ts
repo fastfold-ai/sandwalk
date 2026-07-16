@@ -42,6 +42,7 @@ type UseAgentComposerSlotPropsInput = {
   setFilesPanelCollapsed: AgentComposerSlotProps['setFilesPanelCollapsed']
   setPendingOpenPath: AgentComposerSlotProps['setPendingOpenPath']
   handleComposerSend: AgentComposerSlotProps['handleComposerSend']
+  handleStop: AgentComposerSlotProps['handleStop']
   setWorkspaceVersion: AgentComposerSlotProps['setWorkspaceVersion']
   runtimeSettings: RuntimeSettings | null
   tokenUsage: AgentComposerSlotProps['tokenUsage']
@@ -89,6 +90,7 @@ export function buildAgentComposerSlotProps(
     setFilesPanelCollapsed: input.setFilesPanelCollapsed,
     setPendingOpenPath: input.setPendingOpenPath,
     handleComposerSend: input.handleComposerSend,
+    handleStop: input.handleStop,
     loadSkillDetail,
     setWorkspaceVersion: input.setWorkspaceVersion,
     runtimeSettings: input.runtimeSettings,

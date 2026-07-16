@@ -68,7 +68,13 @@ class _BottomToolbarMixin:
                 '<style fg="#555555" bg="default"> · /interrupt · Ctrl+C interrupt</style>'
             )
         verbose = ' <style fg="#50fa7b" bg="default">verbose</style>' if self.session.verbose else ""
-        plan = ' <style fg="#ff79c6" bg="default">plan mode</style>' if self.session.config.get("agent.plan_preview", False) else ""
+        # Mustard — matches local-web Plan mode composer accent (#9a7429).
+        plan = (
+            ' <style fg="#555555" bg="default">·</style> '
+            '<style fg="#9a7429" bg="default">plan mode</style>'
+            if self.session.config.get("agent.plan_preview", False)
+            else ""
+        )
         specialist = ""
         label = getattr(self, "_cli_specialist_label", None)
         if label:
@@ -82,7 +88,8 @@ class _BottomToolbarMixin:
 
         sandbox_label = getattr(self, "_cli_sandbox_label", None) or "Local Sandbox"
         is_modal = "modal" in sandbox_label.lower()
-        sandbox_fg = "#ffb86c" if is_modal else "#8a8f98"
+        # Modal brand lime (#7fee64); Local Sandbox stays muted gray.
+        sandbox_fg = "#7fee64" if is_modal else "#8a8f98"
         sandbox = (
             f' <style fg="#555555" bg="default">·</style> '
             f'<style fg="{sandbox_fg}" bg="default">{_html_escape(sandbox_label)}</style>'

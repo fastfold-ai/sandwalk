@@ -90,6 +90,8 @@ DEFAULTS_AGENT = {
     "agent.interrupt_drain_timeout_s": 10,
     "agent.planner_max_tools": 90,
     "agent.planner_compact_tool_descriptions": True,
+    # True = Plan mode (author plans/*.md); False = Agent mode (execute).
+    "agent.plan_preview": False,
     "agent.tool_health_enabled": True,
     "agent.tool_health_fail_threshold": 2,
     "agent.tool_health_failure_window_s": 1800,

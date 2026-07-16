@@ -5,6 +5,7 @@ import {
   ComposerAtMenu,
   type ComposerAtMenuHandle
 } from '@/components/agents/composer/ComposerAtMenu'
+import { ComposerAttachments } from '@/components/agents/composer/ComposerAttachments'
 import { ComposerDraftEditor } from '@/components/agents/composer/ComposerDraftEditor'
 import {
   ComposerSlashMenu,
@@ -16,6 +17,7 @@ import {
   type SandboxActionPhase,
   type SandboxComputeChange
 } from '@/components/agents/composer/composer-props'
+import { useComposerAttachments } from '@/components/agents/composer/useComposerAttachments'
 import {
   useComposerDraftState,
   useComposerMentionFocus
@@ -64,6 +66,7 @@ export function Composer({
   onSandboxStop,
   onSandboxRestart,
   onLoadLocalSystem,
+  onPlanModeChange,
   editingQueued = false,
   onCancelEditQueued
 }: ComposerProps) {
@@ -80,6 +83,16 @@ export function Composer({
     workspaceFiles
   })
 
+  const {
+    attachments,
+    addFiles,
+    removeAttachment,
+    clearAttachments,
+    attachmentSendPrefix,
+    hasReadyAttachments,
+    isUploading
+  } = useComposerAttachments(onUpload, focusKey)
+
   useComposerMentionFocus(
     draftState.slashOpen,
     draftState.atOpen,
@@ -91,13 +104,16 @@ export function Composer({
 
   const handleSend = () => {
     const text = draftState.draftRef.current
-    if (!text.trim()) return
+    const prefix = attachmentSendPrefix()
+    if ((!text.trim() && !prefix) || isUploading) return
+    const payload = [prefix, text].filter(Boolean).join(' ').trim()
     setAuraTick(tick => tick + 1)
     draftState.clearDraftAfterSend()
-    onSend(text)
+    clearAttachments()
+    onSend(payload)
   }
 
-  const hasDraft = Boolean(draftState.draft.trim())
+  const hasDraft = Boolean(draftState.draft.trim()) || hasReadyAttachments
   const showStopButton = running && !hasDraft
   const composerParts = useMemo(
     () => parseComposerParts(draftState.draft),
@@ -165,12 +181,33 @@ export function Composer({
             event.preventDefault()
             handleSend()
           }}
+          onDragOver={event => {
+            event.preventDefault()
+            event.stopPropagation()
+          }}
+          onDrop={event => {
+            event.preventDefault()
+            event.stopPropagation()
+            if (event.dataTransfer.files?.length) {
+              void addFiles(event.dataTransfer.files)
+            }
+          }}
+          onPaste={event => {
+            const files = Array.from(event.clipboardData?.files || [])
+            if (files.length === 0) return
+            event.preventDefault()
+            void addFiles(files)
+          }}
           className={cn(
             'bg-card focus-within:border-muted-foreground/40 border-border rounded-3xl border p-2 shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',
             editingQueued &&
               'rounded-t-none border-x-0 border-b-0 border-t border-sky-500/25 shadow-none focus-within:border-sky-500/40'
           )}
         >
+          <ComposerAttachments
+            attachments={attachments}
+            onRemove={removeAttachment}
+          />
           <ComposerDraftEditor
             draft={draftState.draft}
             running={running}
@@ -198,6 +235,7 @@ export function Composer({
           <ComposerToolbar
             running={running}
             showStopButton={showStopButton}
+            sendDisabled={isUploading || (!hasDraft && !running)}
             modelOptions={modelOptions}
             runtimeSettings={runtimeSettings}
             specialists={specialists}
@@ -205,7 +243,7 @@ export function Composer({
             sandboxStatus={sandboxStatus ?? null}
             sandboxPhase={sandboxPhase}
             tokenUsage={tokenUsage}
-            onUpload={onUpload}
+            onUpload={files => void addFiles(files)}
             onModelSelect={onModelSelect}
             onReasoningSettingsChange={onReasoningSettingsChange}
             onSpecialistSelect={onSpecialistSelect}
@@ -218,6 +256,7 @@ export function Composer({
             onSandboxStop={onSandboxStop}
             onSandboxRestart={onSandboxRestart}
             onLoadLocalSystem={onLoadLocalSystem}
+            onPlanModeChange={onPlanModeChange}
             onStop={onStop}
           />
         </form>

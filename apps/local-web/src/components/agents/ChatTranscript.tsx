@@ -1,8 +1,14 @@
-import type { AgentMessage, AgentSession, AgentTodo } from '@sandwalk/agent-ui-core'
+import type {
+  AgentMessage,
+  AgentPlanCard,
+  AgentSession,
+  AgentTodo
+} from '@sandwalk/agent-ui-core'
 import { ArrowDown } from 'lucide-react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useMemo } from 'react'
 
+import { BuildPlanStatusCard } from '@/components/agents/BuildPlanStatusCard'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { TodoListInline } from '@/components/agents/TodoListInline'
 import { ToolCard, type TranscriptTool } from '@/components/agents/ToolCard'
@@ -27,9 +33,12 @@ type ChatTranscriptProps = {
   setCopiedMessageId: Dispatch<SetStateAction<string | null>>
   session: AgentSession | null | undefined
   onOpenFile: (path: string) => void
+  onBuildPlan?: (plan: AgentPlanCard) => void
   onInterrupt: (() => void) | undefined
   activeRunTools: TranscriptTool[]
   activeRunTodos: AgentTodo[]
+  activeBuildPlan?: AgentPlanCard | null
+  builtPlanPaths?: string[]
   liveDelta: string
   showScrollToBottom: boolean
   onScrollToBottom: () => void
@@ -51,9 +60,12 @@ export function ChatTranscript({
   setCopiedMessageId,
   session,
   onOpenFile,
+  onBuildPlan,
   onInterrupt,
   activeRunTools,
   activeRunTodos,
+  activeBuildPlan = null,
+  builtPlanPaths = [],
   liveDelta,
   showScrollToBottom,
   onScrollToBottom
@@ -62,6 +74,11 @@ export function ChatTranscript({
     () => buildChatTimelineItems(conversationTimeline),
     [conversationTimeline]
   )
+  const hiddenPlanPaths = useMemo(() => {
+    const paths = new Set(builtPlanPaths)
+    if (activeBuildPlan?.path) paths.add(activeBuildPlan.path)
+    return paths
+  }, [activeBuildPlan?.path, builtPlanPaths])
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -87,9 +104,20 @@ export function ChatTranscript({
                 setCopiedMessageId={setCopiedMessageId}
                 session={session}
                 onOpenFile={onOpenFile}
+                onBuildPlan={onBuildPlan}
                 onInterrupt={onInterrupt}
+                hiddenPlanPaths={hiddenPlanPaths}
               />
             ))}
+            {runActive && activeBuildPlan ? (
+              <div className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150">
+                <BuildPlanStatusCard
+                  plan={activeBuildPlan}
+                  todos={activeRunTodos}
+                  runActive={runActive}
+                />
+              </div>
+            ) : null}
             {activeRunTools.length > 0 ? (
               <div className="space-y-1">
                 {activeRunTools.map(tool => (
@@ -106,7 +134,7 @@ export function ChatTranscript({
                 ))}
               </div>
             ) : null}
-            {activeRunTodos.length > 0 ? (
+            {activeRunTodos.length > 0 && !activeBuildPlan ? (
               <div className="mx-auto w-full max-w-[44rem] px-2">
                 <TodoListInline todos={activeRunTodos} />
               </div>

@@ -6,6 +6,7 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import { type Dispatch, type MutableRefObject, type SetStateAction,useEffect, useRef } from 'react'
 
+import { toolsFromEvents } from '@/components/agents/transcript'
 import { reduceChatOnAgentEvent } from '@/lib/chat-actions'
 import type { SessionChatState } from '@/lib/sessions'
 
@@ -60,12 +61,22 @@ export function useSessionChatStream({
     }
 
     const controller = new AbortController()
-    void client
-      .listMessages(sessionId, controller.signal)
-      .then(history => {
+    void Promise.all([
+      client.listMessages(sessionId, controller.signal),
+      client.listEventHistory(sessionId, controller.signal).catch(() => [])
+    ])
+      .then(([history, events]) => {
+        const derived = toolsFromEvents(events)
         patchChat(sessionId, prev => ({
           ...prev,
           messages: history,
+          tools: derived.tools,
+          todosByRunId: derived.todosByRunId,
+          plansByRunId: derived.plansByRunId,
+          runIdByMessageId: {
+            ...prev.runIdByMessageId,
+            ...derived.runIdByMessageId
+          },
           messagesLoaded: true
         }))
       })
