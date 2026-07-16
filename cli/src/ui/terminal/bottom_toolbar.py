@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import random
 import time
+
 from prompt_toolkit.formatted_text import HTML
 
 
@@ -89,3 +91,21 @@ class _BottomToolbarMixin:
             f'<style fg="#8be9fd" bg="default">{model}</style>{specialist}{sandbox}{verbose}{plan}'
             '<style fg="#555555" bg="default"> · ? for commands · Ctrl+O verbose</style>'
         )
+
+    def _init_toolbar_animation_profile(self) -> None:
+        """Load spinner/word profile for prompt-owned live animation."""
+        try:
+            from ui.status import SPINNERS, THINKING_WORDS
+            style = str(self.session.config.get("ui.spinner", "benzene_breathing"))
+            spinner_conf = SPINNERS.get(style, SPINNERS["benzene_breathing"])
+            frames = [str(f) for f in spinner_conf.get("frames", []) if str(f)]
+            if frames:
+                self._toolbar_frames = frames
+            interval_ms = int(spinner_conf.get("interval_ms", 125))
+            self._toolbar_frame_interval_s = max(0.12, min(interval_ms / 1000.0, 0.6))
+            words = list(THINKING_WORDS.get("planning", []))
+            random.shuffle(words)
+            if words:
+                self._toolbar_words = words
+        except Exception:
+            pass
