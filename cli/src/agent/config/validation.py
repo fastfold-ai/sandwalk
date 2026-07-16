@@ -103,6 +103,14 @@ def _validate_config(config_dict: dict) -> list[str]:
             "Invalid sandbox.backend (expected 'builtin' or 'modal'): "
             f"{config_dict.get('sandbox.backend')!r}"
         )
+    cli_sandbox = config_dict.get("agent.cli_sandbox")
+    if cli_sandbox is not None and str(cli_sandbox).strip() != "":
+        cli_backend = str(cli_sandbox).strip().lower()
+        if cli_backend not in {"builtin", "modal"}:
+            warnings.append(
+                "Invalid agent.cli_sandbox (expected 'builtin' or 'modal'): "
+                f"{cli_sandbox!r}"
+            )
     compute_type = str(config_dict.get("sandbox.compute_type") or "cpu").strip().lower()
     if compute_type not in {"cpu", "gpu"}:
         warnings.append(

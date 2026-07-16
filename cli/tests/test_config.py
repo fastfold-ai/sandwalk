@@ -738,6 +738,12 @@ class TestValidateConfig:
         })
         assert not any("Unknown config key" in i for i in issues)
 
+    def test_cli_sandbox_key_is_known(self):
+        issues = _validate_config({"agent.cli_sandbox": "modal"})
+        assert not any("Unknown config key" in i for i in issues)
+        bad = _validate_config({"agent.cli_sandbox": "cloud"})
+        assert any("Invalid agent.cli_sandbox" in i for i in bad)
+
     def test_custom_mcp_typo_suffix_still_warns(self):
         issues = _validate_config({
             "mcp.custom_abc_not_a_real_field": "x",

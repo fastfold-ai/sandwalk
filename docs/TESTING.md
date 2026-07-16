@@ -24,8 +24,12 @@ pnpm test                 # unit tests
 pnpm test:coverage        # unit tests + coverage (writes apps/local-web/coverage/)
 
 # Agent CLI + Agent Server
-pnpm test:cli             # unit tests
-pnpm test:cli:coverage    # unit tests + 80% gate (needs cli/.venv)
+pnpm test:cli             # unit + functional CLI (excludes live/network/pexpect)
+pnpm test:cli:functional  # real sandwalk subprocess + temp HOME only
+pnpm test:cli:network     # GitHub skill installs (RUN_CLI_NETWORK=1)
+pnpm test:cli:e2e         # one-shot chat (RUN_CLI_E2E=1 + LLM API key)
+pnpm test:cli:live        # network + e2e together
+pnpm test:cli:coverage    # unit/functional + 80% gate (needs cli/.venv)
 
 # Mac App (requires full Xcode)
 pnpm test:mac             # XCTest + 80% scoped gate + coverage.lcov
@@ -46,19 +50,56 @@ Working directory: `cli/`
 ```bash
 cd cli
 uv sync --extra dev --extra all --extra api   # or: python -m venv .venv && pip install -e ".[dev,all,api]"
-.venv/bin/python -m pytest tests/ -q \
-  -m "not data_smoke and not integration and not modal_e2e"
+.venv/bin/python -m pytest tests/ -q
 
 # With coverage (matches CI)
 .venv/bin/python -m pytest tests/ -q \
-  -m "not data_smoke and not integration and not modal_e2e" \
   --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models \
   --cov=reports --cov=skills --cov=tools --cov=ui \
   --cov-report=term-missing:skip-covered \
   --cov-report=xml:coverage-full.xml \
   --cov-fail-under=80
+```
 
-# Agent Server–only gate (reuses .coverage from the run above)
+Opt-in lanes (`cli_network`, `cli_e2e`, `modal_e2e`, `data_smoke`, `integration`) are
+**auto-deselected** in `tests/conftest.py` unless their env gate is set — no
+`-m "not … and not …"` expression needed.
+
+### CLI test layers
+
+| Layer | What it is | How to run | Size |
+|-------|------------|------------|------|
+| **Functional smoke** | Real `sandwalk` + temp `HOME` | `pnpm test:cli:functional` | ~10–20 tests, ~10s |
+| **Unit** | Mocked helpers / CliRunner | `pnpm test:cli:unit` | ~2400 tests, several minutes |
+| **CI CLI** | Unit + offline functional | `pnpm test:cli` | same as unit + a bit |
+| **Full integration** | Functional + network + live chat | `pnpm test:cli:all` | minutes |
+| Interactive REPL | pexpect TTY | `RUN_INTEGRATION=1` | opt-in |
+| Live Modal / data | Real APIs / Modal | `RUN_MODAL_E2E=1` / `RUN_DATA_SMOKE=1` | credentials |
+
+```bash
+pnpm test:cli:functional   # quick smoke
+pnpm test:cli:unit         # full unit suite — expect several minutes
+pnpm test:cli              # CI mix
+pnpm test:cli:all          # full CLI integration (keys from ~/.sandwalk)
+```
+
+Cases: [`cli/tests/integration_cli/`](../cli/tests/integration_cli/) · [CASES.md](../cli/tests/integration_cli/CASES.md).
+
+### Modal sandbox E2E
+
+Live Modal verification is **opt-in** (creates a short-lived sandbox):
+
+```bash
+export RUN_MODAL_E2E=1
+export MODAL_TOKEN_ID=...
+export MODAL_TOKEN_SECRET=...
+pip install -e ".[modal]"   # from cli/
+sandwalk sandbox probe
+.venv/bin/python -m pytest tests/test_modal_sandbox_e2e.py -m modal_e2e -v
+```
+
+# Agent Server–only gate (reuses .coverage from a coverage run above)
+```bash
 .venv/bin/coverage report --include='*/agent_server/*' \
   --omit='*/agent_server/pty_manager.py,*/agent_server/app.py,*/agent_server/main.py,*/agent_server/mcp_service.py,*/agent_server/service.py,*/agent_server/default_specialists.py' \
   --skip-covered --fail-under=80
@@ -67,18 +108,6 @@ uv sync --extra dev --extra all --extra api   # or: python -m venv .venv && pip 
 .venv/bin/coverage xml -o coverage-agent-cli.xml --omit='*/agent_server/*'
 .venv/bin/coverage xml -o coverage-agent-server.xml --include='*/agent_server/*' \
   --omit='*/agent_server/pty_manager.py,*/agent_server/app.py,*/agent_server/main.py,*/agent_server/mcp_service.py,*/agent_server/service.py,*/agent_server/default_specialists.py'
-```
-
-### Modal sandbox E2E
-
-Live Modal verification is **opt-in** (creates a short-lived sandbox):
-
-```bash
-export MODAL_TOKEN_ID=...
-export MODAL_TOKEN_SECRET=...
-pip install -e ".[modal]"   # from cli/
-sandwalk sandbox probe
-.venv/bin/python -m pytest tests/test_modal_sandbox_e2e.py -m modal_e2e -v
 ```
 
 **What counts toward 80%:** statement coverage with an omit list in

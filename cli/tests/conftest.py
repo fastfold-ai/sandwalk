@@ -3,6 +3,7 @@
 import os
 import sys
 from pathlib import Path
+
 import pytest
 
 # Ensure `src/` packages import when running from repo root without editable install.
@@ -11,21 +12,54 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 
+def _env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes"}
+
+
 def pytest_addoption(parser):
     parser.addoption(
-        "--run-e2e", action="store_true", default=False,
-        help="Run end-to-end tests that hit real APIs",
+        "--run-e2e",
+        action="store_true",
+        default=False,
+        help="Run end-to-end tests that hit real APIs (same as RUN_CLI_E2E=1)",
     )
 
 
+# Opt-in lanes — excluded from plain `pytest tests/` / CI unless their gate is on.
+# Keeps CI/scripts free of the long `-m "not X and not Y…"` expression.
+_OPT_IN_MARKERS: tuple[tuple[str, str], ...] = (
+    ("data_smoke", "RUN_DATA_SMOKE"),
+    ("integration", "RUN_INTEGRATION"),
+    ("modal_e2e", "RUN_MODAL_E2E"),
+    ("cli_network", "RUN_CLI_NETWORK"),
+    ("cli_e2e", "RUN_CLI_E2E"),
+    ("e2e", "RUN_CLI_E2E"),
+)
+
+
 def pytest_collection_modifyitems(config, items):
-    if config.getoption("--run-e2e"):
-        return  # Run all tests including e2e
-    # Skip e2e tests by default
-    skip_e2e = pytest.mark.skip(reason="Need --run-e2e to run")
+    run_e2e = bool(config.getoption("--run-e2e")) or _env_flag("RUN_CLI_E2E")
+
+    def _enabled(marker: str, env_name: str) -> bool:
+        if marker in {"e2e", "cli_e2e"}:
+            return run_e2e
+        return _env_flag(env_name)
+
+    selected: list = []
+    deselected: list = []
     for item in items:
-        if "test_e2e" in item.nodeid or "e2e" in item.keywords:
-            item.add_marker(skip_e2e)
+        blocked = False
+        for marker, env_name in _OPT_IN_MARKERS:
+            if marker in item.keywords and not _enabled(marker, env_name):
+                blocked = True
+                break
+        if not blocked and "test_e2e" in item.nodeid and not run_e2e:
+            blocked = True
+        (deselected if blocked else selected).append(item)
+
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+    items[:] = selected
 
 
 @pytest.fixture(autouse=True)
@@ -61,7 +95,7 @@ def has_api_key():
 
 def _has_cellxgene():
     try:
-        import cellxgene_census
+        import cellxgene_census  # noqa: F401
         return True
     except ImportError:
         return False
@@ -75,7 +109,9 @@ def _has_cellxgene():
 def captured_console():
     """Yield a (console, buffer) tuple for capturing Rich output."""
     from io import StringIO
+
     from rich.console import Console
+
     buf = StringIO()
     console = Console(file=buf, force_terminal=True, width=120)
     return console, buf

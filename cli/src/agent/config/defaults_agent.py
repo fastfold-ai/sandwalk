@@ -79,6 +79,9 @@ DEFAULTS_AGENT = {
     "agent.profile": "research",
     # Active specialist slug for interactive/batch CLI runs (empty = global).
     "agent.cli_specialist": "",
+    # CLI-only sandbox preference (Local vs Modal). Independent of web
+    # dashboard ``sandbox.backend`` — see agent.sandbox_manage.
+    "agent.cli_sandbox": "builtin",
     "agent.enable_claude_code_tool": False,
     "agent.parallel_default_count": 3,
     "agent.parallel_auto_suggest": True,

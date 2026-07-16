@@ -216,7 +216,10 @@ markers = [
     "e2e_matrix: optional live multi-prompt end-to-end matrix (set RUN_E2E_MATRIX=1)",
     "data_smoke: optional live public data-source smoke tests (set RUN_DATA_SMOKE=1)",
     "integration: interactive terminal tests requiring pexpect and a TTY",
-    "modal_e2e: live Modal sandbox E2E (set MODAL_TOKEN_ID and MODAL_TOKEN_SECRET)",
+    "cli_functional: real sandwalk subprocess tests with isolated HOME (no live APIs)",
+    "cli_network: real sandwalk tests that hit the network (set RUN_CLI_NETWORK=1)",
+    "cli_e2e: live one-shot chat / skill+chat tests (set RUN_CLI_E2E=1 + LLM API key)",
+    "modal_e2e: live Modal sandbox E2E (set RUN_MODAL_E2E=1 + MODAL_TOKEN_ID/SECRET)",
 ]
 
 [tool.coverage.run]
