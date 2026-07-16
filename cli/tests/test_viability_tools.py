@@ -111,7 +111,7 @@ class TestViabilityTissueSelectivity:
 
 
 class TestViabilityCompareCompounds:
-    @patch("tools.viability.dose_response")
+    @patch("tools.viability_part2.dose_response")
     def test_compare_sorts_by_ic50(self, mock_dr):
         from tools.viability import compare_compounds
 
@@ -135,7 +135,7 @@ class TestViabilityCompareCompounds:
         assert result["comparison"][0]["compound"] == "cpd_fast"
         assert "Compared 2 compounds" in result["summary"]
 
-    @patch("tools.viability.dose_response")
+    @patch("tools.viability_part2.dose_response")
     def test_compare_all_missing(self, mock_dr):
         from tools.viability import compare_compounds
 

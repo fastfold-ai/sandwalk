@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
 
-echo "==> SwiftLint (pinned file_length gate)"
+echo "==> SwiftLint (advisory)"
 "${ROOT}/scripts/lint.sh"
 
 COVERAGE_THRESHOLD="${COVERAGE_THRESHOLD:-80}"

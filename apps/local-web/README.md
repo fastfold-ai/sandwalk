@@ -81,7 +81,7 @@ apps/local-web/
 ├── package.json                 # @sandwalk/agent-local-web
 ├── vite.config.ts               # Dev server on :8969
 ├── vitest.config.ts             # Coverage include set + 80% gate
-├── eslint.config.js             # max-lines 300 + import rules
+├── eslint.config.js             # ESLint + import rules
 ├── public/brand/                # Logos and mark
 └── src/
     ├── App.tsx / main.tsx
@@ -92,11 +92,11 @@ apps/local-web/
 
 Workspace packages used by this app: `@sandwalk/agent-local-client`, `@sandwalk/agent-ui-core`.
 
-## File length rules
+## Module size guidance
 
-- **Max 300 lines** per `.ts` / `.tsx` file (`skipBlankLines` + `skipComments`)
-- Test files (`*.test.ts` / `*.test.tsx`) are excluded
-- Prefer extracting hooks, parts, and helpers into sibling modules over growing a component past 300
+Prefer cohesive modules. ESLint may warn when a source file grows past ~300 lines
+(`skipBlankLines` / `skipComments`); that is advisory, not a commit gate. Extract
+hooks, parts, and helpers when a file mixes unrelated responsibilities.
 
 ```bash
 pnpm --filter @sandwalk/agent-local-web lint:check
@@ -154,7 +154,7 @@ for repo-wide setup.
 
 When changing the web dashboard:
 
-1. Keep `.ts` / `.tsx` sources under **300 lines** (`lint:check`)
+1. Prefer cohesive modules; extract when a file mixes unrelated responsibilities
 2. Prefer pure helpers in `src/lib/` (and small agent modules) so they can join the coverage gate
 3. Add / update Vitest coverage for modules you touch; keep the scoped gate ≥80%
 4. Run before opening a PR:
@@ -175,5 +175,5 @@ Handy commands from the monorepo root:
 |---------|---------|
 | `pnpm dev` | Vite dashboard on :8969 |
 | `pnpm test` / `pnpm test:coverage` | Vitest (+ coverage gate) |
-| `pnpm --filter @sandwalk/agent-local-web lint:check` | ESLint including `max-lines` |
+| `pnpm --filter @sandwalk/agent-local-web lint:check` | ESLint |
 | `pnpm --filter @sandwalk/agent-local-web build` | `tsc -b` + Vite production build |

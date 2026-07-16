@@ -56,7 +56,7 @@ class TestShellRun:
 
     def test_timeout_cap(self):
         """Timeout should be capped at 300s."""
-        with patch("tools.shell.subprocess.run") as mock_run:
+        with patch("tools.shell_part2.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0, stdout="ok", stderr=""
             )

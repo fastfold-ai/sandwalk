@@ -718,6 +718,32 @@ class TestValidateConfig:
         issues = _validate_config({"agent.typo_key": True})
         assert any("Unknown config key" in i and "typo_key" in i for i in issues)
 
+    def test_custom_mcp_oauth_keys_are_known(self):
+        """Dynamic mcp.custom_<uuid>_* keys written by OAuth must not warn.
+
+        Boot/CI never load a real ~/.sandwalk/config.json with connected custom
+        MCPs, so a static DEFAULTS-only allowlist previously missed this and
+        spammed interactive + serve startups with false "possible typo" warnings.
+        """
+        sid = "2fd7809c-2a40-4c7d-86d5-93ab7946ee0d"
+        issues = _validate_config({
+            f"mcp.custom_{sid}_client_id": "cid",
+            f"mcp.custom_{sid}_access_token": "tok",
+            f"mcp.custom_{sid}_refresh_token": "ref",
+            f"mcp.custom_{sid}_token_expires_at": "9999999999",
+            f"mcp.custom_{sid}_headers": {"Authorization": "Bearer x"},
+            f"mcp.custom_{sid}_tool_count": 3,
+            f"mcp.custom_{sid}_status_message": "ok",
+            "mcp.removed_catalog_ids": ["betterstack"],
+        })
+        assert not any("Unknown config key" in i for i in issues)
+
+    def test_custom_mcp_typo_suffix_still_warns(self):
+        issues = _validate_config({
+            "mcp.custom_abc_not_a_real_field": "x",
+        })
+        assert any("Unknown config key" in i for i in issues)
+
     def test_type_error_bool_as_string(self):
         issues = _validate_config({"output.verbose": "yes"})
         assert any("Type error" in i and "output.verbose" in i for i in issues)

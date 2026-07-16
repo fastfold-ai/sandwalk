@@ -47,7 +47,7 @@ class TestClaudeSkillHelpers:
         assert _installed_claude_skill_names() == ["fold", "md"]
 
     def test_count_installed_claude_skills(self, monkeypatch):
-        monkeypatch.setattr("cli._installed_claude_skill_names", lambda: ["a", "b", "c"])
+        monkeypatch.setattr("cli.banner_support._installed_claude_skill_names", lambda: ["a", "b", "c"])
         assert _count_installed_claude_skills() == 3
 
 
@@ -180,7 +180,7 @@ class TestOpenAICompatibleSetupFetch:
 
     def test_fetch_openai_models_for_setup(self, captured_console, monkeypatch):
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.setup.discovery_fetch.console", console)
         payload = json.dumps({"data": [{"id": "gpt-oss:20b"}, {"id": "gemma:12b"}]}).encode()
 
         class FakeResp:
@@ -227,7 +227,7 @@ class TestOpenAICompatibleSetupFetch:
 
     def test_fetch_openai_models_reports_http_error_body(self, captured_console, monkeypatch):
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.setup.discovery.console", console)
         err = urllib.error.HTTPError(
             url="http://localhost:8000/v1/models",
             code=401,
@@ -278,7 +278,7 @@ class TestTraceAndReportHelpers:
 class TestRunStepCommand:
     def test_run_step_command_pass(self, captured_console, monkeypatch):
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.trace_helpers.console", console)
         proc = subprocess.CompletedProcess(args=["echo"], returncode=0, stdout="ok", stderr="")
         monkeypatch.setattr("cli.subprocess.run", lambda *a, **k: proc)
         assert _run_step_command("pytest", ["pytest", "-q"]) is True
@@ -286,7 +286,7 @@ class TestRunStepCommand:
 
     def test_run_step_command_fail(self, captured_console, monkeypatch):
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.trace_helpers.console", console)
         proc = subprocess.CompletedProcess(args=["pytest"], returncode=2, stdout="", stderr="fail")
         monkeypatch.setattr("cli.subprocess.run", lambda *a, **k: proc)
         assert _run_step_command("pytest", ["pytest"]) is False
@@ -296,7 +296,7 @@ class TestRunStepCommand:
 class TestConfigSetUnsetDirect:
     def test_config_set_plain_key(self, captured_console, monkeypatch):
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.config.console", console)
         cfg = Config(data={})
         monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
         with patch.object(cfg, "save") as mock_save:
@@ -307,7 +307,7 @@ class TestConfigSetUnsetDirect:
 
     def test_config_unset_direct(self, captured_console, monkeypatch):
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.config.console", console)
         cfg = Config(data={"llm.provider": "openai"})
         monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
         with patch.object(cfg, "save") as mock_save:
@@ -379,7 +379,7 @@ class TestRunQueryAndBanner:
         fake_agent = MagicMock()
         fake_agent.run.return_value = fake_result
 
-        with patch("cli.print_banner"), patch("cli.setup_cmd") as mock_setup, patch(
+        with patch("cli.run_query.print_banner"), patch("cli.setup.wizard.setup_cmd") as mock_setup, patch(
             "agent.runner.AgentRunner", return_value=fake_agent
         ):
             run_query("after setup", {}, tmp_path / "out", "gpt-4o", False)
@@ -413,14 +413,14 @@ class TestRunQueryAndBanner:
 
     def test_print_banner_renders_metadata(self, captured_console, monkeypatch):
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.banner.console", console)
         cfg = Config(data={"llm.model": "claude-sonnet-4-5-20250929"})
         monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
-        monkeypatch.setattr("cli._count_installed_claude_skills", lambda: 2)
-        monkeypatch.setattr("cli._resolve_fastfold_subscription_tier", lambda c: "pro")
-        monkeypatch.setattr("cli.get_upgrade_available_version", lambda v: None)
-        monkeypatch.setattr("cli._random_command_tip_markup", lambda: "[dim]tip[/dim]")
-        monkeypatch.setattr("cli._random_news_item_markup", lambda: "[dim]news[/dim]")
+        monkeypatch.setattr("cli.banner._count_installed_claude_skills", lambda: 2)
+        monkeypatch.setattr("cli.banner._resolve_fastfold_subscription_tier_local", lambda c: "pro")
+        monkeypatch.setattr("cli.banner._get_cached_upgrade_available_version", lambda v: None)
+        monkeypatch.setattr("cli.banner._random_command_tip_markup", lambda: "[dim]tip[/dim]")
+        monkeypatch.setattr("cli.banner._random_news_item_markup", lambda: "[dim]news[/dim]")
         monkeypatch.setattr("tools.registry.list_tools", lambda: ["a", "b"])
 
         with patch("tools.ensure_loaded"):
@@ -434,17 +434,17 @@ class TestRunQueryAndBanner:
         self, captured_console, monkeypatch
     ):
         console, _ = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.interactive.console", console)
         cfg = Config(data={"llm.api_key": "sk-ant-test"})
         monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
 
         fake_terminal = MagicMock()
         with patch.object(cfg, "llm_preflight_issue", return_value=None), patch(
-            "cli.print_banner"
+            "cli.interactive.print_banner"
         ), patch(
-            "cli._maybe_offer_fastfold_skills_install_after_upgrade"
+            "cli.interactive._maybe_offer_fastfold_skills_install_after_upgrade"
         ) as mock_offer, patch(
-            "cli.InteractiveTerminal", return_value=fake_terminal
+            "ui.terminal.InteractiveTerminal", return_value=fake_terminal
         ):
             run_interactive({}, None, None, False)
 
@@ -464,7 +464,7 @@ class TestEntryRouting:
             called["args"] = args
             called["prog_name"] = prog_name
 
-        monkeypatch.setattr("cli.app", fake_app)
+        monkeypatch.setattr("cli.main.app", fake_app)
         monkeypatch.setattr("sys.argv", ["fastfold", "help", "config"])
         entry()
         assert called["args"] == ["config", "--help"]
@@ -475,7 +475,7 @@ class TestEntryRouting:
         def fake_app(*, args, prog_name):
             called["args"] = args
 
-        monkeypatch.setattr("cli.app", fake_app)
+        monkeypatch.setattr("cli.main.app", fake_app)
         monkeypatch.setattr("sys.argv", ["fastfold", "--version"])
         entry()
         assert called["args"] == ["run", "--version"]
@@ -495,7 +495,9 @@ class TestUpgradeSkillsPrompt:
         console, _ = captured_console
         monkeypatch.setattr("agent.skills.user_installed_skill_names", lambda: [])
         called = []
-        monkeypatch.setattr("cli._install_skill_sources", lambda sources: called.extend(sources))
+        monkeypatch.setattr(
+            "cli.setup.skills_install._install_skill_sources", lambda sources: called.extend(sources)
+        )
 
         _maybe_offer_fastfold_skills_install_after_upgrade(
             ui=console,

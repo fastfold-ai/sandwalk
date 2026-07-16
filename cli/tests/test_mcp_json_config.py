@@ -34,13 +34,15 @@ def test_seed_catalog_defaults_creates_disabled_rows(tmp_path: Path, monkeypatch
     _cfg(tmp_path, monkeypatch)
     store = AgentStore(tmp_path / "agent.db")
 
+    featured = [e for e in MCP_CATALOG if e.featured]
     created = seed_catalog_defaults(store)
-    assert created == len(MCP_CATALOG)
+    assert created == len(featured)
 
     servers = store.list_mcp_servers()
-    assert len(servers) == len(MCP_CATALOG)
+    assert len(servers) == len(featured)
     assert all(s.catalog_id for s in servers)
     assert all(not s.enabled for s in servers)
+    assert "linear" not in {s.catalog_id for s in servers}
 
     # Idempotent
     assert seed_catalog_defaults(store) == 0
@@ -64,10 +66,11 @@ def test_export_includes_catalog_meta_without_secrets(tmp_path: Path, monkeypatc
     assert "local-tool" in servers
     assert servers["local-tool"]["command"] == "echo"
 
+    featured = [e for e in MCP_CATALOG if e.featured]
     catalog_keys = [
         key for key, entry in servers.items() if entry.get("_sandwalkCatalogId")
     ]
-    assert len(catalog_keys) == len(MCP_CATALOG)
+    assert len(catalog_keys) == len(featured)
     for key in catalog_keys:
         assert "headers" not in servers[key]
 
@@ -96,7 +99,7 @@ def test_install_catalog_clears_removed(tmp_path: Path, monkeypatch):
     store = AgentStore(tmp_path / "agent.db")
     get_or_export_mcp_json(store)
 
-    catalog_id = MCP_CATALOG[0].id
+    catalog_id = next(e.id for e in MCP_CATALOG if e.featured)
     existing = next(s for s in store.list_mcp_servers() if s.catalog_id == catalog_id)
     mark_catalog_removed(catalog_id)
     store.delete_mcp_server(existing.id)
@@ -114,7 +117,7 @@ def test_apply_mcp_json_deletes_missing_catalog(tmp_path: Path, monkeypatch):
 
     doc = export_mcp_json(store)
     # Drop one catalog entry from the file.
-    drop_id = MCP_CATALOG[0].id
+    drop_id = next(e.id for e in MCP_CATALOG if e.featured)
     servers = {
         key: value
         for key, value in doc["mcpServers"].items()
@@ -135,4 +138,39 @@ def test_catalog_statuses_after_seed(tmp_path: Path, monkeypatch):
     statuses = svc.catalog_statuses()
     by_id = {item["id"]: item for item in statuses}
     for entry in MCP_CATALOG:
-        assert by_id[entry.id]["server_id"] is not None
+        if entry.featured:
+            assert by_id[entry.id]["server_id"] is not None
+        else:
+            assert by_id[entry.id]["server_id"] is None
+
+def test_prune_obsolete_catalog_servers(tmp_path: Path, monkeypatch):
+    from agent_server.mcp_json_config import prune_obsolete_catalog_servers
+
+    _cfg(tmp_path, monkeypatch)
+    store = AgentStore(tmp_path / "agent.db")
+    seed_catalog_defaults(store)
+    orphan = store.create_mcp_server(
+        name="Gone Template",
+        transport="streamable_http",
+        command=None,
+        args=[],
+        url="https://example.invalid/mcp",
+        enabled=False,
+        catalog_id="betterstack",
+        description="removed from catalog",
+    )
+    custom = store.create_mcp_server(
+        name="Custom Keep",
+        transport="stdio",
+        command="echo",
+        args=["hi"],
+        url=None,
+        enabled=True,
+    )
+
+    deleted = prune_obsolete_catalog_servers(store)
+    assert deleted == 1
+    ids = {s.id for s in store.list_mcp_servers()}
+    assert orphan.id not in ids
+    assert custom.id in ids
+    assert prune_obsolete_catalog_servers(store) == 0

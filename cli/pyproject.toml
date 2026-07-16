@@ -118,10 +118,9 @@ fastfold = "cli:entry"
 # are no longer exposed as `skills.*` console entry points here.
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent", "src/agent_server", "src/api", "src/data", "src/kb", "src/models", "src/reports", "src/skills", "src/tools", "src/ui"]
+packages = ["src/agent", "src/agent_server", "src/api", "src/cli", "src/data", "src/kb", "src/models", "src/reports", "src/skills", "src/tools", "src/ui"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/cli.py" = "cli.py"
 "src/_version.py" = "_version.py"
 # hatchling includes all files under the package path, so skills/ data files
 # (SKILL.md, scripts/, references/) are bundled automatically
@@ -132,7 +131,7 @@ target-version = "py311"
 exclude = [".venv", "venv"]
 
 [tool.ruff.lint]
-# Match fastfold-cloud-backend rule set; gradual adoption for legacy CLI surface.
+# Correctness + imports + bugbear; E501 ignored — formatter owns wrapping.
 select = [
     "E",      # pycodestyle errors
     "W",      # pycodestyle warnings
@@ -158,6 +157,10 @@ ignore = [
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
 
+[tool.ruff.lint.per-file-ignores]
+# Large re-export aggregator; keep isort flexible here.
+"src/agent_server/models/__init__.py" = ["I001"]
+
 [tool.mypy]
 python_version = "3.11"
 pretty = true
@@ -173,21 +176,21 @@ files = [
   "src/reports",
   "src/api",
   "src/agent_server/__init__.py",
-  "src/agent_server/auth_settings.py",
-  "src/agent_server/default_specialists.py",
-  "src/agent_server/environment_catalog.py",
-  "src/agent_server/environment_service.py",
-  "src/agent_server/pty_manager.py",
-  "src/agent_server/storage_service.py",
+  "src/agent_server/auth_settings",
+  "src/agent_server/default_specialists",
+  "src/agent_server/environment_catalog",
+  "src/agent_server/environment_service",
+  "src/agent_server/pty_manager",
+  "src/agent_server/storage_service",
   "src/agent_server/models.py",
-  "src/agent_server/account_service.py",
+  "src/agent_server/account_service",
   "src/agent_server/title.py",
-  "src/agent_server/workspace.py",
+  "src/agent_server/workspace",
   "src/agent_server/datasets_service.py",
-  "src/agent_server/status_service.py",
-  "src/agent_server/session_sync.py",
-  "src/agent_server/settings_service.py",
-  "src/agent_server/store.py",
+  "src/agent_server/status_service",
+  "src/agent_server/session_sync",
+  "src/agent_server/settings_service",
+  "src/agent_server/store",
 ]
 exclude = ["(?x)(tests/|\\.venv/|venv/)"]
 ignore_missing_imports = true
@@ -225,14 +228,15 @@ omit = [
     # Interactive REPL — covered by focused method tests; full line coverage is impractical.
     "*/ui/terminal.py",
     # Typer CLI entry surface — exercised via CliRunner contract tests.
-    "*/cli.py",
+    "*/cli/*.py",
+    "*/cli/setup/*.py",
     # PTY/process supervisor — requires live TTYs; covered by manual/integration use.
-    "*/agent_server/pty_manager.py",
+    "*/agent_server/pty_manager/*.py",
     # FastAPI/WebSocket route surface and process entrypoint — HTTP contract tests cover behavior.
     "*/agent_server/app.py",
     "*/agent_server/main.py",
     # MCP process/protocol glue — unit-tested at the edges; full coverage needs live servers.
-    "*/agent_server/mcp_service.py",
+    "*/agent_server/mcp_service/*",
     # Agent session streaming loop — covered by focused workspace/session tests + integration.
     "*/agent_server/service.py",
     # Static specialist catalog payload (data, not behavior).

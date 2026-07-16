@@ -1,0 +1,91 @@
+"""Shared cloud model catalog for CLI /model and agent-server /v1/models."""
+
+from __future__ import annotations
+
+from agent.model_catalog.data import (
+    AVAILABLE_MODELS,
+    CATALOG_DEFAULTS_VERSION,
+    CUSTOM_OPENAI_COMPATIBLE_ENTRY,
+    DEFAULT_DISABLED_MODELS,
+    CatalogModel,
+)
+from agent.model_catalog.lookup import (
+    CATALOG_MODEL_ALIASES,
+    catalog_provider_for_model,
+    cloud_catalog_models,
+    resolve_catalog_model_id,
+    terminal_available_models,
+)
+from agent.model_catalog.opencode import (
+    OPENCODE_UNSUPPORTED_MODELS,
+    format_discovered_model_label,
+    openai_model_requires_responses_api,
+    opencode_anthropic_base_url,
+    opencode_model_is_supported,
+    opencode_model_uses_anthropic,
+    opencode_model_uses_responses_api,
+)
+from agent.model_catalog.reasoning_effort_resolve import (
+    clamp_openai_reasoning_effort,
+    effective_anthropic_effort,
+    effective_gemini_thinking_level,
+    effective_reasoning_effort,
+    effective_xai_reasoning_effort,
+    openai_reasoning_effort_floor,
+)
+from agent.model_catalog.reasoning_store import (
+    get_model_reasoning,
+    read_model_reasoning_store,
+    reasoning_settings_key,
+    upsert_model_reasoning,
+)
+from agent.model_catalog.reasoning_support import (
+    REASONING_EFFORT_LEVELS,
+    REASONING_EFFORT_VALUES,
+    anthropic_model_omits_temperature,
+    anthropic_model_supports_effort,
+    google_model_supports_thinking_level,
+    model_supports_reasoning_effort,
+    normalize_reasoning_effort,
+    reasoning_effort_options,
+    xai_model_supports_reasoning_effort,
+)
+
+__all__ = [
+    "AVAILABLE_MODELS",
+    "CATALOG_DEFAULTS_VERSION",
+    "CATALOG_MODEL_ALIASES",
+    "CUSTOM_OPENAI_COMPATIBLE_ENTRY",
+    "DEFAULT_DISABLED_MODELS",
+    "OPENCODE_UNSUPPORTED_MODELS",
+    "REASONING_EFFORT_LEVELS",
+    "REASONING_EFFORT_VALUES",
+    "CatalogModel",
+    "anthropic_model_omits_temperature",
+    "anthropic_model_supports_effort",
+    "catalog_provider_for_model",
+    "clamp_openai_reasoning_effort",
+    "cloud_catalog_models",
+    "effective_anthropic_effort",
+    "effective_gemini_thinking_level",
+    "effective_reasoning_effort",
+    "effective_xai_reasoning_effort",
+    "format_discovered_model_label",
+    "get_model_reasoning",
+    "google_model_supports_thinking_level",
+    "model_supports_reasoning_effort",
+    "normalize_reasoning_effort",
+    "opencode_anthropic_base_url",
+    "opencode_model_is_supported",
+    "opencode_model_uses_anthropic",
+    "opencode_model_uses_responses_api",
+    "openai_model_requires_responses_api",
+    "openai_reasoning_effort_floor",
+    "read_model_reasoning_store",
+    "reasoning_effort_options",
+    "reasoning_settings_key",
+    "resolve_catalog_model_id",
+    "terminal_available_models",
+    "upsert_model_reasoning",
+    "xai_model_supports_reasoning_effort",
+]

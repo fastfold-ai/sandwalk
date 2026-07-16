@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lint.sh — run pinned SwiftLint (file_length gate)
+# lint.sh — run pinned SwiftLint (advisory file_length warning)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,5 +13,6 @@ fi
 "${ROOT}/scripts/install-swiftlint.sh"
 BIN="${ROOT}/.tools/swiftlint"
 
-echo "==> swiftlint lint (file_length)"
-"${BIN}" lint --strict --config .swiftlint.yml
+echo "==> swiftlint lint (advisory file_length)"
+# No --strict: file_length warnings must not fail CI/commits.
+"${BIN}" lint --config .swiftlint.yml

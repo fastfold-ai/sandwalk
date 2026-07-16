@@ -115,11 +115,11 @@ apps/sandwalk-mac/
 `SandwalkCore` holds the real app so XCTest can `@testable import` it. The
 `Sandwalk` executable is a thin entry only.
 
-## File length rules
+## Module size guidance
 
-- **Max 300 lines** per Swift file under `Sources/` (blank / comment-only lines ignored)
-- Tests and scripts are excluded from the lint rule
-- Prefer extracting helpers, sections, and actions into sibling files over growing a view past 300
+Prefer cohesive types and views. SwiftLint may warn around ~300 lines under
+`Sources/` (comment-only lines ignored); that is advisory, not a hard gate.
+Extract helpers, sections, and actions when a file mixes unrelated responsibilities.
 
 SwiftLint is **pinned** in `.swiftlint-version` (portable binary under `.tools/`,
 gitignored):
@@ -210,7 +210,7 @@ for repo-wide setup.
 
 When changing the Mac app:
 
-1. Keep Swift sources under **300 lines** (`pnpm lint:mac`)
+1. Prefer cohesive modules; extract when a file mixes unrelated responsibilities
 2. Prefer logic in `SandwalkCore` (testable) over the thin `SandwalkApp` entry
 3. Add / update XCTest coverage for pure helpers you touch; keep the scoped gate ≥80%
 4. Run before opening a PR:
@@ -228,6 +228,6 @@ Handy scripts from this directory:
 
 | Script | Purpose |
 |--------|---------|
-| `./scripts/lint.sh` | Install pinned SwiftLint if needed + `file_length` check |
+| `./scripts/lint.sh` | Install pinned SwiftLint if needed + advisory lint |
 | `./scripts/test.sh` | Lint → XCTest → coverage gate + `coverage.lcov` |
 | `./scripts/package-app.sh` | Release-style `Sandwalk.app` into `~/Applications` |

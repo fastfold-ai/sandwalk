@@ -1,0 +1,90 @@
+"""Static cloud model catalog data (provider → model rows)."""
+
+from __future__ import annotations
+
+from typing import TypedDict
+
+
+class CatalogModel(TypedDict):
+    id: str
+    label: str
+    description: str
+    provider: str
+
+
+# Static Anthropic + OpenAI cloud catalog (excludes OpenAI-compatible profile entry).
+# New-generation models come first (enabled by default); legacy models remain in
+# the catalog but are disabled by default (see DEFAULT_DISABLED_MODELS).
+AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
+    "anthropic": [
+        ("claude-opus-4-8", "Opus 4.8", "Most capable Anthropic model for complex reasoning"),
+        ("claude-sonnet-5", "Sonnet 5", "Flagship Sonnet for everyday coding and reasoning"),
+        ("claude-sonnet-4-6", "Sonnet 4.6", "Fast, balanced Sonnet for most tasks"),
+        ("claude-fable-5", "Fable 5", "Creative Anthropic model for writing and ideation"),
+        # Legacy (disabled by default)
+        ("claude-sonnet-4-5-20250929", "Sonnet 4.5", "Previous-generation Sonnet"),
+        ("claude-haiku-4-5-20251001", "Haiku 4.5", "Fastest previous-generation Anthropic option"),
+        ("claude-opus-4-6", "Opus 4.6", "Previous-generation Opus"),
+    ],
+    "openai": [
+        ("gpt-5.6-sol", "GPT-5.6 Sol", "High-speed frontier model for coding"),
+        ("gpt-5.6-terra", "GPT-5.6 Terra", "Balanced GPT-5.6 for general professional work"),
+        ("gpt-5.5", "GPT-5.5", "Frontier model for coding and professional work"),
+        ("gpt-5.3-codex", "Codex 5.3", "Specialized OpenAI coding model (Responses API)"),
+        # Legacy (disabled by default)
+        ("gpt-5.5-pro", "GPT-5.5 Pro", "Smarter, more precise GPT-5.5 variant"),
+        ("gpt-5.4", "GPT-5.4", "Previous-generation model for coding and professional work"),
+        ("gpt-5.4-pro", "GPT-5.4 Pro", "Smarter, more precise GPT-5.4 variant"),
+        ("gpt-5.4-mini", "GPT-5.4 Mini", "Strong mini model for coding, computer use, and subagents"),
+        ("gpt-5.4-nano", "GPT-5.4 Nano", "Cheapest GPT-5.4-class model for high-volume simple tasks"),
+        ("gpt-5-mini", "GPT-5 Mini", "Near-frontier model for cost-sensitive low-latency workloads"),
+        ("gpt-5-nano", "GPT-5 Nano", "Cheapest GPT-5-class model for simple high-volume tasks"),
+    ],
+    "xai": [
+        ("grok-4.5", "Grok 4.5", "Most intelligent and fastest xAI model"),
+        ("grok-4.3", "Grok 4.3", "Fast general-purpose xAI model with 1M context"),
+        ("grok-4.20", "Grok 4.20", "Reasoning-capable xAI model"),
+    ],
+    "google": [
+        (
+            "gemini-3.1-pro-preview",
+            "Gemini 3.1 Pro",
+            "Most intelligent Gemini for multimodal reasoning",
+        ),
+        ("gemini-3.5-flash", "Gemini 3.5 Flash", "Frontier-class Gemini at a fraction of the cost"),
+        ("gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite", "High-volume, cost-sensitive Gemini model"),
+    ],
+    "nvidia": [
+        (
+            "nvidia/nemotron-3-ultra-550b-a55b",
+            "Nemotron 3 Ultra 550B",
+            "NVIDIA flagship reasoning model (NIM endpoint)",
+        ),
+    ],
+}
+
+# Bump when the default-enabled set changes so existing configs get migrated once.
+CATALOG_DEFAULTS_VERSION = 2
+
+# Models present in the catalog but hidden by default. Users can re-enable them
+# from Dashboard → Models; toggling simply removes them from the hidden list.
+DEFAULT_DISABLED_MODELS: frozenset[str] = frozenset(
+    {
+        "claude-sonnet-4-5-20250929",
+        "claude-haiku-4-5-20251001",
+        "claude-opus-4-6",
+        "gpt-5.5-pro",
+        "gpt-5.4",
+        "gpt-5.4-pro",
+        "gpt-5.4-mini",
+        "gpt-5.4-nano",
+        "gpt-5-mini",
+        "gpt-5-nano",
+    }
+)
+
+CUSTOM_OPENAI_COMPATIBLE_ENTRY = (
+    "__custom_openai_compatible__",
+    "OpenAI-compatible profiles",
+    "Use, add, or edit Ollama/Unsloth/oMLX/custom OpenAI-compatible profiles",
+)

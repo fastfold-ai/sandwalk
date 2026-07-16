@@ -69,9 +69,10 @@ export function useMcpView({
   /** Full MCP page: every DB server (seeded catalog + custom). */
   const installedServers = mcpServers
 
-  /** Templates the user removed — offer re-add without a permanent Featured grid. */
+  /** Featured templates the user removed — offer re-add without seeding non-featured. */
   const suggestedCatalog = useMemo(
-    () => catalog.filter(entry => !entry.serverId),
+    () =>
+      catalog.filter(entry => entry.featured !== false && !entry.serverId),
     [catalog]
   )
 

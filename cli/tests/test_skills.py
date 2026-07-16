@@ -519,7 +519,10 @@ def test_setup_prompt_install_skills_with_explicit_arg(monkeypatch):
     import cli
 
     installed = []
-    monkeypatch.setattr(cli, "_install_skill_sources", lambda sources: installed.extend(sources))
+    monkeypatch.setattr(
+        "cli.setup.skills_prompt._install_skill_sources",
+        lambda sources: installed.extend(sources),
+    )
     cli._prompt_install_skills(skills_arg="fastfold-ai/skills@skills/fold, owner/repo@skills/x", skip=False)
     assert installed == ["fastfold-ai/skills@skills/fold", "owner/repo@skills/x"]
 

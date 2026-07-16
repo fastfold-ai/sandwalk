@@ -206,7 +206,7 @@ class TestResolveOpenAIEndpoints:
 class TestFetchCompatibleModels:
     def test_unsloth_uses_openai_models(self, monkeypatch):
         monkeypatch.setattr(
-            "cli._fetch_openai_models_for_setup",
+            "cli.setup.discovery_fetch._fetch_openai_models_for_setup",
             lambda base_url, api_key=None: ["model-a"],
         )
         assert _fetch_compatible_models_for_setup("http://x/v1", "unsloth") == ["model-a"]
@@ -222,8 +222,8 @@ class TestFetchCompatibleModels:
             calls.append("ollama")
             return ["should-not-be-used"]
 
-        monkeypatch.setattr("cli._fetch_openai_models_for_setup", fake_openai)
-        monkeypatch.setattr("cli._fetch_ollama_tags_for_setup", fake_ollama)
+        monkeypatch.setattr("cli.setup.discovery_fetch._fetch_openai_models_for_setup", fake_openai)
+        monkeypatch.setattr("cli.setup.discovery_fetch._fetch_ollama_tags_for_setup", fake_ollama)
         names = _fetch_compatible_models_for_setup("http://localhost:1234/v1", "lm_studio")
         assert names == ["local-model"]
         assert calls == ["openai"]
@@ -239,8 +239,8 @@ class TestFetchCompatibleModels:
             calls.append("openai")
             return ["gpt-oss:20b"]
 
-        monkeypatch.setattr("cli._fetch_ollama_tags_for_setup", fake_ollama)
-        monkeypatch.setattr("cli._fetch_openai_models_for_setup", fake_openai)
+        monkeypatch.setattr("cli.setup.discovery_fetch._fetch_ollama_tags_for_setup", fake_ollama)
+        monkeypatch.setattr("cli.setup.discovery_fetch._fetch_openai_models_for_setup", fake_openai)
         names = _fetch_compatible_models_for_setup("http://localhost:11434/v1", "ollama")
         assert names == ["gpt-oss:20b"]
         assert calls == ["ollama", "openai"]
@@ -261,7 +261,7 @@ class TestPromptCompatibleModel:
         monkeypatch.setattr("cli.console", console)
         cfg = Config(data={})
         monkeypatch.setattr(
-            "cli._fetch_compatible_models_for_setup",
+            "cli.setup.model_prompt._fetch_compatible_models_for_setup",
             lambda *a, **k: ["alpha", "beta"],
         )
         monkeypatch.setattr("builtins.input", lambda _: "2")
@@ -279,8 +279,10 @@ class TestPromptCompatibleModel:
                 return []
             return ["omlx-model"]
 
-        monkeypatch.setattr("cli._fetch_compatible_models_for_setup", _fake_fetch)
-        monkeypatch.setattr("cli._prompt_openai_compatible_api_key", lambda backend="other": "sk-omlx-retry")
+        monkeypatch.setattr("cli.setup.model_prompt._fetch_compatible_models_for_setup", _fake_fetch)
+        monkeypatch.setattr(
+            "cli.setup.model_prompt._prompt_openai_compatible_api_key", lambda backend="other": "sk-omlx-retry"
+        )
         answers = iter(["1", "1"])  # retry, then pick discovered model
         monkeypatch.setattr("builtins.input", lambda _: next(answers))
 
@@ -310,7 +312,7 @@ class TestResolveProviderKey:
         monkeypatch.setattr("cli.console", console)
         cfg = Config(data={})
         monkeypatch.setattr(
-            "cli._prompt_openai_api_key_with_default",
+            "cli.setup.provider_key._prompt_openai_api_key_with_default",
             lambda default_key="ollama": "ollama",
         )
         key = _resolve_provider_key(
@@ -325,7 +327,7 @@ class TestResolveProviderKey:
         console, _ = captured_console
         monkeypatch.setattr("cli.console", console)
         cfg = Config(data={})
-        monkeypatch.setattr("cli._prompt_openai_compatible_api_key", lambda backend="other": "lm-key")
+        monkeypatch.setattr("cli.setup.provider_key._prompt_openai_compatible_api_key", lambda backend="other": "lm-key")
         key = _resolve_provider_key(
             cfg,
             "openai_compatible",
@@ -386,11 +388,11 @@ class TestPromptFastfoldCloudApiKey:
         monkeypatch.delenv("BOLTZ_API_KEY", raising=False)
         cfg = Config(data={})
 
-        monkeypatch.setattr("cli._prompt_masked_secret", lambda _message: "")
+        monkeypatch.setattr("cli.setup.cloud_keys._prompt_masked_secret", lambda _message: "")
         assert _prompt_fastfold_cloud_api_key(cfg, None) is None
 
         monkeypatch.setattr(
-            "cli._prompt_masked_secret",
+            "cli.setup.cloud_keys._prompt_masked_secret",
             lambda _message: (_ for _ in ()).throw(KeyboardInterrupt()),
         )
         with pytest.raises(typer.Exit):
@@ -411,11 +413,11 @@ class TestPromptBoltzApiKey:
         monkeypatch.delenv("BOLTZ_API_KEY", raising=False)
         cfg = Config(data={})
 
-        monkeypatch.setattr("cli._prompt_masked_secret", lambda _message: "")
+        monkeypatch.setattr("cli.setup.cloud_keys._prompt_masked_secret", lambda _message: "")
         assert _prompt_boltz_api_key(cfg, None) is None
 
         monkeypatch.setattr(
-            "cli._prompt_masked_secret",
+            "cli.setup.cloud_keys._prompt_masked_secret",
             lambda _message: (_ for _ in ()).throw(KeyboardInterrupt()),
         )
         with pytest.raises(typer.Exit):

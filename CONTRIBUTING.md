@@ -23,13 +23,19 @@ cd cli && uv sync --extra dev --extra all --extra api
 
 ## Lint & typecheck
 
-Python (aligned with fastfold-cloud-backend: **ruff** + **mypy**):
+Prefer cohesive modules. Review unusually large files for mixed responsibilities
+in PR review; do not split based only on line count.
+
+Python (**ruff** + **mypy**):
 
 ```bash
 cd cli
 uv run ruff check src
+uv run ruff format --check src
 uv run mypy          # scoped packages in pyproject.toml; expanding over time
 ```
+
+Ruff formats near `line-length = 100` and ignores `E501`.
 
 Web:
 
@@ -37,6 +43,12 @@ Web:
 pnpm --filter @sandwalk/agent-local-web lint:check
 pnpm --filter @sandwalk/agent-local-web typecheck
 pnpm --filter @sandwalk/agent-local-web build
+```
+
+Mac:
+
+```bash
+pnpm lint:mac
 ```
 
 ## Tests

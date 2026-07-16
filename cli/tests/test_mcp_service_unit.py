@@ -51,20 +51,9 @@ def test_paperclip_catalog_entry_featured_over_linear():
         "latch",
         "neurosnap",
         "paperclip",
-        "betterstack",
         "linear",
     }
-
-
-def test_betterstack_catalog_entry_oauth_preferred():
-    from agent.mcp_catalog import get_catalog_entry
-
-    entry = get_catalog_entry("betterstack")
-    assert entry is not None
-    assert entry.featured is True
-    assert entry.auth_mode == "api_key_or_oauth"
-    assert entry.preferred_auth == "oauth"
-    assert entry.url == "https://mcp.betterstack.com"
+    assert "betterstack" not in {e.id for e in MCP_CATALOG}
 
 
 def test_resource_metadata_url_from_www_authenticate():
