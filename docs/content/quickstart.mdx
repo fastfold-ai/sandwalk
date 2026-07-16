@@ -1,0 +1,52 @@
+---
+title: Quickstart
+description: Install sandwalk and run your first research session.
+---
+
+## CLI (recommended)
+
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.11+.
+
+```bash
+uv tool install sandwalk
+sandwalk --version
+
+sandwalk setup
+sandwalk doctor
+sandwalk
+```
+
+Optional science extras:
+
+```bash
+uv tool install "sandwalk[all]"
+```
+
+## Local server + dashboard
+
+```bash
+sandwalk serve
+```
+
+| Service   | Default URL             |
+|-----------|-------------------------|
+| Agent API | http://127.0.0.1:8787   |
+| Dashboard | http://127.0.0.1:8969   |
+
+## macOS app
+
+Package from the monorepo, or download a release when published:
+
+```bash
+cd apps/sandwalk-mac
+./scripts/package-app.sh
+open ~/Applications/Sandwalk.app
+```
+
+See [macOS](/mac) for menu-bar controls.
+
+## Next steps
+
+- [Configuration](/configuration) — `~/.sandwalk/`, API keys, auth
+- [UI](/ui) — dashboard tour
+- [Skills and MCPs](/skills-and-mcps) — install workflows

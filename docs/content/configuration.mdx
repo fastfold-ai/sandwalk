@@ -1,0 +1,37 @@
+---
+title: Configuration
+description: Config directory, keys, and local server auth.
+---
+
+## Config directory
+
+Runtime config and local data live under:
+
+```text
+~/.sandwalk/
+```
+
+Main file: `~/.sandwalk/config.json`. On first run, sandwalk copy-migrates from legacy `~/.fastfold-cli/` or `~/.ct/` if present (never overwrites existing files).
+
+```bash
+sandwalk config show
+sandwalk config set <key> <value>
+```
+
+## Fastfold Cloud API key
+
+Skills that call Fastfold Cloud resolve `FASTFOLD_API_KEY` from:
+
+1. Environment variable
+2. `.env` in the working directory (or parents)
+3. `~/.sandwalk/config.json` → `api.fastfold_cloud_key`
+4. Legacy fallback: `~/.fastfold-cli/config.json`
+
+## Protect the local server
+
+```bash
+sandwalk auth generate
+sandwalk auth enable
+```
+
+On macOS, auth and bind settings are also editable in Sandwalk.app → Settings.

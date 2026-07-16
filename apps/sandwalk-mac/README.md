@@ -200,7 +200,7 @@ xcrun llvm-cov show \
 open coverage-html/index.html
 ```
 
-Full monorepo testing guide: [docs/TESTING.md](../../docs/TESTING.md).
+Full monorepo testing guide: [`.github/TESTING.md`](../../.github/TESTING.md).
 
 ## Contributing
 

@@ -60,7 +60,7 @@ pnpm --filter @sandwalk/agent-local-web test:coverage
 pnpm test:mac
 ```
 
-See [docs/TESTING.md](docs/TESTING.md) for coverage gates and Codecov flags.
+See [.github/TESTING.md](.github/TESTING.md) for coverage gates and Codecov flags.
 
 ## Pull requests
 

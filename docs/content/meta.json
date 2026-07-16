@@ -1,0 +1,14 @@
+{
+  "pages": [
+    "index",
+    "---Get started---",
+    "quickstart",
+    "configuration",
+    "---Product---",
+    "ui",
+    "cli",
+    "mac",
+    "---Extensibility---",
+    "skills-and-mcps"
+  ]
+}

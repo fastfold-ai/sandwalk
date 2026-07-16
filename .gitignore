@@ -22,7 +22,6 @@ coverage-report.txt
 coverage-html/
 htmlcov/
 **/coverage/
-!docs/**/coverage*
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/

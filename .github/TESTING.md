@@ -10,7 +10,7 @@ and the monorepo dashboard shows them side-by-side.
 | Local Web UI | `local-web` | Vitest + v8 | ≥80% on included modules |
 | Mac App | `mac-app` | XCTest + llvm-cov | ≥80% on pure modules |
 
-Codecov config: [`codecov.yml`](../codecov.yml) · CI: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)  
+Codecov config: [`codecov.yml`](../codecov.yml) · CI: [`workflows/ci.yml`](./workflows/ci.yml)  
 Dashboard (after first upload): https://app.codecov.io/gh/fastfold-ai/sandwalk
 
 ---

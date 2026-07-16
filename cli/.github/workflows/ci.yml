@@ -1,6 +1,6 @@
 # Legacy path — unused by GitHub Actions.
 # Monorepo CI: ../../.github/workflows/ci.yml
-# Docs: ../../docs/TESTING.md
+# Docs: ../../.github/TESTING.md
 name: CI (legacy path)
 
 on:

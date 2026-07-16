@@ -36,6 +36,6 @@ Or from `cli/`:
 ```
 
 Coverage is uploaded to Codecov under flags `agent-cli` and `agent-server`.
-See [docs/TESTING.md](../docs/TESTING.md).
+See [.github/TESTING.md](../.github/TESTING.md).
 
 Package name: `sandwalk` · version: see repo root `VERSION` / `pyproject.toml`.

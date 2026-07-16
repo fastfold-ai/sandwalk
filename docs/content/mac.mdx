@@ -1,0 +1,16 @@
+---
+title: macOS app
+description: Menu-bar supervision for the local agent server and dashboard.
+---
+
+**Sandwalk.app** starts and stops the local agent server, opens the web dashboard, and exposes Settings for ports, models, tools, and skills.
+
+```bash
+cd apps/sandwalk-mac
+./scripts/package-app.sh
+open ~/Applications/Sandwalk.app
+```
+
+Or install from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases) when published.
+
+Server settings also live under Application Support; runtime config remains in `~/.sandwalk/` (see [Configuration](/configuration)).

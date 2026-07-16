@@ -1,0 +1,31 @@
+---
+title: CLI
+description: Interactive and one-shot sandwalk from the terminal.
+---
+
+```bash
+sandwalk                                    # interactive
+sandwalk "What is known about KRAS G12C?"   # one-shot
+sandwalk serve                              # API + dashboard
+```
+
+Interactive mode shares sessions with the web dashboard. Useful slash commands:
+
+| Command | Purpose |
+|---------|---------|
+| `/plan` | Toggle Plan mode (`plans/*.md`) |
+| `/help` | List commands |
+| `/tools` | Tool registry |
+| `/skills` | Installed skills |
+| `/data` | Local datasets |
+
+```bash
+sandwalk config show
+sandwalk tool list
+sandwalk skills list
+sandwalk mcp list
+sandwalk doctor
+sandwalk --help
+```
+
+Package notes for contributors: [`cli/README.md`](https://github.com/fastfold-ai/sandwalk/blob/main/cli/README.md).

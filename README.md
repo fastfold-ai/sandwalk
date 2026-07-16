@@ -20,6 +20,7 @@ A thinking path for open science.
   <a href="#quickstart">Quickstart</a> •
   <a href="#web-dashboard">Web Dashboard</a> •
   <a href="#usage">Usage</a> •
+  <a href="#documentation">Documentation</a> •
   <a href="#contributing--from-source">Contributing</a>
 </p>
 <br>
@@ -32,100 +33,32 @@ A thinking path for open science.
 </p>
 <br>
 
-**sandwalk** is a self-hosted science agent harness for researchers and scientists: multi-step workflows across 190+ tools, database APIs, skills, MCPs, and sandboxes. Covers biology, drug discovery, and related fields, and is extensible beyond them.
+**sandwalk** is a self-hosted science agent for researchers: multi-step workflows across 190+ tools, database APIs, skills, MCPs, and sandboxes. Built for biology and drug discovery, and extensible beyond them.
 
-Use it from the terminal or a web dashboard where you manage agents, specialists, skills, and runtime, with built-in viewers for structures and results. A Mac app can bring the whole stack up locally. Run everything on your machine by default; reach for cloud GPUs when a job needs them.
+Use the CLI or the web dashboard — both share the same sessions, workspace, and history. A macOS app can supervise the local stack. Run on your machine by default; send heavy jobs to cloud GPUs when you need them.
 
 ## Features
 
-- **CLI ↔ web sessions**: start a chat in the terminal or the dashboard; both share the same agent sessions, workspace, and history (bidirectional).
-- **190+ science tools**: chemistry, targets, structures, expression, genomics, clinical, literature, single-cell, and more (`sandwalk tool list`).
-- **Database APIs**: live lookups across PubChem, ChEMBL, UniProt, PDB, Open Targets, ClinicalTrials.gov, GTEx, STRING, Ensembl, NCBI, and related sources.
-- **Local datasets**: optional offline corpora such as DepMap, PRISM, L1000, proteomics, MSigDB, and STRING (`sandwalk data pull-all`).
-- **Local**: run the agent, tools, and dashboard on your machine with a local sandbox for code and plots.
-- **Cloud GPU sandboxing**: run heavy compute in an isolated GPU sandbox, or send serverless jobs to Modal, Lambda, or Fastfold Cloud (folding, design, MD, and more).
-- **MCPs**: connect remote tool servers (catalog + custom) so the agent can use external apps and data sources.
-- **Skills**: discover and install guided workflows (`sandwalk skills find` / `sandwalk skills add`).
-- **Specialist profiles**: save skill + MCP + instruction packs for repeatable research modes (`sandwalk specialists`).
-- **Viewers**: explore structures, plots, and results in the web dashboard alongside the chat transcript.
+- **CLI ↔ web** — one agent session, two surfaces (terminal and dashboard).
+- **Plan mode** — draft `plans/*.md` with todos and a Mermaid flowchart, then **Build** when ready.
+- **Multimodal** — `@`-attach images, PDFs, audio, and video (Gemini takes the full set).
+- **190+ science tools** — chemistry, targets, structures, omics, clinical, literature, and more.
+- **Live databases** — PubChem, ChEMBL, UniProt, PDB, Open Targets, ClinicalTrials.gov, GTEx, STRING, Ensembl, NCBI, …
+- **Local datasets** — optional DepMap, PRISM, L1000, proteomics, MSigDB, STRING (`sandwalk data pull-all`).
+- **Local + cloud compute** — Local Sandbox on your machine, or Modal / Lambda / Fastfold Cloud for GPU jobs.
+- **Skills & MCPs** — install from GitHub or [skills.sh](https://skills.sh); connect remote MCPs via Cursor-compatible `~/.sandwalk/mcp.json`.
+- **Specialists** — reusable skill + MCP + instruction packs for focused research modes.
+- **Viewers** — structures, plots, and artifacts beside the chat.
 
-### Tools and databases
+### Tools, data, and models
 
-Built for tool-heavy research, not generic chat. The agent can search tools on demand, call them in a sandbox, and chain results into a report.
+Tool areas include targets and genetics, chemistry, protein structure and design, expression / single-cell, clinical and translational, literature, and safety / PK / stats. List tools and corpora with `sandwalk tool list` and `sandwalk data list`.
 
-**Tool areas**
+**Models** (via `sandwalk setup`, the dashboard, or `sandwalk config`): Anthropic, OpenAI, Google Gemini, xAI (Grok), NVIDIA, OpenCode Zen, plus local OpenAI-compatible endpoints — Ollama, Unsloth, oMLX, DS4, llama.cpp, LM Studio.
 
-- Targets and genetics
-- Chemistry and compounds
-- Protein structure and design
-- Expression, omics, and single-cell
-- Clinical and translational
-- Literature and competitive intel
-- Safety, PK, biomarkers, and statistics
+**Integrations** (`sandwalk keys` / Dashboard → Integrations): Modal, LangSmith, Tavily, Slack, Vercel, NVIDIA, OpenCode Zen, custom webhooks.
 
-**Database APIs (examples)**
-
-- PubChem, ChEMBL, DrugBank
-- UniProt, PDB / RCSB, AlphaFold DB
-- Open Targets, ClinicalTrials.gov
-- GTEx, STRING, Ensembl, NCBI
-
-**Local datasets**
-
-- DepMap (CRISPR / models)
-- PRISM (drug sensitivity)
-- L1000 (expression signatures)
-- Proteomics, MSigDB, STRING
-
-List everything with `sandwalk tool list` and `sandwalk data list`.
-
-### Models
-
-Configure providers during `sandwalk setup`, in the dashboard, or with `sandwalk config`.
-
-**Frontier / cloud**
-
-- Anthropic (Claude)
-- OpenAI
-- Google Gemini
-- xAI (Grok)
-- NVIDIA
-- OpenCode Zen
-
-**Local models**
-
-Point sandwalk at an OpenAI-compatible endpoint on your machine:
-
-- Ollama
-- Unsloth
-- oMLX
-- DS4
-- llama.cpp
-- LM Studio
-
-### Integrations
-
-Built-in keys and connectors (Dashboard → Integrations / `sandwalk keys`):
-
-- Modal
-- LangSmith
-- Tavily
-- Slack
-- Vercel
-- NVIDIA
-- OpenCode Zen
-- Custom webhook
-
-### MCP catalog
-
-Featured remote MCPs you can connect from setup or Dashboard → MCP:
-
-- Tamarind Bio (protein design, structure, docking, MD)
-- Paperclip (papers, trials, biology databases)
-- Latch Bio (bioinformatics workflows and compute)
-- Neurosnap (folding, docking, design jobs)
-
-Also available: Linear. Add any custom MCP URL as well.
+**MCP catalog** (seeded in Dashboard → MCPs): Tamarind Bio, Paperclip, Latch Bio, Neurosnap, plus Linear, Lucid, and any custom URL.
 
 ## Install
 
@@ -138,15 +71,12 @@ uv tool install sandwalk
 sandwalk --version
 ```
 
-That installs all **core** dependencies (agent server, Local Sandbox plotting stack,
-Modal runtime client, etc.). Optional science stacks are separate extras:
+Core deps (agent server, Local Sandbox plotting, Modal client, …) come with the default install. Optional science stacks are extras:
 
 ```bash
 uv tool install "sandwalk[all]"          # chemistry, single-cell, ML, …
 # or: uv tool install "sandwalk[chemistry]"
 ```
-
-Upgrade later with:
 
 ```bash
 sandwalk upgrade
@@ -154,21 +84,19 @@ sandwalk upgrade
 
 ### macOS app
 
-Package and install the Mac app (API + dashboard supervised together):
-
 ```bash
 cd apps/sandwalk-mac
 ./scripts/package-app.sh
 open ~/Applications/Sandwalk.app
 ```
 
-Or download a release from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases) when published.
+Or grab a build from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases) when published.
 
 ## Quickstart
 
 ### macOS App
 
-Launch **Sandwalk.app** from Applications. The menu bar controls the local agent server: start / stop / restart, open the web dashboard, jump into pinned or recent agents, and open Settings for ports, models, tools, skills, and more.
+Launch **Sandwalk.app**. The menu bar starts / stops the agent server, opens the dashboard, and exposes Settings for ports, models, tools, and skills.
 
 <p align="center">
   <img src="images/showcase-mac-app-1.png" alt="Sandwalk macOS menu bar" width="280" />
@@ -179,39 +107,29 @@ Launch **Sandwalk.app** from Applications. The menu bar controls the local agent
 ### CLI
 
 ```bash
-# First-time wizard (models, keys, skills)
-sandwalk setup
+sandwalk setup          # models, keys, skills
 sandwalk doctor
 
-# Interactive agent (shares sessions with the web dashboard)
-sandwalk
-
-# Single query
+sandwalk                # interactive (shares sessions with the dashboard)
 sandwalk "What is known about KRAS G12C inhibitors?"
 
-# Local server + dashboard (or use Sandwalk.app on macOS)
-sandwalk serve
+sandwalk serve          # API + dashboard (or use Sandwalk.app)
 ```
 
-Defaults when serving:
-
-| Service   | URL                   |
-|-----------|-----------------------|
-| Agent API | http://127.0.0.1:8787 |
-| Dashboard | http://127.0.0.1:8969 |
-
-Optional next steps:
+| Service   | Default URL             |
+|-----------|-------------------------|
+| Agent API | http://127.0.0.1:8787   |
+| Dashboard | http://127.0.0.1:8969   |
 
 ```bash
-sandwalk auth generate   # protect the local server / web UI
-sandwalk auth enable
+sandwalk auth generate && sandwalk auth enable   # optional API key
 sandwalk skills add fastfold-ai/skills
-sandwalk data pull-all   # optional local datasets
+sandwalk data pull-all                           # optional local corpora
 ```
 
 ## Web Dashboard
 
-Open the local dashboard after `sandwalk serve` or **Open Web Dashboard** from Sandwalk.app (`http://127.0.0.1:8969`). Same agent sessions as the CLI: chat, files, viewers, and terminal in one place.
+Open `http://127.0.0.1:8969` after `sandwalk serve` (or **Open Web Dashboard** from the Mac app). Chat, files, viewers, and a terminal share the same sessions as the CLI.
 
 <p align="center">
   <picture>
@@ -221,15 +139,9 @@ Open the local dashboard after `sandwalk serve` or **Open Web Dashboard** from S
   </picture>
 </p>
 
-### Overview
+### Overview and projects
 
-Track agent session activity with a year-long heatmap, streaks, and totals. Featured skills, MCPs, and integrations surface on Overview so you can enable what you need without digging through settings.
-
-### Projects
-
-Organize research into projects. Switch the active project from the sidebar, open existing workspaces, or create a new project for a campaign (indication, target family, or paper series). Sessions, files, and tabs stay scoped to the project you are in, while the CLI can still open the same shared agent sessions.
-
-When you create a project you set a name, an optional description for your own reference, and **Agent Context**: background, conventions, and instructions that every agent in that project inherits in its system prompt.
+Overview shows a year-long session heatmap plus featured skills, MCPs, and integrations. **Projects** scope sessions and files to a campaign; each project can set **Agent Context** that every agent in that project inherits.
 
 <p align="center">
   <picture>
@@ -241,9 +153,9 @@ When you create a project you set a name, an optional description for your own r
 
 ### Composer
 
-The chat composer is the control surface for every turn. Pick how the agent thinks, which specialist profile to use, and where code runs, without leaving the message box. Use `@` for files and `/` for skills and MCPs; chips show what is attached to the turn.
+The composer drives every turn: model and effort, specialist, sandbox, plus `@` files and `/` skills & MCPs.
 
-**Models, effort, and fast mode.** Choose a frontier or local OpenAI-compatible model, then set reasoning depth (Low / Medium / High) and optionally turn on Fast when you want quicker turns.
+**Model.** Pick a frontier or local model, set Low / Medium / High effort, and optionally enable Fast.
 
 <p align="center">
   <picture>
@@ -253,7 +165,7 @@ The chat composer is the control surface for every turn. Pick how the agent thin
   </picture>
 </p>
 
-**Specialists.** Apply a saved skill + MCP + instruction pack for a focused research mode (genomics, single-cell, target discovery, MD, structure prediction, screening, protein design, and more), or create your own.
+**Specialist.** Load a skill + MCP + instruction pack (genomics, MD, protein design, …) or define your own.
 
 <p align="center">
   <picture>
@@ -263,7 +175,7 @@ The chat composer is the control surface for every turn. Pick how the agent thin
   </picture>
 </p>
 
-**Sandbox.** Run on this machine (Local Sandbox, with live chip / RAM / GPU specs) or switch to Modal for isolated cloud CPU/GPU compute.
+**Sandbox.** Stay on Local Sandbox (live chip / RAM / GPU specs) or switch to Modal for cloud CPU/GPU.
 
 <p align="center">
   <picture>
@@ -273,9 +185,73 @@ The chat composer is the control surface for every turn. Pick how the agent thin
   </picture>
 </p>
 
-### Artifact viewers
+**Plan mode.** Switch the composer from **Agent** to **Plan** when you want a campaign design first. The agent writes `plans/<slug>.md` (steps + Mermaid), fills todos, and surfaces a **Build** action — no Y/n gate. Edit in chat, then Build or flip back to Agent. In the CLI: `/plan`.
 
-When the agent produces structures, plots, reports, or other files, open them in the Artifacts panel beside the chat. Search and switch grid/list views; preview JSON, SVG plots (PAE, pLDDT), and CIF/PDB structures in an interactive 3D viewer while you keep chatting.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-plan-mode-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-plan-mode-light.png">
+    <img alt="Plan mode: composer toggle, created plan with Build, and plan markdown preview" src="images/showcase-plan-mode-light.png" width="720" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+**Multimodal.** `@`-attach workspace files in the same composer. Gemini models accept image, PDF, audio, and video natively; Dashboard → **Models** → **Multimodal support** lists what each model can take.
+
+### Skills and MCPs
+
+Type `/` in chat to browse skills and MCPs for the active specialist. Open a skill for docs and **Try** example prompts without leaving the thread.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-skills-mcps-picker-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-skills-mcps-picker-light.png">
+    <img alt="Composer skills and MCPs picker with boltz examples" src="images/showcase-skills-mcps-picker-light.png" width="720" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+Manage those servers under Dashboard → **MCPs**: toggle catalog entries, connect when auth is required, or add a custom URL. Credentials live under Integrations / keys.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-mcp-servers-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-mcp-servers-light.png">
+    <img alt="MCP servers management with toggles and catalog entries" src="images/showcase-mcp-servers-light.png" width="720" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+Config is stored as standard `mcpServers` JSON in `~/.sandwalk/mcp.json` — the same shape Cursor and other MCP clients use. Edit from **Edit mcp.json** and **Save MCPs**, or hand-edit the file.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-mcp-json-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-mcp-json-light.png">
+    <img alt="Edit mcp.json dialog with Cursor-compatible mcpServers config" src="images/showcase-mcp-json-light.png" width="720" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+For packaged workflows, open Dashboard → **Skills**. Toggle **Skills.sh** to search the [skills.sh](https://skills.sh) registry (results show install counts), or import from GitHub (`owner/repo`, `owner/repo@path`, or a URL — same as `sandwalk skills add`).
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-skills-sh-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-skills-sh-light.png">
+    <img alt="Skills.sh catalog search with install counts" src="images/showcase-skills-sh-light.png" width="720" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+Open a skill for the install command, enable/disable toggle, links to Skills.sh and GitHub, plus install count and security audit badges (Socket, Snyk, and others).
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-skills-manage-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/showcase-skills-manage-light.png">
+    <img alt="Skill detail with install count and security audits" src="images/showcase-skills-manage-light.png" width="720" style="max-width:100%; border-radius:8px;">
+  </picture>
+</p>
+
+### Artifacts and terminal
+
+When the agent produces structures, plots, or reports, open them in **Artifacts** beside the chat — JSON, SVG (PAE, pLDDT), and CIF/PDB in a 3D viewer.
 
 <p align="center">
   <picture>
@@ -285,11 +261,7 @@ When the agent produces structures, plots, reports, or other files, open them in
   </picture>
 </p>
 
-### Terminal
-
-An integrated multi-tab terminal sits under the workspace. Run shell commands in the session environment, keep several tabs color-coded, rename tabs, and stay in flow next to chat and artifacts. Theme-aware: the terminal follows your light/dark mode and color palette (Default, Mirage, Mahal, Darwin).
-
-The CLI tab matches interactive `sandwalk`: type `/` for slash-command autocomplete (`/help`, `/tools`, `/data`, `/skills`, …), with model, specialist, and sandbox shown in the status bar.
+Below the workspace, a multi-tab terminal follows your theme. The CLI tab mirrors interactive `sandwalk` (`/` autocomplete; model, specialist, and sandbox in the status bar).
 
 <p align="center">
   <picture>
@@ -299,70 +271,30 @@ The CLI tab matches interactive `sandwalk`: type `/` for slash-command autocompl
   </picture>
 </p>
 
-### Agent chat and workspace
+### Sidebar
 
-- Multi-tab research sessions shared with the CLI
-- File tree for the session workspace
-- Bidirectional history: pick up a CLI chat in the browser (and the reverse)
-
-### Capabilities
-
-Configure everything the agent can use from the sidebar:
-
-| Area | What you can do |
-|------|-----------------|
-| **Models** | Frontier cloud providers and local OpenAI-compatible endpoints (Ollama, Unsloth, oMLX, LM Studio, and more) |
-| **Tools** | Browse and enable the 190+ science tool registry |
-| **Skills** | Install and toggle guided workflows (folding, MD, protein design, diagrams, …) |
-| **Datasets** | Pull and manage local corpora (DepMap, PRISM, L1000, …) |
-| **Specialists** | Save skill + MCP + instruction packs for repeatable research modes |
-| **MCPs** | Connect Tamarind, Paperclip, Latch, Neurosnap, Linear, or custom servers |
-| **Integrations** | Keys and connectors for Modal, Boltz, Fastfold Cloud, LangSmith, Tavily, Slack, Vercel, and more |
-
-### Agent runtime
-
-- **Runtime** and **Prompts**: model defaults and system behavior
-- **Sandbox**: Local Sandbox on your machine, or cloud GPU / serverless jobs (Modal, Lambda, Fastfold Cloud)
-- **Doctor**, **Storage**, **Environment**: health checks, disk usage, and env diagnostics
-
-### Server and security
-
-Status, network bind, auth, and logs for the supervised local API. Generate and enable an API key when you want the dashboard protected (`sandwalk auth`).
+| Area | What you configure |
+|------|--------------------|
+| **Models** | Cloud providers and local OpenAI-compatible endpoints |
+| **Tools** | Enable tools from the science registry |
+| **Skills / MCPs** | Installs, skills.sh, GitHub import, `mcp.json` |
+| **Datasets** | Local corpora (DepMap, PRISM, L1000, …) |
+| **Specialists** | Skill + MCP + instruction packs |
+| **Integrations** | Modal, Boltz, Fastfold Cloud, LangSmith, Tavily, Slack, … |
+| **Runtime** | Defaults, prompts, sandbox, doctor, storage, env |
+| **Server** | Bind, auth (`sandwalk auth`), logs |
 
 ## Usage
-
-### Ask a question (CLI)
 
 ```bash
 sandwalk "What is known about KRAS G12C inhibitors?"
 sandwalk --smiles "CCO" "Profile this compound"
+sandwalk                 # interactive; /plan toggles Plan mode
+sandwalk serve           # dashboard at http://127.0.0.1:8969
 ```
 
-Interactive mode:
-
 ```bash
-sandwalk
-```
-
-### Local server + dashboard
-
-```bash
-sandwalk serve
-```
-
-Then open the dashboard (defaults):
-
-| Service    | URL                         |
-|------------|-----------------------------|
-| Agent API  | http://127.0.0.1:8787       |
-| Dashboard  | http://127.0.0.1:8969       |
-
-On macOS, use **Sandwalk.app** instead: Start / Stop, **Open Web Dashboard**, and **Settings…** for ports, remote bind, API key, models, tools, skills, and more.
-
-### Common commands
-
-```bash
-sandwalk config show
+sandwalk config show|set <key> <value>
 sandwalk tool list
 sandwalk skills list
 sandwalk mcp list
@@ -371,17 +303,18 @@ sandwalk doctor
 sandwalk --help
 ```
 
-## Configuration
+Config and data live under `~/.sandwalk/` (legacy `~/.fastfold-cli/` / `~/.ct/` are copied once if present). On macOS, Sandwalk.app also stores server settings in Application Support.
 
-Config and local data live under `~/.sandwalk/` (legacy `~/.fastfold-cli/` and
-`~/.ct/` are copied once on first run if present). Use:
+## Documentation
+
+Product docs (Fumadocs, same stack as Fastfold Cloud docs) live in [`docs/`](docs/):
 
 ```bash
-sandwalk config show
-sandwalk config set <key> <value>
+pnpm install
+pnpm dev:docs    # http://localhost:3001
 ```
 
-For the Mac app, server and auth settings are also editable in **Settings…** and stored in Application Support.
+Contributor / CI testing notes: [`.github/TESTING.md`](.github/TESTING.md).
 
 ## License
 
@@ -389,7 +322,7 @@ Apache License 2.0. Copyright © 2026 Fastfold AI Labs. See [LICENSE](LICENSE).
 
 ## Contributing / from source
 
-This is a monorepo (`cli/`, `apps/local-web/`, `apps/sandwalk-mac/`). For day-to-day science work, prefer the install options above. To hack on the repo, see [CONTRIBUTING.md](CONTRIBUTING.md). Quick start:
+Monorepo: `cli/`, `apps/local-web/`, `apps/sandwalk-mac/`. Day-to-day use the install options above; to hack on the repo see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```bash
 pnpm install
@@ -398,29 +331,16 @@ cd cli && uv sync --extra dev --extra all --extra api && uv run sandwalk serve
 # or on macOS: cd apps/sandwalk-mac && swift run
 ```
 
-`uv sync` (no extras) already installs core deps including the Local Sandbox stack.
-`--extra all` adds optional chemistry / single-cell / ML packages for full science tooling.
-
-### Lint
+`uv sync` installs core deps (including Local Sandbox). `--extra all` adds optional chemistry / single-cell / ML stacks.
 
 ```bash
 cd cli && uv run ruff check src && uv run mypy
 pnpm --filter @sandwalk/agent-local-web lint:check
 pnpm --filter @sandwalk/agent-local-web build
-```
 
-### Unit tests & coverage
-
-Each component has unit tests with an **≥80%** scoped coverage gate. CI uploads
-reports to [Codecov](https://app.codecov.io/gh/fastfold-ai/sandwalk)
-with flags `agent-cli`, `agent-server`, `local-web`, and `mac-app`.
-
-```bash
 pnpm test:coverage       # Local Web UI
 pnpm test:cli:coverage   # Agent CLI + Agent Server
 pnpm test:mac            # Mac app (Xcode required)
 ```
 
-Full guide: [docs/TESTING.md](docs/TESTING.md).
-
-See `apps/sandwalk-mac/README.md` and `cli/README.md` for package-specific notes.
+Coverage gate is **≥80%** per component; CI uploads to [Codecov](https://app.codecov.io/gh/fastfold-ai/sandwalk). Full guide: [`.github/TESTING.md`](.github/TESTING.md). Package notes: `apps/sandwalk-mac/README.md`, `cli/README.md`.
