@@ -197,14 +197,22 @@ export function StructureViewer({
       className={
         dark
           ? compact
-            ? 'structure-viewer-dark pointer-events-none relative h-full w-full overflow-hidden bg-[#08080a]'
+            ? 'structure-viewer-dark structure-viewer-compact pointer-events-none relative h-full w-full overflow-hidden bg-[#08080a]'
             : 'structure-viewer-dark relative h-full min-h-80 w-full overflow-hidden bg-[#08080a]'
           : compact
-            ? 'structure-viewer-light pointer-events-none relative h-full w-full overflow-hidden bg-white'
+            ? 'structure-viewer-light structure-viewer-compact pointer-events-none relative h-full w-full overflow-hidden bg-white'
             : 'structure-viewer-light relative h-full min-h-80 w-full overflow-hidden bg-white'
       }
     >
       <style>{`
+        .structure-viewer-compact .msp-viewport-controls,
+        .structure-viewer-compact .msp-viewport-controls-buttons,
+        .structure-viewer-compact .msp-highlight-toast-wrapper,
+        .structure-viewer-compact .msp-logo,
+        .structure-viewer-compact .msp-image-wrapper {
+          display: none !important;
+        }
+
         .structure-viewer-dark .msp-plugin,
         .structure-viewer-dark .msp-plugin-content,
         .structure-viewer-dark .msp-layout-standard,

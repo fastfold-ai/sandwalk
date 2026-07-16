@@ -5,7 +5,7 @@ LangChain exposes a beta ``ModelProfile`` with keys like ``image_inputs`` and
 ids and all local/OpenAI-compatible profiles, so we combine:
 
 1. Live ``chat_model.profile`` when available
-2. Provider/model allowlist heuristics (default False for unknown/local)
+2. Provider/model allowlist heuristics (default False for unknown local models)
 """
 
 from __future__ import annotations
@@ -28,6 +28,28 @@ _PROFILE_KEY: dict[ModalityKind, str] = {
     "audio": "audio_inputs",
     "video": "video_inputs",
 }
+
+# Local / Ollama / MLX vision families (name prefix before `:tag`).
+# Gemma 4 + Nemotron 3 advertise Text+Image on ollama.com/library.
+_LOCAL_VISION_PREFIXES = (
+    "gemma4",
+    "gemma-4",
+    "nemotron3",
+    "nemotron-3",
+    "llava",
+    "bakllava",
+    "moondream",
+    "minicpm-v",
+    "minicpmv",
+    "qwen2-vl",
+    "qwen2.5-vl",
+    "qwen2-5-vl",
+    "qwen3-vl",
+    "qwen-vl",
+    "llama3.2-vision",
+    "llama-3.2-vision",
+    "pixtral",
+)
 
 
 def modality_for_extension(suffix: str) -> ModalityKind | None:
@@ -108,6 +130,31 @@ def _xai_multimodal(model_id: str) -> set[ModalityKind]:
     return set()
 
 
+def _normalize_local_model_name(model_id: str) -> str:
+    """Strip org prefix and normalize separators for local tag matching."""
+    value = str(model_id or "").strip().lower().replace("_", "-")
+    if "/" in value:
+        value = value.rsplit("/", 1)[-1]
+    return value
+
+
+def _local_multimodal(model_id: str) -> set[ModalityKind]:
+    """Heuristics for Ollama / MLX / OpenAI-compatible local vision models."""
+    name = _normalize_local_model_name(model_id)
+    if not name:
+        return set()
+    base = name.split(":", 1)[0]
+    if any(
+        name.startswith(prefix) or base.startswith(prefix)
+        for prefix in _LOCAL_VISION_PREFIXES
+    ):
+        return {"image"}
+    # Generic markers used by many local VL checkpoints.
+    if "vision" in name or "-vl" in name or base.endswith("-vl") or base.endswith("vl"):
+        return {"image"}
+    return set()
+
+
 def allowlist_modalities(
     provider: str | None,
     model_id: str | None,
@@ -117,9 +164,9 @@ def allowlist_modalities(
     value = str(model_id or "").strip()
     if not value:
         return set()
-    # Local / unknown compatible endpoints: never inject unless LC profile says so.
-    if provider_norm in {"local"}:
-        return set()
+    # Local / compatible: inject only for known vision families (or LC profile).
+    if provider_norm in {"local", "compatible", "openai-compatible"}:
+        return _local_multimodal(value)
 
     if provider_norm in {"openai", "opencode", "nvidia"}:
         kinds = _openai_cloud_multimodal(value)

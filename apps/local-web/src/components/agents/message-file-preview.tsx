@@ -4,17 +4,29 @@ import { FileText } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { AudioPlayPreview } from '@/components/agents/AudioPlayPreview'
+import {
+  decodeContent,
+  structureFormat
+} from '@/components/agents/artifact-grid-thumb-utils'
 import { PdfFirstPagePreview } from '@/components/agents/PdfFirstPagePreview'
+import { StructureViewer } from '@/components/agents/StructureViewer'
 import { VideoPlayPreview } from '@/components/agents/VideoPlayPreview'
+import { isStructure } from '@/components/agents/workspace-utils'
 import { getFileIcon } from '@/lib/file-icons'
 import { mediaObjectUrlFromFile } from '@/lib/media-src'
 import { multimodalKindForFile } from '@/lib/multimodal-attach'
 import { cn } from '@/lib/utils'
 
-export type MessagePreviewKind = 'image' | 'pdf' | 'video' | 'audio'
+export type MessagePreviewKind =
+  | 'image'
+  | 'pdf'
+  | 'video'
+  | 'audio'
+  | 'structure'
 
 export function messageFilePreviewKind(path: string): MessagePreviewKind | null {
   const name = path.split('/').at(-1) || path
+  if (isStructure(name)) return 'structure'
   const kind = multimodalKindForFile({ name })
   if (kind === 'image') return 'image'
   if (kind === 'video') return 'video'
@@ -73,6 +85,7 @@ export function MessageFilePreview({
   const name = path.split('/').at(-1) || path
   const [src, setSrc] = useState<string | null>(null)
   const [pdfBase64, setPdfBase64] = useState<string | null>(null)
+  const [structureData, setStructureData] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
@@ -82,12 +95,17 @@ export function MessageFilePreview({
     let objectUrl: string | null = null
     setSrc(null)
     setPdfBase64(null)
+    setStructureData(null)
     setFailed(false)
     setLoaded(false)
     void client
       .readFile(sessionId, path, controller.signal)
       .then(file => {
         if (controller.signal.aborted) return
+        if (kind === 'structure') {
+          setStructureData(decodeContent(file.encoding, file.content))
+          return
+        }
         if (kind === 'pdf') {
           if (file.encoding === 'base64') {
             setPdfBase64(file.content)
@@ -127,6 +145,50 @@ export function MessageFilePreview({
 
   if (!kind || failed) {
     return <FileChipFallback path={path} onOpenFile={onOpenFile} />
+  }
+
+  if (kind === 'structure') {
+    // Explicit width: user bubbles are `inline-block w-auto`, and Mol* is
+    // absolutely positioned, so `w-full` collapses to the filename chip.
+    if (!structureData) {
+      return (
+        <div
+          className="bg-background/60 h-52 w-96 max-w-full animate-pulse rounded-lg"
+          aria-hidden
+        />
+      )
+    }
+    return (
+      <div
+        role={onOpenFile ? 'button' : undefined}
+        tabIndex={onOpenFile ? 0 : undefined}
+        className={cn(
+          'bg-background/50 border-border/60 flex w-96 max-w-full flex-col overflow-hidden rounded-lg border text-left',
+          onOpenFile ? 'hover:bg-background/80 cursor-pointer' : 'cursor-default'
+        )}
+        title={onOpenFile ? `Open @${path}` : `@${path}`}
+        onClick={() => onOpenFile?.(path)}
+        onKeyDown={event => {
+          if (!onOpenFile) return
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            onOpenFile(path)
+          }
+        }}
+      >
+        <div className="relative h-52 w-full overflow-hidden">
+          <StructureViewer
+            data={structureData}
+            format={structureFormat(name)}
+            compact
+          />
+        </div>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs">
+          <Icon icon={getFileIcon(name)} className="size-3.5 shrink-0" />
+          <span className="truncate">{name}</span>
+        </div>
+      </div>
+    )
   }
 
   if (kind === 'pdf') {

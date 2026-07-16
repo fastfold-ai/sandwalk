@@ -26,6 +26,13 @@ describe('messageFilePreviewKind', () => {
     expect(messageFilePreviewKind('uploads/sample.WAV')).toBe('audio')
     expect(messageFilePreviewKind('a/b/clip.flac')).toBe('audio')
   })
+
+  it('detects structure files for inline Mol* preview', () => {
+    expect(messageFilePreviewKind('test.cif')).toBe('structure')
+    expect(messageFilePreviewKind('models/1abc.PDB')).toBe('structure')
+    expect(messageFilePreviewKind('a/b/complex.mmcif')).toBe('structure')
+    expect(messageFilePreviewKind('ligand.sdf')).toBe('structure')
+  })
 })
 
 

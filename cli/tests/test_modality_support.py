@@ -26,6 +26,15 @@ def test_local_models_default_false():
     assert allowlist_modalities("local", "anything") == set()
 
 
+def test_local_gemma4_and_nemotron3_image():
+    assert model_supports_image_inputs("local", "gemma4:31b-mlx") is True
+    assert model_supports_image_inputs("local", "gemma4:e2b") is True
+    assert model_supports_image_inputs("local", "nemotron3:33b") is True
+    assert model_supports_image_inputs("local", "nvidia/nemotron-3-nano") is True
+    assert model_supports_pdf_inputs("local", "gemma4:31b-mlx") is False
+    assert allowlist_modalities("local", "gemma4:31b-mlx") == {"image"}
+
+
 def test_claude_and_gpt_image_pdf():
     assert model_supports_image_inputs("anthropic", "claude-sonnet-4-5") is True
     assert model_supports_pdf_inputs("anthropic", "claude-sonnet-4-5") is True
