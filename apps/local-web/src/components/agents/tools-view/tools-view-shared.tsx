@@ -6,30 +6,37 @@ export function ToolToggle({
   enabled,
   pending,
   label,
-  onToggle
+  onToggle,
+  locked = false
 }: {
   enabled: boolean
   pending?: boolean
   label: string
   onToggle: () => void
+  /** Core tools: always on; toggle is non-interactive. */
+  locked?: boolean
 }) {
+  const blocked = pending || locked
   return (
     <button
       type="button"
       role="switch"
       aria-checked={enabled}
       aria-label={label}
-      disabled={pending}
+      aria-disabled={locked || undefined}
+      title={locked ? 'Core tool — always enabled' : undefined}
+      disabled={blocked}
       className={cn(
         'relative inline-flex h-4 w-8 shrink-0 items-center rounded-full transition-colors',
         enabled
           ? 'bg-black/75 dark:bg-zinc-300/50'
           : 'bg-zinc-200 dark:bg-zinc-700',
-        pending && 'cursor-not-allowed opacity-60'
+        blocked && 'cursor-not-allowed opacity-60'
       )}
       onClick={event => {
         event.preventDefault()
         event.stopPropagation()
+        if (locked) return
         onToggle()
       }}
     >
@@ -41,6 +48,12 @@ export function ToolToggle({
       />
     </button>
   )
+}
+
+export function toolIsToggleable(tool: ToolSummary): boolean {
+  if (tool.toggleable === false) return false
+  if (tool.tier === 'core') return false
+  return true
 }
 
 export function statusClass(status: ToolSummary['status']) {

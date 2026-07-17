@@ -1,5 +1,5 @@
 import type { Specialist } from '@sandwalk/agent-ui-core'
-import { Check, ChevronDown, Plus } from 'lucide-react'
+import { Check, GitBranch, Plus } from 'lucide-react'
 import { useState } from 'react'
 
 import {
@@ -40,27 +40,33 @@ export function ComposerSpecialistPicker({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="text-muted-foreground hover:text-foreground inline-flex w-[8.5rem] shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted/50 inline-flex size-7 shrink-0 items-center justify-center rounded-md"
+          aria-label={
+            selectedSpecialist
+              ? `Specialist: ${selectedSpecialist.name}`
+              : 'Specialist: None'
+          }
+          title={
+            selectedSpecialist
+              ? `Specialist: ${selectedSpecialist.name}`
+              : 'Specialist: None'
+          }
         >
           {selectedSpecialist ? (
             <span
               className={cn(
-                'flex size-3.5 shrink-0 items-center justify-center rounded-full text-white [&_svg]:text-white',
+                'flex size-4 items-center justify-center rounded-full text-white [&_svg]:text-white',
                 specialistColorClass(selectedSpecialist.color)
               )}
             >
               <SpecialistGlyph
                 icon={selectedSpecialist.icon}
-                className="size-2 text-white"
+                className="size-2.5 text-white"
               />
             </span>
           ) : (
-            <span className="bg-muted-foreground/40 size-1.5 shrink-0 rounded-full" />
+            <GitBranch className="size-3.5" />
           )}
-          <span className="min-w-0 flex-1 truncate text-left font-medium">
-            {selectedSpecialist?.name || 'None'}
-          </span>
-          <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
         </button>
       </PopoverTrigger>
       <PopoverContent

@@ -37,26 +37,28 @@ export function DashboardMainViews(props: DashboardMainViewsProps) {
     <Suspense
       fallback={<DashboardPageSkeleton kind={dashboardSkeletonKind} />}
     >
-      <AppErrorBoundary
-        variant="panel"
-        resetKeys={[dashboardSection, location.pathname]}
-      >
-        {isDashboardOverview ? (
-          <DashboardMainOverviewPanel {...props} />
-        ) : settingsPanel ? (
-          settingsPanel
-        ) : isSkills ? (
-          <DashboardMainSkillsPanel {...props} />
-        ) : isIntegrations ? (
-          <DashboardMainIntegrationsPanel {...props} />
-        ) : isDashboardMcp ? (
-          <DashboardMainMcpPanel {...props} />
-        ) : isDashboardSpecialists ? (
-          <DashboardMainSpecialistsPanel {...props} />
-        ) : isHome || isProjectHome ? (
-          <DashboardMainHomePanel {...props} />
-        ) : null}
-      </AppErrorBoundary>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <AppErrorBoundary
+          variant="panel"
+          resetKeys={[dashboardSection, location.pathname]}
+        >
+          {isDashboardOverview ? (
+            <DashboardMainOverviewPanel {...props} />
+          ) : settingsPanel ? (
+            settingsPanel
+          ) : isSkills ? (
+            <DashboardMainSkillsPanel {...props} />
+          ) : isIntegrations ? (
+            <DashboardMainIntegrationsPanel {...props} />
+          ) : isDashboardMcp ? (
+            <DashboardMainMcpPanel {...props} />
+          ) : isDashboardSpecialists ? (
+            <DashboardMainSpecialistsPanel {...props} />
+          ) : isHome || isProjectHome ? (
+            <DashboardMainHomePanel {...props} />
+          ) : null}
+        </AppErrorBoundary>
+      </div>
     </Suspense>
   )
 }

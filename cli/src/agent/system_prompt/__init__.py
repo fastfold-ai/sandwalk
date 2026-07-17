@@ -1,13 +1,12 @@
 """
-Unified system prompt builder for the Claude Agent SDK runner.
+Unified system prompt builder for the agent runner.
 
-Merges the domain knowledge primer, workflow guides, bioinformatics code-gen
-hints, synthesis rules, tool catalog, and dynamic data context into a single
-system prompt that Claude uses throughout the agentic loop.
+Assembles a slim always-on prompt (identity, workspace, tools, skills index,
+workflow index, short synthesis checklist). Heavy domain primers and bio
+code-gen live on deepagents subagents (``domain-expert``, ``bio-coder``).
 
-Split into `text_blocks.py` (static identity/synthesis/compute-policy text),
-`workspace_section.py`, `tools_section.py`, `skills_section.py`, and
-`knowledge_section.py` (per-section builders) combined in `builder.py`;
+Split into `text_blocks.py`, `workspace_section.py`, `tools_section.py`,
+`skills_section.py`, and `knowledge_section.py` combined in `builder.py`;
 re-exported here so `from agent.system_prompt import build_system_prompt`
 keeps working unchanged.
 """

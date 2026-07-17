@@ -298,12 +298,15 @@ class DeepAgentsBuildMixin:
                 )
         backend = sandbox_handle.backend
         agent_skills = sandbox_handle.skills_sources or None
+        from agent.deepagents_runtime.subagents import build_domain_subagents
+
         agent = create_deep_agent(
             model=model,
             tools=tools,
             system_prompt=system_prompt,
             skills=agent_skills,
             backend=backend,
+            subagents=build_domain_subagents(),
         )
         return agent, sandbox_handle
 

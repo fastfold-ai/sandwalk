@@ -195,18 +195,26 @@ class DeepAgentsRunMixin:
 
             # Expand @path multimodal attachments into standard content blocks
             # when the model supports that modality (LangChain/Deep Agents).
+            # Raises MultimodalInjectionError if a vision model should see
+            # pixels but injection failed (avoids silent text-only hallucinations).
             from agent.runner.multimodal_user_message import (
+                MultimodalInjectionError,
                 build_multimodal_user_content,
             )
 
             workspace_root = str(ctx.get("workspace_path") or "").strip()
-            user_content = build_multimodal_user_content(
-                user_prompt,
-                workspace_root=workspace_root or None,
-                provider=provider,
-                model_id=str(model_name or ""),
-                profile=getattr(model, "profile", None),
-            )
+            try:
+                user_content = build_multimodal_user_content(
+                    user_prompt,
+                    workspace_root=workspace_root or None,
+                    provider=provider,
+                    model_id=str(model_name or ""),
+                    profile=getattr(model, "profile", None),
+                )
+            except MultimodalInjectionError as inj_exc:
+                duration = time.time() - t0
+                logger.error("multimodal injection failed: %s", inj_exc)
+                return self._make_error_result(query, str(inj_exc), duration)
 
             events = agent.astream_events(
                 {"messages": [{"role": "user", "content": user_content}]},

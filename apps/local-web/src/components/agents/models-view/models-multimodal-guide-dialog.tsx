@@ -9,6 +9,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { resolveMultimodalCapabilityFlags } from '@/lib/multimodal-attach'
 import { cn } from '@/lib/utils'
 
 const PROVIDER_ORDER = [
@@ -55,12 +56,17 @@ function providerSortKey(model: AgentModel): number {
   return idx >= 0 ? idx : 50
 }
 
+function modelCapabilityFlags(model: AgentModel) {
+  return resolveMultimodalCapabilityFlags(model)
+}
+
 function supportsCapability(
   model: AgentModel,
   capability: Exclude<CapabilityFilter, 'all'>
 ): boolean {
+  const flags = modelCapabilityFlags(model)
   const mod = MODALITIES.find(item => item.id === capability)
-  return mod ? Boolean(model[mod.key]) : false
+  return mod ? Boolean(flags[mod.key]) : false
 }
 
 export function ModelsMultimodalGuideDialog({
@@ -221,7 +227,7 @@ export function ModelsMultimodalGuideDialog({
                           {model.label}
                         </td>
                         {MODALITIES.map(mod => {
-                          const ok = Boolean(model[mod.key])
+                          const ok = Boolean(modelCapabilityFlags(model)[mod.key])
                           return (
                             <td key={mod.key} className="px-0.5 py-1 text-center">
                               {ok ? (

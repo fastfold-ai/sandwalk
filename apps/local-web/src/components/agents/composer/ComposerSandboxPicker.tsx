@@ -2,7 +2,7 @@ import type {
   ServerSystemInfo,
   SessionSandboxStatus
 } from '@sandwalk/agent-ui-core'
-import { ChevronDown, Loader } from 'lucide-react'
+import { Container, Loader } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { ComposerSandboxPopoverContent } from '@/components/agents/composer/ComposerSandboxPopoverContent'
@@ -134,35 +134,29 @@ export function ComposerSandboxPicker({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
-          aria-label="Sandbox backend"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted/50 relative inline-flex size-7 shrink-0 items-center justify-center rounded-md"
+          aria-label={`Sandbox: ${sandboxStatusLabel(sandboxStatus, sandboxPhase)}`}
+          title={sandboxStatusLabel(sandboxStatus, sandboxPhase)}
         >
           {sandboxPhase !== 'idle' ||
           sandboxStatus?.status === 'starting' ||
           sandboxStatus?.status === 'stopping' ? (
-            <Loader className="text-muted-foreground size-3.5 shrink-0 animate-spin" />
+            <Loader className="size-3.5 animate-spin" />
           ) : sandboxStatus?.backend === 'modal' ? (
-            <>
-              <ModalGlyph />
-              <span
-                className={cn(
-                  'size-1.5 rounded-full',
-                  sandboxStatusDotClass(sandboxStatus, sandboxPhase)
-                )}
-              />
-            </>
+            <ModalGlyph className="size-3.5" />
           ) : (
+            <Container className="size-3.5" />
+          )}
+          {sandboxPhase === 'idle' &&
+          sandboxStatus?.status !== 'starting' &&
+          sandboxStatus?.status !== 'stopping' ? (
             <span
               className={cn(
-                'size-1.5 rounded-full',
+                'absolute right-0.5 bottom-0.5 size-1.5 rounded-full',
                 sandboxStatusDotClass(sandboxStatus, sandboxPhase)
               )}
             />
-          )}
-          <span className="font-medium">
-            {sandboxStatusLabel(sandboxStatus, sandboxPhase)}
-          </span>
-          <ChevronDown className="text-muted-foreground size-3.5" />
+          ) : null}
         </button>
       </PopoverTrigger>
       <PopoverContent

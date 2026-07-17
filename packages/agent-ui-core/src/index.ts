@@ -613,6 +613,8 @@ export type ToolSummary = {
   description: string
   requiresData: string[]
   enabled: boolean
+  /** False for registry core tools — always on; UI locks the toggle. */
+  toggleable?: boolean
 }
 
 export type PromptBudgetBucket = {

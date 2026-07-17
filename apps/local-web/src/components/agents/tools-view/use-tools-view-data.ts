@@ -148,11 +148,17 @@ export function useToolsViewData({
   }, [tools, query, categoryFilter, tierFilter, statusFilter])
 
   const enableEligible = useMemo(
-    () => filtered.filter(t => !t.enabled).map(t => t.id),
+    () =>
+      filtered
+        .filter(t => !t.enabled && t.toggleable !== false && t.tier !== 'core')
+        .map(t => t.id),
     [filtered]
   )
   const disableEligible = useMemo(
-    () => filtered.filter(t => t.enabled).map(t => t.id),
+    () =>
+      filtered
+        .filter(t => t.enabled && t.toggleable !== false && t.tier !== 'core')
+        .map(t => t.id),
     [filtered]
   )
 
@@ -185,6 +191,7 @@ export function useToolsViewData({
   }
 
   const toggle = async (tool: ToolSummary) => {
+    if (tool.toggleable === false || tool.tier === 'core') return
     setPending(prev => ({ ...prev, [tool.id]: true }))
     setError(null)
     try {

@@ -69,26 +69,54 @@ class ModelHiddenMixin:
             logger.warning("Failed to persist catalog defaults migration: %s", exc)
 
     def hidden_tools(self) -> list[str]:
-        """Return tool IDs disabled from agent tool discovery/calls."""
+        """Return tool IDs disabled from agent tool discovery/calls.
+
+        Registry core tools are never hidden — they stay available even if an
+        older config still lists them under ``agent.hidden_tools``.
+        """
+        from agent.tool_tiers import CORE_TOOL_NAMES
+
         raw = self.get("agent.hidden_tools", [])
         if not isinstance(raw, list):
             return []
         return sorted(
-            {str(item).strip() for item in raw if str(item or "").strip()}
+            {
+                str(item).strip()
+                for item in raw
+                if str(item or "").strip()
+                and str(item).strip() not in CORE_TOOL_NAMES
+            }
         )
 
     def is_tool_hidden(self, tool_id: str) -> bool:
         target = str(tool_id or "").strip()
         if not target:
             return False
+        from agent.tool_tiers import is_core_tool
+
+        if is_core_tool(target):
+            return False
         return target in set(self.hidden_tools())
 
     def set_tool_hidden(self, tool_id: str, hidden: bool) -> list[str]:
-        """Enable/disable a tool for agent use. Returns the updated hidden list."""
+        """Enable/disable a tool for agent use. Returns the updated hidden list.
+
+        Core registry tools cannot be hidden.
+        """
+        from agent.tool_tiers import is_core_tool
+
         target = str(tool_id or "").strip()
         if not target:
             raise ValueError("tool_id is required.")
+        if is_core_tool(target) and hidden:
+            raise ValueError(
+                f"Core tool '{target}' cannot be disabled."
+            )
         current = set(self.hidden_tools())
+        # Drop any stale core entries still on disk.
+        from agent.tool_tiers import CORE_TOOL_NAMES
+
+        current -= set(CORE_TOOL_NAMES)
         if hidden:
             current.add(target)
         else:

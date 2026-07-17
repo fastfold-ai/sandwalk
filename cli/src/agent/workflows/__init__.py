@@ -13,7 +13,11 @@ from agent.workflows.registry_omics_late import WORKFLOWS_OMICS_LATE
 from agent.workflows.registry_resistance_omics_early import WORKFLOWS_RESISTANCE_OMICS_EARLY
 from agent.workflows.registry_validation_safety import WORKFLOWS_VALIDATION_SAFETY
 
-__all__ = ["WORKFLOWS", "format_workflows_for_llm"]
+__all__ = [
+    "WORKFLOWS",
+    "format_workflow_index_for_llm",
+    "format_workflows_for_llm",
+]
 
 WORKFLOWS: dict = {
     **WORKFLOWS_VALIDATION_SAFETY,
@@ -23,8 +27,27 @@ WORKFLOWS: dict = {
 }
 
 
+def format_workflow_index_for_llm() -> str:
+    """Compact workflow name + trigger index for the main system prompt."""
+    lines = [
+        "\n# Workflow index",
+        "",
+        "Common research patterns (names only). For full step sequences and "
+        "domain accuracy anchors, use the ``task`` tool with ``domain-expert``.",
+        "",
+    ]
+    for wf_id, wf in WORKFLOWS.items():
+        triggers = ", ".join(f'"{t}"' for t in (wf.get("trigger_phrases") or [])[:3])
+        desc = str(wf.get("description") or "").strip()
+        lines.append(f"- **{wf_id}**: {desc}")
+        if triggers:
+            lines.append(f"  Triggers: {triggers}")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def format_workflows_for_llm(allowed_tools: set[str] | None = None) -> str:
-    """Format workflow templates as markdown for the planner prompt."""
+    """Format full workflow templates as markdown (for domain-expert subagent)."""
     lines = ["\n# Recommended Workflows", ""]
     lines.append(
         "These are expert-recommended tool sequences for common drug discovery tasks. "

@@ -90,8 +90,11 @@ def iter_skills(
         _normalize_skill_lookup(name) for name in _skills._disabled_skill_names() if name
     }
     for key, info in merged.items():
-        identity = _normalize_skill_lookup(info.name) or _normalize_skill_lookup(key)
-        info.enabled = identity not in disabled
+        # Directory key and frontmatter name can differ (e.g. firecrawl-cli / firecrawl).
+        # Treat as disabled if either identity is listed.
+        name_id = _normalize_skill_lookup(info.name)
+        key_id = _normalize_skill_lookup(key)
+        info.enabled = (name_id not in disabled) and (key_id not in disabled)
     if enabled_only:
         return {name: info for name, info in merged.items() if info.enabled}
     return merged

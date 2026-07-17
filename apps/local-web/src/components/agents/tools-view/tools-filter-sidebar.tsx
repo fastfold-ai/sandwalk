@@ -32,8 +32,8 @@ export function ToolsFilterSidebar({
   onCategoryFilterChange: (value: string) => void
 }) {
   return (
-    <aside className="flex w-full shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:self-start xl:w-[280px]">
-      <section className="bg-background/70 rounded-lg p-2">
+    <aside className="flex w-full shrink-0 flex-col gap-4 max-xl:max-h-[min(28rem,50vh)] xl:h-full xl:min-h-0 xl:w-[280px] xl:self-stretch xl:overflow-hidden">
+      <section className="bg-background/70 shrink-0 rounded-lg p-2">
         <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
           Tier
         </div>
@@ -59,7 +59,7 @@ export function ToolsFilterSidebar({
           Extra ({extraCount})
         </button>
       </section>
-      <section className="bg-background/70 rounded-lg p-2">
+      <section className="bg-background/70 shrink-0 rounded-lg p-2">
         <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
           Status
         </div>
@@ -85,8 +85,8 @@ export function ToolsFilterSidebar({
           Disabled ({disabledCount})
         </button>
       </section>
-      <section className="bg-background/70 flex min-h-0 flex-col rounded-lg p-2 xl:max-h-[calc(100vh-14rem)]">
-        <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
+      <section className="bg-background/70 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg p-2">
+        <div className="text-muted-foreground/60 mb-1 shrink-0 px-2 py-1 text-xs font-semibold">
           Categories
         </div>
         <ScrollArea className="min-h-0 flex-1 pr-2">

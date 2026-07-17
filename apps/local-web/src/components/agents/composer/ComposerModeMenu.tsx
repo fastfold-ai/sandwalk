@@ -53,7 +53,7 @@ export function ComposerModeMenu({
             'inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-xs font-medium',
             planMode
               ? planModeAccent.chip
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
           )}
           aria-label="Agent mode"
         >
@@ -66,7 +66,7 @@ export function ComposerModeMenu({
           <ChevronDown className="size-3 opacity-70" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-44 p-1">
+      <PopoverContent align="start" className="w-auto min-w-0 p-1">
         {(
           [
             { id: 'agent' as const, label: 'Agent', icon: InfinityIcon },

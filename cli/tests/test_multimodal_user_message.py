@@ -2,7 +2,10 @@
 
 from pathlib import Path
 
+import pytest
+
 from agent.runner.multimodal_user_message import (
+    MultimodalInjectionError,
     build_multimodal_user_content,
     extract_multimodal_paths,
 )
@@ -25,7 +28,7 @@ def test_extract_paths_with_spaces():
     ]
 
 
-def test_non_vision_model_returns_string(tmp_path: Path):
+def test_non_vision_model_returns_string_with_notice(tmp_path: Path):
     img = tmp_path / "uploads" / "a.png"
     img.parent.mkdir(parents=True)
     img.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
@@ -36,8 +39,9 @@ def test_non_vision_model_returns_string(tmp_path: Path):
         provider="local",
         model_id="llama3.2",
     )
-    assert out == prompt
     assert isinstance(out, str)
+    assert prompt in out
+    assert "NOT sent as multimodal input" in out
 
 
 def test_image_injects_content_block(tmp_path: Path):
@@ -52,10 +56,50 @@ def test_image_injects_content_block(tmp_path: Path):
         model_id="claude-sonnet-4-5",
     )
     assert isinstance(out, list)
-    assert out[0] == {"type": "text", "text": prompt}
+    assert out[0]["type"] == "text"
+    assert out[0]["text"].startswith(prompt)
+    assert "actual visible content" in out[0]["text"]
     assert out[1]["type"] == "image"
     assert out[1]["mime_type"] == "image/png"
     assert "base64" in out[1]
+
+
+def test_openai_runtime_gemma4_injects(tmp_path: Path):
+    """Local Gemma4 remapped to openai runtime must still get pixels."""
+    img = tmp_path / "uploads" / "capy.png"
+    img.parent.mkdir(parents=True)
+    img.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
+    prompt = "@uploads/capy.png what's this"
+    out = build_multimodal_user_content(
+        prompt,
+        workspace_root=tmp_path,
+        provider="openai",
+        model_id="gemma4:31b-mlx",
+    )
+    assert isinstance(out, list)
+    assert out[1]["type"] == "image"
+
+
+def test_vision_model_missing_file_raises(tmp_path: Path):
+    prompt = "@uploads/missing.png what's this"
+    with pytest.raises(MultimodalInjectionError, match="not sent to the model"):
+        build_multimodal_user_content(
+            prompt,
+            workspace_root=tmp_path,
+            provider="openai",
+            model_id="gemma4:31b-mlx",
+        )
+
+
+def test_vision_model_missing_workspace_raises():
+    prompt = "@uploads/a.png what's this"
+    with pytest.raises(MultimodalInjectionError, match="workspace"):
+        build_multimodal_user_content(
+            prompt,
+            workspace_root=None,
+            provider="openai",
+            model_id="diffusiongemma-26B-A4B-it-4bit",
+        )
 
 
 def test_spaced_filename_injects_for_gemini(tmp_path: Path):
@@ -112,15 +156,15 @@ def test_audio_and_video_for_gemini(tmp_path: Path):
 def test_path_traversal_rejected(tmp_path: Path):
     outside = tmp_path.parent / "secret.png"
     outside.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 8)
-    # Craft a path that resolves outside when joined naively.
     prompt = "@../secret.png what?"
+    # Regex may still match; resolve rejects path outside workspace → hard fail
+    # for vision models, or string for non-vision. Use non-vision here.
     out = build_multimodal_user_content(
         prompt,
         workspace_root=tmp_path,
-        provider="anthropic",
-        model_id="claude-sonnet-4-5",
+        provider="local",
+        model_id="llama3.2",
     )
-    # Either no match (regex) or rejected resolve → string
     assert isinstance(out, str)
 
 

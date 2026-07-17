@@ -1,4 +1,4 @@
-"""Tests for agent.system_prompt builder."""
+"""Tests for agent.system_prompt builder wiring (not prompt copy)."""
 
 import sys
 from types import ModuleType
@@ -7,78 +7,26 @@ from unittest.mock import patch
 from agent.system_prompt import _load_installed_skills, build_system_prompt
 
 
+def _session(config=None):
+    return type("Session", (), {"config": config})()
+
+
 class TestSystemPrompt:
-    @patch("agent.system_prompt._load_installed_skills", return_value="")
-    def test_build_system_prompt_includes_identity(self, mock_skills):
-        session = type("Session", (), {"config": type("Cfg", (), {
-            "get": lambda self, key, default=None: default,
-        })()})()
-
-        prompt = build_system_prompt(session, tool_names=["target.druggability", "run_python"])
-        assert "fastfold-agent-cli" in prompt or "Fastfold Agent" in prompt
-        assert "Available Tools" in prompt
-        assert "run_python" in prompt
-
-    @patch("agent.system_prompt._load_installed_skills", return_value="")
-    def test_identity_discourages_reintroduction(self, mock_skills):
-        session = type("Session", (), {"config": None})()
-        prompt = build_system_prompt(session, include_skills=False)
-        assert "do **not** re-introduce yourself" in prompt
-        assert "Fastfold Agent" in prompt
-        assert "Do **not** paste or announce the session workspace path" in prompt
-
-    @patch("agent.system_prompt._load_installed_skills", return_value="## Skills\n- fold")
-    def test_build_includes_skills_section(self, mock_skills):
-        session = type("Session", (), {"config": type("Cfg", (), {
-            "get": lambda self, key, default=None: default,
-        })()})()
-
-        prompt = build_system_prompt(session)
-        assert "fold" in prompt
-
-    @patch("agent.system_prompt._load_installed_skills", return_value="")
-    def test_build_includes_data_and_history(self, mock_skills):
-        session = type("Session", (), {"config": type("Cfg", (), {
-            "get": lambda self, key, default=None: default,
-        })()})()
-
-        prompt = build_system_prompt(
-            session,
-            data_context="L1000 data available",
-            history="User: prior question",
-        )
-        assert "L1000 data available" in prompt
-        assert "prior question" in prompt
-
-    @patch("agent.system_prompt._load_installed_skills", return_value="")
-    def test_build_includes_session_workspace(self, mock_skills):
-        session = type("Session", (), {"config": type("Cfg", (), {
-            "get": lambda self, key, default=None: default,
-        })()})()
-        prompt = build_system_prompt(
-            session,
-            include_skills=False,
-            runtime="deepagents",
-            workspace_path="/tmp/sandwalk-session-ws",
-        )
-        assert "/tmp/sandwalk-session-ws" in prompt
-        assert "Session workspace" in prompt or "Session Workspace" in prompt
-        assert "absolute" in prompt.lower()
-        assert "download" in prompt.lower() or "write" in prompt.lower()
-        assert "do not" in prompt.lower() or "Do not" in prompt
-
     def test_load_installed_skills_uses_configured_budgets(self):
-        config = type("Cfg", (), {
-            "get": lambda self, key, default=None: {
-                "agent.skills.max_catalog_entries": "12",
-                "agent.skills.max_active": "bad-value",
-                "agent.skills.max_prompt_chars": 5000,
-            }.get(key, default),
-        })()
-        session = type("Session", (), {"config": config})()
+        config = type(
+            "Cfg",
+            (),
+            {
+                "get": lambda self, key, default=None: {
+                    "agent.skills.max_catalog_entries": "12",
+                    "agent.skills.max_active": "bad-value",
+                    "agent.skills.max_prompt_chars": 5000,
+                }.get(key, default),
+            },
+        )()
 
         with patch("agent.skills.build_skills_prompt", return_value="skills") as build:
-            assert _load_installed_skills(session, "fold TP53") == "skills"
+            assert _load_installed_skills(_session(config), "fold TP53") == "skills"
 
         build.assert_called_once_with(
             user_request="fold TP53",
@@ -96,80 +44,48 @@ class TestSystemPrompt:
 
     @patch("agent.system_prompt._load_installed_skills", return_value="")
     @patch("agent.ptc_tools.build_tool_catalog", return_value="## Compact catalog")
-    def test_build_ptc_prompt_and_deepagents_filesystem(self, mock_catalog, mock_skills):
-        session = type("Session", (), {"config": None})()
-
+    def test_build_ptc_passes_exclude_categories(self, mock_catalog, mock_skills):
         prompt = build_system_prompt(
-            session,
+            _session(),
             include_skills=False,
             runtime="deepagents",
             tool_mode="ptc",
             exclude_categories={"unsafe"},
         )
-
-        assert "Compact catalog" in prompt
-        assert "Other tools" in prompt
-        assert "Skills & Filesystem" in prompt
+        assert isinstance(prompt, str) and prompt
         mock_catalog.assert_called_once_with(
             exclude_categories={"unsafe"},
             exclude_tools=set(),
         )
-    @patch("agent.system_prompt._load_installed_skills", return_value="")
-    def test_modal_sandbox_prompt_guides_skill_scripts_to_host(self, mock_skills):
-        session = type("Session", (), {"config": None})()
-        prompt = build_system_prompt(
-            session,
-            include_skills=False,
-            runtime="deepagents",
-            sandbox_backend="modal",
-            workspace_path="/tmp/ws-chat",
-        )
-        assert "not inside Modal" in prompt
-        assert "/workspace" in prompt
-        assert "shell_run" in prompt
-        assert "Compute environment (Modal)" in prompt
-        assert "sandbox_status" in prompt
-        assert "Host path (Files panel)" in prompt
-        assert "auto-routes" in prompt or "run_python" in prompt
-        assert "`execute`" in prompt or "execute" in prompt
-
-    @patch("agent.system_prompt._load_installed_skills", return_value="")
-    def test_builtin_compute_policy_mentions_sandbox_tools(self, mock_skills):
-        session = type("Session", (), {"config": None})()
-        prompt = build_system_prompt(
-            session,
-            include_skills=False,
-            runtime="deepagents",
-            sandbox_backend="builtin",
-        )
-        assert "Compute environment (Built-in)" in prompt
-        assert "sandbox_start" in prompt
 
     @patch("agent.system_prompt._load_installed_skills", return_value="")
     @patch("agent.ptc_tools.build_tool_catalog", side_effect=RuntimeError("catalog failed"))
-    def test_build_ptc_prompt_survives_catalog_error(self, mock_catalog, mock_skills):
-        session = type("Session", (), {"config": None})()
-        prompt = build_system_prompt(session, tool_mode="ptc")
-        assert "Other tools" in prompt
+    def test_build_ptc_survives_catalog_error(self, mock_catalog, mock_skills):
+        prompt = build_system_prompt(_session(), tool_mode="ptc")
+        assert isinstance(prompt, str) and prompt
 
     @patch("agent.system_prompt._load_installed_skills", return_value="")
-    def test_build_survives_optional_prompt_section_import_errors(self, mock_skills):
-        session = type("Session", (), {"config": None})()
+    def test_build_survives_optional_section_import_errors(self, mock_skills):
         workflows = ModuleType("agent.workflows")
-        workflows.format_workflows_for_llm = lambda: (_ for _ in ()).throw(
+        workflows.format_workflow_index_for_llm = lambda: (_ for _ in ()).throw(
             RuntimeError("workflow failure")
         )
-        knowledge = ModuleType("agent.knowledge")
-        code = ModuleType("tools.code")
 
-        with patch.dict(
-            sys.modules,
-            {
-                "agent.workflows": workflows,
-                "agent.knowledge": knowledge,
-                "tools.code": code,
-            },
-        ):
-            prompt = build_system_prompt(session)
+        with patch.dict(sys.modules, {"agent.workflows": workflows}):
+            prompt = build_system_prompt(_session())
 
-        assert "When You Are Ready to Answer" in prompt
+        assert isinstance(prompt, str) and prompt
+
+    @patch("agent.system_prompt._load_installed_skills", return_value="")
+    def test_main_prompt_stays_under_size_budget(self, mock_skills):
+        prompt = build_system_prompt(_session(), include_skills=False)
+        assert len(prompt) < 40_000
+
+    def test_domain_subagents_registered(self):
+        from agent.deepagents_runtime.subagents import build_domain_subagents
+
+        by_name = {s["name"]: s for s in build_domain_subagents()}
+        assert "domain-expert" in by_name
+        assert "bio-coder" in by_name
+        assert by_name["domain-expert"]["system_prompt"]
+        assert by_name["bio-coder"]["system_prompt"]

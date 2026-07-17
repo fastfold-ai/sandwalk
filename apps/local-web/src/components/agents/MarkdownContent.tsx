@@ -13,18 +13,30 @@ export { ensureMermaidFences } from './markdown-mermaid-fences'
 export const MarkdownContent = memo(function MarkdownContent({
   content,
   className,
-  streaming = false
+  streaming = false,
+  onOpenFile,
+  workspacePath
 }: {
   content: string
   className?: string
   /** When true, Mermaid waits until the message finishes streaming. */
   streaming?: boolean
+  /** Open a workspace-relative path in the Files panel. */
+  onOpenFile?: (path: string) => void
+  /** Absolute session workspace root, used to recognize in-workspace paths. */
+  workspacePath?: string | null
 }) {
   const navigate = useNavigate()
   const prepared = useMemo(() => ensureMermaidFences(content), [content])
   const components = useMemo(
-    () => buildMarkdownComponents(navigate, streaming),
-    [navigate, streaming]
+    () =>
+      buildMarkdownComponents({
+        navigate,
+        streaming,
+        onOpenFile,
+        workspacePath
+      }),
+    [navigate, streaming, onOpenFile, workspacePath]
   )
 
   return (

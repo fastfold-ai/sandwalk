@@ -67,20 +67,33 @@ def set_skill_enabled(
     key = _skills._resolve_skill_key(name, skills)
     if key is None:
         return {"ok": False, "summary": f"Skill '{name}' is not installed."}
+    info = skills[key]
+    display_name = str(getattr(info, "name", "") or key)
     disabled = _disabled_skill_names()
-    aliases = {key}
-    normalized = _skills._normalize_skill_lookup(key)
-    for candidate_key, info in skills.items():
-        if _skills._normalize_skill_lookup(candidate_key) == normalized:
+    # Persist both directory key and frontmatter name — they often differ
+    # (e.g. dir ``firecrawl-cli``, name ``firecrawl``).
+    aliases = {key, display_name}
+    targets = {
+        _skills._normalize_skill_lookup(key),
+        _skills._normalize_skill_lookup(display_name),
+    }
+    targets.discard("")
+    for candidate_key, candidate in skills.items():
+        candidate_ids = {
+            _skills._normalize_skill_lookup(candidate_key),
+            _skills._normalize_skill_lookup(getattr(candidate, "name", "")),
+        }
+        candidate_ids.discard("")
+        if candidate_ids & targets:
             aliases.add(candidate_key)
-        if _skills._normalize_skill_lookup(getattr(info, "name", "")) == normalized:
-            aliases.add(candidate_key)
+            cand_name = str(getattr(candidate, "name", "") or "").strip()
+            if cand_name:
+                aliases.add(cand_name)
     if enabled:
         disabled -= aliases
     else:
         disabled |= aliases
     _set_disabled_skill_names(disabled)
-    display_name = str(getattr(skills.get(key), "name", "") or key)
     return {
         "ok": True,
         "summary": f"{'Enabled' if enabled else 'Disabled'} skill '{display_name}'.",

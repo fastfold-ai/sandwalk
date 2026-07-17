@@ -148,6 +148,8 @@ export function ChatTranscript({
                 <MarkdownContent
                   content={liveDelta}
                   streaming
+                  onOpenFile={onOpenFile}
+                  workspacePath={session?.workspacePath}
                   className="max-w-full [&_*]:max-w-full"
                 />
               </div>

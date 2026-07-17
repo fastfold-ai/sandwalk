@@ -1433,3 +1433,44 @@ def test_installed_catalog_release_returns_none_when_no_match(monkeypatch):
         },
     )
     assert skills_mod._installed_catalog_release() is None
+
+
+def test_disable_skill_when_directory_name_differs_from_frontmatter(
+    monkeypatch, tmp_path
+):
+    """Regression: firecrawl lives in firecrawl-cli/ but frontmatter name is firecrawl."""
+    global_dir = tmp_path / "global"
+    skill_dir = global_dir / "firecrawl-cli"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: firecrawl\ndescription: scrape the web\n---\n\n# firecrawl\n",
+        encoding="utf-8",
+    )
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.setattr(skills_mod, "GLOBAL_SKILLS_DIR", global_dir)
+    monkeypatch.setattr(skills_mod, "BUNDLED_SKILLS_DIR", tmp_path / "bundled")
+    monkeypatch.setattr(skills_mod, "NPX_SKILLS_DIR", tmp_path / "npx")
+    monkeypatch.setattr(skills_mod, "CONFIG_DIR", config_dir)
+
+    info = skills_mod.skill_info("firecrawl")
+    assert info is not None
+    assert info.enabled is True
+    assert info.name == "firecrawl"
+
+    result = skills_mod.set_skill_enabled("firecrawl", False)
+    assert result["ok"] is True
+
+    after = skills_mod.skill_info("firecrawl")
+    assert after is not None
+    assert after.enabled is False
+    enabled_names = {s.name for s in skills_mod.list_skills(enabled_only=True)}
+    assert "firecrawl" not in enabled_names
+
+    state = json.loads((config_dir / skills_mod.SKILL_STATE_FILENAME).read_text())
+    disabled = set(state.get("disabled") or [])
+    assert "firecrawl" in disabled
+    assert "firecrawl-cli" in disabled
+
+    skills_mod.set_skill_enabled("firecrawl", True)
+    assert skills_mod.skill_info("firecrawl").enabled is True

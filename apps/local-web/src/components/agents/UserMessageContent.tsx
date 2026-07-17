@@ -7,7 +7,9 @@ import {
   MessageFilePreview,
   messageFilePreviewKind
 } from '@/components/agents/message-file-preview'
+import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
 import { getFileIcon } from '@/lib/file-icons'
+import { splitTextWithWorkspacePaths } from '@/lib/workspace-file-paths'
 import { cn } from '@/lib/utils'
 
 export function UserMessageContent({
@@ -15,13 +17,15 @@ export function UserMessageContent({
   className,
   onOpenFile,
   client,
-  sessionId
+  sessionId,
+  workspacePath
 }: {
   content: string
   className?: string
   onOpenFile?: (path: string) => void
   client?: LocalAgentClient | null
   sessionId?: string | null
+  workspacePath?: string | null
 }) {
   const parts = parseMessageParts(content)
   const canPreview = Boolean(client && sessionId)
@@ -37,8 +41,17 @@ export function UserMessageContent({
   const previewPathSet = new Set(previewPaths)
   const hasChips = parts.some(part => part.type !== 'text')
   const hasInlinePreviews = previewPaths.length > 0
+  const hasWorkspacePaths =
+    Boolean(onOpenFile) &&
+    parts.some(
+      part =>
+        part.type === 'text' &&
+        splitTextWithWorkspacePaths(part.text, workspacePath).some(
+          segment => segment.type === 'file'
+        )
+    )
 
-  if (!hasChips && !hasInlinePreviews) {
+  if (!hasChips && !hasInlinePreviews && !hasWorkspacePaths) {
     return (
       <p
         className={cn(
@@ -51,14 +64,35 @@ export function UserMessageContent({
     )
   }
 
+  const renderText = (text: string, key: string) => {
+    if (!onOpenFile) {
+      return (
+        <span key={key} className="whitespace-pre-wrap">
+          {text}
+        </span>
+      )
+    }
+    const segments = splitTextWithWorkspacePaths(text, workspacePath)
+    return (
+      <span key={key} className="whitespace-pre-wrap">
+        {segments.map((segment, segmentIndex) => {
+          if (segment.type === 'text') return segment.text
+          return (
+            <WorkspaceFileChip
+              key={`${key}-ws-${segmentIndex}`}
+              path={segment.relative}
+              onOpenFile={onOpenFile}
+            />
+          )
+        })}
+      </span>
+    )
+  }
+
   const inlineParts = parts.map((part, index) => {
     if (part.type === 'text') {
       if (!part.text) return null
-      return (
-        <span key={`text-${index}`} className="whitespace-pre-wrap">
-          {part.text}
-        </span>
-      )
+      return renderText(part.text, `text-${index}`)
     }
     if (part.type === 'file') {
       if (previewPathSet.has(part.path)) return null

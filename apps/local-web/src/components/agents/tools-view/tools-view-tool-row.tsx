@@ -7,6 +7,7 @@ import {
   statusClass,
   tierClass,
   ToolToggle,
+  toolIsToggleable,
   toolTier
 } from './tools-view-shared'
 
@@ -87,7 +88,12 @@ export function ToolsViewToolRow({
       <ToolToggle
         enabled={tool.enabled}
         pending={pending}
-        label={`${tool.enabled ? 'Disable' : 'Enable'} ${tool.id}`}
+        locked={!toolIsToggleable(tool)}
+        label={
+          toolIsToggleable(tool)
+            ? `${tool.enabled ? 'Disable' : 'Enable'} ${tool.id}`
+            : `${tool.id} (core — always on)`
+        }
         onToggle={onToggle}
       />
     </div>

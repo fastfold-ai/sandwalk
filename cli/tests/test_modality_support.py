@@ -35,6 +35,70 @@ def test_local_gemma4_and_nemotron3_image():
     assert allowlist_modalities("local", "gemma4:31b-mlx") == {"image"}
 
 
+def test_local_diffusion_gemma_image():
+    # oMLX Chat serves diffusion_gemma via mlx-vlm; sandwalk must allow images.
+    assert (
+        model_supports_image_inputs(
+            "local", "diffusiongemma-26B-A4B-it-4bit"
+        )
+        is True
+    )
+    assert (
+        model_supports_image_inputs(
+            "compatible", "mlx-community/diffusiongemma-26B-A4B-it-4bit"
+        )
+        is True
+    )
+    assert model_supports_image_inputs("local", "diffusion-gemma-4b") is True
+
+
+def test_openai_runtime_provider_keeps_local_vlm_image():
+    # Catalog labels oMLX models as local, but AgentComposerSlot remaps the
+    # runtime provider to openai for the wire protocol. Injection must still
+    # treat Diffusion Gemma / Qwen3.5 as vision-capable.
+    assert (
+        model_supports_image_inputs(
+            "openai", "diffusiongemma-26B-A4B-it-4bit"
+        )
+        is True
+    )
+    assert model_supports_image_inputs("openai", "Qwen3.5-4B-MLX-4bit") is True
+    assert model_supports_video_inputs("openai", "Qwen3.5-4B-MLX-4bit") is True
+    # Plain local text models stay false even under openai runtime.
+    assert model_supports_image_inputs("openai", "llama3.2") is False
+
+
+def test_local_qwen35_and_qwen36_image_and_video():
+    # Qwen3.5 / 3.6 are unified multimodal families (image + video).
+    assert model_supports_image_inputs("local", "Qwen3.5-4B-MLX-4bit") is True
+    assert model_supports_video_inputs("local", "Qwen3.5-4B-MLX-4bit") is True
+    assert (
+        model_supports_image_inputs(
+            "compatible", "mlx-community/Qwen3.5-4B-MLX-4bit"
+        )
+        is True
+    )
+    assert (
+        model_supports_image_inputs("local", "Unsloth Qwen3.6 35B A3B UD")
+        is True
+    )
+    assert model_supports_video_inputs("local", "Qwen3.6-35B-A3B") is True
+    assert allowlist_modalities("local", "Qwen3.6-35B-A3B") == {
+        "image",
+        "video",
+    }
+    # Plain Qwen3 (not 3.5/3.6) stays text-only unless it has a -vl marker.
+    assert model_supports_image_inputs("local", "qwen3:8b") is False
+    # DeepSeek-V4-Flash is an LLM in oMLX (mlx-lm), not a VLM.
+    assert model_supports_image_inputs("local", "DeepSeek-V4-Flash") is False
+    assert model_supports_image_inputs("local", "Deepseek V4 Flash") is False
+    # Gemma / Diffusion Gemma remain image-only (no video column).
+    assert allowlist_modalities("local", "gemma4:31b-mlx") == {"image"}
+    assert allowlist_modalities(
+        "local", "diffusiongemma-26B-A4B-it-4bit"
+    ) == {"image"}
+
+
 def test_claude_and_gpt_image_pdf():
     assert model_supports_image_inputs("anthropic", "claude-sonnet-4-5") is True
     assert model_supports_pdf_inputs("anthropic", "claude-sonnet-4-5") is True

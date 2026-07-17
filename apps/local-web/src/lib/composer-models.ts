@@ -1,3 +1,5 @@
+import { resolveMultimodalCapabilityFlags } from '@/lib/multimodal-attach'
+
 export type ComposerModelOption = {
   provider: string
   model: string
@@ -104,10 +106,7 @@ export function toComposerModelOptions(
       reasoningEffortOptions: model.reasoningEffortOptions || [],
       reasoningEffort: model.reasoningEffort ?? 'medium',
       reasoningFast: Boolean(model.reasoningFast),
-      supportsImageInputs: Boolean(model.supportsImageInputs),
-      supportsPdfInputs: Boolean(model.supportsPdfInputs),
-      supportsAudioInputs: Boolean(model.supportsAudioInputs),
-      supportsVideoInputs: Boolean(model.supportsVideoInputs)
+      ...resolveMultimodalCapabilityFlags(model)
     }))
 }
 

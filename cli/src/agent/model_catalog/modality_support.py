@@ -29,9 +29,11 @@ _PROFILE_KEY: dict[ModalityKind, str] = {
     "video": "video_inputs",
 }
 
-# Local / Ollama / MLX vision families (name prefix before `:tag`).
-# Gemma 4 + Nemotron 3 advertise Text+Image on ollama.com/library.
-_LOCAL_VISION_PREFIXES = (
+# Local / Ollama / MLX vision families (name markers).
+# DeepSeek-V4-Flash is intentionally omitted: oMLX serves it via mlx-lm (text LLM).
+_LOCAL_IMAGE_MARKERS = (
+    "diffusiongemma",
+    "diffusion-gemma",
     "gemma4",
     "gemma-4",
     "nemotron3",
@@ -49,6 +51,16 @@ _LOCAL_VISION_PREFIXES = (
     "llama3.2-vision",
     "llama-3.2-vision",
     "pixtral",
+)
+
+# Qwen3.5 / 3.6 are unified multimodal (text + image + video) per HF / mlx-vlm.
+_LOCAL_IMAGE_VIDEO_MARKERS = (
+    "qwen3.5",
+    "qwen3-5",
+    "qwen3_5",
+    "qwen3.6",
+    "qwen3-6",
+    "qwen3_6",
 )
 
 
@@ -132,10 +144,24 @@ def _xai_multimodal(model_id: str) -> set[ModalityKind]:
 
 def _normalize_local_model_name(model_id: str) -> str:
     """Strip org prefix and normalize separators for local tag matching."""
-    value = str(model_id or "").strip().lower().replace("_", "-")
+    value = (
+        str(model_id or "")
+        .strip()
+        .lower()
+        .replace("_", "-")
+        .replace(" ", "-")
+    )
     if "/" in value:
         value = value.rsplit("/", 1)[-1]
     return value
+
+
+def _name_matches_marker(name: str, base: str, marker: str) -> bool:
+    return (
+        marker in name
+        or name.startswith(marker)
+        or base.startswith(marker)
+    )
 
 
 def _local_multimodal(model_id: str) -> set[ModalityKind]:
@@ -144,11 +170,19 @@ def _local_multimodal(model_id: str) -> set[ModalityKind]:
     if not name:
         return set()
     base = name.split(":", 1)[0]
+
     if any(
-        name.startswith(prefix) or base.startswith(prefix)
-        for prefix in _LOCAL_VISION_PREFIXES
+        _name_matches_marker(name, base, marker)
+        for marker in _LOCAL_IMAGE_VIDEO_MARKERS
+    ):
+        return {"image", "video"}
+
+    if any(
+        _name_matches_marker(name, base, marker)
+        for marker in _LOCAL_IMAGE_MARKERS
     ):
         return {"image"}
+
     # Generic markers used by many local VL checkpoints.
     if "vision" in name or "-vl" in name or base.endswith("-vl") or base.endswith("vl"):
         return {"image"}
@@ -173,6 +207,10 @@ def allowlist_modalities(
         # OpenCode may host Claude behind an OpenAI-compatible proxy.
         if provider_norm == "opencode" and value.lower().startswith("claude-"):
             kinds |= _anthropic_multimodal(value)
+        # Local VLMs (oMLX / Ollama / MLX) are catalogued as provider=local but
+        # remapped to openai at runtime for the OpenAI-compatible wire protocol.
+        # Keep vision injection working for those model ids.
+        kinds |= _local_multimodal(value)
         return kinds
     if provider_norm == "anthropic":
         return _anthropic_multimodal(value)

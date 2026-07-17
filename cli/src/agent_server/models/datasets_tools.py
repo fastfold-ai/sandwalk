@@ -43,6 +43,8 @@ class ToolSummary(ApiModel):
     description: str
     requires_data: list[str] = Field(default_factory=list)
     enabled: bool = True
+    # False for registry core tools — always on; UI should lock the toggle.
+    toggleable: bool = True
 
 
 class ToolList(ApiModel):

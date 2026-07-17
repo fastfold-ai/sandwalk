@@ -24,8 +24,9 @@ def _tool_status(tool) -> str:
 
 class ToolsService:
     def _summary(self, tool, hidden: set[str]) -> ToolSummary:
-        from agent.tool_tiers import tool_tier
+        from agent.tool_tiers import is_core_tool, tool_tier
 
+        core = is_core_tool(tool.name)
         return ToolSummary(
             id=tool.name,
             name=tool.name,
@@ -34,7 +35,8 @@ class ToolsService:
             tier=tool_tier(tool.name),  # type: ignore[arg-type]
             description=str(tool.description or ""),
             requires_data=list(tool.requires_data or []),
-            enabled=tool.name not in hidden,
+            enabled=True if core else tool.name not in hidden,
+            toggleable=not core,
         )
 
     def list_tools(self, *, enabled_only: bool = False) -> ToolList:
@@ -67,6 +69,7 @@ class ToolsService:
         return self._summary(tool, hidden)
 
     def set_tool_enabled(self, tool_id: str, enabled: bool) -> ToolSummary:
+        from agent.tool_tiers import is_core_tool
         from tools import ensure_loaded, registry
 
         ensure_loaded()
@@ -75,6 +78,8 @@ class ToolsService:
             raise ValueError("tool_id is required.")
         if registry.get_tool(target) is None:
             raise KeyError(target)
+        if is_core_tool(target) and not enabled:
+            raise ValueError(f"Core tool '{target}' cannot be disabled.")
         cfg = Config.load()
         cfg.set_tool_hidden(target, hidden=not enabled)
         cfg.save()
@@ -105,11 +110,16 @@ class ToolsService:
             seen.add(tool_id)
             targets.append(tool_id)
 
+        from agent.tool_tiers import is_core_tool
+
         cfg = Config.load()
         succeeded: list[str] = []
         failed: list[str] = []
         for tool_id in targets:
             if registry.get_tool(tool_id) is None:
+                failed.append(tool_id)
+                continue
+            if is_core_tool(tool_id) and not enabled:
                 failed.append(tool_id)
                 continue
             cfg.set_tool_hidden(tool_id, hidden=not enabled)

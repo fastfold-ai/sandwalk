@@ -68,6 +68,7 @@ export function ChatTranscriptMessageEntry({
               onOpenFile={onOpenFile}
               client={client}
               sessionId={sessionId}
+              workspacePath={session?.workspacePath}
             />
           </div>
         </div>
@@ -83,6 +84,8 @@ export function ChatTranscriptMessageEntry({
             <MarkdownContent
               content={entry.content}
               streaming={hideActionsWhileStreaming}
+              onOpenFile={onOpenFile}
+              workspacePath={session?.workspacePath}
               className="max-w-full [&_*]:max-w-full [&_pre]:w-full [&_pre]:max-w-full [&_pre_code]:whitespace-pre-wrap [&_table]:w-full [&_table]:table-auto"
             />
           ) : null}

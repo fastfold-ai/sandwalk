@@ -22,6 +22,11 @@ from agent.model_catalog.modality_support import (
 
 logger = logging.getLogger("runner.multimodal")
 
+
+class MultimodalInjectionError(RuntimeError):
+    """Raised when the user attached media that must be injected but was not."""
+
+
 # Match @path tokens including spaces in filenames (macOS screenshots, etc.).
 # Path segments may contain spaces; stop at common trailing punctuation.
 _AT_PATH_RE = re.compile(
@@ -128,53 +133,122 @@ def build_multimodal_user_content(
     provider: str | None,
     model_id: str | None,
     profile: Any = None,
+    require_injection: bool = True,
 ) -> str | list[dict[str, Any]]:
-    """Return multimodal content list or the original string when nothing injects."""
-    text = str(user_prompt or "")
-    if not text.strip() or not workspace_root:
-        return text
+    """Return multimodal content list or the original string when nothing injects.
 
-    root = Path(str(workspace_root)).expanduser()
-    if not root.is_dir():
+    When ``require_injection`` is True (default) and the prompt references image
+    attachments that the model is marked as able to view, but no image bytes
+    are injected, raises ``MultimodalInjectionError`` instead of silently
+    sending text-only (which causes domain hallucinations).
+    """
+    text = str(user_prompt or "")
+    if not text.strip():
         return text
 
     paths = extract_multimodal_paths(text)
     if not paths:
         return text
 
+    image_paths = [
+        rel
+        for rel in paths
+        if modality_for_extension(Path(rel).suffix) == "image"
+    ]
+    vision_model = bool(
+        image_paths
+        and model_supports_modality(
+            provider, model_id, "image", profile=profile
+        )
+    )
+
+    if not workspace_root:
+        if require_injection and vision_model:
+            raise MultimodalInjectionError(
+                "Image attachment(s) were not sent to the model: session "
+                "workspace path is missing, so pixels could not be loaded. "
+                f"Referenced: {', '.join(image_paths)}"
+            )
+        return text
+
+    root = Path(str(workspace_root)).expanduser()
+    if not root.is_dir():
+        if require_injection and vision_model:
+            raise MultimodalInjectionError(
+                "Image attachment(s) were not sent to the model: workspace "
+                f"directory does not exist ({root}). "
+                f"Referenced: {', '.join(image_paths)}"
+            )
+        return text
+
     blocks: list[dict[str, Any]] = []
     notes: list[str] = []
+    skipped_unsupported: list[str] = []
+    failed_image_reasons: list[str] = []
 
     for rel in paths:
         kind = modality_for_extension(Path(rel).suffix)
         if kind is None:
             continue
         if not model_supports_modality(provider, model_id, kind, profile=profile):
+            skipped_unsupported.append(rel)
             continue
         resolved = _resolve_under_workspace(root, rel)
         if resolved is None:
-            notes.append(f"(Could not read attached file `{rel}` for multimodal input.)")
+            msg = f"Could not read attached file `{rel}` for multimodal input."
+            notes.append(f"({msg})")
+            if kind == "image":
+                failed_image_reasons.append(msg)
             continue
         max_bytes = _MAX_BYTES[kind]
         try:
             size = resolved.stat().st_size
         except OSError:
-            notes.append(f"(Could not stat attached file `{rel}`.)")
+            msg = f"Could not stat attached file `{rel}`."
+            notes.append(f"({msg})")
+            if kind == "image":
+                failed_image_reasons.append(msg)
             continue
         if size > max_bytes:
-            notes.append(
-                f"(Skipped `{rel}`: exceeds {max_bytes // (1024 * 1024)}MB multimodal limit.)"
+            msg = (
+                f"Skipped `{rel}`: exceeds "
+                f"{max_bytes // (1024 * 1024)}MB multimodal limit."
             )
+            notes.append(f"({msg})")
+            if kind == "image":
+                failed_image_reasons.append(msg)
             continue
         try:
             data = resolved.read_bytes()
         except OSError as exc:
             logger.warning("Failed reading multimodal attachment %s: %s", rel, exc)
-            notes.append(f"(Could not read attached file `{rel}`.)")
+            msg = f"Could not read attached file `{rel}`."
+            notes.append(f"({msg})")
+            if kind == "image":
+                failed_image_reasons.append(msg)
             continue
         blocks.append(_build_block(kind, resolved, data))
 
+    injected_images = sum(1 for b in blocks if b.get("type") == "image")
+    if require_injection and vision_model and injected_images == 0:
+        detail = "; ".join(failed_image_reasons) or "unknown reason"
+        raise MultimodalInjectionError(
+            "Image attachment(s) were not sent to the model as native "
+            "multimodal input, so the model cannot see the pixels. "
+            f"Provider={provider!r} model={model_id!r}. {detail}"
+        )
+
+    if skipped_unsupported:
+        notes.append(
+            "(These attachments were NOT sent as multimodal input because "
+            f"the active model is not marked as supporting them: "
+            f"{', '.join(skipped_unsupported)}. Switch to a vision model or "
+            "use tools to inspect the files.)"
+        )
+
     if not blocks:
+        if notes:
+            return text + "\n\n" + "\n".join(notes)
         return text
 
     prompt_text = text
@@ -200,7 +274,9 @@ def build_multimodal_user_content(
         if "image" in kinds_present:
             hint_bits.append(
                 "Image(s) are attached as native multimodal input — describe "
-                "them directly."
+                "the actual visible content first. Do not invent scientific "
+                "plots, assays, chemical structures, or dose–response "
+                "interpretations that are not in the image."
             )
         if "file" in kinds_present:
             hint_bits.append(
@@ -209,5 +285,16 @@ def build_multimodal_user_content(
             )
         if hint_bits:
             prompt_text = prompt_text + "\n\n" + "\n".join(hint_bits)
+
+    total_bytes = sum(len(base64.b64decode(b["base64"])) for b in blocks if "base64" in b)
+    logger.info(
+        "Injected multimodal content: provider=%s model=%s blocks=%s "
+        "images=%s bytes=%s",
+        provider,
+        model_id,
+        len(blocks),
+        injected_images,
+        total_bytes,
+    )
 
     return [{"type": "text", "text": prompt_text}, *blocks]

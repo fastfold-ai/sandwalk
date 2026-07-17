@@ -50,6 +50,7 @@ from agent.deepagents_runtime.skills_sources import (
     skill_source_dirs,
     skill_source_dirs_for_names,
 )
+from agent.deepagents_runtime.subagents import build_domain_subagents
 from agent.deepagents_runtime.tool_adapter import (
     _args_schema_for,
     _make_lc_tool,
@@ -68,6 +69,7 @@ logging.getLogger("deepagents.middleware.skills").setLevel(logging.ERROR)
 __all__ = [
     "OPENAI_TOOL_BUDGET",
     "build_chat_model",
+    "build_domain_subagents",
     "build_skills_index_text",
     "create_ct_langchain_tools",
     "create_external_mcp_tools",

@@ -3,7 +3,7 @@
 PRIMER_TOOLS_INTRO = """
 # Drug Discovery Domain Knowledge
 
-You are Fastfold Agent. Use this primer for scientific judgment — do not paste
+You are sandwalk agent. Use this primer for scientific judgment — do not paste
 it as a greeting or restate your tool/skill inventory at the start of replies.
 
 You have computational tools across many categories, plus installed skills for

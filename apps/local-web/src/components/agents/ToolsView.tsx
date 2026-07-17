@@ -44,19 +44,19 @@ export function ToolsView({
   })
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 xl:flex-row">
-        <div className="min-w-0 flex-1">
-          <div className="mb-4">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden p-4 md:p-6 xl:flex-row xl:items-stretch xl:gap-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="mb-3 shrink-0">
             <h2 className="text-2xl font-semibold">Tools</h2>
             <p className="text-muted-foreground mt-1 text-sm">
               Research tools available to the agent. Toggle a tool off to hide it
-              from the agent's discovery and calls. Core tools are the default
-              set for new specialists; Extra tools stay opt-in.
+              from the agent's discovery and calls. Core tools stay always on;
+              Extra tools are opt-in.
             </p>
           </div>
 
-          <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-2 pb-3 pt-2 backdrop-blur">
+          <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
             <div className="relative min-w-[240px] flex-1">
               <Search className="text-muted-foreground/70 pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
               <Input
@@ -83,12 +83,12 @@ export function ToolsView({
           </div>
 
           {data.error ? (
-            <div className="border-destructive/40 text-destructive mb-4 rounded-md border px-3 py-2 text-sm">
+            <div className="border-destructive/40 text-destructive mb-3 shrink-0 rounded-md border px-3 py-2 text-sm">
               {data.error}
             </div>
           ) : null}
 
-          <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
             <p className="text-muted-foreground text-xs">
               {data.enabledCount} of {data.tools.length} tools enabled
               {data.catalog && data.filtered.length !== data.tools.length
@@ -119,26 +119,28 @@ export function ToolsView({
             </div>
           </div>
 
-          <div className="bg-muted/20 border-border/60 divide-y overflow-hidden rounded-xl border shadow-sm">
-            {data.loading && data.tools.length === 0 ? (
-              <ListRowsSkeleton rows={8} />
-            ) : data.filtered.length === 0 ? (
-              <div className="text-muted-foreground px-4 py-8 text-sm">
-                No tools match this search.
-              </div>
-            ) : (
-              data.filtered.map(tool => (
-                <ToolsViewToolRow
-                  key={tool.id}
-                  tool={tool}
-                  pending={Boolean(data.pending[tool.id])}
-                  onOpenData={onOpenData}
-                  onToggle={() => void data.toggle(tool)}
-                  resolveRequirement={data.resolveRequirement}
-                />
-              ))
-            )}
-          </div>
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="bg-muted/20 border-border/60 divide-y overflow-hidden rounded-xl border shadow-sm">
+              {data.loading && data.tools.length === 0 ? (
+                <ListRowsSkeleton rows={8} />
+              ) : data.filtered.length === 0 ? (
+                <div className="text-muted-foreground px-4 py-8 text-sm">
+                  No tools match this search.
+                </div>
+              ) : (
+                data.filtered.map(tool => (
+                  <ToolsViewToolRow
+                    key={tool.id}
+                    tool={tool}
+                    pending={Boolean(data.pending[tool.id])}
+                    onOpenData={onOpenData}
+                    onToggle={() => void data.toggle(tool)}
+                    resolveRequirement={data.resolveRequirement}
+                  />
+                ))
+              )}
+            </div>
+          </ScrollArea>
         </div>
 
         <ToolsFilterSidebar
@@ -157,6 +159,6 @@ export function ToolsView({
           onCategoryFilterChange={data.setCategoryFilter}
         />
       </div>
-    </ScrollArea>
+    </div>
   )
 }
