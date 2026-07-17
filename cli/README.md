@@ -4,11 +4,19 @@ Python package for the Sandwalk agent and local server.
 
 ```bash
 cd cli
-uv sync --extra dev --extra all --extra api
+
+# CLI + local agent server (default; FastAPI serve is included)
+uv sync
+
+# Everything — chemistry, biology, single-cell, ML, DuckDB/Arrow
+uv sync --extra all
+
 uv run sandwalk serve
 uv run sandwalk --version
 uv run pytest tests/ -q
 ```
+
+`uv sync` already pulls the `dev` group (pytest, ruff, mypy). Use `--extra all` only when you need the optional science stacks.
 
 ## Interactive terminal
 
@@ -67,26 +75,86 @@ Other forms:
 CLI preference key: `agent.cli_sandbox` (`builtin` | `modal`).  
 Compute/image keys: `sandbox.compute_type`, `sandbox.gpu_class`, `sandbox.cpu_cores`, `sandbox.ram_gb`, `sandbox.cpu_image`, `sandbox.gpu_image`.
 
-### Models & context
+### Models (`/model`)
 
-- `/model` — interactive model picker  
-- Cloud context windows are curated in `agent/model_catalog/context_windows.py` (e.g. 1M for modern Claude / GPT-5.6 / Gemini).  
-- Local Ollama: context from `/api/tags`, with `/api/show` fallback when tags omit it.  
-- Usage popover / status bar show the known limit; the model picker shows a **1M** badge only for ≥1M windows.
+Bare `/model` opens a numbered picker of **enabled** catalog models (same list as Dashboard → Models). Pick a cloud or local entry to switch the active session model.
 
-### Useful slash commands
+- Hidden / disabled models are omitted (toggle them in the Web UI Models view).
+- Status bar shows the active model id; `/usage` shows tokens for the session.
+- Cloud context windows are curated in `agent/model_catalog/context_windows.py` (e.g. 1M for modern Claude / GPT-5.6 / Gemini).
+- Local Ollama: context from `/api/tags`, with `/api/show` fallback when tags omit it.
+- The picker shows a **1M** badge only for ≥1M windows; the status bar shows `context: N% (used/limit)` when known.
+
+Config keys: `llm.provider`, `llm.model`. Cloud keys: `/keys` or `sandwalk config set`.
+
+### Model Manager (`/model-manager`)
+
+Manage **OpenAI-compatible** endpoints (local / proxy). Profile CRUD lives here — not under `/model`.
+
+```text
+/model-manager
+```
+
+Interactive menu:
+
+1. **Add** compatible profile  
+2. **Edit** compatible profile  
+3. **Delete** compatible profile  
+0. Back  
+
+For each profile you set endpoint type, base URL, optional API key, and default model. Endpoint types:
+
+| # | Backend | Typical discovery |
+|---|---------|-------------------|
+| 1 | Ollama | `/api/tags` |
+| 2 | Unsloth | `/v1/models` (auth) |
+| 3 | oMLX | `/v1/models` (auth) |
+| 4 | DS4 (DeepSeek v4) | `/v1/models` |
+| 5 | llama.cpp | `/v1/models` |
+| 6 | LM Studio | `/v1/models` |
+| 7 | Other OpenAI-compatible | `/v1/models`, then `/api/tags` |
+
+The table probes each profile (health, models path, key preview, discovered model ids). After adding a profile, use `/model` to select one of its models.
+
+### Slash commands
 
 | Slash | Description |
 |-------|-------------|
-| `/help` | Full command reference |
-| `/model` | Switch model / provider |
-| `/sandbox` | Pick Local / Modal compute (+ edit base image) |
-| `/plan` | Toggle Plan mode |
-| `/specialist` | Set / clear specialist |
-| `/usage` | Session token / cost table |
-| `/doctor` | Readiness checks |
-| `/keys` | API key status |
-| `/interrupt` | Stop the active generation (`!` to force) |
+| `/help` | Show command reference with examples |
+| `/model` | Switch LLM model / provider interactively |
+| `/model-manager` | Manage OpenAI-compatible profiles (add / edit / delete) |
+| `/keys` | API key status (`/keys profile`, `set-compatible`, `set-boltz`) |
+| `/sandbox` | Pick Local / Modal compute presets (+ edit base image) |
+| `/plan` | Toggle Plan mode (starts off; writes `plans/*.md` until Agent mode) |
+| `/specialist` | Set / list specialists (`<slug>` \| `use` \| `clear` \| `list` \| `show`) |
+| `/mcp` | MCP servers (`connect` \| `enable` \| `validate` \| `add` \| `remove`) |
+| `/tools` | List tools with status (stable / experimental) |
+| `/skills` | List loaded skills (filtered to active specialist if set) |
+| `/skills-add` | Install a skill from GitHub / local path / name |
+| `/skills-find` | Discover installable skills from the catalog |
+| `/skills-upgrade` | Sync the Fastfold catalog and update installed skills |
+| `/skills-remove` | Remove a globally installed skill |
+| `/data` | Local datasets (`list` \| `status` \| `pull <name>` \| `pull-all`) |
+| `/config` | Show active runtime configuration |
+| `/settings` | Configure UI and agent preferences |
+| `/usage` | Show session token / cost usage |
+| `/tasks` | Background task watcher status (`/tasks refresh` for live probe) |
+| `/compact` | Compress session context for longer runs |
+| `/new` | Start a new empty session |
+| `/sessions` | List saved sessions (`/sessions delete <id>`) |
+| `/resume` | Resume a previous session by id / index |
+| `/sync` | Import legacy CLI sessions into the shared UI database |
+| `/export` | Export current session transcript to markdown |
+| `/export-share` | Export session, send to Slack, and save to library |
+| `/notebook` | Export current session as Jupyter notebook (`.ipynb`) |
+| `/copy` | Copy the last answer to clipboard |
+| `/agents` | Run a query with N parallel research agents |
+| `/case-study` | Run / list curated case studies (`/case-study list`) |
+| `/doctor` | Run readiness diagnostics and fix hints |
+| `/upgrade` | Upgrade sandwalk via uv |
+| `/interrupt` | Interrupt the active generation (add `!` to force) |
+| `/clear` | Clear the screen |
+| `/exit` | Exit the terminal |
 
 Shortcuts: `Ctrl+J` / `Alt+Enter` newline · `Tab` accept suggestion · `Ctrl+C` interrupt (double-tap at idle to exit).
 

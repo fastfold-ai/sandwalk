@@ -328,12 +328,13 @@ Monorepo: `cli/`, `apps/local-web/`, `apps/sandwalk-mac/`. Day-to-day use the in
 
 ```bash
 pnpm install
-cd cli && uv sync --extra dev --extra all --extra api && uv run sandwalk serve
+cd cli && uv sync && uv run sandwalk serve   # CLI + agent server
+# cd cli && uv sync --extra all              # optional science stacks
 # another terminal: pnpm dev
 # or on macOS: cd apps/sandwalk-mac && swift run
 ```
 
-`uv sync` installs core deps (including Local Sandbox). `--extra all` adds optional chemistry / single-cell / ML stacks.
+`uv sync` installs the CLI, Local Sandbox, and agent server. `--extra all` adds chemistry / single-cell / ML / DuckDB.
 
 ```bash
 cd cli && uv run ruff check src && uv run mypy

@@ -49,7 +49,7 @@ Working directory: `cli/`
 
 ```bash
 cd cli
-uv sync --extra dev --extra all --extra api   # or: python -m venv .venv && pip install -e ".[dev,all,api]"
+uv sync --extra all   # or: python -m venv .venv && pip install -e ".[dev,all]"
 .venv/bin/python -m pytest tests/ -q
 
 # With coverage (matches CI)

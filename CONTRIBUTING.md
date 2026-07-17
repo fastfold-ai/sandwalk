@@ -18,7 +18,8 @@ Thanks for helping improve Sandwalk. This monorepo contains:
 
 ```bash
 pnpm install
-cd cli && uv sync --extra dev --extra all --extra api
+cd cli && uv sync                # CLI + agent server (+ dev tools)
+# cd cli && uv sync --extra all  # optional: chemistry / single-cell / ML
 ```
 
 ## Lint & typecheck
