@@ -258,3 +258,11 @@ class _SwitchModelMixin:
         self.console.print(
             f"  [green]Switched to {display}[/green] ({model_id}) [dim]provider={selected_provider}[/dim]"
         )
+        # Prompt Effort / Fast when the model supports thinking controls.
+        if isinstance(cfg, Config):
+            self._prompt_and_save_model_effort(
+                cfg,
+                provider=selected_provider,
+                model_id=model_id,
+                display=display,
+            )

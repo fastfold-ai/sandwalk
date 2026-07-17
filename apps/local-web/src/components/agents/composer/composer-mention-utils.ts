@@ -14,11 +14,31 @@ export function mcpSlashKey(server: McpServer): string {
   return `mcp:${server.id}`
 }
 
-export function mcpIconForServer(server: McpServer) {
-  const key = String(server.catalogId || server.name || '')
+function normalizeMcpIconKey(value: string): string {
+  return String(value || '')
     .trim()
     .toLowerCase()
-  return INTEGRATION_ICONS[key] || null
+    .replace(/[^a-z0-9]+/g, '')
+}
+
+export function mcpIconForServer(
+  server: Pick<McpServer, 'catalogId' | 'name' | 'id'>
+) {
+  const candidates = [server.catalogId, server.id, server.name]
+  for (const candidate of candidates) {
+    const raw = String(candidate || '').trim().toLowerCase()
+    if (!raw) continue
+    if (INTEGRATION_ICONS[raw]) return INTEGRATION_ICONS[raw]
+    const normalized = normalizeMcpIconKey(raw)
+    for (const [key, icon] of Object.entries(INTEGRATION_ICONS)) {
+      if (normalizeMcpIconKey(key) === normalized) return icon
+    }
+  }
+  return null
+}
+
+export function mcpIconForChip(id: string, name: string) {
+  return mcpIconForServer({ id, name, catalogId: null })
 }
 
 export function mcpMatchesSearch(server: McpServer, query: string): boolean {

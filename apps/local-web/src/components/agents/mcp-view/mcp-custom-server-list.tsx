@@ -3,7 +3,7 @@ import type {
   McpCatalogEntry,
   McpServer
 } from '@sandwalk/agent-ui-core'
-import { KeyRound, Loader2, Plus, Trash2 } from 'lucide-react'
+import { ExternalLink, KeyRound, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -121,16 +121,19 @@ export function McpCustomServerList({
       }
     } catch (err) {
       const message = formatConnectError(err)
+      const apiKeyOnly = /uses api key auth, not oauth/i.test(message)
       const oauthUnavailable =
+        apiKeyOnly ||
         /no oauth registration|use api key|could not discover oauth/i.test(
           message
         )
-      toast.error(
-        oauthUnavailable
-          ? `${server.name} does not advertise OAuth — use an API key instead.`
-          : message,
-        { description: server.name }
-      )
+      if (apiKeyOnly || oauthUnavailable) {
+        toast.message('API key required', {
+          description: `${server.name} uses an API key — paste it below to connect.`
+        })
+      } else {
+        toast.error(message, { description: server.name })
+      }
       setApiKeyServerId(server.id)
     } finally {
       setPendingId(null)
@@ -207,6 +210,12 @@ export function McpCustomServerList({
         const canConnect = Boolean(
           server.catalogId ? onConnectCatalog : onConnectCustom
         )
+        const apiKeyOnly = catalogEntry?.authMode === 'api_key'
+        // Prefer token mint pages over general MCP settings when known.
+        const tokenSetupUrl =
+          catalogEntry?.id === 'huggingface'
+            ? 'https://huggingface.co/settings/tokens'
+            : catalogEntry?.setupUrl || null
         // Always show off while unauthenticated (matches Cursor).
         const shownEnabled = needsConnect ? false : server.enabled
         const waiting = waitingId === server.id
@@ -320,25 +329,51 @@ export function McpCustomServerList({
                   </>
                 ) : needsConnect && canConnect ? (
                   <>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 gap-1 px-2 text-xs"
-                      onClick={() => {
-                        setApiKeyServerId(showApiKey ? null : server.id)
-                        setApiKeyDraft('')
-                      }}
-                    >
-                      <KeyRound className="size-3.5" />
-                      {showApiKey ? 'Cancel' : 'API key'}
-                    </Button>
+                    {apiKeyOnly ? null : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1 px-2 text-xs"
+                        onClick={() => {
+                          setApiKeyServerId(showApiKey ? null : server.id)
+                          setApiKeyDraft('')
+                        }}
+                      >
+                        <KeyRound className="size-3.5" />
+                        {showApiKey ? 'Cancel' : 'API key'}
+                      </Button>
+                    )}
+                    {apiKeyOnly && showApiKey ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => {
+                          setApiKeyServerId(null)
+                          setApiKeyDraft('')
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       size="sm"
                       className="h-7 px-2.5 text-xs"
                       disabled={pending}
-                      onClick={() => void connectOAuth(server)}
+                      onClick={() => {
+                        if (apiKeyOnly) {
+                          if (showApiKey && apiKeyDraft.trim()) {
+                            void connectApiKey(server)
+                            return
+                          }
+                          setApiKeyServerId(server.id)
+                          return
+                        }
+                        void connectOAuth(server)
+                      }}
                     >
                       {pending ? (
                         <Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -383,7 +418,9 @@ export function McpCustomServerList({
                 <Input
                   type="password"
                   className="max-w-md"
-                  placeholder="API key or Bearer token"
+                  placeholder={
+                    catalogEntry?.apiKeyEnvVar || 'API key or Bearer token'
+                  }
                   value={apiKeyDraft}
                   autoFocus
                   disabled={pending}
@@ -404,6 +441,17 @@ export function McpCustomServerList({
                   ) : null}
                   Save
                 </Button>
+                {tokenSetupUrl ? (
+                  <a
+                    href={tokenSetupUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
+                  >
+                    Get API token
+                    <ExternalLink className="size-3" />
+                  </a>
+                ) : null}
               </div>
             ) : null}
           </div>

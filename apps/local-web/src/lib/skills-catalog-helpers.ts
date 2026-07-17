@@ -95,6 +95,13 @@ export function suggestionSourceIcon(item: AgentSkillSource): string | null {
   if (source.includes('anthropic') || provider.includes('anthropic')) {
     return '/suggestions/anthropic-claude.png'
   }
+  if (
+    source.includes('huggingface') ||
+    provider.includes('hugging face') ||
+    provider.includes('huggingface')
+  ) {
+    return '/suggestions/huggingface.png'
+  }
   return null
 }
 
@@ -103,6 +110,12 @@ export function suggestionSourceLabel(item: AgentSkillSource): string {
   const provider = String(item.provider || '').trim()
   if (source.includes('anthropic') || provider.toLowerCase().includes('anthropic')) {
     return 'Anthropic Claude'
+  }
+  if (
+    source.includes('huggingface') ||
+    provider.toLowerCase().includes('hugging face')
+  ) {
+    return 'Hugging Face'
   }
   return provider || item.source
 }

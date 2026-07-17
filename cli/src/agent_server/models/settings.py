@@ -14,8 +14,8 @@ class RuntimeSettings(ApiModel):
     tool_mode: str
     reasoning_effort: str = "medium"
     reasoning_fast: bool = False
-    recursion_limit: int = 120
-    max_sdk_turns: int = 30
+    recursion_limit: int = 100_000
+    max_sdk_turns: int = 500
     group_tool_traces: bool = True
     tool_trace_detail_limit: int = 1
     background_watch_timeout_s: int = 7200

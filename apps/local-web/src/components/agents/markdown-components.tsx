@@ -70,7 +70,13 @@ export function buildMarkdownComponents({
     },
     p({ children }) {
       return (
-        <p className="text-foreground text-[15px] leading-6 [&:not(:first-child)]:mt-2.5">
+        <p
+          className={
+            streaming
+              ? 'text-foreground text-[15px] leading-7 [&:not(:first-child)]:mt-3.5'
+              : 'text-foreground text-[15px] leading-6 [&:not(:first-child)]:mt-2.5'
+          }
+        >
           {linkify(children)}
         </p>
       )

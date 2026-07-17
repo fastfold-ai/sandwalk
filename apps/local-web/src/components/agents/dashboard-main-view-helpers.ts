@@ -2,17 +2,22 @@ import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentSession, IntegrationSummary } from '@sandwalk/agent-ui-core'
 import type { NavigateFunction } from 'react-router-dom'
 
+/** Shared slug for `/dashboard/integrations/<segment>` (name or key). */
+export function slugifyIntegrationRoute(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 export function integrationRouteSegment(
   integrations: IntegrationSummary[],
   key: string | null
 ) {
   if (!key) return null
   const target = integrations.find(item => item.key === key)
-  const segment = (target?.name || key)
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+  const segment = slugifyIntegrationRoute(target?.name || key)
   return segment || key
 }
 

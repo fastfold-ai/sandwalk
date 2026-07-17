@@ -28,7 +28,9 @@ export function useComposerCaret({
   focusedPartIndex: number
   setFocusedPartIndex: (index: number) => void
   setCaretPos: (pos: number) => void
-  textInputRefs: MutableRefObject<Map<number, HTMLInputElement>>
+  textInputRefs: MutableRefObject<
+    Map<number, HTMLInputElement | HTMLTextAreaElement>
+  >
 }) {
   const pendingCaretRef = useRef<number | null>(null)
   const autoFocusedKeyRef = useRef<string | null>(null)
@@ -99,7 +101,12 @@ export function useComposerCaret({
 
   const isComposerInput = useCallback(
     (node: Element | null) => {
-      if (!(node instanceof HTMLInputElement)) return false
+      if (
+        !(node instanceof HTMLInputElement) &&
+        !(node instanceof HTMLTextAreaElement)
+      ) {
+        return false
+      }
       return [...textInputRefs.current.values()].includes(node)
     },
     [textInputRefs]

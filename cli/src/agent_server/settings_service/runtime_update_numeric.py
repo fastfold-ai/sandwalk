@@ -8,25 +8,30 @@ from agent_server.settings_service.limits import (
     DEFAULT_RECURSION_LIMIT,
     MAX_RECURSION_LIMIT,
     MIN_RECURSION_LIMIT,
+    UNLIMITED_RECURSION_LIMIT,
     clamp_int,
 )
 
 
 def apply_numeric_updates(config: Config, payload: UpdateRuntimeSettingsRequest) -> None:
     if payload.recursion_limit is not None:
-        config.set(
-            "agent.recursion_limit",
-            clamp_int(
-                payload.recursion_limit,
-                minimum=MIN_RECURSION_LIMIT,
-                maximum=MAX_RECURSION_LIMIT,
-                default=DEFAULT_RECURSION_LIMIT,
-            ),
-        )
+        raw = payload.recursion_limit
+        if isinstance(raw, (int, float)) and int(raw) <= 0:
+            config.set("agent.recursion_limit", UNLIMITED_RECURSION_LIMIT)
+        else:
+            config.set(
+                "agent.recursion_limit",
+                clamp_int(
+                    raw,
+                    minimum=MIN_RECURSION_LIMIT,
+                    maximum=MAX_RECURSION_LIMIT,
+                    default=DEFAULT_RECURSION_LIMIT,
+                ),
+            )
     if payload.max_sdk_turns is not None:
         config.set(
             "agent.max_sdk_turns",
-            clamp_int(payload.max_sdk_turns, minimum=1, maximum=500, default=30),
+            clamp_int(payload.max_sdk_turns, minimum=1, maximum=10_000, default=500),
         )
     if payload.group_tool_traces is not None:
         config.set("agent.group_tool_traces", bool(payload.group_tool_traces))

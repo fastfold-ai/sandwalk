@@ -221,6 +221,21 @@ export function McpDetailApiKeyBar({ state }: { state: McpDetailViewState }) {
       >
         Cancel
       </Button>
+      {catalogEntry?.setupUrl || catalogEntry?.id === 'huggingface' ? (
+        <a
+          href={
+            catalogEntry?.id === 'huggingface'
+              ? 'https://huggingface.co/settings/tokens'
+              : catalogEntry?.setupUrl || '#'
+          }
+          target="_blank"
+          rel="noreferrer"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
+        >
+          Get API token
+          <ExternalLink className="size-3" />
+        </a>
+      ) : null}
     </div>
   )
 }

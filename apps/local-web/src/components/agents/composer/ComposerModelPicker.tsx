@@ -1,6 +1,6 @@
 import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
 import { ChevronDown, Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { ComposerModelPickerOption } from '@/components/agents/composer/ComposerModelPickerOption'
 import { Input } from '@/components/ui/input'
@@ -95,6 +95,29 @@ export function ComposerModelPicker({
       return haystack.includes(needle)
     })
   }, [modelOptions, modelSearch])
+
+  useEffect(() => {
+    if (!modelPickerOpen || modelSearch.trim()) return
+    // Wait for Popover + ScrollArea to mount, then center the active model.
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      if (cancelled) return
+      const selected = document.querySelector(
+        '[data-composer-model-selected="true"]'
+      )
+      selected?.scrollIntoView({ block: 'center', inline: 'nearest' })
+    }, 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [
+    modelPickerOpen,
+    modelSearch,
+    selectedModel.model,
+    selectedModel.provider,
+    selectedModel.profileId
+  ])
 
   return (
     <Popover

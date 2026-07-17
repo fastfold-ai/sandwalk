@@ -10,6 +10,7 @@ Update these values when providers revise their published limits:
 - OpenAI:    https://developers.openai.com/api/docs/models
 - Google:    https://ai.google.dev/gemini-api/docs/models
 - xAI:       https://docs.x.ai/docs/models
+- Moonshot:  https://platform.kimi.ai/docs/models
 
 As of July 2026:
 - Anthropic 1M context is GA (default, no beta header) on Opus 4.8/4.7/4.6,
@@ -26,6 +27,12 @@ _EXACT_CONTEXT_WINDOWS: dict[str, int] = {
     "grok-4.5": 256_000,
     "grok-4.3": 1_000_000,
     "grok-4.20": 256_000,
+    # Moonshot / Kimi (per platform.kimi.ai)
+    "kimi-k3": 1_000_000,
+    "kimi-k2.6": 256_000,
+    "kimi-k2.5": 256_000,
+    "kimi-k2.7-code": 256_000,
+    "kimi-k2.7-code-highspeed": 256_000,
     # NVIDIA NIM
     "nvidia/nemotron-3-ultra-550b-a55b": 262_144,
 }
@@ -48,6 +55,9 @@ _PREFIX_CONTEXT_WINDOWS: list[tuple[str, int]] = [
     # Google Gemini — 1M input window.
     ("gemini-3", 1_048_576),
     ("gemini-", 1_048_576),
+    # Moonshot / Kimi — k3 is 1M; other kimi-* are 256k.
+    ("kimi-k3", 1_000_000),
+    ("kimi-", 256_000),
 ]
 
 

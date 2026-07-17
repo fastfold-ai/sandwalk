@@ -59,7 +59,7 @@ def _setup_persist_provider_choice(cfg, selection: dict, args: dict) -> None:
                 cfg.set("llm.model", desired_model)
         elif prov == "anthropic":
             cfg.set("llm.anthropic_api_key", key)
-        elif prov in ("xai", "google", "nvidia", "opencode"):
+        elif prov in ("xai", "google", "moonshot", "nvidia", "opencode"):
             from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
             cfg.set(OPENAI_COMPATIBLE_PROVIDERS[prov]["config_key"], key)
@@ -93,7 +93,13 @@ def _apply_default_model(cfg, active_setup_provider, selected_providers, resolve
         meta = _OCP[active_setup_provider]
         current_model = str(cfg.get("llm.model") or "").strip().lower()
         default_model = str(meta.get("default_model") or "")
-        prefixes = {"xai": "grok", "google": "gemini", "nvidia": "nvidia/", "opencode": ""}
+        prefixes = {
+            "xai": "grok",
+            "google": "gemini",
+            "moonshot": "kimi-",
+            "nvidia": "nvidia/",
+            "opencode": "",
+        }
         prefix = prefixes.get(active_setup_provider, "")
         if default_model and (not prefix or not current_model.startswith(prefix)):
             cfg.set("llm.model", default_model)

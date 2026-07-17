@@ -126,10 +126,8 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
     if "recursion" in low and "limit" in low:
         return (
             "Agent step limit reached",
-            "This run used too many tool steps for the current recursion limit.\n"
-            "Raise it, then retry:\n"
-            "  • sandwalk config set agent.recursion_limit 200\n"
-            "  • or Dashboard → Agent → Runtime in the Mac/web app",
+            "LangGraph hit its internal step safety cap for this run.\n"
+            "Retry the task, or split the work into a smaller follow-up prompt.",
         )
 
     if "thought_signature" in low:

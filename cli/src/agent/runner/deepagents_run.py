@@ -40,12 +40,20 @@ class DeepAgentsRunMixin:
             self.session.config.get("llm.provider", "anthropic") or "anthropic"
         ).strip().lower()
 
-        if provider not in ("anthropic", "openai", "xai", "google", "nvidia", "opencode"):
+        if provider not in (
+            "anthropic",
+            "openai",
+            "xai",
+            "google",
+            "moonshot",
+            "nvidia",
+            "opencode",
+        ):
             return self._make_error_result(
                 query,
                 f"Unsupported llm.provider '{provider}'. Use 'anthropic', 'openai', "
-                "'xai', 'google', 'nvidia', or 'opencode' (OpenAI-compatible endpoints via "
-                "llm.openai_base_url).",
+                "'xai', 'google', 'moonshot', 'nvidia', or 'opencode' "
+                "(OpenAI-compatible endpoints via llm.openai_base_url).",
                 0.0,
             )
 
@@ -180,15 +188,12 @@ class DeepAgentsRunMixin:
             )
             trace_events: list[dict] | None = [] if self.trace_store is not None else None
 
-            max_turns = int(config.get("agent.max_sdk_turns", 30) or 30)
-            raw_recursion = config.get("agent.recursion_limit")
-            if raw_recursion is None or str(raw_recursion).strip() == "":
-                recursion_limit = max(25, max_turns * 2 + 10)
-            else:
-                try:
-                    recursion_limit = max(25, int(raw_recursion))
-                except (TypeError, ValueError):
-                    recursion_limit = max(25, max_turns * 2 + 10)
+            # LangGraph requires a finite recursion_limit (no documented upper bound;
+            # default in langgraph 1.2.x is ~10k). We always pass a very high cap so
+            # long training/fold workflows are not cut off by a product setting.
+            from agent_server.settings_service.limits import UNLIMITED_RECURSION_LIMIT
+
+            recursion_limit = UNLIMITED_RECURSION_LIMIT
             model_name = config.get("llm.model") or (
                 "claude-sonnet-4-5-20250929" if provider == "anthropic" else "gpt-5.6-sol"
             )

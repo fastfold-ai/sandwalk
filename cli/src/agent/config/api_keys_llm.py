@@ -31,6 +31,14 @@ API_KEYS_LLM = {
         "url": "https://aistudio.google.com/apikey",
         "free": True,
     },
+    "llm.moonshot_api_key": {
+        "name": "Kimi",
+        "provider_key": "moonshot",
+        "env_var": "MOONSHOT_API_KEY",
+        "description": "Kimi model access (Moonshot AI)",
+        "url": "https://platform.moonshot.ai/console/api-keys",
+        "free": False,
+    },
     "llm.opencode_api_key": {
         "name": "OpenCode Zen",
         "provider_key": "opencode",

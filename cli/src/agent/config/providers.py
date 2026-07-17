@@ -21,6 +21,14 @@ OPENAI_COMPATIBLE_PROVIDERS: dict[str, dict[str, str]] = {
         "signup_url": "https://aistudio.google.com/apikey",
         "default_model": "gemini-3.5-flash",
     },
+    "moonshot": {
+        "base_url": "https://api.moonshot.ai/v1",
+        "config_key": "llm.moonshot_api_key",
+        "env_var": "MOONSHOT_API_KEY",
+        "label": "Kimi",
+        "signup_url": "https://platform.moonshot.ai/console/api-keys",
+        "default_model": "kimi-k3",
+    },
     "nvidia": {
         "base_url": "https://integrate.api.nvidia.com/v1",
         "config_key": "api.nvidia_api_key",

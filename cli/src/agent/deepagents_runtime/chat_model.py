@@ -5,6 +5,7 @@ from __future__ import annotations
 from agent.deepagents_runtime.chat_model_anthropic import build_anthropic_chat_model
 from agent.deepagents_runtime.chat_model_compatible import build_compatible_chat_model
 from agent.deepagents_runtime.chat_model_google import build_google_chat_model
+from agent.deepagents_runtime.chat_model_moonshot import build_moonshot_chat_model
 from agent.deepagents_runtime.chat_model_openai import build_openai_chat_model
 
 # Leave headroom below the OpenAI 128-tool ceiling for deepagents' built-in
@@ -38,8 +39,9 @@ def build_chat_model(config, *, streaming: bool = True):
     """Create a LangChain chat model from Fastfold config via ``init_chat_model``.
 
     Supports ``anthropic``, ``openai`` (including OpenAI-compatible local
-    endpoints), ``google`` via the native Google GenAI SDK, and other
-    first-party OpenAI-compatible providers (xAI, NVIDIA, OpenCode Zen).
+    endpoints), ``google`` via the native Google GenAI SDK, ``moonshot`` via
+    ChatMoonshot, and other first-party OpenAI-compatible providers (xAI,
+    NVIDIA, OpenCode Zen).
     """
     provider = str(config.get("llm.provider", "openai") or "openai").strip().lower()
     temperature = float(config.get("llm.temperature", 0.1))
@@ -50,6 +52,8 @@ def build_chat_model(config, *, streaming: bool = True):
         return build_openai_chat_model(config, temperature=temperature)
     if provider == "google":
         return build_google_chat_model(config, temperature=temperature)
+    if provider == "moonshot":
+        return build_moonshot_chat_model(config, temperature=temperature)
     return build_compatible_chat_model(config, provider, temperature=temperature)
 
 

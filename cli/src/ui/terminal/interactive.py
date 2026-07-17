@@ -27,6 +27,7 @@ from .compatible_profile_activate import _CompatibleProfileActivateMixin
 from .compatible_profile_edit import _CompatibleProfileEditMixin
 from .data_and_help import _DataAndHelpMixin
 from .discovery_helpers import _DiscoveryHelpersMixin
+from .effort_command import _EffortCommandMixin
 from .export_helpers import _ExportHelpersMixin
 from .export_session import _ExportSessionMixin
 from .export_share_and_misc import _ExportShareAndMiscMixin
@@ -69,6 +70,7 @@ class InteractiveTerminal(
     _CompatibleProfileEditMixin,
     _DataAndHelpMixin,
     _DiscoveryHelpersMixin,
+    _EffortCommandMixin,
     _ExportHelpersMixin,
     _ExportSessionMixin,
     _ExportShareAndMiscMixin,
@@ -272,6 +274,7 @@ class InteractiveTerminal(
                 continue
             if busy and (
                 cmd.startswith("/model")
+                or cmd.startswith("/effort")
                 or cmd.startswith("/settings")
                 or cmd.startswith("/model-manager")
                 or cmd.startswith("/plan")
@@ -344,6 +347,10 @@ class InteractiveTerminal(
                 continue
             if cmd in ("model", "/model"):
                 self._switch_model()
+                self._advance_suggestion()
+                continue
+            if cmd in ("effort", "/effort") or cmd.startswith("/effort"):
+                self._handle_effort_command(query)
                 self._advance_suggestion()
                 continue
             if cmd in ("settings", "/settings"):

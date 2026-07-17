@@ -5,6 +5,7 @@ import {
   featuredSkillIcon,
   isFeaturedSkill,
   skillIcon,
+  skillIconForName,
   skillIconInvertInDark
 } from './skill-icons'
 
@@ -84,5 +85,31 @@ describe('skillIcon helpers', () => {
         source: 'user'
       })
     ).toBe('/pipelines/boltzgen.svg')
+  })
+
+  it('infers Hugging Face logos and keeps mapped skill logos by name', () => {
+    expect(skillIcon({ name: 'diagrams_mermaid', iconSrc: null })).toBe(
+      '/mermaid-logo.png'
+    )
+    expect(skillIcon({ name: 'hf-cli', iconSrc: null })).toBe(
+      '/integrations/huggingface.png'
+    )
+    expect(
+      skillIcon({
+        name: 'other',
+        iconSrc: null,
+        source: 'github:huggingface/skills'
+      })
+    ).toBe('/integrations/huggingface.png')
+    expect(
+      skillIconForName('diagrams_mermaid', [
+        {
+          name: 'diagrams_mermaid',
+          iconSrc: '/custom-mermaid.png',
+          author: '',
+          source: ''
+        }
+      ])
+    ).toBe('/custom-mermaid.png')
   })
 })

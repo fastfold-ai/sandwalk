@@ -4,8 +4,6 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 export type RuntimeDraft = {
-  recursionLimit: string
-  maxSdkTurns: string
   toolMode: 'ptc' | 'native'
   groupToolTraces: boolean
   toolTraceDetailLimit: string
@@ -19,8 +17,6 @@ export type RuntimeDraft = {
 
 export function settingsToDraft(settings: RuntimeSettings | null): RuntimeDraft {
   return {
-    recursionLimit: String(settings?.recursionLimit ?? 120),
-    maxSdkTurns: String(settings?.maxSdkTurns ?? 30),
     toolMode: settings?.toolMode === 'native' ? 'native' : 'ptc',
     groupToolTraces: settings?.groupToolTraces ?? true,
     toolTraceDetailLimit: String(settings?.toolTraceDetailLimit ?? 1),

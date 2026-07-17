@@ -46,6 +46,7 @@ const CLOUD_PROVIDER_LABELS: Record<string, string> = {
   openai: 'OpenAI',
   google: 'Gemini',
   xai: 'Grok',
+  moonshot: 'Kimi',
   nvidia: 'NVIDIA',
   opencode: 'OpenCode Zen'
 }

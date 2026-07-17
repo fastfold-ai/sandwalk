@@ -10,6 +10,12 @@ import { buildMarkdownComponents } from './markdown-components'
 
 export { ensureMermaidFences } from './markdown-mermaid-fences'
 
+/** While streaming, long single-paragraph dumps read as a wall of text. */
+function loosenStreamingParagraphs(content: string): string {
+  if (!content.trim() || content.includes('\n\n')) return content
+  return content.replace(/([.!?])\s+(?=[A-Z“"(\[])/g, '$1\n\n')
+}
+
 export const MarkdownContent = memo(function MarkdownContent({
   content,
   className,
@@ -27,7 +33,10 @@ export const MarkdownContent = memo(function MarkdownContent({
   workspacePath?: string | null
 }) {
   const navigate = useNavigate()
-  const prepared = useMemo(() => ensureMermaidFences(content), [content])
+  const prepared = useMemo(() => {
+    const fenced = ensureMermaidFences(content)
+    return streaming ? loosenStreamingParagraphs(fenced) : fenced
+  }, [content, streaming])
   const components = useMemo(
     () =>
       buildMarkdownComponents({

@@ -23,7 +23,9 @@ export function useComposerDraftState({
   focusKey?: string | null
   workspaceFiles?: WorkspaceFile[]
 }) {
-  const textInputRefs = useRef<Map<number, HTMLInputElement>>(new Map())
+  const textInputRefs = useRef<
+    Map<number, HTMLInputElement | HTMLTextAreaElement>
+  >(new Map())
   const [caretPos, setCaretPos] = useState(0)
   const [focusedPartIndex, setFocusedPartIndex] = useState(0)
   const [draft, setDraft] = useState(value)

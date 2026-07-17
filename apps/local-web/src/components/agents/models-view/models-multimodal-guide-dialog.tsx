@@ -17,6 +17,7 @@ const PROVIDER_ORDER = [
   'openai',
   'google',
   'xai',
+  'moonshot',
   'nvidia',
   'opencode',
   'local'
@@ -27,6 +28,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   openai: 'OpenAI',
   google: 'Gemini',
   xai: 'Grok',
+  moonshot: 'Kimi',
   nvidia: 'NVIDIA',
   opencode: 'OpenCode',
   local: 'Local'

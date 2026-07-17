@@ -142,6 +142,20 @@ def _xai_multimodal(model_id: str) -> set[ModalityKind]:
     return set()
 
 
+def _moonshot_multimodal(model_id: str) -> set[ModalityKind]:
+    value = model_id.lower()
+    # Coding-focused K2.7 variants are text-only in the catalog.
+    if value.startswith("kimi-k2.7-code"):
+        return set()
+    # K3 / K2.6 / K2.5 support vision (and K2.5 video per LangChain docs).
+    if value.startswith("kimi-k3") or value.startswith("kimi-k2."):
+        kinds: set[ModalityKind] = {"image"}
+        if value.startswith("kimi-k2.5") or value.startswith("kimi-k3"):
+            kinds.add("video")
+        return kinds
+    return set()
+
+
 def _normalize_local_model_name(model_id: str) -> str:
     """Strip org prefix and normalize separators for local tag matching."""
     value = (
@@ -218,6 +232,8 @@ def allowlist_modalities(
         return _google_multimodal(value)
     if provider_norm == "xai":
         return _xai_multimodal(value)
+    if provider_norm == "moonshot":
+        return _moonshot_multimodal(value)
     return set()
 
 

@@ -30,6 +30,9 @@ def test_gemini_and_xai():
     assert context_window_for_model("gemini-3.1-pro-preview") == 1_048_576
     assert context_window_for_model("grok-4.3") == 1_000_000
     assert context_window_for_model("grok-4.5") == 256_000
+    assert context_window_for_model("kimi-k3") == 1_000_000
+    assert context_window_for_model("kimi-k2.6") == 256_000
+    assert context_window_for_model("kimi-k2.7-code-highspeed") == 256_000
 
 
 def test_unknown_model_returns_none():

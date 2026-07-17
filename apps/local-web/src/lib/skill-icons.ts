@@ -23,12 +23,32 @@ export function isFeaturedSkill(
   )
 }
 
+function inferredSkillIcon(
+  skill: Pick<AgentSkill, 'name'> &
+    Partial<Pick<AgentSkill, 'author' | 'source'>>
+): string | null {
+  const name = String(skill.name || '').trim().toLowerCase()
+  const author = String(skill.author || '').trim().toLowerCase()
+  const source = String(skill.source || '').trim().toLowerCase()
+  if (
+    name.startsWith('hf-') ||
+    name.includes('huggingface') ||
+    author.includes('hugging face') ||
+    author.includes('huggingface') ||
+    source.includes('huggingface')
+  ) {
+    return '/integrations/huggingface.png'
+  }
+  return null
+}
+
 export function skillIcon(
-  skill: Pick<AgentSkill, 'name' | 'iconSrc'>
+  skill: Pick<AgentSkill, 'name' | 'iconSrc'> &
+    Partial<Pick<AgentSkill, 'author' | 'source'>>
 ): string | null {
   const custom = String(skill.iconSrc || '').trim()
   if (custom) return custom
-  return SKILL_ICON_BY_NAME[skill.name]?.src || null
+  return SKILL_ICON_BY_NAME[skill.name]?.src || inferredSkillIcon(skill)
 }
 
 /** Match Integrations: invert dark logos (e.g. Boltz) in dark mode. */
@@ -40,7 +60,8 @@ export function skillIconInvertInDark(
 }
 
 export function featuredSkillIcon(
-  skill: Pick<AgentSkill, 'name' | 'iconSrc'>
+  skill: Pick<AgentSkill, 'name' | 'iconSrc'> &
+    Partial<Pick<AgentSkill, 'author' | 'source'>>
 ): string {
   return skillIcon(skill) || '/ff_simbol_color.svg'
 }
@@ -49,4 +70,14 @@ export function composerSkillIcon(
   skill: Pick<AgentSkill, 'name' | 'iconSrc' | 'author' | 'source'>
 ): string | null {
   return skillIcon(skill) || (isFeaturedSkill(skill) ? '/ff_simbol_color.svg' : null)
+}
+
+/** Resolve a chip/message icon when only the skill name is available. */
+export function skillIconForName(
+  name: string,
+  skills?: Array<Pick<AgentSkill, 'name' | 'iconSrc' | 'author' | 'source'>>
+): string | null {
+  const match = skills?.find(skill => skill.name === name)
+  if (match) return composerSkillIcon(match)
+  return skillIcon({ name, iconSrc: null })
 }

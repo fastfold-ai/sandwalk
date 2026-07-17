@@ -83,6 +83,12 @@ SUGGESTED_SKILL_SOURCES = [
         "url": "https://github.com/google-deepmind/science-skills",
         "description": "Google DeepMind science skills",
     },
+    {
+        "provider": "Hugging Face",
+        "source": "huggingface/skills",
+        "url": "https://github.com/huggingface/skills",
+        "description": "Hub skills for models, datasets, training, evals, and Gradio",
+    },
 ]
 
 # ─── GitHub releases + update cache ─────────────────────────────────────────

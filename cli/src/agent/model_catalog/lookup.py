@@ -54,6 +54,8 @@ def catalog_provider_for_model(model_id: str | None) -> str | None:
         return "anthropic"
     if lower.startswith("grok-"):
         return "xai"
+    if lower.startswith("kimi-") or lower.startswith("moonshot-"):
+        return "moonshot"
     if lower.startswith("nvidia/"):
         return "nvidia"
     if (

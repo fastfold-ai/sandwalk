@@ -13,6 +13,7 @@ SETUP_PROVIDER_ORDER = (
     "anthropic",
     "xai",
     "google",
+    "moonshot",
     "nvidia",
     "opencode",
     "openai_compatible",

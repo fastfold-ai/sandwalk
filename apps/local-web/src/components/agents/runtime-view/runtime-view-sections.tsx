@@ -13,50 +13,6 @@ type SectionProps = {
   onDraftChange: (updater: (current: RuntimeDraft) => RuntimeDraft) => void
 }
 
-export function RuntimeLangGraphSection({
-  draft,
-  connected,
-  saving,
-  onDraftChange
-}: SectionProps) {
-  return (
-    <section className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold">LangGraph loop</h3>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Raise these if long fold/download workflows stop early with a
-          recursion-limit error.
-        </p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <RuntimeNumberField
-          label="Recursion limit"
-          hint="Max model↔tool graph steps (agent.recursion_limit)."
-          value={draft.recursionLimit}
-          min={25}
-          max={2000}
-          step={10}
-          disabled={!connected || saving}
-          onChange={value =>
-            onDraftChange(current => ({ ...current, recursionLimit: value }))
-          }
-        />
-        <RuntimeNumberField
-          label="Max SDK turns"
-          hint="Soft turn budget used when recursion limit is unset."
-          value={draft.maxSdkTurns}
-          min={1}
-          max={500}
-          disabled={!connected || saving}
-          onChange={value =>
-            onDraftChange(current => ({ ...current, maxSdkTurns: value }))
-          }
-        />
-      </div>
-    </section>
-  )
-}
-
 export function RuntimeToolCallingSection({
   draft,
   connected,

@@ -37,6 +37,11 @@ PROVIDER_METADATA = {
         "category": "AI Models",
         "description": "OpenCode Zen pay-as-you-go gateway for curated coding models.",
     },
+    "moonshot": {
+        "name": "Kimi",
+        "category": "AI Models",
+        "description": "Kimi API key for first-party Kimi models.",
+    },
     "tavily": {
         "name": "Tavily",
         "category": "Search",
@@ -76,6 +81,13 @@ PROVIDER_METADATA = {
         "name": "Linear",
         "category": "MCP",
         "description": "Linear MCP API key for issues and projects.",
+    },
+    "huggingface": {
+        "name": "Hugging Face",
+        "category": "MCP",
+        "description": (
+            "Hugging Face Hub MCP — models, datasets, Spaces, papers, and docs."
+        ),
     },
 }
 VERCEL_INTEGRATION_DIR = (CONFIG_DIR / "vercel-integration").expanduser()

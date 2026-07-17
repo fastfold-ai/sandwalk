@@ -81,11 +81,14 @@ Bare `/model` opens a numbered picker of **enabled** catalog models (same list a
 
 - Hidden / disabled models are omitted (toggle them in the Web UI Models view).
 - Status bar shows the active model id; `/usage` shows tokens for the session.
-- Cloud context windows are curated in `agent/model_catalog/context_windows.py` (e.g. 1M for modern Claude / GPT-5.6 / Gemini).
+- Cloud context windows are curated in `agent/model_catalog/context_windows.py` (e.g. 1M for modern Claude / GPT-5.6 / Gemini / Kimi K3).
 - Local Ollama: context from `/api/tags`, with `/api/show` fallback when tags omit it.
 - The picker shows a **1M** badge only for ≥1M windows; the status bar shows `context: N% (used/limit)` when known.
+- After switching to a model that supports thinking controls (Kimi K2.5/K2.6, Unsloth profiles, GPT/Claude effort models, …), the CLI prompts for **Effort** (Low / Medium / High / Fast). Use `/effort` to change it later. Values persist in `llm.model_reasoning` (shared with the Web UI).
 
-Config keys: `llm.provider`, `llm.model`. Cloud keys: `/keys` or `sandwalk config set`.
+**Kimi:** set `MOONSHOT_API_KEY` via `/keys set-moonshot`, `sandwalk config set llm.moonshot_api_key …`, or `sandwalk setup`. Catalog models include `kimi-k3`, `kimi-k2.6`, `kimi-k2.7-code` (+ highspeed); `kimi-k2.5` is disabled by default.
+
+Config keys: `llm.provider`, `llm.model`, `llm.moonshot_api_key`, `llm.model_reasoning`. Cloud keys: `/keys` or `sandwalk config set`.
 
 ### Model Manager (`/model-manager`)
 
@@ -122,8 +125,9 @@ The table probes each profile (health, models path, key preview, discovered mode
 |-------|-------------|
 | `/help` | Show command reference with examples |
 | `/model` | Switch LLM model / provider interactively |
+| `/effort` | Set Effort / Fast (thinking) for the active model |
 | `/model-manager` | Manage OpenAI-compatible profiles (add / edit / delete) |
-| `/keys` | API key status (`/keys profile`, `set-compatible`, `set-boltz`) |
+| `/keys` | API key status (`profile`, `set-compatible`, `set-moonshot`, `set-boltz`) |
 | `/sandbox` | Pick Local / Modal compute presets (+ edit base image) |
 | `/plan` | Toggle Plan mode (starts off; writes `plans/*.md` until Agent mode) |
 | `/specialist` | Set / list specialists (`<slug>` \| `use` \| `clear` \| `list` \| `show`) |

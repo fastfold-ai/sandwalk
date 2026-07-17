@@ -15,7 +15,9 @@ type DraftEditorHandlersInput = {
   focusedPartIndex: number
   atOpen: boolean
   slashOpen: boolean
-  textInputRefs: MutableRefObject<Map<number, HTMLInputElement>>
+  textInputRefs: MutableRefObject<
+    Map<number, HTMLInputElement | HTMLTextAreaElement>
+  >
   atMenuRef: MutableRefObject<ComposerAtMenuHandle | null>
   slashMenuRef: MutableRefObject<ComposerSlashMenuHandle | null>
   setFocusedPartIndex: (index: number) => void

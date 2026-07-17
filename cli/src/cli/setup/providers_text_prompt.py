@@ -21,6 +21,9 @@ def _prompt_setup_providers_text(options: list[str]) -> list[str]:
         "g": "google",
         "google": "google",
         "gemini": "google",
+        "m": "moonshot",
+        "moonshot": "moonshot",
+        "kimi": "moonshot",
         "n": "nvidia",
         "nvidia": "nvidia",
         "nemotron": "nvidia",
@@ -40,7 +43,7 @@ def _prompt_setup_providers_text(options: list[str]) -> list[str]:
         console.print("  [cyan]Select provider(s) to configure[/cyan]")
         console.print(
             "  [dim]Options:[/dim] anthropic (a), openai (o), xai (x), google (g), "
-            "nvidia (n), opencode (oc), openai_compatible (k), all"
+            "kimi/moonshot (m), nvidia (n), opencode (oc), openai_compatible (k), all"
         )
         try:
             raw = input("  Providers: ").strip().lower()

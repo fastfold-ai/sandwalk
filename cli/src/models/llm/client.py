@@ -20,6 +20,7 @@ class LLMClient:
         "openai": "gpt-5.6-sol",
         "xai": "grok-4.5",
         "google": "gemini-3.5-flash",
+        "moonshot": "kimi-k2.6",
         "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
         "opencode": "kimi-k2.7-code",
     }
@@ -31,6 +32,7 @@ class LLMClient:
             "https://generativelanguage.googleapis.com/v1beta/openai/",
             "GEMINI_API_KEY",
         ),
+        "moonshot": ("https://api.moonshot.ai/v1", "MOONSHOT_API_KEY"),
         "nvidia": ("https://integrate.api.nvidia.com/v1", "NVIDIA_API_KEY"),
         "opencode": ("https://opencode.ai/zen/v1", "OPENCODE_API_KEY"),
     }

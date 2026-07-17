@@ -37,20 +37,28 @@ def test_paperclip_catalog_entry_featured_over_linear():
 
     paperclip = get_catalog_entry("paperclip")
     linear = get_catalog_entry("linear")
+    huggingface = get_catalog_entry("huggingface")
     assert paperclip is not None
     assert linear is not None
+    assert huggingface is not None
     assert paperclip.featured is True
+    assert huggingface.featured is True
     assert linear.featured is False
     assert paperclip.auth_mode == "api_key_or_oauth"
     assert paperclip.preferred_auth == "oauth"
     assert paperclip.url == "https://paperclip.gxl.ai/mcp"
     assert paperclip.api_key_header == "X-API-Key"
     assert paperclip.api_key_config_key == "mcp.paperclip_api_key"
+    assert huggingface.url == "https://huggingface.co/mcp"
+    assert huggingface.auth_mode == "api_key"
+    assert huggingface.api_key_env_var == "HF_TOKEN"
+    assert huggingface.api_key_header_prefix == "Bearer "
     assert {e.id for e in MCP_CATALOG} >= {
         "tamarind",
         "latch",
         "neurosnap",
         "paperclip",
+        "huggingface",
         "linear",
     }
     assert "betterstack" not in {e.id for e in MCP_CATALOG}

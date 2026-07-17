@@ -93,6 +93,25 @@ MCP_CATALOG: list[McpCatalogEntry] = [
         featured=True,
     ),
     McpCatalogEntry(
+        id="huggingface",
+        name="Hugging Face",
+        description=(
+            "Search Hub models, datasets, Spaces, papers, and docs; "
+            "run enabled community Gradio tools."
+        ),
+        url="https://huggingface.co/mcp",
+        auth_mode="api_key",
+        preferred_auth="api_key",
+        api_key_config_key="mcp.huggingface_api_key",
+        api_key_env_var="HF_TOKEN",
+        api_key_header="Authorization",
+        api_key_header_prefix="Bearer ",
+        docs_url="https://huggingface.co/docs/hub/en/agents-mcp",
+        setup_url="https://huggingface.co/settings/tokens",
+        integration_key="huggingface",
+        featured=True,
+    ),
+    McpCatalogEntry(
         id="linear",
         name="Linear",
         description="Issues, projects, and comments for product and ops workflows.",

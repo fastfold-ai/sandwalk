@@ -267,6 +267,21 @@ export function McpCatalogCard({
           >
             Cancel
           </Button>
+          {view.setupUrl || view.id === 'huggingface' ? (
+            <a
+              href={
+                view.id === 'huggingface'
+                  ? 'https://huggingface.co/settings/tokens'
+                  : view.setupUrl || '#'
+              }
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
+            >
+              Get API token
+              <ExternalLink className="size-3" />
+            </a>
+          ) : null}
         </div>
       ) : null}
     </div>

@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { Plug, Sparkles } from 'lucide-react'
 
+import { mcpIconForChip } from '@/components/agents/composer/composer-mention-utils'
 import { parseMessageParts } from '@/components/agents/composer-parts'
 import {
   MessageFilePreview,
@@ -9,6 +10,10 @@ import {
 } from '@/components/agents/message-file-preview'
 import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
 import { getFileIcon } from '@/lib/file-icons'
+import {
+  skillIconForName,
+  skillIconInvertInDark
+} from '@/lib/skill-icons'
 import { splitTextWithWorkspacePaths } from '@/lib/workspace-file-paths'
 import { cn } from '@/lib/utils'
 
@@ -129,6 +134,7 @@ export function UserMessageContent({
       )
     }
     if (part.type === 'mcp') {
+      const icon = mcpIconForChip(part.id, part.name)
       return (
         <a
           key={`mcp-${index}-${part.id}`}
@@ -137,11 +143,23 @@ export function UserMessageContent({
           rel="noopener noreferrer"
           className="border-border/70 bg-muted/40 text-foreground inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 align-middle text-xs hover:underline"
         >
-          <Plug className="text-muted-foreground size-3.5 shrink-0" />
+          {icon ? (
+            <img
+              src={icon.src}
+              alt=""
+              className={cn(
+                'size-3.5 shrink-0 rounded-sm object-contain',
+                icon.invertInDark && 'dark:invert'
+              )}
+            />
+          ) : (
+            <Plug className="text-muted-foreground size-3.5 shrink-0" />
+          )}
           <span className="max-w-[200px] truncate">{part.name}</span>
         </a>
       )
     }
+    const skillIcon = skillIconForName(part.name)
     return (
       <a
         key={`skill-${index}-${part.name}`}
@@ -150,7 +168,19 @@ export function UserMessageContent({
         rel="noopener noreferrer"
         className="border-primary/30 bg-primary/5 text-foreground inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 align-middle text-xs hover:underline"
       >
-        <Sparkles className="text-primary/80 size-3.5 shrink-0" />
+        {skillIcon ? (
+          <img
+            src={skillIcon}
+            alt=""
+            className={cn(
+              'size-3.5 shrink-0 rounded-sm object-contain',
+              skillIconInvertInDark({ name: part.name, iconSrc: null }) &&
+                'dark:invert'
+            )}
+          />
+        ) : (
+          <Sparkles className="text-primary/80 size-3.5 shrink-0" />
+        )}
         <span className="max-w-[200px] truncate">{part.name}</span>
       </a>
     )

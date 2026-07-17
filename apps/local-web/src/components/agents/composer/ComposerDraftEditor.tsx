@@ -1,3 +1,4 @@
+import type { AgentSkill, McpServer } from '@sandwalk/agent-ui-core'
 import {
   type MutableRefObject,
   useMemo
@@ -16,13 +17,14 @@ import {
   type ComposerPart,
   removeComposerChipAt
 } from '@/components/agents/composer-parts'
-
 export function ComposerDraftEditor({
   draft,
   running,
   autoFocus,
   focusKey,
   composerParts,
+  skills = [],
+  mcpServers = [],
   textInputRefs,
   pendingCaretRef,
   autoFocusedKeyRef,
@@ -46,7 +48,11 @@ export function ComposerDraftEditor({
   autoFocus?: boolean
   focusKey?: string | null
   composerParts: ComposerPart[]
-  textInputRefs: MutableRefObject<Map<number, HTMLInputElement>>
+  skills?: AgentSkill[]
+  mcpServers?: McpServer[]
+  textInputRefs: MutableRefObject<
+    Map<number, HTMLInputElement | HTMLTextAreaElement>
+  >
   pendingCaretRef: MutableRefObject<number | null>
   autoFocusedKeyRef: MutableRefObject<string | null>
   draftRef: MutableRefObject<string>
@@ -123,10 +129,14 @@ export function ComposerDraftEditor({
         if (part.type === 'skill') {
           chipRenderIndex += 1
           const chipIndex = chipRenderIndex
+          const skill = skills.find(item => item.name === part.name)
           return (
             <ComposerSkillChip
               key={`skill-${partIndex}-${part.name}`}
               name={part.name}
+              iconSrc={skill?.iconSrc}
+              author={skill?.author}
+              source={skill?.source}
               onRemove={() => {
                 commitDraft(removeComposerChipAt(draft, chipIndex))
                 onSkillChipsChange([])
@@ -137,11 +147,15 @@ export function ComposerDraftEditor({
         if (part.type === 'mcp') {
           chipRenderIndex += 1
           const chipIndex = chipRenderIndex
+          const server = mcpServers.find(
+            item => item.id === part.id || item.name === part.name
+          )
           return (
             <ComposerMcpChip
               key={`mcp-${partIndex}-${part.id}`}
               id={part.id}
               name={part.name}
+              catalogId={server?.catalogId}
               onRemove={() => {
                 commitDraft(removeComposerChipAt(draft, chipIndex))
               }}

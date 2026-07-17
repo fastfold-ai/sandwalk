@@ -46,8 +46,16 @@ def _to_profile(
     )
 
 
-def _reasoning_fields(cfg: Config, provider: str, model_id: str) -> dict[str, Any]:
-    supports = model_supports_reasoning_effort(provider, model_id)
+def _reasoning_fields(
+    cfg: Config,
+    provider: str,
+    model_id: str,
+    *,
+    compatible_backend: str | None = None,
+) -> dict[str, Any]:
+    supports = model_supports_reasoning_effort(
+        provider, model_id, compatible_backend=compatible_backend
+    )
     effort, fast = get_model_reasoning(
         cfg.get("llm.model_reasoning"),
         provider,
@@ -56,7 +64,11 @@ def _reasoning_fields(cfg: Config, provider: str, model_id: str) -> dict[str, An
     return {
         "supports_reasoning_effort": supports,
         "reasoning_effort_options": (
-            reasoning_effort_options(provider, model_id) if supports else []
+            reasoning_effort_options(
+                provider, model_id, compatible_backend=compatible_backend
+            )
+            if supports
+            else []
         ),
         "reasoning_effort": effort if supports else None,
         "reasoning_fast": bool(fast) if supports else False,

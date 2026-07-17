@@ -41,13 +41,13 @@ DEFAULTS_AGENT = {
     # older ones collapse to compact named lines. 1 = only the last call full.
     "agent.tool_trace_detail_limit": 1,
     # Max model↔tool loop iterations for the deepagents (LangGraph) runtime.
-    # When the agent hits this limit you get GRAPH_RECURSION_LIMIT; raise it for
-    # long fold/download workflows. Override via CLI:
-    #   sandwalk config set agent.recursion_limit 200
+    # LangGraph requires a finite cap; default is effectively unlimited for
+    # long training / fold / download workflows. Override via CLI:
+    #   sandwalk config set agent.recursion_limit 0   # unlimited
     # or Dashboard → Agent → Runtime in the Mac/web app.
-    "agent.recursion_limit": 120,
-    # Soft cap used when deriving recursion_limit if agent.recursion_limit is unset.
-    "agent.max_sdk_turns": 30,
+    "agent.recursion_limit": 100_000,
+    # Legacy soft turn budget (only used if recursion_limit is explicitly cleared).
+    "agent.max_sdk_turns": 500,
     "agent.enable_experimental_tools": False,
     "skills.allow_agent_install": False,
     "agent.observer_model": None,

@@ -3,12 +3,28 @@
 from __future__ import annotations
 
 
+def _active_compatible_backend(config) -> str | None:
+    """Return the active OpenAI-compatible profile backend, if any."""
+    try:
+        profile = config.get_openai_profile()
+    except Exception:  # noqa: BLE001
+        profile = None
+    if not isinstance(profile, dict):
+        return None
+    backend = str(profile.get("backend") or "").strip().lower() or None
+    if backend in {None, "", "openai"}:
+        return None
+    return backend
+
+
 def build_openai_chat_model(config, *, temperature: float):
     from langchain.chat_models import init_chat_model
 
     from agent.config import Config
     from agent.model_catalog import (
+        compatible_profile_supports_thinking,
         effective_reasoning_effort,
+        effective_unsloth_enable_thinking,
         get_model_reasoning,
         model_supports_reasoning_effort,
         openai_model_requires_responses_api,
@@ -49,4 +65,18 @@ def build_openai_chat_model(config, *, temperature: float):
             fast=fast,
             model_id=model,
         )
+    elif not is_openai_cloud:
+        backend = _active_compatible_backend(config)
+        if compatible_profile_supports_thinking(backend):
+            effort, fast = get_model_reasoning(
+                config.get("llm.model_reasoning"),
+                "local",
+                model,
+                default_effort=str(config.get("llm.reasoning_effort") or "medium"),
+                default_fast=bool(config.get("llm.reasoning_fast", False)),
+            )
+            enable_thinking = effective_unsloth_enable_thinking(
+                effort=effort, fast=fast
+            )
+            kwargs["extra_body"] = {"enable_thinking": enable_thinking}
     return init_chat_model(f"openai:{model}", **kwargs)

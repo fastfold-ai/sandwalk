@@ -1104,6 +1104,7 @@ def test_provider_label_for_source():
     assert _provider_label_for_source("fastfold-ai/skills@skills/fold") == "Fastfold"
     assert _provider_label_for_source("anthropics/life-sciences") == "Anthropic"
     assert _provider_label_for_source("google-deepmind/science-skills") == "DeepMind"
+    assert _provider_label_for_source("huggingface/skills") == "Hugging Face"
     assert _provider_label_for_source("K-Dense-AI/scientific-agent-skills") == "K-Dense-AI"
     assert _provider_label_for_source("https://github.com/anthropics/life-sciences/tree/main/skills") == "Anthropic"
     assert _provider_label_for_source("someuser/their-skills") == "someuser"
@@ -1111,7 +1112,7 @@ def test_provider_label_for_source():
 
 def test_suggested_skill_sources_present():
     providers = {s["provider"] for s in skills_mod.SUGGESTED_SKILL_SOURCES}
-    assert {"K-Dense-AI", "Anthropic", "DeepMind"} <= providers
+    assert {"K-Dense-AI", "Anthropic", "DeepMind", "Hugging Face"} <= providers
     for s in skills_mod.SUGGESTED_SKILL_SOURCES:
         assert "/" in s["source"]
         assert s["url"].startswith("https://github.com/")
@@ -1126,6 +1127,7 @@ def test_setup_select_suggested_sources_inline(monkeypatch):
     assert "K-Dense-AI/scientific-agent-skills" in sources
     assert "anthropics/life-sciences" in sources
     assert "google-deepmind/science-skills" in sources
+    assert "huggingface/skills" in sources
 
 
 def test_terminal_add_skill_invokes_install(monkeypatch):

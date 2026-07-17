@@ -11,7 +11,15 @@ def _configured_llm_summary(cfg: Config) -> DoctorCheck:
     """Report which LLM providers/profiles have credentials configured."""
     labels: list[str] = []
 
-    cloud_order = ("anthropic", "openai", "google", "xai", "nvidia", "opencode")
+    cloud_order = (
+        "anthropic",
+        "openai",
+        "google",
+        "xai",
+        "moonshot",
+        "nvidia",
+        "opencode",
+    )
     for provider in cloud_order:
         if not cfg.llm_api_key(provider):
             continue

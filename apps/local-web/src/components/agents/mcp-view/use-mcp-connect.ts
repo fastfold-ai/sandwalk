@@ -55,14 +55,17 @@ export function useMcpConnect({
         }
       } catch (err) {
         const message = formatConnectError(err)
+        const apiKeyOnly = /uses api key auth, not oauth/i.test(message)
         const oauthUnavailable =
+          apiKeyOnly ||
           /no oauth registration|use api key connect/i.test(message)
-        toast.error(
-          oauthUnavailable
-            ? `${entry.name} OAuth needs a registered client here — use API key instead.`
-            : message,
-          { description: entry.name }
-        )
+        if (apiKeyOnly || oauthUnavailable) {
+          toast.message('API key required', {
+            description: `${entry.name} uses an API key — paste it below to connect.`
+          })
+        } else {
+          toast.error(message, { description: entry.name })
+        }
         if (entry.authMode !== 'oauth') {
           setShowApiKey(prev => ({ ...prev, [entry.id]: true }))
         }

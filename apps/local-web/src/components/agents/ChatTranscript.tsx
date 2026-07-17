@@ -138,11 +138,6 @@ export function ChatTranscript({
                 ))}
               </div>
             ) : null}
-            {activeRunTodos.length > 0 && !activeBuildPlan ? (
-              <div className="mx-auto w-full max-w-[44rem] px-2">
-                <TodoListInline todos={activeRunTodos} />
-              </div>
-            ) : null}
             {liveDelta ? (
               <div className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150">
                 <MarkdownContent
@@ -150,7 +145,7 @@ export function ChatTranscript({
                   streaming
                   onOpenFile={onOpenFile}
                   workspacePath={session?.workspacePath}
-                  className="max-w-full [&_*]:max-w-full"
+                  className="max-w-full space-y-3 [&_*]:max-w-full"
                 />
               </div>
             ) : null}
@@ -158,6 +153,11 @@ export function ChatTranscript({
               <div className="text-muted-foreground mx-auto flex w-full max-w-[44rem] items-center gap-1 px-2 py-2 text-sm">
                 <div className="bg-foreground/80 animate-breathe h-2.5 w-2.5 rounded-full" />
                 <span className="sr-only">Generating</span>
+              </div>
+            ) : null}
+            {activeRunTodos.length > 0 && !activeBuildPlan ? (
+              <div className="mx-auto w-full max-w-[44rem] px-2 pt-1">
+                <TodoListInline todos={activeRunTodos} />
               </div>
             ) : null}
           </div>

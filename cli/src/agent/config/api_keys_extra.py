@@ -96,4 +96,15 @@ API_KEYS_EXTRA = {
         "url": "https://linear.app/settings/account/security",
         "free": True,
     },
+    "mcp.huggingface_api_key": {
+        "name": "Hugging Face",
+        "provider_key": "huggingface",
+        "env_var": "HF_TOKEN",
+        "description": (
+            "Hugging Face access token (Bearer) for the Hub MCP server "
+            "(models, datasets, Spaces, papers, docs)"
+        ),
+        "url": "https://huggingface.co/settings/tokens",
+        "free": True,
+    },
 }

@@ -54,6 +54,34 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
         ("gemini-3.5-flash", "Gemini 3.5 Flash", "Frontier-class Gemini at a fraction of the cost"),
         ("gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite", "High-volume, cost-sensitive Gemini model"),
     ],
+    "moonshot": [
+        (
+            "kimi-k3",
+            "Kimi K3",
+            "Frontier Kimi with 1M context, vision, and deep reasoning",
+        ),
+        (
+            "kimi-k2.6",
+            "Kimi K2.6",
+            "Multimodal Kimi with thinking and non-thinking modes (256k)",
+        ),
+        (
+            "kimi-k2.7-code",
+            "Kimi K2.7 Code",
+            "Coding-focused Kimi with always-on thinking (256k)",
+        ),
+        (
+            "kimi-k2.7-code-highspeed",
+            "Kimi K2.7 Code Highspeed",
+            "Faster Kimi K2.7 Code variant (~180 tok/s)",
+        ),
+        # Legacy (disabled by default; sunsetting for new users)
+        (
+            "kimi-k2.5",
+            "Kimi K2.5",
+            "Previous-generation multimodal Kimi (256k)",
+        ),
+    ],
     "nvidia": [
         (
             "nvidia/nemotron-3-ultra-550b-a55b",
@@ -64,7 +92,7 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
 }
 
 # Bump when the default-enabled set changes so existing configs get migrated once.
-CATALOG_DEFAULTS_VERSION = 2
+CATALOG_DEFAULTS_VERSION = 3
 
 # Models present in the catalog but hidden by default. Users can re-enable them
 # from Dashboard → Models; toggling simply removes them from the hidden list.
@@ -80,6 +108,7 @@ DEFAULT_DISABLED_MODELS: frozenset[str] = frozenset(
         "gpt-5.4-nano",
         "gpt-5-mini",
         "gpt-5-nano",
+        "kimi-k2.5",
     }
 )
 

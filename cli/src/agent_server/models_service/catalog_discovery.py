@@ -126,7 +126,9 @@ def _profile_discovered_items(
                     enabled=enabled,
                     health=health,
                     context_window=int(context_window) if context_window else None,
-                    **_reasoning_fields(cfg, "local", model_id),
+                    **_reasoning_fields(
+                        cfg, "local", model_id, compatible_backend=backend
+                    ),
                 )
             )
     return items

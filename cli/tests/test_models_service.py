@@ -338,6 +338,14 @@ def test_model_supports_reasoning_effort():
     assert model_supports_reasoning_effort("xai", "grok-4.5") is True
     assert model_supports_reasoning_effort("xai", "grok-4.3") is True
     assert model_supports_reasoning_effort("xai", "grok-4.20") is True
+    assert model_supports_reasoning_effort("moonshot", "kimi-k2.6") is True
+    assert model_supports_reasoning_effort("moonshot", "kimi-k3") is False
+    assert (
+        model_supports_reasoning_effort(
+            "local", "gemma-4", compatible_backend="unsloth"
+        )
+        is True
+    )
     assert model_supports_reasoning_effort("nvidia", "nvidia/nemotron-3-ultra-550b-a55b") is False
     assert model_supports_reasoning_effort("openai", "gpt-5-chat-latest") is False
     assert reasoning_effort_options("openai", "gpt-5.6-sol") == [

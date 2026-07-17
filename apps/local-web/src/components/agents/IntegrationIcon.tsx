@@ -17,6 +17,7 @@ export const INTEGRATION_ICONS: Record<
   anthropic: { src: '/anthropic.png', invertInDark: true },
   xai: { src: '/xai.png' },
   google: { src: '/gemini.png' },
+  moonshot: { src: '/kimi.png' },
   'ibm-rxn': { src: '/ibm.png' },
   lens: { src: '/lens.png' },
   sendgrid: { src: '/sendgrid.png' },
@@ -29,6 +30,7 @@ export const INTEGRATION_ICONS: Record<
   latch: { src: '/integrations/latch.png' },
   neurosnap: { src: '/integrations/neurosnap.png' },
   paperclip: { src: '/integrations/paperclip.png' },
+  huggingface: { src: '/integrations/huggingface.png' },
   linear: { src: '/integrations/linear.png' },
 }
 

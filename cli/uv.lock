@@ -1986,6 +1986,19 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain-moonshot"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "langchain-openai" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7e/dc/4fbcb89c06259a18eb04f9d9229e6fc938011c060b82791e6e45d85f60e1/langchain_moonshot-0.1.0.tar.gz", hash = "sha256:0d98b5ca0f707b631a138008087815990b8fc7e2cbc369205724ed5d322d056a", size = 39140, upload-time = "2026-04-07T12:34:53.261Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f0/2f/cfab3472126a3532ddd3f68bf37205971d3fce1a7ec5aec2194b19bf3a40/langchain_moonshot-0.1.0-py3-none-any.whl", hash = "sha256:1f62d84ae7b0dcdd544c643778149437a632acd034c7f0e9e148f55285bf5796", size = 11386, upload-time = "2026-04-07T12:34:54.207Z" },
+]
+
+[[package]]
 name = "langchain-openai"
 version = "1.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -4306,6 +4319,7 @@ dependencies = [
     { name = "langchain-anthropic" },
     { name = "langchain-mcp-adapters" },
     { name = "langchain-modal" },
+    { name = "langchain-moonshot" },
     { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "markdown" },
@@ -4337,6 +4351,7 @@ all = [
     { name = "biopython" },
     { name = "celltypist" },
     { name = "cellxgene-census" },
+    { name = "duckdb" },
     { name = "fair-esm" },
     { name = "openpyxl" },
     { name = "pyarrow" },
@@ -4426,6 +4441,7 @@ requires-dist = [
     { name = "cellxgene-census", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "cellxgene-census", marker = "extra == 'singlecell'", specifier = ">=1.0" },
     { name = "deepagents", specifier = ">=0.3.0" },
+    { name = "duckdb", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "duckdb", marker = "extra == 'api'", specifier = ">=1.0" },
     { name = "fair-esm", marker = "extra == 'all'", specifier = ">=2.0" },
     { name = "fair-esm", marker = "extra == 'ml'", specifier = ">=2.0" },
@@ -4437,6 +4453,7 @@ requires-dist = [
     { name = "langchain-mcp-adapters", specifier = ">=0.3.0" },
     { name = "langchain-modal", specifier = ">=0.0.1" },
     { name = "langchain-modal", marker = "extra == 'modal'", specifier = ">=0.0.1" },
+    { name = "langchain-moonshot", specifier = ">=0.1.0" },
     { name = "langchain-openai", specifier = ">=1.3.2" },
     { name = "langgraph", specifier = ">=1.2.5" },
     { name = "markdown", specifier = ">=3.5" },

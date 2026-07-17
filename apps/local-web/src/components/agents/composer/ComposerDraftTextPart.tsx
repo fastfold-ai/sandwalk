@@ -32,14 +32,18 @@ export function ComposerDraftTextPart({
   running: boolean
   autoFocus?: boolean
   focusKey?: string | null
-  textInputRefs: MutableRefObject<Map<number, HTMLInputElement>>
+  textInputRefs: MutableRefObject<
+    Map<number, HTMLInputElement | HTMLTextAreaElement>
+  >
   pendingCaretRef: MutableRefObject<number | null>
   autoFocusedKeyRef: MutableRefObject<string | null>
   draftRef: MutableRefObject<string>
   setFocusedPartIndex: (index: number) => void
   setCaretPos: (pos: number) => void
   updateTextPart: (partIndex: number, text: string, localCaret: number) => void
-  handleKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void
+  handleKeyDown: (
+    event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => void
 }) {
   const isLastText = partIndex === lastTextPartIndex(composerParts)
   if (!isLastText && part.text.length === 0) {
@@ -70,12 +74,12 @@ export function ComposerDraftTextPart({
       )}
     >
       <span
-        className="invisible col-start-1 row-start-1 whitespace-pre text-[15px] leading-7"
+        className="invisible col-start-1 row-start-1 whitespace-pre-wrap break-words text-[15px] leading-7"
         aria-hidden
       >
         {part.text.length > 0 ? part.text : '\u00a0'}
       </span>
-      <input
+      <textarea
         ref={node => {
           if (!node) {
             textInputRefs.current.delete(partIndex)
@@ -117,7 +121,7 @@ export function ComposerDraftTextPart({
           })
         }}
         value={part.text}
-        size={1}
+        rows={1}
         autoFocus={Boolean(autoFocus && isLastText)}
         onChange={event => {
           const localCaret = event.target.selectionStart ?? 0
@@ -136,7 +140,7 @@ export function ComposerDraftTextPart({
         }
         onKeyDown={handleKeyDown}
         placeholder={emptyLastText ? showPlaceholder || undefined : undefined}
-        className="placeholder:text-muted-foreground/70 col-start-1 row-start-1 m-0 w-full min-w-0 border-0 bg-transparent p-0 text-[15px] leading-7 outline-none"
+        className="placeholder:text-muted-foreground/70 col-start-1 row-start-1 m-0 w-full min-w-0 resize-none overflow-hidden border-0 bg-transparent p-0 text-[15px] leading-7 outline-none"
       />
     </span>
   )

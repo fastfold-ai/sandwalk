@@ -214,6 +214,8 @@ export function Composer({
             autoFocus={autoFocus}
             focusKey={focusKey}
             composerParts={composerParts}
+            skills={skills}
+            mcpServers={mcpServers}
             textInputRefs={draftState.textInputRefs}
             pendingCaretRef={draftState.pendingCaretRef}
             autoFocusedKeyRef={draftState.autoFocusedKeyRef}

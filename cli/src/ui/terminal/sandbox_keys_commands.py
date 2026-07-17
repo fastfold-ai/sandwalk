@@ -194,9 +194,57 @@ class _SandboxKeysCommandsMixin:
             self._handle_set_boltz_key(cfg)
             return
 
+        if action in {"set-moonshot", "moonshot", "set-moonshot-key", "kimi", "set-kimi"}:
+            self._handle_set_moonshot_key(cfg)
+            return
+
         self.console.print(
-            "  [dim]Usage:[/dim] /keys  |  /keys profile  |  /keys set-compatible [profile_id]  |  /keys set-boltz"
+            "  [dim]Usage:[/dim] /keys  |  /keys profile  |  /keys set-compatible [profile_id]  "
+            "|  /keys set-moonshot  |  /keys set-boltz"
         )
+        self.console.print(cfg.keys_table())
+
+    def _handle_set_moonshot_key(self, cfg) -> None:
+        """Prompt/update MOONSHOT_API_KEY for Kimi."""
+        import os
+
+        existing_value = str(
+            cfg.get("llm.moonshot_api_key")
+            or os.environ.get("MOONSHOT_API_KEY")
+            or ""
+        ).strip()
+        current_state = "configured" if existing_value else "not set"
+        self.console.print(
+            f"  [cyan]Update Kimi API key[/cyan] "
+            f"[dim](currently {current_state})[/dim]"
+        )
+        self.console.print(
+            "  [dim]Get a key at https://platform.moonshot.ai/console/api-keys[/dim]"
+        )
+        try:
+            api_key_input = self._secret_prompt_session.prompt(
+                [("class:prompt", "  New MOONSHOT_API_KEY [Enter clears; :keep keeps existing]: ")],
+                is_password=True,
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            self.console.print("  [dim]Cancelled.[/dim]")
+            return
+
+        api_key = self._resolve_optional_api_key_input(
+            api_key_input,
+            existing_key=existing_value,
+            default_key=existing_value,
+        )
+        if api_key:
+            cfg.set("llm.moonshot_api_key", api_key)
+            os.environ["MOONSHOT_API_KEY"] = api_key
+            self.console.print("  [green]MOONSHOT_API_KEY updated.[/green]")
+        else:
+            cfg.unset("llm.moonshot_api_key")
+            os.environ.pop("MOONSHOT_API_KEY", None)
+            self.console.print("  [green]MOONSHOT_API_KEY cleared.[/green]")
+        cfg.save()
+        self.session.config = cfg
         self.console.print(cfg.keys_table())
 
     @staticmethod

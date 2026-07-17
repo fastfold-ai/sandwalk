@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from agent.config import Config
 
-DEFAULT_RECURSION_LIMIT = 120
+# LangGraph requires a finite recursion_limit; treat "unlimited" as a huge cap.
+DEFAULT_RECURSION_LIMIT = 100_000
 MIN_RECURSION_LIMIT = 25
-MAX_RECURSION_LIMIT = 2000
+MAX_RECURSION_LIMIT = 1_000_000
+UNLIMITED_RECURSION_LIMIT = 1_000_000
 ONBOARDING_MAX_STEP = 6
 
 
@@ -22,8 +24,10 @@ def clamp_int(value: object, *, minimum: int, maximum: int, default: int) -> int
 def recursion_limit_from_config(config: Config) -> int:
     raw = config.get("agent.recursion_limit")
     if raw is None or str(raw).strip() == "":
-        max_turns = int(config.get("agent.max_sdk_turns", 30) or 30)
-        return max(MIN_RECURSION_LIMIT, max_turns * 2 + 10)
+        return DEFAULT_RECURSION_LIMIT
+    text = str(raw).strip().lower()
+    if text in {"0", "unlimited", "none", "inf", "infinite"}:
+        return UNLIMITED_RECURSION_LIMIT
     return clamp_int(
         raw,
         minimum=MIN_RECURSION_LIMIT,

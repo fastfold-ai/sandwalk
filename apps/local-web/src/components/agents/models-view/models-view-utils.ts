@@ -5,6 +5,7 @@ export const CLOUD_PROVIDERS = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'google', label: 'Google Gemini' },
   { value: 'xai', label: 'xAI (Grok)' },
+  { value: 'moonshot', label: 'Kimi' },
   { value: 'nvidia', label: 'NVIDIA' },
   { value: 'opencode', label: 'OpenCode Zen' }
 ] as const
@@ -128,6 +129,7 @@ export const LLM_API_KEY_ORDER = [
   'anthropic',
   'google',
   'xai',
+  'moonshot',
   'nvidia',
   'opencode'
 ] as const
@@ -170,6 +172,13 @@ export const LLM_API_KEY_COPY: Record<
     linkLabel: 'your xAI key',
     afterLink: ' to use Grok models at cost.',
     placeholderUnset: 'Enter your xAI API Key'
+  },
+  moonshot: {
+    title: 'Kimi API Key',
+    beforeLink: 'You can put in ',
+    linkLabel: 'your Kimi key',
+    afterLink: ' to use Kimi models at cost.',
+    placeholderUnset: 'Enter your Kimi API Key'
   },
   nvidia: {
     title: 'NVIDIA API Key',

@@ -12,7 +12,6 @@ import {
   type RuntimeDraft
 } from './runtime-view/runtime-view-fields'
 import {
-  RuntimeLangGraphSection,
   RuntimeTimeoutsSection,
   RuntimeToolCallingSection,
   RuntimeToolHealthSection,
@@ -57,12 +56,12 @@ export function AgentRuntimeView({
     setOverlay({
       phase: 'working',
       message: 'Saving runtime…',
-      description: 'Applying LangGraph and tool-calling limits.'
+      description: 'Applying tool-calling and timeout settings.'
     })
     try {
+      // Recursion limit is fixed high in the agent runtime (LangGraph requires a
+      // finite cap; no documented maximum). Do not expose or overwrite it here.
       const next = await onUpdateRuntimeSettings({
-        recursionLimit: clampInt(draft.recursionLimit, 25, 2000, 120),
-        maxSdkTurns: clampInt(draft.maxSdkTurns, 1, 500, 30),
         toolMode: draft.toolMode,
         groupToolTraces: draft.groupToolTraces,
         toolTraceDetailLimit: clampInt(draft.toolTraceDetailLimit, 1, 50, 1),
@@ -97,7 +96,7 @@ export function AgentRuntimeView({
       setOverlay({
         phase: 'done',
         message: 'Runtime saved',
-        description: 'New sessions use these limits.'
+        description: 'New sessions use these settings.'
       })
       await new Promise(resolve => setTimeout(resolve, 900))
       setOverlay(null)
@@ -129,8 +128,7 @@ export function AgentRuntimeView({
         <div>
           <h2 className="text-2xl font-semibold">Runtime</h2>
           <p className="text-muted-foreground mt-2 text-sm">
-            LangGraph loop limits, tool calling, traces, and health overrides
-            for agent runs.
+            Tool calling, traces, timeouts, and health overrides for agent runs.
           </p>
         </div>
 
@@ -140,7 +138,6 @@ export function AgentRuntimeView({
           </div>
         ) : null}
 
-        <RuntimeLangGraphSection {...sectionProps} />
         <RuntimeToolCallingSection {...sectionProps} />
         <RuntimeToolTracesSection {...sectionProps} />
         <RuntimeTimeoutsSection {...sectionProps} />
@@ -150,11 +147,6 @@ export function AgentRuntimeView({
           CLI equivalents use{' '}
           <code className="bg-muted rounded px-1 py-0.5 font-mono">
             sandwalk config set agent.&lt;key&gt; &lt;value&gt;
-          </code>
-          , e.g.{' '}
-          <code className="bg-muted rounded px-1 py-0.5 font-mono">
-            sandwalk config set agent.recursion_limit{' '}
-            {draft.recursionLimit || 120}
           </code>
           .
         </p>

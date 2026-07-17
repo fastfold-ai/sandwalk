@@ -12,6 +12,7 @@ _PROVIDER_BY_OWNER = {
     "anthropic": "Anthropic",
     "google-deepmind": "DeepMind",
     "deepmind": "DeepMind",
+    "huggingface": "Hugging Face",
     "vercel-labs": "Vercel",
 }
 

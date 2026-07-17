@@ -8,6 +8,7 @@ export const LLM_API_KEY_ORDER = [
   'anthropic',
   'google',
   'xai',
+  'moonshot',
   'nvidia',
   'opencode'
 ] as const

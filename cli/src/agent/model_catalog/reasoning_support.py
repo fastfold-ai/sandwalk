@@ -6,13 +6,35 @@ REASONING_EFFORT_LEVELS = ("low", "medium", "high")
 REASONING_EFFORT_VALUES = ("none", "low", "medium", "high")
 
 
+def compatible_profile_supports_thinking(backend: str | None) -> bool:
+    """Return True when a local OpenAI-compatible backend accepts a thinking toggle."""
+    return str(backend or "").strip().lower() == "unsloth"
+
+
+def moonshot_model_supports_thinking_toggle(model_id: str | None) -> bool:
+    """Kimi models that accept ChatMoonshot ``thinking`` on/off (not always-on)."""
+    value = str(model_id or "").strip().lower()
+    if not value:
+        return False
+    # k2.5 / k2.6 support thinking enabled/disabled. k2.7-code* and k3 do not.
+    if value.startswith("kimi-k2.7"):
+        return False
+    if value.startswith("kimi-k2.5") or value.startswith("kimi-k2.6"):
+        return True
+    return False
+
+
 def model_supports_reasoning_effort(
     provider: str | None,
     model_id: str | None,
+    *,
+    compatible_backend: str | None = None,
 ) -> bool:
     """Return True when the UI should expose Effort / Fast for this model."""
     provider_norm = str(provider or "").strip().lower()
     value = str(model_id or "").strip().lower()
+    if compatible_profile_supports_thinking(compatible_backend):
+        return True
     if not value:
         return False
     # OpenAI cloud GPT-5 / o-series reasoning models.
@@ -35,6 +57,12 @@ def model_supports_reasoning_effort(
     # xAI Grok 4.3 / 4.5 / 4.20 support reasoning_effort (see xAI Reasoning docs).
     if provider_norm == "xai":
         return xai_model_supports_reasoning_effort(value)
+    # Moonshot Kimi — only models with a real thinking toggle.
+    if provider_norm == "moonshot":
+        return moonshot_model_supports_thinking_toggle(value)
+    # Local / compatible profiles: Unsloth via ``compatible_backend``.
+    if provider_norm in {"local", "compatible", "openai-compatible"}:
+        return compatible_profile_supports_thinking(compatible_backend)
     return False
 
 
@@ -101,9 +129,13 @@ def anthropic_model_omits_temperature(model_id: str | None) -> bool:
 def reasoning_effort_options(
     provider: str | None,
     model_id: str | None,
+    *,
+    compatible_backend: str | None = None,
 ) -> list[str]:
     """Effort choices shown in the Cursor-style selector (Low/Medium/High)."""
-    if not model_supports_reasoning_effort(provider, model_id):
+    if not model_supports_reasoning_effort(
+        provider, model_id, compatible_backend=compatible_backend
+    ):
         return []
     return list(REASONING_EFFORT_LEVELS)
 

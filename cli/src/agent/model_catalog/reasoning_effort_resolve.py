@@ -105,3 +105,33 @@ def effective_xai_reasoning_effort(
     if raw == "none" and not allows_none:
         return "low"
     return raw
+
+
+def effective_moonshot_thinking(
+    *,
+    effort: str | None,
+    fast: bool = False,
+) -> bool:
+    """Map UI effort/Fast onto Moonshot ChatMoonshot ``thinking``.
+
+    Fast → thinking off; Low/Medium/High → thinking on.
+    """
+    if fast:
+        return False
+    raw = normalize_reasoning_effort(effort)
+    return raw != "none"
+
+
+def effective_unsloth_enable_thinking(
+    *,
+    effort: str | None,
+    fast: bool = False,
+) -> bool:
+    """Map UI effort/Fast onto Unsloth ``enable_thinking``.
+
+    Fast → false; Low/Medium/High → true (Unsloth default is on).
+    """
+    if fast:
+        return False
+    raw = normalize_reasoning_effort(effort)
+    return raw != "none"

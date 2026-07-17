@@ -98,6 +98,7 @@ export function useModelsViewData({
       openai: 'OpenAI',
       google: 'Gemini',
       xai: 'xAI',
+      moonshot: 'Kimi',
       nvidia: 'NVIDIA',
       opencode: 'OpenCode Zen',
       local: 'Local'

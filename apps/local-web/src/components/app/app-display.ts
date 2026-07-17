@@ -1,5 +1,6 @@
 import type { AgentSession, IntegrationSummary } from '@sandwalk/agent-ui-core'
 
+import { slugifyIntegrationRoute } from '@/components/agents/dashboard-main-view-helpers'
 import { groupSessions } from '@/lib/sessions'
 
 const CONCURRENT_RUN_SOFT_LIMIT = 3
@@ -12,17 +13,22 @@ export function resolveSelectedIntegrationKey(
   integrations: IntegrationSummary[]
 ) {
   if (!decodedIntegrationRouteName) return null
-  return (
-    integrations.find(item => {
-      const normalizedKey = item.key.toLowerCase().replace(/[_\s]+/g, '-')
-      const normalizedName = item.name.toLowerCase().replace(/[_\s]+/g, '-')
-      return (
-        item.key === decodedIntegrationRouteName ||
-        normalizedKey === normalizedIntegrationRouteName ||
-        normalizedName === normalizedIntegrationRouteName
-      )
-    })?.key ?? decodedIntegrationRouteName
-  )
+  const routeSlug =
+    slugifyIntegrationRoute(
+      normalizedIntegrationRouteName || decodedIntegrationRouteName
+    ) || decodedIntegrationRouteName
+  const matched = integrations.find(item => {
+    const keySlug = slugifyIntegrationRoute(item.key)
+    const nameSlug = slugifyIntegrationRoute(item.name)
+    return (
+      item.key === decodedIntegrationRouteName ||
+      keySlug === routeSlug ||
+      nameSlug === routeSlug
+    )
+  })
+  // Prefer a real catalog key; never return a display slug that would bounce
+  // the detail view back to the list (e.g. "moonshot-kimi" vs key "moonshot").
+  return matched?.key ?? null
 }
 
 export function computeRunningCount(sessions: AgentSession[]) {
