@@ -4,7 +4,9 @@ import { Check } from 'lucide-react'
 import { ComposerModelEffortMenu } from '@/components/agents/composer/ComposerModelEffortMenu'
 import {
   type ComposerModelOption,
+  formatContextWindow,
   formatModelEffortBadge,
+  formatPickerContextBadge,
   isComposerModelSelected
 } from '@/lib/composer-models'
 import { cn } from '@/lib/utils'
@@ -59,6 +61,7 @@ export function ComposerModelPickerOption({
     reasoningEffort: optionEffort,
     reasoningFast: optionFast
   })
+  const contextBadge = formatPickerContextBadge(option.contextWindow)
 
   const selectModel = () => {
     void onModelSelect(option.provider, option.model, option.profileId)
@@ -78,11 +81,18 @@ export function ComposerModelPickerOption({
       <button
         type="button"
         title={`${option.label}${
+          contextBadge ? ` ${contextBadge}` : ''
+        }${
           optionSupportsEffort
             ? ` ${optionEffortLabel}`
             : option.speed
               ? ` · ${option.speed}`
               : ''
+        }${
+          formatContextWindow(option.contextWindow) &&
+          !contextBadge
+            ? ` · ${formatContextWindow(option.contextWindow)} context`
+            : ''
         }`}
         className="absolute inset-0 z-0"
         aria-label={`Select ${option.label}`}
@@ -90,6 +100,11 @@ export function ComposerModelPickerOption({
       />
       <span className="pointer-events-none flex min-w-0 flex-1 items-baseline gap-1.5 truncate text-left">
         <span className="text-foreground truncate">{option.label}</span>
+        {contextBadge ? (
+          <span className="text-muted-foreground shrink-0 text-[11px]">
+            {contextBadge}
+          </span>
+        ) : null}
         {optionSupportsEffort ? (
           <span className="text-muted-foreground shrink-0 text-[11px]">
             {optionEffortLabel}

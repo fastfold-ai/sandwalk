@@ -7,15 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Interactive `/sandbox` picker aligned with the Web UI (Local + Modal CPU/GPU
+  presets) and inline base-image edit after a Modal choice.
+- CLI status bar: working-directory path and `context: N% (used/limit)` when the
+  model context window is known.
+- Curated cloud context windows (`context_windows.py`); Ollama context from
+  `/api/tags` with `/api/show` fallback; Web model picker shows a **1M** badge
+  for ≥1M windows.
+- Session sandbox status exposes `gpuImage` / `baseImage` for the active compute mode.
+
+### Changed
+
+- Prefer `sandwalk fork <share_id>` (kept `sandwalk agent fork` as an alias).
+- Interactive CLI sessions start with Plan mode **off**; `/plan` persists the toggle.
+- Removed idle status-bar “? for commands / Ctrl+O verbose” chrome and the
+  Ctrl+O verbose binding.
+
 ### Fixed
 
 - `sandwalk fork` / `sandwalk agent fork` now imports the forked chat into the
   shared SQLite store so it appears in the Web UI Agents list immediately
   (no separate `sandwalk sync` required).
-
-### Changed
-
-- Prefer `sandwalk fork <share_id>` (kept `sandwalk agent fork` as an alias).
+- Bottom-toolbar context usage no longer deadlocks on `_run_lock` (frozen prompt /
+  missing status bar).
+- Modal GPU sandboxes recreate when an existing named sandbox lacks CUDA/GPU
+  (avoids reusing a CPU `python:3.12-slim` image after switching to T4, etc.).
+- Local/OpenAI-compatible token usage extraction for Usage UI (stream usage +
+  metadata fallbacks).
 
 ## [0.0.1] - 2026-07-12
 

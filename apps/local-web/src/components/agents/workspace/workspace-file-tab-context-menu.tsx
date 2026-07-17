@@ -1,4 +1,4 @@
-import { CircleX, Download, Pencil, Trash2, X } from 'lucide-react'
+import { CircleX, Download, FolderInput, Pencil, Trash2, X } from 'lucide-react'
 
 import {
   TabContextItem,
@@ -13,6 +13,7 @@ export function WorkspaceFileTabContextMenu({
   onCloseTab,
   onCloseOtherTabs,
   onRename,
+  onMove,
   onDownload,
   onDelete
 }: {
@@ -22,6 +23,7 @@ export function WorkspaceFileTabContextMenu({
   onCloseTab: (path: string) => void
   onCloseOtherTabs: (path: string) => void
   onRename: (path: string) => void
+  onMove: (path: string) => void
   onDownload: (path: string) => void
   onDelete: (path: string) => void
 }) {
@@ -56,6 +58,15 @@ export function WorkspaceFileTabContextMenu({
           const path = menu.path
           onClose()
           onRename(path)
+        }}
+      />
+      <TabContextItem
+        icon={<FolderInput className="size-3.5" />}
+        label="Move to folder…"
+        onClick={() => {
+          const path = menu.path
+          onClose()
+          onMove(path)
         }}
       />
       <TabContextItem

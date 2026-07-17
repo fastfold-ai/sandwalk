@@ -19,6 +19,7 @@ from agent.sandbox_backend.handle import (
     register_handle,
     unregister_handle,
 )
+from agent.sandbox_backend.profile import sandbox_profile_fingerprint
 from agent.sandbox_backend.provisioning import sandbox_backend_from_config
 from agent.sandbox_backend.runtime import _run_modal_blocking
 from agent.sandbox_backend.skills_route import _compose_modal_with_local_skills
@@ -81,6 +82,7 @@ def resolve_deepagents_backend(
         register_handle(handle)
         return handle
 
+    desired_fingerprint = sandbox_profile_fingerprint(config)
     existing = get_active_handle(session_id)
     if (
         existing is not None
@@ -89,7 +91,12 @@ def resolve_deepagents_backend(
     ):
         # Idle TTL / external terminate leaves a stale in-memory handle that
         # surfaces as "Modal Sandbox … not found" on the next tool call.
-        if not _modal_handle_is_alive(existing):
+        cached_fingerprint = str(existing.extras.get("profile_fingerprint") or "")
+        if cached_fingerprint and cached_fingerprint != desired_fingerprint:
+            existing.terminate()
+            unregister_handle(session_id)
+            existing = None
+        elif not _modal_handle_is_alive(existing):
             unregister_handle(session_id)
             existing = None
         else:
@@ -119,6 +126,9 @@ def resolve_deepagents_backend(
     backend, skill_paths, skills_root = _compose_modal_with_local_skills(
         modal_backend, sources
     )
+    extras: dict[str, Any] = {"profile_fingerprint": desired_fingerprint}
+    if skills_root is not None:
+        extras["skills_root"] = str(skills_root)
     handle = SandboxHandle(
         kind="modal",
         backend=backend,
@@ -128,7 +138,7 @@ def resolve_deepagents_backend(
         provider_sandbox_name=name,
         modal_sandbox=modal_sandbox,
         seeded=False,
-        extras={"skills_root": str(skills_root)} if skills_root else {},
+        extras=extras,
     )
     # Register before sync so status APIs can report "running" immediately.
     register_handle(handle)

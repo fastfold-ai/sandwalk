@@ -214,7 +214,9 @@ export function createSessionSandboxActions({
               gpuClass: next.gpuClass,
               cpuCores: next.cpuCores,
               ramGb: next.ramGb,
-              cpuImage:
+              cpuImage: next.cpuImage,
+              gpuImage: next.gpuImage,
+              baseImage:
                 next.computeType === 'gpu' ? next.gpuImage : next.cpuImage
             }
           : current

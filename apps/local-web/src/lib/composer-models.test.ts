@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  formatContextWindow,
+  formatPickerContextBadge,
   isComposerModelSelected,
   modelOptionBadge,
   resolveComposerModelOption,
@@ -108,6 +110,7 @@ describe('toComposerModelOptions', () => {
         reasoningEffortOptions: [],
         reasoningEffort: 'medium',
         reasoningFast: false,
+        contextWindow: null,
         supportsImageInputs: false,
         supportsPdfInputs: false,
         supportsAudioInputs: false,
@@ -125,12 +128,31 @@ describe('toComposerModelOptions', () => {
         reasoningEffortOptions: [],
         reasoningEffort: 'medium',
         reasoningFast: false,
+        contextWindow: null,
         supportsImageInputs: false,
         supportsPdfInputs: false,
         supportsAudioInputs: false,
         supportsVideoInputs: false
       }
     ])
+  })
+})
+
+describe('formatPickerContextBadge', () => {
+  it('shows 1M only for mega-context models', () => {
+    expect(formatPickerContextBadge(1_000_000)).toBe('1M')
+    expect(formatPickerContextBadge(1_048_576)).toBe('1M')
+    expect(formatPickerContextBadge(1_050_000)).toBe('1M')
+    expect(formatPickerContextBadge(262_144)).toBeNull()
+    expect(formatPickerContextBadge(200_000)).toBeNull()
+    expect(formatPickerContextBadge(null)).toBeNull()
+  })
+})
+
+describe('formatContextWindow', () => {
+  it('formats sub-megabyte windows for usage UI', () => {
+    expect(formatContextWindow(262_144)).toBe('262k')
+    expect(formatContextWindow(1_050_000)).toBe('1.1M')
   })
 })
 

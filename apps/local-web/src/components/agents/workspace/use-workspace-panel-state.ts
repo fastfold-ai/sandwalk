@@ -49,6 +49,17 @@ export function useWorkspacePanelState({
     x: number
     y: number
   } | null>(null)
+  const [fileBrowserMenu, setFileBrowserMenu] = useState<{
+    path: string
+    x: number
+    y: number
+    type: 'file' | 'directory'
+  } | null>(null)
+  const [moveSourcePath, setMoveSourcePath] = useState<string | null>(null)
+  const [moveBusy, setMoveBusy] = useState(false)
+  const [renameDialogPath, setRenameDialogPath] = useState<string | null>(null)
+  const [renameDialogValue, setRenameDialogValue] = useState('')
+  const [renameDialogBusy, setRenameDialogBusy] = useState(false)
   const [renameFilePath, setRenameFilePath] = useState<string | null>(null)
   const [renameFileValue, setRenameFileValue] = useState('')
   const [renameFileBusy, setRenameFileBusy] = useState(false)
@@ -176,16 +187,19 @@ export function useWorkspacePanelState({
     () => files.filter(file => file.type === 'file'),
     [files]
   )
-  const filteredFiles = useMemo(() => {
+  const filteredEntries = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    if (!needle) return artifactFiles
-    return artifactFiles.filter(
+    if (!needle) return files
+    return files.filter(
       file =>
         file.name.toLowerCase().includes(needle) ||
         file.path.toLowerCase().includes(needle)
     )
-  }, [artifactFiles, query])
-  const groups = useMemo(() => groupArtifacts(filteredFiles), [filteredFiles])
+  }, [files, query])
+  const groups = useMemo(
+    () => groupArtifacts(filteredEntries),
+    [filteredEntries]
+  )
 
   useEffect(() => {
     setExpandedGroups(current => {
@@ -248,6 +262,18 @@ export function useWorkspacePanelState({
     setPathBusy,
     fileTabMenu,
     setFileTabMenu,
+    fileBrowserMenu,
+    setFileBrowserMenu,
+    moveSourcePath,
+    setMoveSourcePath,
+    moveBusy,
+    setMoveBusy,
+    renameDialogPath,
+    setRenameDialogPath,
+    renameDialogValue,
+    setRenameDialogValue,
+    renameDialogBusy,
+    setRenameDialogBusy,
     renameFilePath,
     setRenameFilePath,
     renameFileValue,
@@ -281,7 +307,7 @@ export function useWorkspacePanelState({
     openingPath,
     isDirty,
     artifactFiles,
-    filteredFiles,
+    filteredFiles: filteredEntries,
     groups,
     refresh,
     save,

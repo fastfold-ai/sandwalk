@@ -231,8 +231,8 @@ describe('reduceChatOnAgentEvent', () => {
         outputTokens: 4
       } as never)
     )
-    expect(state.tokenUsage).toEqual({ inputTokens: 10, outputTokens: 4 })
-    expect(state.usageByRunId['run-1']).toEqual({
+    expect(state.tokenUsage).toMatchObject({ inputTokens: 10, outputTokens: 4 })
+    expect(state.usageByRunId['run-1']).toMatchObject({
       inputTokens: 10,
       outputTokens: 4
     })
@@ -245,8 +245,8 @@ describe('reduceChatOnAgentEvent', () => {
         { runId: null }
       )
     )
-    expect(state.tokenUsage).toEqual({ inputTokens: 1, outputTokens: 2 })
-    expect(state.usageByRunId['run-1']).toEqual({
+    expect(state.tokenUsage).toMatchObject({ inputTokens: 1, outputTokens: 2 })
+    expect(state.usageByRunId['run-1']).toMatchObject({
       inputTokens: 10,
       outputTokens: 4
     })

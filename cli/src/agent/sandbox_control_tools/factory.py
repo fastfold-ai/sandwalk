@@ -34,6 +34,21 @@ def create_sandbox_control_tools(
                 "selected for this chat."
             ),
         )
+        compute_type: str | None = Field(
+            default=None,
+            description=(
+                "Optional Modal compute mode: 'cpu' or 'gpu'. Set to 'gpu' when "
+                "the user asks for a GPU / CUDA / T4 (etc.) sandbox. CUDA comes "
+                "from sandbox.gpu_image (default pytorch CUDA runtime)."
+            ),
+        )
+        gpu_class: str | None = Field(
+            default=None,
+            description=(
+                "Optional Modal GPU class when compute_type='gpu' "
+                "(e.g. T4, A10G, A100, H100, L4, L40S)."
+            ),
+        )
 
     def _sync_unsupported(**_kwargs: Any) -> str:
         raise RuntimeError("Sandbox control tools require async invocation")
@@ -56,7 +71,9 @@ def create_sandbox_control_tools(
                 "Start or attach the Modal sandbox for this chat. Use when the user "
                 "asks to start/boot/attach Modal, or when status is stopped and "
                 "Modal compute is required. Can switch the chat from Built-in to "
-                "Modal when enable_modal=true."
+                "Modal when enable_modal=true. When the user requests a GPU "
+                "(T4/A10G/…), pass compute_type='gpu' and gpu_class so the CUDA "
+                "base image is used — CPU images have no nvidia-smi."
             ),
             args_schema=StartArgs,
             func=_sync_unsupported,

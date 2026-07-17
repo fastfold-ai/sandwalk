@@ -452,6 +452,9 @@ export type SessionSandboxStatus = {
   cpuCores: number
   ramGb: number
   cpuImage: string
+  gpuImage?: string
+  /** Active base image for the current compute mode (CPU or GPU). */
+  baseImage?: string
   detail: string | null
   type?: 'sandbox_status'
   ready?: boolean
@@ -511,6 +514,8 @@ export type AgentModel = {
   supportsPdfInputs?: boolean
   supportsAudioInputs?: boolean
   supportsVideoInputs?: boolean
+  /** Effective context window when known (e.g. oMLX max_model_len). */
+  contextWindow?: number | null
 }
 
 export type CreateAgentModelInput = {

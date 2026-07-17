@@ -5,16 +5,22 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip'
+import { formatContextWindow } from '@/lib/composer-models'
 
 export function ComposerTokenUsage({
-  tokenUsage
+  tokenUsage,
+  contextWindow
 }: {
   tokenUsage: { inputTokens: number; outputTokens: number }
+  contextWindow?: number | null
 }) {
-  const usagePercent = Math.min(
-    100,
-    ((tokenUsage.inputTokens + tokenUsage.outputTokens) / 200_000) * 100
-  )
+  const maxTokens =
+    typeof contextWindow === 'number' && contextWindow > 0
+      ? contextWindow
+      : null
+  const totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens
+  const usagePercent =
+    maxTokens != null ? Math.min(100, (totalTokens / maxTokens) * 100) : null
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -38,16 +44,18 @@ export function ComposerTokenUsage({
                 stroke="hsl(var(--muted))"
                 strokeWidth="2.5"
               />
-              <circle
-                cx="12"
-                cy="12"
-                r="9"
-                fill="none"
-                stroke="hsl(var(--foreground) / 0.7)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeDasharray={`${usagePercent * 0.565} 56.5`}
-              />
+              {usagePercent != null ? (
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  fill="none"
+                  stroke="hsl(var(--foreground) / 0.7)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeDasharray={`${usagePercent * 0.565} 56.5`}
+                />
+              ) : null}
             </svg>
           </button>
         </TooltipTrigger>
@@ -60,7 +68,7 @@ export function ComposerTokenUsage({
             <div className="flex items-center justify-between gap-4">
               <span className="text-muted-foreground">Usage</span>
               <span className="font-mono tabular-nums">
-                {Math.round(usagePercent)}%
+                {usagePercent != null ? `${Math.round(usagePercent)}%` : '—'}
               </span>
             </div>
             <div className="flex items-center justify-between gap-4">
@@ -79,12 +87,17 @@ export function ComposerTokenUsage({
               <div className="flex items-center justify-between gap-4">
                 <span className="text-muted-foreground">Total</span>
                 <span className="font-mono tabular-nums">
-                  {formatTokenCount(
-                    tokenUsage.inputTokens + tokenUsage.outputTokens
-                  )}{' '}
-                  / 200k
+                  {formatTokenCount(totalTokens)}
+                  {maxTokens != null
+                    ? ` / ${formatContextWindow(maxTokens)}`
+                    : ''}
                 </span>
               </div>
+              {maxTokens == null ? (
+                <div className="text-muted-foreground/80 mt-1 text-[10px]">
+                  Context limit unknown for this model
+                </div>
+              ) : null}
             </div>
           </div>
         </TooltipContent>

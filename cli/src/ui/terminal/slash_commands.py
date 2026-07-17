@@ -12,7 +12,7 @@ SLASH_COMMANDS = {
     "/skills-upgrade": "Sync the Fastfold catalog and update installed skills",
     "/skills-remove": "Remove a globally-installed skill",
     "/specialist": "Set/list specialists (/specialist <slug> | use|clear|list|show)",
-    "/sandbox": "Sandbox backend (/sandbox builtin|modal|toggle|status)",
+    "/sandbox": "Pick Local / Modal compute presets (+ edit base image)",
     "/model": "Switch LLM model/provider interactively",
     "/settings": "Configure UI and agent preferences",
     "/config": "Show active runtime configuration",
@@ -35,7 +35,7 @@ SLASH_COMMANDS = {
     "/sync": "Import legacy CLI sessions into the shared UI database",
     "/resume": "Resume a previous session by id/index",
     "/case-study": "Run/list curated case studies (/case-study list)",
-    "/plan": "Toggle Plan mode vs Agent mode (plans/*.md; no approval gate)",
+    "/plan": "Toggle Plan mode (starts off; writes plans/*.md until Agent mode)",
     "/clear": "Clear the screen",
     "/exit": "Exit the terminal",
 }

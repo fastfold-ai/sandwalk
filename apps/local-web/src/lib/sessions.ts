@@ -7,14 +7,25 @@ import type {
 
 import type { TranscriptTool } from '@/components/agents/ToolCard'
 
+export type RunTokenUsage = {
+  inputTokens: number
+  outputTokens: number
+  tokensPerSecond?: number | null
+  promptTokensPerSecond?: number | null
+  promptEvalSeconds?: number | null
+  generationSeconds?: number | null
+  timeToFirstToken?: number | null
+  estimated?: boolean
+}
+
 export type SessionChatState = {
   messages: AgentMessage[]
   tools: TranscriptTool[]
   todosByRunId: Record<string, AgentTodo[]>
   plansByRunId: Record<string, AgentPlanCard[]>
   runIdByMessageId: Record<string, string>
-  usageByRunId: Record<string, { inputTokens: number; outputTokens: number }>
-  tokenUsage: { inputTokens: number; outputTokens: number }
+  usageByRunId: Record<string, RunTokenUsage>
+  tokenUsage: RunTokenUsage
   activeRunId: string | null
   runActive: boolean
   liveDelta: string

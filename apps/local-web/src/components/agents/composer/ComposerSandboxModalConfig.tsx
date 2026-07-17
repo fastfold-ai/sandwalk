@@ -166,7 +166,13 @@ export function ComposerSandboxModalConfig({
       <div className="text-muted-foreground space-y-0.5 px-0.5 text-[10px]">
         <span>Base image</span>
         <div className="text-foreground truncate font-mono text-[10px]">
-          {sandboxStatus?.cpuImage || 'python:3.12-slim'}
+          {sandboxDraft.computeType === 'gpu'
+            ? sandboxStatus?.baseImage ||
+              sandboxStatus?.gpuImage ||
+              'pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime'
+            : sandboxStatus?.baseImage ||
+              sandboxStatus?.cpuImage ||
+              'python:3.12-slim'}
         </div>
       </div>
     </>

@@ -14,10 +14,13 @@ import { TerminalPanel } from './TerminalPanel'
 import { WorkspaceArtifactsModal } from './WorkspaceArtifactsModal'
 import { WorkspaceFileTabsColumn } from './WorkspaceFileTabsColumn'
 import { useWorkspacePanel } from './workspace/use-workspace-panel'
+import { WorkspaceFileBrowserContextMenu } from './workspace/workspace-file-browser-context-menu'
 import { WorkspaceFileTabContextMenu } from './workspace/workspace-file-tab-context-menu'
 import {
   WorkspaceDeleteFileDialog,
-  WorkspacePathDialog
+  WorkspaceMoveFileDialog,
+  WorkspacePathDialog,
+  WorkspaceRenameDialog
 } from './workspace/workspace-panel-dialogs'
 
 export function WorkspacePanel({
@@ -85,7 +88,9 @@ export function WorkspacePanel({
       viewMode={workspace.viewMode}
       expandedGroups={workspace.expandedGroups}
       activePath={workspace.activePath}
-      empty={workspace.artifactFiles.length === 0}
+      empty={
+        workspace.artifactFiles.length === 0 && workspace.groups.length === 0
+      }
       onQueryChange={workspace.setQuery}
       onViewModeChange={workspace.setViewMode}
       onToggleGroup={id =>
@@ -101,6 +106,14 @@ export function WorkspacePanel({
       onNewFile={() => workspace.openPathDialog('file')}
       onNewFolder={() => workspace.openPathDialog('folder')}
       onRefresh={() => void workspace.refresh()}
+      onFileContextMenu={(file, x, y) =>
+        workspace.setFileBrowserMenu({
+          path: file.path,
+          x,
+          y,
+          type: file.type === 'directory' ? 'directory' : 'file'
+        })
+      }
     />
   )
 
@@ -227,8 +240,33 @@ export function WorkspacePanel({
       <WorkspaceDeleteFileDialog
         path={workspace.deleteFilePath}
         busy={workspace.deleteFileBusy}
+        isDirectory={
+          workspace.files.find(
+            item => item.path === workspace.deleteFilePath
+          )?.type === 'directory'
+        }
         onClose={() => workspace.setDeleteFilePath(null)}
         onConfirm={() => void workspace.submitDeleteFile()}
+      />
+
+      <WorkspaceMoveFileDialog
+        sourcePath={workspace.moveSourcePath}
+        folders={workspace.files
+          .filter(item => item.type === 'directory')
+          .map(item => item.path)
+          .sort((a, b) => a.localeCompare(b))}
+        busy={workspace.moveBusy}
+        onClose={workspace.closeMoveDialog}
+        onSubmit={folder => void workspace.submitMoveToFolder(folder)}
+      />
+
+      <WorkspaceRenameDialog
+        path={workspace.renameDialogPath}
+        value={workspace.renameDialogValue}
+        busy={workspace.renameDialogBusy}
+        onValueChange={workspace.setRenameDialogValue}
+        onClose={workspace.closeRenameDialog}
+        onSubmit={() => void workspace.submitRenameDialog()}
       />
 
       {workspace.fileTabMenu &&
@@ -240,10 +278,20 @@ export function WorkspacePanel({
           onCloseTab={workspace.closeTab}
           onCloseOtherTabs={workspace.closeOtherTabs}
           onRename={workspace.beginRenameFile}
+          onMove={workspace.openMoveDialog}
           onDownload={workspace.downloadFileTab}
           onDelete={workspace.setDeleteFilePath}
         />
       ) : null}
+
+      <WorkspaceFileBrowserContextMenu
+        menu={workspace.fileBrowserMenu}
+        onClose={() => workspace.setFileBrowserMenu(null)}
+        onRename={workspace.openRenameDialog}
+        onMove={workspace.openMoveDialog}
+        onDownload={workspace.downloadFile}
+        onDelete={workspace.setDeleteFilePath}
+      />
     </>
   )
 }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from agent.config import Config
-from agent.model_catalog import cloud_catalog_models
+from agent.model_catalog import cloud_catalog_models, context_window_for_model
 from agent_server.models import AgentModel
 from agent_server.models_service.helpers import _reasoning_fields
 
@@ -29,6 +29,7 @@ def _cloud_catalog_items(
                 backend=None,
                 enabled=enabled,
                 health=None,
+                context_window=context_window_for_model(model_id),
                 **_reasoning_fields(cfg, entry["provider"], model_id),
             )
         )
@@ -56,6 +57,7 @@ def _custom_model_items(
                 backend=None,
                 enabled=enabled,
                 health=None,
+                context_window=context_window_for_model(model_id),
                 **_reasoning_fields(cfg, entry["provider"], model_id),
             )
         )

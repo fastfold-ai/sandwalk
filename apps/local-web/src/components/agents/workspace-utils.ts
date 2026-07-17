@@ -121,19 +121,61 @@ export function normalizeFileContent(
   return content
 }
 
-export function groupArtifacts(files: WorkspaceFile[]): ArtifactGroup[] {
-  const onlyFiles = files.filter(file => file.type === 'file')
+/** Scaffold dirs created for every session — hide when empty. */
+const SYSTEM_TOP_LEVEL_DIRS = new Set([
+  'uploads',
+  'outputs',
+  'artifacts',
+  'plans'
+])
+
+function artifactGroupKey(path: string): string {
+  const parts = path.split('/').filter(Boolean)
+  const top = parts[0]?.toLowerCase() || ''
+  if (top === 'uploads') return 'Your uploads'
+  if (top === 'outputs') return 'Generated outputs'
+  if (parts.length > 1) return parts[0]
+  return 'Artifacts'
+}
+
+function ensureBucket(
+  buckets: Map<string, WorkspaceFile[]>,
+  key: string
+): WorkspaceFile[] {
+  const existing = buckets.get(key)
+  if (existing) return existing
+  const next: WorkspaceFile[] = []
+  buckets.set(key, next)
+  return next
+}
+
+export function groupArtifacts(entries: WorkspaceFile[]): ArtifactGroup[] {
   const buckets = new Map<string, WorkspaceFile[]>()
 
-  for (const file of onlyFiles) {
-    const parts = file.path.split('/').filter(Boolean)
-    let key = 'Artifacts'
-    if (parts[0]?.toLowerCase() === 'uploads') key = 'Your uploads'
-    else if (parts[0]?.toLowerCase() === 'outputs') key = 'Generated outputs'
-    else if (parts.length > 1) key = parts[0]
-    const bucket = buckets.get(key) || []
-    bucket.push(file)
-    buckets.set(key, bucket)
+  for (const entry of entries) {
+    const parts = entry.path.split('/').filter(Boolean)
+    if (parts.length === 0) continue
+
+    if (entry.type === 'directory') {
+      if (parts.length === 1) {
+        const top = parts[0]
+        const key =
+          top.toLowerCase() === 'uploads'
+            ? 'Your uploads'
+            : top.toLowerCase() === 'outputs'
+              ? 'Generated outputs'
+              : top
+        // Always-present scaffold folders stay hidden until they have items.
+        if (!SYSTEM_TOP_LEVEL_DIRS.has(top.toLowerCase())) {
+          ensureBucket(buckets, key)
+        }
+        continue
+      }
+      ensureBucket(buckets, artifactGroupKey(entry.path)).push(entry)
+      continue
+    }
+
+    ensureBucket(buckets, artifactGroupKey(entry.path)).push(entry)
   }
 
   const preferred = ['Your uploads', 'Generated outputs', 'Artifacts']
@@ -144,9 +186,10 @@ export function groupArtifacts(files: WorkspaceFile[]): ArtifactGroup[] {
   return keys.map(title => ({
     id: title,
     title,
-    files: (buckets.get(title) || []).sort((a, b) =>
-      a.name.localeCompare(b.name)
-    )
+    files: (buckets.get(title) || []).sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
   }))
 }
 

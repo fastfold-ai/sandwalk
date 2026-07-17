@@ -33,6 +33,9 @@ def build_openai_chat_model(config, *, temperature: float):
         is_openai_cloud and openai_model_requires_responses_api(model)
     )
     kwargs["use_responses_api"] = use_responses
+    # Ask OpenAI-compatible servers (oMLX, Ollama, Unsloth, …) to include
+    # usage on the final stream chunk so local models don't report 0 tokens.
+    kwargs["stream_usage"] = True
     if is_openai_cloud and model_supports_reasoning_effort("openai", model):
         effort, fast = get_model_reasoning(
             config.get("llm.model_reasoning"),

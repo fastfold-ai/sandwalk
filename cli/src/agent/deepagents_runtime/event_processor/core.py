@@ -101,16 +101,38 @@ class EventProcessorCoreMixin:
         totals = _usage_from_message(message)
         if not totals:
             return
+        count_keys = (
+            "input_tokens",
+            "output_tokens",
+            "cache_creation_input_tokens",
+            "cache_read_input_tokens",
+        )
         changed = False
-        for key, value in totals.items():
+        for key in count_keys:
+            value = int(totals.get(key, 0) or 0)
             if value > 0:
-                self.token_usage[key] = int(self.token_usage.get(key, 0)) + int(value)
+                self.token_usage[key] = int(self.token_usage.get(key, 0)) + value
                 changed = True
-        if changed:
-            self._emit_progress(
-                "usage",
-                input_tokens=int(self.token_usage["input_tokens"]),
-                output_tokens=int(self.token_usage["output_tokens"]),
-                cache_creation_input_tokens=int(self.token_usage["cache_creation_input_tokens"]),
-                cache_read_input_tokens=int(self.token_usage["cache_read_input_tokens"]),
-            )
+        if not changed and not totals.get("estimated"):
+            return
+        payload: dict[str, Any] = {
+            "input_tokens": int(self.token_usage["input_tokens"]),
+            "output_tokens": int(self.token_usage["output_tokens"]),
+            "cache_creation_input_tokens": int(
+                self.token_usage["cache_creation_input_tokens"]
+            ),
+            "cache_read_input_tokens": int(self.token_usage["cache_read_input_tokens"]),
+        }
+        for key in (
+            "tokens_per_second",
+            "prompt_tokens_per_second",
+            "prompt_eval_seconds",
+            "generation_seconds",
+            "time_to_first_token",
+        ):
+            value = totals.get(key)
+            if value is not None:
+                payload[key] = float(value)
+        if totals.get("estimated"):
+            payload["estimated"] = True
+        self._emit_progress("usage", **payload)

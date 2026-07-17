@@ -75,11 +75,15 @@ class _DataAndHelpMixin:
             + "\n".join(command_lines)
             + "\n\n"
             "**Shortcuts:**\n"
-            "- `Ctrl+O` — toggle verbose mode\n"
             "- `Ctrl+J` or `Alt+Enter` — insert newline (multi-line input)\n"
             "- `Tab` — accept ghost suggestion\n"
             "- `Ctrl+C` — interrupt active generation (double-tap forces stop)\n"
             "- `Ctrl+C` × 2 at idle prompt — exit\n"
+            "\n"
+            "**Tips:**\n"
+            "- `/sandbox` — pick Local or Modal CPU/GPU (same presets as the Web UI); edit base image after Modal.\n"
+            "- `/plan` — toggle Plan mode (CLI sessions start in Agent mode).\n"
+            "- Status bar shows model · specialist · sandbox · cwd · context % when known.\n"
             "\n"
             "**Examples:**\n"
             '- `find top genetically supported Parkinson targets`\n'

@@ -16,6 +16,29 @@ export type ComposerModelOption = {
   supportsPdfInputs?: boolean
   supportsAudioInputs?: boolean
   supportsVideoInputs?: boolean
+  /** Effective context window when known (local max_model_len, etc.). */
+  contextWindow?: number | null
+}
+
+/** Compact context-window label, e.g. 200_000 → "200k", 1_048_576 → "1M". */
+export function formatContextWindow(
+  window: number | null | undefined
+): string | null {
+  if (typeof window !== 'number' || window <= 0) return null
+  if (window >= 1_000_000) {
+    const millions = window / 1_000_000
+    return `${millions >= 10 || Number.isInteger(millions) ? Math.round(millions) : millions.toFixed(1)}M`
+  }
+  if (window >= 1_000) return `${Math.round(window / 1_000)}k`
+  return String(window)
+}
+
+/** Model-picker badge: only mega-context models (Cursor-style inline "1M"). */
+export function formatPickerContextBadge(
+  window: number | null | undefined
+): string | null {
+  if (typeof window !== 'number' || window < 1_000_000) return null
+  return '1M'
 }
 
 const CLOUD_PROVIDER_LABELS: Record<string, string> = {
@@ -90,6 +113,7 @@ export function toComposerModelOptions(
     supportsPdfInputs?: boolean
     supportsAudioInputs?: boolean
     supportsVideoInputs?: boolean
+    contextWindow?: number | null
   }>
 ): ComposerModelOption[] {
   return models
@@ -106,6 +130,10 @@ export function toComposerModelOptions(
       reasoningEffortOptions: model.reasoningEffortOptions || [],
       reasoningEffort: model.reasoningEffort ?? 'medium',
       reasoningFast: Boolean(model.reasoningFast),
+      contextWindow:
+        typeof model.contextWindow === 'number' && model.contextWindow > 0
+          ? model.contextWindow
+          : null,
       ...resolveMultimodalCapabilityFlags(model)
     }))
 }

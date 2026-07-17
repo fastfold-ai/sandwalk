@@ -99,10 +99,43 @@ def test_handle_sandbox_argv_status(capsys):
     console = Console(force_terminal=True, width=80)
     cfg = MagicMock()
     cfg.get.return_value = "builtin"
-    handle_sandbox_argv(["status"], console, config=cfg)
+    with patch(
+        "agent.sandbox_manage._print_local_host_info",
+        return_value=None,
+    ):
+        handle_sandbox_argv(["status"], console, config=cfg)
     out = capsys.readouterr().out
     assert "Local Sandbox" in out
     assert "builtin" in out
+
+
+def test_handle_sandbox_argv_modal_status_shows_image(capsys):
+    console = Console(force_terminal=True, width=100)
+
+    def _get(key, default=None):
+        return {
+            "agent.cli_sandbox": "modal",
+            "sandbox.compute_type": "gpu",
+            "sandbox.gpu_class": "T4",
+            "sandbox.cpu_cores": 4.0,
+            "sandbox.ram_gb": 16.0,
+            "sandbox.cpu_image": "python:3.12-slim",
+            "sandbox.gpu_image": "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
+        }.get(key, default)
+
+    cfg = MagicMock()
+    cfg.get.side_effect = _get
+    with patch(
+        "agent.sandbox_probe.modal_tokens_present",
+        return_value=(True, ""),
+    ):
+        handle_sandbox_argv(["status"], console, config=cfg)
+    out = capsys.readouterr().out
+    assert "Modal Sandbox" in out
+    assert "GPU" in out
+    assert "T4" in out
+    assert "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime" in out
+    assert "16" in out
 
 
 def test_cli_preference_keys_are_registered_in_defaults():

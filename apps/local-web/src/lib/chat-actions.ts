@@ -143,9 +143,30 @@ export function reduceChatOnAgentEvent(
 
   if (event.type === 'run.usage') {
     const payload = event.payload as Record<string, unknown>
+    const optionalNumber = (value: unknown) => {
+      if (value == null || value === '') return null
+      const number = Number(value)
+      return Number.isFinite(number) ? number : null
+    }
     const nextUsage = {
       inputTokens: Number(payload.inputTokens ?? payload.input_tokens ?? 0),
-      outputTokens: Number(payload.outputTokens ?? payload.output_tokens ?? 0)
+      outputTokens: Number(payload.outputTokens ?? payload.output_tokens ?? 0),
+      tokensPerSecond: optionalNumber(
+        payload.tokensPerSecond ?? payload.tokens_per_second
+      ),
+      promptTokensPerSecond: optionalNumber(
+        payload.promptTokensPerSecond ?? payload.prompt_tokens_per_second
+      ),
+      promptEvalSeconds: optionalNumber(
+        payload.promptEvalSeconds ?? payload.prompt_eval_seconds
+      ),
+      generationSeconds: optionalNumber(
+        payload.generationSeconds ?? payload.generation_seconds
+      ),
+      timeToFirstToken: optionalNumber(
+        payload.timeToFirstToken ?? payload.time_to_first_token
+      ),
+      estimated: Boolean(payload.estimated)
     }
     return {
       ...prev,

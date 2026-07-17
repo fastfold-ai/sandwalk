@@ -141,27 +141,13 @@ class TestTerminalKeyBindings:
 
         app.exit.assert_called_once_with(result="__EXIT__")
 
-    def test_toggle_verbose_and_mention_tabs(self):
+    def test_mention_tabs(self):
         terminal = _build_terminal_for_bindings(active_query=False)
         kb = _build_key_bindings(terminal)
         buf = _FakeBuffer(text="@")
         app = SimpleNamespace(current_buffer=buf, invalidate=MagicMock(), is_running=True)
         event = SimpleNamespace(app=app)
 
-        class _ImmediateThread:
-            def __init__(self, target=None, daemon=None):
-                self._target = target
-
-            def start(self):
-                if self._target:
-                    self._target()
-
-        with patch("ui.terminal.threading.Thread", _ImmediateThread), patch(
-            "ui.terminal.time.sleep", lambda _s: None
-        ):
-            _handler(kb, "_toggle_verbose")(event)
-
-        assert terminal.session.verbose is True
         _handler(kb, "_mention_tab_right")(event)
         assert terminal._merged_completer.mention_completer._active_tab == 1
         _handler(kb, "_mention_tab_left")(event)

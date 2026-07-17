@@ -2,14 +2,109 @@
 
 from __future__ import annotations
 
+
 class _SandboxKeysCommandsMixin:
     def _handle_sandbox_command(self, query: str) -> None:
-        """Handle /sandbox — toggle Local Sandbox vs Modal Sandbox."""
+        """Handle /sandbox — picker (like /models) or explicit args."""
         from agent.sandbox_manage import handle_sandbox_argv
 
         parts = query.strip().split()
-        handle_sandbox_argv(parts or ["status"], self.console)
+        # Bare `/sandbox` opens the same style of numbered picker as `/models`.
+        if len(parts) <= 1:
+            self._pick_sandbox()
+            return
+        handle_sandbox_argv(parts, self.console)
         self._refresh_cli_sandbox_label()
+
+    def _pick_sandbox(self) -> None:
+        """Interactive sandbox picker matching the web UI Local / Modal presets."""
+        from agent.config import Config
+        from agent.sandbox_presets import (
+            apply_sandbox_pick,
+            current_sandbox_pick_index,
+            format_current_sandbox_summary,
+            sandbox_pick_options,
+        )
+
+        cfg = getattr(self.session, "config", None) or Config.load()
+        options = sandbox_pick_options()
+        current_idx = current_sandbox_pick_index(cfg, options)
+
+        self.console.print(
+            f"\n  [cyan]Current sandbox:[/cyan] {format_current_sandbox_summary(cfg)}\n"
+        )
+        for i, option in enumerate(options, 1):
+            marker = " [green]*[/green]" if current_idx == i - 1 else "  "
+            self.console.print(
+                f"  {marker} [{i}] {option.label} [dim]— {option.detail}[/dim]"
+            )
+        self.console.print()
+
+        try:
+            choice = self._prompt_session.prompt(
+                [("class:prompt", "  Select sandbox (number): ")],
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            self.console.print("  [dim]Cancelled.[/dim]")
+            return
+
+        if not choice.isdigit() or int(choice) < 1 or int(choice) > len(options):
+            self.console.print("  [dim]Cancelled.[/dim]")
+            return
+
+        selected = options[int(choice) - 1]
+        already = current_idx is not None and int(choice) - 1 == current_idx
+        if already and selected.kind == "builtin":
+            self.console.print(f"  [dim]Already using {selected.label}.[/dim]")
+            return
+
+        if not already:
+            try:
+                label = apply_sandbox_pick(selected, cfg)
+            except RuntimeError as exc:
+                self.console.print(f"  [red]{exc}[/red]")
+                return
+            self.session.config = cfg
+            self._refresh_cli_sandbox_label()
+            self.console.print(f"  [green]Sandbox → {label}[/green] — {selected.label}")
+        else:
+            self.console.print(f"  [dim]Already using {selected.label}.[/dim]")
+
+        if selected.kind != "builtin":
+            self._prompt_sandbox_base_image(
+                cfg,
+                compute_type="gpu" if selected.kind == "modal_gpu" else "cpu",
+            )
+
+    def _prompt_sandbox_base_image(self, cfg, *, compute_type: str) -> None:
+        """Let the user edit the Modal base image inline (Enter keeps current)."""
+        from agent.sandbox_backend.profile import (
+            DEFAULT_CPU_IMAGE,
+            DEFAULT_GPU_IMAGE,
+            sandbox_image_ref,
+        )
+
+        is_gpu = str(compute_type).strip().lower() == "gpu"
+        image_key = "sandbox.gpu_image" if is_gpu else "sandbox.cpu_image"
+        default_ref = DEFAULT_GPU_IMAGE if is_gpu else DEFAULT_CPU_IMAGE
+        current = sandbox_image_ref(cfg, compute_type=compute_type)
+        try:
+            edited = self._prompt_session.prompt(
+                [("class:prompt", "  Base image (edit / Enter to keep): ")],
+                default=current,
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            self.console.print(f"  [dim]Base image:[/dim] {current}")
+            return
+
+        next_image = edited or current or default_ref
+        if next_image != current:
+            cfg.set(image_key, next_image)
+            cfg.save()
+            self.session.config = cfg
+            self.console.print(f"  [green]Base image →[/green] {next_image}")
+        else:
+            self.console.print(f"  [dim]Base image:[/dim] {next_image}")
 
     def _handle_keys_command(self, query: str) -> None:
         """Handle /keys with optional compatible-profile actions."""

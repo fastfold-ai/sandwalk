@@ -31,6 +31,7 @@ export function useWorkspaceFileActions(
     setDraft,
     setStatus,
     tabsRef,
+    files,
     pathDialog,
     setPathDialog,
     pathValue,
@@ -39,6 +40,14 @@ export function useWorkspaceFileActions(
     deleteFilePath,
     setDeleteFilePath,
     setDeleteFileBusy,
+    moveSourcePath,
+    setMoveSourcePath,
+    setMoveBusy,
+    renameDialogPath,
+    setRenameDialogPath,
+    renameDialogValue,
+    setRenameDialogValue,
+    setRenameDialogBusy,
     filesTabActive,
     setFilesTabActive,
     artifactFiles,
@@ -180,11 +189,36 @@ export function useWorkspaceFileActions(
 
   const submitDeleteFile = async () => {
     if (!deleteFilePath) return
+    const entry = files.find(item => item.path === deleteFilePath)
+    const recursive = entry?.type === 'directory'
     setDeleteFileBusy(true)
     setStatus(null)
     try {
-      await client.deleteFile(sessionId, deleteFilePath)
-      closeTab(deleteFilePath)
+      await client.deleteFile(sessionId, deleteFilePath, recursive)
+      const removed = deleteFilePath
+      const prefix = `${removed}/`
+      if (activePath === removed || activePath?.startsWith(prefix)) {
+        await flushActiveDraft()
+      }
+      const next = tabsRef.current.filter(
+        tab => tab.path !== removed && !tab.path.startsWith(prefix)
+      )
+      setTabs(next)
+      tabsRef.current = next
+      if (activePath === removed || activePath?.startsWith(prefix)) {
+        const replacement = next[0] || null
+        if (replacement) {
+          setActivePath(replacement.path)
+          setDraft(
+            replacement.encoding === 'text' ? replacement.content : ''
+          )
+          setFilesTabActive(false)
+        } else {
+          setActivePath(null)
+          setDraft('')
+          setFilesTabActive(true)
+        }
+      }
       setDeleteFilePath(null)
       await refresh()
     } catch (error) {
@@ -193,6 +227,111 @@ export function useWorkspaceFileActions(
       )
     } finally {
       setDeleteFileBusy(false)
+    }
+  }
+
+  const openMoveDialog = (path: string) => {
+    setMoveSourcePath(path)
+  }
+
+  const closeMoveDialog = () => {
+    setMoveSourcePath(null)
+  }
+
+  const submitMoveToFolder = async (targetFolder: string) => {
+    if (!moveSourcePath) return
+    const name = moveSourcePath.split('/').at(-1) || moveSourcePath
+    const targetPath = targetFolder ? `${targetFolder}/${name}` : name
+    if (targetPath === moveSourcePath) {
+      closeMoveDialog()
+      return
+    }
+    setMoveBusy(true)
+    setStatus(null)
+    const previousPath = moveSourcePath
+    const prefix = `${previousPath}/`
+    setTabs(current =>
+      current.map(tab => {
+        if (tab.path === previousPath) return { ...tab, path: targetPath }
+        if (tab.path.startsWith(prefix)) {
+          return {
+            ...tab,
+            path: `${targetPath}/${tab.path.slice(prefix.length)}`
+          }
+        }
+        return tab
+      })
+    )
+    if (activePath === previousPath) setActivePath(targetPath)
+    else if (activePath?.startsWith(prefix)) {
+      setActivePath(`${targetPath}/${activePath.slice(prefix.length)}`)
+    }
+    try {
+      await client.moveFile(sessionId, previousPath, targetPath)
+      closeMoveDialog()
+      await refresh()
+    } catch (error) {
+      setTabs(current =>
+        current.map(tab => {
+          if (tab.path === targetPath) return { ...tab, path: previousPath }
+          if (tab.path.startsWith(`${targetPath}/`)) {
+            return {
+              ...tab,
+              path: `${previousPath}/${tab.path.slice(targetPath.length + 1)}`
+            }
+          }
+          return tab
+        })
+      )
+      if (activePath === targetPath) setActivePath(previousPath)
+      setStatus(error instanceof Error ? error.message : 'Failed to move file')
+    } finally {
+      setMoveBusy(false)
+    }
+  }
+
+  const openRenameDialog = (path: string) => {
+    const tab = tabs.find(item => item.path === path)
+    if (tab) {
+      rename.beginRenameFile(path)
+      return
+    }
+    setRenameDialogPath(path)
+    setRenameDialogValue(path.split('/').at(-1) || path)
+  }
+
+  const closeRenameDialog = () => {
+    setRenameDialogPath(null)
+    setRenameDialogValue('')
+  }
+
+  const submitRenameDialog = async () => {
+    const previousPath = renameDialogPath
+    const nextName = renameDialogValue.trim()
+    if (!previousPath || !nextName) return
+    if (nextName.includes('/') || nextName.includes('\\')) {
+      setStatus('Enter a name without path separators.')
+      return
+    }
+    const slash = previousPath.lastIndexOf('/')
+    const dir = slash >= 0 ? previousPath.slice(0, slash) : ''
+    const targetPath = dir ? `${dir}/${nextName}` : nextName
+    if (targetPath === previousPath) {
+      closeRenameDialog()
+      return
+    }
+    setRenameDialogBusy(true)
+    setStatus(null)
+    try {
+      await client.moveFile(sessionId, previousPath, targetPath)
+      closeRenameDialog()
+      await refresh()
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : 'Failed to rename'
+      )
+    } finally {
+      setRenameDialogBusy(false)
     }
   }
 
@@ -250,6 +389,12 @@ export function useWorkspaceFileActions(
     cancelRenameFile: rename.cancelRenameFile,
     commitRenameFileFromBlur: rename.commitRenameFileFromBlur,
     submitDeleteFile,
+    openMoveDialog,
+    closeMoveDialog,
+    submitMoveToFolder,
+    openRenameDialog,
+    closeRenameDialog,
+    submitRenameDialog,
     selectFilesTab,
     selectFileTab,
     downloadAll,

@@ -11,7 +11,7 @@ from prompt_toolkit.key_binding import KeyBindings
 
 def _build_key_bindings(terminal):
     """Key bindings: Tab accepts ghost suggestion, Ctrl+C double-tap to exit,
-    Ctrl+O toggle verbose, Ctrl+J insert newline."""
+    Ctrl+J insert newline."""
     kb = KeyBindings()
 
     @kb.add("tab")
@@ -66,25 +66,6 @@ def _build_key_bindings(terminal):
                     pass
 
             threading.Thread(target=_clear_hint, daemon=True).start()
-
-    @kb.add("c-o")
-    def _toggle_verbose(event):
-        """Toggle verbose mode mid-session."""
-        terminal.session.verbose = not terminal.session.verbose
-        state = "ON" if terminal.session.verbose else "OFF"
-        terminal._verbose_hint = f"Verbose {state}"
-        event.app.invalidate()
-
-        def _clear_hint():
-            time.sleep(2.0)
-            terminal._verbose_hint = None
-            try:
-                if event.app.is_running:
-                    event.app.invalidate()
-            except Exception:
-                pass
-
-        threading.Thread(target=_clear_hint, daemon=True).start()
 
     @kb.add("c-j")
     def _insert_newline(event):

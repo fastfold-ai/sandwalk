@@ -1,6 +1,6 @@
 ---
 title: Command reference
-description: sandwalk CLI commands at a glance.
+description: sandwalk CLI commands and interactive slash commands.
 ---
 
 | Command | Description | Docs |
@@ -15,18 +15,34 @@ description: sandwalk CLI commands at a glance.
 | `sandwalk skills …` | Skills | [Skills](/cli/skills) |
 | `sandwalk mcp list` | MCP servers | [MCPs](/mcps) |
 | `sandwalk data …` | Local datasets | [Data](/cli/data) |
+| `sandwalk sandbox …` | Sandbox backend helpers | [Sandbox](/cli/sandbox) |
 | `sandwalk --help` | Full flag list | |
 
 ### Interactive slash commands
 
 | Slash | Description |
 |-------|-------------|
-| `/help` | List commands |
-| `/plan` | Toggle Plan mode |
+| `/help` | List commands and shortcuts |
+| `/model` | Switch model / provider |
+| `/sandbox` | Pick Local / Modal compute (+ edit base image) |
+| `/plan` | Toggle Plan mode (sessions start in Agent mode) |
+| `/specialist` | Set / clear / list specialists |
+| `/usage` | Session token and cost usage |
 | `/tools` | Browse tools |
 | `/skills` | Installed skills |
+| `/skills-add` / `/skills-find` / `/skills-upgrade` / `/skills-remove` | Skill install lifecycle |
 | `/data` | Datasets |
+| `/keys` | API key status |
+| `/mcp` | MCP servers |
+| `/model-manager` | OpenAI-compatible profiles |
+| `/doctor` | Readiness diagnostics |
+| `/interrupt` | Stop active generation (`!` to force) |
+| `/export` / `/notebook` | Export transcript / Jupyter |
+| `/new` / `/sessions` / `/resume` | Session lifecycle |
+| `/exit` | Leave the terminal |
 
 ```bash
 sandwalk --help
 ```
+
+More detail: [Terminal](/cli/terminal) · [Plan mode](/cli/plan) · [Sandbox](/cli/sandbox).

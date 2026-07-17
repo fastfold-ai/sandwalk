@@ -185,7 +185,7 @@ The composer drives every turn: model and effort, specialist, sandbox, plus `@` 
   </picture>
 </p>
 
-**Plan mode.** Switch the composer from **Agent** to **Plan** when you want a campaign design first. The agent writes `plans/<slug>.md` (steps + Mermaid), fills todos, and surfaces a **Build** action with no Y/n gate. Edit in chat, then Build or flip back to Agent. In the CLI: `/plan`.
+**Plan mode.** Switch the composer from **Agent** to **Plan** when you want a campaign design first. The agent writes `plans/<slug>.md` (steps + Mermaid), fills todos, and surfaces a **Build** action with no Y/n gate. Edit in chat, then Build or flip back to Agent. In the CLI: `/plan` (sessions start in Agent mode; the status bar shows plan mode only when on).
 
 <p align="center">
   <picture>
@@ -261,7 +261,7 @@ When the agent produces structures, plots, or reports, open them in **Artifacts*
   </picture>
 </p>
 
-Below the workspace, a multi-tab terminal follows your theme. The CLI tab mirrors interactive `sandwalk` (`/` autocomplete; model, specialist, and sandbox in the status bar).
+Below the workspace, a multi-tab terminal follows your theme. The CLI tab mirrors interactive `sandwalk` (`/` autocomplete; status bar shows model, specialist, sandbox, cwd, and context usage).
 
 <p align="center">
   <picture>
@@ -289,7 +289,7 @@ Below the workspace, a multi-tab terminal follows your theme. The CLI tab mirror
 ```bash
 sandwalk "What is known about KRAS G12C inhibitors?"
 sandwalk --smiles "CCO" "Profile this compound"
-sandwalk                 # interactive; /plan toggles Plan mode
+sandwalk                 # interactive; /sandbox picker, /plan (starts off)
 sandwalk serve           # dashboard at http://127.0.0.1:8969
 ```
 
@@ -302,6 +302,8 @@ sandwalk data list
 sandwalk doctor
 sandwalk --help
 ```
+
+Interactive highlights: `/model`, `/sandbox` (Local / Modal presets + base image), `/plan`, `/usage`. See [`cli/README.md`](cli/README.md) and the [CLI docs](https://docs.sandwalk.ai/cli/terminal) (or `docs/content/cli/`).
 
 Config and data live under `~/.sandwalk/` (legacy `~/.fastfold-cli/` / `~/.ct/` are copied once if present). On macOS, Sandwalk.app also stores server settings in Application Support.
 

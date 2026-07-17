@@ -105,6 +105,12 @@ class InteractiveTerminal(
         from ui.terminal import Console, PromptSession
 
         self.session = Session(config=config, verbose=verbose, mode="interactive")
+        # CLI sessions always start in agent mode (plan mode off). Toggle with /plan.
+        # In-memory only so we don't overwrite the web dashboard preference on disk.
+        try:
+            self.session.config.set("agent.plan_preview", False)
+        except Exception:
+            pass
         self.console = Console()
         self.history_file = CONFIG_DIR / "history"
         self.history_file.parent.mkdir(parents=True, exist_ok=True)
@@ -221,6 +227,10 @@ class InteractiveTerminal(
                     self._request_interrupt(force=True)
                 self._print_exit_with_resume_hint()
                 break
+            except KeyboardInterrupt:
+                # Ctrl+C at idle prompt — keep session alive (double-tap exits via binding).
+                self.console.print("  [dim]Interrupted.[/dim]")
+                continue
 
             # Handle double Ctrl+C exit signal from key binding
             if query == "__EXIT__":

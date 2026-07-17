@@ -46,7 +46,8 @@ export function ArtifactsBrowser({
   onUpload,
   onNewFile,
   onNewFolder,
-  onRefresh
+  onRefresh,
+  onFileContextMenu
 }: {
   client: LocalAgentClient
   sessionId: string
@@ -67,6 +68,7 @@ export function ArtifactsBrowser({
   onNewFile: () => void
   onNewFolder: () => void
   onRefresh: () => void
+  onFileContextMenu: (file: WorkspaceFile, x: number, y: number) => void
 }) {
   const scopeState = useArtifactsBrowserScope(groups, totalCount)
 
@@ -189,6 +191,7 @@ export function ArtifactsBrowser({
         onToggleGroup={onToggleGroup}
         onOpenFile={onOpenFile}
         onDownloadFile={onDownloadFile}
+        onFileContextMenu={onFileContextMenu}
       />
     </div>
   )

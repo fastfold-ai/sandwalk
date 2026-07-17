@@ -67,6 +67,9 @@ class SessionSandboxStatus(ApiModel):
     cpu_cores: float = 2.0
     ram_gb: float = 8.0
     cpu_image: str = "python:3.12-slim"
+    gpu_image: str = "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime"
+    # Active base image for the current compute mode (CPU or GPU).
+    base_image: str = "python:3.12-slim"
     detail: str | None = None
 
 

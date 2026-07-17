@@ -9,6 +9,7 @@ from agent.model_catalog.data import (
     DEFAULT_DISABLED_MODELS,
     CatalogModel,
 )
+from agent.model_catalog.context_windows import context_window_for_model
 from agent.model_catalog.lookup import (
     CATALOG_MODEL_ALIASES,
     catalog_provider_for_model,
@@ -86,6 +87,7 @@ __all__ = [
     "catalog_provider_for_model",
     "clamp_openai_reasoning_effort",
     "cloud_catalog_models",
+    "context_window_for_model",
     "effective_anthropic_effort",
     "effective_gemini_thinking_level",
     "effective_reasoning_effort",

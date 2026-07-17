@@ -1,6 +1,6 @@
 ---
 title: Plan mode
-description: Toggle Plan mode from the CLI with /plan.
+description: Toggle Plan mode from the CLI with /plan. Sessions start in Agent mode.
 ---
 
 ```bash
@@ -9,6 +9,22 @@ sandwalk
 /plan
 ```
 
-Same behavior as [Plan mode in the Web UI](/web/plan-mode): the agent writes `plans/<slug>.md`, fills todos, and you switch back to Agent (or Build in the UI) when ready. The status bar shows plan mode when active.
+## Defaults
 
-{/* TODO: examples of plan files and Build from CLI context */}
+Interactive CLI sessions **always start with Plan mode off** (Agent mode), even if Plan mode was left on in the Web UI. That keeps terminal runs executable by default.
+
+`/plan` toggles Plan ↔ Agent and saves the preference for the rest of the session. The status bar shows a mustard **plan mode** label only when Plan mode is active.
+
+## Behavior
+
+Same idea as [Plan mode in the Web UI](/web/plan-mode):
+
+- The agent drafts a campaign under `plans/<slug>.md` (steps + Mermaid flowchart).
+- Todos are filled from the plan.
+- Heavy tool execution waits until you switch back to Agent mode (`/plan` again) or continue from the Web UI **Build** action.
+
+## Related
+
+- [Terminal status bar](/cli/terminal#status-bar)
+- [Slash commands](/cli/commands)
+- Web: [Plan mode](/web/plan-mode)

@@ -47,20 +47,18 @@ def terminal():
         t._mention_completing = MagicMock(return_value=False)
         t._estimate_output_tokens_from_chars = MagicMock(return_value=3)
         t._toolbar_spinner_markup = MagicMock(return_value="[*]")
+        t._session_sdk_turn_rows = []
+        t._session_sdk_input_tokens = 0
         return t
 
 
-def test_exit_interrupt_and_verbose_hints(terminal):
+def test_exit_and_interrupt_hints(terminal):
     terminal._show_exit_hint = True
     assert "Ctrl+C again to exit" in str(terminal._bottom_toolbar())
 
     terminal._show_exit_hint = False
     terminal._show_interrupt_hint = True
     assert "Interrupt requested" in str(terminal._bottom_toolbar())
-
-    terminal._show_interrupt_hint = False
-    terminal._verbose_hint = "Verbose on"
-    assert "Verbose on" in str(terminal._bottom_toolbar())
 
 
 def test_mention_tab_bar(terminal):
@@ -106,19 +104,56 @@ def test_active_query_stale_status_and_minute_elapsed(terminal):
     assert "↓ 3 tokens" in text
 
 
-def test_idle_toolbar_verbose_plan_modal_colors(terminal):
-    terminal.session.verbose = True
+def test_idle_toolbar_plan_modal_colors(terminal):
     terminal.session.config.get.side_effect = lambda key, default=None: {
         "agent.plan_preview": True,
     }.get(key, default)
     terminal._cli_specialist_label = "Protein Designer"
     terminal._cli_sandbox_label = "Modal Sandbox"
     text = str(terminal._bottom_toolbar())
-    assert "verbose" in text
     assert "plan mode" in text
     assert "#9a7429" in text
     assert "#7fee64" in text
     assert "Protein Designer" in text
+    assert "verbose" not in text
+    assert "? for commands" not in text
+    assert "Ctrl+O" not in text
+
+
+def test_idle_toolbar_shows_folder_and_context(terminal, monkeypatch):
+    monkeypatch.setattr(
+        "ui.terminal.bottom_toolbar._short_cwd_label",
+        lambda: "~/Projects/sandwalk/cli",
+    )
+    monkeypatch.setattr(
+        "ui.terminal.bottom_toolbar.get_terminal_size",
+        lambda: type("T", (), {"columns": 120})(),
+    )
+    terminal.session.current_model = "gemini-3.1-flash-lite"
+    terminal._session_sdk_turn_rows = [{"input_tokens": 19800}]
+    with patch(
+        "agent.model_catalog.context_window_for_model",
+        return_value=1_048_576,
+    ):
+        text = str(terminal._bottom_toolbar())
+    assert "~/Projects/sandwalk/cli" in text
+    assert "context:" in text
+    assert "1M" in text or "1048.6k" in text or "1.0M" in text
+
+
+def test_toolbar_context_tokens_does_not_deadlock_on_real_lock(terminal):
+    """Regression: never call _has_active_query while holding _run_lock."""
+    import threading
+
+    terminal._run_lock = threading.Lock()
+    terminal._active_query = None
+    terminal._active_input_tokens = 0
+    terminal._session_sdk_turn_rows = [{"input_tokens": 1200}]
+    terminal._session_sdk_input_tokens = 1200
+    # Real Lock + nested acquire would hang forever; this must return promptly.
+    assert terminal._toolbar_context_used_tokens() == 1200
+    text = str(terminal._bottom_toolbar())
+    assert "gemini" in text or "Local Sandbox" in text or "sandwalk" in text
 
 
 def test_init_toolbar_animation_profile_loads_frames(terminal):

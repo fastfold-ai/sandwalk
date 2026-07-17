@@ -11,7 +11,6 @@ export function TerminalViewport({
   tabs,
   activeId,
   hostsRef,
-  onMountActive,
   onCreateTab
 }: {
   booting: boolean
@@ -19,7 +18,6 @@ export function TerminalViewport({
   tabs: PtySessionInfo[]
   activeId: string | null
   hostsRef: RefObject<Record<string, HTMLDivElement | null>>
-  onMountActive: (ptyId: string) => void
   onCreateTab: () => void
 }) {
   return (
@@ -65,7 +63,6 @@ export function TerminalViewport({
             )}
             ref={node => {
               hostsRef.current[tab.id] = node
-              if (activeId === tab.id) onMountActive(tab.id)
             }}
           />
         ))

@@ -77,6 +77,15 @@ export function useSessionChatStream({
             ...prev.runIdByMessageId,
             ...derived.runIdByMessageId
           },
+          usageByRunId: {
+            ...prev.usageByRunId,
+            ...derived.usageByRunId
+          },
+          tokenUsage:
+            derived.tokenUsage.inputTokens > 0 ||
+            derived.tokenUsage.outputTokens > 0
+              ? derived.tokenUsage
+              : prev.tokenUsage,
           messagesLoaded: true
         }))
       })

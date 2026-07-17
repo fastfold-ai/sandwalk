@@ -16,8 +16,23 @@ import {
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
-import { downloadMarkdown, formatMessagePopoverDate } from '@/lib/sessions'
+import {
+  downloadMarkdown,
+  formatMessagePopoverDate,
+  type RunTokenUsage
+} from '@/lib/sessions'
 import { cn } from '@/lib/utils'
+
+function formatSeconds(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return null
+  if (value < 1) return `${Math.round(value * 1000)}ms`
+  return `${value.toFixed(2)}s`
+}
+
+function formatTokPerSec(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value) || value <= 0) return null
+  return `${value.toFixed(1)} tok/s`
+}
 
 export function ChatTranscriptMessageEntry({
   entry,
@@ -35,7 +50,7 @@ export function ChatTranscriptMessageEntry({
   entry: Extract<TranscriptEntry, { kind: 'message' }>
   runActive: boolean
   runIdByMessageId: Record<string, string>
-  usageByRunId: Record<string, { inputTokens: number; outputTokens: number }>
+  usageByRunId: Record<string, RunTokenUsage>
   messages: AgentMessage[]
   copiedMessageId: string | null
   setCopiedMessageId: Dispatch<SetStateAction<string | null>>
@@ -111,6 +126,11 @@ export function ChatTranscriptMessageEntry({
                   <Copy className="size-3.5" />
                 )}
               </button>
+              {formatTokPerSec(messageUsage?.tokensPerSecond) ? (
+                <span className="text-muted-foreground px-1.5 font-mono text-[11px] tabular-nums">
+                  {formatTokPerSec(messageUsage?.tokensPerSecond)}
+                </span>
+              ) : null}
               <Popover>
                 <PopoverTrigger asChild>
                   <button
@@ -140,6 +160,35 @@ export function ChatTranscriptMessageEntry({
                         {(messageUsage?.outputTokens ?? 0).toLocaleString()}
                       </span>
                     </div>
+                    {messageUsage?.estimated ? (
+                      <div className="text-muted-foreground/80 mt-0.5 text-[10px]">
+                        Estimated (provider omitted usage)
+                      </div>
+                    ) : null}
+                    {formatTokPerSec(messageUsage?.tokensPerSecond) ? (
+                      <div className="mt-0.5 flex items-center justify-between gap-3">
+                        <span>Speed</span>
+                        <span className="text-foreground">
+                          {formatTokPerSec(messageUsage?.tokensPerSecond)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {formatSeconds(messageUsage?.promptEvalSeconds) ? (
+                      <div className="mt-0.5 flex items-center justify-between gap-3">
+                        <span>Prompt eval</span>
+                        <span className="text-foreground">
+                          {formatSeconds(messageUsage?.promptEvalSeconds)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {formatSeconds(messageUsage?.generationSeconds) ? (
+                      <div className="mt-0.5 flex items-center justify-between gap-3">
+                        <span>Generation</span>
+                        <span className="text-foreground">
+                          {formatSeconds(messageUsage?.generationSeconds)}
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                   <button
                     type="button"

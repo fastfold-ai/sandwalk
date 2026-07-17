@@ -111,6 +111,7 @@ class TestSettingsAndCommands:
         term.session.config.get.return_value = False
         term._toggle_plan_mode()
         term.session.config.set.assert_called_once_with("agent.plan_preview", True)
+        term.session.config.save.assert_called_once()
 
     def test_show_usage_fallback_when_no_calls(self):
         term = _mk_terminal()

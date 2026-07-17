@@ -24,6 +24,11 @@ def status_payload(status: Any) -> dict[str, Any]:
             "status": getattr(status, "status", None),
             "detail": getattr(status, "detail", None),
         }
+    compute = str(data.get("compute_type") or "cpu").strip().lower()
+    if not data.get("base_image"):
+        data["base_image"] = (
+            data.get("gpu_image") if compute == "gpu" else data.get("cpu_image")
+        )
     return data
 
 

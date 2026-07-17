@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from agent.config import OPENAI_COMPATIBLE_PROVIDERS, Config
-from agent.model_catalog import format_discovered_model_label, opencode_model_is_supported
+from agent.model_catalog import (
+    context_window_for_model,
+    format_discovered_model_label,
+    opencode_model_is_supported,
+)
 from agent_server.models import AgentModel
 from agent_server.models_service.helpers import _reasoning_fields
 
@@ -39,6 +43,7 @@ def _provider_discovered_items(
             api_key=api_key,
         )
         discovered = list(probe.get("models") or [])
+        context_windows = dict(probe.get("context_windows") or {})
         health = str(probe.get("health") or "") or None
         if not discovered:
             fallback = str(meta.get("default_model") or "").strip()
@@ -53,6 +58,7 @@ def _provider_discovered_items(
             enabled = model_id not in hidden
             if enabled_only and not enabled:
                 continue
+            context_window = context_windows.get(model_id)
             items.append(
                 AgentModel(
                     id=model_id,
@@ -64,6 +70,11 @@ def _provider_discovered_items(
                     backend=None,
                     enabled=enabled,
                     health=health,
+                    context_window=(
+                        int(context_window)
+                        if context_window
+                        else context_window_for_model(model_id)
+                    ),
                     **_reasoning_fields(cfg, provider, model_id),
                 )
             )
@@ -91,7 +102,10 @@ def _profile_discovered_items(
                 api_key=api_key,
             )
             discovered = list(probe.get("models") or [])
+            context_windows = dict(probe.get("context_windows") or {})
             health = str(probe.get("health") or "") or None
+        else:
+            context_windows = {}
         if not discovered and default_model:
             discovered = [default_model]
 
@@ -99,6 +113,7 @@ def _profile_discovered_items(
             enabled = model_id not in hidden
             if enabled_only and not enabled:
                 continue
+            context_window = context_windows.get(model_id)
             items.append(
                 AgentModel(
                     id=model_id,
@@ -110,6 +125,7 @@ def _profile_discovered_items(
                     backend=backend,
                     enabled=enabled,
                     health=health,
+                    context_window=int(context_window) if context_window else None,
                     **_reasoning_fields(cfg, "local", model_id),
                 )
             )

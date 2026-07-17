@@ -64,7 +64,20 @@ def run_interactive(
 
     console.print()
 
+    import faulthandler
+    import traceback
+
     from ui.terminal import InteractiveTerminal
 
+    # Surface native crashes (segfaults) that otherwise look like a silent exit.
+    faulthandler.enable()
+
     terminal = InteractiveTerminal(config=cfg, verbose=verbose)
-    terminal.run(initial_context=context, resume_id=resume_id)
+    try:
+        terminal.run(initial_context=context, resume_id=resume_id)
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n  [dim]Bye![/dim]")
+    except Exception:
+        console.print("\n  [red]CLI crashed with an unhandled error:[/red]")
+        console.print(traceback.format_exc())
+        raise

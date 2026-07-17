@@ -21,7 +21,10 @@ import {
   type SandboxComputeChange
 } from '@/components/agents/composer/sandbox-utils'
 import { Button } from '@/components/ui/button'
-import { type ComposerModelOption } from '@/lib/composer-models'
+import {
+  type ComposerModelOption,
+  resolveComposerModelOption
+} from '@/lib/composer-models'
 
 export function ComposerToolbar({
   running,
@@ -150,7 +153,13 @@ export function ComposerToolbar({
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
-        <ComposerTokenUsage tokenUsage={tokenUsage} />
+        <ComposerTokenUsage
+          tokenUsage={tokenUsage}
+          contextWindow={
+            resolveComposerModelOption(modelOptions, runtimeSettings)
+              ?.contextWindow
+          }
+        />
         <Button
           type={showStopButton ? 'button' : 'submit'}
           size="icon"

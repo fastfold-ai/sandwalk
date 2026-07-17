@@ -135,6 +135,10 @@ class _ModelManagerCommandMixin:
         cfg = self.session.config
         current = bool(cfg.get("agent.plan_preview", False))
         cfg.set("agent.plan_preview", not current)
+        try:
+            cfg.save()
+        except Exception:
+            pass
         if not current:
             self.console.print(
                 "  [#ff79c6]Plan mode ON[/] — write plans under workspace/plans/; "

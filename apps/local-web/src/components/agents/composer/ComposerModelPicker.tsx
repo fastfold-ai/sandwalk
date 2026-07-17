@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   type ComposerModelOption,
   formatModelEffortBadge,
+  formatPickerContextBadge,
   resolveComposerModelOption
 } from '@/lib/composer-models'
 
@@ -42,20 +43,22 @@ export function ComposerModelPicker({
   const [modelSearch, setModelSearch] = useState('')
   const [effortMenuOpen, setEffortMenuOpen] = useState(false)
 
-  const selectedModel =
+  const selectedModel: ComposerModelOption =
     resolveComposerModelOption(modelOptions, runtimeSettings) ||
     (runtimeSettings
       ? {
           provider: runtimeSettings.provider,
           model: runtimeSettings.model,
           label: runtimeSettings.model,
-          speed: ''
+          speed: '',
+          contextWindow: null
         }
       : modelOptions[0] || {
           provider: 'anthropic',
           model: '',
           label: 'Select model',
-          speed: ''
+          speed: '',
+          contextWindow: null
         })
 
   const supportsReasoningEffort = Boolean(
@@ -73,6 +76,7 @@ export function ComposerModelPicker({
         reasoningFast: selectedFast
       })
     : null
+  const contextBadge = formatPickerContextBadge(selectedModel.contextWindow)
 
   const filteredModelOptions = useMemo(() => {
     const needle = modelSearch.trim().toLowerCase()
@@ -106,12 +110,17 @@ export function ComposerModelPicker({
       <PopoverTrigger asChild>
         <button
           type="button"
-          title={`${selectedModel.label}${selectedModel.speed ? ` · ${selectedModel.speed}` : ''}${reasoningBadge ? ` · ${reasoningBadge}` : ''}`}
+          title={`${selectedModel.label}${contextBadge ? ` ${contextBadge}` : ''}${selectedModel.speed ? ` · ${selectedModel.speed}` : ''}${reasoningBadge ? ` · ${reasoningBadge}` : ''}`}
           className="text-muted-foreground hover:text-foreground inline-flex min-w-0 max-w-[min(100%,20rem)] items-center gap-1 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
         >
           <span className="min-w-0 truncate font-medium">
             {selectedModel.label}
           </span>
+          {contextBadge ? (
+            <span className="text-muted-foreground shrink-0 text-[11px]">
+              {contextBadge}
+            </span>
+          ) : null}
           {reasoningBadge ? (
             <span className="text-muted-foreground shrink-0 text-[11px]">
               {reasoningBadge}

@@ -63,7 +63,12 @@ class SandboxControlContext:
             )
         return format_status(status, summary=summary)
 
-    async def start_coro(self, enable_modal: bool = True) -> str:
+    async def start_coro(
+        self,
+        enable_modal: bool = True,
+        compute_type: str | None = None,
+        gpu_class: str | None = None,
+    ) -> str:
         if not self.sid:
             return self._missing_session()
         try:
@@ -90,6 +95,12 @@ class SandboxControlContext:
             except Exception as exc:  # noqa: BLE001
                 return f"Failed to switch chat to Modal: {exc}"
 
+        apply_error = self._apply_compute_request(
+            compute_type=compute_type, gpu_class=gpu_class
+        )
+        if apply_error:
+            return apply_error
+
         try:
             result = self.service.start(self.sid)
         except ValueError as exc:
@@ -106,11 +117,45 @@ class SandboxControlContext:
                 "Modal sandbox is running. Workspace sync may still finish in the "
                 "background; prefer `/workspace` paths for Modal compute."
             )
+            if str(getattr(result, "compute_type", "")).lower() == "gpu":
+                summary += (
+                    f" GPU={getattr(result, 'gpu_class', 'T4')}; "
+                    f"base image={getattr(result, 'base_image', '')}."
+                )
         elif state == "starting":
             summary = "Modal sandbox start requested; wait briefly then re-check status."
         else:
             summary = f"Sandbox start finished with status `{state}`."
         return format_status(result, summary=summary)
+
+    def _apply_compute_request(
+        self,
+        *,
+        compute_type: str | None,
+        gpu_class: str | None,
+    ) -> str | None:
+        """Persist optional compute_type/gpu_class before Modal start."""
+        kind = str(compute_type or "").strip().lower() or None
+        gpu = str(gpu_class or "").strip() or None
+        if kind is None and gpu is None:
+            return None
+        if kind is None and gpu is not None:
+            kind = "gpu"
+        if kind not in {"cpu", "gpu"}:
+            return "compute_type must be 'cpu' or 'gpu'."
+        try:
+            from agent_server.models.settings import UpdateSandboxSettingsRequest
+            from agent_server.sandbox_settings_service import SandboxSettingsService
+
+            SandboxSettingsService.update(
+                UpdateSandboxSettingsRequest(
+                    compute_type=kind,  # type: ignore[arg-type]
+                    gpu_class=gpu,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            return f"Failed to update sandbox compute settings: {exc}"
+        return None
 
     async def stop_coro(self) -> str:
         if not self.sid:

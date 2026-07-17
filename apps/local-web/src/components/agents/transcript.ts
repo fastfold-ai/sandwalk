@@ -171,11 +171,57 @@ export function toolsFromEvents(events: AgentEvent[]): {
   todosByRunId: Record<string, AgentTodo[]>
   plansByRunId: Record<string, AgentPlanCard[]>
   runIdByMessageId: Record<string, string>
+  usageByRunId: Record<
+    string,
+    {
+      inputTokens: number
+      outputTokens: number
+      tokensPerSecond?: number | null
+      promptTokensPerSecond?: number | null
+      promptEvalSeconds?: number | null
+      generationSeconds?: number | null
+      timeToFirstToken?: number | null
+      estimated?: boolean
+    }
+  >
+  tokenUsage: {
+    inputTokens: number
+    outputTokens: number
+    tokensPerSecond?: number | null
+    promptTokensPerSecond?: number | null
+    promptEvalSeconds?: number | null
+    generationSeconds?: number | null
+    timeToFirstToken?: number | null
+    estimated?: boolean
+  }
 } {
   const toolsById = new Map<string, TranscriptTool>()
   const todosByRunId: Record<string, AgentTodo[]> = {}
   const plansByRunId: Record<string, AgentPlanCard[]> = {}
   const runIdByMessageId: Record<string, string> = {}
+  const usageByRunId: Record<
+    string,
+    {
+      inputTokens: number
+      outputTokens: number
+      tokensPerSecond?: number | null
+      promptTokensPerSecond?: number | null
+      promptEvalSeconds?: number | null
+      generationSeconds?: number | null
+      timeToFirstToken?: number | null
+      estimated?: boolean
+    }
+  > = {}
+  let tokenUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    tokensPerSecond: null as number | null,
+    promptTokensPerSecond: null as number | null,
+    promptEvalSeconds: null as number | null,
+    generationSeconds: null as number | null,
+    timeToFirstToken: null as number | null,
+    estimated: false
+  }
 
   for (const event of events) {
     if (event.type === 'run.started' && event.runId && event.payload.messageId) {
@@ -228,6 +274,37 @@ export function toolsFromEvents(events: AgentEvent[]): {
       })
     } else if (event.type === 'todos.updated' && event.runId) {
       todosByRunId[event.runId] = event.payload.todos
+    } else if (event.type === 'run.usage' && event.runId) {
+      const payload = event.payload as Record<string, unknown>
+      const optionalNumber = (value: unknown) => {
+        if (value == null || value === '') return null
+        const number = Number(value)
+        return Number.isFinite(number) ? number : null
+      }
+      const nextUsage = {
+        inputTokens: Number(payload.inputTokens ?? payload.input_tokens ?? 0),
+        outputTokens: Number(
+          payload.outputTokens ?? payload.output_tokens ?? 0
+        ),
+        tokensPerSecond: optionalNumber(
+          payload.tokensPerSecond ?? payload.tokens_per_second
+        ),
+        promptTokensPerSecond: optionalNumber(
+          payload.promptTokensPerSecond ?? payload.prompt_tokens_per_second
+        ),
+        promptEvalSeconds: optionalNumber(
+          payload.promptEvalSeconds ?? payload.prompt_eval_seconds
+        ),
+        generationSeconds: optionalNumber(
+          payload.generationSeconds ?? payload.generation_seconds
+        ),
+        timeToFirstToken: optionalNumber(
+          payload.timeToFirstToken ?? payload.time_to_first_token
+        ),
+        estimated: Boolean(payload.estimated)
+      }
+      usageByRunId[event.runId] = nextUsage
+      tokenUsage = nextUsage
     }
   }
 
@@ -235,7 +312,9 @@ export function toolsFromEvents(events: AgentEvent[]): {
     tools: [...toolsById.values()],
     todosByRunId,
     plansByRunId,
-    runIdByMessageId
+    runIdByMessageId,
+    usageByRunId,
+    tokenUsage
   }
 }
 

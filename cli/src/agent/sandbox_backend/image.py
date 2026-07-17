@@ -17,17 +17,11 @@ def _build_modal_image(config: Any, *, compute_type: str = "cpu"):
     import modal
 
     from agent.sandbox_backend import parse_pip_packages
+    from agent.sandbox_backend.profile import sandbox_image_ref
 
     packages = parse_pip_packages(config.get("sandbox.pip_packages"))
     python_version = "3.11"
-    is_gpu = str(compute_type).strip().lower() == "gpu"
-    image_key = "sandbox.gpu_image" if is_gpu else "sandbox.cpu_image"
-    default_ref = (
-        "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime"
-        if is_gpu
-        else "python:3.12-slim"
-    )
-    ref = str(config.get(image_key) or default_ref).strip() or default_ref
+    ref = sandbox_image_ref(config, compute_type=compute_type)
     # debian_slim is Modal's helper (Image.debian_slim), not a Docker Hub tag.
     if ref in {"debian_slim", "debian-slim"}:
         image = modal.Image.debian_slim(python_version=python_version)

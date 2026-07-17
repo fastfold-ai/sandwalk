@@ -57,13 +57,14 @@ export function TerminalPanel({
   } = useTerminalPanelTabs({ client, sessionId, autoCreateOnEmpty })
 
   useEffect(() => {
+    if (booting) return
     mountActive(activeId)
-  }, [activeId, mountActive, tabs])
+  }, [activeId, booting, mountActive, tabs])
 
   useEffect(() => {
-    if (!visible || !activeId) return
+    if (!visible || !activeId || booting) return
     requestAnimationFrame(() => mountActive(activeId))
-  }, [visible, activeId, mountActive])
+  }, [visible, activeId, booting, mountActive])
 
   useEffect(() => {
     if (!activeId) return
@@ -113,7 +114,6 @@ export function TerminalPanel({
         tabs={tabs}
         activeId={activeId}
         hostsRef={hostsRef}
-        onMountActive={mountActive}
         onCreateTab={() => void createTab()}
       />
 

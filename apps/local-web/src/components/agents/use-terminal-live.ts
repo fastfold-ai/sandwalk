@@ -219,7 +219,12 @@ export function useTerminalLive({
       requestAnimationFrame(() => {
         try {
           live.fit.fit()
-          if (!renameIdRef.current) {
+          const active = document.activeElement
+          const focusOutside =
+            active instanceof HTMLElement &&
+            active !== document.body &&
+            !host.contains(active)
+          if (!renameIdRef.current && !focusOutside) {
             live.term.focus()
           }
           const dims = live.fit.proposeDimensions()

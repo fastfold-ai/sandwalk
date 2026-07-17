@@ -47,6 +47,15 @@ class SessionSandboxService:
                 detail = "Modal sandbox is not running for this chat."
         elif handle is not None and handle.kind == "builtin":
             status = "ready"
+        compute_type = str(settings.compute_type or "cpu").strip().lower() or "cpu"
+        cpu_image = str(
+            getattr(settings, "cpu_image", None) or "python:3.12-slim"
+        )
+        gpu_image = str(
+            getattr(settings, "gpu_image", None)
+            or "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime"
+        )
+        base_image = gpu_image if compute_type == "gpu" else cpu_image
         return SessionSandboxStatus(
             session_id=session_id,
             backend=backend,  # type: ignore[arg-type]
@@ -55,11 +64,13 @@ class SessionSandboxService:
             status=status,  # type: ignore[arg-type]
             provider_sandbox_name=provider_name,
             modal_configured=settings.modal_configured,
-            compute_type=settings.compute_type,
+            compute_type=compute_type,
             gpu_class=settings.gpu_class,
             cpu_cores=settings.cpu_cores,
             ram_gb=settings.ram_gb,
-            cpu_image=settings.cpu_image,
+            cpu_image=cpu_image,
+            gpu_image=gpu_image,
+            base_image=base_image,
             detail=detail,
         )
 

@@ -27,6 +27,8 @@ class AgentModel(ApiModel):
     supports_pdf_inputs: bool = False
     supports_audio_inputs: bool = False
     supports_video_inputs: bool = False
+    # Effective context window when known (e.g. oMLX max_model_len).
+    context_window: int | None = None
 
 
 class AgentModelList(ApiModel):
