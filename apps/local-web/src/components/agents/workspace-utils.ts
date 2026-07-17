@@ -149,6 +149,39 @@ function ensureBucket(
   return next
 }
 
+/** Parent directory path for a workspace entry (`a/b/c` → `a/b`). */
+export function parentDir(path: string): string {
+  const parts = path.split('/').filter(Boolean)
+  return parts.slice(0, -1).join('/')
+}
+
+/** Filesystem root path for an artifact group id/title. */
+export function groupRootPath(groupId: string): string {
+  if (groupId === 'Your uploads') return 'uploads'
+  if (groupId === 'Generated outputs') return 'outputs'
+  if (groupId === 'Artifacts') return ''
+  return groupId
+}
+
+/** Newest-first by mtime; directories before files; name as tiebreaker. */
+export function compareArtifacts(a: WorkspaceFile, b: WorkspaceFile): number {
+  if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+  const am = a.mtime ? new Date(a.mtime).getTime() : 0
+  const bm = b.mtime ? new Date(b.mtime).getTime() : 0
+  if (am !== bm) return bm - am
+  return a.name.localeCompare(b.name)
+}
+
+/** Immediate children of `parentPath` within a flat listing. */
+export function childrenOf(
+  entries: WorkspaceFile[],
+  parentPath: string
+): WorkspaceFile[] {
+  return entries
+    .filter(entry => parentDir(entry.path) === parentPath)
+    .sort(compareArtifacts)
+}
+
 export function groupArtifacts(entries: WorkspaceFile[]): ArtifactGroup[] {
   const buckets = new Map<string, WorkspaceFile[]>()
 
@@ -186,10 +219,7 @@ export function groupArtifacts(entries: WorkspaceFile[]): ArtifactGroup[] {
   return keys.map(title => ({
     id: title,
     title,
-    files: (buckets.get(title) || []).sort((a, b) => {
-      if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
-      return a.name.localeCompare(b.name)
-    })
+    files: (buckets.get(title) || []).sort(compareArtifacts)
   }))
 }
 

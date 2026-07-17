@@ -28,6 +28,8 @@ export function WorkspaceArtifactsModal({
   sessionId,
   onUpload,
   onRefresh,
+  onReload,
+  reloading = false,
   onAddToChat,
   onBuildPlan,
   onDraftChange,
@@ -45,6 +47,8 @@ export function WorkspaceArtifactsModal({
   sessionId: string
   onUpload: () => void
   onRefresh: () => void
+  onReload?: () => void
+  reloading?: boolean
   onAddToChat: (path: string) => void
   onBuildPlan?: (path: string) => void
   onDraftChange: (value: string) => void
@@ -113,6 +117,21 @@ export function WorkspaceArtifactsModal({
                     >
                       Add to chat
                     </Button>
+                    {onReload ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        title="Reload file"
+                        aria-label="Reload file"
+                        disabled={reloading}
+                        onClick={onReload}
+                      >
+                        <RefreshCw
+                          className={`size-3.5 ${reloading ? 'animate-spin' : ''}`}
+                        />
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon"

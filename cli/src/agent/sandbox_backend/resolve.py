@@ -23,6 +23,7 @@ from agent.sandbox_backend.profile import sandbox_profile_fingerprint
 from agent.sandbox_backend.provisioning import sandbox_backend_from_config
 from agent.sandbox_backend.runtime import _run_modal_blocking
 from agent.sandbox_backend.skills_route import _compose_modal_with_local_skills
+from agent.sandbox_backend.workspace_route import wrap_backend_for_host_workspace
 
 
 def _modal_handle_is_alive(handle: SandboxHandle) -> bool:
@@ -107,9 +108,15 @@ def resolve_deepagents_backend(
                     sources,
                 )
                 if skills_root is not None:
-                    existing.backend = composed
+                    existing.backend = wrap_backend_for_host_workspace(
+                        composed, workspace_root
+                    )
                     existing.skills_sources = skill_paths
                     existing.extras["skills_root"] = str(skills_root)
+            # Ensure reused handles still mirror workspace writes to the host.
+            existing.backend = wrap_backend_for_host_workspace(
+                existing.backend, workspace_root
+            )
             if sync_workspace and not existing.seeded:
                 # Never block the agent on workspace sync.
                 threading.Thread(
@@ -126,6 +133,7 @@ def resolve_deepagents_backend(
     backend, skill_paths, skills_root = _compose_modal_with_local_skills(
         modal_backend, sources
     )
+    backend = wrap_backend_for_host_workspace(backend, workspace_root)
     extras: dict[str, Any] = {"profile_fingerprint": desired_fingerprint}
     if skills_root is not None:
         extras["skills_root"] = str(skills_root)

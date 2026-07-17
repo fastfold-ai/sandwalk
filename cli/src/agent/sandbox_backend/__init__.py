@@ -46,6 +46,10 @@ from agent.sandbox_backend.skills_route import (
     _skills_filesystem_root,
     _wrap_composite_execute_for_skills,
 )
+from agent.sandbox_backend.workspace_route import (
+    wrap_backend_for_host_workspace,
+    workspace_relative_tool_path,
+)
 
 __all__ = [
     "SandboxHandle",
@@ -71,4 +75,6 @@ __all__ = [
     "sandbox_backend_from_config",
     "unregister_handle",
     "wait_until_seeded",
+    "wrap_backend_for_host_workspace",
+    "workspace_relative_tool_path",
 ]

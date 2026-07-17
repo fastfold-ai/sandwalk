@@ -7,6 +7,7 @@ export function useWorkspacePanel({
   client,
   sessionId,
   workspaceVersion = 0,
+  runActive = false,
   openPathRequest = null,
   onOpenPathRequestHandled,
   onFilesChange
@@ -14,6 +15,7 @@ export function useWorkspacePanel({
   client: LocalAgentClient
   sessionId: string
   workspaceVersion?: number
+  runActive?: boolean
   openPathRequest?: string | null
   onOpenPathRequestHandled?: () => void
   onFilesChange?: (count: number) => void
@@ -22,6 +24,7 @@ export function useWorkspacePanel({
     client,
     sessionId,
     workspaceVersion,
+    runActive,
     onFilesChange
   })
   const actions = useWorkspaceFileActions(state, {
@@ -38,6 +41,8 @@ export function useWorkspacePanel({
     draft: state.draft,
     status: state.status,
     saving: state.saving,
+    refreshing: state.refreshing,
+    reloading: state.reloading,
     isDirty: state.isDirty,
     pathDialog: state.pathDialog,
     pathValue: state.pathValue,

@@ -1,0 +1,53 @@
+"""Tests for Modal → host workspace path mirroring."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+from deepagents.backends.protocol import WriteResult
+
+from agent.sandbox_backend.workspace_route import (
+    HostWorkspaceMirrorBackend,
+    workspace_relative_tool_path,
+    wrap_backend_for_host_workspace,
+)
+
+
+def test_workspace_relative_tool_path_variants(tmp_path: Path):
+    root = tmp_path / "ws"
+    root.mkdir()
+    assert workspace_relative_tool_path(str(root / "plans" / "a.md"), root) == (
+        "plans/a.md"
+    )
+    assert workspace_relative_tool_path("/workspace/plans/a.md", root) == "plans/a.md"
+    assert workspace_relative_tool_path("plans/a.md", root) == "plans/a.md"
+    assert workspace_relative_tool_path("/skills/foo/SKILL.md", root) is None
+    assert workspace_relative_tool_path("/tmp/other.md", root) is None
+
+
+def test_mirror_write_creates_host_file(tmp_path: Path):
+    root = tmp_path / "ws"
+    root.mkdir()
+    inner = MagicMock()
+    inner.write.return_value = WriteResult(path="/workspace/plans/plan.md")
+    inner.upload_files = MagicMock()
+
+    backend = HostWorkspaceMirrorBackend(inner, root)
+    result = backend.write(str(root / "plans" / "plan.md"), "# Title\n")
+
+    assert result.error is None
+    assert Path(result.path).read_text(encoding="utf-8") == "# Title\n"
+    assert (root / "plans" / "plan.md").is_file()
+    inner.upload_files.assert_called_once()
+    uploaded_path, uploaded_bytes = inner.upload_files.call_args[0][0][0]
+    assert uploaded_path == "/workspace/plans/plan.md"
+    assert uploaded_bytes == b"# Title\n"
+
+
+def test_wrap_is_idempotent(tmp_path: Path):
+    inner = SimpleNamespace(write=MagicMock())
+    first = wrap_backend_for_host_workspace(inner, tmp_path)
+    second = wrap_backend_for_host_workspace(first, tmp_path)
+    assert first is second

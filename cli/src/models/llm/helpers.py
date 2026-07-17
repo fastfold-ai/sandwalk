@@ -21,6 +21,9 @@ def _openai_temperature_kwargs(model: str, temperature: float) -> dict[str, floa
     model_name = str(model or "").strip().lower()
     if model_name.startswith("gpt-5"):
         return {}
+    # Moonshot / Kimi reasoning models reject any temperature other than 1.
+    if model_name.startswith("kimi-"):
+        return {"temperature": 1.0}
     return {"temperature": float(temperature)}
 
 

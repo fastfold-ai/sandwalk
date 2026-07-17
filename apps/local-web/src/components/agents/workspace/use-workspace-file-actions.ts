@@ -51,6 +51,9 @@ export function useWorkspaceFileActions(
     filesTabActive,
     setFilesTabActive,
     artifactFiles,
+    isDirty,
+    draftRef,
+    setReloading,
     refresh,
     flushActiveDraft
   } = state
@@ -185,6 +188,39 @@ export function useWorkspaceFileActions(
     anchor.href = client.downloadUrl(sessionId, path)
     anchor.download = name
     anchor.click()
+  }
+
+  const reloadActiveFile = () => {
+    void (async () => {
+      const path = activePath
+      if (!path || filesTabActive) return
+      if (isDirty) {
+        setStatus('Save or discard changes before reloading')
+        return
+      }
+      setReloading(true)
+      setStatus(null)
+      try {
+        const content = normalizeFileContent(
+          await client.readFile(sessionId, path)
+        )
+        const next = tabsRef.current.map(tab =>
+          tab.path === path ? content : tab
+        )
+        setTabs(next)
+        tabsRef.current = next
+        if (activePath === path) {
+          setDraft(content.encoding === 'text' ? content.content : '')
+          draftRef.current = content.encoding === 'text' ? content.content : ''
+        }
+      } catch (error) {
+        setStatus(
+          error instanceof Error ? error.message : 'Failed to reload file'
+        )
+      } finally {
+        setReloading(false)
+      }
+    })()
   }
 
   const submitDeleteFile = async () => {
@@ -397,6 +433,7 @@ export function useWorkspaceFileActions(
     submitRenameDialog,
     selectFilesTab,
     selectFileTab,
+    reloadActiveFile,
     downloadAll,
     downloadFile,
     handleUploadChange

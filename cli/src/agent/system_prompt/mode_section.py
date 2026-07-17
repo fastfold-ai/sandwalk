@@ -11,8 +11,10 @@ You are in **Plan mode**. Do **not** execute the research campaign or run heavy
 workflows. Focus on authoring a plan the user can review.
 
 Required actions each turn that produces a plan:
-1. Create or update a markdown file under `{workspace}/plans/<descriptive-slug>.md`
-   (use `files.create_file` / `files.edit_file` or equivalent write tools).
+1. Create or update a markdown file at the **relative** workspace path
+   `plans/<descriptive-slug>.md` (or `/workspace/plans/<descriptive-slug>.md`
+   in Modal). Prefer `write_file` / `files.create_file` with that relative path —
+   do **not** invent host absolute paths under `~/.sandwalk/workspaces/...`.
 2. Call the built-in ``write_todos`` tool with the executable checklist for that plan.
 3. Reply in normal chat asking whether the plan looks good or needs edits.
    There is **no** approve/reject gate — the user switches to **Agent mode**
@@ -70,9 +72,8 @@ def build_mode_section(
     workspace_path: str | None = None,
 ) -> str:
     """Build the Agent vs Plan mode block for the system prompt."""
-    workspace = str(workspace_path or "").strip() or "<session-workspace>"
     if plan_mode:
-        return _PLAN_MODE_INSTRUCTIONS.format(workspace=workspace).rstrip() + "\n"
+        return _PLAN_MODE_INSTRUCTIONS.rstrip() + "\n"
 
     parts = [_AGENT_MODE_INSTRUCTIONS.rstrip(), ""]
     recent = list_recent_plan_files(workspace_path)

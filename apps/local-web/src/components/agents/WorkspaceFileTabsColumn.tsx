@@ -17,6 +17,7 @@ export function WorkspaceFileTabsColumn({
   editorDark,
   isDirty,
   saving,
+  reloading,
   status,
   uploadRef,
   renameFileInputRef,
@@ -37,6 +38,7 @@ export function WorkspaceFileTabsColumn({
   onBeginRenameFile,
   onDraftChange,
   onSave,
+  onReload,
   onAddToChat,
   onBuildPlan,
   onUploadChange
@@ -52,6 +54,7 @@ export function WorkspaceFileTabsColumn({
   editorDark: boolean
   isDirty: boolean
   saving: boolean
+  reloading?: boolean
   status: string | null
   uploadRef: RefObject<HTMLInputElement | null>
   renameFileInputRef: RefObject<HTMLInputElement | null>
@@ -72,6 +75,7 @@ export function WorkspaceFileTabsColumn({
   onBeginRenameFile: (path: string) => void
   onDraftChange: (value: string) => void
   onSave: () => void
+  onReload?: () => void
   onAddToChat: (path: string) => void
   onBuildPlan?: (path: string) => void
   onUploadChange: (files: FileList | null) => void
@@ -110,6 +114,7 @@ export function WorkspaceFileTabsColumn({
         editorDark={editorDark}
         isDirty={isDirty}
         saving={saving}
+        reloading={reloading}
         status={status}
         browser={browser}
         client={client}
@@ -119,6 +124,7 @@ export function WorkspaceFileTabsColumn({
         onOpenModal={onOpenModal}
         onDraftChange={onDraftChange}
         onSave={onSave}
+        onReload={onReload}
         onAddToChat={onAddToChat}
         onBuildPlan={onBuildPlan}
       />

@@ -113,7 +113,8 @@ def generate_session_title(
         title = sanitize_generated_title(response.content)
         if title:
             return title
-    except Exception:
-        logger.exception("Failed to generate session title via LLM")
+    except Exception as exc:
+        # Title generation is best-effort — never break the session for it.
+        logger.debug("Session title generation skipped: %s", exc)
 
     return fallback_title_from_query(fallback_query)

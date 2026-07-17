@@ -47,6 +47,7 @@ export function ArtifactsBrowser({
   onNewFile,
   onNewFolder,
   onRefresh,
+  refreshing = false,
   onFileContextMenu
 }: {
   client: LocalAgentClient
@@ -68,6 +69,7 @@ export function ArtifactsBrowser({
   onNewFile: () => void
   onNewFolder: () => void
   onRefresh: () => void
+  refreshing?: boolean
   onFileContextMenu: (file: WorkspaceFile, x: number, y: number) => void
 }) {
   const scopeState = useArtifactsBrowserScope(groups, totalCount)
@@ -120,6 +122,20 @@ export function ArtifactsBrowser({
             onClick={() => onViewModeChange('list')}
           >
             <List className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-6"
+            title="Refresh artifacts"
+            aria-label="Refresh artifacts"
+            disabled={refreshing}
+            onClick={onRefresh}
+          >
+            <RefreshCw
+              className={cn('size-3.5', refreshing && 'animate-spin')}
+            />
           </Button>
           <Popover>
             <PopoverTrigger asChild>
@@ -188,6 +204,7 @@ export function ArtifactsBrowser({
         expandedGroups={expandedGroups}
         activePath={activePath}
         empty={empty}
+        searchActive={query.trim().length > 0}
         onToggleGroup={onToggleGroup}
         onOpenFile={onOpenFile}
         onDownloadFile={onDownloadFile}

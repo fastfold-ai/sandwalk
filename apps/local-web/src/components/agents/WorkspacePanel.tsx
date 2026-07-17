@@ -27,6 +27,7 @@ export function WorkspacePanel({
   client,
   sessionId,
   workspaceVersion = 0,
+  runActive = false,
   openPathRequest = null,
   onOpenPathRequestHandled,
   onAddToChat,
@@ -40,6 +41,7 @@ export function WorkspacePanel({
   client: LocalAgentClient
   sessionId: string
   workspaceVersion?: number
+  runActive?: boolean
   /** When set, open this workspace path in a preview tab. */
   openPathRequest?: string | null
   onOpenPathRequestHandled?: () => void
@@ -55,6 +57,7 @@ export function WorkspacePanel({
     client,
     sessionId,
     workspaceVersion,
+    runActive,
     openPathRequest,
     onOpenPathRequestHandled,
     onFilesChange
@@ -106,6 +109,7 @@ export function WorkspacePanel({
       onNewFile={() => workspace.openPathDialog('file')}
       onNewFolder={() => workspace.openPathDialog('folder')}
       onRefresh={() => void workspace.refresh()}
+      refreshing={workspace.refreshing}
       onFileContextMenu={(file, x, y) =>
         workspace.setFileBrowserMenu({
           path: file.path,
@@ -130,6 +134,7 @@ export function WorkspacePanel({
       editorDark={workspace.editorDark}
       isDirty={workspace.isDirty}
       saving={workspace.saving}
+      reloading={workspace.reloading}
       status={workspace.status}
       uploadRef={workspace.uploadRef}
       renameFileInputRef={workspace.renameFileInputRef}
@@ -152,6 +157,7 @@ export function WorkspacePanel({
       onBeginRenameFile={workspace.beginRenameFile}
       onDraftChange={workspace.setDraft}
       onSave={() => void workspace.save()}
+      onReload={workspace.reloadActiveFile}
       onAddToChat={onAddToChat}
       onBuildPlan={onBuildPlan}
       onUploadChange={workspace.handleUploadChange}
@@ -222,6 +228,8 @@ export function WorkspacePanel({
         sessionId={sessionId}
         onUpload={() => workspace.uploadRef.current?.click()}
         onRefresh={() => void workspace.refresh()}
+        onReload={workspace.reloadActiveFile}
+        reloading={workspace.reloading}
         onAddToChat={onAddToChat}
         onBuildPlan={onBuildPlan}
         onDraftChange={workspace.setDraft}

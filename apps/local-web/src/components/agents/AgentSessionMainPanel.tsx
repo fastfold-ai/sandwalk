@@ -268,6 +268,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 client={client}
                 sessionId={sessionId}
                 workspaceVersion={workspaceVersion}
+                runActive={runActive}
                 openPathRequest={pendingOpenPath}
                 onOpenPathRequestHandled={() => setPendingOpenPath(null)}
                 onAddToChat={path => {

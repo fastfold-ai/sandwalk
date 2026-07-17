@@ -17,6 +17,7 @@ export function WorkspaceFileContentArea({
   editorDark,
   isDirty,
   saving,
+  reloading,
   status,
   browser,
   client,
@@ -26,6 +27,7 @@ export function WorkspaceFileContentArea({
   onOpenModal,
   onDraftChange,
   onSave,
+  onReload,
   onAddToChat,
   onBuildPlan
 }: {
@@ -37,6 +39,7 @@ export function WorkspaceFileContentArea({
   editorDark: boolean
   isDirty: boolean
   saving: boolean
+  reloading?: boolean
   status: string | null
   browser: ReactNode
   client: LocalAgentClient
@@ -46,6 +49,7 @@ export function WorkspaceFileContentArea({
   onOpenModal: () => void
   onDraftChange: (value: string) => void
   onSave: () => void
+  onReload?: () => void
   onAddToChat: (path: string) => void
   onBuildPlan?: (path: string) => void
 }) {
@@ -70,9 +74,11 @@ export function WorkspaceFileContentArea({
           canSave={active.encoding === 'text' && !isStructure(active.path)}
           dirty={isDirty}
           saving={saving}
+          reloading={reloading}
           downloadUrl={client.downloadUrl(sessionId, active.path)}
           onAddToChat={() => onAddToChat(active.path)}
           onSave={onSave}
+          onReload={onReload}
           onExpand={onOpenModal}
           onClose={() => onCloseTab(active.path)}
         />
@@ -102,6 +108,7 @@ export function WorkspaceFileContentArea({
         canSave={false}
         dirty={false}
         saving={false}
+        reloading={reloading}
         downloadUrl={
           openingPath || activePath
             ? client.downloadUrl(sessionId, openingPath || activePath!)
@@ -111,6 +118,7 @@ export function WorkspaceFileContentArea({
           if (activePath) onAddToChat(activePath)
         }}
         onSave={() => undefined}
+        onReload={onReload}
         onExpand={onOpenModal}
         onClose={() => {
           if (activePath) onCloseTab(activePath)

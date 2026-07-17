@@ -44,7 +44,8 @@ def build_moonshot_chat_model(config, *, temperature: float):
     # k3 always reasons; only supported effort is ``max``.
     if model_lower.startswith("kimi-k3"):
         kwargs["reasoning_effort"] = "max"
-        # Temperature is fixed at 1.0 for k3 — omit custom sampling.
+        # API rejects any temperature other than 1.0 for k3.
+        kwargs["temperature"] = 1.0
     elif moonshot_model_supports_thinking_toggle(model):
         effort, fast = get_model_reasoning(
             config.get("llm.model_reasoning"),

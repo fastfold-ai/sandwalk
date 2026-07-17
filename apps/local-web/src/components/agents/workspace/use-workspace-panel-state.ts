@@ -18,15 +18,20 @@ import { useWorkspaceFileSave } from './use-workspace-file-save'
 
 export type WorkspacePanelState = ReturnType<typeof useWorkspacePanelState>
 
+const WORKSPACE_POLL_MS = 5000
+
 export function useWorkspacePanelState({
   client,
   sessionId,
   workspaceVersion = 0,
+  runActive = false,
   onFilesChange
 }: {
   client: LocalAgentClient
   sessionId: string
   workspaceVersion?: number
+  /** When true, poll the artifacts list so files appear as the agent writes them. */
+  runActive?: boolean
   onFilesChange?: (count: number) => void
 }) {
   const [files, setFiles] = useState<WorkspaceFile[]>([])
@@ -35,12 +40,16 @@ export function useWorkspacePanelState({
   const [draft, setDraft] = useState('')
   const [status, setStatus] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [reloading, setReloading] = useState(false)
   const draftRef = useRef(draft)
   const savingRef = useRef(false)
   const tabsRef = useRef(tabs)
+  const activePathRef = useRef(activePath)
   draftRef.current = draft
   savingRef.current = saving
   tabsRef.current = tabs
+  activePathRef.current = activePath
   const [pathDialog, setPathDialog] = useState<'file' | 'folder' | null>(null)
   const [pathValue, setPathValue] = useState('')
   const [pathBusy, setPathBusy] = useState(false)
@@ -108,15 +117,74 @@ export function useWorkspacePanelState({
     return () => observer.disconnect()
   }, [])
 
-  const refresh = useCallback(async () => {
-    const next = await client.listFiles(sessionId)
-    setFiles(next)
-    onFilesChange?.(next.filter(file => file.type === 'file').length)
+  const refresh = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setRefreshing(true)
+    try {
+      const next = await client.listFiles(sessionId)
+      setFiles(next)
+      onFilesChange?.(next.filter(file => file.type === 'file').length)
+    } finally {
+      if (!options?.silent) setRefreshing(false)
+    }
   }, [client, onFilesChange, sessionId])
+
+  /** Reload open tabs from disk, skipping the active tab when it has unsaved edits. */
+  const softReloadOpenTabs = useCallback(async () => {
+    const open = tabsRef.current
+    if (open.length === 0) return
+    const path = activePathRef.current
+    const next: WorkspaceFileContent[] = []
+    let changed = false
+    for (const tab of open) {
+      const isActive = tab.path === path
+      if (
+        isActive &&
+        tab.encoding === 'text' &&
+        !isStructure(tab.path) &&
+        draftRef.current !== tab.content
+      ) {
+        next.push(tab)
+        continue
+      }
+      try {
+        const content = normalizeFileContent(
+          await client.readFile(sessionId, tab.path)
+        )
+        if (
+          content.content !== tab.content ||
+          content.encoding !== tab.encoding
+        ) {
+          changed = true
+          next.push(content)
+          if (isActive && content.encoding === 'text') {
+            setDraft(content.content)
+          }
+        } else {
+          next.push(tab)
+        }
+      } catch {
+        next.push(tab)
+      }
+    }
+    if (!changed) return
+    setTabs(next)
+    tabsRef.current = next
+  }, [client, sessionId])
 
   useEffect(() => {
     void refresh()
   }, [refresh, workspaceVersion])
+
+  useEffect(() => {
+    if (!runActive) return
+    const timer = window.setInterval(() => {
+      void (async () => {
+        await refresh({ silent: true })
+        await softReloadOpenTabs()
+      })()
+    }, WORKSPACE_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [refresh, runActive, softReloadOpenTabs])
 
   useEffect(() => {
     let cancelled = false
@@ -252,6 +320,9 @@ export function useWorkspacePanelState({
     status,
     setStatus,
     saving,
+    refreshing,
+    reloading,
+    setReloading,
     draftRef,
     tabsRef,
     pathDialog,

@@ -13,7 +13,7 @@ def test_build_mode_section_plan_requires_mermaid_and_todos():
     assert "write_todos" in text
     assert "```mermaid" in text
     assert "flowchart TD" in text
-    assert "/tmp/ws/plans" in text
+    assert "plans/<descriptive-slug>.md" in text
     assert "Do not execute the plan" in text
 
 

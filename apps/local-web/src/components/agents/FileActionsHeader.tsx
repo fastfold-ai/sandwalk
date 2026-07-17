@@ -4,6 +4,7 @@ import {
   Eye,
   MessageSquarePlus,
   MoreHorizontal,
+  RefreshCw,
   Save,
   X
 } from 'lucide-react'
@@ -20,9 +21,11 @@ export function FileActionsHeader({
   canSave,
   dirty,
   saving,
+  reloading,
   downloadUrl,
   onAddToChat,
   onSave,
+  onReload,
   onExpand,
   onClose
 }: {
@@ -30,9 +33,11 @@ export function FileActionsHeader({
   canSave: boolean
   dirty?: boolean
   saving?: boolean
+  reloading?: boolean
   downloadUrl: string
   onAddToChat: () => void
   onSave: () => void
+  onReload?: () => void
   onExpand: () => void
   onClose: () => void
 }) {
@@ -91,6 +96,19 @@ export function FileActionsHeader({
               <Copy className="size-3.5" />
               Copy path
             </button>
+            {onReload ? (
+              <button
+                type="button"
+                className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm disabled:opacity-40"
+                disabled={reloading}
+                onClick={onReload}
+              >
+                <RefreshCw
+                  className={`size-3.5 ${reloading ? 'animate-spin' : ''}`}
+                />
+                Reload
+              </button>
+            ) : null}
             <a
               href={downloadUrl}
               download
@@ -109,6 +127,22 @@ export function FileActionsHeader({
             </button>
           </PopoverContent>
         </Popover>
+        {onReload ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            title="Reload file"
+            aria-label="Reload file"
+            disabled={reloading}
+            onClick={onReload}
+          >
+            <RefreshCw
+              className={`size-3.5 ${reloading ? 'animate-spin' : ''}`}
+            />
+          </Button>
+        ) : null}
         <Button variant="ghost" size="icon" className="size-7" asChild>
           <a href={downloadUrl} download title="Download">
             <Download className="size-3.5" />

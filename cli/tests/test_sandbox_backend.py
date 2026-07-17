@@ -182,8 +182,11 @@ def test_resolve_modal_mocked(tmp_path: Path):
     # Skills are routed locally via CompositeBackend — not uploaded to Modal.
     from deepagents.backends import CompositeBackend
 
-    assert isinstance(handle.backend, CompositeBackend)
-    assert handle.backend.default is fake_backend
+    from agent.sandbox_backend.workspace_route import HostWorkspaceMirrorBackend
+
+    assert isinstance(handle.backend, HostWorkspaceMirrorBackend)
+    assert isinstance(handle.backend._inner, CompositeBackend)
+    assert handle.backend._inner.default is fake_backend
     assert fake_backend.upload_files.called  # workspace push only
     # seed_skills must not run: no /skills/ uploads beyond workspace files
     uploaded_paths = []
