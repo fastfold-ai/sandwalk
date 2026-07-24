@@ -35,11 +35,11 @@ export type TranscriptEntry =
 
 export function buildConversationTimeline({
   messages,
-  tools,
+  tools: allTools,
   todosByRunId,
   plansByRunId,
   runIdByMessageId,
-  activeRunId: _activeRunId = null
+  activeRunId = null
 }: {
   messages: AgentMessage[]
   tools: TranscriptTool[]
@@ -48,6 +48,13 @@ export function buildConversationTimeline({
   runIdByMessageId?: Record<string, string> | null
   activeRunId?: string | null
 }): TranscriptEntry[] {
+  // The active run's unassigned tools render in the live stack below the
+  // timeline; anchoring them here too showed each card twice (a "mirror"
+  // stuck under the run's user message until the run settled).
+  const tools = allTools.filter(
+    tool =>
+      !(activeRunId && tool.runId === activeRunId && !tool.messageId)
+  )
   const timeline: TranscriptEntry[] = []
   const usedToolIds = new Set<string>()
   const todosMap = todosByRunId ?? {}

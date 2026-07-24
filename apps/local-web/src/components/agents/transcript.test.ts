@@ -105,6 +105,38 @@ describe('buildConversationTimeline', () => {
     ])
   })
 
+  it('excludes the active run’s unassigned tools (they render in the live stack)', () => {
+    const user = msg({ id: 'u1', role: 'user', content: 'run it' })
+    const tools = [
+      tool({
+        id: 't-live',
+        runId: 'run-live',
+        messageId: null,
+        status: 'pending',
+        name: 'run_python'
+      }),
+      tool({
+        id: 't-live-done',
+        runId: 'run-live',
+        messageId: null,
+        status: 'completed',
+        name: 'shell.run'
+      })
+    ]
+    const timeline = buildConversationTimeline({
+      messages: [user],
+      tools,
+      todosByRunId: {},
+      plansByRunId: {},
+      runIdByMessageId: { u1: 'run-live' },
+      activeRunId: 'run-live'
+    })
+    // No mirrored tool cards under the user message while the run is live.
+    expect(timeline).toEqual([
+      { kind: 'message', message: user, content: 'run it' }
+    ])
+  })
+
   it('splits thoughts, attaches tools by message/run, and appends todos', () => {
     const assistant = msg({
       id: 'a1',
