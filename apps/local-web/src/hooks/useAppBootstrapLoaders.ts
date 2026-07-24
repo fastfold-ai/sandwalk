@@ -52,7 +52,9 @@ export function useAppBootstrapLoaders({
   const loadSkillsRef = useRef<(() => Promise<void>) | null>(null)
   const sessionPreviewsRef = useRef<Record<string, string>>({})
   const previewInFlightRef = useRef(new Set<string>())
+  const specialistsRef = useRef(specialists)
   sessionPreviewsRef.current = sessionPreviews
+  specialistsRef.current = specialists
 
   const loadSessions = useCallback(async () => {
     const key = `sessions:${client.baseUrl}`
@@ -193,7 +195,8 @@ export function useAppBootstrapLoaders({
   }, [loadMcpCatalog, loadMcpServers])
 
   const loadSpecialists = useCallback(async () => {
-    setSpecialistsLoading(true)
+    // Only skeleton when we have nothing to show — avoids list flicker on refresh/toggle.
+    if (specialistsRef.current.length === 0) setSpecialistsLoading(true)
     try {
       setSpecialists(
         await dedupeAsync(`specialists:${client.baseUrl}`, () =>

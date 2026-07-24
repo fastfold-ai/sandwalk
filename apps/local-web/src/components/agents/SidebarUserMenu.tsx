@@ -26,6 +26,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { openInSystemBrowser } from '@/lib/desktop'
 import {
   getStoredPalette,
   getStoredTheme,
@@ -49,7 +50,7 @@ function userInitials(name: string) {
 }
 
 function openExternal(url: string) {
-  window.open(url, '_blank', 'noopener,noreferrer')
+  void openInSystemBrowser(url)
 }
 
 export function SidebarUserMenu({

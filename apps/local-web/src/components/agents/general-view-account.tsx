@@ -4,6 +4,9 @@ import { useNavigate } from 'react-router-dom'
 
 import { SettingsBlockSkeleton } from '@/components/agents/PageSkeletons'
 import { Button } from '@/components/ui/button'
+import { openInSystemBrowser } from '@/lib/desktop'
+
+const FASTFOLD_CLOUD_URL = 'https://cloud.fastfold.ai/'
 
 export function GeneralViewAccountSection({
   loading,
@@ -56,20 +59,15 @@ export function GeneralViewAccountSection({
               </div>
               <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                 <span>{planLabel || 'Plan unknown'}</span>
-                {account?.billingUrl ? (
-                  <>
-                    <span aria-hidden>·</span>
-                    <a
-                      href={account.billingUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-blue-600 inline-flex items-center gap-1 hover:underline dark:text-blue-400"
-                    >
-                      Manage billing
-                      <ExternalLink className="size-3.5" />
-                    </a>
-                  </>
-                ) : null}
+                <span aria-hidden>·</span>
+                <button
+                  type="button"
+                  className="text-blue-600 inline-flex items-center gap-1 hover:underline dark:text-blue-400"
+                  onClick={() => void openInSystemBrowser(FASTFOLD_CLOUD_URL)}
+                >
+                  Fastfold AI Cloud
+                  <ExternalLink className="size-3.5" />
+                </button>
               </div>
             </div>
             <Button

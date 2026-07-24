@@ -169,6 +169,17 @@ export const toggleMaximize = () => invoke<boolean>('toggle_maximize')
 export const openExternalUrl = (url: string) =>
   invokeStrict<void>('open_external_url', { url })
 
+/** Open any http(s) URL in the system browser (Tauri) or a new tab (web). */
+export async function openInSystemBrowser(url: string): Promise<void> {
+  const trimmed = url.trim()
+  if (!trimmed) return
+  if (isTauri()) {
+    await openExternalUrl(trimmed)
+    return
+  }
+  window.open(trimmed, '_blank', 'noopener,noreferrer')
+}
+
 /**
  * Resolve the supervised web dashboard URL (browser UI), then open it externally
  * when running in Tauri; otherwise open a new tab.
@@ -185,11 +196,7 @@ export async function openWebUiInBrowser(backendUrl?: string | null): Promise<vo
   if (!url) {
     url = fallbackWebUiUrl(backendUrl)
   }
-  if (isTauri()) {
-    await openExternalUrl(url)
-    return
-  }
-  window.open(url, '_blank', 'noopener,noreferrer')
+  await openInSystemBrowser(url)
 }
 
 function fallbackWebUiUrl(backendUrl?: string | null): string {

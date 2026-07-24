@@ -11,6 +11,7 @@ export function DashboardMainSpecialistsPanel({
   mcpServers,
   mcpCatalog,
   specialistsLoading,
+  connecting,
   loadSpecialists,
   loadSkills
 }: Pick<
@@ -24,6 +25,7 @@ export function DashboardMainSpecialistsPanel({
   | 'mcpServers'
   | 'mcpCatalog'
   | 'specialistsLoading'
+  | 'connecting'
   | 'loadSpecialists'
   | 'loadSkills'
 >) {
@@ -35,7 +37,7 @@ export function DashboardMainSpecialistsPanel({
       skills={skills}
       mcpServers={mcpServers}
       mcpCatalog={mcpCatalog}
-      loading={specialistsLoading}
+      loading={specialistsLoading || (connecting && specialists.length === 0)}
       onRefresh={loadSpecialists}
       onCreate={input => client.createSpecialist(input)}
       onUpdate={(id, input) => client.updateSpecialist(id, input)}
