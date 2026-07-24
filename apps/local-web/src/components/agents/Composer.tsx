@@ -1,3 +1,4 @@
+import { Upload } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
@@ -22,6 +23,7 @@ import {
   useComposerDraftState,
   useComposerMentionFocus
 } from '@/components/agents/composer/useComposerDraftState'
+import { useComposerFileDrop } from '@/components/agents/composer/useComposerFileDrop'
 import { parseComposerParts } from '@/components/agents/composer-parts'
 import { cn } from '@/lib/utils'
 
@@ -92,6 +94,10 @@ export function Composer({
     hasReadyAttachments,
     isUploading
   } = useComposerAttachments(onUpload, focusKey)
+
+  const { dragging, dropHandlers } = useComposerFileDrop(files => {
+    void addFiles(files)
+  })
 
   useComposerMentionFocus(
     draftState.slashOpen,
@@ -181,17 +187,7 @@ export function Composer({
             event.preventDefault()
             handleSend()
           }}
-          onDragOver={event => {
-            event.preventDefault()
-            event.stopPropagation()
-          }}
-          onDrop={event => {
-            event.preventDefault()
-            event.stopPropagation()
-            if (event.dataTransfer.files?.length) {
-              void addFiles(event.dataTransfer.files)
-            }
-          }}
+          {...dropHandlers}
           onPaste={event => {
             const files = Array.from(event.clipboardData?.files || [])
             if (files.length === 0) return
@@ -199,11 +195,23 @@ export function Composer({
             void addFiles(files)
           }}
           className={cn(
-            'bg-card focus-within:border-muted-foreground/40 border-border rounded-3xl border p-2 shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',
+            'bg-card focus-within:border-muted-foreground/40 border-border relative rounded-3xl border p-2 shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',
+            dragging && 'border-sky-500/60 ring-2 ring-sky-500/20',
             editingQueued &&
               'rounded-t-none border-x-0 border-b-0 border-t border-sky-500/25 shadow-none focus-within:border-sky-500/40'
           )}
         >
+          {dragging ? (
+            <div
+              className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 rounded-[inherit] bg-sky-500/10 backdrop-blur-[1px]"
+              aria-hidden
+            >
+              <Upload className="size-6 text-sky-700 dark:text-sky-300" />
+              <p className="text-sm font-medium text-sky-800 dark:text-sky-200">
+                Drop to upload
+              </p>
+            </div>
+          ) : null}
           <ComposerAttachments
             attachments={attachments}
             onRemove={removeAttachment}

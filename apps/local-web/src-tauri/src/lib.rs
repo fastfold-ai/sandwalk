@@ -338,6 +338,9 @@ pub fn run() {
                 .title("Sandwalk")
                 .inner_size(1280.0, 860.0)
                 .min_inner_size(900.0, 600.0)
+                // Tauri's native file-drop handler blocks HTML5 DnD; the composer
+                // uses DOM drag/drop so OS file drops auto-upload into the session.
+                .disable_drag_drop_handler()
                 .initialization_script(&script);
 
             #[cfg(target_os = "macos")]
