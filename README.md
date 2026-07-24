@@ -47,6 +47,9 @@ Use the CLI, the web dashboard, or the macOS desktop app: same sessions, workspa
 - **Local datasets**: optional DepMap, PRISM, L1000, proteomics, MSigDB, STRING (`sandwalk data pull-all`).
 - **Local + cloud compute**: Local Sandbox on your machine, or Modal / Lambda / Fastfold Cloud for GPU jobs.
 - **Skills & MCPs**: install from GitHub or [skills.sh](https://skills.sh); connect remote MCPs via Cursor-compatible `~/.sandwalk/mcp.json`.
+- **Find skills**: ask the agent to search the Fastfold catalog and the [skills.sh](https://skills.sh) ecosystem (`skill-find` / `skills.manage find`), try a skill once without installing, or install what you pick.
+- **Create skills with the agent**: scaffold, author, validate, and install new skills via `skill-creator` — they land under **Created by Me** and show up in the composer `/` menu.
+- **Human-in-the-loop approvals**: skill install/remove (and related lifecycle actions) pause for **Approve / Edit / Reject** in the desktop chat or interactive CLI; one approve can cover the rest of a run.
 - **Specialists**: reusable skill + MCP + instruction packs for focused research modes.
 - **Viewers**: structures, plots, and artifacts beside the chat.
 
@@ -249,7 +252,7 @@ The composer drives every turn: model and effort, specialist, sandbox, plus `@` 
 
 ### Skills and MCPs
 
-Type `/` in chat to browse skills and MCPs for the active specialist. Open a skill for docs and **Try** example prompts without leaving the thread.
+Type `/` in chat to browse skills and MCPs for the active specialist. Open a skill for docs and **Try** example prompts without leaving the thread. Mentions like `/lab-notes` in chat link to skill details.
 
 <p align="center">
   <picture>
@@ -259,7 +262,27 @@ Type `/` in chat to browse skills and MCPs for the active specialist. Open a ski
   </picture>
 </p>
 
-Manage those servers under Dashboard → **MCPs**: toggle catalog entries, connect when auth is required, or add a custom URL. Credentials live under Integrations / keys.
+#### Find and create skills (with the agent)
+
+You can manage skills from the dashboard **or** by asking the agent in chat / CLI:
+
+| Goal | How |
+|------|-----|
+| **Find** | Ask to find skills for a task (e.g. “find a Google Calendar skill”). The agent uses **skill-find**: Fastfold catalog first, then [skills.sh](https://skills.sh) / curated collections. It can **try once** without installing, or **install** after you confirm. |
+| **Create** | Ask to create a skill. The agent uses **skill-creator** to scaffold `SKILL.md` (optional scripts), validate, package, and install. New skills are tagged **Created by Me** under your local user name and appear in `/` on the next turn. |
+| **Lifecycle** | Enable, disable, remove, or list skills via the same `skills.manage` flow (`sandwalk skills …` also works). |
+
+#### Human-in-the-loop (approve / reject)
+
+When the agent installs, removes, or otherwise changes skill lifecycle in a way that needs a gate, the run **pauses** for your decision:
+
+- **Desktop / web chat**: an approval card with **Approve**, **Edit**, or **Reject** (and batch approve for the rest of the run when applicable).
+- **Interactive CLI**: a terminal HITL prompt with the same decisions.
+- Notifications can surface pending approvals when the window is in the background.
+
+This is separate from chat “yes/no” — the primary gate is the approval UI so installs don’t proceed on a casual confirmation alone.
+
+Manage MCP servers under Dashboard → **MCPs**: toggle catalog entries, connect when auth is required, or add a custom URL. Credentials live under Integrations / keys.
 
 <p align="center">
   <picture>
