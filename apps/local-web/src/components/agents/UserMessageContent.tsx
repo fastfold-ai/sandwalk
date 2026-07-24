@@ -1,6 +1,6 @@
 import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import { Plug, Sparkles } from 'lucide-react'
+import { Plug } from 'lucide-react'
 
 import { mcpIconForChip } from '@/components/agents/composer/composer-mention-utils'
 import { parseMessageParts } from '@/components/agents/composer-parts'
@@ -8,12 +8,9 @@ import {
   MessageFilePreview,
   messageFilePreviewKind
 } from '@/components/agents/message-file-preview'
+import { SkillMentionChip } from '@/components/agents/SkillMentionChip'
 import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
 import { getFileIcon } from '@/lib/file-icons'
-import {
-  skillIconForName,
-  skillIconInvertInDark
-} from '@/lib/skill-icons'
 import { splitTextWithWorkspacePaths } from '@/lib/workspace-file-paths'
 import { cn } from '@/lib/utils'
 
@@ -159,30 +156,11 @@ export function UserMessageContent({
         </a>
       )
     }
-    const skillIcon = skillIconForName(part.name)
     return (
-      <a
+      <SkillMentionChip
         key={`skill-${index}-${part.name}`}
-        href={`/dashboard/skills/${encodeURIComponent(part.name)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="border-primary/30 bg-primary/5 text-foreground inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 align-middle text-xs hover:underline"
-      >
-        {skillIcon ? (
-          <img
-            src={skillIcon}
-            alt=""
-            className={cn(
-              'size-3.5 shrink-0 rounded-sm object-contain',
-              skillIconInvertInDark({ name: part.name, iconSrc: null }) &&
-                'dark:invert'
-            )}
-          />
-        ) : (
-          <Sparkles className="text-primary/80 size-3.5 shrink-0" />
-        )}
-        <span className="max-w-[200px] truncate">{part.name}</span>
-      </a>
+        name={part.name}
+      />
     )
   })
 

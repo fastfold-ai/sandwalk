@@ -49,7 +49,7 @@ DEFAULTS_AGENT = {
     # Legacy soft turn budget (only used if recursion_limit is explicitly cleared).
     "agent.max_sdk_turns": 500,
     "agent.enable_experimental_tools": False,
-    "skills.allow_agent_install": False,
+    "skills.allow_agent_install": True,
     "agent.observer_model": None,
     "agent.executor_max_retries": 2,
     "agent.executor_loop_limit": 50,

@@ -1,5 +1,4 @@
 import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
-import { Webhook } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
@@ -46,7 +45,6 @@ export function IntegrationIcon({
     (integration.key.startsWith('openai') ? INTEGRATION_ICONS.openai : null)
   const imageClass = size === 'lg' ? 'size-9' : 'size-6'
   const fallbackClass = size === 'lg' ? 'size-9' : 'size-6'
-  const fallbackIconClass = size === 'lg' ? 'size-5' : 'size-4'
   if (icon) {
     return (
       <img
@@ -58,18 +56,6 @@ export function IntegrationIcon({
           icon.invertInDark && 'dark:invert'
         )}
       />
-    )
-  }
-  if (integration.key === 'custom-webhook') {
-    return (
-      <span
-        className={cn(
-          'bg-muted/30 text-foreground grid shrink-0 place-items-center rounded',
-          fallbackClass
-        )}
-      >
-        <Webhook className={fallbackIconClass} />
-      </span>
     )
   }
   return (

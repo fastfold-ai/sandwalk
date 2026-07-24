@@ -99,6 +99,7 @@ SKILLS_UPDATE_CACHE = CONFIG_DIR / "skills_update_check.json"
 SKILLS_PROMPT_INDEX_CACHE = CONFIG_DIR / "skills_prompt_index.json"
 
 from .models import (  # noqa: E402
+    USER_CREATED_CATEGORY,
     SkillInfo,
     _derive_author,
     _npx_lock_sources,
@@ -107,6 +108,8 @@ from .models import (  # noqa: E402
     display_author,
     display_updated,
     display_version,
+    is_user_created_skill,
+    local_skill_author_name,
     parse_skill_md,
 )
 from .prompt import (  # noqa: E402
@@ -131,6 +134,7 @@ from .discover import (  # noqa: E402
     _scan_dir,
     _scan_project,
     _skill_source_tier_rank,
+    discover_ecosystem_skills,
     discover_skills,
     installed_skill_names,
     iter_skills,
@@ -198,16 +202,20 @@ from .remove import (  # noqa: E402
 
 __all__ = [
     "SkillInfo",
+    "USER_CREATED_CATEGORY",
     "parse_skill_md",
     "display_author",
     "display_updated",
     "display_version",
+    "is_user_created_skill",
+    "local_skill_author_name",
     "iter_skills",
     "list_skills",
     "skill_info",
     "installed_skill_names",
     "user_installed_skill_names",
     "discover_skills",
+    "discover_ecosystem_skills",
     "build_skills_prompt",
     "detect_source_type",
     "install_skill",
@@ -220,6 +228,7 @@ __all__ = [
     "remove_skill",
     "remove_all_skills",
     "set_skill_enabled",
+    "CONFIG_DIR",
     "GLOBAL_SKILLS_DIR",
     "BUNDLED_SKILLS_DIR",
     "NPX_SKILLS_DIR",

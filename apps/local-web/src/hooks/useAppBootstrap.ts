@@ -95,6 +95,7 @@ export function useAppBootstrap({
     setSandboxSettings: loaders.setSandboxSettings,
     modelOptions: loaders.modelOptions,
     loadSessionsRef: loaders.loadSessionsRef,
+    loadSkillsRef: loaders.loadSkillsRef,
     loadSessions: loaders.loadSessions,
     loadProjects: loaders.loadProjects,
     loadSkills: loaders.loadSkills,

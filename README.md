@@ -56,7 +56,7 @@ We ship a curated toolkit out of the box (targets and genetics, chemistry, prote
 
 **Models** (via `sandwalk setup`, the dashboard, or `sandwalk config`): Anthropic, OpenAI, Google Gemini, xAI (Grok), NVIDIA, OpenCode Zen, plus local OpenAI-compatible endpoints like Ollama, Unsloth, oMLX, DS4, llama.cpp, and LM Studio.
 
-**Integrations** (`sandwalk keys` / Dashboard → Integrations): Modal, LangSmith, Tavily, Slack, Vercel, NVIDIA, OpenCode Zen, custom webhooks.
+**Integrations** (`sandwalk keys` / Dashboard → Integrations): Modal, LangSmith, Tavily, Slack, Vercel, NVIDIA, OpenCode Zen.
 
 **MCP catalog** (seeded in Dashboard → MCPs): Tamarind Bio, Paperclip, Latch Bio, Neurosnap, plus Linear, Lucid, and any custom URL.
 

@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import logging
+import re
+import subprocess
 import tempfile
 from pathlib import Path
 
 from agent import skills as _skills
 
 logger = logging.getLogger("skills")
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+# e.g. googleworkspace/cli@gws-calendar  48.9K installs
+_ECO_SKILL_RE = re.compile(
+    r"(?P<source>(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+)(?:@(?P<sub>[\w./-]+))?)"
+    r"(?:\s+(?P<installs>[\d.]+[KkMm]?\s+installs))?"
+)
 
 
 # ─── Discovery / loading ───────────────────────────────────────────────────
@@ -23,6 +32,7 @@ def _scan_dir(base: Path, source: str) -> dict[str, _skills.SkillInfo]:
         skill_md = child / "SKILL.md"
         if child.is_dir() and skill_md.exists():
             info = _skills.parse_skill_md(skill_md)
+            frontmatter_author = (info.author or "").strip()
             info.source = source
             meta = skills_meta.get(child.name) or {}
             if isinstance(meta, dict):
@@ -31,7 +41,8 @@ def _scan_dir(base: Path, source: str) -> dict[str, _skills.SkillInfo]:
                     # Prefer the real source spec (owner/repo@path or URL) so
                     # UI links and install commands can trace origin correctly.
                     info.source = install_source
-                info.author = _skills._derive_author(install_source)
+                derived = _skills._derive_author(install_source) if install_source else ""
+                info.author = frontmatter_author or derived
                 info.updated_at = str(meta.get("installed_at") or "")
                 release = meta.get("release")
                 info.version = str(release) if release else None
@@ -39,7 +50,12 @@ def _scan_dir(base: Path, source: str) -> dict[str, _skills.SkillInfo]:
                 lock_source = npx_sources.get(child.name) or npx_sources.get(info.name)
                 if lock_source:
                     info.source = lock_source
-                    info.author = _skills._derive_author(lock_source)
+                    info.author = frontmatter_author or _skills._derive_author(lock_source)
+            if _skills.is_user_created_skill(info):
+                if (info.category or "").strip().lower() in {"", "custom", "user"}:
+                    info.category = _skills.USER_CREATED_CATEGORY
+                if not info.author or info.author.strip().lower() in {"custom", "user"}:
+                    info.author = _skills.local_skill_author_name()
             # Key by directory name (canonical identifier everywhere else).
             out[child.name] = info
     return out
@@ -188,7 +204,7 @@ def _resolve_skill_key(name: str, skills: dict[str, _skills.SkillInfo]) -> str |
         if key.lower() == lowered:
             return key
 
-    # Match SKILL.md frontmatter name (e.g. "find-skills").
+    # Match SKILL.md frontmatter name (e.g. "skill-find").
     for key, info in skills.items():
         if str(getattr(info, "name", "")).strip().lower() == lowered:
             return key
@@ -273,3 +289,81 @@ def _resolve_name_to_source(name: str, *, catalog: str = _skills.DEFAULT_CATALOG
     # Loose fallback: first match.
     matches = _skills.discover_skills(name, catalog=catalog)
     return matches[0]["install_source"] if matches else None
+
+
+def discover_ecosystem_skills(query: str) -> dict:
+    """Search the public skills.sh ecosystem via ``npx -y skills find``.
+
+    Does not use the UI's Vercel-authenticated skills.sh API. Returns
+    ``{ok, summary, results}`` where each result has name/install_source.
+    """
+    q = (query or "").strip()
+    if not q:
+        return {
+            "ok": False,
+            "summary": "Ecosystem find requires a non-empty query.",
+            "results": [],
+        }
+    if not _skills._npx_available():
+        return {
+            "ok": False,
+            "summary": (
+                "Node/npx is not available, so public ecosystem search is skipped. "
+                "Install Node.js, browse https://skills.sh, or use the Skills UI."
+            ),
+            "results": [],
+        }
+    try:
+        proc = subprocess.run(
+            ["npx", "-y", "skills", "find", q],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=90,
+            stdin=subprocess.DEVNULL,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("npx skills find failed: %s", exc)
+        return {
+            "ok": False,
+            "summary": f"Ecosystem search failed: {exc}",
+            "results": [],
+        }
+
+    text = _ANSI_RE.sub("", (proc.stdout or "") + "\n" + (proc.stderr or ""))
+    results: list[dict] = []
+    seen: set[str] = set()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("└") or "skills.sh" in stripped and "http" in stripped:
+            # Still try to parse install_source lines; skip pure URL-only rows.
+            if "http" in stripped and "@" not in stripped:
+                continue
+        match = _ECO_SKILL_RE.search(stripped)
+        if not match:
+            continue
+        install_source = match.group("source")
+        if install_source in seen:
+            continue
+        seen.add(install_source)
+        sub = match.group("sub") or ""
+        name = sub.rsplit("/", 1)[-1] if sub else match.group("repo")
+        results.append({
+            "name": name,
+            "description": "",
+            "tags": [],
+            "install_source": install_source,
+            "installs": (match.group("installs") or "").strip(),
+            "tier": "ecosystem",
+        })
+
+    if not results:
+        detail = "No public ecosystem matches."
+        if proc.returncode != 0:
+            detail += f" (npx exit {proc.returncode})"
+        return {"ok": True, "summary": detail, "results": []}
+    return {
+        "ok": True,
+        "summary": f"Found {len(results)} public ecosystem skill(s).",
+        "results": results,
+    }

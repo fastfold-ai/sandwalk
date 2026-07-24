@@ -101,7 +101,7 @@ def skill_delete(
     console.print(
         f"  [yellow]This will remove {len(names)} user-installed skill(s):[/yellow] {', '.join(names)}"
     )
-    console.print("  [dim]Bundled skills (find_skills, skill_creator) are not affected.[/dim]")
+    console.print("  [dim]Bundled skills (skill_find, skill_creator) are not affected.[/dim]")
     if not yes:
         try:
             confirm = input("  Delete ALL of these skills? [y/N] ").strip().lower()

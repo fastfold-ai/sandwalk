@@ -346,9 +346,28 @@ def test_skills_manage_find_uses_discover(monkeypatch):
         "discover_skills",
         lambda query=None: [{"name": "foo", "description": "d", "tags": [], "install_source": "o/r@skills/foo"}],
     )
+    monkeypatch.setattr(
+        skills_mod,
+        "discover_ecosystem_skills",
+        lambda query: {
+            "ok": True,
+            "summary": "eco",
+            "results": [
+                {
+                    "name": "bar",
+                    "description": "",
+                    "tags": [],
+                    "install_source": "owner/repo@bar",
+                    "tier": "ecosystem",
+                }
+            ],
+        },
+    )
     result = skills_tool.manage(action="find", query="foo")
     assert "foo" in result["summary"]
-    assert result["results"][0]["name"] == "foo"
+    assert "bar" in result["summary"]
+    assert result["catalog"][0]["name"] == "foo"
+    assert result["ecosystem"][0]["name"] == "bar"
 
 
 def test_skills_manage_install_allowed_calls_install(monkeypatch):
@@ -365,7 +384,142 @@ def test_skills_manage_install_allowed_calls_install(monkeypatch):
     session.config.get.return_value = True
     result = manage(action="install", source="owner/repo@skills/foo", _session=session)
     assert result["ok"] is True
+    assert result.get("skills_updated") is True
     assert called["source"] == "owner/repo@skills/foo"
+
+
+def test_skills_manage_enable_disable(monkeypatch):
+    from tools.skills import manage
+
+    calls = []
+
+    def fake_set(name, enabled, **kwargs):
+        calls.append((name, enabled))
+        return {"ok": True, "summary": f"{'Enabled' if enabled else 'Disabled'} {name}"}
+
+    monkeypatch.setattr(skills_mod, "set_skill_enabled", fake_set)
+    assert manage(action="disable", name="fold")["enabled"] is False
+    assert manage(action="enable", name="fold")["enabled"] is True
+    assert calls == [("fold", False), ("fold", True)]
+
+
+def test_skills_manage_create_scaffolds_and_installs(tmp_path, monkeypatch):
+    from tools.skills import manage
+
+    monkeypatch.setattr(skills_mod, "GLOBAL_SKILLS_DIR", tmp_path / "global")
+    monkeypatch.setattr(skills_mod, "CONFIG_DIR", tmp_path / "cfg")
+    (tmp_path / "global").mkdir()
+    (tmp_path / "cfg").mkdir()
+
+    def fake_install(source, **kwargs):
+        from pathlib import Path
+        import shutil
+
+        assert kwargs.get("manifest_source") == "custom"
+        src = Path(source)
+        dest = tmp_path / "global" / src.name
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(src, dest)
+        return {"ok": True, "installed": [src.name], "summary": "ok"}
+
+    monkeypatch.setattr(skills_mod, "install_skill", fake_install)
+    session = MagicMock()
+    session.config.get.side_effect = lambda key, default=None: {
+        "skills.allow_agent_install": True,
+        "user.display_name": "Julio",
+    }.get(key, default)
+
+    result = manage(
+        action="create",
+        name="my-custom-skill",
+        path=str(tmp_path / "drafts"),
+        install=True,
+        _session=session,
+    )
+    assert result["ok"] is True
+    assert result["skills_updated"] is True
+    assert result["mention"] == "/my-custom-skill"
+    assert "/my-custom-skill" in result["summary"]
+    skill_md = (tmp_path / "drafts" / "my-custom-skill" / "SKILL.md").read_text(encoding="utf-8")
+    assert "author: Julio" in skill_md
+    assert "category: Created by Me" in skill_md
+
+
+def test_skills_manage_create_defaults_to_skill_drafts(tmp_path, monkeypatch):
+    from tools.skills import manage
+
+    monkeypatch.setattr(skills_mod, "CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr(skills_mod, "GLOBAL_SKILLS_DIR", tmp_path / "global")
+    (tmp_path / "cfg").mkdir()
+    (tmp_path / "global").mkdir()
+
+    result = manage(
+        action="create",
+        name="draft-only",
+        install=False,
+        _session=None,
+    )
+    assert result["ok"] is True
+    assert str(tmp_path / "cfg" / "skill-drafts" / "draft-only") in result["path"]
+    assert result["mention"] == "/draft-only"
+
+
+def test_install_local_zip_archive(tmp_path, monkeypatch):
+    import zipfile
+
+    skill_root = tmp_path / "pack" / "zip-skill"
+    skill_root.mkdir(parents=True)
+    (skill_root / "SKILL.md").write_text(
+        "---\nname: zip-skill\ndescription: from zip\nauthor: Ada\ncategory: Created by Me\n---\n",
+        encoding="utf-8",
+    )
+    archive = tmp_path / "zip-skill.skill"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.write(skill_root / "SKILL.md", arcname="zip-skill/SKILL.md")
+
+    dest = tmp_path / "global"
+    dest.mkdir()
+    monkeypatch.setattr(skills_mod, "GLOBAL_SKILLS_DIR", dest)
+    result = skills_mod.install_skill(str(archive))
+    assert result["ok"] is True
+    assert (dest / "zip-skill" / "SKILL.md").exists()
+
+
+def test_parse_skill_md_author_and_custom_category(tmp_path):
+    skill_md = tmp_path / "SKILL.md"
+    skill_md.write_text(
+        "---\nname: authored\ndescription: d\nauthor: Ada\ncategory: Created by Me\n---\n",
+        encoding="utf-8",
+    )
+    info = skills_mod.parse_skill_md(skill_md)
+    assert info.author == "Ada"
+    assert info.category == "Created by Me"
+    assert skills_mod.is_user_created_skill(info) is True
+
+
+def test_discover_ecosystem_skills_parses_npx_output(monkeypatch):
+    class FakeProc:
+        returncode = 0
+        stdout = "googleworkspace/cli@gws-calendar  48.9K installs\n"
+        stderr = ""
+
+    monkeypatch.setattr(skills_mod, "_npx_available", lambda: True)
+    monkeypatch.setattr(
+        "agent.skills.discover.subprocess.run",
+        lambda *a, **k: FakeProc(),
+    )
+    result = skills_mod.discover_ecosystem_skills("google calendar")
+    assert result["ok"] is True
+    assert result["results"][0]["install_source"] == "googleworkspace/cli@gws-calendar"
+    assert result["results"][0]["name"] == "gws-calendar"
+
+
+def test_bundled_skill_find_exists():
+    skill_find = skills_mod.BUNDLED_SKILLS_DIR / "skill_find" / "SKILL.md"
+    assert skill_find.exists()
+    assert "name: skill-find" in skill_find.read_text(encoding="utf-8")
+    assert not (skills_mod.BUNDLED_SKILLS_DIR / "find_skills").exists()
 
 
 # ─── CLI ───────────────────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ class SkillSummary(ApiModel):
     tags: list[str] = Field(default_factory=list)
     source: str
     author: str
+    category: str = ""
     version: str | None = None
     updated_at: str | None = None
     icon_src: str | None = None

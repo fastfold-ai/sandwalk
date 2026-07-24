@@ -19,7 +19,7 @@ def _fast_computational_scientist_spec() -> dict[str, Any]:
         "- Use `shell.run` to execute skill scripts; use `run_python` only for "
         "small local analysis or plotting.\n"
         "- Keep tool use minimal. Do not invent skills that are not installed — "
-        "tell the user to install/enable them (or use `find-skills`).\n"
+        "tell the user to install/enable them (or use `skill-find`).\n"
         "- Do not pull in broad MCP tool surfaces; stay on FastFold workflows.\n"
     )
     return {
@@ -37,7 +37,7 @@ def _fast_computational_scientist_spec() -> dict[str, Any]:
             "protein_design_boltzgen",
             "md_openmm_calvados",
             "md_openmmdl",
-            "find-skills",
+            "skill-find",
         ],
         "tool_names": core_tools,
         "mcp_catalog_ids": [],

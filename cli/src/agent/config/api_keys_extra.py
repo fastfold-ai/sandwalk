@@ -26,23 +26,6 @@ API_KEYS_EXTRA = {
         "url": "https://api.slack.com/apps",
         "free": True,
     },
-    "notification.webhook_url": {
-        "name": "Custom Webhook URL",
-        "provider_key": "custom-webhook",
-        "env_var": "FASTFOLD_WEBHOOK_URL",
-        "description": "Completion event webhook destination",
-        "url": "",
-        "free": True,
-        "secret": False,
-    },
-    "notification.webhook_secret": {
-        "name": "Custom Webhook Secret",
-        "provider_key": "custom-webhook",
-        "env_var": "FASTFOLD_WEBHOOK_SECRET",
-        "description": "Completion webhook signing secret",
-        "url": "",
-        "free": True,
-    },
     "notification.sendgrid_api_key": {
         "name": "SendGrid",
         "env_var": "SENDGRID_API_KEY",

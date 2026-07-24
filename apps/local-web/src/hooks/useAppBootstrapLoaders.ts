@@ -49,6 +49,7 @@ export function useAppBootstrapLoaders({
     useState<SandboxSettings | null>(null)
   const [modelOptions, setModelOptions] = useState<ComposerModelOption[]>([])
   const loadSessionsRef = useRef<(() => Promise<void>) | null>(null)
+  const loadSkillsRef = useRef<(() => Promise<void>) | null>(null)
   const sessionPreviewsRef = useRef<Record<string, string>>({})
   const previewInFlightRef = useRef(new Set<string>())
   sessionPreviewsRef.current = sessionPreviews
@@ -155,6 +156,8 @@ export function useAppBootstrapLoaders({
     })
     setSkills(unique)
   }, [client])
+
+  loadSkillsRef.current = loadSkills
 
   const loadIntegrations = useCallback(async () => {
     setIntegrations(
@@ -269,6 +272,7 @@ export function useAppBootstrapLoaders({
     setSandboxSettings,
     modelOptions,
     loadSessionsRef,
+    loadSkillsRef,
     loadSessions,
     loadProjects,
     loadSkills,

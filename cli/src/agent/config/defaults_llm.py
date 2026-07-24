@@ -89,8 +89,6 @@ DEFAULTS_LLM = {
     "compute.modal_token_id": None,
     "compute.modal_token_secret": None,
     "notification.slack_bot_token": None,
-    "notification.webhook_url": None,
-    "notification.webhook_secret": None,
     "fastfold.subscription_tier": None,
 
     "output.format": "markdown",

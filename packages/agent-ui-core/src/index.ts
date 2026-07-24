@@ -906,6 +906,7 @@ export type AgentSkill = {
   tags: string[]
   source: string
   author: string
+  category?: string
   version: string | null
   updatedAt: string | null
   iconSrc: string | null

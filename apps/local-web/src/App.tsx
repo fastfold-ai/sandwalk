@@ -66,6 +66,7 @@ export default function App() {
     setError: bootstrap.setError,
     loadSessions: bootstrap.loadSessions,
     loadSessionsRef: bootstrap.loadSessionsRef,
+    loadSkillsRef: bootstrap.loadSkillsRef,
     loadProjects: bootstrap.loadProjects,
     setSandboxSettings: bootstrap.setSandboxSettings,
     skills: bootstrap.skills,

@@ -16,10 +16,14 @@ def test_init_skill_existing_and_success(tmp_path):
     existing.mkdir()
     assert init_skill.main(["my-skill", "--path", str(tmp_path)]) == 1
 
-    out_code = init_skill.main(["new-skill", "--path", str(tmp_path), "--with-scripts"])
+    out_code = init_skill.main(
+        ["new-skill", "--path", str(tmp_path), "--with-scripts", "--author", "Ada"]
+    )
     assert out_code == 0
     skill_dir = tmp_path / "new-skill"
-    assert (skill_dir / "SKILL.md").exists()
+    text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+    assert "author: Ada" in text
+    assert "category: Created by Me" in text
     assert (skill_dir / "references").exists()
     assert (skill_dir / "scripts").exists()
 

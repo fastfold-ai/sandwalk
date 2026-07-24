@@ -406,12 +406,21 @@ def _install_github_source(
     return {"ok": False, "summary": summary, "via": "git"}
 
 
-def install_skill(source: str, *, dest: Path | None = None, prefer_npx: bool = False) -> dict:
+def install_skill(
+    source: str,
+    *,
+    dest: Path | None = None,
+    prefer_npx: bool = False,
+    manifest_source: str | None = None,
+) -> dict:
     """Install a skill from a GitHub URL/shorthand, local path, or catalog name.
 
     By default uses a native ``git clone``, then GitHub archive download, then
     ``npx skills add`` when available. When ``prefer_npx`` is True and ``npx`` is
     available, tries ``npx skills add`` first and falls back to git/archive.
+
+    ``manifest_source`` overrides the recorded install source (e.g. ``custom``
+    for agent-authored skills so the UI does not pin a session workspace path).
 
     Returns a dict with keys: ok, installed (list of names), summary.
     """
@@ -433,7 +442,7 @@ def install_skill(source: str, *, dest: Path | None = None, prefer_npx: bool = F
         src_type = detect_source_type(source)
 
     if src_type == "local":
-        return _install_local(source, dest)
+        return _install_local(source, dest, manifest_source=manifest_source)
 
     url, ref, subpath = _parse_github(source)
 
@@ -451,20 +460,85 @@ def install_skill(source: str, *, dest: Path | None = None, prefer_npx: bool = F
     return _install_github_source(source, url, ref, subpath, dest, release_tag)
 
 
-def _install_local(source: str, dest: Path) -> dict:
+def _install_local(
+    source: str,
+    dest: Path,
+    *,
+    manifest_source: str | None = None,
+) -> dict:
     base = Path(source).expanduser().resolve()
     if not base.exists():
         return {"ok": False, "summary": f"Local path does not exist: {source}"}
+
+    # .zip / .skill archives — same shape as UI upload install.
+    if base.is_file() and base.suffix.lower() in {".zip", ".skill"}:
+        return _install_local_archive(
+            base, dest, manifest_source=manifest_source
+        )
+
     skill_dirs = _resolve_skill_dirs(base, None)
     if not skill_dirs:
         return {"ok": False, "summary": f"No SKILL.md found at {source}."}
-    installed = _copy_skill_dirs(skill_dirs, dest, str(base), None)
+    recorded = (manifest_source or "").strip() or str(base)
+    installed = _copy_skill_dirs(skill_dirs, dest, recorded, None)
     return {
         "ok": True,
         "installed": installed,
         "summary": f"Installed {len(installed)} skill(s) to {dest}: {', '.join(installed)}.",
         "via": "local",
     }
+
+
+def _install_local_archive(
+    archive_path: Path,
+    dest: Path,
+    *,
+    manifest_source: str | None = None,
+) -> dict:
+    """Extract a .zip/.skill bundle and install skill dirs found inside."""
+    import zipfile
+
+    with tempfile.TemporaryDirectory(prefix="sandwalk-skill-zip-") as tmp:
+        extract_dir = Path(tmp) / "extracted"
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            with zipfile.ZipFile(archive_path) as archive:
+                extract_root = extract_dir.resolve()
+                for member in archive.infolist():
+                    target = (extract_dir / member.filename).resolve()
+                    if target != extract_root and extract_root not in target.parents:
+                        return {
+                            "ok": False,
+                            "summary": "Archive contains invalid file paths.",
+                        }
+                archive.extractall(extract_dir)
+        except zipfile.BadZipFile:
+            return {
+                "ok": False,
+                "summary": "Archive is not a valid .zip/.skill bundle.",
+            }
+        skill_dirs = _resolve_skill_dirs(extract_dir, None)
+        if not skill_dirs:
+            # Nested single folder common in GitHub zip downloads.
+            children = [p for p in extract_dir.iterdir() if p.is_dir()]
+            if len(children) == 1:
+                skill_dirs = _resolve_skill_dirs(children[0], None)
+        if not skill_dirs:
+            return {
+                "ok": False,
+                "summary": f"No SKILL.md found inside archive {archive_path.name}.",
+            }
+        recorded = (manifest_source or "").strip() or str(archive_path)
+        installed = _copy_skill_dirs(skill_dirs, dest, recorded, None)
+        return {
+            "ok": True,
+            "installed": installed,
+            "summary": (
+                f"Installed {len(installed)} skill(s) from archive "
+                f"{archive_path.name}: {', '.join(installed)}."
+            ),
+            "via": "local-archive",
+        }
 
 
 def _copy_skill_dirs(

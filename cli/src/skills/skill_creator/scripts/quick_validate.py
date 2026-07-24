@@ -16,7 +16,19 @@ import sys
 from pathlib import Path
 
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
-_ALLOWED_KEYS = {"name", "description", "tags", "license", "allowed-tools", "metadata", "compatibility"}
+_ALLOWED_KEYS = {
+    "name",
+    "description",
+    "tags",
+    "license",
+    "allowed-tools",
+    "metadata",
+    "compatibility",
+    "author",
+    "category",
+    "origin",
+    "icon",
+}
 
 
 def _parse_frontmatter(text: str) -> dict[str, str]:

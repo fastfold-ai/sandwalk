@@ -16,6 +16,9 @@ _SKILL_FRONTMATTER_READ_MAX_CHARS = 64_000
 
 
 # ─── Data model ─────────────────────────────────────────────────────────────
+USER_CREATED_CATEGORY = "Created by Me"
+
+
 @dataclass
 class SkillInfo:
     """A discovered skill."""
@@ -26,6 +29,7 @@ class SkillInfo:
     path: Path | None = None  # path to SKILL.md
     source: str = ""  # tier: global | project | bundled | npx
     author: str = ""  # org/owner derived from the install source
+    category: str = ""  # optional frontmatter category / origin
     updated_at: str = ""  # ISO timestamp the skill was installed/updated
     version: str | None = None  # release tag (e.g. "v1.2.0") when known
     icon: str = ""  # optional icon path/URL from SKILL.md frontmatter
@@ -34,6 +38,43 @@ class SkillInfo:
     @property
     def directory(self) -> Path | None:
         return self.path.parent if self.path else None
+
+
+def is_user_created_skill(info: SkillInfo) -> bool:
+    """True for agent/user-authored skills (not catalog/GitHub installs)."""
+    category = (getattr(info, "category", "") or "").strip().lower()
+    if category in {"custom", "created by me", "user"}:
+        return True
+    source = str(getattr(info, "source", "") or "").strip()
+    source_l = source.lower()
+    if source_l == "custom" or source_l.startswith("custom:"):
+        return True
+    if source.startswith(("/", "~")):
+        return True
+    if "skill-drafts" in source_l or "/workspaces/" in source_l:
+        return True
+    return False
+
+
+def local_skill_author_name() -> str:
+    """Display name for the local Sandwalk user (same as /v1/health userName)."""
+    try:
+        from agent_server.routes.health import local_user_name
+
+        name = (local_user_name() or "").strip()
+        if name:
+            return name
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        import getpass
+        import os
+
+        return getpass.getuser().replace(".", " ").replace("_", " ").title() or os.environ.get(
+            "USER", "Me"
+        )
+    except Exception:  # noqa: BLE001
+        return "Me"
 
 
 # ─── SKILL.md parsing ─────────────────────────────────────────────────────
@@ -47,6 +88,8 @@ def parse_skill_md(skill_md: Path) -> SkillInfo:
     description = ""
     tags: list[str] = []
     icon = ""
+    author = ""
+    category = ""
 
     try:
         # Frontmatter lives at the top; avoid loading large SKILL.md bodies just
@@ -78,6 +121,15 @@ def parse_skill_md(skill_md: Path) -> SkillInfo:
             tags = [t.strip().strip('"').strip("'") for t in raw.split(",") if t.strip()]
         elif line.startswith("icon:"):
             icon = line.split(":", 1)[1].strip().strip('"').strip("'")
+        elif line.startswith("author:"):
+            author = line.split(":", 1)[1].strip().strip('"').strip("'")
+        elif line.startswith("category:") or line.startswith("origin:"):
+            category = line.split(":", 1)[1].strip().strip('"').strip("'")
+
+    if category.lower() in {"custom", "user"}:
+        category = USER_CREATED_CATEGORY
+    if not author and category == USER_CREATED_CATEGORY:
+        author = local_skill_author_name()
 
     return SkillInfo(
         name=name,
@@ -85,6 +137,8 @@ def parse_skill_md(skill_md: Path) -> SkillInfo:
         tags=tags,
         path=skill_md,
         icon=icon,
+        author=author,
+        category=category,
     )
 
 
@@ -160,10 +214,16 @@ def _npx_lock_sources() -> dict[str, str]:
 
 def display_author(info: SkillInfo) -> str:
     """Author column value, with clean fallbacks for tiers without a source."""
+    if is_user_created_skill(info):
+        author = (getattr(info, "author", "") or "").strip()
+        if author and author.lower() not in {"custom", "user"}:
+            return author
+        return local_skill_author_name()
     author = getattr(info, "author", "") or ""
-    if author:
+    if author and author.lower() not in {"custom", "user"}:
         return author
-    if getattr(info, "source", "") == "bundled":
+    source = str(getattr(info, "source", "") or "")
+    if source == "bundled":
         return "fastfold-ai"
     return "-"
 

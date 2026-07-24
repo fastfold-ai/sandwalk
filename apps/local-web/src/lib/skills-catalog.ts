@@ -4,6 +4,7 @@ export {
   cloudAccountDisplayName,
   frontmatterValue,
   isFeaturedIntegration,
+  isUserCreatedSkill,
   skillAuthorLabel,
   skillMetaText,
   stripFrontmatter,

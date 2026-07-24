@@ -28,6 +28,17 @@ type UseSessionChatStreamArgs = {
   setWorkspaceVersion: Dispatch<SetStateAction<number>>
   setError: Dispatch<SetStateAction<string | null>>
   loadSessionsRef: MutableRefObject<(() => Promise<void>) | null>
+  loadSkillsRef: MutableRefObject<(() => Promise<void>) | null>
+}
+
+function skillsMutatedFromToolEvent(event: AgentEvent): boolean {
+  if (event.type !== 'tool.completed') return false
+  if (event.payload.name !== 'skills.manage') return false
+  if (event.payload.isError) return false
+  const output = event.payload.output
+  if (!output || typeof output !== 'object') return false
+  const record = output as Record<string, unknown>
+  return record.skills_updated === true
 }
 
 export function useSessionChatStream({
@@ -42,7 +53,8 @@ export function useSessionChatStream({
   setSessions,
   setWorkspaceVersion,
   setError,
-  loadSessionsRef
+  loadSessionsRef,
+  loadSkillsRef
 }: UseSessionChatStreamArgs) {
   const streamControllersRef = useRef<Map<string, AbortController>>(new Map())
 
@@ -136,6 +148,10 @@ export function useSessionChatStream({
           onEvent: (event: AgentEvent) => {
             patchChat(id, prev => reduceChatOnAgentEvent(prev, event))
 
+            if (skillsMutatedFromToolEvent(event)) {
+              void loadSkillsRef.current?.()
+            }
+
             if (event.type === 'run.started') {
               setSessions(current =>
                 current.map(item =>
@@ -171,6 +187,7 @@ export function useSessionChatStream({
               )
               if (event.type === 'run.completed') {
                 setWorkspaceVersion(current => current + 1)
+                void loadSkillsRef.current?.()
               }
               void client.listMessages(id).then(history => {
                 patchChat(id, prev => ({

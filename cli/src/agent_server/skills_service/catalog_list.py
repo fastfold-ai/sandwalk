@@ -67,12 +67,25 @@ class CatalogListMixin:
         return None
 
     def _summary(self, info) -> SkillSummary:
+        from agent.skills.models import (
+            USER_CREATED_CATEGORY,
+            display_author,
+            is_user_created_skill,
+        )
+
+        author = display_author(info)
+        if author in {"-", ""}:
+            author = info.author or ("fastfold-ai" if info.source == "bundled" else "")
+        category = str(getattr(info, "category", "") or "").strip()
+        if is_user_created_skill(info):
+            category = USER_CREATED_CATEGORY
         return SkillSummary(
             name=info.name,
             description=info.description or "",
             tags=list(info.tags or []),
             source=info.source or "",
-            author=info.author or ("fastfold-ai" if info.source == "bundled" else ""),
+            author=author,
+            category=category,
             version=info.version,
             updated_at=info.updated_at or None,
             icon_src=self._icon_source(info),

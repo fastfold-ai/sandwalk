@@ -5,7 +5,30 @@ import type {
   IntegrationSummary
 } from '@sandwalk/agent-ui-core'
 
+export function isUserCreatedSkill(skill: AgentSkill): boolean {
+  const category = String(skill.category || '').trim().toLowerCase()
+  if (
+    category === 'created by me' ||
+    category === 'custom' ||
+    category === 'user'
+  ) {
+    return true
+  }
+  const source = String(skill.source || '').trim().toLowerCase()
+  if (source === 'custom' || source.startsWith('custom:')) return true
+  if (
+    source.startsWith('/') ||
+    source.startsWith('~') ||
+    source.includes('skill-drafts') ||
+    source.includes('/workspaces/')
+  ) {
+    return true
+  }
+  return false
+}
+
 export function categorizeSkill(skill: AgentSkill) {
+  if (isUserCreatedSkill(skill)) return 'Created by Me'
   const name = skill.name.toLowerCase()
   if (name === 'fold' || name === 'boltz-structure-and-binding')
     return 'Structure Prediction'

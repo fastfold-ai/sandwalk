@@ -34,6 +34,7 @@ type SessionLayerArgs = {
   setError: Dispatch<SetStateAction<string | null>>
   loadSessions: () => Promise<void>
   loadSessionsRef: MutableRefObject<(() => Promise<void>) | null>
+  loadSkillsRef: MutableRefObject<(() => Promise<void>) | null>
   loadProjects: () => Promise<void>
   setSandboxSettings: Dispatch<SetStateAction<import('@sandwalk/agent-ui-core').SandboxSettings | null>>
   skills: AgentSkill[]
@@ -96,7 +97,8 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     setSessions: args.setSessions,
     setWorkspaceVersion: args.setWorkspaceVersion,
     setError: args.setError,
-    loadSessionsRef: args.loadSessionsRef
+    loadSessionsRef: args.loadSessionsRef,
+    loadSkillsRef: args.loadSkillsRef
   })
 
   const send = useSessionChatSend({

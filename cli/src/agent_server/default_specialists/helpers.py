@@ -7,7 +7,7 @@ from typing import Any
 # Shared across curated defaults — discovery, diagrams, reporting.
 CORE_SKILLS: list[str] = [
     "diagrams_mermaid",
-    "find-skills",
+    "skill-find",
     "scientific-writing",
     "slack_report",
 ]
@@ -39,7 +39,7 @@ def _with_tools(body: str, tools: list[str]) -> str:
         + "compute, docking, descriptors, DepMap/Open Targets/PDB/UniProt queries, "
         + "and local analysis.\n"
         + "- If a needed skill is missing or disabled, tell the user to install or "
-        + "enable it (or use `find-skills`) before continuing that path.\n"
+        + "enable it (or use `skill-find`) before continuing that path.\n"
     )
 
 

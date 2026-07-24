@@ -52,11 +52,6 @@ PROVIDER_METADATA = {
         "category": "Communication",
         "description": "Slack reports and agent notifications.",
     },
-    "custom-webhook": {
-        "name": "Custom Webhook",
-        "category": "Automation",
-        "description": "Completion event webhook URL and signing secret.",
-    },
     "skills-sh": {
         "name": "Vercel",
         "category": "Skills",
