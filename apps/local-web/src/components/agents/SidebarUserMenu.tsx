@@ -124,14 +124,14 @@ export function SidebarUserMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="bg-card min-w-[300px] rounded-xl border p-1.5 shadow-xl"
+        className="bg-card w-[var(--radix-popper-anchor-width)] min-w-0 max-w-[var(--radix-popper-anchor-width)] rounded-xl border p-1 shadow-xl"
         side="top"
         align="start"
-        sideOffset={10}
+        sideOffset={8}
         onCloseAutoFocus={() => previewPalette(getStoredPalette())}
       >
         <DropdownMenuItem
-          className="cursor-pointer items-start rounded-lg p-2 [&>div]:w-full"
+          className="cursor-pointer items-start rounded-lg p-1.5 [&>div]:w-full"
           onClick={() => navigate('/dashboard/general')}
         >
           <SandwalkServerCard
@@ -148,21 +148,21 @@ export function SidebarUserMenu({
 
         <DropdownMenuGroup>
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="flex cursor-default items-center gap-2 px-2.5 py-1.5 text-sm">
-              <span className="flex-1">Theme</span>
-              <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            <DropdownMenuSubTrigger className="flex cursor-default items-center gap-2 px-2 py-1.5 text-sm">
+              <span className="min-w-0 flex-1 truncate">Theme</span>
+              <span
+                className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs"
+                title={activePalette.name}
+              >
                 <ModeIcon className="size-3.5 shrink-0" />
                 <span className="flex items-center gap-0.5">
                   {activePalette.swatches.map(color => (
                     <span
                       key={color}
-                      className="border-border/60 size-2.5 rounded-sm border"
+                      className="border-border/60 size-2 rounded-sm border"
                       style={{ backgroundColor: color }}
                     />
                   ))}
-                </span>
-                <span className="max-w-[4.5rem] truncate">
-                  {activePalette.name}
                 </span>
               </span>
             </DropdownMenuSubTrigger>
@@ -185,37 +185,37 @@ export function SidebarUserMenu({
 
         <DropdownMenuGroup>
           <DropdownMenuItem
-            className="flex cursor-pointer items-center justify-between px-2.5 py-1.5 text-sm"
+            className="flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm"
             onClick={() => openExternal(DOCS_URL)}
           >
-            <span>Docs</span>
-            <BookOpen className="text-muted-foreground size-4" />
+            <span className="truncate">Docs</span>
+            <BookOpen className="text-muted-foreground size-4 shrink-0" />
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="flex cursor-pointer items-center justify-between px-2.5 py-1.5 text-sm"
+            className="flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm"
             onClick={() => openExternal(CLOUD_URL)}
           >
-            <span>Fastfold Cloud</span>
+            <span className="truncate">Fastfold Cloud</span>
             <img
               src="/ff_simbol_color.svg"
               alt=""
               aria-hidden="true"
-              className="size-4"
+              className="size-4 shrink-0"
             />
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="flex cursor-pointer items-center justify-between px-2.5 py-1.5 text-sm"
+            className="flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm"
             onClick={() => openExternal(STATUS_URL)}
           >
-            <span>Status</span>
-            <ExternalLink className="text-muted-foreground size-4" />
+            <span className="truncate">Status</span>
+            <ExternalLink className="text-muted-foreground size-4 shrink-0" />
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          className="flex cursor-pointer items-center justify-between px-2.5 py-1.5 text-sm"
+          className="flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm"
           disabled={loggingOut || !onLogout}
           onClick={() => {
             if (!onLogout) return
@@ -223,8 +223,10 @@ export function SidebarUserMenu({
             void Promise.resolve(onLogout()).finally(() => setLoggingOut(false))
           }}
         >
-          <span>{loggingOut ? 'Signing out…' : 'Log out'}</span>
-          <LogOut className="text-muted-foreground size-4" />
+          <span className="truncate">
+            {loggingOut ? 'Signing out…' : 'Log out'}
+          </span>
+          <LogOut className="text-muted-foreground size-4 shrink-0" />
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

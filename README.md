@@ -65,63 +65,59 @@ We ship a curated toolkit out of the box (targets and genetics, chemistry, prote
 
 ## Install
 
-### CLI (recommended)
+### Install from source
 
-Requires [uv](https://docs.astral.sh/uv/) and Python 3.11+.
-
-```bash
-uv tool install sandwalk
-sandwalk --version
-```
-
-Core deps (agent server, Local Sandbox plotting, Modal client, …) come with the default install. Optional science stacks are extras:
+Clone once, then pick **macOS** or **CLI + Web UI**.
 
 ```bash
-uv tool install "sandwalk[all]"          # chemistry, single-cell, ML, …
-# or: uv tool install "sandwalk[chemistry]"
+git clone https://github.com/fastfold-ai/sandwalk.git
+cd sandwalk
+pnpm install
 ```
 
-```bash
-sandwalk upgrade
-```
+Prerequisites: [uv](https://docs.astral.sh/uv/), Python 3.11+, Node 20+, pnpm. For the macOS desktop build also: Xcode CLT and Rust (`rustup`).
 
-### macOS desktop (DMG)
-
-The Mac product is **one install**:
+#### macOS
 
 | Piece | Role |
 |-------|------|
 | **Sandwalk.app** | Tauri desktop client (Dock / Launchpad) |
 | **Sandwalk Server** | Nested menubar helper (no Dock icon): Start / Stop / Restart, Server Settings |
 
-**From a release** (when published): download the DMG from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases), open it, drag **Sandwalk** into Applications, then launch Sandwalk.
-
-**Build a DMG from this repo** (Apple Silicon, ad-hoc signed for local use):
+**Build and install a DMG** (Apple Silicon, ad-hoc signed for local use):
 
 ```bash
-# Prerequisites: Xcode CLT, Rust (rustup), Node 20+, pnpm, uv
-pnpm install
 ./apps/packaging/package-macos-dmg.sh
 
-# Optional: install the assembled app for QA
+# Install the assembled app for local QA
 INSTALL=1 ./apps/packaging/package-macos-dmg.sh
 open ~/Applications/Sandwalk.app
 ```
 
-Output: `apps/packaging/dist/Sandwalk-<version>-macos-arm64.dmg`.
+Output: `apps/packaging/dist/Sandwalk-<version>-macos-arm64.dmg`. Details: [`apps/packaging/README.md`](apps/packaging/README.md).
 
-Details: [`apps/packaging/README.md`](apps/packaging/README.md).
+When releases are published, you can also download the DMG from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases).
 
-### From source (CLI + web UI)
-
-Use this when hacking on the agent or dashboard without packaging the Mac app.
+**Dev without packaging** — run the API, then the Tauri client (and optionally the menubar helper):
 
 ```bash
-git clone https://github.com/fastfold-ai/sandwalk.git
-cd sandwalk
-pnpm install
+# Terminal 1 — agent API
+cd cli && uv sync && uv run sandwalk serve
 
-# Terminal 1 — agent API (and bundled dashboard on :8969 when configured)
+# Terminal 2 — Tauri desktop client
+pnpm --filter @sandwalk/agent-local-web tauri:dev
+
+# Optional — menubar helper only (no Dock icon)
+cd apps/sandwalk-mac && ./scripts/package-app.sh
+open ~/Applications/Sandwalk\ Server.app
+```
+
+#### CLI + Web UI
+
+Use this when you want the terminal CLI and browser dashboard without the macOS desktop app.
+
+```bash
+# Terminal 1 — agent API (dashboard also on :8969 when configured)
 cd cli && uv sync && uv run sandwalk serve
 
 # Terminal 2 — Vite web UI (hot reload) against that API
@@ -129,21 +125,7 @@ pnpm --filter @sandwalk/agent-local-web dev
 # → http://127.0.0.1:5173 (or the port Vite prints)
 ```
 
-Point the UI at the API if needed (default `http://127.0.0.1:8787`). Optional: `uv sync --extra all` in `cli/` for science stacks.
-
-**macOS menubar helper only** (server supervisor, no Tauri client):
-
-```bash
-cd apps/sandwalk-mac
-./scripts/package-app.sh
-open ~/Applications/Sandwalk\ Server.app
-```
-
-**Tauri client in dev** (needs the helper or `sandwalk serve` for the API):
-
-```bash
-pnpm --filter @sandwalk/agent-local-web tauri:dev
-```
+Point the UI at the API if needed (default `http://127.0.0.1:8787`). Optional science stacks: `uv sync --extra all` in `cli/`. Use `uv run sandwalk …` for CLI commands from this checkout.
 
 ## Quickstart
 
