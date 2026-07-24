@@ -5,7 +5,7 @@ import type {
   AgentSession
 } from '@sandwalk/agent-ui-core'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import type { Dispatch, SetStateAction } from 'react'
+import { memo, type Dispatch, type SetStateAction } from 'react'
 
 import { CreatedPlanCard } from '@/components/agents/CreatedPlanCard'
 import { ReasoningGhost } from '@/components/agents/ReasoningGhost'
@@ -39,7 +39,8 @@ type TimelineItemProps = {
   hiddenPlanPaths?: ReadonlySet<string> | string[]
 }
 
-export function ChatTranscriptTimelineItem({
+/** Memoized: history rows must not re-render on every streamed delta. */
+export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineItem({
   timelineItem,
   sessionId,
   client,
@@ -190,4 +191,4 @@ export function ChatTranscriptTimelineItem({
       sessionId={sessionId}
     />
   )
-}
+})

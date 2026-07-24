@@ -9,7 +9,7 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import { ArrowDown } from 'lucide-react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
-import { useMemo } from 'react'
+import { useDeferredValue, useMemo } from 'react'
 
 import { AgentStatusText } from '@/components/agents/AgentStatusText'
 import { BuildPlanStatusCard } from '@/components/agents/BuildPlanStatusCard'
@@ -87,6 +87,9 @@ export function ChatTranscript({
     () => buildChatTimelineItems(conversationTimeline),
     [conversationTimeline]
   )
+  // Deferred: the markdown re-parse of the growing stream renders at low
+  // priority so typing/scrolling stays responsive during fast token bursts.
+  const deferredDelta = useDeferredValue(liveDelta)
   const hiddenPlanPaths = useMemo(() => {
     const paths = new Set(builtPlanPaths)
     if (activeBuildPlan?.path) paths.add(activeBuildPlan.path)
@@ -168,10 +171,10 @@ export function ChatTranscript({
                 />
               </div>
             ) : null}
-            {liveDelta ? (
+            {deferredDelta ? (
               <div className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150">
                 <MarkdownContent
-                  content={liveDelta}
+                  content={deferredDelta}
                   streaming
                   onOpenFile={onOpenFile}
                   workspacePath={session?.workspacePath}
@@ -179,7 +182,7 @@ export function ChatTranscript({
                 />
               </div>
             ) : null}
-            {runActive && !liveDelta ? (
+            {runActive && !deferredDelta ? (
               <div className="mx-auto flex w-full max-w-[44rem] items-center px-2 py-2 text-sm">
                 {pendingApproval ? (
                   <span className="animate-text-shimmer font-light">

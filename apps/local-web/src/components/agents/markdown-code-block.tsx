@@ -41,7 +41,9 @@ export const MarkdownCodeBlock = memo(function MarkdownCodeBlock({
   }, [])
 
   useEffect(() => {
-    if (!language || isMermaid) return
+    // Highlighting a growing block on every delta is a stream-perf killer;
+    // show the plain <pre> fallback and highlight once the message settles.
+    if (!language || isMermaid || streaming) return
     let active = true
     void import('shiki').then(({ codeToHtml }) =>
       codeToHtml(code, {
@@ -54,7 +56,7 @@ export const MarkdownCodeBlock = memo(function MarkdownCodeBlock({
     return () => {
       active = false
     }
-  }, [code, dark, isMermaid, language])
+  }, [code, dark, isMermaid, language, streaming])
 
   if (isMermaid) {
     return (

@@ -37,6 +37,9 @@ def register_auth_middleware(app: FastAPI, deps: AppDeps) -> None:
                 cookies=request.cookies,
                 api_key=key,
                 secret_key=deps.current_secret(),
+                # EventSource cannot set headers; SSE consumers pass ?token=
+                # (same pattern as the sandbox/PTY WebSockets).
+                query_token=request.query_params.get("token"),
             )
             if not ok:
                 return JSONResponse(

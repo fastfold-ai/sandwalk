@@ -70,13 +70,13 @@ def test_together_inkling_and_maverick_multimodal():
 
     assert (
         model_supports_image_inputs(
-            "together", "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
+            "together", "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP4"
         )
         is True
     )
     assert (
         model_supports_pdf_inputs(
-            "together", "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
+            "together", "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP4"
         )
         is False
     )

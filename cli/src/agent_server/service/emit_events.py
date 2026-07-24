@@ -94,6 +94,11 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
         event_type = _EVENT_TYPES.get(event)
         if event_type is None:
             return
+        if event == "stream":
+            # Perf probe: run pipeline reports tail latency after last token.
+            import time
+
+            emit_runtime_event.last_stream_at = time.monotonic()
         event_payload = _event_payload(event, payload)
         if event == "approval_required":
             # Keep runId on the wire for the UI even though payload omits it.
@@ -129,4 +134,5 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
                     payload=plan_payload,
                 )
 
+    emit_runtime_event.last_stream_at = None
     return emit_runtime_event

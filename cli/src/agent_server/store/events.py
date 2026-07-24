@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from agent_server.models import EventEnvelope
+from agent_server.store.event_notifier import EVENT_NOTIFIER
 from agent_server.store.util import utc_now
 
 
@@ -38,6 +39,8 @@ class EventMixin:
                 ),
             )
             sequence = int(cursor.lastrowid or 0)
+        # Wake SSE pollers immediately (outside the write lock).
+        EVENT_NOTIFIER.notify(session_id)
         return EventEnvelope(
             id=event_id,
             session_id=session_id,

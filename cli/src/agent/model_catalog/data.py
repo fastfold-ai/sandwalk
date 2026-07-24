@@ -153,11 +153,8 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
             "DeepSeek V4 Pro · via Together",
             "DeepSeek V4 Pro via Together AI",
         ),
-        (
-            "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-            "Llama 4 Maverick · via Together",
-            "Meta Llama 4 Maverick — vision via Together AI",
-        ),
+        # Llama 4 (Maverick/Scout) is dedicated-endpoint-only on Together now
+        # (HTTP 400 model_not_available on serverless) — not curated.
     ],
 }
 

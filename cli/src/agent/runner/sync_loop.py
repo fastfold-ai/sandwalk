@@ -122,6 +122,7 @@ class SyncLoopMixin:
                     self._cancel_loop_tasks(loop)
                     raise KeyboardInterrupt
         finally:
+            t_shutdown = time.time()
             stdin_watch_stop.set()
             if stdin_watch_thread is not None:
                 stdin_watch_thread.join(timeout=0.25)
@@ -138,6 +139,9 @@ class SyncLoopMixin:
             asyncio.set_event_loop(None)
             with suppress(Exception):
                 loop.close()
+            logger.info(
+                "[perf] runner loop shutdown %.2fs", time.time() - t_shutdown
+            )
 
     def request_interrupt(self, force: bool = False) -> bool:
         """Request interrupt from another thread (interactive prompt while running)."""

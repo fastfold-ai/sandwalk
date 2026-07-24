@@ -1,6 +1,6 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { AgentMessage, AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
-import { lazy, Suspense, type ComponentProps, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import type { AgentMessage, AgentPlanCard, AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
+import { lazy, Suspense, useCallback, useMemo, useRef, type ComponentProps, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
@@ -116,6 +116,57 @@ export function SessionChatBody({
   setPendingOpenPath,
   error
 }: SessionChatBodyProps) {
+  // Stable callbacks: memoized transcript rows must not re-render per stream
+  // delta because a lambda got a new identity. Composer props change every
+  // render, so reach them through a ref.
+  const composerPropsRef = useRef(agentComposerSlotProps)
+  composerPropsRef.current = agentComposerSlotProps
+
+  const handleToggleToolRunExpanded = useCallback(
+    (key: string) => {
+      if (!sessionId) return
+      patchChat(sessionId, prev => ({
+        ...prev,
+        expandedToolRunKeys: {
+          ...prev.expandedToolRunKeys,
+          [key]: !(prev.expandedToolRunKeys[key] === true)
+        }
+      }))
+    },
+    [patchChat, sessionId]
+  )
+
+  const handleOpenFile = useCallback(
+    (path: string) => {
+      setFilesPanelCollapsed(false)
+      setPendingOpenPath(path)
+    },
+    [setFilesPanelCollapsed, setPendingOpenPath]
+  )
+
+  const handleBuildPlan = useCallback(
+    (plan: AgentPlanCard) => {
+      if (!sessionId) return
+      void startPlanBuild({
+        sessionId,
+        plan,
+        patchChat,
+        client,
+        setRuntimeSettings: composerPropsRef.current.setRuntimeSettings,
+        handleComposerSend: composerPropsRef.current.handleComposerSend
+      })
+    },
+    [client, patchChat, sessionId]
+  )
+
+  const handleInterrupt = useMemo(
+    () =>
+      sessionId
+        ? () => void composerPropsRef.current.handleStop()
+        : undefined,
+    [sessionId]
+  )
+
   return (
     <>
       {isInspect ? (
@@ -173,16 +224,7 @@ export function SessionChatBody({
               expandedToolRunKeys={expandedToolRunKeys}
               sessionId={sessionId}
               client={client}
-              onToggleToolRunExpanded={key => {
-                if (!sessionId) return
-                patchChat(sessionId, prev => ({
-                  ...prev,
-                  expandedToolRunKeys: {
-                    ...prev.expandedToolRunKeys,
-                    [key]: !(prev.expandedToolRunKeys[key] === true)
-                  }
-                }))
-              }}
+              onToggleToolRunExpanded={handleToggleToolRunExpanded}
               runActive={runActive}
               tools={tools}
               runIdByMessageId={runIdByMessageId}
@@ -191,26 +233,9 @@ export function SessionChatBody({
               copiedMessageId={copiedMessageId}
               setCopiedMessageId={setCopiedMessageId}
               session={session}
-              onOpenFile={path => {
-                setFilesPanelCollapsed(false)
-                setPendingOpenPath(path)
-              }}
-              onBuildPlan={plan => {
-                if (!sessionId) return
-                void startPlanBuild({
-                  sessionId,
-                  plan,
-                  patchChat,
-                  client,
-                  setRuntimeSettings: agentComposerSlotProps.setRuntimeSettings,
-                  handleComposerSend: agentComposerSlotProps.handleComposerSend
-                })
-              }}
-              onInterrupt={
-                sessionId
-                  ? () => void agentComposerSlotProps.handleStop()
-                  : undefined
-              }
+              onOpenFile={handleOpenFile}
+              onBuildPlan={handleBuildPlan}
+              onInterrupt={handleInterrupt}
               activeRunTools={activeRunTools}
               activeRunTodos={activeRunTodos}
               activeBuildPlan={activeBuildPlan}

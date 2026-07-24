@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from agent_server.app_deps import AppDeps
 from agent_server.models import EventList
+from agent_server.store.event_notifier import EVENT_NOTIFIER
 
 
 def register_session_event_routes(app: FastAPI, deps: AppDeps) -> None:
@@ -41,7 +42,11 @@ def register_session_event_routes(app: FastAPI, deps: AppDeps) -> None:
         async def event_source() -> AsyncIterator[str]:
             nonlocal cursor
             heartbeat_ticks = 0
+            flush_after_batch = False
             while not await request.is_disconnected():
+                # Capture the generation before querying so an event appended
+                # between the query and the wait wakes us instantly.
+                generation = EVENT_NOTIFIER.generation(session_id)
                 events = await asyncio.to_thread(
                     store.list_events,
                     session_id,
@@ -55,13 +60,33 @@ def register_session_event_routes(app: FastAPI, deps: AppDeps) -> None:
                             event.model_dump(mode="json", by_alias=True),
                             separators=(",", ":"),
                         )
-                        yield f"id: {event.sequence}\nevent: {event.type}\ndata: {data}\n\n"
+                        # No `event:` name — EventSource.onmessage only fires
+                        # for unnamed frames; the payload JSON carries `type`.
+                        yield f"id: {event.sequence}\ndata: {data}\n\n"
+                    # WKWebView (Tauri) buffers small fetch-stream chunks until
+                    # more bytes arrive, so trailing frames (assistant.message /
+                    # run.completed) can sit undelivered for seconds. Pad each
+                    # batch past the buffer threshold; browsers ignore comments.
+                    yield ":" + (" " * 8192) + "\n\n"
+                    flush_after_batch = True
                 else:
+                    if flush_after_batch:
+                        # Second write in a separate packet: WKWebView may hold
+                        # the previous chunk until more network data arrives.
+                        flush_after_batch = False
+                        yield ":" + (" " * 8192) + "\n\n"
                     heartbeat_ticks += 1
                     if heartbeat_ticks >= 15:
                         heartbeat_ticks = 0
                         yield ": heartbeat\n\n"
-                    await asyncio.sleep(1)
+                    # Push-latency wake on new events; 1s timeout preserves the
+                    # heartbeat cadence and disconnect detection.
+                    await asyncio.to_thread(
+                        EVENT_NOTIFIER.wait_for_change,
+                        session_id,
+                        generation,
+                        1.0,
+                    )
 
         return StreamingResponse(
             event_source(),

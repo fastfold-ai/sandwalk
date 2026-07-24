@@ -324,9 +324,14 @@ class DeepAgentsRunMixin:
                             "model_call_count": 0,
                         }
                     thinking_status = None  # consumed by process_events
+                    t_stream_end = time.time()
                     result = _merge_deepagents_chunks(result, chunk)
                     interrupt_payload = await asyncio.to_thread(
                         extract_interrupt_payload, agent, run_config
+                    )
+                    logger.info(
+                        "[perf] deepagents: interrupt-state check %.2fs after stream end",
+                        time.time() - t_stream_end,
                     )
                     if interrupt_payload is None:
                         break
@@ -360,10 +365,15 @@ class DeepAgentsRunMixin:
                 clear_session_grants(session_id or None)
                 reset_hitl_context(hitl_token)
             if sandbox_handle is not None and sandbox_handle.kind == "modal":
+                t_pull = time.time()
                 try:
                     sandbox_handle.pull()
                 except Exception as pull_exc:  # noqa: BLE001
                     logger.warning("Modal workspace pull failed: %s", pull_exc)
+                logger.info(
+                    "[perf] deepagents: modal workspace pull %.2fs",
+                    time.time() - t_pull,
+                )
         except InterruptedError:
             if thinking_status is not None:
                 thinking_status.stop()
@@ -392,6 +402,13 @@ class DeepAgentsRunMixin:
             if thinking_status is not None:
                 thinking_status.stop()
 
-        return self._build_deepagents_exec_result(
+        t_build = time.time()
+        exec_result = self._build_deepagents_exec_result(
             query, result, t0, model_name, sandbox, trace_events, MODEL_PRICING
         )
+        logger.info(
+            "[perf] deepagents: build result %.2fs (total run %.2fs)",
+            time.time() - t_build,
+            time.time() - t0,
+        )
+        return exec_result

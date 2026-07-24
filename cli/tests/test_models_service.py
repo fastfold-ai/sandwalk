@@ -271,12 +271,14 @@ def test_opencode_discovers_models_when_key_set(
     opencode_ids = {
         item.id for item in listed.data if item.provider == "opencode"
     }
-    assert "kimi-k2.7-code" in opencode_ids
-    assert "glm-5.2" in opencode_ids
-    kimi = next(item for item in listed.data if item.id == "kimi-k2.7-code")
-    assert kimi.enabled is True
-    assert kimi.source == "cloud"
-    assert kimi.label == "Kimi K2.7 Code"
+    # Ids owned by the static catalog (kimi-k2.7-code → moonshot,
+    # deepseek-v4-flash → deepseek) stay with their providers; discovery
+    # only surfaces ids the catalog doesn't already list.
+    assert opencode_ids == {"glm-5.2"}
+    glm = next(item for item in listed.data if item.id == "glm-5.2")
+    assert glm.enabled is True
+    assert glm.source == "cloud"
+    assert glm.label == "GLM 5.2"
 
     # No models when discover=False (static catalog has no opencode entries).
     static = service.list_models(discover=False)

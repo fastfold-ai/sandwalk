@@ -43,6 +43,9 @@ function skillsMutatedFromToolEvent(event: AgentEvent): boolean {
   return record.skills_updated === true
 }
 
+/** Flush cadence for streamed text deltas (~30fps keeps markdown parse cheap). */
+const DELTA_FLUSH_MS = 33
+
 export function useSessionChatStream({
   client,
   health,
@@ -59,6 +62,47 @@ export function useSessionChatStream({
   loadSkillsRef
 }: UseSessionChatStreamArgs) {
   const streamControllersRef = useRef<Map<string, AbortController>>(new Map())
+
+  // Perf probe (visible in devtools): time from last delta to run.completed
+  // as *received* by JS — splits webview transport lag from render lag.
+  const lastDeltaAtRef = useRef<Map<string, number>>(new Map())
+
+  // Coalesce assistant.delta events: one React state update per flush window
+  // instead of one per token. Buffers/timers live in refs so late timer
+  // callbacks never see stale closures.
+  const deltaBuffersRef = useRef<Map<string, string>>(new Map())
+  const deltaTimersRef = useRef<Map<string, number>>(new Map())
+  const flushDeltaRef = useRef<(id: string) => void>(() => {})
+  flushDeltaRef.current = (id: string) => {
+    const timer = deltaTimersRef.current.get(id)
+    if (timer !== undefined) {
+      window.clearTimeout(timer)
+      deltaTimersRef.current.delete(id)
+    }
+    const text = deltaBuffersRef.current.get(id)
+    if (!text) return
+    deltaBuffersRef.current.delete(id)
+    // Mirrors reduceChatOnAgentEvent's assistant.delta branch.
+    patchChat(id, prev => ({ ...prev, liveDelta: prev.liveDelta + text }))
+  }
+  const queueDelta = (id: string, delta: string) => {
+    deltaBuffersRef.current.set(
+      id,
+      (deltaBuffersRef.current.get(id) || '') + delta
+    )
+    if (!deltaTimersRef.current.has(id)) {
+      deltaTimersRef.current.set(
+        id,
+        window.setTimeout(() => flushDeltaRef.current(id), DELTA_FLUSH_MS)
+      )
+    }
+  }
+  const dropDeltaBuffer = (id: string) => {
+    const timer = deltaTimersRef.current.get(id)
+    if (timer !== undefined) window.clearTimeout(timer)
+    deltaTimersRef.current.delete(id)
+    deltaBuffersRef.current.delete(id)
+  }
 
   useEffect(() => {
     if (!health || !sessionId) return
@@ -116,8 +160,9 @@ export function useSessionChatStream({
 
   useEffect(() => {
     if (!health) {
-      for (const controller of streamControllersRef.current.values()) {
+      for (const [id, controller] of streamControllersRef.current) {
         controller.abort()
+        dropDeltaBuffer(id)
       }
       streamControllersRef.current.clear()
       return
@@ -136,6 +181,7 @@ export function useSessionChatStream({
       if (!wanted.has(id)) {
         controller.abort()
         streamControllersRef.current.delete(id)
+        dropDeltaBuffer(id)
       }
     }
 
@@ -148,6 +194,27 @@ export function useSessionChatStream({
         .streamEvents(id, {
           signal: controller.signal,
           onEvent: (event: AgentEvent) => {
+            if (event.type === 'assistant.delta') {
+              lastDeltaAtRef.current.set(id, performance.now())
+              queueDelta(id, event.payload.delta)
+              return
+            }
+            if (
+              event.type === 'run.completed' ||
+              event.type === 'assistant.message'
+            ) {
+              const lastDelta = lastDeltaAtRef.current.get(id)
+              if (lastDelta !== undefined) {
+                console.debug(
+                  `[perf-ui] ${event.type} received ${(
+                    performance.now() - lastDelta
+                  ).toFixed(0)}ms after last delta`
+                )
+              }
+            }
+            // Any other event flushes buffered deltas first to keep ordering
+            // (e.g. run.completed clears liveDelta after the last token).
+            flushDeltaRef.current(id)
             patchChat(id, prev => reduceChatOnAgentEvent(prev, event))
 
             if (skillsMutatedFromToolEvent(event)) {

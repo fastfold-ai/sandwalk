@@ -715,6 +715,13 @@ export class LocalAgentClient
   ): Promise<void> {
     const query = new URLSearchParams()
     if (options.afterSequence) query.set('after_sequence', String(options.afterSequence))
+    // Prefer native EventSource: WKWebView (Tauri) buffers fetch ReadableStream
+    // chunks, delivering trailing frames (run.completed) seconds late. The
+    // native SSE parser flushes per event and auto-reconnects with
+    // Last-Event-ID, which the server maps back onto the event cursor.
+    if (typeof EventSource !== 'undefined') {
+      return this.streamEventsViaEventSource(sessionId, query, options)
+    }
     const suffix = query.size ? `?${query}` : ''
     const response = await fetch(
       `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/events${suffix}`,
@@ -748,6 +755,57 @@ export class LocalAgentClient
         if (data) options.onEvent(JSON.parse(data) as AgentEvent)
       }
     }
+  }
+
+  private streamEventsViaEventSource(
+    sessionId: string,
+    query: URLSearchParams,
+    options: {
+      signal?: AbortSignal
+      onEvent: (event: AgentEvent) => void
+    },
+  ): Promise<void> {
+    // EventSource cannot set headers; authenticate via query token
+    // (same pattern as the sandbox/PTY WebSockets) plus cookies.
+    if (this.apiKey) query.set('token', this.apiKey)
+    const suffix = query.size ? `?${query}` : ''
+    const url = `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/events${suffix}`
+    return new Promise<void>((resolve, reject) => {
+      const source = new EventSource(url, { withCredentials: true })
+      let opened = false
+      const cleanup = () => {
+        source.close()
+        options.signal?.removeEventListener('abort', onAbort)
+      }
+      const onAbort = () => {
+        cleanup()
+        resolve()
+      }
+      if (options.signal?.aborted) {
+        onAbort()
+        return
+      }
+      options.signal?.addEventListener('abort', onAbort)
+      source.onopen = () => {
+        opened = true
+      }
+      source.onmessage = (message) => {
+        try {
+          options.onEvent(JSON.parse(message.data) as AgentEvent)
+        } catch {
+          // Ignore malformed frames; the stream keeps going.
+        }
+      }
+      source.onerror = () => {
+        // Transient errors auto-reconnect (readyState CONNECTING); only a
+        // CLOSED source is fatal.
+        if (source.readyState === EventSource.CLOSED) {
+          cleanup()
+          if (opened) resolve()
+          else reject(new Error('FastFold Agent event stream failed to connect'))
+        }
+      }
+    })
   }
 
   async listFiles(sessionId: string, signal?: AbortSignal): Promise<WorkspaceFile[]> {
