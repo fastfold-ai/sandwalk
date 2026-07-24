@@ -5,8 +5,6 @@ import type { RefObject } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-import { tabColorBackgroundStyle } from './tab-context-menu'
-
 export function TerminalTabBar({
   tabs,
   activeId,
@@ -50,24 +48,16 @@ export function TerminalTabBar({
         {tabs.map(tab => {
           const color = tabColors[tab.id]
           const renaming = renameId === tab.id
-          const colored = Boolean(color)
           return (
             <div
               key={tab.id}
               className={cn(
                 'group relative my-auto flex h-8 max-w-[180px] shrink-0 items-center rounded-md px-2.5',
-                colored
-                  ? 'text-[#1f2937]'
-                  : activeId === tab.id || renaming
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                colored &&
-                  activeId !== tab.id &&
-                  !renaming &&
-                  'opacity-90 hover:opacity-100',
+                activeId === tab.id || renaming
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
                 renaming && 'max-w-[220px] pr-1.5'
               )}
-              style={color ? tabColorBackgroundStyle(color) : undefined}
               onContextMenu={event => {
                 if (renaming) return
                 event.preventDefault()
@@ -76,21 +66,12 @@ export function TerminalTabBar({
             >
               {renaming ? (
                 <div className="inline-flex min-w-0 max-w-full flex-1 items-center gap-1.5">
-                  <span
-                    className={cn(
-                      'inline-flex size-5 shrink-0 items-center justify-center rounded-full',
-                      colored ? 'bg-black/15' : 'bg-transparent'
-                    )}
-                  >
+                  <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full">
                     <SquareTerminal className="size-3.5 opacity-80" />
                   </span>
                   <input
                     ref={renameInputRef}
-                    className={cn(
-                      'border-input bg-background text-foreground focus-visible:ring-ring h-6 w-full min-w-[6rem] rounded border px-1.5 text-xs font-medium outline-none focus-visible:ring-1',
-                      colored &&
-                        'border-black/15 bg-white/70 text-[#1f2937] focus-visible:ring-black/20'
-                    )}
+                    className="border-input bg-background text-foreground focus-visible:ring-ring h-6 w-full min-w-[6rem] rounded border px-1.5 text-xs font-medium outline-none focus-visible:ring-1"
                     value={renameValue}
                     onFocus={event => event.currentTarget.select()}
                     onChange={event => onRenameValueChange(event.target.value)}
@@ -122,24 +103,21 @@ export function TerminalTabBar({
                       onBeginRename(tab)
                     }}
                   >
-                    <span
-                      className={cn(
-                        'inline-flex size-5 shrink-0 items-center justify-center rounded-full',
-                        colored ? 'bg-black/15' : 'bg-transparent'
-                      )}
-                    >
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full">
                       <SquareTerminal className="size-3.5 opacity-80" />
                     </span>
+                    {color ? (
+                      <span
+                        className="size-2 shrink-0 rounded-full border border-black/10"
+                        style={{ backgroundColor: color }}
+                        aria-hidden
+                      />
+                    ) : null}
                     <span className="truncate">{tab.title}</span>
                   </button>
                   <button
                     type="button"
-                    className={cn(
-                      'absolute right-0.5 top-1/2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100',
-                      colored
-                        ? 'bg-black/10 hover:bg-black/20'
-                        : 'bg-muted hover:bg-background/80'
-                    )}
+                    className="bg-muted hover:bg-background/80 absolute right-0.5 top-1/2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100"
                     aria-label={`Close ${tab.title}`}
                     onClick={event => {
                       event.stopPropagation()

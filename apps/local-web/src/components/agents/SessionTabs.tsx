@@ -14,13 +14,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useHorizontalWheelScroll } from '@/hooks/useHorizontalWheelScroll'
 import { cn } from '@/lib/utils'
 
+import { SessionStatusIcon } from './SessionStatusIcon'
 import { useSessionTabColors } from './session-tab-colors'
 import {
   TabContextItem,
   TabContextMenuShell,
   TabContextSeparator,
-  TabInlineColorRow,
-  tabColorBackgroundStyle
+  TabInlineColorRow
 } from './tab-context-menu'
 
 type TabContextMenuState = {
@@ -96,7 +96,6 @@ export function SessionTabs({
   const renderTab = (tab: AgentSession, options?: { scrollActive?: boolean }) => {
     const active = tab.id === activeId
     const color = tabColors[tab.id]
-    const colored = Boolean(color)
     const pinned = tab.organizeLabel === 'pinned'
     return (
       <div
@@ -104,14 +103,10 @@ export function SessionTabs({
         ref={options?.scrollActive && active ? activeTabRef : undefined}
         className={cn(
           'group relative flex h-8 w-40 shrink-0 items-center rounded-md px-2.5',
-          colored
-            ? 'text-[#1f2937]'
-            : active
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-          colored && !active && 'opacity-90 hover:opacity-100'
+          active
+            ? 'bg-muted text-foreground'
+            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
         )}
-        style={color ? tabColorBackgroundStyle(color) : undefined}
         onContextMenu={event => {
           event.preventDefault()
           setMenu({
@@ -127,12 +122,14 @@ export function SessionTabs({
           onClick={() => onSelect(tab.id)}
           title={tab.title || 'Untitled'}
         >
+          <SessionStatusIcon status={tab.status} />
           {pinned ? (
-            <Pin
-              className={cn(
-                'size-3 shrink-0',
-                colored ? 'opacity-80' : 'text-muted-foreground'
-              )}
+            <Pin className="text-muted-foreground size-3 shrink-0" aria-hidden />
+          ) : null}
+          {color ? (
+            <span
+              className="size-2 shrink-0 rounded-full border border-black/10"
+              style={{ backgroundColor: color }}
               aria-hidden
             />
           ) : null}
@@ -140,12 +137,7 @@ export function SessionTabs({
         </button>
         <button
           type="button"
-          className={cn(
-            'absolute right-0.5 top-1/2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100',
-            colored
-              ? 'bg-black/10 hover:bg-black/20'
-              : 'bg-muted hover:bg-background/80'
-          )}
+          className="bg-muted hover:bg-background/80 absolute right-0.5 top-1/2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100"
           aria-label={`Close ${tab.title || 'Untitled'}`}
           onClick={event => {
             event.stopPropagation()

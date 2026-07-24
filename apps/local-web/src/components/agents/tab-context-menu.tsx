@@ -1,9 +1,9 @@
 import { Ban } from 'lucide-react'
-import { type CSSProperties, type ReactNode,useEffect, useRef } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 
 import { cn } from '@/lib/utils'
 
-/** Soft pastel fills for colored terminal tabs (Cursor-style). */
+/** Soft pastel dots marking colored tabs (Cursor-style). */
 export const TAB_INLINE_COLORS: { name: string; value: string }[] = [
   { name: 'Pink', value: '#F5A9C5' },
   { name: 'Green', value: '#86D4A8' },
@@ -12,13 +12,6 @@ export const TAB_INLINE_COLORS: { name: string; value: string }[] = [
   { name: 'Purple', value: '#B5A4F5' },
   { name: 'Teal', value: '#76C0A7' }
 ]
-
-export function tabColorBackgroundStyle(color: string): CSSProperties {
-  return {
-    backgroundColor: color,
-    color: '#1f2937'
-  }
-}
 
 export function TabContextMenuShell({
   x,
