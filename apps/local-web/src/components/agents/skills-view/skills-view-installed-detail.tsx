@@ -5,9 +5,11 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import {
   ArrowLeft,
+  ArrowUp,
   Box,
   CalendarDays,
   GitBranch,
+  Loader2,
   Tag,
   Trash2,
   UserRound
@@ -41,13 +43,18 @@ export function SkillsInstalledDetailView({
   detailIconInvert,
   detailVersionLabel,
   detailUpdatedLabel,
+  updateAvailable = false,
+  latestVersionLabel = null,
   copiedInstall,
   pendingEnabled,
   pendingRemove,
+  pendingUpgrade,
   batchBusy,
+  batchToast,
   removeTarget,
   onBack,
   onCopyInstall,
+  onUpgrade,
   onRemove,
   onRemoveDialogOpenChange,
   onConfirmRemove,
@@ -65,16 +72,21 @@ export function SkillsInstalledDetailView({
   detailIconInvert: boolean
   detailVersionLabel: string
   detailUpdatedLabel: string
+  updateAvailable?: boolean
+  latestVersionLabel?: string | null
   copiedInstall: boolean
   pendingEnabled: Record<string, boolean>
   pendingRemove: Record<string, boolean>
+  pendingUpgrade: boolean
   batchBusy: boolean
+  batchToast: { message: string; tone: 'success' | 'warning' } | null
   removeTarget:
     | { type: 'single'; name: string }
     | { type: 'filtered'; count: number }
     | null
   onBack: () => void
   onCopyInstall: () => void
+  onUpgrade: () => void
   onRemove: (name: string) => void
   onRemoveDialogOpenChange: (open: boolean) => void
   onConfirmRemove: () => void
@@ -121,6 +133,35 @@ export function SkillsInstalledDetailView({
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
             type="button"
+            variant={updateAvailable ? 'default' : 'ghost'}
+            size="sm"
+            className={cn(
+              'h-7 px-2 text-xs',
+              updateAvailable && 'bg-foreground text-background hover:bg-foreground/90'
+            )}
+            disabled={pendingUpgrade || batchBusy}
+            title={
+              updateAvailable
+                ? latestVersionLabel
+                  ? `Upgrade to ${latestVersionLabel}`
+                  : 'A newer version is available — run upgrade'
+                : 'Sync installed skills to the latest release (sandwalk skills upgrade)'
+            }
+            onClick={onUpgrade}
+          >
+            {pendingUpgrade ? (
+              <Loader2 className="mr-1 size-3.5 animate-spin" />
+            ) : (
+              <ArrowUp className="mr-1 size-3.5" />
+            )}
+            {updateAvailable
+              ? latestVersionLabel
+                ? `Upgrade to ${latestVersionLabel}`
+                : 'Upgrade available'
+              : 'Upgrade'}
+          </Button>
+          <Button
+            type="button"
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-xs text-red-600 hover:text-red-700"
@@ -131,32 +172,26 @@ export function SkillsInstalledDetailView({
             Remove
           </Button>
           {localSkillsShUrl ? (
-            <a
-              href={localSkillsShUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted"
-            >
-              <img
-                src="/suggestions/skills-sh.png"
-                alt=""
-                className="size-3.5 rounded object-contain dark:invert"
-              />
-              View in Skills.sh
-            </a>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+              <a href={localSkillsShUrl} target="_blank" rel="noreferrer">
+                <img
+                  src="/suggestions/skills-sh.png"
+                  alt=""
+                  className="mr-1 size-3.5 rounded object-contain dark:invert"
+                />
+                View in Skills.sh
+              </a>
+            </Button>
           ) : null}
           {detailGithubUrl ? (
-            <a
-              href={detailGithubUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted"
-            >
-              <GitBranch className="h-3.5 w-3.5" />
-              View in GitHub
-            </a>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+              <a href={detailGithubUrl} target="_blank" rel="noreferrer">
+                <GitBranch className="mr-1 h-3.5 w-3.5" />
+                View in GitHub
+              </a>
+            </Button>
           ) : (
-            <span className="text-muted-foreground inline-flex items-center gap-1.5 rounded-md border border-border/60 px-3 py-1.5 text-xs">
+            <span className="text-muted-foreground inline-flex h-7 items-center gap-1.5 px-2 text-xs">
               <GitBranch className="h-3.5 w-3.5" />
               Source not on GitHub
             </span>
@@ -277,6 +312,20 @@ export function SkillsInstalledDetailView({
           </div>
         </div>
       </ScrollArea>
+      {batchToast ? (
+        <div
+          className={cn(
+            'fixed bottom-4 right-4 z-50 max-w-xs rounded-md border px-3 py-2 text-xs shadow-md',
+            batchToast.tone === 'warning'
+              ? 'border-amber-300/70 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100'
+              : 'border-border/70 bg-background/95 text-foreground'
+          )}
+          role="status"
+          aria-live="polite"
+        >
+          {batchToast.message}
+        </div>
+      ) : null}
       <SkillsRemoveDialog
         removeTarget={removeTarget}
         onOpenChange={onRemoveDialogOpenChange}

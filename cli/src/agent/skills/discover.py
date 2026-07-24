@@ -46,6 +46,8 @@ def _scan_dir(base: Path, source: str) -> dict[str, _skills.SkillInfo]:
                 info.updated_at = str(meta.get("installed_at") or "")
                 release = meta.get("release")
                 info.version = str(release) if release else None
+                commit = str(meta.get("commit") or "").strip()
+                info.commit = commit or None
             if source == "npx" and info.source == "npx":
                 lock_source = npx_sources.get(child.name) or npx_sources.get(info.name)
                 if lock_source:

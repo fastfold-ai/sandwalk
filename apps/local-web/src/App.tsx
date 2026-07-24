@@ -119,6 +119,7 @@ export default function App() {
     onOnboardingPath: route.onOnboardingPath,
     onboardingStep: route.onboardingStep,
     sessionTitle: context.session?.title,
+    titleSource: context.session?.titleSource,
     activeIntegration: context.activeIntegration,
     activeProject: context.activeProject,
     isDashboardOverview: route.isDashboardOverview,

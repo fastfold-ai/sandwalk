@@ -1,15 +1,15 @@
 import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { getFileIcon } from '@/lib/file-icons'
 import { mediaObjectUrlFromFile } from '@/lib/media-src'
 import { cn } from '@/lib/utils'
 
 import { AudioPlayPreview } from './AudioPlayPreview'
-import { StructureViewer } from './StructureViewer'
 import { VideoPlayPreview } from './VideoPlayPreview'
 import { decodeContent, structureFormat } from './artifact-grid-thumb-utils'
+import { Py2dMolMiniPreview } from './py2dmol/Py2dMolMiniPreview'
 
 export function IconFallback({
   name,
@@ -43,28 +43,39 @@ export function ImageThumb({
 }) {
   const [src, setSrc] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const isSvg = name.toLowerCase().endsWith('.svg')
 
   useEffect(() => {
     const controller = new AbortController()
     let objectUrl: string | null = null
+    setFailed(false)
+    setSrc(null)
     void client
       .readFile(sessionId, path, controller.signal)
       .then(file => {
         if (controller.signal.aborted) return
         if (file.encoding === 'base64') {
+          const mime =
+            file.mimeType && file.mimeType !== 'application/octet-stream'
+              ? file.mimeType
+              : isSvg
+                ? 'image/svg+xml'
+                : 'application/octet-stream'
+          setSrc(`data:${mime};base64,${file.content}`)
+          return
+        }
+        // Match FilePreview: data URLs are more reliable for SVG than Blobs
+        // (Blob + revoke races under Strict Mode leave empty dark tiles).
+        if (isSvg || file.mimeType === 'image/svg+xml') {
           setSrc(
-            `data:${file.mimeType || 'application/octet-stream'};base64,${
-              file.content
-            }`
+            `data:image/svg+xml;charset=utf-8,${encodeURIComponent(file.content)}`
           )
           return
         }
         const mime =
           file.mimeType && file.mimeType !== 'application/octet-stream'
             ? file.mimeType
-            : name.toLowerCase().endsWith('.svg')
-              ? 'image/svg+xml'
-              : 'text/plain'
+            : 'text/plain'
         objectUrl = URL.createObjectURL(
           new Blob([file.content], { type: mime })
         )
@@ -77,19 +88,27 @@ export function ImageThumb({
       controller.abort()
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [client, name, path, sessionId])
+  }, [client, isSvg, name, path, sessionId])
 
   if (failed) return <IconFallback name={name} />
   if (!src) {
     return <div className="bg-muted/30 h-full w-full animate-pulse" />
   }
   return (
-    <img
-      src={src}
-      alt={name}
-      className="h-full w-full object-contain p-1.5"
-      onError={() => setFailed(true)}
-    />
+    <div
+      className={cn(
+        'flex h-full w-full items-center justify-center',
+        // Light plate so dark/currentColor SVGs stay visible in dark UI.
+        isSvg && 'bg-white'
+      )}
+    >
+      <img
+        src={src}
+        alt={name}
+        className="h-full w-full object-contain p-1.5"
+        onError={() => setFailed(true)}
+      />
+    </div>
   )
 }
 
@@ -228,6 +247,53 @@ export function TextThumb({
   )
 }
 
+export function StructureThumb({
+  client,
+  sessionId,
+  path,
+  name
+}: {
+  client: LocalAgentClient
+  sessionId: string
+  path: string
+  name: string
+}) {
+  const [text, setText] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+  const structureKind = structureFormat(name)
+  const format: 'pdb' | 'cif' | null =
+    structureKind === 'pdb' ? 'pdb' : structureKind === 'sdf' ? null : 'cif'
+  const viewerId = useMemo(
+    () => `thumb-${path.replace(/[^a-zA-Z0-9_-]+/g, '_')}`,
+    [path]
+  )
+
+  useEffect(() => {
+    if (!format) return
+    const controller = new AbortController()
+    setFailed(false)
+    setText(null)
+    void client
+      .readFile(sessionId, path, controller.signal)
+      .then(file => {
+        if (controller.signal.aborted) return
+        setText(decodeContent(file.encoding, file.content))
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true)
+      })
+    return () => controller.abort()
+  }, [client, format, path, sessionId])
+
+  if (!format || failed) return <IconFallback name={name} />
+  if (!text) {
+    return <div className="bg-muted/30 h-full w-full animate-pulse" />
+  }
+  return (
+    <Py2dMolMiniPreview text={text} format={format} viewerId={viewerId} />
+  )
+}
+
 export function TableThumb({
   client,
   sessionId,
@@ -292,38 +358,3 @@ export function TableThumb({
   )
 }
 
-export function StructureThumb({
-  client,
-  sessionId,
-  path,
-  name
-}: {
-  client: LocalAgentClient
-  sessionId: string
-  path: string
-  name: string
-}) {
-  const [data, setData] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    const controller = new AbortController()
-    void client
-      .readFile(sessionId, path, controller.signal)
-      .then(file => {
-        if (controller.signal.aborted) return
-        setData(decodeContent(file.encoding, file.content))
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setFailed(true)
-      })
-    return () => controller.abort()
-  }, [client, path, sessionId])
-
-  if (failed) return <IconFallback name={name} />
-  if (!data) {
-    return <div className="bg-muted/30 h-full w-full animate-pulse" />
-  }
-
-  return <StructureViewer data={data} format={structureFormat(name)} compact />
-}

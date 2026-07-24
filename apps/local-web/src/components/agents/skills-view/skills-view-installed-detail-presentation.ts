@@ -18,7 +18,18 @@ export function resolveInstalledDetailPresentation(detail: AgentSkillDetail) {
     ? featuredSkillIcon(detail)
     : skillIcon(detail)
   const detailIconInvert = skillIconInvertInDark(detail)
-  const detailVersionLabel = displaySkillVersion(detail.version)
+  const installed = detail.version
+    ? displaySkillVersion(detail.version)
+    : detail.commit
+      ? detail.commit.slice(0, 7)
+      : 'Unknown'
+  const rawLatest = String(detail.latestVersion || '').trim()
+  const latest = detail.updateAvailable
+    ? detail.updateChannel === 'commit' || /^[0-9a-f]{7,40}$/i.test(rawLatest)
+      ? rawLatest.slice(0, 7)
+      : displaySkillVersion(rawLatest)
+    : null
+  const detailVersionLabel = installed
   const detailUpdatedLabel = formatSkillUpdatedLabel(detail.updatedAt)
   const detailGithubUrl = skillGithubUrl(detail.name, detail.source)
   const detailAuthorUrl = skillAuthorUrl(detail.source)
@@ -29,6 +40,8 @@ export function resolveInstalledDetailPresentation(detail: AgentSkillDetail) {
     detailVersionLabel,
     detailUpdatedLabel,
     detailGithubUrl,
-    detailAuthorUrl
+    detailAuthorUrl,
+    updateAvailable: Boolean(detail.updateAvailable),
+    latestVersionLabel: latest
   }
 }

@@ -18,6 +18,10 @@ class SkillSummary(ApiModel):
     updated_at: str | None = None
     icon_src: str | None = None
     enabled: bool = True
+    commit: str | None = None
+    update_available: bool = False
+    latest_version: str | None = None
+    update_channel: str | None = None
 
 
 class SkillList(ApiModel):

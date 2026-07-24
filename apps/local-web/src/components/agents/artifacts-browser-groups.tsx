@@ -172,13 +172,21 @@ function ArtifactEntryCard({
   onFileContextMenu: (file: WorkspaceFile, x: number, y: number) => void
 }) {
   return (
-    <button
-      type="button"
+    // div (not button): structure thumbs embed control stubs; nested <button> is invalid HTML.
+    <div
+      role="button"
+      tabIndex={0}
       className={cn(
-        'hover:bg-muted/60 group/file flex flex-col items-stretch gap-1.5 rounded-md border border-transparent p-1.5 text-left transition-colors',
+        'hover:bg-muted/60 group/file flex cursor-pointer flex-col items-stretch gap-1.5 rounded-md border border-transparent p-1.5 text-left transition-colors',
         activePath === file.path && 'bg-muted border-border'
       )}
       onClick={() => onOpen(file)}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onOpen(file)
+        }
+      }}
       onContextMenu={event => {
         event.preventDefault()
         onFileContextMenu(file, event.clientX, event.clientY)
@@ -201,7 +209,7 @@ function ArtifactEntryCard({
           ? 'Folder'
           : relativeTime(file.mtime)}
       </span>
-    </button>
+    </div>
   )
 }
 
@@ -243,8 +251,12 @@ export function ArtifactsBrowserGroups({
     return visibleGroups.map(group => {
       const root = groupRootPath(group.id)
       const cwd = searchActive ? root : (cwdByGroup[group.id] ?? root)
+      // Flatten mode / search: show every file under the group so previews
+      // appear without drilling into folders.
       const items = searchActive
-        ? [...group.files].sort(compareArtifacts)
+        ? [...group.files]
+            .filter(file => file.type === 'file')
+            .sort(compareArtifacts)
         : childrenOf(group.files, cwd)
       return { group, root, cwd, items }
     })

@@ -20,14 +20,13 @@ export function WorkspaceFileContentArea({
   reloading,
   status,
   browser,
-  client,
-  sessionId,
   onSelectFilesTab,
   onCloseTab,
   onOpenModal,
   onDraftChange,
   onSave,
   onReload,
+  onDownload,
   onAddToChat,
   onBuildPlan
 }: {
@@ -50,6 +49,7 @@ export function WorkspaceFileContentArea({
   onDraftChange: (value: string) => void
   onSave: () => void
   onReload?: () => void
+  onDownload: () => void
   onAddToChat: (path: string) => void
   onBuildPlan?: (path: string) => void
 }) {
@@ -75,7 +75,7 @@ export function WorkspaceFileContentArea({
           dirty={isDirty}
           saving={saving}
           reloading={reloading}
-          downloadUrl={client.downloadUrl(sessionId, active.path)}
+          onDownload={onDownload}
           onAddToChat={() => onAddToChat(active.path)}
           onSave={onSave}
           onReload={onReload}
@@ -109,11 +109,7 @@ export function WorkspaceFileContentArea({
         dirty={false}
         saving={false}
         reloading={reloading}
-        downloadUrl={
-          openingPath || activePath
-            ? client.downloadUrl(sessionId, openingPath || activePath!)
-            : '#'
-        }
+        onDownload={onDownload}
         onAddToChat={() => {
           if (activePath) onAddToChat(activePath)
         }}

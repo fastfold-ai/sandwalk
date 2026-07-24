@@ -21,6 +21,7 @@ type SkillsViewListActionsInput = {
   ) => Promise<AgentSkillBatchResult>
   onSetEnabled: (name: string, enabled: boolean) => Promise<void>
   onRemove: (name: string) => Promise<void>
+  onUpgrade: () => Promise<string[]>
 }
 
 export function useSkillsViewListActions({
@@ -30,10 +31,12 @@ export function useSkillsViewListActions({
   onBack,
   onBulkAction,
   onSetEnabled,
-  onRemove
+  onRemove,
+  onUpgrade
 }: SkillsViewListActionsInput) {
   const [pendingEnabled, setPendingEnabled] = useState<Record<string, boolean>>({})
   const [pendingRemove, setPendingRemove] = useState<Record<string, boolean>>({})
+  const [pendingUpgrade, setPendingUpgrade] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<
     | { type: 'single'; name: string }
     | { type: 'filtered'; count: number }
@@ -155,9 +158,36 @@ export function useSkillsViewListActions({
     if (!open) setRemoveTarget(null)
   }
 
+  const upgradeSkills = async () => {
+    if (batchBusy || pendingUpgrade) return
+    setPendingUpgrade(true)
+    setBatchBusy(true)
+    try {
+      const installed = await onUpgrade()
+      const count = installed.length
+      setBatchToast({
+        message:
+          count > 0
+            ? `Upgraded ${count} skill${count === 1 ? '' : 's'} to latest.`
+            : 'Skills already up to date.',
+        tone: 'success'
+      })
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Skill upgrade failed.'
+      setBatchToast({ message, tone: 'warning' })
+    } finally {
+      setPendingUpgrade(false)
+      setBatchBusy(false)
+    }
+  }
+
   return {
     pendingEnabled,
     pendingRemove,
+    pendingUpgrade,
     removeTarget,
     batchBusy,
     batchToast,
@@ -170,6 +200,7 @@ export function useSkillsViewListActions({
     removeFiltered,
     confirmRemoveSkill,
     setFilteredEnabled,
-    handleRemoveDialogOpenChange
+    handleRemoveDialogOpenChange,
+    upgradeSkills
   }
 }

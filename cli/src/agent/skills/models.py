@@ -32,6 +32,10 @@ class SkillInfo:
     category: str = ""  # optional frontmatter category / origin
     updated_at: str = ""  # ISO timestamp the skill was installed/updated
     version: str | None = None  # release tag (e.g. "v1.2.0") when known
+    commit: str | None = None  # installed git SHA when known
+    update_available: bool = False
+    latest_version: str | None = None  # newer release tag or short SHA
+    update_channel: str | None = None  # "release" | "commit"
     icon: str = ""  # optional icon path/URL from SKILL.md frontmatter
     enabled: bool = True
 

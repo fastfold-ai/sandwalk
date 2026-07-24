@@ -228,9 +228,13 @@ export type AgentProject = {
   updatedAt: string
 }
 
+export type SessionTitleSource = 'pending' | 'auto' | 'user'
+
 export type AgentSession = {
   id: string
   title: string
+  /** pending = still eligible for auto-title; auto = model-generated; user = renamed */
+  titleSource?: SessionTitleSource
   status: AgentSessionStatus
   organizeLabel: 'pinned' | 'archive' | null
   projectId: string | null
@@ -964,6 +968,10 @@ export type AgentSkill = {
   updatedAt: string | null
   iconSrc: string | null
   enabled: boolean
+  commit?: string | null
+  updateAvailable?: boolean
+  latestVersion?: string | null
+  updateChannel?: 'release' | 'commit' | string | null
 }
 
 export type AgentSkillDetail = AgentSkill & {

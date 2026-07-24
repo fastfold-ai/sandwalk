@@ -22,14 +22,17 @@ class AgentStoreBase(ConnectionMixin):
 
     Durability rules:
     - Exclusive serve takes a process lock so a second serve cannot open the
-      same file, and checkpoints WAL on ``close()``.
+      same file, checkpoints WAL on ``close()``, then switches to DELETE journal
+      so a restart never re-applies a stale ``-wal``.
     - Short-lived CLI opens leave ``exclusive=False`` so they can share the DB
       with a running server via SQLite WAL.
-    - On exclusive open, a corrupt DB is auto-healed when enabled (default):
-      quarantine → ``sqlite3 .recover`` → last ``*.recovered`` backup. Set
+    - On exclusive open (and again if a connect hits "malformed"), a corrupt DB
+      is auto-healed when enabled (default): quarantine → ``sqlite3 .recover``
+      on the main file only → last ``*.recovered`` backup. Set
       ``SANDWALK_DB_AUTO_HEAL=0`` to refuse and fail loud instead.
-    - Hard ``kill -9`` / crash mid-write is the usual corruption cause (menubar
-      restart loops historically SIGKILL'd the API after ~0.2s).
+    - Prefer ``SIGTERM`` / graceful shutdown over ``kill -9``. Hard kills during
+      heal/install used to leave a new main paired with an old WAL — that path
+      is guarded now.
     """
 
     def __init__(
@@ -70,17 +73,27 @@ class AgentStoreBase(ConnectionMixin):
             self._atexit_registered = True
 
     def close(self) -> None:
-        """Checkpoint WAL and release the exclusive lock (idempotent)."""
+        """Checkpoint WAL, fold into main, and release the exclusive lock."""
         with self._write_lock:
             if self._closed:
                 return
             self._closed = True
             try:
                 if self.path.exists():
-                    with self._connect() as connection:
+                    # Use the raw opener so a heal loop cannot run during close.
+                    with self._open_connection() as connection:
                         connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                        # Fold WAL into the main file so the next process never
+                        # inherits a sidecar from this generation.
+                        connection.execute("PRAGMA journal_mode = DELETE")
             except sqlite3.Error as exc:
                 logger.warning("WAL checkpoint on close failed: %s", exc)
+            try:
+                from agent_server.store_heal import clear_wal_sidecars
+
+                clear_wal_sidecars(self.path)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Clearing WAL sidecars on close failed: %s", exc)
             self._release_exclusive_lock()
 
     def _initialize(self) -> None:

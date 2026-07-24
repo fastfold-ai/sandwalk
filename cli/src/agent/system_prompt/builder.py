@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from .credentials_section import build_credentials_section
 from .knowledge_section import build_knowledge_sections
 from .mode_section import build_mode_section
 from .skills_section import build_skills_section
@@ -60,6 +61,7 @@ def build_system_prompt(
     parts: list[str] = [_IDENTITY]
 
     parts.append(build_workspace_section(workspace_path, sandbox_backend))
+    parts.append(build_credentials_section())
 
     plan_mode = bool(getattr(session, "config", None) and session.config.get("agent.plan_preview", False))
     parts.append(

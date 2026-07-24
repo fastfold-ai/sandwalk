@@ -2983,6 +2983,7 @@ dependencies = [
 name = "sandwalk-desktop"
 version = "0.0.1"
 dependencies = [
+ "base64 0.22.1",
  "dirs 5.0.1",
  "reqwest 0.12.28",
  "serde",

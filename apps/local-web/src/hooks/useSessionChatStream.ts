@@ -158,6 +158,11 @@ export function useSessionChatStream({
     // Intentionally omit `sessions` — only re-hydrate when the active session changes.
   }, [client, health, patchChat, sessionId])
 
+  // Cursor per session so intentional stream restarts (and EventSource
+  // reconnects that lose Last-Event-ID) don't replay the entire history —
+  // that spam-logged run.completed and could leave the UI looking stuck.
+  const afterSequenceRef = useRef<Map<string, number>>(new Map())
+
   useEffect(() => {
     if (!health) {
       for (const [id, controller] of streamControllersRef.current) {
@@ -189,11 +194,19 @@ export function useSessionChatStream({
       if (streamControllersRef.current.has(id)) continue
       const controller = new AbortController()
       streamControllersRef.current.set(id, controller)
+      const afterSequence = afterSequenceRef.current.get(id) || 0
 
       void client
         .streamEvents(id, {
+          afterSequence,
           signal: controller.signal,
           onEvent: (event: AgentEvent) => {
+            if (typeof event.sequence === 'number' && event.sequence > 0) {
+              const prev = afterSequenceRef.current.get(id) || 0
+              if (event.sequence > prev) {
+                afterSequenceRef.current.set(id, event.sequence)
+              }
+            }
             if (event.type === 'assistant.delta') {
               lastDeltaAtRef.current.set(id, performance.now())
               queueDelta(id, event.payload.delta)

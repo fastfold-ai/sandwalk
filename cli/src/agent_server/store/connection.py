@@ -110,12 +110,36 @@ class ConnectionMixin:
                 pass
 
     def _connect(self) -> sqlite3.Connection:
+        try:
+            return self._open_connection()
+        except sqlite3.DatabaseError as exc:
+            # Exclusive serve: a mid-flight malformed DB (stale WAL after a hard
+            # kill/restart) can be healed once under the write lock.
+            if not getattr(self, "_exclusive", False):
+                raise
+            detail = str(exc).lower()
+            healable = (
+                "malformed" in detail
+                or "corrupt" in detail
+                or "not a database" in detail
+                or "disk image is malformed" in detail
+            )
+            if not healable:
+                raise
+            with self._write_lock:
+                logger.warning("Agent DB error on connect (%s); attempting heal", exc)
+                self._assert_healthy_database(allow_heal=True)
+                return self._open_connection()
+
+    def _open_connection(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA journal_mode = WAL")
-        # NORMAL is durable enough with WAL; avoid OFF (torn pages on kill).
-        connection.execute("PRAGMA synchronous = NORMAL")
+        # Exclusive serve uses FULL so a SIGKILL mid-write is far less likely to
+        # leave a torn main DB. CLI/shared opens keep NORMAL for speed.
+        sync = "FULL" if getattr(self, "_exclusive", False) else "NORMAL"
+        connection.execute(f"PRAGMA synchronous = {sync}")
         connection.execute("PRAGMA busy_timeout = 30000")
         return connection
 

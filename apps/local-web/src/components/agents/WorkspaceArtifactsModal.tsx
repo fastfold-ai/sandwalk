@@ -24,8 +24,8 @@ export function WorkspaceArtifactsModal({
   activePath,
   draft,
   editorDark,
-  client,
-  sessionId,
+  client: _client,
+  sessionId: _sessionId,
   onUpload,
   onRefresh,
   onReload,
@@ -33,7 +33,8 @@ export function WorkspaceArtifactsModal({
   onAddToChat,
   onBuildPlan,
   onDraftChange,
-  onSave
+  onSave,
+  onDownload
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -53,6 +54,7 @@ export function WorkspaceArtifactsModal({
   onBuildPlan?: (path: string) => void
   onDraftChange: (value: string) => void
   onSave: () => void
+  onDownload?: (path: string) => void
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -133,17 +135,15 @@ export function WorkspaceArtifactsModal({
                       </Button>
                     ) : null}
                     <Button
+                      type="button"
                       variant="ghost"
                       size="icon"
                       className="size-7"
-                      asChild
+                      title="Download"
+                      aria-label="Download"
+                      onClick={() => onDownload?.(activeTab.path)}
                     >
-                      <a
-                        href={client.downloadUrl(sessionId, activeTab.path)}
-                        download
-                      >
-                        <Download className="size-3.5" />
-                      </a>
+                      <Download className="size-3.5" />
                     </Button>
                   </div>
                 </div>

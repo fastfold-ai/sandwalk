@@ -122,6 +122,11 @@ export function DashboardMainOverviewPanel({
           await client.removeSkill(name)
           await loadSkills()
         }}
+        onUpgrade={async () => {
+          const installed = await client.upgradeSkills()
+          await loadSkills()
+          return installed
+        }}
       />
       <McpView
         featuredOnly

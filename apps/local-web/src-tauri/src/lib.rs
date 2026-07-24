@@ -194,6 +194,105 @@ fn toggle_maximize(window: tauri::WebviewWindow) -> Result<bool, String> {
     }
 }
 
+fn sanitize_download_filename(name: &str) -> String {
+    let trimmed = name.trim();
+    let base = if trimmed.is_empty() { "download" } else { trimmed };
+    let safe: String = base
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_' | ' ') {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let collapsed = safe.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.is_empty() {
+        "download".into()
+    } else {
+        collapsed
+    }
+}
+
+fn unique_download_path(dir: &std::path::Path, filename: &str) -> PathBuf {
+    let candidate = dir.join(filename);
+    if !candidate.exists() {
+        return candidate;
+    }
+    let stem = candidate
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("download");
+    let ext = candidate
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|e| format!(".{e}"))
+        .unwrap_or_default();
+    for index in 1..1000 {
+        let next = dir.join(format!("{stem} ({index}){ext}"));
+        if !next.exists() {
+            return next;
+        }
+    }
+    dir.join(format!(
+        "{stem}-{}.{}{ext}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    ))
+}
+
+fn reveal_in_file_manager(path: &std::path::Path) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = Command::new("open").args(["-R"]).arg(path).spawn();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(parent) = path.parent() {
+            let _ = Command::new("xdg-open").arg(parent).spawn();
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = Command::new("explorer")
+            .args(["/select,", &path.display().to_string()])
+            .spawn();
+    }
+}
+
+fn write_download_file(default_filename: &str, bytes: &[u8]) -> Result<String, String> {
+    let dir = dirs::download_dir()
+        .or_else(dirs::home_dir)
+        .ok_or_else(|| "Unable to locate Downloads folder.".to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let filename = sanitize_download_filename(default_filename);
+    let path = unique_download_path(&dir, &filename);
+    fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    reveal_in_file_manager(&path);
+    Ok(path.display().to_string())
+}
+
+/// Save text to the user's Downloads folder (WebView `<a download>` is a no-op
+/// in Tauri). Reveals the file in Finder on macOS.
+#[tauri::command]
+fn save_text_file(default_filename: String, contents: String) -> Result<String, String> {
+    write_download_file(&default_filename, contents.as_bytes())
+}
+
+/// Save binary bytes (base64) to Downloads and reveal in the file manager.
+#[tauri::command]
+fn save_bytes_file(default_filename: String, contents_base64: String) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(contents_base64.trim())
+        .map_err(|e| format!("Invalid base64 payload: {e}"))?;
+    write_download_file(&default_filename, &bytes)
+}
+
 /// Open a URL in the system browser (Safari / default handler).
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
@@ -330,6 +429,8 @@ pub fn run() {
             start_window_drag,
             toggle_maximize,
             open_external_url,
+            save_text_file,
+            save_bytes_file,
         ])
         .setup(|app| {
             ensure_server_helper();

@@ -6,6 +6,7 @@ import {
   FolderPlus,
   LayoutGrid,
   List,
+  ListTree,
   MoreHorizontal,
   RefreshCw,
   Search,
@@ -21,6 +22,7 @@ import {
 import { cn } from '@/lib/utils'
 
 import { ArtifactsBrowserGroups } from './artifacts-browser-groups'
+import { ArtifactsBrowserPathFooter } from './artifacts-browser-path-footer'
 import {
   ArtifactsBrowserScopeMenu,
   useArtifactsBrowserScope
@@ -34,11 +36,14 @@ export function ArtifactsBrowser({
   totalCount,
   query,
   viewMode,
+  flatMode = false,
   expandedGroups,
   activePath,
   empty,
+  workspacePath = null,
   onQueryChange,
   onViewModeChange,
+  onFlatModeChange,
   onToggleGroup,
   onOpenFile,
   onDownloadFile,
@@ -56,11 +61,14 @@ export function ArtifactsBrowser({
   totalCount: number
   query: string
   viewMode: ViewMode
+  flatMode?: boolean
   expandedGroups: Record<string, boolean>
   activePath: string | null
   empty: boolean
+  workspacePath?: string | null
   onQueryChange: (value: string) => void
   onViewModeChange: (mode: ViewMode) => void
+  onFlatModeChange?: (flat: boolean) => void
   onToggleGroup: (id: string) => void
   onOpenFile: (file: WorkspaceFile) => void
   onDownloadFile: (path: string) => void
@@ -73,6 +81,7 @@ export function ArtifactsBrowser({
   onFileContextMenu: (file: WorkspaceFile, x: number, y: number) => void
 }) {
   const scopeState = useArtifactsBrowserScope(groups, totalCount)
+  const flatten = flatMode || query.trim().length > 0
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -123,6 +132,26 @@ export function ArtifactsBrowser({
           >
             <List className="size-3.5" />
           </Button>
+          {onFlatModeChange ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={cn('size-6', flatMode && 'bg-muted')}
+              title={
+                flatMode
+                  ? 'Show folders (narrow)'
+                  : 'Expand all folders (show every file)'
+              }
+              aria-label={
+                flatMode ? 'Show folders' : 'Expand all folders'
+              }
+              aria-pressed={flatMode}
+              onClick={() => onFlatModeChange(!flatMode)}
+            >
+              <ListTree className="size-3.5" />
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -204,11 +233,15 @@ export function ArtifactsBrowser({
         expandedGroups={expandedGroups}
         activePath={activePath}
         empty={empty}
-        searchActive={query.trim().length > 0}
+        searchActive={flatten}
         onToggleGroup={onToggleGroup}
         onOpenFile={onOpenFile}
         onDownloadFile={onDownloadFile}
         onFileContextMenu={onFileContextMenu}
+      />
+      <ArtifactsBrowserPathFooter
+        workspacePath={workspacePath}
+        relativePath={activePath}
       />
     </div>
   )

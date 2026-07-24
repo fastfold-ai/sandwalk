@@ -4,13 +4,10 @@ import { FileText } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { AudioPlayPreview } from '@/components/agents/AudioPlayPreview'
-import {
-  decodeContent,
-  structureFormat
-} from '@/components/agents/artifact-grid-thumb-utils'
 import { PdfFirstPagePreview } from '@/components/agents/PdfFirstPagePreview'
-import { StructureViewer } from '@/components/agents/StructureViewer'
 import { VideoPlayPreview } from '@/components/agents/VideoPlayPreview'
+import { decodeContent } from '@/components/agents/artifact-grid-thumb-utils'
+import { Py2dMolMiniPreview } from '@/components/agents/py2dmol/Py2dMolMiniPreview'
 import { isStructure } from '@/components/agents/workspace-utils'
 import { getFileIcon } from '@/lib/file-icons'
 import { mediaObjectUrlFromFile } from '@/lib/media-src'
@@ -85,7 +82,7 @@ export function MessageFilePreview({
   const name = path.split('/').at(-1) || path
   const [src, setSrc] = useState<string | null>(null)
   const [pdfBase64, setPdfBase64] = useState<string | null>(null)
-  const [structureData, setStructureData] = useState<string | null>(null)
+  const [structureText, setStructureText] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
@@ -95,7 +92,7 @@ export function MessageFilePreview({
     let objectUrl: string | null = null
     setSrc(null)
     setPdfBase64(null)
-    setStructureData(null)
+    setStructureText(null)
     setFailed(false)
     setLoaded(false)
     void client
@@ -103,7 +100,7 @@ export function MessageFilePreview({
       .then(file => {
         if (controller.signal.aborted) return
         if (kind === 'structure') {
-          setStructureData(decodeContent(file.encoding, file.content))
+          setStructureText(decodeContent(file.encoding, file.content))
           return
         }
         if (kind === 'pdf') {
@@ -148,22 +145,14 @@ export function MessageFilePreview({
   }
 
   if (kind === 'structure') {
-    // Explicit width: user bubbles are `inline-block w-auto`, and Mol* is
-    // absolutely positioned, so `w-full` collapses to the filename chip.
-    if (!structureData) {
-      return (
-        <div
-          className="bg-background/60 h-52 w-96 max-w-full animate-pulse rounded-lg"
-          aria-hidden
-        />
-      )
-    }
+    const format = name.toLowerCase().endsWith('.pdb') ? 'pdb' : 'cif'
+    const viewerId = `msg-${path.replace(/[^a-zA-Z0-9_-]+/g, '_')}`
     return (
       <div
         role={onOpenFile ? 'button' : undefined}
         tabIndex={onOpenFile ? 0 : undefined}
         className={cn(
-          'bg-background/50 border-border/60 flex w-96 max-w-full flex-col overflow-hidden rounded-lg border text-left',
+          'bg-background/50 border-border/60 flex w-72 max-w-full flex-col overflow-hidden rounded-lg border text-left',
           onOpenFile ? 'hover:bg-background/80 cursor-pointer' : 'cursor-default'
         )}
         title={onOpenFile ? `Open @${path}` : `@${path}`}
@@ -176,12 +165,16 @@ export function MessageFilePreview({
           }
         }}
       >
-        <div className="relative h-52 w-full overflow-hidden">
-          <StructureViewer
-            data={structureData}
-            format={structureFormat(name)}
-            compact
-          />
+        <div className="relative h-36 w-full overflow-hidden">
+          {structureText ? (
+            <Py2dMolMiniPreview
+              text={structureText}
+              format={format}
+              viewerId={viewerId}
+            />
+          ) : (
+            <div className="bg-muted/30 h-full w-full animate-pulse" />
+          )}
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs">
           <Icon icon={getFileIcon(name)} className="size-3.5 shrink-0" />

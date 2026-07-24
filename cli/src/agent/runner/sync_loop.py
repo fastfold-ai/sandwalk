@@ -17,9 +17,15 @@ import signal
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 
 logger = logging.getLogger("runner")
+
+# Temporary per-run loops must not block forever in finally waiting on
+# stray to_thread workers — that left desktop runs stuck in status=running
+# after the model had already finished streaming.
+_EXECUTOR_SHUTDOWN_TIMEOUT_S = 2.0
 
 
 class SyncLoopMixin:
@@ -28,6 +34,12 @@ class SyncLoopMixin:
     def _run_coro_sync(self, coro):
         """Run async coroutine with SDK interrupt before force cancel."""
         loop = asyncio.new_event_loop()
+        # Dedicated executor so we can hard-stop it without touching the
+        # process-wide default pool used by uvicorn / other loops.
+        executor = ThreadPoolExecutor(
+            max_workers=8, thread_name_prefix="sandwalk-agent-run"
+        )
+        loop.set_default_executor(executor)
         task = loop.create_task(coro)
         with self._active_client_lock:
             self._active_loop = loop
@@ -137,6 +149,16 @@ class SyncLoopMixin:
             self._cancel_loop_tasks(loop)
             self._restore_tty_mode(tty_state)
             asyncio.set_event_loop(None)
+            # Never block run completion on leftover executor threads (network
+            # calls, sandbox helpers, etc.). wait=False returns immediately;
+            # cancel_futures drops queued work that never started.
+            try:
+                executor.shutdown(wait=False, cancel_futures=True)
+            except TypeError:
+                # Python < 3.9 has no cancel_futures.
+                executor.shutdown(wait=False)
+            except Exception:  # noqa: BLE001
+                logger.debug("agent-run executor shutdown failed", exc_info=True)
             with suppress(Exception):
                 loop.close()
             logger.info(
@@ -257,9 +279,19 @@ class SyncLoopMixin:
         if pending:
             with suppress(Exception):
                 loop.run_until_complete(
-                    asyncio.gather(*pending, return_exceptions=True)
+                    asyncio.wait_for(
+                        asyncio.gather(*pending, return_exceptions=True),
+                        timeout=_EXECUTOR_SHUTDOWN_TIMEOUT_S,
+                    )
                 )
         with suppress(Exception):
-            loop.run_until_complete(loop.shutdown_asyncgens())
-        with suppress(Exception):
-            loop.run_until_complete(loop.shutdown_default_executor())
+            loop.run_until_complete(
+                asyncio.wait_for(
+                    loop.shutdown_asyncgens(),
+                    timeout=_EXECUTOR_SHUTDOWN_TIMEOUT_S,
+                )
+            )
+        # Do NOT call loop.shutdown_default_executor() here — on a temporary
+        # per-run loop it can hang forever waiting for wedged to_thread workers,
+        # which blocks _finish_run and leaves the UI stuck on the stop button.
+        # The dedicated executor is shut down explicitly in _run_coro_sync.

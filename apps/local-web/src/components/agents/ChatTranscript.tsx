@@ -16,10 +16,11 @@ import { BuildPlanStatusCard } from '@/components/agents/BuildPlanStatusCard'
 import { HitlDecisionCard } from '@/components/agents/hitl/HitlDecisionCard'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { TodoListInline } from '@/components/agents/TodoListInline'
-import { ToolCard, type TranscriptTool } from '@/components/agents/ToolCard'
+import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import { buildChatTimelineItems } from '@/components/agents/chat-transcript-timeline'
 import { ChatTranscriptTimelineItem } from '@/components/agents/chat-transcript-timeline-item'
+import { LiveToolStack } from '@/components/agents/live-tool-stack'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 type ChatTranscriptProps = {
@@ -145,22 +146,11 @@ export function ChatTranscript({
                 />
               </div>
             ) : null}
-            {activeRunTools.length > 0 ? (
-              <div className="space-y-1">
-                {activeRunTools.map(tool => (
-                  <div
-                    key={`active-${tool.id}`}
-                    className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150"
-                  >
-                    <ToolCard
-                      tool={tool}
-                      isRunning={runActive}
-                      onStop={onInterrupt}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : null}
+            <LiveToolStack
+              tools={activeRunTools}
+              runActive={runActive}
+              onInterrupt={onInterrupt}
+            />
             {pendingApproval && onSubmitApprovals ? (
               <div className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150">
                 <HitlDecisionCard

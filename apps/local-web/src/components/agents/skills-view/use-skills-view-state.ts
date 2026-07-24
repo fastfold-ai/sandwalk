@@ -62,6 +62,7 @@ export type SkillsViewInput = {
   ) => Promise<AgentSkillBatchResult>
   onSetEnabled: (name: string, enabled: boolean) => Promise<void>
   onRemove: (name: string) => Promise<void>
+  onUpgrade: () => Promise<string[]>
 }
 
 export function useSkillsViewState({
@@ -83,7 +84,8 @@ export function useSkillsViewState({
   onGetCatalogAudit,
   onBulkAction,
   onSetEnabled,
-  onRemove
+  onRemove,
+  onUpgrade
 }: SkillsViewInput) {
   const [installing, setInstalling] = useState(false)
 
@@ -106,7 +108,8 @@ export function useSkillsViewState({
     onBack,
     onBulkAction,
     onSetEnabled,
-    onRemove
+    onRemove,
+    onUpgrade
   })
 
   const catalog = useSkillsViewCatalog({

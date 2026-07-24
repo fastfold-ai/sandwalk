@@ -55,24 +55,30 @@ def build_skills_section(
     modal_on = str(sandbox_backend or "").strip().lower() == "modal"
     skills_exec = (
         "To run a skill's bundled scripts, use the `shell_run` tool "
-        "(``python3`` + absolute **host** script path from the skill listing). "
+        "(``python3`` + absolute **host** script path, or "
+        "``$SANDWALK_SKILLS_DIR/<skill>/scripts/...``). "
         "Skill scripts run on the host (API keys / env), not inside Modal.\n"
         "Modal `execute` is only for `/workspace` compute (CPU/GPU code). "
         "Do **not** `execute` skill paths like `/skills/.../scripts/*.py` — "
         "those files are not in the Modal sandbox.\n"
         if modal_on
         else "To run a skill's bundled scripts, prefer the `shell_run` tool "
-        "(``python3`` + absolute script path from the skill listing).\n"
+        "(``python3`` + absolute script path, or "
+        "``$SANDWALK_SKILLS_DIR/<skill>/scripts/...``).\n"
     )
     return (
         "\n## Skills & Filesystem\n"
         "Installed skills are listed in the Skills System section below. Read a "
         "skill's full SKILL.md with `read_file(path, limit=1000)` before following "
         "it. "
+        "When the user message includes `/skill-name` (or a skill chip), that is a "
+        "skill activation — not a directory under `/`. Prefer the preloaded "
+        "SKILL.md / listed `read_file` path; never `ls /skill-name` or hunt "
+        "`/skills` with shell.\n"
         + skills_exec
         + "Filesystem tools (`read_file`, `ls`, `glob`, `grep`) may read skill "
         "directories and the **session workspace**. Do not use them to roam "
         "the whole machine (`/`, `$HOME`, `/tmp`, unrelated repos) looking for "
-        "artifacts — downloads belong in the session workspace so the UI file "
-        "tree stays in sync.\n"
+        "artifacts or API keys — downloads belong in the session workspace; "
+        "credentials come from Integrations / host env (see Credentials section).\n"
     )

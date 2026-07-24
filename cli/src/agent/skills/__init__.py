@@ -23,6 +23,7 @@ This is a package split by responsibility:
 - ``models``   — ``SkillInfo``, SKILL.md frontmatter parsing, display helpers.
 - ``discover`` — tier merging/scanning, name resolution, catalog discovery.
 - ``prompt``   — the adaptive "Installed Agent Skills" prompt section.
+- ``mentions`` — slash/chip skill mentions → activation hint + SKILL.md preload.
 - ``install``  — source detection, git/archive/npx installation, manifest I/O.
 - ``releases`` — GitHub release lookups and the boot-time update cache.
 - ``upgrade``  — re-syncing installed skills to their latest versions.
@@ -182,9 +183,12 @@ from .releases import (  # noqa: E402
     _read_update_cache,
     _tag_tuple,
     _write_update_cache,
+    check_github_skill_update,
     fetch_latest_release,
+    fetch_repo_head_sha,
     get_cached_skills_update,
     refresh_skills_update_cache,
+    resolve_repo_remote_state,
 )
 from .upgrade import (  # noqa: E402
     _clone_repo_once,
@@ -206,6 +210,10 @@ from .remove import (  # noqa: E402
     remove_skill,
     set_skill_enabled,
 )
+from .mentions import (  # noqa: E402
+    build_skill_mention_context,
+    extract_skill_mentions,
+)
 
 __all__ = [
     "SkillInfo",
@@ -224,10 +232,15 @@ __all__ = [
     "discover_skills",
     "discover_ecosystem_skills",
     "build_skills_prompt",
+    "build_skill_mention_context",
+    "extract_skill_mentions",
     "detect_source_type",
     "install_skill",
     "npx_add",
     "fetch_latest_release",
+    "fetch_repo_head_sha",
+    "resolve_repo_remote_state",
+    "check_github_skill_update",
     "get_cached_skills_update",
     "refresh_skills_update_cache",
     "upgrade_skills",

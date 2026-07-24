@@ -1,5 +1,10 @@
 import { useEffect } from 'react'
 
+import {
+  downloadWorkspaceFile,
+  downloadWorkspaceZip
+} from '@/lib/workspace-download'
+
 import { normalizeFileContent } from '../workspace-utils'
 
 import type { WorkspacePanelState } from './use-workspace-panel-state'
@@ -61,8 +66,11 @@ export function useWorkspaceFileActions(
   useEffect(() => {
     if (!openPathRequest) return
     let cancelled = false
+    let clearTimer: number | undefined
     void (async () => {
       try {
+        const requested = openPathRequest.replace(/\\/g, '/')
+        const trimmed = requested.replace(/\/+$/, '')
         const list =
           state.files.length > 0
             ? state.files
@@ -70,33 +78,89 @@ export function useWorkspaceFileActions(
         if (cancelled) return
         const match =
           list.find(
-            file => file.type === 'file' && file.path === openPathRequest
+            file => file.type === 'file' && file.path === requested
           ) ||
           list.find(
             file =>
               file.type === 'file' &&
-              (file.name === openPathRequest ||
-                file.path.endsWith(`/${openPathRequest}`))
+              trimmed.length > 0 &&
+              (file.path === trimmed ||
+                file.name === trimmed ||
+                file.path.endsWith(`/${trimmed}`))
           )
-        if (match) await open.openFile(match)
-        else {
-          const normalized = normalizeFileContent(
-            await client.readFile(sessionId, openPathRequest)
-          )
-          if (cancelled) return
-          setTabs(current => [
-            ...current.filter(tab => tab.path !== normalized.path),
-            normalized
-          ])
-          setActivePath(normalized.path)
-          setDraft(normalized.encoding === 'text' ? normalized.content : '')
-          setFilesTabActive(false)
+        if (match) {
+          await open.openFile(match)
+          return
         }
+
+        // Folder chips like `@artifacts/` must not hit files/content (400).
+        const dirMatch =
+          list.find(
+            file =>
+              file.type === 'directory' &&
+              (file.path === trimmed ||
+                file.path === requested ||
+                `${file.path}/` === requested)
+          ) || null
+        const looksLikeDir =
+          Boolean(dirMatch) ||
+          requested.endsWith('/') ||
+          (trimmed.length > 0 &&
+            list.some(
+              file =>
+                file.path === trimmed ||
+                file.path.startsWith(`${trimmed}/`)
+            ))
+        if (looksLikeDir || !trimmed) {
+          setFilesTabActive(true)
+          setActivePath(null)
+          const hasChildren = list.some(
+            file =>
+              file.type === 'file' &&
+              (trimmed.length === 0 ||
+                file.path === trimmed ||
+                file.path.startsWith(`${trimmed}/`))
+          )
+          setStatus(
+            hasChildren
+              ? `Showing ${trimmed || 'workspace'} in Files`
+              : `No files in ${trimmed || 'workspace'} yet`
+          )
+          clearTimer = window.setTimeout(() => {
+            setStatus(current =>
+              current?.startsWith('No files in') ||
+              current?.startsWith('Showing ')
+                ? null
+                : current
+            )
+          }, 3500)
+          return
+        }
+
+        const normalized = normalizeFileContent(
+          await client.readFile(sessionId, trimmed || requested)
+        )
+        if (cancelled) return
+        setTabs(current => [
+          ...current.filter(tab => tab.path !== normalized.path),
+          normalized
+        ])
+        setActivePath(normalized.path)
+        setDraft(normalized.encoding === 'text' ? normalized.content : '')
+        setFilesTabActive(false)
       } catch (cause) {
         if (!cancelled) {
-          setStatus(
+          setFilesTabActive(true)
+          setActivePath(null)
+          const message =
             cause instanceof Error ? cause.message : 'Unable to open file'
+          // Prefer a short status over a sticky API 400 dump for bad paths.
+          setStatus(
+            /is a directory|artifacts\/|400/i.test(message)
+              ? 'That path is a folder — use Files to browse it'
+              : message
           )
+          clearTimer = window.setTimeout(() => setStatus(null), 4000)
         }
       } finally {
         if (!cancelled) onOpenPathRequestHandled?.()
@@ -104,6 +168,7 @@ export function useWorkspaceFileActions(
     })()
     return () => {
       cancelled = true
+      if (clearTimer) window.clearTimeout(clearTimer)
     }
   }, [openPathRequest])
 
@@ -183,11 +248,9 @@ export function useWorkspaceFileActions(
   }
 
   const downloadFileTab = (path: string) => {
-    const name = path.split('/').at(-1) || path
-    const anchor = document.createElement('a')
-    anchor.href = client.downloadUrl(sessionId, path)
-    anchor.download = name
-    anchor.click()
+    void downloadWorkspaceFile(client, sessionId, path).catch(() => {
+      // toast handled in helper
+    })
   }
 
   const reloadActiveFile = () => {
@@ -390,19 +453,19 @@ export function useWorkspaceFileActions(
   }
 
   const downloadAll = () => {
-    for (const file of artifactFiles) {
-      const anchor = document.createElement('a')
-      anchor.href = client.downloadUrl(sessionId, file.path)
-      anchor.download = file.name
-      anchor.click()
-    }
+    const stamp = new Date().toISOString().slice(0, 10)
+    const zipName = `sandwalk-artifacts-${stamp}.zip`
+    void downloadWorkspaceZip(client, sessionId, artifactFiles, zipName).catch(
+      () => {
+        // toast handled in helper
+      }
+    )
   }
 
   const downloadFile = (path: string) => {
-    const anchor = document.createElement('a')
-    anchor.href = client.downloadUrl(sessionId, path)
-    anchor.download = path.split('/').at(-1) || path
-    anchor.click()
+    void downloadWorkspaceFile(client, sessionId, path).catch(() => {
+      // toast handled in helper
+    })
   }
 
   const handleUploadChange = (uploads: FileList | null) => {

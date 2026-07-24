@@ -15,10 +15,14 @@ OrganizeLabel = Literal["pinned", "archive"]
 
 SandboxBackendChoice = Literal["builtin", "modal"]
 
+# pending = still eligible for auto-title; auto = model-generated; user = manual rename
+TitleSource = Literal["pending", "auto", "user"]
+
 
 class AgentSession(ApiModel):
     id: str
     title: str
+    title_source: TitleSource = "pending"
     status: SessionStatus = "idle"
     organize_label: OrganizeLabel | None = None
     project_id: str | None = None

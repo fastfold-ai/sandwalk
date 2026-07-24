@@ -62,7 +62,7 @@ def _http_get_bytes(
 
 
 def fetch_latest_release(owner_repo: str, *, timeout_s: float = 2.5) -> dict | None:
-    """Return ``{"tag", "published_at"}`` for a repo's latest GitHub Release.
+    """Return ``{"tag", "published_at", "commit"}`` for a repo's latest GitHub Release.
 
     Best-effort and network-bound: returns None on any error or when the repo
     has no releases (HTTP 404). Used to surface a version in the /skills table.
@@ -89,7 +89,179 @@ def fetch_latest_release(owner_repo: str, *, timeout_s: float = 2.5) -> dict | N
     tag = str(data.get("tag_name") or "").strip()
     if not tag:
         return None
-    return {"tag": tag, "published_at": str(data.get("published_at") or "")}
+    commit = ""
+    target = data.get("target_commitish")
+    if isinstance(target, str) and re.fullmatch(r"[0-9a-fA-F]{7,40}", target.strip()):
+        commit = target.strip().lower()
+    return {
+        "tag": tag,
+        "published_at": str(data.get("published_at") or ""),
+        "commit": commit,
+    }
+
+
+def fetch_repo_head_sha(owner_repo: str, *, timeout_s: float = 2.5) -> dict | None:
+    """Return ``{"sha", "default_branch"}`` for a repo's default-branch HEAD."""
+    import httpx
+
+    if not owner_repo:
+        return None
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "fastfold-agent-cli"}
+    try:
+        with httpx.Client(timeout=timeout_s, follow_redirects=True) as client:
+            meta = client.get(f"{_skills.GITHUB_API}/repos/{owner_repo}", headers=headers)
+            if meta.status_code == 404:
+                return None
+            meta.raise_for_status()
+            body = meta.json()
+            branch = str((body or {}).get("default_branch") or "main").strip() or "main"
+            commits = client.get(
+                f"{_skills.GITHUB_API}/repos/{owner_repo}/commits/{branch}",
+                headers=headers,
+            )
+            if commits.status_code == 404:
+                return None
+            commits.raise_for_status()
+            data = commits.json()
+    except (httpx.HTTPError, TimeoutError, ValueError):
+        return None
+    except Exception:  # noqa: BLE001
+        return None
+    sha = str((data or {}).get("sha") or "").strip().lower()
+    if not sha:
+        return None
+    return {"sha": sha, "default_branch": branch}
+
+
+_REPO_CHECK_INTERVAL_S = 3600  # 1h — fresher than catalog banner (24h)
+
+
+def resolve_repo_remote_state(
+    owner_repo: str,
+    *,
+    force: bool = False,
+    timeout_s: float = 2.5,
+) -> dict:
+    """Cached remote state for a GitHub repo: latest release + default HEAD.
+
+    Returns ``{release_tag, release_published_at, head_sha, default_branch, checked_at}``.
+    Values may be empty when the network call fails or the repo has no releases.
+    """
+    owner_repo = str(owner_repo or "").strip()
+    if not owner_repo:
+        return {}
+    cache = _read_update_cache()
+    repos = cache.get("repos") if isinstance(cache.get("repos"), dict) else {}
+    entry = repos.get(owner_repo) if isinstance(repos.get(owner_repo), dict) else {}
+    if entry and not force:
+        checked = entry.get("checked_at")
+        if checked:
+            try:
+                last = datetime.fromisoformat(str(checked))
+                if (datetime.now(UTC) - last).total_seconds() < _REPO_CHECK_INTERVAL_S:
+                    return dict(entry)
+            except Exception:  # noqa: BLE001
+                pass
+
+    release = fetch_latest_release(owner_repo, timeout_s=timeout_s) or {}
+    head = fetch_repo_head_sha(owner_repo, timeout_s=timeout_s) or {}
+    fresh = {
+        "checked_at": datetime.now(UTC).isoformat(),
+        "release_tag": str(release.get("tag") or ""),
+        "release_published_at": str(release.get("published_at") or ""),
+        "release_commit": str(release.get("commit") or ""),
+        "head_sha": str(head.get("sha") or ""),
+        "default_branch": str(head.get("default_branch") or ""),
+    }
+    repos = dict(repos)
+    repos[owner_repo] = fresh
+    cache = dict(cache)
+    cache["repos"] = repos
+    # Keep legacy catalog fields in sync for the Fastfold default catalog.
+    if owner_repo == _skills.DEFAULT_CATALOG.split("@", 1)[0] and fresh["release_tag"]:
+        cache["checked_at"] = fresh["checked_at"]
+        cache["latest_release"] = fresh["release_tag"]
+        cache["latest_published_at"] = fresh["release_published_at"]
+    _write_update_cache(cache)
+    return fresh
+
+
+def check_github_skill_update(
+    source: str,
+    *,
+    installed_release: str | None = None,
+    installed_commit: str | None = None,
+    force: bool = False,
+) -> dict | None:
+    """Return update info for a GitHub-sourced skill, or None if up to date / N/A.
+
+    Policy (works for any GitHub skill repo):
+    1. Prefer latest GitHub **Release** tag vs installed ``release`` (semver).
+    2. Else compare remote default-branch **HEAD** vs installed ``commit``.
+
+    Returns ``{available, channel, latest, installed, owner_repo}`` when an update
+    is available. ``channel`` is ``"release"`` or ``"commit"``.
+    """
+    owner_repo = _owner_repo_from_source(source)
+    if not owner_repo:
+        return None
+    remote = resolve_repo_remote_state(owner_repo, force=force)
+    if not remote:
+        return None
+
+    installed_tag = str(installed_release or "").strip()
+    latest_tag = str(remote.get("release_tag") or "").strip()
+
+    # 1) Release channel — preferred when the repo publishes GitHub Releases.
+    if latest_tag and installed_tag:
+        if _is_newer_tag(latest_tag, installed_tag):
+            return {
+                "available": True,
+                "channel": "release",
+                "latest": latest_tag,
+                "installed": installed_tag,
+                "owner_repo": owner_repo,
+            }
+        # Same semver / same tag → current. Do not also nag on HEAD drift.
+        if latest_tag.lstrip("v") == installed_tag.lstrip("v") or (
+            _tag_tuple(latest_tag)
+            and _tag_tuple(latest_tag) == _tag_tuple(installed_tag)
+        ):
+            return None
+        # Non-semver tags that differ — surface as an update.
+        if latest_tag != installed_tag:
+            return {
+                "available": True,
+                "channel": "release",
+                "latest": latest_tag,
+                "installed": installed_tag,
+                "owner_repo": owner_repo,
+            }
+        return None
+
+    if latest_tag and not installed_tag:
+        return {
+            "available": True,
+            "channel": "release",
+            "latest": latest_tag,
+            "installed": (installed_commit or "")[:7] or "unknown",
+            "owner_repo": owner_repo,
+        }
+
+    # 2) Commit channel — repos without releases (or no installed release label).
+    head = str(remote.get("head_sha") or "").strip().lower()
+    current = str(installed_commit or "").strip().lower()
+    if head and current and not (
+        head == current or head.startswith(current) or current.startswith(head)
+    ):
+        return {
+            "available": True,
+            "channel": "commit",
+            "latest": head[:7],
+            "installed": current[:7],
+            "owner_repo": owner_repo,
+        }
+    return None
 
 
 def _read_update_cache() -> dict:
@@ -168,10 +340,8 @@ def refresh_skills_update_cache(
                 pass
     owner_repo = catalog.split("@", 1)[0]
     rel = _skills.fetch_latest_release(owner_repo, timeout_s=timeout_s)
-    _skills._write_update_cache(
-        {
-            "checked_at": datetime.now(UTC).isoformat(),
-            "latest_release": (rel or {}).get("tag"),
-            "latest_published_at": (rel or {}).get("published_at", ""),
-        }
-    )
+    cache = dict(cache)
+    cache["checked_at"] = datetime.now(UTC).isoformat()
+    cache["latest_release"] = (rel or {}).get("tag")
+    cache["latest_published_at"] = (rel or {}).get("published_at", "")
+    _skills._write_update_cache(cache)

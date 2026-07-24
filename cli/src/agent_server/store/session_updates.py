@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_server.models import AgentSession, SessionStatus
+from agent_server.models import AgentSession, SessionStatus, TitleSource
 from agent_server.store.util import require_sandbox_backend, utc_now
 
 
@@ -12,6 +12,7 @@ class SessionUpdateMixin:
         session_id: str,
         *,
         title: str | None = None,
+        title_source: TitleSource | None = None,
         organize_label: str | None = None,
         update_organize_label: bool = False,
         project_id: str | None = None,
@@ -25,10 +26,19 @@ class SessionUpdateMixin:
         if current is None:
             return None
         next_title = current.title
+        next_title_source = current.title_source
         if title is not None:
             next_title = title.strip()
             if not next_title:
                 raise ValueError("Session title cannot be empty.")
+            # Explicit source wins; otherwise a title patch from the API is a
+            # user rename and must stop further auto-title attempts.
+            if title_source is not None:
+                next_title_source = title_source
+            else:
+                next_title_source = "user"
+        elif title_source is not None:
+            next_title_source = title_source
         next_label = organize_label if update_organize_label else current.organize_label
         next_project_id = current.project_id
         if update_project_id:
@@ -51,12 +61,13 @@ class SessionUpdateMixin:
             connection.execute(
                 """
                 UPDATE sessions
-                SET title = ?, organize_label = ?, project_id = ?, specialist_id = ?,
-                    sandbox_backend = ?, updated_at = ?
+                SET title = ?, title_source = ?, organize_label = ?, project_id = ?,
+                    specialist_id = ?, sandbox_backend = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
                     next_title,
+                    next_title_source,
                     next_label,
                     next_project_id,
                     next_specialist_id,

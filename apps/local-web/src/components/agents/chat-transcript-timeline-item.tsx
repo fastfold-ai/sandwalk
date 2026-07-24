@@ -72,6 +72,7 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
       0,
       timelineItem.tools.length - TOOL_RUN_VISIBLE_COUNT
     )
+    const groupLabel = timelineItem.tools[0]?.name || 'tool'
     return (
       <div key={timelineItem.key} className="space-y-1">
         {hiddenCount > 0 ? (
@@ -90,7 +91,9 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
                 <ChevronRight className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
               )}
               <span>
-                {isExpanded ? 'Show less' : `Show more (${hiddenCount})`}
+                {isExpanded
+                  ? 'Show less'
+                  : `${groupLabel} × ${timelineItem.tools.length}`}
               </span>
             </button>
           </div>

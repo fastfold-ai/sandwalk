@@ -49,6 +49,7 @@ export function ArtifactGridThumb({
           name={file.name}
         />
       ) : kind === 'structure' ? (
+        // Canvas-2D py2Dmol (Library) — no WebGL context limit.
         <StructureThumb
           client={client}
           sessionId={sessionId}

@@ -126,3 +126,53 @@ def test_refresh_healthy_backup_roundtrip(tmp_path: Path) -> None:
     with sqlite3.connect(backup) as connection:
         row = connection.execute("PRAGMA integrity_check").fetchone()
         assert row and row[0] == "ok"
+
+
+def test_install_database_file_strips_stale_wal(tmp_path: Path) -> None:
+    """A leftover -wal from an older generation must not poison a restore."""
+    from agent_server.store_heal import install_database_file, integrity_ok
+
+    healthy = tmp_path / "healthy.db"
+    dest = tmp_path / "live.db"
+    with sqlite3.connect(healthy) as connection:
+        connection.execute("CREATE TABLE t(x INTEGER)")
+        connection.execute("INSERT INTO t VALUES (1)")
+        connection.commit()
+
+    # Fake a stale WAL next to the destination (wrong generation).
+    dest.write_bytes(b"old-broken-main")
+    Path(f"{dest}-wal").write_bytes(b"not-a-real-wal-but-must-be-removed")
+    Path(f"{dest}-shm").write_bytes(b"\0" * 32)
+
+    install_database_file(healthy, dest)
+
+    assert not Path(f"{dest}-wal").exists()
+    assert not Path(f"{dest}-shm").exists()
+    assert integrity_ok(dest, isolate_main=True)
+    with sqlite3.connect(dest) as connection:
+        assert connection.execute("SELECT x FROM t").fetchone()[0] == 1
+
+
+def test_exclusive_runtime_connect_heals_malformed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SANDWALK_DB_AUTO_HEAL", "1")
+    path = tmp_path / "agent-server.db"
+    store = AgentStore(path, exclusive=True)
+    store.create_session(title="survive", workspace_path=None)
+    store.close()
+    refresh_healthy_backup(path)
+
+    # Simulate mid-run corruption while the exclusive process is still "up".
+    path.write_bytes(b"broken-mid-flight")
+    for suffix in ("-wal", "-shm"):
+        Path(f"{path}{suffix}").unlink(missing_ok=True)
+
+    store2 = AgentStore(path, exclusive=True, verify_integrity=False)
+    try:
+        # First connect should heal via _connect, not only startup verify.
+        sessions = store2.list_sessions()
+        assert any(s.title == "survive" for s in sessions)
+        assert store2.last_heal_note is not None
+    finally:
+        store2.close()

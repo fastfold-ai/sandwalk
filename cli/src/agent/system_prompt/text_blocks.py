@@ -63,8 +63,9 @@ When a **Session workspace** path is listed below (or in `SANDWALK_SESSION_WORKS
   ``$SANDWALK_SESSION_WORKSPACE/...`` so an unset variable cannot expand to
   ``/artifacts/...``. Relative paths like ``./artifacts/...`` are fine only when
   the shell cwd is already the session workspace.
-- You may read installed skill directories (e.g. ``~/.sandwalk/skills/...``)
-  to run scripts; never treat those as the download or write destination.
+- You may read installed skill directories under ``$SANDWALK_SKILLS_DIR/...``
+  (or the absolute path from the skills listing) to run scripts; never treat
+  those as the download or write destination.
 - Do **not** announce the workspace path in greetings or ordinary answers.
   Only cite it when pointing the user at a concrete saved file, or when asked.
 

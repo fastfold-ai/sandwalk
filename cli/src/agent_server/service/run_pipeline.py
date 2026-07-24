@@ -116,7 +116,7 @@ class _RunPipelineMixin:
         # and off the event loop — inline it froze the UI (and every request,
         # including the SSE stream) for seconds after streaming finished.
         current_session = self.store.get_session(session_id)
-        if current_session and self._should_auto_title(current_session.title):
+        if self._should_auto_title(current_session):
             threading.Thread(
                 target=self._retitle_after_run,
                 args=(session_id, run_id, content),
@@ -126,18 +126,37 @@ class _RunPipelineMixin:
 
     def _retitle_after_run(self, session_id: str, run_id: str, content: str) -> None:
         try:
-            from agent_server.title import generate_session_title
+            from agent_server.title import (
+                TitleResult,
+                fallback_title_from_query,
+                generate_session_title,
+                should_attempt_llm_title,
+            )
 
+            current = self.store.get_session(session_id)
+            if not self._should_auto_title(current):
+                return
             history_for_title = [
                 {"role": message.role, "content": message.content}
                 for message in self.store.list_messages(session_id)
             ]
-            generated_title = generate_session_title(
-                history_for_title, fallback_query=content
-            )
-            if not generated_title:
+            if should_attempt_llm_title(history_for_title):
+                result = generate_session_title(
+                    history_for_title, fallback_query=content
+                )
+            else:
+                # First turn: interim title from the user query (no LLM yet).
+                result = TitleResult(
+                    title=fallback_title_from_query(content),
+                    final=False,
+                )
+            if not result.title:
                 return
-            updated_session = self.store.update_session(session_id, title=generated_title)
+            updated_session = self.store.update_session(
+                session_id,
+                title=result.title,
+                title_source="auto" if result.final else "pending",
+            )
             if updated_session is not None:
                 self.store.append_event(
                     session_id=session_id,
@@ -148,4 +167,4 @@ class _RunPipelineMixin:
                     },
                 )
         except Exception:  # noqa: BLE001 — titling is best-effort, never fail a run
-            logger.debug("Session retitle failed", exc_info=True)
+            logger.warning("Session retitle failed", exc_info=True)

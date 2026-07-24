@@ -457,7 +457,10 @@ def install_skill(
     owner_repo = _skills._owner_repo_from_source(source)
     release_info = _skills.fetch_latest_release(owner_repo) if owner_repo else None
     release_tag = release_info.get("tag") if release_info else None
-    return _install_github_source(source, url, ref, subpath, dest, release_tag)
+    # Unpinned installs track the latest GitHub Release (not floating HEAD),
+    # so the labeled version matches the content that was copied.
+    install_ref = ref or release_tag
+    return _install_github_source(source, url, install_ref, subpath, dest, release_tag)
 
 
 def _install_local(

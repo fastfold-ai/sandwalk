@@ -1,31 +1,49 @@
 """shell — part 2 of split module. See tools/shell.py."""
 from tools.shell_base import Path, os, registry, shlex, subprocess
-from tools.shell_part1 import _expand_env_refs, _is_blocked, _split_cd_prefix
+from tools.shell_part1 import (
+    _expand_env_refs,
+    _is_blocked,
+    _needs_shell,
+    _split_cd_prefix,
+)
 
 @registry.register(
     name="shell.run",
     description=(
-        "Run a single shell command. To run in a specific directory, pass "
-        "working_dir (preferred) or a leading 'cd <dir> &&' prefix — do not chain "
-        "multiple commands with && or use redirection."
+        "Run a shell command on the host. Prefer working_dir (or a leading "
+        "'cd <dir> && …') for skill scripts. Inside "
+        "$SANDWALK_SESSION_WORKSPACE the agent may freely redirect, chain "
+        "with &&/||/;, and rm/chmod workspace paths. Backticks, $(), and "
+        "system-level commands stay blocked."
     ),
     category="shell",
     parameters={
-        "command": "Shell command to execute (a single command)",
+        "command": "Shell command to execute",
         "working_dir": "Directory to run the command in (optional; absolute path preferred)",
         "timeout": "Timeout in seconds (default 30, max 300)",
     },
     usage_guide=(
-        "Use to run a single shell command: scripts, data processing, git, pip, etc. "
-        "Set working_dir to run from a directory (e.g. a skill folder) instead of "
-        "'cd ... &&'. Environment variables like $FASTFOLD_API_KEY are expanded. "
-        "Dangerous commands and shell operators (multi-command chaining, "
-        "redirection) are blocked for safety. Prefer printenv NAME to check whether "
-        "a credential is set (do not print secret values into the chat)."
+        "Use for host CLI / skill scripts (e.g. python3 …/create_job.py). "
+        "With SANDWALK_SESSION_WORKSPACE set (normal chat): free to "
+        "> / >> / < under that folder, chain with && / || / ;, "
+        "rm/chmod/rmdir workspace paths, and python3 -c. "
+        "Prefer skill --download-dir for FastFold artifacts. "
+        "Still blocked: backticks, $(), sudo, redirects/rm outside the "
+        "session workspace, bash -c. Prefer printenv NAME to check "
+        "credentials (do not paste secret values into the chat)."
     ),
 )
 def shell_run(command: str, working_dir: str = None, timeout: int = 30, **kwargs) -> dict:
     """Run a shell command and return stdout/stderr."""
+    # Refresh Integrations → process env so skill scripts see current keys
+    # (and SANDWALK_* path helpers) even if config changed after serve start.
+    try:
+        from agent.config import sync_process_env_from_config
+
+        sync_process_env_from_config()
+    except Exception:
+        pass
+
     # Accommodate the common ``cd <dir> && <cmd>`` habit: extract the directory
     # and run the remaining single command there instead of blocking it.
     cd_dir, command = _split_cd_prefix(command)
@@ -59,10 +77,9 @@ def shell_run(command: str, working_dir: str = None, timeout: int = 30, **kwargs
     # Cap timeout
     timeout = min(max(timeout, 1), 300)
 
-    # Use shell=True for pipe commands, shell=False otherwise.
-    # Without a shell, `$VAR` is not expanded — expand from os.environ so
-    # checks like `echo $FASTFOLD_API_KEY` / skill scripts see real values.
-    use_shell = "|" in command
+    # shell=True for pipes / && / || / null redirects. Otherwise expand $VAR
+    # ourselves so skill/env checks work without a shell.
+    use_shell = _needs_shell(command)
     if use_shell:
         run_args = command
     else:

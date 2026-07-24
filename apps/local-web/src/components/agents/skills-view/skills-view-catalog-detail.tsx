@@ -3,7 +3,7 @@ import type {
   AgentCatalogSkillAudit,
   AgentCatalogSkillDetail
 } from '@sandwalk/agent-ui-core'
-import { Loader } from 'lucide-react'
+import { Loader, Loader2, Plus } from 'lucide-react'
 
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
@@ -92,26 +92,51 @@ export function SkillsCatalogDetailView({
         )
       )
     : null
+  const alreadyInstalled = isInstalled({
+    id: catalogId,
+    slug: catalogSlug,
+    name: catalogSlug,
+    source: catalogSource,
+    installs: catalogInstalls,
+    sourceType: 'github',
+    installUrl: null,
+    url: null
+  })
+  const installBusy =
+    installing && catalogInstallingId === (catalogId || 'catalog-detail')
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
       <DetailStickyNav>
         <SkillsBreadcrumb onBack={onBack} />
-        {catalogSkillsShUrl ? (
-          <a
-            href={catalogSkillsShUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted"
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            disabled={!catalogInstallTarget || installing || catalogDetailLoading}
+            onClick={onInstall}
           >
-            <img
-              src="/suggestions/skills-sh.png"
-              alt=""
-              className="size-3.5 rounded object-contain dark:invert"
-            />
-            View in Skills.sh
-          </a>
-        ) : null}
+            {installBusy ? (
+              <Loader2 className="mr-1 size-3.5 animate-spin" />
+            ) : (
+              <Plus className="mr-1 size-3.5" />
+            )}
+            {installBusy ? 'Installing…' : alreadyInstalled ? 'Update' : 'Install'}
+          </Button>
+          {catalogSkillsShUrl ? (
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+              <a href={catalogSkillsShUrl} target="_blank" rel="noreferrer">
+                <img
+                  src="/suggestions/skills-sh.png"
+                  alt=""
+                  className="mr-1 size-3.5 rounded object-contain dark:invert"
+                />
+                View in Skills.sh
+              </a>
+            </Button>
+          ) : null}
+        </div>
       </DetailStickyNav>
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
@@ -143,28 +168,6 @@ export function SkillsCatalogDetailView({
                   copied={copiedCatalogInstall}
                   onCopy={onCopyInstall}
                 />
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    disabled={!catalogInstallTarget || installing}
-                    onClick={onInstall}
-                  >
-                    {installing && catalogInstallingId === (catalogId || 'catalog-detail')
-                      ? 'Installing…'
-                      : isInstalled({
-                          id: catalogId,
-                          slug: catalogSlug,
-                          name: catalogSlug,
-                          source: catalogSource,
-                          installs: catalogInstalls,
-                          sourceType: 'github',
-                          installUrl: null,
-                          url: null
-                        })
-                      ? 'Update'
-                      : 'Install'}
-                  </Button>
-                </div>
                 {catalogInstallError ? (
                   <div
                     role="alert"

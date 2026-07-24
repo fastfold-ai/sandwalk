@@ -43,13 +43,18 @@ export function SkillsViewDetailMode({
       detailIconInvert={state.detailPresentation.detailIconInvert}
       detailVersionLabel={state.detailPresentation.detailVersionLabel}
       detailUpdatedLabel={state.detailPresentation.detailUpdatedLabel}
+      updateAvailable={state.detailPresentation.updateAvailable}
+      latestVersionLabel={state.detailPresentation.latestVersionLabel}
       copiedInstall={state.copiedInstall}
       pendingEnabled={state.pendingEnabled}
       pendingRemove={state.pendingRemove}
+      pendingUpgrade={state.pendingUpgrade}
       batchBusy={state.batchBusy}
+      batchToast={state.batchToast}
       removeTarget={state.removeTarget}
       onBack={onBack}
       onCopyInstall={state.handleCopyInstall}
+      onUpgrade={() => void state.upgradeSkills()}
       onRemove={state.removeSkill}
       onRemoveDialogOpenChange={state.handleRemoveDialogOpenChange}
       onConfirmRemove={() => void state.confirmRemoveSkill()}

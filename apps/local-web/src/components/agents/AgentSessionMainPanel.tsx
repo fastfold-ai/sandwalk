@@ -278,6 +278,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 key={sessionId}
                 client={client}
                 sessionId={sessionId}
+                workspacePath={session?.workspacePath ?? null}
                 workspaceVersion={workspaceVersion}
                 runActive={runActive}
                 openPathRequest={pendingOpenPath}
@@ -298,6 +299,26 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                     handleComposerSend:
                       agentComposerSlotProps.handleComposerSend
                   })
+                }}
+                onNewFiles={added => {
+                  // Generic listener: any new workspace file opens Files;
+                  // previewable artifacts auto-open in a tab.
+                  setFilesPanelCollapsed(false)
+                  const previewable = [...added]
+                    .reverse()
+                    .find(file =>
+                      /\.(svg|png|jpe?g|gif|webp|pdb|cif|mmcif|sdf|json|md|txt|csv|tsv)$/i.test(
+                        file.name
+                      )
+                    )
+                  if (previewable) {
+                    setPendingOpenPath(previewable.path)
+                    return
+                  }
+                  const artifactDir = added.find(file =>
+                    file.path.replace(/\\/g, '/').startsWith('artifacts/')
+                  )
+                  if (artifactDir) setPendingOpenPath('artifacts/')
                 }}
                 onTogglePanel={() => setFilesPanelCollapsed(true)}
                 terminalOpen={terminalOpen}

@@ -50,6 +50,7 @@ export function SkillsView({
   onBulkAction,
   onSetEnabled,
   onRemove,
+  onUpgrade,
   embedded = false
 }: {
   mode: SkillsViewMode
@@ -102,6 +103,7 @@ export function SkillsView({
   ) => Promise<AgentSkillBatchResult>
   onSetEnabled: (name: string, enabled: boolean) => Promise<void>
   onRemove: (name: string) => Promise<void>
+  onUpgrade: () => Promise<string[]>
   embedded?: boolean
 }) {
   const state = useSkillsViewState({
@@ -123,7 +125,8 @@ export function SkillsView({
     onGetCatalogAudit,
     onBulkAction,
     onSetEnabled,
-    onRemove
+    onRemove,
+    onUpgrade
   })
 
   if (mode === 'import_github') {

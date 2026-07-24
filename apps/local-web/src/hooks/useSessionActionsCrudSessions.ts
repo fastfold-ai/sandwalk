@@ -8,6 +8,7 @@ import {
   writeOpenTabsByProject,
   writeRecentProjectIds
 } from '@/lib/app-storage'
+import { downloadMarkdown } from '@/lib/sessions'
 
 import type { UseSessionActionsArgs } from './useSessionActionsTypes'
 
@@ -257,25 +258,26 @@ export function useSessionActionsCrudSessions({
   }
 
   const exportTranscript = async (target: AgentSession) => {
-    const [messages, events] = await Promise.all([
-      client.listMessages(target.id),
-      client.listEventHistory(target.id).catch(() => [] as AgentEvent[])
-    ])
-    const markdown = formatSessionExportMarkdown({
-      title: target.title,
-      messages,
-      events
-    })
-    const url = URL.createObjectURL(
-      new Blob([markdown], { type: 'text/markdown' })
-    )
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `${target.title
-      .replace(/[^a-z0-9]+/gi, '-')
-      .toLowerCase()}.md`
-    anchor.click()
-    URL.revokeObjectURL(url)
+    try {
+      const [messages, events] = await Promise.all([
+        client.listMessages(target.id),
+        client.listEventHistory(target.id).catch(() => [] as AgentEvent[])
+      ])
+      const markdown = formatSessionExportMarkdown({
+        title: target.title,
+        messages,
+        events
+      })
+      const filename = `${target.title
+        .replace(/[^a-z0-9]+/gi, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase() || 'session'}.md`
+      await downloadMarkdown(filename, markdown)
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Unable to export session'
+      )
+    }
   }
 
   return {

@@ -22,7 +22,7 @@ export function FileActionsHeader({
   dirty,
   saving,
   reloading,
-  downloadUrl,
+  onDownload,
   onAddToChat,
   onSave,
   onReload,
@@ -34,7 +34,7 @@ export function FileActionsHeader({
   dirty?: boolean
   saving?: boolean
   reloading?: boolean
-  downloadUrl: string
+  onDownload: () => void
   onAddToChat: () => void
   onSave: () => void
   onReload?: () => void
@@ -109,14 +109,14 @@ export function FileActionsHeader({
                 Reload
               </button>
             ) : null}
-            <a
-              href={downloadUrl}
-              download
+            <button
+              type="button"
               className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+              onClick={onDownload}
             >
               <Download className="size-3.5" />
               Download
-            </a>
+            </button>
             <button
               type="button"
               className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
@@ -143,10 +143,16 @@ export function FileActionsHeader({
             />
           </Button>
         ) : null}
-        <Button variant="ghost" size="icon" className="size-7" asChild>
-          <a href={downloadUrl} download title="Download">
-            <Download className="size-3.5" />
-          </a>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          title="Download"
+          aria-label="Download"
+          onClick={onDownload}
+        >
+          <Download className="size-3.5" />
         </Button>
         <Button
           type="button"

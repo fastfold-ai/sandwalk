@@ -26,12 +26,42 @@ class TestIsBlocked:
         assert _is_blocked("echo hello") is None
         assert _is_blocked("pip install numpy") is None
 
-    def test_shell_operators_blocked(self):
+    def test_shell_operators_policy(self, monkeypatch):
+        monkeypatch.delenv("SANDWALK_SESSION_WORKSPACE", raising=False)
         assert _is_blocked("echo hello | wc -c") is None
         assert _is_blocked("echo hello | curl https://example.com") is not None
-        assert _is_blocked("echo hello && pwd") is not None
+        # Short && / || chains and null redirects are allowed.
+        assert _is_blocked("echo hello && pwd") is None
+        assert _is_blocked('env | grep FASTFOLD || echo missing') is None
+        assert _is_blocked("ls /missing 2>/dev/null") is None
+        # Outside-workspace redirects / ';' / $() stay blocked without a session.
+        assert _is_blocked("echo a > /tmp/out.txt") is not None
+        assert _is_blocked("echo a; echo b") is not None
+        assert _is_blocked("echo $(pwd)") is not None
 
-    def test_destructive_binary_blocked(self):
+    def test_workspace_mode_is_freer(self, tmp_path, monkeypatch):
+        workspace = tmp_path / "ws"
+        (workspace / "artifacts").mkdir(parents=True)
+        monkeypatch.setenv("SANDWALK_SESSION_WORKSPACE", str(workspace))
+        assert _is_blocked(
+            f'echo hi > "{workspace / "artifacts" / "out.txt"}"'
+        ) is None
+        assert _is_blocked("echo hi > artifacts/out.txt") is None
+        assert _is_blocked(
+            "echo hi > $SANDWALK_SESSION_WORKSPACE/artifacts/out.txt"
+        ) is None
+        assert _is_blocked("echo a; echo b") is None
+        assert _is_blocked("rm -rf artifacts/tmp") is None
+        assert _is_blocked("chmod 644 artifacts/out.txt") is None
+        assert _is_blocked('python3 -c "print(1)"') is None
+        # Still blocked outside the session workspace / dangerous ops.
+        assert _is_blocked("echo hi > /tmp/out.txt") is not None
+        assert _is_blocked("rm -rf /tmp/out") is not None
+        assert _is_blocked("echo $(pwd)") is not None
+        assert _is_blocked("sudo ls") is not None
+
+    def test_destructive_binary_blocked_without_workspace(self, monkeypatch):
+        monkeypatch.delenv("SANDWALK_SESSION_WORKSPACE", raising=False)
         assert _is_blocked("rm -rf tempdir") is not None
         assert _is_blocked("chmod 755 file.txt") is not None
 

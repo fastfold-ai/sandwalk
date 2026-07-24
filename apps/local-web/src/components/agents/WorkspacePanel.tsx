@@ -26,6 +26,7 @@ import {
 export function WorkspacePanel({
   client,
   sessionId,
+  workspacePath = null,
   workspaceVersion = 0,
   runActive = false,
   openPathRequest = null,
@@ -33,6 +34,7 @@ export function WorkspacePanel({
   onAddToChat,
   onBuildPlan,
   onFilesChange,
+  onNewFiles,
   onTogglePanel,
   terminalOpen = false,
   onCloseTerminal,
@@ -40,6 +42,7 @@ export function WorkspacePanel({
 }: {
   client: LocalAgentClient
   sessionId: string
+  workspacePath?: string | null
   workspaceVersion?: number
   runActive?: boolean
   /** When set, open this workspace path in a preview tab. */
@@ -48,6 +51,9 @@ export function WorkspacePanel({
   onAddToChat: (path: string) => void
   onBuildPlan?: (path: string) => void
   onFilesChange?: (count: number) => void
+  onNewFiles?: (
+    files: import('@sandwalk/agent-ui-core').WorkspaceFile[]
+  ) => void
   onTogglePanel?: () => void
   terminalOpen?: boolean
   onCloseTerminal?: () => void
@@ -60,7 +66,8 @@ export function WorkspacePanel({
     runActive,
     openPathRequest,
     onOpenPathRequestHandled,
-    onFilesChange
+    onFilesChange,
+    onNewFiles
   })
 
   /** Keep terminal mounted after first open so toggle doesn't drop the PTY socket. */
@@ -89,13 +96,16 @@ export function WorkspacePanel({
       totalCount={workspace.filteredFiles.length}
       query={workspace.query}
       viewMode={workspace.viewMode}
+      flatMode={workspace.flatMode}
       expandedGroups={workspace.expandedGroups}
       activePath={workspace.activePath}
+      workspacePath={workspacePath}
       empty={
         workspace.artifactFiles.length === 0 && workspace.groups.length === 0
       }
       onQueryChange={workspace.setQuery}
       onViewModeChange={workspace.setViewMode}
+      onFlatModeChange={workspace.setFlatMode}
       onToggleGroup={id =>
         workspace.setExpandedGroups(current => ({
           ...current,
@@ -158,6 +168,9 @@ export function WorkspacePanel({
       onDraftChange={workspace.setDraft}
       onSave={() => void workspace.save()}
       onReload={workspace.reloadActiveFile}
+      onDownload={() => {
+        if (workspace.activePath) workspace.downloadFileTab(workspace.activePath)
+      }}
       onAddToChat={onAddToChat}
       onBuildPlan={onBuildPlan}
       onUploadChange={workspace.handleUploadChange}
@@ -234,6 +247,7 @@ export function WorkspacePanel({
         onBuildPlan={onBuildPlan}
         onDraftChange={workspace.setDraft}
         onSave={() => void workspace.save()}
+        onDownload={workspace.downloadFile}
       />
 
       <WorkspacePathDialog

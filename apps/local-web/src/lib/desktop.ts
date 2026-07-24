@@ -169,6 +169,26 @@ export const toggleMaximize = () => invoke<boolean>('toggle_maximize')
 export const openExternalUrl = (url: string) =>
   invokeStrict<void>('open_external_url', { url })
 
+/**
+ * Save text via the native shell (Downloads + reveal). WebView `<a download>`
+ * does not write files in Tauri.
+ */
+export const saveTextFile = (defaultFilename: string, contents: string) =>
+  invokeStrict<string>('save_text_file', {
+    defaultFilename,
+    contents
+  })
+
+/**
+ * Save binary bytes (base64) to Downloads and reveal in Finder / file manager.
+ * Returns the absolute path written.
+ */
+export const saveBytesFile = (defaultFilename: string, contentsBase64: string) =>
+  invokeStrict<string>('save_bytes_file', {
+    defaultFilename,
+    contentsBase64
+  })
+
 /** Open any http(s) URL in the system browser (Tauri) or a new tab (web). */
 export async function openInSystemBrowser(url: string): Promise<void> {
   const trimmed = url.trim()

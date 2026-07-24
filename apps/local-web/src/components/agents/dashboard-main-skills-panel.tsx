@@ -113,6 +113,19 @@ export function DashboardMainSkillsPanel({
         )
         await loadSkills()
       }}
+      onUpgrade={async () => {
+        const installed = await client.upgradeSkills()
+        await loadSkills()
+        if (skillDetail) {
+          try {
+            const refreshed = await client.getSkill(skillDetail.name)
+            setSkillDetail(refreshed)
+          } catch {
+            setSkillDetail(null)
+          }
+        }
+        return installed
+      }}
     />
   )
 }

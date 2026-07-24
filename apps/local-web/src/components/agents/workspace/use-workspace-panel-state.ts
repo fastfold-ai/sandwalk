@@ -25,7 +25,8 @@ export function useWorkspacePanelState({
   sessionId,
   workspaceVersion = 0,
   runActive = false,
-  onFilesChange
+  onFilesChange,
+  onNewFiles
 }: {
   client: LocalAgentClient
   sessionId: string
@@ -33,6 +34,8 @@ export function useWorkspacePanelState({
   /** When true, poll the artifacts list so files appear as the agent writes them. */
   runActive?: boolean
   onFilesChange?: (count: number) => void
+  /** Called when new file paths appear since the last list (agent writes, uploads). */
+  onNewFiles?: (files: WorkspaceFile[]) => void
 }) {
   const [files, setFiles] = useState<WorkspaceFile[]>([])
   const [tabs, setTabs] = useState<WorkspaceFileContent[]>([])
@@ -96,6 +99,8 @@ export function useWorkspacePanelState({
       : true
   )
   const uploadRef = useRef<HTMLInputElement | null>(null)
+  const seenFilePathsRef = useRef<Set<string> | null>(null)
+  const [flatMode, setFlatMode] = useState(true)
   const activeTab = tabs.find(tab => tab.path === activePath) || null
   const active = !filesTabActive ? activeTab : null
   const openingPath =
@@ -104,6 +109,11 @@ export function useWorkspacePanelState({
   renameFilePathRef.current = renameFilePath
   renameFileValueRef.current = renameFileValue
   renameFileBusyRef.current = renameFileBusy
+
+  useEffect(() => {
+    seenFilePathsRef.current = null
+    setFlatMode(true)
+  }, [sessionId])
 
   useEffect(() => {
     const sync = () =>
@@ -122,11 +132,19 @@ export function useWorkspacePanelState({
     try {
       const next = await client.listFiles(sessionId)
       setFiles(next)
-      onFilesChange?.(next.filter(file => file.type === 'file').length)
+      const fileEntries = next.filter(file => file.type === 'file')
+      onFilesChange?.(fileEntries.length)
+      const paths = new Set(fileEntries.map(file => file.path))
+      const previous = seenFilePathsRef.current
+      if (previous) {
+        const added = fileEntries.filter(file => !previous.has(file.path))
+        if (added.length > 0) onNewFiles?.(added)
+      }
+      seenFilePathsRef.current = paths
     } finally {
       if (!options?.silent) setRefreshing(false)
     }
-  }, [client, onFilesChange, sessionId])
+  }, [client, onFilesChange, onNewFiles, sessionId])
 
   /** Reload open tabs from disk, skipping the active tab when it has unsaved edits. */
   const softReloadOpenTabs = useCallback(async () => {
@@ -365,6 +383,8 @@ export function useWorkspacePanelState({
     setQuery,
     viewMode,
     setViewMode,
+    flatMode,
+    setFlatMode,
     expandedGroups,
     setExpandedGroups,
     modalOpen,

@@ -35,9 +35,14 @@ def session_from_row(row: sqlite3.Row) -> AgentSession:
     sandbox_backend = parse_sandbox_backend(
         None if raw_backend is None else str(raw_backend)
     )
+    raw_source = row["title_source"] if "title_source" in keys else "pending"
+    title_source = str(raw_source or "pending").strip().lower()
+    if title_source not in {"pending", "auto", "user"}:
+        title_source = "pending"
     return AgentSession(
         id=row["id"],
         title=row["title"],
+        title_source=title_source,  # type: ignore[arg-type]
         status=row["status"],
         organize_label=row["organize_label"],
         project_id=row["project_id"] if "project_id" in keys else None,

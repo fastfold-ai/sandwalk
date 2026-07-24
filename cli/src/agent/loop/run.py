@@ -115,9 +115,18 @@ class LoopRunMixin:
             if not self.trajectory.title or self._is_placeholder_title(
                 self.trajectory.title
             ):
-                self.trajectory.title = self._generate_title(
-                    query, result.summary or ""
-                )
+                # Headless/server runs: never block completion on a title LLM
+                # call — agent_server retitles asynchronously via title_source.
+                if self.headless:
+                    from agent_server.title import fallback_title_from_query
+
+                    self.trajectory.title = (
+                        fallback_title_from_query(query) or "New research session"
+                    )
+                else:
+                    self.trajectory.title = self._generate_title(
+                        query, result.summary or ""
+                    )
             self.trajectory.model = self.session.current_model
             self.trajectory.save()
             try:
@@ -148,6 +157,7 @@ class LoopRunMixin:
             {"role": "user", "content": query},
             {"role": "assistant", "content": answer},
         ]
-        return generate_session_title(messages, fallback_query=query) or (
+        result = generate_session_title(messages, fallback_query=query)
+        return result.title or (
             fallback_title_from_query(query) or "New research session"
         )

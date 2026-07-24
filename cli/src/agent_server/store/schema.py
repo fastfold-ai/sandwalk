@@ -8,6 +8,7 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
+    title_source TEXT NOT NULL DEFAULT 'pending',
     status TEXT NOT NULL,
     organize_label TEXT,
     workspace_path TEXT,

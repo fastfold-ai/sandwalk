@@ -109,10 +109,12 @@ def _run_grouped_clones(
         if fetch_release and owner_repo:
             release_info = _skills.fetch_latest_release(owner_repo)
             release_tag = release_info.get("tag") if release_info else None
+        # Unpinned groups install the release tag so upgrade matches version labels.
+        clone_ref = ref or release_tag
         grp_installed: list[str] = []
         grp_failures: list[tuple[str, str]] = []
         with tempfile.TemporaryDirectory(prefix="fastfold-skill-grp-") as tmp:
-            repo_root, commit, via = _skills._clone_repo_once(url, ref, Path(tmp))
+            repo_root, commit, via = _skills._clone_repo_once(url, clone_ref, Path(tmp))
             if repo_root is None:
                 for item in items:
                     grp_failures.append((item[0], "clone/archive failed"))

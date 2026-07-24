@@ -191,6 +191,14 @@ class DeepAgentsBuildMixin:
         if workspace_path:
             # Align shell/skill subprocesses with the UI file tree.
             os.environ["SANDWALK_SESSION_WORKSPACE"] = workspace_path
+            try:
+                from agent.config import sync_process_env_from_config
+
+                sync_process_env_from_config(
+                    getattr(self.session, "config", None)
+                )
+            except Exception:
+                pass
             Path(workspace_path).joinpath("artifacts").mkdir(
                 parents=True, exist_ok=True
             )
@@ -226,6 +234,21 @@ class DeepAgentsBuildMixin:
             context_parts.append(f"Indication: {ctx['indication']}")
         if ctx.get("mention_context"):
             context_parts.append(ctx["mention_context"])
+        try:
+            from agent.skills.mentions import build_skill_mention_context
+
+            allowed = ctx.get("allowed_skill_names")
+            skill_mention_ctx = build_skill_mention_context(
+                query,
+                sandbox_backend=str(ctx.get("sandbox_backend") or "") or None,
+                allowed_skill_names=(
+                    None if allowed is None else list(allowed or [])
+                ),
+            )
+        except Exception:  # noqa: BLE001
+            skill_mention_ctx = ""
+        if skill_mention_ctx:
+            context_parts.append(skill_mention_ctx)
         if context_parts:
             user_prompt = query + "\n\nContext:\n" + "\n".join(context_parts)
         return user_prompt, ctx

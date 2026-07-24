@@ -24,6 +24,29 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE sessions ADD COLUMN specialist_id TEXT")
     if "sandbox_backend" not in columns:
         connection.execute("ALTER TABLE sessions ADD COLUMN sandbox_backend TEXT")
+    if "title_source" not in columns:
+        connection.execute(
+            "ALTER TABLE sessions ADD COLUMN title_source TEXT NOT NULL DEFAULT 'pending'"
+        )
+        # One-time backfill: only known placeholders stay eligible for auto-title.
+        placeholders = (
+            "untitled",
+            "untitled session",
+            "untitled thread",
+            "new chat",
+            "new agent",
+            "new agent session",
+            "new research session",
+        )
+        placeholders_sql = ", ".join("?" for _ in placeholders)
+        connection.execute(
+            f"""
+            UPDATE sessions
+            SET title_source = 'user'
+            WHERE lower(trim(title)) NOT IN ({placeholders_sql})
+            """,
+            placeholders,
+        )
 
     specialist_columns = {
         row["name"]

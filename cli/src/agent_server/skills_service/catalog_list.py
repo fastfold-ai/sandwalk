@@ -66,7 +66,7 @@ class CatalogListMixin:
                 return candidate
         return None
 
-    def _summary(self, info) -> SkillSummary:
+    def _summary(self, info, *, update: dict | None = None) -> SkillSummary:
         from agent.skills.models import (
             USER_CREATED_CATEGORY,
             display_author,
@@ -79,6 +79,7 @@ class CatalogListMixin:
         category = str(getattr(info, "category", "") or "").strip()
         if is_user_created_skill(info):
             category = USER_CREATED_CATEGORY
+        update = update or {}
         return SkillSummary(
             name=info.name,
             description=info.description or "",
@@ -90,12 +91,59 @@ class CatalogListMixin:
             updated_at=info.updated_at or None,
             icon_src=self._icon_source(info),
             enabled=bool(getattr(info, "enabled", True)),
+            commit=getattr(info, "commit", None),
+            update_available=bool(update.get("available")),
+            latest_version=str(update["latest"]) if update.get("latest") else None,
+            update_channel=str(update["channel"]) if update.get("channel") else None,
         )
+
+    @staticmethod
+    def _updates_by_source(infos: list) -> dict[str, dict]:
+        """Map ``owner/repo`` → update info (one GitHub lookup per unique repo)."""
+        from agent.skills.releases import (
+            _owner_repo_from_source,
+            check_github_skill_update,
+        )
+
+        by_repo: dict[str, dict] = {}
+        checked: set[str] = set()
+        for info in infos:
+            source = str(getattr(info, "source", "") or "").strip()
+            owner_repo = _owner_repo_from_source(source) if source else None
+            if not owner_repo or owner_repo in checked:
+                continue
+            checked.add(owner_repo)
+            try:
+                update = check_github_skill_update(
+                    source,
+                    installed_release=getattr(info, "version", None),
+                    installed_commit=getattr(info, "commit", None),
+                )
+            except Exception:  # noqa: BLE001
+                update = None
+            if update:
+                by_repo[owner_repo] = update
+        return by_repo
+
+    @staticmethod
+    def _update_for_info(info, updates: dict[str, dict]) -> dict | None:
+        from agent.skills.releases import _owner_repo_from_source
+
+        source = str(getattr(info, "source", "") or "").strip()
+        owner_repo = _owner_repo_from_source(source) if source else None
+        if not owner_repo:
+            return None
+        return updates.get(owner_repo)
 
     def list(self) -> list[SkillSummary]:
         from agent_server import skills_service as _skills_service
 
-        return [self._summary(info) for info in _skills_service.list_skills()]
+        infos = list(_skills_service.list_skills())
+        updates = self._updates_by_source(infos)
+        return [
+            self._summary(info, update=self._update_for_info(info, updates))
+            for info in infos
+        ]
 
     def suggested_sources(self) -> list[SkillSource]:
         from agent.skills import SUGGESTED_SKILL_SOURCES
@@ -121,7 +169,8 @@ class CatalogListMixin:
             content = info.path.read_text(encoding="utf-8")
         except OSError:
             content = ""
-        summary = self._summary(info)
+        updates = self._updates_by_source([info])
+        summary = self._summary(info, update=self._update_for_info(info, updates))
         return SkillDetail(
             **summary.model_dump(),
             content=content,

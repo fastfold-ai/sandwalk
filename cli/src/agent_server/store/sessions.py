@@ -6,9 +6,18 @@ import sqlite3
 import uuid
 from datetime import datetime
 
-from agent_server.models import AgentSession
+from agent_server.models import AgentSession, TitleSource
 from agent_server.store.rows import session_from_row
 from agent_server.store.util import require_sandbox_backend, utc_now
+
+DEFAULT_SESSION_TITLE = "New research session"
+
+
+def initial_title_source(title: str | None) -> TitleSource:
+    cleaned = (title or "").strip()
+    if not cleaned or cleaned == DEFAULT_SESSION_TITLE:
+        return "pending"
+    return "user"
 
 
 class SessionCreateMixin:
@@ -57,18 +66,23 @@ class SessionCreateMixin:
         existing = self.get_session(normalized_id)
         if existing is not None:
             # Titles are owned by create/update/auto-title. Workspace boot and
-            # CLI ensure paths often pass placeholders like "New research session";
-            # never clobber a real title, and only upgrade placeholder → real.
-            from agent_server.title import is_placeholder_title
-
+            # CLI ensure paths often pass the default placeholder; never clobber
+            # a settled title, and only upgrade while still pending.
             incoming = (title or "").strip()
             if (
                 incoming
                 and incoming != existing.title
-                and is_placeholder_title(existing.title)
-                and not is_placeholder_title(incoming)
+                and existing.title_source == "pending"
+                and incoming != DEFAULT_SESSION_TITLE
             ):
-                return self.update_session(normalized_id, title=incoming) or existing
+                return (
+                    self.update_session(
+                        normalized_id,
+                        title=incoming,
+                        title_source="auto",
+                    )
+                    or existing
+                )
             return existing
 
         if project_id is not None and self.get_project(project_id) is None:
@@ -82,9 +96,11 @@ class SessionCreateMixin:
         now = utc_now()
         created = created_at or now
         updated = updated_at or created
+        resolved_title = (title or DEFAULT_SESSION_TITLE).strip() or DEFAULT_SESSION_TITLE
         session = AgentSession(
             id=normalized_id,
-            title=(title or "New research session").strip() or "New research session",
+            title=resolved_title,
+            title_source=initial_title_source(title),
             status="idle",
             organize_label=None,
             project_id=project_id,
@@ -99,14 +115,16 @@ class SessionCreateMixin:
             connection.execute(
                 """
                 INSERT INTO sessions(
-                    id, title, status, organize_label, project_id, specialist_id,
-                    sandbox_backend, workspace_path, last_message_at, created_at, updated_at
+                    id, title, title_source, status, organize_label, project_id,
+                    specialist_id, sandbox_backend, workspace_path, last_message_at,
+                    created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session.id,
                     session.title,
+                    session.title_source,
                     session.status,
                     session.organize_label,
                     session.project_id,

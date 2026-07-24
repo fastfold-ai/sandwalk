@@ -25,6 +25,7 @@ type UseAppShellEffectsArgs = {
   onOnboardingPath: boolean
   onboardingStep: number
   sessionTitle: string | undefined
+  titleSource: AgentSession['titleSource']
   activeIntegration: IntegrationSummary | null
   activeProject: { name: string } | null
   isDashboardOverview: boolean
@@ -143,6 +144,7 @@ export function useAppShellEffects(args: UseAppShellEffectsArgs) {
     sessionId: args.sessionId,
     runActive: args.runActive,
     sessionTitle: args.sessionTitle,
+    titleSource: args.titleSource,
     messages: args.messages,
     client: args.client,
     setSessions: args.setSessions

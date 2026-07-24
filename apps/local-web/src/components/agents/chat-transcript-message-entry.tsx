@@ -193,12 +193,12 @@ export function ChatTranscriptMessageEntry({
                   <button
                     type="button"
                     className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-                    onClick={() =>
-                      downloadMarkdown(
+                    onClick={() => {
+                      void downloadMarkdown(
                         `${session?.title || 'assistant-reply'}-${message.id.slice(0, 8)}.md`,
                         message.content
                       )
-                    }
+                    }}
                   >
                     <Download className="size-4" />
                     Export Markdown

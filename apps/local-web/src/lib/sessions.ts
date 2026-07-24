@@ -97,19 +97,13 @@ export function formatMessagePopoverDate(value: string) {
   }).format(date)
 }
 
-export function downloadMarkdown(filename: string, content: string) {
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
-  const href = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = href
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(href)
+export async function downloadMarkdown(filename: string, content: string) {
+  const { downloadTextWithLocation } = await import('@/lib/workspace-download')
+  await downloadTextWithLocation(filename, content)
 }
 
-export const AUTO_TITLE_FIRST_RESPONSE_THRESHOLD = 2
+// Two full turns (user + assistant × 2) before asking the model for a title.
+export const AUTO_TITLE_FIRST_RESPONSE_THRESHOLD = 4
 
 export function isLowSignalTitle(title: string): boolean {
   const normalized = String(title || '')

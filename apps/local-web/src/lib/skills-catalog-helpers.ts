@@ -98,6 +98,14 @@ export function skillMetaText(skill: AgentSkill): string | null {
   const author = skill.author.trim()
   if (author) parts.push(author)
   if (skill.version) parts.push(`v${skill.version.replace(/^v/i, '')}`)
+  if (skill.updateAvailable && skill.latestVersion) {
+    const latest = String(skill.latestVersion)
+    const label =
+      skill.updateChannel === 'commit' || /^[0-9a-f]{7,40}$/i.test(latest)
+        ? latest.slice(0, 7)
+        : latest
+    parts.push(`→ ${label}`)
+  }
   return parts.length > 0 ? parts.join(' · ') : null
 }
 

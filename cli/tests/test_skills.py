@@ -1369,6 +1369,78 @@ def test_is_newer_tag_returns_false_for_invalid_versions():
     assert skills_mod._is_newer_tag("v1.1.0", "bad") is False
 
 
+def test_check_github_skill_update_prefers_newer_release(monkeypatch):
+    import agent.skills.releases as releases_mod
+
+    monkeypatch.setattr(
+        releases_mod,
+        "resolve_repo_remote_state",
+        lambda owner_repo, force=False, timeout_s=2.5: {
+            "release_tag": "v1.1.3",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+    )
+    out = skills_mod.check_github_skill_update(
+        "fastfold-ai/skills",
+        installed_release="v1.1.2",
+        installed_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    )
+    assert out == {
+        "available": True,
+        "channel": "release",
+        "latest": "v1.1.3",
+        "installed": "v1.1.2",
+        "owner_repo": "fastfold-ai/skills",
+    }
+
+
+def test_check_github_skill_update_same_release_ignores_head_drift(monkeypatch):
+    import agent.skills.releases as releases_mod
+
+    monkeypatch.setattr(
+        releases_mod,
+        "resolve_repo_remote_state",
+        lambda owner_repo, force=False, timeout_s=2.5: {
+            "release_tag": "v1.1.2",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+    )
+    assert (
+        skills_mod.check_github_skill_update(
+            "fastfold-ai/skills@skills/fold",
+            installed_release="v1.1.2",
+            installed_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        )
+        is None
+    )
+
+
+def test_check_github_skill_update_falls_back_to_commit(monkeypatch):
+    import agent.skills.releases as releases_mod
+
+    monkeypatch.setattr(
+        releases_mod,
+        "resolve_repo_remote_state",
+        lambda owner_repo, force=False, timeout_s=2.5: {
+            "release_tag": "",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+    )
+    out = skills_mod.check_github_skill_update(
+        "https://github.com/acme/skills.git",
+        installed_release=None,
+        installed_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    )
+    assert out["channel"] == "commit"
+    assert out["latest"] == "aaaaaaa"
+    assert out["installed"] == "bbbbbbb"
+    assert out["owner_repo"] == "acme/skills"
+
+
+def test_check_github_skill_update_skips_non_github_source():
+    assert skills_mod.check_github_skill_update("custom:/tmp/skill") is None
+
+
 def test_installed_catalog_release_skips_non_dict_manifest_entries(monkeypatch):
     monkeypatch.setattr(
         skills_mod,

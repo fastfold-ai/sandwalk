@@ -1,5 +1,7 @@
 """Mirror configured credentials into ``os.environ`` for subprocess tools/skills."""
 
+from __future__ import annotations
+
 import os
 
 from .api_keys import API_KEYS
@@ -47,7 +49,28 @@ def _config_secret_for_env(config: "object", config_key: str) -> str:
         if value and not config._is_openai_managed_base_url(value):
             return str(value).strip()
         return ""
-    return str(config.get(config_key) or "").strip()
+    raw = config.get(config_key)
+    if hasattr(config, "_normalized_secret"):
+        return str(config._normalized_secret(raw) or "").strip()
+    return str(raw or "").strip()
+
+
+def sync_sandwalk_path_env(*, force: bool = True) -> list[str]:
+    """Export stable Sandwalk path env vars for skills/agents (no hardcoded homes)."""
+    from .constants import CONFIG_DIR
+
+    config_dir = str(CONFIG_DIR.expanduser().resolve())
+    skills_dir = str((CONFIG_DIR / "skills").expanduser().resolve())
+    applied: list[str] = []
+    for name, value in (
+        ("SANDWALK_CONFIG_DIR", config_dir),
+        ("SANDWALK_SKILLS_DIR", skills_dir),
+    ):
+        current = str(os.environ.get(name) or "").strip()
+        if force or not current:
+            os.environ[name] = value
+            applied.append(name)
+    return applied
 
 
 def sync_process_env_from_config(
@@ -61,6 +84,8 @@ def sync_process_env_from_config(
     Matches CLI ``Session`` behavior so the web agent-server (Mac app / local-web)
     exposes the same keys that an interactive CLI session would. Existing process
     env values win when ``only_missing`` is True (default).
+
+    Always refreshes ``SANDWALK_CONFIG_DIR`` and ``SANDWALK_SKILLS_DIR``.
 
     Returns the list of environment variable names that were written.
     """
@@ -100,7 +125,25 @@ def sync_process_env_from_config(
         os.environ[env_name] = value
         applied.append(env_name)
 
+    applied.extend(sync_sandwalk_path_env(force=True))
     return applied
+
+
+def listed_integration_env_vars(config: "object | None" = None) -> list[str]:
+    """Return sorted env var *names* that Integrations/config currently populate.
+
+    Values are never returned — only names the agent can ``printenv`` / rely on.
+    """
+    sync_process_env_from_config(config)
+    names: list[str] = []
+    for info in API_KEYS.values():
+        env_name = str(info.get("env_var") or "").strip()
+        if env_name and str(os.environ.get(env_name) or "").strip():
+            names.append(env_name)
+    for env_name in _EXTRA_ENV_FROM_CONFIG:
+        if str(os.environ.get(env_name) or "").strip():
+            names.append(env_name)
+    return sorted(set(names))
 
 
 def unset_process_env_for_config_keys(config_keys: list[str]) -> list[str]:

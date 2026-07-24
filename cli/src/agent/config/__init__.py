@@ -49,7 +49,9 @@ from .defaults import AGENT_PROFILE_PRESETS, DEFAULTS  # noqa: E402
 from .env_sync import (  # noqa: E402
     apply_env_overrides,
     env_var_mappings,
+    listed_integration_env_vars,
     sync_process_env_from_config,
+    sync_sandwalk_path_env,
     unset_process_env_for_config_keys,
 )
 from .legacy import migrate_tree as _migrate_tree  # noqa: E402

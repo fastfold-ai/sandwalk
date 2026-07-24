@@ -10,7 +10,8 @@ export function useWorkspacePanel({
   runActive = false,
   openPathRequest = null,
   onOpenPathRequestHandled,
-  onFilesChange
+  onFilesChange,
+  onNewFiles
 }: {
   client: LocalAgentClient
   sessionId: string
@@ -19,13 +20,15 @@ export function useWorkspacePanel({
   openPathRequest?: string | null
   onOpenPathRequestHandled?: () => void
   onFilesChange?: (count: number) => void
+  onNewFiles?: (files: import('@sandwalk/agent-ui-core').WorkspaceFile[]) => void
 }) {
   const state = useWorkspacePanelState({
     client,
     sessionId,
     workspaceVersion,
     runActive,
-    onFilesChange
+    onFilesChange,
+    onNewFiles
   })
   const actions = useWorkspaceFileActions(state, {
     openPathRequest,
@@ -60,6 +63,7 @@ export function useWorkspacePanel({
     renameDialogBusy: state.renameDialogBusy,
     query: state.query,
     viewMode: state.viewMode,
+    flatMode: state.flatMode,
     expandedGroups: state.expandedGroups,
     modalOpen: state.modalOpen,
     filesTabActive: state.filesTabActive,
@@ -73,6 +77,7 @@ export function useWorkspacePanel({
     files: state.files,
     setQuery: state.setQuery,
     setViewMode: state.setViewMode,
+    setFlatMode: state.setFlatMode,
     setExpandedGroups: state.setExpandedGroups,
     setModalOpen: state.setModalOpen,
     setFileTabMenu: state.setFileTabMenu,

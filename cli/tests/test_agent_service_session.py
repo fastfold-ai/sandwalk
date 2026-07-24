@@ -189,30 +189,79 @@ def test_submit_message_busy_guard(tmp_path: Path, monkeypatch):
         svc.submit_message(session_id=session.id, content="hello")
 
 
-def test_auto_title_session_skips_non_placeholder(tmp_path: Path, monkeypatch):
+def test_auto_title_session_skips_settled_user_title(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("agent_server.service.CONFIG_DIR", tmp_path / "cfg")
     store = AgentStore(tmp_path / "agent.db")
     svc = AgentService(store)
     session = store.create_session(title="Concrete title", workspace_path=None)
+    assert session.title_source == "user"
 
     monkeypatch.setattr(
         "agent_server.title.generate_session_title",
-        lambda *args, **kwargs: "Should not apply",
+        lambda *args, **kwargs: __import__(
+            "agent_server.title", fromlist=["TitleResult"]
+        ).TitleResult(title="Should not apply", final=True),
     )
     result = svc.auto_title_session(session.id)
     assert result.title == "Concrete title"
+    assert result.title_source == "user"
 
 
-def test_auto_title_session_generates(tmp_path: Path, monkeypatch):
+def test_auto_title_session_uses_interim_fallback_before_four_messages(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.setattr("agent_server.service.CONFIG_DIR", tmp_path / "cfg")
+    store = AgentStore(tmp_path / "agent.db")
+    svc = AgentService(store)
+    session = store.create_session(title="New research session", workspace_path=None)
+    assert session.title_source == "pending"
+    store.add_message(session_id=session.id, role="user", content="Fold TP53")
+
+    monkeypatch.setattr(
+        "agent_server.title.generate_session_title",
+        lambda *args, **kwargs: __import__(
+            "agent_server.title", fromlist=["TitleResult"]
+        ).TitleResult(title="Should not call yet", final=True),
+    )
+    result = svc.auto_title_session(session.id)
+    assert result.title == "Fold TP53"
+    assert result.title_source == "pending"
+
+
+def test_auto_title_session_generates_after_four_messages(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("agent_server.service.CONFIG_DIR", tmp_path / "cfg")
     store = AgentStore(tmp_path / "agent.db")
     svc = AgentService(store)
     session = store.create_session(title="New research session", workspace_path=None)
     store.add_message(session_id=session.id, role="user", content="Fold TP53")
+    store.add_message(session_id=session.id, role="assistant", content="Folding now.")
+    store.add_message(session_id=session.id, role="user", content="Also check PAE")
+    store.add_message(session_id=session.id, role="assistant", content="PAE looks good.")
 
     monkeypatch.setattr(
         "agent_server.title.generate_session_title",
-        lambda *args, **kwargs: "Fold TP53 study",
+        lambda *args, **kwargs: __import__(
+            "agent_server.title", fromlist=["TitleResult"]
+        ).TitleResult(title="Fold TP53 study", final=True),
     )
     result = svc.auto_title_session(session.id)
     assert result.title == "Fold TP53 study"
+    assert result.title_source == "auto"
+
+
+def test_manual_rename_marks_title_source_user(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("agent_server.service.CONFIG_DIR", tmp_path / "cfg")
+    store = AgentStore(tmp_path / "agent.db")
+    svc = AgentService(store)
+    session = store.create_session(title="New research session", workspace_path=None)
+    renamed = svc.update_session(
+        session_id=session.id,
+        title="My custom name",
+        organize_label=None,
+        update_organize_label=False,
+    )
+    assert renamed.title == "My custom name"
+    assert renamed.title_source == "user"
+    again = svc.auto_title_session(session.id, force=True)
+    assert again.title == "My custom name"
+    assert again.title_source == "user"
