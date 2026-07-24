@@ -16,6 +16,11 @@ SETUP_PROVIDER_ORDER = (
     "moonshot",
     "nvidia",
     "opencode",
+    "deepseek",
+    "minimax",
+    "mistral",
+    "qwen",
+    "together",
     "openai_compatible",
 )
 UV_INSTALL_FLAVORS = frozenset({"all", "win_build"})

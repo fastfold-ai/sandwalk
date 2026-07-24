@@ -89,6 +89,76 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
             "NVIDIA flagship reasoning model (NIM endpoint)",
         ),
     ],
+    "deepseek": [
+        (
+            "deepseek-v4-flash",
+            "DeepSeek V4 Flash",
+            "Fast DeepSeek model for everyday agent work",
+        ),
+        (
+            "deepseek-v4-pro",
+            "DeepSeek V4 Pro",
+            "Higher-capability DeepSeek for harder reasoning",
+        ),
+    ],
+    "minimax": [
+        (
+            "MiniMax-M2.5",
+            "MiniMax M2.5",
+            "MiniMax flagship agent-capable model",
+        ),
+    ],
+    "mistral": [
+        (
+            "mistral-large-latest",
+            "Mistral Large",
+            "Mistral flagship model for complex work",
+        ),
+        (
+            "mistral-small-latest",
+            "Mistral Small",
+            "Faster, lower-cost Mistral model",
+        ),
+    ],
+    "qwen": [
+        (
+            "qwen3-max",
+            "Qwen3 Max",
+            "Alibaba Qwen flagship for general agent work",
+        ),
+    ],
+    "together": [
+        (
+            "thinkingmachines/Inkling",
+            "Inkling · via Together",
+            "Thinking Machines Inkling — multimodal (image + audio) via Together AI",
+        ),
+        (
+            "zai-org/GLM-5.2",
+            "GLM-5.2 · via Together",
+            "Z AI GLM-5.2 via Together AI",
+        ),
+        (
+            "moonshotai/Kimi-K2.7-Code",
+            "Kimi K2.7 Code · via Together",
+            "Moonshot Kimi K2.7 Code via Together AI",
+        ),
+        (
+            "moonshotai/Kimi-K2.6",
+            "Kimi K2.6 · via Together",
+            "Moonshot Kimi K2.6 via Together AI",
+        ),
+        (
+            "deepseek-ai/DeepSeek-V4-Pro",
+            "DeepSeek V4 Pro · via Together",
+            "DeepSeek V4 Pro via Together AI",
+        ),
+        (
+            "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+            "Llama 4 Maverick · via Together",
+            "Meta Llama 4 Maverick — vision via Together AI",
+        ),
+    ],
 }
 
 # Bump when the default-enabled set changes so existing configs get migrated once.

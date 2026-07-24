@@ -19,6 +19,11 @@ def _configured_llm_summary(cfg: Config) -> DoctorCheck:
         "moonshot",
         "nvidia",
         "opencode",
+        "deepseek",
+        "minimax",
+        "mistral",
+        "qwen",
+        "together",
     )
     for provider in cloud_order:
         if not cfg.llm_api_key(provider):

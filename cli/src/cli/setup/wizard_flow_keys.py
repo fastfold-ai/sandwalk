@@ -38,7 +38,18 @@ def _resolve_all_provider_keys(
         cli_key_for_provider = args["api_key"]
         if prov == "openai":
             cli_key_for_provider = args["openai_api_key"]
-        elif prov in ("xai", "google", "moonshot", "nvidia", "opencode"):
+        elif prov in (
+            "xai",
+            "google",
+            "moonshot",
+            "nvidia",
+            "opencode",
+            "deepseek",
+            "minimax",
+            "mistral",
+            "qwen",
+            "together",
+        ):
             cli_key_for_provider = None
         elif prov == "openai_compatible":
             cli_key_for_provider = args["profile_key"] or args["openai_api_key"]

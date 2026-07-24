@@ -10,7 +10,12 @@ export const LLM_API_KEY_ORDER = [
   'xai',
   'moonshot',
   'nvidia',
-  'opencode'
+  'opencode',
+  'deepseek',
+  'minimax',
+  'mistral',
+  'qwen',
+  'together'
 ] as const
 
 /** Same backends as ModelsView local modal / CLI setup. */
@@ -20,7 +25,7 @@ export const PROFILE_BACKENDS = [
     label: 'Ollama',
     hint: '/api/tags',
     baseUrl: 'http://127.0.0.1:11434/v1',
-    defaultLabel: 'Ollama Local',
+    defaultLabel: 'Ollama',
     icon: '/local-llm/ollama.png'
   },
   {
@@ -28,7 +33,7 @@ export const PROFILE_BACKENDS = [
     label: 'Unsloth',
     hint: '/v1/models · auth',
     baseUrl: 'http://127.0.0.1:8888/v1',
-    defaultLabel: 'Unsloth Local',
+    defaultLabel: 'Unsloth',
     icon: '/local-llm/unsloth.png'
   },
   {
@@ -36,7 +41,7 @@ export const PROFILE_BACKENDS = [
     label: 'oMLX',
     hint: '/v1/models · auth',
     baseUrl: 'http://127.0.0.1:8000/v1',
-    defaultLabel: 'oMLX Local',
+    defaultLabel: 'oMLX',
     icon: '/local-llm/omlx.png'
   },
   {
@@ -44,7 +49,7 @@ export const PROFILE_BACKENDS = [
     label: 'DS4',
     hint: '/v1/models',
     baseUrl: 'http://127.0.0.1:8000/v1',
-    defaultLabel: 'DS4 Local',
+    defaultLabel: 'DS4',
     icon: 'cpu'
   },
   {
@@ -52,7 +57,7 @@ export const PROFILE_BACKENDS = [
     label: 'llama.cpp',
     hint: '/v1/models',
     baseUrl: 'http://127.0.0.1:8080/v1',
-    defaultLabel: 'llama.cpp Local',
+    defaultLabel: 'llama.cpp',
     icon: '/local-llm/llama-cpp.png'
   },
   {
@@ -60,7 +65,7 @@ export const PROFILE_BACKENDS = [
     label: 'LM Studio',
     hint: '/v1/models',
     baseUrl: 'http://127.0.0.1:1234/v1',
-    defaultLabel: 'LM Studio Local',
+    defaultLabel: 'LM Studio',
     icon: '/local-llm/lm-studio.png'
   },
   {

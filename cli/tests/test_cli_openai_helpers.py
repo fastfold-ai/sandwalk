@@ -347,7 +347,7 @@ class TestCompatibleProfilePrompt:
         cfg = Config(data={"llm.provider": "openai"})
         cfg.upsert_openai_profile(
             profile_id="unsloth_local",
-            label="Unsloth Local",
+            label="Unsloth",
             backend="unsloth",
             base_url="http://localhost:8888/v1",
             api_key="sk-unsloth",
@@ -365,7 +365,7 @@ class TestCompatibleProfilePrompt:
         cfg = Config(data={"llm.provider": "openai"})
         cfg.upsert_openai_profile(
             profile_id="omlx_local",
-            label="oMLX Local",
+            label="oMLX",
             backend="omlx",
             base_url="http://localhost:8000/v1",
             api_key="sk-omlx",

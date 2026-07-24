@@ -61,6 +61,11 @@ def test_agent_server_health_and_session_contract(tmp_path: Path, monkeypatch):
             "langsmith",
             "nvidia",
             "opencode",
+            "deepseek",
+            "minimax",
+            "mistral",
+            "qwen",
+            "together",
             "tavily",
         }.issubset(
             integration_keys

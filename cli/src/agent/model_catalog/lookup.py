@@ -58,6 +58,30 @@ def catalog_provider_for_model(model_id: str | None) -> str | None:
         return "moonshot"
     if lower.startswith("nvidia/"):
         return "nvidia"
+    # Bare DeepSeek API ids (deepseek-v4-*); reseller paths use deepseek-ai/.
+    if lower.startswith("deepseek") and not lower.startswith("deepseek-ai/"):
+        return "deepseek"
+    if lower.startswith("minimax") or lower.startswith("abab"):
+        return "minimax"
+    if (
+        lower.startswith("mistral")
+        or lower.startswith("codestral")
+        or lower.startswith("pixtral")
+        or lower.startswith("magistral")
+    ):
+        return "mistral"
+    if lower.startswith("qwen"):
+        return "qwen"
+    if lower.startswith(
+        (
+            "thinkingmachines/",
+            "zai-org/",
+            "moonshotai/",
+            "deepseek-ai/",
+            "meta-llama/",
+        )
+    ):
+        return "together"
     if (
         lower.startswith("gpt-4")
         or lower.startswith("gpt-5")

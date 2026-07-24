@@ -369,7 +369,7 @@ class TestTerminalMethods:
         terminal.session.config.get.side_effect = _cfg_get
         terminal.session.config.get_openai_profile.return_value = {
             "id": "ollama_local",
-            "label": "Ollama Local",
+            "label": "Ollama",
             "backend": "ollama",
             "base_url": "http://localhost:11434/v1",
         }
@@ -388,7 +388,7 @@ class TestTerminalMethods:
                     "ollama_local": {
                         "backend": "ollama",
                         "base_url": "http://localhost:11434/v1",
-                        "label": "Ollama Local",
+                        "label": "Ollama",
                     },
                 },
             }

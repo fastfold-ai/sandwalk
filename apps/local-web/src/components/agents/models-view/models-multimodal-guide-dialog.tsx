@@ -20,6 +20,11 @@ const PROVIDER_ORDER = [
   'moonshot',
   'nvidia',
   'opencode',
+  'deepseek',
+  'minimax',
+  'mistral',
+  'qwen',
+  'together',
   'local'
 ] as const
 
@@ -31,6 +36,11 @@ const PROVIDER_LABELS: Record<string, string> = {
   moonshot: 'Kimi',
   nvidia: 'NVIDIA',
   opencode: 'OpenCode',
+  deepseek: 'DeepSeek',
+  minimax: 'MiniMax',
+  mistral: 'Mistral',
+  qwen: 'Qwen',
+  together: 'Together AI',
   local: 'Local'
 }
 

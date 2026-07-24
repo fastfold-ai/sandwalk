@@ -58,6 +58,9 @@ type ModelsViewCallbacks = {
     value: string
   ) => Promise<void>
   onClearProviderKey: (key: string) => Promise<void>
+  onTestProviderKey: (
+    key: string
+  ) => Promise<{ ok: boolean; message: string }>
 }
 
 export function useModelsViewState(callbacks: ModelsViewCallbacks) {
@@ -75,7 +78,8 @@ export function useModelsViewState(callbacks: ModelsViewCallbacks) {
     load: data.load,
     setError,
     onSaveProviderKey: callbacks.onSaveProviderKey,
-    onClearProviderKey: callbacks.onClearProviderKey
+    onClearProviderKey: callbacks.onClearProviderKey,
+    onTestProviderKey: callbacks.onTestProviderKey
   })
 
   const custom = useModelsViewCustom({
@@ -86,6 +90,7 @@ export function useModelsViewState(callbacks: ModelsViewCallbacks) {
   })
 
   const profiles = useModelsViewProfiles({
+    localProfiles: data.localProfiles,
     load: data.load,
     setError,
     onCreateProfile: callbacks.onCreateProfile,

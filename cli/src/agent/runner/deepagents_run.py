@@ -68,11 +68,17 @@ class DeepAgentsRunMixin:
             "moonshot",
             "nvidia",
             "opencode",
+            "deepseek",
+            "minimax",
+            "mistral",
+            "qwen",
+            "together",
         ):
             return self._make_error_result(
                 query,
                 f"Unsupported llm.provider '{provider}'. Use 'anthropic', 'openai', "
-                "'xai', 'google', 'moonshot', 'nvidia', or 'opencode' "
+                "'xai', 'google', 'moonshot', 'nvidia', 'opencode', 'deepseek', "
+                "'minimax', 'mistral', 'qwen', or 'together' "
                 "(OpenAI-compatible endpoints via llm.openai_base_url).",
                 0.0,
             )

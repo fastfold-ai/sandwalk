@@ -42,6 +42,33 @@ PROVIDER_METADATA = {
         "category": "AI Models",
         "description": "Kimi API key for first-party Kimi models.",
     },
+    "deepseek": {
+        "name": "DeepSeek",
+        "category": "AI Models",
+        "description": "DeepSeek API key for first-party DeepSeek models.",
+    },
+    "minimax": {
+        "name": "MiniMax",
+        "category": "AI Models",
+        "description": "MiniMax API key for first-party MiniMax models.",
+    },
+    "mistral": {
+        "name": "Mistral",
+        "category": "AI Models",
+        "description": "Mistral API key for first-party Mistral models.",
+    },
+    "qwen": {
+        "name": "Qwen",
+        "category": "AI Models",
+        "description": "Qwen (Alibaba DashScope) API key for first-party Qwen models.",
+    },
+    "together": {
+        "name": "Together AI",
+        "category": "AI Models",
+        "description": (
+            "Together AI OpenAI-compatible API — curated open models behind one key."
+        ),
+    },
     "tavily": {
         "name": "Tavily",
         "category": "Search",

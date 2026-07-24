@@ -31,6 +31,17 @@ def _prompt_setup_providers_text(options: list[str]) -> list[str]:
         "opencode": "opencode",
         "opencode-go": "opencode",
         "go": "opencode",
+        "ds": "deepseek",
+        "deepseek": "deepseek",
+        "mm": "minimax",
+        "minimax": "minimax",
+        "mi": "mistral",
+        "mistral": "mistral",
+        "qw": "qwen",
+        "qwen": "qwen",
+        "dashscope": "qwen",
+        "tg": "together",
+        "together": "together",
         "k": "openai_compatible",
         "compatible": "openai_compatible",
         "openai-compatible": "openai_compatible",
@@ -43,7 +54,9 @@ def _prompt_setup_providers_text(options: list[str]) -> list[str]:
         console.print("  [cyan]Select provider(s) to configure[/cyan]")
         console.print(
             "  [dim]Options:[/dim] anthropic (a), openai (o), xai (x), google (g), "
-            "kimi/moonshot (m), nvidia (n), opencode (oc), openai_compatible (k), all"
+            "kimi/moonshot (m), nvidia (n), opencode (oc), deepseek (ds), "
+            "minimax (mm), mistral (mi), qwen (qw), together (tg), "
+            "openai_compatible (k), all"
         )
         try:
             raw = input("  Providers: ").strip().lower()

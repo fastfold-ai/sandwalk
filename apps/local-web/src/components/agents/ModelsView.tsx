@@ -8,7 +8,7 @@ import type {
   UpsertModelProfileInput
 } from '@sandwalk/agent-ui-core'
 import { Info } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -28,6 +28,7 @@ import {
 import { applyBackendDefaults } from './models-view/models-view-utils'
 import { useModelsViewState } from './models-view/use-models-view-state'
 
+/** Models catalog + Local LLM connection status. */
 export function ModelsView({
   integrations,
   onListModels,
@@ -42,6 +43,7 @@ export function ModelsView({
   onDiscoverEndpoint,
   onSaveProviderKey,
   onClearProviderKey,
+  onTestProviderKey,
   embedded = false
 }: {
   integrations: IntegrationSummary[]
@@ -87,9 +89,39 @@ export function ModelsView({
     value: string
   ) => Promise<void>
   onClearProviderKey: (key: string) => Promise<void>
+  onTestProviderKey: (
+    key: string
+  ) => Promise<{ ok: boolean; message: string }>
   /** Compact chrome for setup wizard embedding. */
   embedded?: boolean
 }) {
+  // Keep latest callback in a ref so HMR / identity churn can't leave Test
+  // holding an undefined function from an earlier render.
+  const testRef = useRef(onTestProviderKey)
+  testRef.current = onTestProviderKey
+  const runTestProviderKey = (key: string) => {
+    const run = testRef.current
+    if (typeof run !== 'function') {
+      return Promise.resolve({
+        ok: false,
+        message: 'Test is unavailable. Reload the Models page and try again.'
+      })
+    }
+    return run(key)
+  }
+
+  const clearRef = useRef(onClearProviderKey)
+  clearRef.current = onClearProviderKey
+  const runClearProviderKey = (key: string) => {
+    const run = clearRef.current
+    if (typeof run !== 'function') {
+      return Promise.reject(
+        new Error('Remove is unavailable. Reload the Models page and try again.')
+      )
+    }
+    return run(key)
+  }
+
   const state = useModelsViewState({
     integrations,
     onListModels,
@@ -103,7 +135,8 @@ export function ModelsView({
     onProbeProfile,
     onDiscoverEndpoint,
     onSaveProviderKey,
-    onClearProviderKey
+    onClearProviderKey: runClearProviderKey,
+    onTestProviderKey: runTestProviderKey
   })
   const [multimodalGuideOpen, setMultimodalGuideOpen] = useState(false)
 
@@ -176,6 +209,7 @@ export function ModelsView({
           keyDrafts={state.keyDrafts}
           savingKeys={state.savingKeys}
           revealedKeys={state.revealedKeys}
+          cloudStatusFor={state.cloudStatusFor}
           onOpenChange={state.setApiKeysOpen}
           onKeyDraftChange={(key, value) =>
             state.setKeyDrafts(prev => ({ ...prev, [key]: value }))
@@ -183,12 +217,20 @@ export function ModelsView({
           onRevealedKeyChange={(key, revealed) =>
             state.setRevealedKeys(prev => ({ ...prev, [key]: revealed }))
           }
-          onSaveProviderKey={integration =>
-            void state.saveProviderKey(integration)
-          }
+          onSaveProviderKey={integration => state.saveProviderKey(integration)}
           onClearProviderKey={integration =>
-            void state.clearProviderKey(integration)
+            state.clearProviderKey(integration)
           }
+          onTestProviderKey={state.testProviderKey}
+        />
+
+        <ModelsProfilesSection
+          open={state.profilesOpen}
+          localProfiles={state.localProfiles}
+          probeStatusById={state.probeStatusById}
+          onOpenChange={state.setProfilesOpen}
+          onOpenCreate={state.openCreate}
+          onOpenEdit={state.openEdit}
         />
 
         <ModelsCustomSection
@@ -197,16 +239,6 @@ export function ModelsView({
           onOpenChange={state.setCustomOpen}
           onOpenCustomCreate={state.openCustomCreate}
           onRemoveCustomModel={model => void state.removeCustomModel(model)}
-        />
-
-        <ModelsProfilesSection
-          open={state.profilesOpen}
-          localProfiles={state.localProfiles}
-          onOpenChange={state.setProfilesOpen}
-          onOpenCreate={state.openCreate}
-          onProbeProfile={profile => void state.probeProfile(profile)}
-          onOpenEdit={state.openEdit}
-          onRemoveProfile={profile => void state.removeProfile(profile)}
         />
       </div>
 
@@ -235,6 +267,7 @@ export function ModelsView({
         }}
         onDiscoverModels={() => void state.discoverModels()}
         onSaveProfile={() => void state.saveProfile()}
+        onRemoveProfile={profile => void state.removeProfile(profile)}
         onShowProfileApiKeyChange={state.setShowProfileApiKey}
         onResetDiscoverState={state.resetDiscoverState}
       />

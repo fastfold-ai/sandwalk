@@ -1,5 +1,5 @@
 import type { AgentModel, IntegrationSummary, ModelProfile } from '@sandwalk/agent-ui-core'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   LLM_API_KEY_ORDER,
@@ -57,19 +57,26 @@ export function useModelsViewData({
     [models]
   )
 
+  const onListModelsRef = useRef(onListModels)
+  onListModelsRef.current = onListModels
+  const onListProfilesRef = useRef(onListProfiles)
+  onListProfilesRef.current = onListProfiles
+
   const load = useCallback(
     async (discover = true) => {
       setError(null)
       const [nextModels, nextProfiles] = await Promise.all([
-        onListModels({ discover }),
-        onListProfiles()
+        onListModelsRef.current({ discover }),
+        onListProfilesRef.current()
       ])
       setModels(nextModels)
       setProfiles(nextProfiles)
     },
-    [onListModels, onListProfiles, setError]
+    [setError]
   )
 
+  // Mount-only catalog fetch. Parent often passes inline callbacks; do not
+  // re-subscribe when those identities change or we loop on setLoading.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -85,7 +92,8 @@ export function useModelsViewData({
     return () => {
       cancelled = true
     }
-  }, [load, setError])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only
+  }, [])
 
   const providerFilterOptions = useMemo(() => {
     const counts = new Map<string, number>()
@@ -101,6 +109,11 @@ export function useModelsViewData({
       moonshot: 'Kimi',
       nvidia: 'NVIDIA',
       opencode: 'OpenCode Zen',
+      deepseek: 'DeepSeek',
+      minimax: 'MiniMax',
+      mistral: 'Mistral',
+      qwen: 'Qwen',
+      together: 'Together AI',
       local: 'Local'
     }
     return Array.from(counts.entries())
@@ -182,7 +195,10 @@ export function useModelsViewData({
     }
   }
 
-  const localProfiles = profiles.filter(profile => !profile.isCloud)
+  const localProfiles = useMemo(
+    () => profiles.filter(profile => !profile.isCloud),
+    [profiles]
+  )
 
   return {
     models,

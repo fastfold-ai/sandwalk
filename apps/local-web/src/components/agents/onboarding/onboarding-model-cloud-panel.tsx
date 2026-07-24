@@ -4,9 +4,26 @@ import { Check, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { openInSystemBrowser } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
+import {
+  LLM_API_KEY_COPY,
+  LLM_API_KEY_ORDER
+} from '@/components/agents/models-view/models-view-utils'
 
 import { primaryMaskedPreview } from './onboarding-model-shared'
+
+function hostLabelFor(integration: IntegrationSummary) {
+  const copy =
+    LLM_API_KEY_COPY[integration.key as (typeof LLM_API_KEY_ORDER)[number]]
+  if (copy?.hostLabel) return copy.hostLabel
+  if (!integration.setupUrl) return 'provider site'
+  try {
+    return new URL(integration.setupUrl).hostname
+  } catch {
+    return 'provider site'
+  }
+}
 
 export function OnboardingModelCloudPanel({
   loadingIntegrations,
@@ -116,14 +133,15 @@ export function OnboardingModelCloudPanel({
           ) : null}
           <div className="flex items-center justify-between gap-3">
             {selectedIntegration.setupUrl ? (
-              <a
-                href={selectedIntegration.setupUrl}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
                 className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
+                onClick={() =>
+                  void openInSystemBrowser(selectedIntegration.setupUrl!)
+                }
               >
-                Get a {selectedIntegration.name} key
-              </a>
+                No key yet? Create one at {hostLabelFor(selectedIntegration)} ↗
+              </button>
             ) : (
               <span />
             )}

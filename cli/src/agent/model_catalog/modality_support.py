@@ -156,6 +156,22 @@ def _moonshot_multimodal(model_id: str) -> set[ModalityKind]:
     return set()
 
 
+def _together_multimodal(model_id: str) -> set[ModalityKind]:
+    """Per-model modalities for Together reseller ids (org/name).
+
+    Inkling: native text + image + audio (Thinking Machines model card /
+    Together docs). No native PDF/file or video input.
+    Llama 4 Maverick: native text + image.
+    Other curated Together rows stay text-only until probed.
+    """
+    value = model_id.lower()
+    if "inkling" in value or value.endswith("/inkling"):
+        return {"image", "audio"}
+    if "llama-4-maverick" in value or "llama4-maverick" in value:
+        return {"image"}
+    return set()
+
+
 def _normalize_local_model_name(model_id: str) -> str:
     """Strip org prefix and normalize separators for local tag matching."""
     value = (
@@ -234,6 +250,13 @@ def allowlist_modalities(
         return _xai_multimodal(value)
     if provider_norm == "moonshot":
         return _moonshot_multimodal(value)
+    if provider_norm == "together":
+        return _together_multimodal(value)
+    # DeepSeek / MiniMax / Mistral / Qwen curated text flagships — no native
+    # image/PDF/audio/video injection (OpenWorker matrix; vision variants exist
+    # elsewhere, e.g. Pixtral, but are not in our curated picker lists).
+    if provider_norm in {"deepseek", "minimax", "mistral", "qwen"}:
+        return set()
     return set()
 
 

@@ -272,7 +272,7 @@ def test_keys_table_lists_compatible_profiles_dynamically():
     cfg = Config(data={"llm.provider": "openai"})
     cfg.upsert_openai_profile(
         profile_id="omlx_local",
-        label="oMLX Local",
+        label="oMLX",
         backend="omlx",
         base_url="http://localhost:8000/v1",
         api_key="sk-omlx-example",
@@ -291,10 +291,10 @@ def test_keys_table_lists_compatible_profiles_dynamically():
     status_col = list(getattr(table.columns[1], "_cells", []))
     unlocks_col = list(getattr(table.columns[3], "_cells", []))
 
-    assert "Local LLM: oMLX Local" in service_col
+    assert "Local LLM: oMLX" in service_col
     assert "Local LLM: Unsloth Lab" in service_col
 
-    omlx_idx = service_col.index("Local LLM: oMLX Local")
+    omlx_idx = service_col.index("Local LLM: oMLX")
     unsloth_idx = service_col.index("Local LLM: Unsloth Lab")
     assert "configured" in status_col[omlx_idx]
     assert "active" in status_col[omlx_idx]
@@ -307,14 +307,14 @@ def test_keys_table_uses_template_install_links_for_compatible_profiles():
     cfg = Config(data={"llm.provider": "openai"})
     cfg.upsert_openai_profile(
         profile_id="ds4_local",
-        label="DS4 Local",
+        label="DS4",
         backend="ds4",
         base_url="http://localhost:8000/v1",
         api_key=None,
     )
     cfg.upsert_openai_profile(
         profile_id="llama_cpp_local",
-        label="llama.cpp Local",
+        label="llama.cpp",
         backend="llama_cpp",
         base_url="http://localhost:8080/v1",
         api_key=None,
@@ -331,8 +331,8 @@ def test_keys_table_uses_template_install_links_for_compatible_profiles():
     service_col = list(getattr(table.columns[0], "_cells", []))
     signup_col = list(getattr(table.columns[5], "_cells", []))
 
-    ds4_idx = service_col.index("Local LLM: DS4 Local")
-    llama_idx = service_col.index("Local LLM: llama.cpp Local")
+    ds4_idx = service_col.index("Local LLM: DS4")
+    llama_idx = service_col.index("Local LLM: llama.cpp")
     custom_idx = service_col.index("Local LLM: Custom Other")
 
     assert "github.com/antirez/ds4" in signup_col[ds4_idx]
@@ -434,7 +434,7 @@ def test_llm_api_key_uses_active_profile_only_ignores_stale_env(monkeypatch):
                     "api_key": "sk-proj-cloud-key",
                 },
                 "omlx_local": {
-                    "label": "oMLX Local",
+                    "label": "oMLX",
                     "backend": "omlx",
                     "base_url": "http://127.0.0.1:8009/v1",
                     "api_key": "sk-omlx-profile-key",
@@ -488,7 +488,7 @@ def test_heals_openai_cloud_model_when_active_profile_is_local_backend():
                     "default_model": "gpt-5.5",
                 },
                 "ollama_local": {
-                    "label": "Ollama Local",
+                    "label": "Ollama",
                     "backend": "ollama",
                     "base_url": "http://localhost:11434/v1",
                     "default_model": "qwen3.6:32b",
@@ -541,14 +541,14 @@ def test_upsert_profile_key_does_not_get_overwritten_by_stale_legacy_projection(
                     "default_model": "gpt-5.5",
                 },
                 "omlx_local": {
-                    "label": "oMLX Local",
+                    "label": "oMLX",
                     "backend": "omlx",
                     "base_url": "http://127.0.0.1:8005/v1",
                     "api_key": "sk-omlx-old",
                     "default_model": "omlx-model",
                 },
                 "unsloth_local": {
-                    "label": "Unsloth Local",
+                    "label": "Unsloth",
                     "backend": "unsloth",
                     "base_url": "http://localhost:8888/v1",
                     "api_key": "sk-omlx-wrong",
@@ -587,7 +587,7 @@ def test_set_legacy_compatible_key_updates_active_profile_key():
                     "default_model": "gpt-5.5",
                 },
                 "unsloth_local": {
-                    "label": "Unsloth Local",
+                    "label": "Unsloth",
                     "backend": "unsloth",
                     "base_url": "http://localhost:8888/v1",
                     "api_key": "sk-unsloth-old",

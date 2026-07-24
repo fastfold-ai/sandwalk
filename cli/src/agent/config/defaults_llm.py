@@ -16,6 +16,11 @@ DEFAULTS_LLM = {
     "llm.google_api_key": None,
     "llm.moonshot_api_key": None,
     "llm.opencode_api_key": None,
+    "llm.deepseek_api_key": None,
+    "llm.minimax_api_key": None,
+    "llm.mistral_api_key": None,
+    "llm.qwen_api_key": None,
+    "llm.together_api_key": None,
     "llm.openai_compatible_api_key": None,  # legacy; migrated into profiles then cleared
     "llm.openai_base_url": None,
     "llm.openai_compatible_backend": None,

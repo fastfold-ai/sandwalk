@@ -1,10 +1,11 @@
 import type {
   DiscoverModelEndpointInput,
+  DoctorCheckResult,
   ModelProfile,
   ModelProfileProbeResult,
   UpsertModelProfileInput
 } from '@sandwalk/agent-ui-core'
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   PROFILE_BACKENDS,
@@ -13,7 +14,46 @@ import {
   type ProfileFormState
 } from './models-view-utils'
 
+export type ProfileProbeStatus = {
+  tone: DoctorCheckResult['status']
+  label: string
+  detail: string | null
+  probing: boolean
+}
+
+function statusFromProbe(result: {
+  health: string
+  error: string | null
+  models: string[]
+}): Omit<ProfileProbeStatus, 'probing'> {
+  const health = result.health || 'error'
+  if (health === 'healthy') {
+    return {
+      tone: 'ok',
+      label: 'Connected',
+      detail:
+        result.models.length > 0
+          ? `${result.models.length} models`
+          : 'Reachable'
+    }
+  }
+  if (health === 'no_models') {
+    return {
+      tone: 'warn',
+      label: 'No models',
+      detail: result.error || 'Endpoint reachable but returned no models'
+    }
+  }
+  // Match Doctor local-endpoint checks: unreachable is warn, not hard error.
+  return {
+    tone: 'warn',
+    label: 'Unreachable',
+    detail: result.error || 'Local endpoint unreachable'
+  }
+}
+
 type ModelsViewProfilesInput = {
+  localProfiles: ModelProfile[]
   load: (discover?: boolean) => Promise<void>
   setError: (error: string | null) => void
   onCreateProfile: (
@@ -37,6 +77,7 @@ type ModelsViewProfilesInput = {
 }
 
 export function useModelsViewProfiles({
+  localProfiles,
   load,
   setError,
   onCreateProfile,
@@ -54,6 +95,9 @@ export function useModelsViewProfiles({
   const [discoverSource, setDiscoverSource] = useState<string | null>(null)
   const [discoverError, setDiscoverError] = useState<string | null>(null)
   const [showProfileApiKey, setShowProfileApiKey] = useState(false)
+  const [probeStatusById, setProbeStatusById] = useState<
+    Record<string, ProfileProbeStatus>
+  >({})
   const [form, setForm] = useState<ProfileFormState>({
     label: '',
     backend: 'ollama',
@@ -62,6 +106,62 @@ export function useModelsViewProfiles({
   })
 
   const selectedBackend = profileBackend(form.backend) || PROFILE_BACKENDS[0]
+  const onProbeProfileRef = useRef(onProbeProfile)
+  onProbeProfileRef.current = onProbeProfile
+  const localProfilesRef = useRef(localProfiles)
+  localProfilesRef.current = localProfiles
+  const probedIdsKeyRef = useRef('')
+
+  const checkProfileStatus = useCallback(async (profile: ModelProfile) => {
+    setProbeStatusById(current => ({
+      ...current,
+      [profile.id]: {
+        tone: current[profile.id]?.tone || 'warn',
+        label: current[profile.id]?.label || 'Checking…',
+        detail: current[profile.id]?.detail || null,
+        probing: true
+      }
+    }))
+    try {
+      const result = await onProbeProfileRef.current(profile.id)
+      const next = statusFromProbe(result)
+      setProbeStatusById(current => ({
+        ...current,
+        [profile.id]: { ...next, probing: false }
+      }))
+      return result
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      setProbeStatusById(current => ({
+        ...current,
+        [profile.id]: {
+          tone: 'warn',
+          label: 'Unreachable',
+          detail,
+          probing: false
+        }
+      }))
+      throw err
+    }
+  }, [])
+
+  // One-shot: ref-guarded so re-renders / HMR cannot re-enter setState.
+  useEffect(() => {
+    if (!profilesOpen) {
+      probedIdsKeyRef.current = ''
+      return
+    }
+    const profiles = localProfilesRef.current
+    const key = profiles
+      .map(profile => profile.id)
+      .sort()
+      .join('\0')
+    if (!key || probedIdsKeyRef.current === key) return
+    probedIdsKeyRef.current = key
+    for (const profile of profiles) {
+      void checkProfileStatus(profile).catch(() => null)
+    }
+  }, [checkProfileStatus, localProfiles, profilesOpen])
 
   const resetDiscoverState = () => {
     setDiscoveredModels([])
@@ -182,8 +282,8 @@ export function useModelsViewProfiles({
   const probeProfile = async (profile: ModelProfile) => {
     setError(null)
     try {
-      const result = await onProbeProfile(profile.id)
-      if (result.error && result.models.length === 0) {
+      const result = await checkProfileStatus(profile)
+      if (result?.error && result.models.length === 0) {
         setError(`${profile.label}: ${result.error}`)
       }
       await load(true)
@@ -204,6 +304,7 @@ export function useModelsViewProfiles({
     showProfileApiKey,
     form,
     selectedBackend,
+    probeStatusById,
     setProfilesOpen,
     setDialogOpen,
     setForm,

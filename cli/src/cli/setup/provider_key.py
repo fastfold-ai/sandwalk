@@ -56,7 +56,18 @@ def _resolve_provider_key(
             prompt_fn = _prompt_openai_api_key
             label = "OpenAI"
             default_compat_key = None
-    elif provider in ("xai", "google", "moonshot", "nvidia", "opencode"):
+    elif provider in (
+        "xai",
+        "google",
+        "moonshot",
+        "nvidia",
+        "opencode",
+        "deepseek",
+        "minimax",
+        "mistral",
+        "qwen",
+        "together",
+    ):
         from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
         meta = OPENAI_COMPATIBLE_PROVIDERS[provider]

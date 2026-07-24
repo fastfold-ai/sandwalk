@@ -5,8 +5,17 @@ import { Link } from 'react-router-dom'
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
 import { Button } from '@/components/ui/button'
+import { openInSystemBrowser } from '@/lib/desktop'
 
 import { VERCEL_SETUP_COMMANDS } from './integrations-view-shared'
+
+function setupHostLabel(url: string) {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return 'provider site'
+  }
+}
 
 export function IntegrationsDetailNav({
   selected,
@@ -90,14 +99,15 @@ export function IntegrationsDetailHeader({
               <li>
                 In{' '}
                 {selected.setupUrl ? (
-                  <a
-                    href={selected.setupUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline"
+                  <button
+                    type="button"
+                    className="underline underline-offset-2"
+                    onClick={() =>
+                      void openInSystemBrowser(selected.setupUrl!)
+                    }
                   >
-                    Vercel Dashboard
-                  </a>
+                    Vercel Dashboard ↗
+                  </button>
                 ) : (
                   'Vercel Dashboard'
                 )}
@@ -129,15 +139,14 @@ export function IntegrationsDetailHeader({
         )}
         {selected.setupUrl && selected.key !== 'skills-sh' ? (
           <p className="text-muted-foreground mt-1 text-xs">
-            Get API keys at{' '}
-            <a
-              href={selected.setupUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
+            No key yet?{' '}
+            <button
+              type="button"
+              className="underline underline-offset-2"
+              onClick={() => void openInSystemBrowser(selected.setupUrl!)}
             >
-              {selected.setupUrl}
-            </a>
+              Create one at {setupHostLabel(selected.setupUrl)} ↗
+            </button>
           </p>
         ) : null}
       </div>

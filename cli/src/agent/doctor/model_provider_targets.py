@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 from agent.config import Config
 from agent.doctor.models import DoctorCheck
 
@@ -67,44 +65,9 @@ def gather_local_profile_checks(cfg: Config) -> list[DoctorCheck]:
 
 
 def gather_cloud_provider_targets(cfg: Config) -> list[ProviderTarget]:
-    """Build the list of cloud/OpenAI-compatible provider endpoints to probe."""
-    from agent.config import OPENAI_COMPATIBLE_PROVIDERS
+    """Deprecated: cloud auth probes use ``probe_llm_api_key`` (1-token chat).
 
-    targets: list[ProviderTarget] = []
-
-    anthropic_key = cfg.llm_api_key("anthropic")
-    if anthropic_key:
-        targets.append(
-            (
-                "anthropic",
-                "Anthropic",
-                "https://api.anthropic.com/v1/models",
-                {"x-api-key": anthropic_key, "anthropic-version": "2023-06-01"},
-                False,
-            )
-        )
-
-    openai_key = cfg._normalized_secret(
-        cfg.get("llm.openai_api_key")
-    ) or cfg._normalized_secret(os.environ.get("OPENAI_API_KEY"))
-    if openai_key:
-        targets.append(
-            (
-                "openai",
-                "OpenAI",
-                "https://api.openai.com/v1/models",
-                {"Authorization": f"Bearer {openai_key}"},
-                False,
-            )
-        )
-
-    for prov, meta in OPENAI_COMPATIBLE_PROVIDERS.items():
-        key = cfg.llm_api_key(prov)
-        if not key:
-            continue
-        models_url = str(meta["base_url"]).rstrip("/") + "/models"
-        targets.append(
-            (prov, meta["label"], models_url, {"Authorization": f"Bearer {key}"}, False)
-        )
-
-    return targets
+    Kept for import compatibility; always returns an empty list.
+    """
+    _ = cfg
+    return []

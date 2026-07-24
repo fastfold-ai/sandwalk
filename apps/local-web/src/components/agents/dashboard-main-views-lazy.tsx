@@ -58,7 +58,9 @@ export const SandboxListView = lazy(() =>
   }))
 )
 export const ModelsView = lazy(() =>
-  import('@/components/agents/ModelsView').then(m => ({ default: m.ModelsView }))
+  import('@/components/agents/ModelsView').then(m => ({
+    default: m.ModelsView
+  }))
 )
 export const ServerStatusView = lazy(() =>
   import('@/components/agents/ServerStatusView').then(m => ({

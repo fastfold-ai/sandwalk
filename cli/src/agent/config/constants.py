@@ -12,7 +12,20 @@ LEGACY_FASTFOLD_DIR = Path.home() / ".fastfold-cli"
 LEGACY_CT_DIR = Path.home() / ".ct"
 LEGACY_CONFIG_DIRS = (LEGACY_FASTFOLD_DIR, LEGACY_CT_DIR)
 VALID_LLM_PROVIDERS = frozenset(
-    {"anthropic", "openai", "xai", "google", "moonshot", "nvidia", "opencode"}
+    {
+        "anthropic",
+        "openai",
+        "xai",
+        "google",
+        "moonshot",
+        "nvidia",
+        "opencode",
+        "deepseek",
+        "minimax",
+        "mistral",
+        "qwen",
+        "together",
+    }
 )
 
 logger = logging.getLogger("config")

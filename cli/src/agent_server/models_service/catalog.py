@@ -17,6 +17,14 @@ from agent_server.models_service.catalog_static import (
 def list_models(
     cfg: Config, *, enabled_only: bool = False, discover: bool = True
 ) -> AgentModelList:
+    # Keep toggles aligned with API Keys: no key ⇒ models off.
+    from agent_server.models_service.mutate import (
+        sync_models_for_unconfigured_providers,
+    )
+
+    if sync_models_for_unconfigured_providers(cfg):
+        cfg.save()
+
     hidden = set(cfg.hidden_models())
     # Track static/custom ids so discovered entries don't duplicate them.
     known_ids: set[str] = set()

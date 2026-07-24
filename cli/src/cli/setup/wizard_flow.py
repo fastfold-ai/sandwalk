@@ -59,12 +59,12 @@ def _setup_resolve_providers_and_keys(cfg, args: dict) -> dict:
         )
         if not resolved_compatible_profile_label:
             label_defaults = {
-                "ollama": "Ollama Local",
-                "unsloth": "Unsloth Local",
-                "omlx": "oMLX Local",
-                "ds4": "DS4 Local",
-                "llama_cpp": "llama.cpp Local",
-                "lm_studio": "LM Studio Local",
+                "ollama": "Ollama",
+                "unsloth": "Unsloth",
+                "omlx": "oMLX",
+                "ds4": "DS4",
+                "llama_cpp": "llama.cpp",
+                "lm_studio": "LM Studio",
                 "other": "Custom Compatible Endpoint",
             }
             resolved_compatible_profile_label = label_defaults.get(

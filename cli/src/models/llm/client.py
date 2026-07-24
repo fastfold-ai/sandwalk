@@ -23,6 +23,11 @@ class LLMClient:
         "moonshot": "kimi-k2.6",
         "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
         "opencode": "kimi-k2.7-code",
+        "deepseek": "deepseek-v4-flash",
+        "minimax": "MiniMax-M2.5",
+        "mistral": "mistral-large-latest",
+        "qwen": "qwen3-max",
+        "together": "zai-org/GLM-5.2",
     }
 
     # First-party OpenAI-compatible providers: fixed base URL + env fallback.
@@ -35,6 +40,14 @@ class LLMClient:
         "moonshot": ("https://api.moonshot.ai/v1", "MOONSHOT_API_KEY"),
         "nvidia": ("https://integrate.api.nvidia.com/v1", "NVIDIA_API_KEY"),
         "opencode": ("https://opencode.ai/zen/v1", "OPENCODE_API_KEY"),
+        "deepseek": ("https://api.deepseek.com/v1", "DEEPSEEK_API_KEY"),
+        "minimax": ("https://api.minimax.io/v1", "MINIMAX_API_KEY"),
+        "mistral": ("https://api.mistral.ai/v1", "MISTRAL_API_KEY"),
+        "qwen": (
+            "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+            "DASHSCOPE_API_KEY",
+        ),
+        "together": ("https://api.together.xyz/v1", "TOGETHER_API_KEY"),
     }
 
     def __init__(self, provider: str = "openai", model: str = None,

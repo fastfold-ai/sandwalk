@@ -130,7 +130,7 @@ class TestOpenAICompatibleSetupAndFetch:
         cfg = Config(data={"llm.provider": "openai", "llm.model": "gpt-5.5"})
         cfg.upsert_openai_profile(
             profile_id="omlx_local",
-            label="oMLX Local",
+            label="oMLX",
             backend="omlx",
             base_url="http://localhost:8000/v1",
             api_key="sk-omlx-test",
@@ -139,7 +139,7 @@ class TestOpenAICompatibleSetupAndFetch:
         )
         cfg.upsert_openai_profile(
             profile_id="unsloth_local",
-            label="Unsloth Local",
+            label="Unsloth",
             backend="unsloth",
             base_url="http://localhost:8888/v1",
             api_key="sk-unsloth-test",
@@ -170,8 +170,8 @@ class TestOpenAICompatibleSetupAndFetch:
         )
         assert "[0] OpenAI-compatible profiles" not in rendered
         assert "(custom)" not in rendered
-        assert "oMLX Local: omlx-a" in rendered
-        assert "Unsloth Local: unsloth-a" in rendered
+        assert "oMLX: omlx-a" in rendered
+        assert "Unsloth: unsloth-a" in rendered
         assert "(oMLX)" in rendered
         assert "(openai:omlx_local)" not in rendered
 
@@ -180,7 +180,7 @@ class TestOpenAICompatibleSetupAndFetch:
         cfg = Config(data={"llm.provider": "openai", "llm.model": "gpt-5.5"})
         cfg.upsert_openai_profile(
             profile_id="unsloth_local",
-            label="Unsloth Local",
+            label="Unsloth",
             backend="unsloth",
             base_url="http://localhost:8888/v1",
             api_key="sk-unsloth-test",
@@ -219,7 +219,7 @@ class TestOpenAICompatibleSetupAndFetch:
         cfg = Config(data={"llm.provider": "openai", "llm.model": "gpt-5.5"})
         cfg.upsert_openai_profile(
             profile_id="omlx_local",
-            label="oMLX Local",
+            label="oMLX",
             backend="omlx",
             base_url="http://127.0.0.1:8005/v1",
             api_key="sk-omlx-test",
@@ -247,7 +247,7 @@ class TestOpenAICompatibleSetupAndFetch:
         endpoint_col = list(getattr(table.columns[2], "_cells", []))
         path_col = list(getattr(table.columns[3], "_cells", []))
         models_col = list(getattr(table.columns[6], "_cells", []))
-        assert any("oMLX Local" in cell for cell in first_col)
+        assert any("oMLX" in cell for cell in first_col)
         assert any(cell == "oMLX" for cell in backend_col)
         assert any("http://127.0.0.1:8005/v1" in cell for cell in endpoint_col)
         assert any(cell == "/v1/models" for cell in path_col)
@@ -258,7 +258,7 @@ class TestOpenAICompatibleSetupAndFetch:
         cfg = Config(data={"llm.provider": "openai", "llm.model": "gpt-5.5"})
         cfg.upsert_openai_profile(
             profile_id="omlx_local",
-            label="oMLX Local",
+            label="oMLX",
             backend="omlx",
             base_url="http://127.0.0.1:8005/v1",
             api_key="sk-omlx-test",

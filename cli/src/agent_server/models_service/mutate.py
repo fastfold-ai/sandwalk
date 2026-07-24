@@ -3,9 +3,62 @@
 from __future__ import annotations
 
 from agent.config import OPENAI_COMPATIBLE_PROVIDERS, Config
+from agent.doctor.model_provider_http import supports_llm_key_probe
 from agent.model_catalog import cloud_catalog_models, format_discovered_model_label
 from agent_server.models import AgentModel, CreateAgentModelRequest, UpdateAgentModelRequest
 from agent_server.models_service.catalog_discovery import _discover_models_enabled
+
+
+def disable_models_for_provider(cfg: Config, provider: str) -> list[str]:
+    """Hide catalog + custom models for an LLM provider. Returns ids newly hidden."""
+    target = str(provider or "").strip()
+    if not target or not supports_llm_key_probe(target):
+        return []
+    ids = [
+        str(item["id"])
+        for item in cloud_catalog_models()
+        if str(item.get("provider") or "") == target
+    ]
+    for item in cfg.custom_models():
+        if str(item.get("provider") or "") == target:
+            ids.append(str(item["id"]))
+    newly_hidden: list[str] = []
+    for model_id in ids:
+        if cfg.is_model_hidden(model_id):
+            continue
+        cfg.set_model_hidden(model_id, True)
+        newly_hidden.append(model_id)
+    return newly_hidden
+
+
+def _cloud_provider_key_present(cfg: Config, provider: str) -> bool:
+    """True when the cloud API-key integration for ``provider`` has a secret."""
+    import os
+
+    if provider == "openai":
+        return bool(
+            cfg._normalized_secret(cfg.get("llm.openai_api_key"))
+            or cfg._normalized_secret(os.environ.get("OPENAI_API_KEY"))
+        )
+    if provider == "anthropic":
+        return bool(
+            cfg._normalized_secret(cfg.get("llm.anthropic_api_key"))
+            or cfg._normalized_secret(cfg.get("llm.api_key"))
+            or cfg._normalized_secret(os.environ.get("ANTHROPIC_API_KEY"))
+        )
+    return bool(cfg.llm_api_key(provider))
+
+
+def sync_models_for_unconfigured_providers(cfg: Config) -> bool:
+    """Hide models for LLM providers with no key. Returns True if config changed."""
+    changed = False
+    providers = ("anthropic", "openai", *OPENAI_COMPATIBLE_PROVIDERS.keys())
+    for provider in providers:
+        if _cloud_provider_key_present(cfg, provider):
+            continue
+        if disable_models_for_provider(cfg, provider):
+            changed = True
+    return changed
 
 
 def set_model_enabled(model_id: str, enabled: bool) -> AgentModel:

@@ -163,6 +163,7 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
   if (isDashboardModels) {
     return (
       <ModelsView
+        key="models-api-key-test-v3"
         integrations={integrations}
         onListModels={options => client.listModels(options)}
         onUpdateModelEnabled={async (modelId, enabled, signal) => {
@@ -218,6 +219,7 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
           await loadIntegrations()
           await loadModelOptions()
         }}
+        onTestProviderKey={key => client.validateIntegration(key)}
       />
     )
   }

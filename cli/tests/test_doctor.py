@@ -388,7 +388,7 @@ def test_heal_gemini_model_under_openai_provider():
                     "base_url": "https://api.openai.com/v1",
                 },
                 "ollama_local": {
-                    "label": "Ollama Local",
+                    "label": "Ollama",
                     "backend": "ollama",
                     "base_url": "http://localhost:11434/v1",
                 },
@@ -415,7 +415,7 @@ def test_heal_openai_model_under_google_provider():
                     "base_url": "https://api.openai.com/v1",
                 },
                 "ollama_local": {
-                    "label": "Ollama Local",
+                    "label": "Ollama",
                     "backend": "ollama",
                     "base_url": "http://localhost:11434/v1",
                     "default_model": "llama3.1",
@@ -443,7 +443,7 @@ def test_heal_anthropic_with_gemini_model_prefers_google():
                     "base_url": "https://api.openai.com/v1",
                 },
                 "ollama_local": {
-                    "label": "Ollama Local",
+                    "label": "Ollama",
                     "backend": "ollama",
                     "base_url": "http://localhost:11434/v1",
                     "default_model": "llama3.1",

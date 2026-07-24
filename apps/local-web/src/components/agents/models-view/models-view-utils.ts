@@ -7,7 +7,12 @@ export const CLOUD_PROVIDERS = [
   { value: 'xai', label: 'xAI (Grok)' },
   { value: 'moonshot', label: 'Kimi' },
   { value: 'nvidia', label: 'NVIDIA' },
-  { value: 'opencode', label: 'OpenCode Zen' }
+  { value: 'opencode', label: 'OpenCode Zen' },
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'minimax', label: 'MiniMax' },
+  { value: 'mistral', label: 'Mistral' },
+  { value: 'qwen', label: 'Qwen' },
+  { value: 'together', label: 'Together AI' }
 ] as const
 
 export const MODEL_LIST_PREVIEW_LIMIT = 10
@@ -19,7 +24,7 @@ export const PROFILE_BACKENDS = [
     label: 'Ollama',
     hint: '/api/tags',
     baseUrl: 'http://127.0.0.1:11434/v1',
-    defaultLabel: 'Ollama Local',
+    defaultLabel: 'Ollama',
     icon: '/local-llm/ollama.png'
   },
   {
@@ -27,7 +32,7 @@ export const PROFILE_BACKENDS = [
     label: 'Unsloth',
     hint: '/v1/models · auth',
     baseUrl: 'http://127.0.0.1:8888/v1',
-    defaultLabel: 'Unsloth Local',
+    defaultLabel: 'Unsloth',
     icon: '/local-llm/unsloth.png'
   },
   {
@@ -35,7 +40,7 @@ export const PROFILE_BACKENDS = [
     label: 'oMLX',
     hint: '/v1/models · auth',
     baseUrl: 'http://127.0.0.1:8000/v1',
-    defaultLabel: 'oMLX Local',
+    defaultLabel: 'oMLX',
     icon: '/local-llm/omlx.png'
   },
   {
@@ -43,7 +48,7 @@ export const PROFILE_BACKENDS = [
     label: 'DS4',
     hint: '/v1/models',
     baseUrl: 'http://127.0.0.1:8000/v1',
-    defaultLabel: 'DS4 Local',
+    defaultLabel: 'DS4',
     icon: 'cpu'
   },
   {
@@ -51,7 +56,7 @@ export const PROFILE_BACKENDS = [
     label: 'llama.cpp',
     hint: '/v1/models',
     baseUrl: 'http://127.0.0.1:8080/v1',
-    defaultLabel: 'llama.cpp Local',
+    defaultLabel: 'llama.cpp',
     icon: '/local-llm/llama-cpp.png'
   },
   {
@@ -59,7 +64,7 @@ export const PROFILE_BACKENDS = [
     label: 'LM Studio',
     hint: '/v1/models',
     baseUrl: 'http://127.0.0.1:1234/v1',
-    defaultLabel: 'LM Studio Local',
+    defaultLabel: 'LM Studio',
     icon: '/local-llm/lm-studio.png'
   },
   {
@@ -131,69 +136,113 @@ export const LLM_API_KEY_ORDER = [
   'xai',
   'moonshot',
   'nvidia',
-  'opencode'
+  'opencode',
+  'deepseek',
+  'minimax',
+  'mistral',
+  'qwen',
+  'together'
 ] as const
 
 export const LLM_API_KEY_COPY: Record<
   (typeof LLM_API_KEY_ORDER)[number],
   {
+    cardTitle: string
     title: string
-    beforeLink: string
-    linkLabel: string
-    afterLink: string
+    /** Short blurb above the key field. */
+    description: string
+    /** Host shown in “No key yet? Create one at …” */
+    hostLabel: string
     placeholderUnset: string
   }
 > = {
   openai: {
+    cardTitle: 'OpenAI',
     title: 'OpenAI API Key',
-    beforeLink: 'You can put in ',
-    linkLabel: 'your OpenAI key',
-    afterLink: ' to use OpenAI models at cost.',
+    description: 'Use your OpenAI key for GPT models at cost.',
+    hostLabel: 'platform.openai.com',
     placeholderUnset: 'Enter your OpenAI API Key'
   },
   anthropic: {
+    cardTitle: 'Claude (Anthropic)',
     title: 'Anthropic API Key',
-    beforeLink: 'You can put in ',
-    linkLabel: 'your Anthropic key',
-    afterLink:
-      ' to use Claude at cost. When enabled, this key will be used for all models beginning with "claude-".',
+    description:
+      'Use your Anthropic key for Claude. When enabled, this key is used for all models beginning with “claude-”.',
+    hostLabel: 'console.anthropic.com',
     placeholderUnset: 'Enter your Anthropic API Key'
   },
   google: {
+    cardTitle: 'Gemini (Google)',
     title: 'Google Gemini API Key',
-    beforeLink: 'You can put in ',
-    linkLabel: 'your Google AI Studio key',
-    afterLink: ' to use Gemini models at cost.',
+    description: 'Use your Google AI Studio key for Gemini models at cost.',
+    hostLabel: 'aistudio.google.com',
     placeholderUnset: 'Enter your Google AI Studio API Key'
   },
   xai: {
+    cardTitle: 'xAI (Grok)',
     title: 'xAI API Key',
-    beforeLink: 'You can put in ',
-    linkLabel: 'your xAI key',
-    afterLink: ' to use Grok models at cost.',
+    description: 'Use your xAI key for Grok models at cost.',
+    hostLabel: 'console.x.ai',
     placeholderUnset: 'Enter your xAI API Key'
   },
   moonshot: {
+    cardTitle: 'Kimi (Moonshot AI)',
     title: 'Kimi API Key',
-    beforeLink: 'You can put in ',
-    linkLabel: 'your Kimi key',
-    afterLink: ' to use Kimi models at cost.',
+    description: 'Use your Kimi key for Moonshot models at cost.',
+    hostLabel: 'platform.moonshot.ai',
     placeholderUnset: 'Enter your Kimi API Key'
   },
   nvidia: {
+    cardTitle: 'NVIDIA',
     title: 'NVIDIA API Key',
-    beforeLink: 'You can put in ',
-    linkLabel: 'your NVIDIA API key',
-    afterLink: ' to use NVIDIA NIM and model inference endpoints.',
+    description: 'Use your NVIDIA key for NIM and model inference endpoints.',
+    hostLabel: 'build.nvidia.com',
     placeholderUnset: 'Enter your NVIDIA API Key'
   },
   opencode: {
+    cardTitle: 'OpenCode Zen',
     title: 'OpenCode Zen API Key',
-    beforeLink: 'Sign in to OpenCode Zen and put in ',
-    linkLabel: 'your Zen API key',
-    afterLink:
-      ' for pay-as-you-go access to curated coding models (GPT, Claude, Gemini, Kimi, DeepSeek, and more).',
+    description:
+      'Pay-as-you-go access to curated coding models (GPT, Claude, Gemini, Kimi, DeepSeek, and more).',
+    hostLabel: 'opencode.ai',
     placeholderUnset: 'Enter your OpenCode Zen API Key'
+  },
+  deepseek: {
+    cardTitle: 'DeepSeek',
+    title: 'DeepSeek API Key',
+    description: 'Use your DeepSeek key for DeepSeek models at cost.',
+    hostLabel: 'platform.deepseek.com',
+    placeholderUnset: 'Enter your DeepSeek API Key'
+  },
+  minimax: {
+    cardTitle: 'MiniMax',
+    title: 'MiniMax API Key',
+    description: 'Use your MiniMax key for MiniMax models at cost.',
+    hostLabel: 'platform.minimax.io',
+    placeholderUnset: 'Enter your MiniMax API Key'
+  },
+  mistral: {
+    cardTitle: 'Mistral',
+    title: 'Mistral API Key',
+    description: 'Use your Mistral key for Mistral models at cost.',
+    hostLabel: 'console.mistral.ai',
+    placeholderUnset: 'Enter your Mistral API Key'
+  },
+  qwen: {
+    cardTitle: 'Qwen (Alibaba)',
+    title: 'Qwen API Key',
+    description:
+      'Use your DashScope key for Qwen models (Alibaba Model Studio).',
+    hostLabel: 'alibabacloud.com',
+    placeholderUnset: 'Enter your DashScope API Key'
+  },
+  together: {
+    cardTitle: 'Together AI',
+    title: 'Together AI API Key',
+    description:
+      "Uses Together AI's OpenAI-compatible API — the endpoint is prefilled, just add your key.",
+    hostLabel: 'together.xyz',
+    placeholderUnset: 'Enter your Together AI API Key'
   }
 }
 

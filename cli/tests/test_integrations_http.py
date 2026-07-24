@@ -33,13 +33,30 @@ def test_integrations_http_crud(tmp_path: Path, monkeypatch):
         assert updated.status_code == 200, updated.text
         assert updated.json()["configured"] is True
 
+        from agent.doctor.model_provider_http import ModelsProbeResult
+
+        monkeypatch.setattr(
+            "agent_server.integrations_service.mutate.probe_llm_api_key",
+            lambda *_a, **_k: ModelsProbeResult(
+                ok=True,
+                message="Anthropic API key works (1 models).",
+                model_count=1,
+                status_code=200,
+            ),
+        )
+
         validated = client.post("/v1/integrations/anthropic/validate")
         assert validated.status_code == 200
-        assert validated.json()["ok"] is True
+        body = validated.json()
+        assert body["ok"] is True
+        assert "API key works" in body["message"]
 
         removed = client.delete("/v1/integrations/anthropic")
         assert removed.status_code == 200
         assert removed.json()["configured"] is False
+        # Clearing the key also turns that provider's models off.
+        hidden = set(Config.load().hidden_models())
+        assert any(mid.startswith("claude-") for mid in hidden)
 
         missing = client.get("/v1/integrations/not-real")
         assert missing.status_code == 404

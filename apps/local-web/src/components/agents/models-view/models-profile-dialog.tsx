@@ -1,5 +1,13 @@
 import type { ModelProfile } from '@sandwalk/agent-ui-core'
-import { Check, ChevronDown, Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Loader2,
+  RefreshCw,
+  Trash2
+} from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -44,6 +52,7 @@ export function ModelsProfileDialog({
   onBackendChange,
   onDiscoverModels,
   onSaveProfile,
+  onRemoveProfile,
   onShowProfileApiKeyChange,
   onResetDiscoverState
 }: {
@@ -64,6 +73,7 @@ export function ModelsProfileDialog({
   onBackendChange: (backend: ProfileBackendValue) => void
   onDiscoverModels: () => void
   onSaveProfile: () => void
+  onRemoveProfile?: (profile: ModelProfile) => void
   onShowProfileApiKeyChange: (value: boolean | ((open: boolean) => boolean)) => void
   onResetDiscoverState: () => void
 }) {
@@ -263,14 +273,29 @@ export function ModelsProfileDialog({
           ) : null}
         </div>
 
-        <DialogFooter className="shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button disabled={savingProfile} onClick={onSaveProfile}>
-            {savingProfile ? <Loader2 className="animate-spin" /> : null}
-            Save
-          </Button>
+        <DialogFooter className="shrink-0 gap-2 sm:justify-between">
+          {editing && onRemoveProfile ? (
+            <Button
+              variant="ghost"
+              className="text-destructive hover:text-destructive"
+              disabled={savingProfile}
+              onClick={() => onRemoveProfile(editing)}
+            >
+              <Trash2 />
+              Remove
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button disabled={savingProfile} onClick={onSaveProfile}>
+              {savingProfile ? <Loader2 className="animate-spin" /> : null}
+              Save
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

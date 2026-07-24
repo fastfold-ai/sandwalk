@@ -48,7 +48,12 @@ const CLOUD_PROVIDER_LABELS: Record<string, string> = {
   xai: 'Grok',
   moonshot: 'Kimi',
   nvidia: 'NVIDIA',
-  opencode: 'OpenCode Zen'
+  opencode: 'OpenCode Zen',
+  deepseek: 'DeepSeek',
+  minimax: 'MiniMax',
+  mistral: 'Mistral',
+  qwen: 'Qwen',
+  together: 'Together AI'
 }
 
 const LOCAL_BACKEND_LABELS: Record<string, string> = {

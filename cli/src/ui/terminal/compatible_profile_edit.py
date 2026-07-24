@@ -23,12 +23,12 @@ class _CompatibleProfileEditMixin:
             )
 
         label_defaults = {
-            "ollama": "Ollama Local",
-            "unsloth": "Unsloth Local",
-            "omlx": "oMLX Local",
-            "ds4": "DS4 Local",
-            "llama_cpp": "llama.cpp Local",
-            "lm_studio": "LM Studio Local",
+            "ollama": "Ollama",
+            "unsloth": "Unsloth",
+            "omlx": "oMLX",
+            "ds4": "DS4",
+            "llama_cpp": "llama.cpp",
+            "lm_studio": "LM Studio",
             "other": "Custom Compatible Endpoint",
         }
         default_label = str((existing_profile or {}).get("label") or "").strip() or label_defaults.get(

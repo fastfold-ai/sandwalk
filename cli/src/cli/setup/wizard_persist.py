@@ -59,7 +59,18 @@ def _setup_persist_provider_choice(cfg, selection: dict, args: dict) -> None:
                 cfg.set("llm.model", desired_model)
         elif prov == "anthropic":
             cfg.set("llm.anthropic_api_key", key)
-        elif prov in ("xai", "google", "moonshot", "nvidia", "opencode"):
+        elif prov in (
+            "xai",
+            "google",
+            "moonshot",
+            "nvidia",
+            "opencode",
+            "deepseek",
+            "minimax",
+            "mistral",
+            "qwen",
+            "together",
+        ):
             from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
             cfg.set(OPENAI_COMPATIBLE_PROVIDERS[prov]["config_key"], key)
@@ -99,6 +110,11 @@ def _apply_default_model(cfg, active_setup_provider, selected_providers, resolve
             "moonshot": "kimi-",
             "nvidia": "nvidia/",
             "opencode": "",
+            "deepseek": "deepseek",
+            "minimax": "minimax",
+            "mistral": "mistral",
+            "qwen": "qwen",
+            "together": "",
         }
         prefix = prefixes.get(active_setup_provider, "")
         if default_model and (not prefix or not current_model.startswith(prefix)):
@@ -132,6 +148,16 @@ def _setup_print_provider_summary(selected_providers: list[str], cloud_key: str 
             if p == "nvidia"
             else "OpenCode Zen"
             if p == "opencode"
+            else "DeepSeek"
+            if p == "deepseek"
+            else "MiniMax"
+            if p == "minimax"
+            else "Mistral"
+            if p == "mistral"
+            else "Qwen"
+            if p == "qwen"
+            else "Together AI"
+            if p == "together"
             else "Anthropic"
         )
         for p in selected_providers
