@@ -9,10 +9,19 @@ import {
   Trash2,
   X
 } from 'lucide-react'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useHorizontalWheelScroll } from '@/hooks/useHorizontalWheelScroll'
 import { cn } from '@/lib/utils'
+
+import { useSessionTabColors } from './session-tab-colors'
+import {
+  TabContextItem,
+  TabContextMenuShell,
+  TabContextSeparator,
+  TabInlineColorRow,
+  tabColorBackgroundStyle
+} from './tab-context-menu'
 
 type TabContextMenuState = {
   sessionId: string
@@ -46,36 +55,26 @@ export function SessionTabs({
   onDelete: (session: AgentSession) => void
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
-  const menuRef = useRef<HTMLDivElement | null>(null)
+  const { tabColors, setTabColor } = useSessionTabColors()
   const activeTabRef = useRef<HTMLDivElement | null>(null)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   useHorizontalWheelScroll(scrollerRef)
 
-  useEffect(() => {
-    if (!menu) return
-    const close = (event: MouseEvent) => {
-      if (menuRef.current?.contains(event.target as Node)) return
-      setMenu(null)
+  const { pinnedTabs, scrollTabs } = useMemo(() => {
+    const pinned: AgentSession[] = []
+    const scroll: AgentSession[] = []
+    for (const tab of tabs) {
+      if (tab.organizeLabel === 'pinned') pinned.push(tab)
+      else scroll.push(tab)
     }
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenu(null)
-    }
-    const onScroll = () => setMenu(null)
-    // Use click (not mousedown) so menu item handlers run first.
-    window.addEventListener('click', close, true)
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('scroll', onScroll, true)
-    return () => {
-      window.removeEventListener('click', close, true)
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('scroll', onScroll, true)
-    }
-  }, [menu])
+    return { pinnedTabs: pinned, scrollTabs: scroll }
+  }, [tabs])
 
-  // Keep the selected chat tab in view when the bar overflows.
-  const tabIdsKey = tabs.map(tab => tab.id).join('\0')
+  // Keep the selected unpinned tab in view when the bar overflows.
+  const scrollIdsKey = scrollTabs.map(tab => tab.id).join('\0')
   useEffect(() => {
     if (!activeId) return
+    if (pinnedTabs.some(tab => tab.id === activeId)) return
     const node = activeTabRef.current
     if (!node) return
     node.scrollIntoView({
@@ -83,7 +82,7 @@ export function SessionTabs({
       inline: 'nearest',
       block: 'nearest'
     })
-  }, [activeId, tabIdsKey])
+  }, [activeId, pinnedTabs, scrollIdsKey])
 
   const menuSession = menu
     ? tabs.find(tab => tab.id === menu.sessionId) || null
@@ -94,151 +93,153 @@ export function SessionTabs({
     action()
   }
 
+  const renderTab = (tab: AgentSession, options?: { scrollActive?: boolean }) => {
+    const active = tab.id === activeId
+    const color = tabColors[tab.id]
+    const colored = Boolean(color)
+    const pinned = tab.organizeLabel === 'pinned'
+    return (
+      <div
+        key={tab.id}
+        ref={options?.scrollActive && active ? activeTabRef : undefined}
+        className={cn(
+          'group relative flex h-8 w-40 shrink-0 items-center rounded-md px-2.5',
+          colored
+            ? 'text-[#1f2937]'
+            : active
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+          colored && !active && 'opacity-90 hover:opacity-100'
+        )}
+        style={color ? tabColorBackgroundStyle(color) : undefined}
+        onContextMenu={event => {
+          event.preventDefault()
+          setMenu({
+            sessionId: tab.id,
+            x: event.clientX,
+            y: event.clientY
+          })
+        }}
+      >
+        <button
+          type="button"
+          className="inline-flex min-w-0 flex-1 items-center gap-1.5 truncate pr-5 text-left text-xs font-medium leading-none"
+          onClick={() => onSelect(tab.id)}
+          title={tab.title || 'Untitled'}
+        >
+          {pinned ? (
+            <Pin
+              className={cn(
+                'size-3 shrink-0',
+                colored ? 'opacity-80' : 'text-muted-foreground'
+              )}
+              aria-hidden
+            />
+          ) : null}
+          <span className="truncate">{tab.title || 'Untitled'}</span>
+        </button>
+        <button
+          type="button"
+          className={cn(
+            'absolute right-0.5 top-1/2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100',
+            colored
+              ? 'bg-black/10 hover:bg-black/20'
+              : 'bg-muted hover:bg-background/80'
+          )}
+          aria-label={`Close ${tab.title || 'Untitled'}`}
+          onClick={event => {
+            event.stopPropagation()
+            onClose(tab.id)
+          }}
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1">
+    <div className="flex h-8 min-w-0 flex-1 items-center gap-0.5">
+      {pinnedTabs.length > 0 ? (
+        <div className="border-border/50 flex h-8 shrink-0 items-center gap-0.5 border-r pr-1 mr-0.5">
+          {pinnedTabs.map(tab => renderTab(tab))}
+        </div>
+      ) : null}
+
       <div
         ref={scrollerRef}
-        className="chat-scrollbar-x flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto transition-opacity duration-150"
+        className="session-tabs-scroll flex h-8 min-w-0 flex-1 items-center gap-0.5 overflow-x-auto overflow-y-hidden"
       >
-        {tabs.map(tab => {
-          const active = tab.id === activeId
-          return (
-            <div
-              key={tab.id}
-              ref={active ? activeTabRef : undefined}
-              className={cn(
-                'group relative my-auto flex h-8 w-40 shrink-0 items-center rounded-md px-2.5',
-                active
-                  ? 'bg-muted text-foreground'
-                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-              )}
-              onContextMenu={event => {
-                event.preventDefault()
-                setMenu({
-                  sessionId: tab.id,
-                  x: event.clientX,
-                  y: event.clientY
-                })
-              }}
-            >
-              <button
-                type="button"
-                className="min-w-0 flex-1 truncate pr-5 text-left text-xs font-medium"
-                onClick={() => onSelect(tab.id)}
-                title={tab.title || 'Untitled'}
-              >
-                {tab.title || 'Untitled'}
-              </button>
-              <button
-                type="button"
-                className="bg-muted hover:bg-background/80 absolute right-0.5 top-1/2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100"
-                aria-label={`Close ${tab.title || 'Untitled'}`}
-                onClick={event => {
-                  event.stopPropagation()
-                  onClose(tab.id)
-                }}
-              >
-                <X className="size-3.5" />
-              </button>
-            </div>
-          )
-        })}
+        {scrollTabs.map(tab => renderTab(tab, { scrollActive: true }))}
       </div>
 
       {menu && menuSession ? (
-        <div
-          ref={menuRef}
-          className="bg-popover text-popover-foreground fixed z-50 min-w-[11.5rem] rounded-md border p-1 shadow-md"
-          style={{ left: menu.x, top: menu.y }}
-          role="menu"
-          onClick={event => event.stopPropagation()}
+        <TabContextMenuShell
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
         >
-          <ContextItem
+          <TabContextItem
             icon={<X className="size-3.5" />}
             label="Close"
             onClick={() => runAction(() => onClose(menuSession.id))}
           />
-          <ContextItem
+          <TabContextItem
             icon={<CircleX className="size-3.5" />}
             label="Close others"
             disabled={tabs.length <= 1}
             onClick={() => runAction(() => onCloseOthers(menuSession.id))}
           />
-          <div className="bg-border my-1 h-px" />
-          <ContextItem
+          <TabContextSeparator />
+          <TabContextItem
             icon={<Pencil className="size-3.5" />}
             label="Rename…"
             onClick={() => runAction(() => onRename(menuSession))}
           />
-          <ContextItem
+          <TabContextItem
             icon={<Pin className="size-3.5" />}
             label={menuSession.organizeLabel === 'pinned' ? 'Unpin' : 'Pin'}
             onClick={() => runAction(() => onTogglePin(menuSession))}
           />
-          <div className="bg-border my-1 h-px" />
-          <ContextItem
+          <TabContextSeparator />
+          <TabInlineColorRow
+            value={tabColors[menuSession.id] || null}
+            onSelect={color => {
+              setTabColor(menuSession.id, color)
+              setMenu(null)
+            }}
+            onClear={() => {
+              setTabColor(menuSession.id, null)
+              setMenu(null)
+            }}
+          />
+          <TabContextSeparator />
+          <TabContextItem
             icon={<Download className="size-3.5" />}
             label="Export session"
             onClick={() => runAction(() => onExport(menuSession))}
           />
-          <ContextItem
+          <TabContextItem
             icon={<Search className="size-3.5" />}
             label="Inspect chat"
             onClick={() => runAction(() => onInspect(menuSession))}
           />
-          <ContextItem
+          <TabContextItem
             icon={<Archive className="size-3.5" />}
             label={
               menuSession.organizeLabel === 'archive' ? 'Unarchive' : 'Archive'
             }
             onClick={() => runAction(() => onArchive(menuSession))}
           />
-          <div className="bg-border my-1 h-px" />
-          <ContextItem
+          <TabContextSeparator />
+          <TabContextItem
             icon={<Trash2 className="size-3.5" />}
             label="Delete"
             destructive
             onClick={() => runAction(() => onDelete(menuSession))}
           />
-        </div>
+        </TabContextMenuShell>
       ) : null}
     </div>
-  )
-}
-
-function ContextItem({
-  icon,
-  label,
-  onClick,
-  disabled,
-  destructive
-}: {
-  icon: ReactNode
-  label: string
-  onClick: () => void
-  disabled?: boolean
-  destructive?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      disabled={disabled}
-      className={cn(
-        'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm',
-        destructive
-          ? 'text-red-600 hover:bg-red-50 disabled:opacity-40 dark:hover:bg-red-950/20'
-          : 'hover:bg-muted disabled:opacity-40',
-        disabled && 'pointer-events-none'
-      )}
-      onClick={event => {
-        event.preventDefault()
-        event.stopPropagation()
-        onClick()
-      }}
-    >
-      {icon}
-      {label}
-    </button>
   )
 }

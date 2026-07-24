@@ -80,7 +80,7 @@ export function SessionMainHeader({
   setFilesPanelCollapsed
 }: SessionMainHeaderProps) {
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 px-1.5 md:px-2">
+    <div className="border-border/60 flex h-11 shrink-0 items-center gap-1 border-b px-1.5 md:px-2">
       {sidebarCollapsed ? (
         <Button
           variant="ghost"
@@ -119,7 +119,7 @@ export function SessionMainHeader({
         }
         onDelete={item => setDeleteTarget(item)}
       />
-      <div className="ml-auto flex shrink-0 items-center gap-0.5">
+      <div className="flex h-8 shrink-0 items-center gap-0.5">
         {session?.projectId
           ? (() => {
               const projectName =

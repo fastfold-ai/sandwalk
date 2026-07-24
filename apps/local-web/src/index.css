@@ -353,7 +353,23 @@
   background: hsl(var(--muted-foreground) / 0.6);
 }
 
-/* Horizontal strips (session tabs) — no reserved gutter, thinner thumb. */
+/*
+ * Session tab strip: hide the scrollbar entirely so overflow never steals
+ * vertical space (which misaligns chips vs flanking icon buttons).
+ * Trackpad / wheel still scrolls via useHorizontalWheelScroll.
+ */
+.session-tabs-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.session-tabs-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Horizontal strips (file/terminal tabs) — no reserved gutter, thinner thumb. */
 .chat-scrollbar-x {
   scrollbar-gutter: auto;
   scrollbar-width: thin;

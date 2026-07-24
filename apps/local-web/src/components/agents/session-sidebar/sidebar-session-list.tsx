@@ -18,6 +18,7 @@ import type { NavigateFunction } from 'react-router-dom'
 
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
+import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import {
   Popover,
   PopoverContent,
@@ -84,6 +85,7 @@ export function SidebarSessionList({
 }: SidebarSessionListProps) {
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
+  const { tabColors, setTabColor } = useSessionTabColors()
   const previousScopeRef = useRef(scopeKey)
   const sectionsRef = useRef(sections)
   sectionsRef.current = sections
@@ -156,6 +158,7 @@ export function SidebarSessionList({
                   <ul className="space-y-0.5">
                     {section.items.map(item => {
                       const isSelected = selectedSessionIds.has(item.id)
+                      const tabColor = tabColors[item.id]
                       return (
                         <li key={item.id}>
                           <div
@@ -165,6 +168,10 @@ export function SidebarSessionList({
                               isSelected &&
                                 'bg-sidebar-accent ring-primary/30 ring-1'
                             )}
+                            onContextMenu={event => {
+                              event.preventDefault()
+                              setThreadMenuOpenId(item.id)
+                            }}
                           >
                             <button
                               type="button"
@@ -224,6 +231,13 @@ export function SidebarSessionList({
                               {item.organizeLabel === 'pinned' ? (
                                 <Pin className="text-muted-foreground/70 size-3 shrink-0" />
                               ) : null}
+                              {tabColor ? (
+                                <span
+                                  className="size-2 shrink-0 rounded-full border border-black/10"
+                                  style={{ backgroundColor: tabColor }}
+                                  aria-hidden
+                                />
+                              ) : null}
                               <span className="text-foreground/90 group-hover:text-foreground truncate text-[13px]">
                                 {item.title || 'Untitled'}
                               </span>
@@ -263,11 +277,12 @@ export function SidebarSessionList({
                                 </PopoverTrigger>
                                 <PopoverContent
                                   align="start"
-                                  className="w-44 p-1.5"
+                                  className="w-52 p-1.5"
                                 >
                                   <SessionActionsMenu
                                     session={item}
                                     projects={projects}
+                                    tabColor={tabColor || null}
                                     onRename={() => {
                                       setThreadMenuOpenId(null)
                                       openRenameDialog(item)
@@ -284,6 +299,10 @@ export function SidebarSessionList({
                                     onMoveToProject={projectId => {
                                       setThreadMenuOpenId(null)
                                       void updateSession(item, { projectId })
+                                    }}
+                                    onSetTabColor={color => {
+                                      setTabColor(item.id, color)
+                                      setThreadMenuOpenId(null)
                                     }}
                                     onExport={() => {
                                       setThreadMenuOpenId(null)

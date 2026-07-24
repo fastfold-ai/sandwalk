@@ -10,13 +10,19 @@ import {
 } from 'lucide-react'
 
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
+import {
+  TabContextSeparator,
+  TabInlineColorRow
+} from '@/components/agents/tab-context-menu'
 
 export function SessionActionsMenu({
   session,
   projects,
+  tabColor,
   onRename,
   onTogglePin,
   onMoveToProject,
+  onSetTabColor,
   onExport,
   onInspect,
   onArchive,
@@ -24,9 +30,11 @@ export function SessionActionsMenu({
 }: {
   session: AgentSession
   projects: AgentProject[]
+  tabColor?: string | null
   onRename: () => void
   onTogglePin: () => void
   onMoveToProject: (projectId: string | null) => void
+  onSetTabColor: (color: string | null) => void
   onExport: () => void
   onInspect: () => void
   onArchive: () => void
@@ -65,6 +73,13 @@ export function SessionActionsMenu({
         <Pin className="h-3.5 w-3.5" />
         {session.organizeLabel === 'pinned' ? 'Unpin' : 'Pin'}
       </button>
+      <TabContextSeparator />
+      <TabInlineColorRow
+        value={tabColor || null}
+        onSelect={color => onSetTabColor(color)}
+        onClear={() => onSetTabColor(null)}
+      />
+      <TabContextSeparator />
       <button
         type="button"
         className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
