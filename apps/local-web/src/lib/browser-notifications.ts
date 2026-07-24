@@ -33,8 +33,7 @@ export async function notifyBrowser(input: {
   try {
     const note = new Notification(input.title, {
       body: input.body,
-      tag: input.tag,
-      renotify: Boolean(input.tag)
+      tag: input.tag
     })
     note.onclick = () => {
       window.focus()

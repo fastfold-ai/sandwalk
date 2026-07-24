@@ -11,6 +11,8 @@ import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
+import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
+import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import {
   useAppRouteContext,
   useChatBySessionIdBridge
@@ -25,6 +27,8 @@ import { visibleSessionIds } from '@/lib/sessions'
 export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
+  useDesktopNavigate(navigate)
+  useMacDesktopOverlay()
   const ui = useAppUiState()
   const route = useAppRouting(location)
   const { setChatBySessionIdRef, setChatBySessionIdBridge } =

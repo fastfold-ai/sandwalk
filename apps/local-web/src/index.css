@@ -388,3 +388,28 @@
 .chat-scrollbar-x:focus-within::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* ---- macOS Tauri overlay title bar / window drag ----------------------- */
+.sandwalk-drag-region,
+.sandwalk-desktop-titlebar {
+  -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
+  cursor: default;
+}
+
+.sandwalk-drag-region button,
+.sandwalk-drag-region a,
+.sandwalk-drag-region input,
+.sandwalk-drag-region textarea,
+.sandwalk-drag-region select,
+.sandwalk-drag-region [role='button'],
+.sandwalk-drag-region [data-no-window-drag] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+html.sandwalk-mac-overlay .sandwalk-floating-sidebar-toggle {
+  top: 12px;
+  left: 12px;
+}

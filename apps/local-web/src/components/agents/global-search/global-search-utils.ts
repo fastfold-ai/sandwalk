@@ -1,6 +1,5 @@
 import type { AgentSession } from '@sandwalk/agent-ui-core'
 import {
-  Activity,
   Box,
   Boxes,
   Cpu,
@@ -75,13 +74,6 @@ export function placeholderFor(scope: SearchScope) {
 }
 
 export const DASHBOARD_COMMANDS = [
-  {
-    id: 'status',
-    label: 'Status',
-    path: '/dashboard/status',
-    value: 'command status server health system ram cache',
-    icon: Activity
-  },
   {
     id: 'overview',
     label: 'Overview',

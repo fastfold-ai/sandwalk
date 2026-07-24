@@ -7,11 +7,17 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import { AppErrorBoundary } from './components/AppErrorBoundary.tsx'
 import { Toaster } from './components/ui/sonner.tsx'
+import { isMacDesktopOverlay, platformOS } from './lib/desktop.ts'
 import { applyPalette, applyTheme, getStoredPalette, getStoredTheme, watchSystemTheme } from './lib/theme.ts'
 
 applyTheme(getStoredTheme())
 applyPalette(getStoredPalette())
 watchSystemTheme()
+
+document.documentElement.dataset.platform = platformOS()
+if (isMacDesktopOverlay()) {
+  document.documentElement.classList.add('sandwalk-mac-overlay')
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

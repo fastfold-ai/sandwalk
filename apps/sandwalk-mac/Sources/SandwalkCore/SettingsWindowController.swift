@@ -26,34 +26,6 @@ struct SettingsRootView: View {
                 }
 
                 Section {
-                    SidebarRow(section: .runtime)
-                    SidebarRow(section: .sandbox)
-                    SidebarRow(section: .prompts)
-                } header: {
-                    Text("Agent")
-                }
-
-                Section {
-                    SidebarRow(section: .models)
-                    SidebarRow(section: .tools)
-                    SidebarRow(section: .datasets)
-                    SidebarRow(section: .skills)
-                    SidebarRow(section: .specialists)
-                    SidebarRow(section: .integrations)
-                    SidebarRow(section: .mcps)
-                } header: {
-                    Text("Capabilities")
-                }
-
-                Section {
-                    SidebarRow(section: .doctor)
-                    SidebarRow(section: .storage)
-                    SidebarRow(section: .environment)
-                } header: {
-                    Text("Workspace")
-                }
-
-                Section {
                     SidebarRow(section: .general)
                     SidebarRow(section: .about)
                 } header: {
@@ -178,7 +150,7 @@ private struct SettingsDetailScaffold: View {
     }
 }
 
-/// Owns the Settings window; shows Dock while open, drops back to menubar-only when closed.
+/// Owns the Settings window. Stays `.accessory` (no Dock icon) — menubar-only UI.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     static let shared = SettingsWindowController()
@@ -186,8 +158,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
 
     func show(section: SettingsSection? = nil) {
-        if NSApp.activationPolicy() != .regular {
-            NSApp.setActivationPolicy(.regular)
+        // Keep LSUIElement / accessory so Server never takes a Dock slot.
+        if NSApp.activationPolicy() != .accessory {
+            NSApp.setActivationPolicy(.accessory)
         }
         NSApp.activate(ignoringOtherApps: true)
 
@@ -229,10 +202,6 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        DispatchQueue.main.async {
-            if NSApp.windows.filter({ $0.isVisible && $0 !== self.window }).isEmpty {
-                NSApp.setActivationPolicy(.accessory)
-            }
-        }
+        // no-op: remain accessory (menubar-only) whether Settings is open or closed
     }
 }

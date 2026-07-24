@@ -31,20 +31,20 @@ extension MenubarController {
         menu.addItem(newAgentItem)
 
         dashboardItem = NSMenuItem(
-            title: "Open Web Dashboard",
+            title: "Open Sandwalk",
             action: #selector(openDashboard),
             keyEquivalent: "o"
         )
         dashboardItem.keyEquivalentModifierMask = [.command]
         dashboardItem.target = self
         dashboardItem.image = NSImage(
-            systemSymbolName: "rectangle.split.2x2",
-            accessibilityDescription: "Dashboard"
+            systemSymbolName: "macwindow",
+            accessibilityDescription: "Sandwalk"
         )
         menu.addItem(dashboardItem)
 
         let settingsItem = NSMenuItem(
-            title: "Settings…",
+            title: "Server Settings…",
             action: #selector(openSettings),
             keyEquivalent: ","
         )
@@ -86,7 +86,7 @@ extension MenubarController {
         menu.addItem(.separator())
 
         let quit = NSMenuItem(
-            title: "Quit Sandwalk",
+            title: "Quit Sandwalk Server",
             action: #selector(quitApp),
             keyEquivalent: "q"
         )

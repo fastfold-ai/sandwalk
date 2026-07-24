@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip'
+import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import { groupSessions, type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
@@ -128,7 +129,7 @@ export function AgentSessionSidebar({
 }: AgentSessionSidebarProps) {
   return (
     <>
-      <div className="shrink-0 p-3">
+      <div className="sandwalk-sidebar-chrome shrink-0 p-3">
         <div className="mb-2 flex items-center gap-1">
           <button
             type="button"
@@ -147,7 +148,7 @@ export function AgentSessionSidebar({
             onOpenSettings={onOpenProjectSettings}
             onNewProject={onNewProject}
           />
-          <div className="min-w-0 flex-1" />
+          <DesktopDragRegion className="min-h-8 min-w-0 flex-1 self-stretch" />
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>

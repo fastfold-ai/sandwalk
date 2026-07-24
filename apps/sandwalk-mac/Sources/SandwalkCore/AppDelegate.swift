@@ -8,6 +8,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var supervisor: SandwalkSupervisor?
     private var menubar: MenubarController?
+    private var controlPlane: ControlPlane?
     private var cmdQMonitor: Any?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
@@ -17,6 +18,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let supervisor = SandwalkSupervisor(config: config)
         self.supervisor = supervisor
         SandwalkRuntime.supervisor = supervisor
+
+        let plane = ControlPlane()
+        self.controlPlane = plane
+        plane.start()
+
         self.menubar = MenubarController(
             supervisor: supervisor,
             requestQuit: { [weak self] in
@@ -27,6 +33,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             openSettings: {
+                // Server manager: Settings opens the Swift Server panes.
                 SettingsWindowController.shared.show()
             }
         )
@@ -68,6 +75,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             NSEvent.removeMonitor(cmdQMonitor)
             self.cmdQMonitor = nil
         }
+        controlPlane?.stop()
         supervisor?.reapSync()
     }
 

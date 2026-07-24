@@ -191,7 +191,6 @@ export type AppShellMainProps = {
 export function isDashboardMainView(props: AppShellMainProps) {
   return (
     props.isDashboardOverview ||
-    props.isDashboardStatus ||
     props.isDashboardGeneral ||
     props.isDashboardAgentRuntime ||
     props.isDashboardAgentSandbox ||

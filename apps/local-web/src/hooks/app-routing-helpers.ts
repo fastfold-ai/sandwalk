@@ -69,12 +69,6 @@ export function decodeRouteParam(value: string | undefined) {
 
 export function resolveDashboardSection(pathname: string) {
   if (
-    pathname.startsWith('/dashboard/status') ||
-    pathname.startsWith('/dashboard/server')
-  ) {
-    return 'status' as const
-  }
-  if (
     pathname.startsWith('/dashboard/general') ||
     pathname.startsWith('/dashboard/settings')
   ) {

@@ -33,6 +33,17 @@ export function useAppLegacyRouteRedirects({
       navigate('/dashboard/general', { replace: true })
       return
     }
+    if (
+      locationPathname.startsWith('/dashboard/status') ||
+      locationPathname.startsWith('/dashboard/server') ||
+      locationPathname.startsWith('/dashboard/network') ||
+      locationPathname.startsWith('/dashboard/advanced') ||
+      locationPathname.startsWith('/dashboard/security') ||
+      locationPathname.startsWith('/dashboard/logs')
+    ) {
+      navigate('/dashboard', { replace: true })
+      return
+    }
     if (locationPathname === '/agents/skills') {
       navigate('/dashboard/skills', { replace: true })
       return

@@ -10,7 +10,6 @@ import {
   GeneralView,
   ModelsView,
   SandboxListView,
-  ServerStatusView,
   StorageView,
   ToolsView
 } from './dashboard-main-views-lazy'
@@ -25,7 +24,6 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     integrations,
     runtimeSettings,
     sandboxSettings,
-    isDashboardStatus,
     isDashboardGeneral,
     isDashboardAgentRuntime,
     isDashboardAgentPrompts,
@@ -40,7 +38,6 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     isDashboardEnvironment,
     setRuntimeSettings,
     setSandboxSettings,
-    loadServerStatus,
     loadAccountForUi,
     logoutAccount,
     changeBackend,
@@ -51,15 +48,6 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     loadModelOptions,
     refreshSessionSandbox
   } = props
-
-  if (isDashboardStatus) {
-    return (
-      <ServerStatusView
-        onLoad={loadServerStatus}
-        onClearCache={signal => client.clearRuntimeCache(signal)}
-      />
-    )
-  }
 
   if (isDashboardGeneral) {
     return (

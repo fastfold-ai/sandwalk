@@ -65,6 +65,26 @@ export const ServerStatusView = lazy(() =>
     default: m.ServerStatusView
   }))
 )
+export const ServerNetworkView = lazy(() =>
+  import('@/components/agents/ServerNetworkView').then(m => ({
+    default: m.ServerNetworkView
+  }))
+)
+export const ServerAdvancedView = lazy(() =>
+  import('@/components/agents/ServerAdvancedView').then(m => ({
+    default: m.ServerAdvancedView
+  }))
+)
+export const ServerSecurityView = lazy(() =>
+  import('@/components/agents/ServerSecurityView').then(m => ({
+    default: m.ServerSecurityView
+  }))
+)
+export const ServerLogsView = lazy(() =>
+  import('@/components/agents/ServerLogsView').then(m => ({
+    default: m.ServerLogsView
+  }))
+)
 export const SkillsView = lazy(() =>
   import('@/components/agents/SkillsView').then(m => ({ default: m.SkillsView }))
 )

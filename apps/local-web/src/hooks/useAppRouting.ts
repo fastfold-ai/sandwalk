@@ -78,7 +78,7 @@ export function useAppRouting(location: Location) {
     dashboardSection === 'integrations' ||
     location.pathname === '/agents/integrations' ||
     Boolean(routes.legacyIntegrationRoute)
-  const isDashboardStatus = dashboardSection === 'status'
+  const isDashboardStatus = false
   const isDashboardGeneral = dashboardSection === 'general'
   const isDashboardAgentRuntime = dashboardSection === 'agent_runtime'
   const isDashboardAgentSandbox = dashboardSection === 'agent_sandbox'

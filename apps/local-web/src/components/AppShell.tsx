@@ -2,6 +2,7 @@ import { AppDialogs } from '@/components/AppDialogs'
 import type { AppShellProps } from '@/components/app-shell-props'
 import { AppShellMain } from '@/components/AppShellMain'
 import { AppShellSidebar } from '@/components/AppShellSidebar'
+import { DesktopTitleBar } from '@/components/DesktopTitleBar'
 import {
   ResizableHandle,
   ResizablePanelGroup
@@ -14,11 +15,13 @@ export type { AppShellProps } from '@/components/app-shell-props'
 export function AppShell(props: AppShellProps) {
   return (
     <>
-      <ResizablePanelGroup
-        direction="horizontal"
-        autoSaveId={SHELL_PANELS_AUTO_SAVE_ID}
-        className="bg-background h-full w-full overflow-hidden"
-      >
+      <div className="bg-background flex h-full w-full flex-col overflow-hidden">
+        <DesktopTitleBar />
+        <ResizablePanelGroup
+          direction="horizontal"
+          autoSaveId={SHELL_PANELS_AUTO_SAVE_ID}
+          className="min-h-0 w-full flex-1 overflow-hidden"
+        >
         <AppShellSidebar
           sidebarPanelRef={props.sidebarPanelRef}
           isDashboard={props.isDashboard}
@@ -221,7 +224,8 @@ export function AppShell(props: AppShellProps) {
           setComposer={props.setComposer}
           setComposerFiles={props.setComposerFiles}
         />
-      </ResizablePanelGroup>
+        </ResizablePanelGroup>
+      </div>
 
       <AppDialogs
         client={props.client}

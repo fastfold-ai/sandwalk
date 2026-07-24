@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
+import { DesktopGateFrame } from '@/components/DesktopGateFrame'
 import { ErrorPage } from '@/components/ErrorPage'
 import { MirageBackground } from '@/components/MirageBackground'
 import { ServerToggle } from '@/components/ServerToggle'
@@ -36,11 +37,8 @@ export function LoginView({
   }, [backendUrl])
 
   return (
-    <div
-      className={cn(
-        'bg-background text-foreground relative h-full min-h-full',
-        className
-      )}
+    <DesktopGateFrame
+      className={cn('bg-background text-foreground relative', className)}
     >
       <main className="relative isolate grid h-full min-h-full place-items-center overflow-hidden p-6">
         <MirageBackground />
@@ -141,6 +139,6 @@ export function LoginView({
         />
       ) : null}
       <ThemeToggle />
-    </div>
+    </DesktopGateFrame>
   )
 }

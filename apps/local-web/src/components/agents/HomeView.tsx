@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 
 import {
   HomeEmptySessions,
@@ -45,6 +46,7 @@ export function HomeView({
   const hour = new Date().getHours()
   const greeting =
     hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+  const pagePad = 'mx-auto w-full px-6 py-8 md:px-10'
   const activeProject =
     projects.find(project => project.id === activeProjectId) || null
   const recent = useMemo(
@@ -91,7 +93,7 @@ export function HomeView({
   if (recent.length === 0 && orderedProjects.length === 0) {
     return (
       <ScrollArea className="flex-1">
-        <div className="mx-auto w-full max-w-3xl px-6 py-8 md:px-10">
+        <div className={cn(pagePad, 'max-w-3xl')}>
           <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-xl font-semibold">
@@ -123,7 +125,7 @@ export function HomeView({
 
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-6xl px-6 py-8 md:px-10">
+      <div className={cn(pagePad, 'max-w-6xl')}>
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold">

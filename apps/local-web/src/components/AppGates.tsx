@@ -8,6 +8,7 @@ import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { BackendConnectFields } from '@/components/agents/BackendConnectFields'
 import { LoginView } from '@/components/agents/LoginView'
 import { OnboardingWizardHost } from '@/components/agents/OnboardingWizardHost'
+import { DesktopGateFrame } from '@/components/DesktopGateFrame'
 import { ErrorPage } from '@/components/ErrorPage'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import { isBackendUnavailableError } from '@/lib/app-error'
@@ -75,9 +76,11 @@ export function AppGates({
 }: AppGatesProps): ReactElement | null {
   if (!authBootstrapped && !needsAuthLogin) {
     return (
-      <main className="grid min-h-full place-items-center bg-[#f5f5f5] dark:bg-neutral-950">
-        <AuraIconPulse className="text-muted-foreground/50 h-12 w-12" />
-      </main>
+      <DesktopGateFrame>
+        <main className="grid h-full min-h-full place-items-center bg-[#f5f5f5] dark:bg-neutral-950">
+          <AuraIconPulse className="text-muted-foreground/50 h-12 w-12" />
+        </main>
+      </DesktopGateFrame>
     )
   }
 
@@ -107,92 +110,98 @@ export function AppGates({
 
     if (isLocalBackendUrl(backendUrl)) {
       return (
-        <AppGatesLocalWaiting
-          backendDown={backendDown}
-          connecting={connecting}
-          connectError={connectError}
-          connect={connect}
-          backendUrl={backendUrl}
-          setBackendUrl={setBackendUrl}
-          backendApiKey={backendApiKey}
-          setBackendApiKey={setBackendApiKey}
-        />
-      )
-    }
-
-    return (
-      <main className="bg-background grid h-full place-items-center p-6">
-        <form
-          className="bg-card w-full max-w-lg rounded-xl border p-6"
-          onSubmit={event => {
-            event.preventDefault()
-            void connect()
-          }}
-        >
-          <div className="mb-6 flex items-center gap-3">
-            <div className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-lg">
-              <SandwalkMark className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="font-semibold">sandwalk</h1>
-              <p className="text-muted-foreground text-sm">
-                Connect to an agent backend
-              </p>
-            </div>
-          </div>
-          <BackendConnectFields
+        <DesktopGateFrame>
+          <AppGatesLocalWaiting
+            backendDown={backendDown}
+            connecting={connecting}
+            connectError={connectError}
+            connect={connect}
             backendUrl={backendUrl}
             setBackendUrl={setBackendUrl}
             backendApiKey={backendApiKey}
             setBackendApiKey={setBackendApiKey}
-            connecting={connecting}
           />
-          {error ? (
-            <ErrorPage
-              className="mt-3"
-              variant="inline"
-              error={
-                errorStack
-                  ? Object.assign(new Error(error), { stack: errorStack })
-                  : error
-              }
+        </DesktopGateFrame>
+      )
+    }
+
+    return (
+      <DesktopGateFrame>
+        <main className="bg-background grid h-full place-items-center p-6">
+          <form
+            className="bg-card w-full max-w-lg rounded-xl border p-6"
+            onSubmit={event => {
+              event.preventDefault()
+              void connect()
+            }}
+          >
+            <div className="mb-6 flex items-center gap-3">
+              <div className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-lg">
+                <SandwalkMark className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="font-semibold">sandwalk</h1>
+                <p className="text-muted-foreground text-sm">
+                  Connect to an agent backend
+                </p>
+              </div>
+            </div>
+            <BackendConnectFields
+              backendUrl={backendUrl}
+              setBackendUrl={setBackendUrl}
+              backendApiKey={backendApiKey}
+              setBackendApiKey={setBackendApiKey}
+              connecting={connecting}
             />
-          ) : null}
-        </form>
-      </main>
+            {error ? (
+              <ErrorPage
+                className="mt-3"
+                variant="inline"
+                error={
+                  errorStack
+                    ? Object.assign(new Error(error), { stack: errorStack })
+                    : error
+                }
+              />
+            ) : null}
+          </form>
+        </main>
+      </DesktopGateFrame>
     )
   }
 
   if (onOnboardingPath) {
     return (
-      <div className="h-full min-h-0 overflow-hidden">
-        <OnboardingWizardHost
-          step={onboardingStep}
-          client={client}
-          onStepChange={next => {
-            const clamped = clampOnboardingStep(next)
-            void client
-              .updateOnboardingSettings({ step: clamped })
-              .catch(() => {})
-            navigate(onboardingPath(clamped))
-          }}
-          onFinish={() => {
-            void client
-              .updateOnboardingSettings({
-                completed: true,
-                step: ONBOARDING_MAX_STEP
-              })
-              .catch(() => {})
-            void loadModelOptions()
-            void loadIntegrations()
-            void loadSkills()
-            void loadMcpServers()
-            void loadMcpCatalog()
-            navigate('/', { replace: true })
-          }}
-          onExit={() => navigate('/')}
-        />
-      </div>
+      <DesktopGateFrame>
+        <div className="h-full min-h-0 overflow-hidden">
+          <OnboardingWizardHost
+            step={onboardingStep}
+            client={client}
+            onStepChange={next => {
+              const clamped = clampOnboardingStep(next)
+              void client
+                .updateOnboardingSettings({ step: clamped })
+                .catch(() => {})
+              navigate(onboardingPath(clamped))
+            }}
+            onFinish={() => {
+              void client
+                .updateOnboardingSettings({
+                  completed: true,
+                  step: ONBOARDING_MAX_STEP
+                })
+                .catch(() => {})
+              void loadModelOptions()
+              void loadIntegrations()
+              void loadSkills()
+              void loadMcpServers()
+              void loadMcpCatalog()
+              navigate('/', { replace: true })
+            }}
+            onExit={() => navigate('/')}
+          />
+        </div>
+      </DesktopGateFrame>
     )
   }
 

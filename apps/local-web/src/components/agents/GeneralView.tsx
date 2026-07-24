@@ -114,7 +114,7 @@ export function GeneralView({
         <div>
           <h2 className="text-2xl font-semibold">General</h2>
           <p className="text-muted-foreground mt-2 text-sm">
-            Account, themes, agent server, and app details.
+            Account, themes, agent server connection, and app details.
           </p>
         </div>
 

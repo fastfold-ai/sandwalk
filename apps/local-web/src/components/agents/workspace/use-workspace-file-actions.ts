@@ -409,7 +409,7 @@ export function useWorkspaceFileActions(
     const items = Array.from(uploads || [])
     void Promise.all(
       items.map(file => client.uploadFile(sessionId, file, 'uploads'))
-    ).then(refresh)
+    ).then(() => refresh())
   }
 
   return {

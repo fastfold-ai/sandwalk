@@ -1,7 +1,7 @@
 import AppKit
 import QuartzCore
 
-/// Menubar: Docker/Cursor-style menu — status, recent agents, controls.
+/// Menubar server manager — status, open client, Start/Stop/Restart.
 @MainActor
 final class MenubarController: NSObject, NSMenuDelegate {
     let supervisor: SandwalkSupervisor
@@ -116,7 +116,10 @@ final class MenubarController: NSObject, NSMenuDelegate {
 
     @objc func openRecentSession(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
-        NSWorkspace.shared.open(supervisor.config.agentSessionURL(id))
+        if TauriDesktopLauncher.open(path: "/agents/\(id)") {
+            return
+        }
+        presentMissingClientAlert()
     }
 
     @objc func newAgent() {
@@ -127,11 +130,16 @@ final class MenubarController: NSObject, NSMenuDelegate {
                     try supervisor.startAll()
                 }
                 let session = try await SessionsAPI.createSession(config: supervisor.config)
-                NSWorkspace.shared.open(supervisor.config.agentSessionURL(session.id))
+                let path = "/agents/\(session.id)"
+                if TauriDesktopLauncher.open(path: path) {
+                    return
+                }
+                presentMissingClientAlert()
             } catch {
-                NSLog("Sandwalk: new agent failed — \(error.localizedDescription)")
-                // Fallback: open agents home so the UI can create one.
-                NSWorkspace.shared.open(supervisor.config.agentsHomeURL)
+                NSLog("Sandwalk Server: new agent failed — \(error.localizedDescription)")
+                if !TauriDesktopLauncher.open(path: "/") {
+                    presentMissingClientAlert()
+                }
             }
         }
     }
@@ -175,7 +183,10 @@ final class MenubarController: NSObject, NSMenuDelegate {
     }
 
     @objc func openDashboard() {
-        NSWorkspace.shared.open(supervisor.config.dashboardHomeURL)
+        if TauriDesktopLauncher.open(path: "/") {
+            return
+        }
+        presentMissingClientAlert()
     }
 
     @objc func openSettings() {
@@ -184,5 +195,14 @@ final class MenubarController: NSObject, NSMenuDelegate {
 
     @objc func quitApp() {
         requestQuit()
+    }
+
+    private func presentMissingClientAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Sandwalk isn’t installed"
+        alert.informativeText =
+            "Install Sandwalk.app (the desktop client) from the DMG, then try again."
+        alert.alertStyle = .informational
+        alert.runModal()
     }
 }

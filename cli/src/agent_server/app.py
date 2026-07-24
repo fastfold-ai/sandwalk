@@ -38,6 +38,12 @@ DEFAULT_LOCAL_ORIGINS = [
     "http://localhost:8969",
     "http://127.0.0.1:5173",
     "http://localhost:5173",
+    # Tauri desktop (dev Vite + packaged custom protocol)
+    "http://127.0.0.1:1420",
+    "http://localhost:1420",
+    "tauri://localhost",
+    "https://tauri.localhost",
+    "http://tauri.localhost",
 ]
 
 
@@ -135,7 +141,11 @@ def create_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins or DEFAULT_LOCAL_ORIGINS,
-        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+        # Browser/Vite localhost, plus packaged Tauri origins (tauri:// / tauri.localhost).
+        allow_origin_regex=(
+            r"(https?://(localhost|127\.0\.0\.1|tauri\.localhost)(:\d+)?)"
+            r"|(tauri://localhost)"
+        ),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["authorization", "content-type", "last-event-id", "x-api-key", "cookie"],

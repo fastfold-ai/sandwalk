@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-Native macOS app that supervises the local <strong>agent API</strong> (<code>sandwalk serve</code>) and the
-<strong>web dashboard</strong> together — start, stop, restart, open the dashboard, and manage
-settings from one place.
+Native macOS <strong>menu bar</strong> app that supervises the local <strong>agent API</strong>
+(<code>sandwalk serve</code>) and dashboard processes — start, stop, restart, and open the UI.
+The agent keeps running with <strong>no windows open</strong>; only Quit stops it.
 </p>
 
 <p align="center">
@@ -26,11 +26,14 @@ Toggle under **Settings → Server → Advanced**.
 ## What it does
 
 - **Menu bar** — running status, pinned / recent agents, New Agent (⌘N), Open Web Dashboard (⌘O), Settings (⌘,), Stop / Restart (⌘R), Quit (⌘Q)
-- **Settings window** — Server (Status, Network, Advanced, Security, Logs), Agent (Runtime, Sandbox, Prompts), Capabilities (Models, Tools, Datasets, Skills, Specialists, Integrations, MCPs), Workspace, About
+- **Control plane** — local HTTP API + `control.json` so **Sandwalk Desktop** (Tauri) can Start/Stop/Restart and edit Server settings without spawning a second `serve`
+- **Settings window** — still available as fallback; when Sandwalk Desktop is installed, Settings… / Open Web Dashboard / New Agent prefer the Tauri window (Web UI now includes Server Status / Network / Advanced / Security / Logs)
 - **Supervises both processes** — API + dashboard share Start / Stop / Quit; Apply on network settings restarts both
 - **Persists config** under `~/Library/Application Support/Sandwalk/settings.json` (`server` + `auth`), same auth story as `sandwalk auth`
 
-Clicking the Dock icon (while Settings is open) or Launchpad / Applications relaunches into Settings.
+See [`apps/local-web/DESKTOP.md`](../local-web/DESKTOP.md) for Tauri desktop UI.
+
+Clicking the Dock icon (while Settings is open) or Launchpad / Applications opens Settings (or Desktop when available).
 
 ## Prerequisites
 

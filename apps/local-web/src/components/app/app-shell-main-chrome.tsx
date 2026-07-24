@@ -1,6 +1,8 @@
 import { PanelLeft } from 'lucide-react'
 
+import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export function ConnectionLimitBanner({
   runningCount,
@@ -42,12 +44,18 @@ export function AppShellTitleBar({
   activeTitle: string
 }) {
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 border-b px-1.5 md:px-2">
+    <DesktopDragRegion
+      className={cn(
+        'sandwalk-titlebar flex h-10 shrink-0 items-center gap-1 border-b px-1.5 md:px-2',
+        sidebarCollapsed && 'sandwalk-titlebar-collapsed'
+      )}
+    >
       {sidebarCollapsed ? (
         <Button
           variant="ghost"
           size="icon"
           className="size-8 shrink-0"
+          data-no-window-drag
           onClick={() => setSidebarCollapsed(false)}
           aria-label="Show sidebar"
         >
@@ -57,7 +65,7 @@ export function AppShellTitleBar({
       <span className="min-w-0 flex-1 truncate px-2 text-sm font-medium">
         {activeTitle}
       </span>
-    </div>
+    </DesktopDragRegion>
   )
 }
 
@@ -67,7 +75,7 @@ export function AppShellFloatingSidebarToggle({
   setSidebarCollapsed: (value: boolean | ((current: boolean) => boolean)) => void
 }) {
   return (
-    <div className="absolute left-2 top-2 z-20">
+    <div className="sandwalk-floating-sidebar-toggle absolute left-2 top-2 z-20">
       <Button
         variant="ghost"
         size="icon"

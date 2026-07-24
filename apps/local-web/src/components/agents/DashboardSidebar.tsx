@@ -1,5 +1,4 @@
 import {
-  Activity,
   ArrowLeft,
   Box,
   Boxes,
@@ -28,7 +27,6 @@ import { cn } from '@/lib/utils'
 
 export type DashboardSection =
   | 'overview'
-  | 'status'
   | 'general'
   | 'agent_runtime'
   | 'agent_sandbox'
@@ -52,17 +50,6 @@ type NavItem = {
 }
 
 const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
-  {
-    label: 'Server',
-    items: [
-      {
-        id: 'status',
-        label: 'Status',
-        path: '/dashboard/status',
-        icon: Activity
-      }
-    ]
-  },
   {
     label: null,
     items: [
@@ -183,7 +170,7 @@ export function DashboardSidebar({
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
-      <div className="shrink-0 border-b p-3">
+      <div className="sandwalk-sidebar-chrome shrink-0 border-b p-3">
         <div className="flex items-center gap-1">
           <button
             type="button"
