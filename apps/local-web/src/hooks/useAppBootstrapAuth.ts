@@ -32,7 +32,6 @@ type UseAppBootstrapAuthArgs = {
   setNeedsAuthLogin: (value: boolean) => void
   setAuthBootstrapped: (value: boolean) => void
   setConnectionPaused: (value: boolean) => void
-  connectRef: MutableRefObject<(() => Promise<void>) | null>
 }
 
 export function useAppBootstrapAuth({
@@ -49,8 +48,7 @@ export function useAppBootstrapAuth({
   needsAuthLoginRef,
   setNeedsAuthLogin,
   setAuthBootstrapped,
-  setConnectionPaused,
-  connectRef
+  setConnectionPaused
 }: UseAppBootstrapAuthArgs) {
   const [cloudUserName, setCloudUserName] = useState<string | null>(null)
   const [authLoggingIn, setAuthLoggingIn] = useState(false)
@@ -114,13 +112,18 @@ export function useAppBootstrapAuth({
     async (apiKey: string, remember: boolean) => {
       setAuthLoggingIn(true)
       setAuthLoginError(null)
+      const key = apiKey.trim()
       try {
-        await client.login(apiKey, { remember })
-        setClientApiKey(apiKey.trim())
+        await client.login(key, { remember })
+        // Put the key on the next LocalAgentClient before leaving the login gate.
+        // Cookie session from /auth/login often does not apply in the Tauri shell
+        // (tauri:// origin → http://127.0.0.1), so Authorization must be set first.
+        // Do not call connect() with the current (keyless) client — the connect
+        // effect re-runs after clientApiKey + needsAuthLogin update.
+        setClientApiKey(key)
         setBackendApiKey('')
         needsAuthLoginRef.current = false
-        const connect = connectRef.current
-        if (connect) await connect()
+        setNeedsAuthLogin(false)
       } catch (cause) {
         needsAuthLoginRef.current = true
         setNeedsAuthLogin(true)
@@ -152,7 +155,6 @@ export function useAppBootstrapAuth({
     },
     [
       client,
-      connectRef,
       needsAuthLoginRef,
       setBackendApiKey,
       setClientApiKey,

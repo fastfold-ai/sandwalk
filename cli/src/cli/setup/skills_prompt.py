@@ -59,7 +59,7 @@ def _prompt_install_skills(skills_arg: str | None = None, skip: bool = False) ->
             "You can still add suggested or custom sources below.[/dim]"
         )
 
-    # Offer curated third-party collections (K-Dense-AI, Anthropic, DeepMind).
+    # Offer curated collections (Fastfold AI + third-party).
     selected += _select_suggested_sources()
 
     # Always offer custom sources (GitHub URL / owner/repo@subpath / local path).

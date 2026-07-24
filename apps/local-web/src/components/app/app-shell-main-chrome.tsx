@@ -69,6 +69,7 @@ export function AppShellTitleBar({
   )
 }
 
+/** Floating reopen control when the nav sidebar is collapsed (dashboard/home). */
 export function AppShellFloatingSidebarToggle({
   setSidebarCollapsed
 }: {
@@ -79,7 +80,7 @@ export function AppShellFloatingSidebarToggle({
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0"
+        className="bg-background/80 size-8 shrink-0 shadow-sm backdrop-blur-sm"
         onClick={() => setSidebarCollapsed(false)}
         aria-label="Show sidebar"
       >

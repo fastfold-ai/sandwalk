@@ -142,7 +142,7 @@ export function AgentPromptsView({
 
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto max-w-3xl space-y-8 px-8 py-10">
+      <div className="mx-auto w-full max-w-7xl space-y-8 p-4 md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold">Prompts</h2>

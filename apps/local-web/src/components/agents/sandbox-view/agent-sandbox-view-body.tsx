@@ -31,7 +31,7 @@ export function AgentSandboxViewBody({
       />
       <div
         className={
-          bare ? 'space-y-6' : 'mx-auto max-w-3xl space-y-8 px-8 py-10'
+          bare ? 'space-y-6' : 'mx-auto w-full max-w-7xl space-y-8 p-4 md:p-6'
         }
       >
         {!bare && onBack ? (

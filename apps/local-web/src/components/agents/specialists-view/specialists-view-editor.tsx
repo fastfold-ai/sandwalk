@@ -113,7 +113,7 @@ export function SpecialistsEditorView({
   if (mode === 'edit' && !state.editing && !loading) {
     return (
       <div className="chat-scrollbar flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-8 py-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
           <p className="text-sm">Specialist not found.</p>
           <div>
             <Button type="button" variant="ghost" size="sm" onClick={onBack}>
@@ -127,14 +127,14 @@ export function SpecialistsEditorView({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <SpecialistsEditorHeader
+        mode={mode}
+        specialistId={specialistId}
+        state={state}
+        onBack={onBack}
+      />
       <div className="chat-scrollbar min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-8 md:px-10">
-          <SpecialistsEditorHeader
-            mode={mode}
-            specialistId={specialistId}
-            state={state}
-            onBack={onBack}
-          />
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 pb-8 md:gap-8 md:p-6 md:pb-10">
           <SpecialistsEditorCapabilityBanner state={state} />
           <SpecialistsEditorAppearanceFields state={state} />
 
@@ -186,29 +186,31 @@ export function SpecialistsEditorView({
         </div>
       </div>
 
-      <div className="border-border/60 flex shrink-0 items-center justify-end gap-1 border-t px-6 py-3">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onBack}
-          disabled={state.saving}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          className="rounded-full px-4"
-          disabled={state.saving}
-          onClick={() => void state.save()}
-        >
-          {state.saving
-            ? 'Saving…'
-            : mode === 'new'
-              ? 'Create specialist'
-              : 'Save'}
-        </Button>
+      <div className="border-border/60 bg-background flex shrink-0 items-center justify-end gap-1 border-t">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-end gap-1 px-4 py-3 md:px-6">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            disabled={state.saving}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            className="rounded-full px-4"
+            disabled={state.saving}
+            onClick={() => void state.save()}
+          >
+            {state.saving
+              ? 'Saving…'
+              : mode === 'new'
+                ? 'Create specialist'
+                : 'Save'}
+          </Button>
+        </div>
       </div>
     </div>
   )

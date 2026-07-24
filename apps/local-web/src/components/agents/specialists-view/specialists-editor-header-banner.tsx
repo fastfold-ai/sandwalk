@@ -1,5 +1,6 @@
 import { AlertTriangle, ArrowLeft, Trash2 } from 'lucide-react'
 
+import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { SpecialistToggle } from '@/components/agents/specialists-view/specialists-view-shared'
 import { Button } from '@/components/ui/button'
 
@@ -20,7 +21,7 @@ export function SpecialistsEditorHeader({
     state
 
   return (
-    <div className="flex items-center justify-between gap-3">
+    <DetailStickyNav>
       <div className="flex items-center gap-2 text-sm">
         <button
           type="button"
@@ -40,7 +41,7 @@ export function SpecialistsEditorHeader({
         </button>
       </div>
       {mode === 'edit' || mode === 'new' ? (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-xs">
               {form.enabled ? 'On' : 'Off'}
@@ -82,7 +83,7 @@ export function SpecialistsEditorHeader({
           ) : null}
         </div>
       ) : null}
-    </div>
+    </DetailStickyNav>
   )
 }
 

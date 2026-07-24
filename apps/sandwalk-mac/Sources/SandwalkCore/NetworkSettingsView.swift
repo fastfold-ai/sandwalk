@@ -70,7 +70,7 @@ struct NetworkSettingsView: View {
                 SettingsRow(
                     label: "Allow remote connections",
                     sublabel: "Bind the UI to 0.0.0.0 for LAN access (use with care).",
-                    isLast: !draft.dashboardExposesRemote
+                    isLast: false
                 ) {
                     Toggle("", isOn: dashboardRemoteBinding)
                         .labelsHidden()
@@ -80,10 +80,20 @@ struct NetworkSettingsView: View {
                     SettingsRow(
                         label: "LAN hint",
                         sublabel: "http://\(localLANHint()):\(draft.dashboardPort)",
-                        isLast: true
+                        isLast: false
                     ) {
                         EmptyView()
                     }
+                }
+                SettingsRow(
+                    label: "Web UI",
+                    sublabel: liveConfig.dashboardHomeURL.absoluteString,
+                    isLast: true
+                ) {
+                    Button("Open") {
+                        NSWorkspace.shared.open(liveConfig.dashboardHomeURL)
+                    }
+                    .buttonStyle(.sandwalk(.normal))
                 }
             }
 
@@ -101,6 +111,11 @@ struct NetworkSettingsView: View {
                         .lineLimit(2)
                 }
                 Spacer()
+                Button("Open Web UI") {
+                    NSWorkspace.shared.open(liveConfig.dashboardHomeURL)
+                }
+                .buttonStyle(.sandwalk(.normal))
+                .disabled(busy)
                 Button(busy ? "Applying…" : "Apply") {
                     Task { await apply() }
                 }

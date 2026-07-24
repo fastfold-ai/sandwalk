@@ -409,7 +409,12 @@
   app-region: no-drag;
 }
 
+/* Floating sidebar reopen control — inset content so titles don't collide. */
 html.sandwalk-mac-overlay .sandwalk-floating-sidebar-toggle {
-  top: 12px;
-  left: 12px;
+  top: 0.5rem;
+  left: 0.5rem;
+}
+
+.sandwalk-main-with-floating-sidebar-toggle {
+  padding-left: 2.75rem;
 }

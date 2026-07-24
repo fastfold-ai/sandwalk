@@ -168,46 +168,49 @@ export function SkillsTrustedSourcesView({
             </p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {trustedSources.map(item => (
-                <button
-                  key={item.source}
-                  type="button"
-                  className={cn(
-                    'bg-background/60 hover:bg-muted/40 flex items-start gap-3 rounded-lg border p-3 text-left transition-colors',
-                    trustedSelected[item.source] &&
-                      'ring-primary bg-muted/40 ring-1'
-                  )}
-                  onClick={() =>
-                    onTrustedSelectedChange(current => ({
-                      ...current,
-                      [item.source]: !current[item.source]
-                    }))
-                  }
-                >
-                  {suggestionSourceIcon(item) ? (
-                    <img
-                      src={suggestionSourceIcon(item) || ''}
-                      alt=""
-                      className="mt-0.5 size-8 rounded object-contain"
-                    />
-                  ) : (
-                    <span className="bg-muted/30 text-muted-foreground mt-0.5 grid size-8 shrink-0 place-items-center rounded">
-                      <GitBranch className="size-4" />
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">
-                      {suggestionSourceLabel(item)}
-                    </p>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                      {item.description}
-                    </p>
-                    <span className="text-muted-foreground mt-1 block truncate text-xs">
-                      {item.source}
-                    </span>
-                  </div>
-                </button>
-              ))}
+              {trustedSources.map(item => {
+                const icon = suggestionSourceIcon(item)
+                return (
+                  <button
+                    key={item.source}
+                    type="button"
+                    className={cn(
+                      'bg-background/60 hover:bg-muted/40 flex items-start gap-3 rounded-lg border p-3 text-left transition-colors',
+                      trustedSelected[item.source] &&
+                        'ring-primary bg-muted/40 ring-1'
+                    )}
+                    onClick={() =>
+                      onTrustedSelectedChange(current => ({
+                        ...current,
+                        [item.source]: !current[item.source]
+                      }))
+                    }
+                  >
+                    {icon ? (
+                      <img
+                        src={icon}
+                        alt=""
+                        className="mt-0.5 size-8 shrink-0 rounded object-contain"
+                      />
+                    ) : (
+                      <span className="bg-muted/30 text-muted-foreground mt-0.5 grid size-8 shrink-0 place-items-center rounded">
+                        <GitBranch className="size-4" />
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        {suggestionSourceLabel(item)}
+                      </p>
+                      <p className="text-muted-foreground mt-0.5 text-xs">
+                        {item.description}
+                      </p>
+                      <span className="text-muted-foreground mt-1 block truncate text-xs">
+                        {item.source}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           )}
           <div className="flex justify-end gap-2">

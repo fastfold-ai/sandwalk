@@ -58,6 +58,25 @@ export function DashboardMainSkillsPanel({
       onSearchCatalog={(query, signal) =>
         client.searchSkillCatalog(query, 12, signal)
       }
+      onListCatalogLeaderboard={async (view, options, signal) => {
+        const result = await client.listSkillCatalogLeaderboard(
+          {
+            view,
+            page: options?.page ?? 0,
+            perPage: options?.perPage ?? 100
+          },
+          signal
+        )
+        return {
+          data: result.data,
+          total: result.total,
+          allTimeTotal: result.allTimeTotal,
+          hasMore:
+            Boolean(result.hasMore) ||
+            result.data.length >= (options?.perPage ?? 100),
+          page: result.page
+        }
+      }}
       onGetCatalogDetail={(source, skill, signal) =>
         client.getCatalogSkillDetail(source, skill, signal)
       }

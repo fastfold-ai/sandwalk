@@ -1,4 +1,12 @@
-import { Check, ChevronDown, GitBranch, Plus, Search, Upload } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  GitBranch,
+  ListFilter,
+  Plus,
+  Search,
+  Upload
+} from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -14,6 +22,8 @@ export function SkillsMainListToolbar({
   query,
   catalogSearchMode,
   catalogSearchEnabled,
+  activeFilterCount = 0,
+  onOpenFilters,
   onQueryChange,
   onCatalogSearchModeChange,
   onEnableCatalogSearchMode,
@@ -24,6 +34,8 @@ export function SkillsMainListToolbar({
   query: string
   catalogSearchMode: boolean
   catalogSearchEnabled: boolean
+  activeFilterCount?: number
+  onOpenFilters?: () => void
   onQueryChange: (value: string) => void
   onCatalogSearchModeChange: (enabled: boolean) => void
   onEnableCatalogSearchMode: () => void
@@ -33,7 +45,7 @@ export function SkillsMainListToolbar({
 }) {
   return (
     <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-2 pb-3 pt-2 backdrop-blur">
-      <div className="relative min-w-[280px] flex-1 max-w-3xl">
+      <div className="relative min-w-[200px] flex-1 max-w-3xl">
         <Search className="text-muted-foreground/70 pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
         <Input
           value={query}
@@ -89,6 +101,23 @@ export function SkillsMainListToolbar({
           </span>
         </button>
       </div>
+      {!catalogSearchMode && onOpenFilters ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-10 xl:hidden"
+          onClick={onOpenFilters}
+        >
+          <ListFilter className="mr-1.5 size-3.5" />
+          Filters
+          {activeFilterCount > 0 ? (
+            <span className="bg-foreground text-background ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-medium tabular-nums">
+              {activeFilterCount}
+            </span>
+          ) : null}
+        </Button>
+      ) : null}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-10">

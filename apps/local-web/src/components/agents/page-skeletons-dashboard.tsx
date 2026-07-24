@@ -14,8 +14,8 @@ import {
 
 /**
  * Settings-style dashboard pages:
- * General, Status, Agent Runtime, Storage, Environment.
- * Layout: `mx-auto max-w-3xl space-y-10 px-8 py-10`
+ * General, Status, Agent Runtime, Storage, Environment, Prompts, Sandbox.
+ * Layout: `mx-auto max-w-7xl … p-4 md:p-6` (matches Skills).
  */
 export function DashboardSettingsSkeleton({
   className,
@@ -27,7 +27,7 @@ export function DashboardSettingsSkeleton({
   return (
     <ScrollArea className={cn('flex-1', className)}>
       <div
-        className="mx-auto max-w-3xl space-y-10 px-8 py-10"
+        className="mx-auto w-full max-w-7xl space-y-10 p-4 md:p-6"
         aria-busy="true"
       >
         <PageHeaderSkeleton titleWidth="w-40" subtitleWidth="w-80" />
@@ -46,13 +46,13 @@ export function DashboardSettingsSkeleton({
 
 /**
  * Doctor page — settings column + check groups.
- * Layout: `mx-auto max-w-3xl … px-8 py-10`
+ * Layout: `mx-auto max-w-7xl … p-4 md:p-6` (matches Skills).
  */
 export function DashboardDoctorSkeleton({ className }: { className?: string }) {
   return (
     <ScrollArea className={cn('flex-1', className)}>
       <div
-        className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 py-10"
+        className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 md:p-6"
         aria-busy="true"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -135,7 +135,7 @@ export function DashboardListSkeleton({
 
 /**
  * Dashboard Overview — heatmap + featured sections.
- * Layout: `mx-auto max-w-5xl … px-6 py-8 sm:px-8 sm:py-10`
+ * Layout: `mx-auto max-w-7xl … p-4 md:p-6` (matches Skills).
  */
 export function DashboardOverviewSkeleton({
   className
@@ -145,7 +145,7 @@ export function DashboardOverviewSkeleton({
   return (
     <ScrollArea className={cn('flex-1', className)}>
       <div
-        className="mx-auto w-full max-w-5xl space-y-10 px-6 py-8 sm:px-8 sm:py-10"
+        className="mx-auto w-full max-w-7xl space-y-10 p-4 md:p-6"
         aria-busy="true"
       >
         <section className="space-y-3">

@@ -93,6 +93,19 @@ class CatalogSkillList(ApiModel):
     count: int = 0
 
 
+class CatalogLeaderboard(ApiModel):
+    data: list[CatalogSkill]
+    view: str = "all-time"
+    page: int = 0
+    per_page: int = 50
+    # Unique skills in the ranked list (API pagination.total — ~9.6K today).
+    total: int = 0
+    # Homepage "All Time (986,330)" badge — distinct from ``total``.
+    all_time_total: int = 0
+    has_more: bool = False
+    count: int = 0
+
+
 class CatalogSkillFile(ApiModel):
     path: str
     contents: str
@@ -105,6 +118,10 @@ class CatalogSkillDetail(ApiModel):
     installs: int = 0
     hash: str | None = None
     files: list[CatalogSkillFile] | None = None
+    # skills.sh page Summary (rich markdown; distinct from SKILL.md description).
+    summary: str | None = None
+    github_stars: int | None = None
+    first_seen: str | None = None
 
 
 class CatalogSkillAuditEntry(ApiModel):

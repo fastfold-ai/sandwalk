@@ -7,6 +7,8 @@ import type {
   AgentProject,
   AgentSession,
   Specialist,
+  AgentCatalogLeaderboard,
+  AgentCatalogLeaderboardView,
   AgentCatalogSkill,
   AgentCatalogSkillAudit,
   AgentCatalogSkillDetail,
@@ -897,6 +899,25 @@ export class LocalAgentClient
       { signal },
     )
     return result.data
+  }
+
+  async listSkillCatalogLeaderboard(
+    options?: {
+      view?: AgentCatalogLeaderboardView
+      page?: number
+      perPage?: number
+    },
+    signal?: AbortSignal,
+  ): Promise<AgentCatalogLeaderboard> {
+    const params = new URLSearchParams({
+      view: options?.view || 'all-time',
+      page: String(options?.page ?? 0),
+      per_page: String(options?.perPage ?? 50),
+    })
+    return this.request<AgentCatalogLeaderboard>(
+      `/skills/catalog/leaderboard?${params.toString()}`,
+      { signal },
+    )
   }
 
   getCatalogSkillDetail(

@@ -11,6 +11,7 @@ import {
 } from '@/components/app/app-shell-main-props'
 import { buildDashboardMainViewsProps } from '@/components/app/build-dashboard-main-views-props'
 import { ResizablePanel } from '@/components/ui/resizable'
+import { cn } from '@/lib/utils'
 
 export type { AppShellMainProps } from '@/components/app/app-shell-main-props'
 
@@ -50,6 +51,12 @@ export function AppShellMain(props: AppShellMainProps) {
           />
         ) : null}
 
+        <div
+          className={cn(
+            'flex min-h-0 min-w-0 flex-1 flex-col',
+            showFloatingSidebarToggle && 'sandwalk-main-with-floating-sidebar-toggle'
+          )}
+        >
         {isDashboardMainView(props) ? (
           <DashboardMainViews {...buildDashboardMainViewsProps(props)} />
         ) : (
@@ -119,6 +126,7 @@ export function AppShellMain(props: AppShellMainProps) {
             setComposerFiles={props.setComposerFiles}
           />
         )}
+        </div>
       </div>
     </ResizablePanel>
   )

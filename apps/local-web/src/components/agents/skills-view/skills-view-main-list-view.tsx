@@ -1,6 +1,18 @@
-import type { AgentCatalogSkill, AgentSkill } from '@sandwalk/agent-ui-core'
+import type {
+  AgentCatalogLeaderboardView,
+  AgentCatalogSkill,
+  AgentSkill
+} from '@sandwalk/agent-ui-core'
+import { useState } from 'react'
 
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle
+} from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 
 import {
@@ -35,8 +47,17 @@ export function SkillsMainListView({
   catalogSearchMode,
   catalogSearchEnabled,
   catalogLoading,
+  catalogLoadingMore,
+  catalogRefreshing,
   catalogError,
   catalogResults,
+  catalogTotal,
+  catalogHasMore,
+  allTimeTotal,
+  leaderboardView,
+  onLeaderboardViewChange,
+  onLoadMoreLeaderboard,
+  onRefreshLeaderboard,
   showCatalogEmptyState,
   batchBusy,
   batchToast,
@@ -85,8 +106,17 @@ export function SkillsMainListView({
   catalogSearchMode: boolean
   catalogSearchEnabled: boolean
   catalogLoading: boolean
+  catalogLoadingMore: boolean
+  catalogRefreshing: boolean
   catalogError: string | null
   catalogResults: AgentCatalogSkill[]
+  catalogTotal: number
+  catalogHasMore: boolean
+  allTimeTotal: number
+  leaderboardView: AgentCatalogLeaderboardView
+  onLeaderboardViewChange: (view: AgentCatalogLeaderboardView) => void
+  onLoadMoreLeaderboard: () => void
+  onRefreshLeaderboard: () => void
   showCatalogEmptyState: boolean
   batchBusy: boolean
   batchToast: { message: string; tone: 'success' | 'warning' } | null
@@ -115,6 +145,28 @@ export function SkillsMainListView({
   onRemoveDialogOpenChange: (open: boolean) => void
   onConfirmRemove: () => void
 }) {
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const activeFilterCount =
+    (statusFilter !== 'all' ? 1 : 0) +
+    (categoryFilter !== 'all' ? 1 : 0) +
+    (authorFilter !== 'all' ? 1 : 0)
+  const sidebarProps = {
+    skills,
+    statusFilter,
+    categoryFilter,
+    authorFilter,
+    categories,
+    authors,
+    categoryCounts,
+    authorCounts,
+    featuredCount,
+    enabledCount,
+    disabledCount,
+    onStatusFilterChange,
+    onCategoryFilterChange,
+    onAuthorFilterChange
+  }
+
   return (
     <>
       <ScrollArea className={embedded ? 'h-[min(22rem,45vh)]' : 'flex-1'}>
@@ -139,6 +191,10 @@ export function SkillsMainListView({
               query={query}
               catalogSearchMode={catalogSearchMode}
               catalogSearchEnabled={catalogSearchEnabled}
+              activeFilterCount={activeFilterCount}
+              onOpenFilters={
+                catalogSearchMode ? undefined : () => setFiltersOpen(true)
+              }
               onQueryChange={onQueryChange}
               onCatalogSearchModeChange={onCatalogSearchModeChange}
               onEnableCatalogSearchMode={onEnableCatalogSearchMode}
@@ -150,8 +206,17 @@ export function SkillsMainListView({
               <SkillsCatalogResultsSection
                 query={query}
                 catalogLoading={catalogLoading}
+                catalogLoadingMore={catalogLoadingMore}
+                catalogRefreshing={catalogRefreshing}
                 catalogError={catalogError}
                 catalogResults={catalogResults}
+                catalogTotal={catalogTotal}
+                catalogHasMore={catalogHasMore}
+                allTimeTotal={allTimeTotal}
+                leaderboardView={leaderboardView}
+                onLeaderboardViewChange={onLeaderboardViewChange}
+                onLoadMoreLeaderboard={onLoadMoreLeaderboard}
+                onRefreshLeaderboard={onRefreshLeaderboard}
                 showCatalogEmptyState={showCatalogEmptyState}
                 isCatalogSkillInstalled={isCatalogSkillInstalled}
                 onOpenCatalogDetail={onOpenCatalogDetail}
@@ -178,25 +243,33 @@ export function SkillsMainListView({
             )}
           </div>
           {!catalogSearchMode ? (
-            <SkillsListSidebar
-              skills={skills}
-              statusFilter={statusFilter}
-              categoryFilter={categoryFilter}
-              authorFilter={authorFilter}
-              categories={categories}
-              authors={authors}
-              categoryCounts={categoryCounts}
-              authorCounts={authorCounts}
-              featuredCount={featuredCount}
-              enabledCount={enabledCount}
-              disabledCount={disabledCount}
-              onStatusFilterChange={onStatusFilterChange}
-              onCategoryFilterChange={onCategoryFilterChange}
-              onAuthorFilterChange={onAuthorFilterChange}
-            />
+            <div className="hidden xl:block">
+              <SkillsListSidebar {...sidebarProps} />
+            </div>
           ) : null}
         </div>
       </ScrollArea>
+      {!catalogSearchMode ? (
+        <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <SheetContent
+            side="right"
+            className="w-[min(100vw,22rem)] gap-0 overflow-hidden p-0 sm:max-w-[22rem]"
+          >
+            <SheetHeader className="border-border/60 border-b px-4 py-3">
+              <SheetTitle>Filters</SheetTitle>
+              <SheetDescription>
+                Narrow installed skills by status, category, or author.
+              </SheetDescription>
+            </SheetHeader>
+            <ScrollArea className="h-[calc(100dvh-5.5rem)] px-3 py-3">
+              <SkillsListSidebar
+                {...sidebarProps}
+                className="xl:static xl:max-h-none xl:w-full xl:overflow-visible"
+              />
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
+      ) : null}
       {batchToast ? (
         <div
           className={cn(

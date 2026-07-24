@@ -1,5 +1,6 @@
 import type { AgentSkill } from '@sandwalk/agent-ui-core'
 
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 
 export function SkillsListSidebar({
@@ -16,7 +17,8 @@ export function SkillsListSidebar({
   disabledCount,
   onStatusFilterChange,
   onCategoryFilterChange,
-  onAuthorFilterChange
+  onAuthorFilterChange,
+  className
 }: {
   skills: AgentSkill[]
   statusFilter: 'all' | 'enabled' | 'disabled'
@@ -32,10 +34,16 @@ export function SkillsListSidebar({
   onStatusFilterChange: (value: 'all' | 'enabled' | 'disabled') => void
   onCategoryFilterChange: (value: string) => void
   onAuthorFilterChange: (value: string) => void
+  className?: string
 }) {
   return (
-    <aside className="flex w-full shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:self-start xl:w-[320px]">
-      <section className="bg-background/70 rounded-lg p-2">
+    <aside
+      className={cn(
+        'flex w-full shrink-0 flex-col gap-4 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-5.5rem)] xl:w-[320px] xl:self-start xl:overflow-hidden',
+        className
+      )}
+    >
+      <section className="bg-background/70 shrink-0 rounded-lg p-2">
         <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
           Status
         </div>
@@ -76,7 +84,7 @@ export function SkillsListSidebar({
           Disabled ({disabledCount})
         </button>
       </section>
-      <section className="bg-background/70 rounded-lg p-2">
+      <section className="bg-background/70 shrink-0 rounded-lg p-2">
         <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
           Categories
         </div>
@@ -120,37 +128,39 @@ export function SkillsListSidebar({
           </button>
         ))}
       </section>
-      <section className="bg-background/70 rounded-lg p-2">
+      <section className="bg-background/70 min-h-0 flex-1 rounded-lg p-2">
         <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
           Authors
         </div>
-        <button
-          type="button"
-          className={cn(
-            'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
-            authorFilter === 'all'
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-          )}
-          onClick={() => onAuthorFilterChange('all')}
-        >
-          All ({skills.length})
-        </button>
-        {authors.map(author => (
+        <ScrollArea className="h-[min(22rem,calc(100dvh-22rem))] pr-2">
           <button
-            key={author}
             type="button"
             className={cn(
               'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
-              authorFilter === author
+              authorFilter === 'all'
                 ? 'bg-muted text-foreground'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
             )}
-            onClick={() => onAuthorFilterChange(author)}
+            onClick={() => onAuthorFilterChange('all')}
           >
-            {author} ({authorCounts[author] || 0})
+            All ({skills.length})
           </button>
-        ))}
+          {authors.map(author => (
+            <button
+              key={author}
+              type="button"
+              className={cn(
+                'block w-full rounded-md px-2 py-1 text-left text-xs transition-colors',
+                authorFilter === author
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+              onClick={() => onAuthorFilterChange(author)}
+            >
+              {author} ({authorCounts[author] || 0})
+            </button>
+          ))}
+        </ScrollArea>
       </section>
     </aside>
   )

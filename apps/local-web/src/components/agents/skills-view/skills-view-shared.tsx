@@ -91,16 +91,25 @@ export function SkillsRemoveDialog({
 export function SkillsShMetrics({
   source,
   installs,
-  audits
+  audits,
+  githubStars,
+  firstSeen
 }: {
   source: string
   installs: number
   audits: AgentCatalogSkillAudit['audits']
+  githubStars?: number | null
+  firstSeen?: string | null
 }) {
-  const installLabel = new Intl.NumberFormat('en-US', {
+  const compact = new Intl.NumberFormat('en-US', {
     notation: 'compact',
     maximumFractionDigits: 1
-  }).format(installs)
+  })
+  const installLabel = compact.format(installs)
+  const starsLabel =
+    typeof githubStars === 'number' && githubStars > 0
+      ? compact.format(githubStars)
+      : null
 
   return (
     <aside className="space-y-4 lg:sticky lg:top-4">
@@ -116,6 +125,22 @@ export function SkillsShMetrics({
         </p>
         <p className="mt-1 break-all text-sm">{source || 'Unknown'}</p>
       </div>
+      {starsLabel ? (
+        <div className="rounded-lg p-3">
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            GitHub Stars
+          </p>
+          <p className="mt-1 text-sm font-medium">★ {starsLabel}</p>
+        </div>
+      ) : null}
+      {firstSeen ? (
+        <div className="rounded-lg p-3">
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            First Seen
+          </p>
+          <p className="mt-1 text-sm">{firstSeen}</p>
+        </div>
+      ) : null}
       <div className="rounded-lg p-3">
         <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
           Security Audits

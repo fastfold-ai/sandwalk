@@ -158,6 +158,54 @@ def test_search_catalog_with_mock(monkeypatch):
     assert results[0].slug == "fold"
 
 
+def test_list_catalog_leaderboard_with_mock(monkeypatch):
+    captured = {}
+
+    def fake_request(self, endpoint, operation=""):
+        captured["endpoint"] = endpoint
+        captured["operation"] = operation
+        return {
+            "data": [
+                {
+                    "id": "vercel-labs/skills/find-skills",
+                    "slug": "find-skills",
+                    "name": "find-skills",
+                    "source": "vercel-labs/skills",
+                    "installs": 2600000,
+                    "sourceType": "github",
+                }
+            ],
+            "pagination": {
+                "page": 0,
+                "perPage": 50,
+                "total": 9572,
+                "hasMore": True,
+            },
+        }
+
+    monkeypatch.setattr(
+        "agent_server.skills_service.SkillsService._skills_sh_token",
+        lambda self: "token",
+    )
+    monkeypatch.setattr(
+        "agent_server.skills_service.SkillsService._skills_sh_request_json",
+        fake_request,
+    )
+    monkeypatch.setattr(
+        "agent_server.skills_service.search._fetch_skills_sh_all_time_total",
+        lambda: 986330,
+    )
+    svc = SkillsService()
+    board = svc.list_catalog_leaderboard(view="trending", page=0, per_page=50)
+    assert board.view == "trending"
+    assert board.total == 9572
+    assert board.all_time_total == 986330
+    assert board.has_more is True
+    assert board.data[0].slug == "find-skills"
+    assert "view=trending" in captured["endpoint"]
+    assert captured["operation"] == "skills.sh leaderboard"
+
+
 def test_catalog_detail_and_audit(monkeypatch):
     monkeypatch.setattr(
         "agent_server.skills_service.SkillsService._skills_sh_token",
@@ -182,11 +230,22 @@ def test_catalog_detail_and_audit(monkeypatch):
             ],
         },
     )
+    monkeypatch.setattr(
+        "agent_server.skills_service.catalog_detail.fetch_skills_sh_page_meta",
+        lambda source, skill: {
+            "summary": "**Rich summary**\n\n- Bullet one",
+            "github_stars": 183100,
+            "first_seen": "Mar 13, 2026",
+        },
+    )
     svc = SkillsService()
     detail = svc.get_catalog_detail("src", "fold")
     assert detail.slug == "fold"
     assert detail.installs == 1
     assert detail.files and detail.files[0].path == "SKILL.md"
+    assert detail.summary and "Rich summary" in detail.summary
+    assert detail.github_stars == 183100
+    assert detail.first_seen == "Mar 13, 2026"
 
     audit = svc.get_catalog_audit("src", "fold")
     assert audit.audits[0].status == "pass"
@@ -226,6 +285,14 @@ def test_catalog_detail_enriches_installs_from_search(monkeypatch):
                 source_type="github",
             )
         ],
+    )
+    monkeypatch.setattr(
+        "agent_server.skills_service.catalog_detail.fetch_skills_sh_page_meta",
+        lambda source, skill: {
+            "summary": None,
+            "github_stars": None,
+            "first_seen": None,
+        },
     )
     svc = SkillsService()
     detail = svc.get_catalog_detail("fastfold-ai/skills", "md_openmm_calvados")

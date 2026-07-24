@@ -1,4 +1,5 @@
 import type {
+  AgentCatalogLeaderboardView,
   AgentCatalogSkill,
   AgentCatalogSkillAudit,
   AgentCatalogSkillDetail,
@@ -35,6 +36,17 @@ type SkillsViewCatalogInput = {
     query: string,
     signal?: AbortSignal
   ) => Promise<AgentCatalogSkill[]>
+  onListCatalogLeaderboard: (
+    view: AgentCatalogLeaderboardView,
+    options?: { page?: number; perPage?: number },
+    signal?: AbortSignal
+  ) => Promise<{
+    data: AgentCatalogSkill[]
+    total: number
+    allTimeTotal: number
+    hasMore: boolean
+    page: number
+  }>
   onGetCatalogDetail: (
     source: string,
     skill: string,
@@ -62,6 +74,7 @@ export function useSkillsViewCatalog({
   onOpenCatalogSetup,
   onInstall,
   onSearchCatalog,
+  onListCatalogLeaderboard,
   onGetCatalogDetail,
   onGetCatalogAudit
 }: SkillsViewCatalogInput) {
@@ -90,7 +103,8 @@ export function useSkillsViewCatalog({
   const search = useSkillsViewCatalogSearch({
     catalogSearchMode,
     query,
-    onSearchCatalog
+    onSearchCatalog,
+    onListCatalogLeaderboard
   })
 
   useEffect(() => {
@@ -170,8 +184,17 @@ export function useSkillsViewCatalog({
 
   return {
     catalogResults: search.catalogResults,
+    catalogTotal: search.catalogTotal,
+    catalogHasMore: search.catalogHasMore,
+    allTimeTotal: search.allTimeTotal,
     catalogLoading: search.catalogLoading,
+    catalogLoadingMore: search.catalogLoadingMore,
+    catalogRefreshing: search.catalogRefreshing,
     catalogError: search.catalogError,
+    leaderboardView: search.leaderboardView,
+    setLeaderboardView: search.setLeaderboardView,
+    loadMoreLeaderboard: search.loadMoreLeaderboard,
+    refreshLeaderboard: search.refreshLeaderboard,
     catalogSearchMode,
     setCatalogSearchMode,
     setCatalogResults: search.setCatalogResults,

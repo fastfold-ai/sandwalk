@@ -194,6 +194,31 @@ fn toggle_maximize(window: tauri::WebviewWindow) -> Result<bool, String> {
     }
 }
 
+/// Open a URL in the system browser (Safari / default handler).
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    let trimmed = url.trim();
+    if trimmed.is_empty() {
+        return Err("url is required".into());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(trimmed)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Command::new("xdg-open")
+            .arg(trimmed)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+}
+
 #[derive(Clone, Serialize)]
 struct NavigatePayload {
     path: String,
@@ -304,6 +329,7 @@ pub fn run() {
             desktop_menubar_available,
             start_window_drag,
             toggle_maximize,
+            open_external_url,
         ])
         .setup(|app| {
             ensure_server_helper();

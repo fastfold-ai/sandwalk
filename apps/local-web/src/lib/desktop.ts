@@ -165,6 +165,49 @@ export const startWindowDrag = () => invoke<boolean>('start_window_drag')
 /** Double-click title bar — toggle maximized (native macOS behavior). */
 export const toggleMaximize = () => invoke<boolean>('toggle_maximize')
 
+/** Open a URL in the system browser. */
+export const openExternalUrl = (url: string) =>
+  invokeStrict<void>('open_external_url', { url })
+
+/**
+ * Resolve the supervised web dashboard URL (browser UI), then open it externally
+ * when running in Tauri; otherwise open a new tab.
+ */
+export async function openWebUiInBrowser(backendUrl?: string | null): Promise<void> {
+  let url: string | null = null
+  if (isTauri()) {
+    const status = await desktopServerStatus()
+    url =
+      status?.dashboard_home_url?.trim() ||
+      status?.dashboard_url?.trim() ||
+      null
+  }
+  if (!url) {
+    url = fallbackWebUiUrl(backendUrl)
+  }
+  if (isTauri()) {
+    await openExternalUrl(url)
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+function fallbackWebUiUrl(backendUrl?: string | null): string {
+  const raw = (backendUrl || 'http://127.0.0.1:8787').trim()
+  try {
+    const parsed = new URL(raw)
+    if (!parsed.port || parsed.port === '8787') {
+      parsed.port = '8969'
+    }
+    parsed.pathname = '/dashboard'
+    parsed.search = ''
+    parsed.hash = ''
+    return parsed.toString()
+  } catch {
+    return 'http://127.0.0.1:8969/dashboard'
+  }
+}
+
 /** Listen for menubar deep-link navigation into this window. */
 export async function listenDesktopNavigate(
   handler: (path: string) => void

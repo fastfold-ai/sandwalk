@@ -109,6 +109,9 @@ export function skillAuthorLabel(skill: AgentSkill): string {
 export function suggestionSourceIcon(item: AgentSkillSource): string | null {
   const source = String(item.source || '').toLowerCase()
   const provider = String(item.provider || '').toLowerCase()
+  if (source.includes('fastfold-ai') || provider.includes('fastfold')) {
+    return '/ff_simbol_color.svg'
+  }
   if (source.includes('k-dense-ai') || provider.includes('k-dense')) {
     return '/suggestions/k-dense.png'
   }
@@ -131,6 +134,9 @@ export function suggestionSourceIcon(item: AgentSkillSource): string | null {
 export function suggestionSourceLabel(item: AgentSkillSource): string {
   const source = String(item.source || '').toLowerCase()
   const provider = String(item.provider || '').trim()
+  if (source.includes('fastfold-ai') || provider.toLowerCase().includes('fastfold')) {
+    return 'Fastfold AI'
+  }
   if (source.includes('anthropic') || provider.toLowerCase().includes('anthropic')) {
     return 'Anthropic Claude'
   }

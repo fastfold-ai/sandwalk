@@ -5,6 +5,7 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import { Loader } from 'lucide-react'
 
+import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -64,6 +65,7 @@ export function SkillsCatalogDetailView({
     catalogFiles.find(file => file.path.toLowerCase().endsWith('/skill.md'))
   )?.contents
   const catalogSummary =
+    String(catalogDetail?.summary || '').trim() ||
     (catalogSkillMd ? frontmatterValue(catalogSkillMd, 'description') : null) ||
     (catalogSkillMd
       ? stripFrontmatter(catalogSkillMd)
@@ -92,26 +94,27 @@ export function SkillsCatalogDetailView({
     : null
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <SkillsBreadcrumb onBack={onBack} />
-          {catalogSkillsShUrl ? (
-            <a
-              href={catalogSkillsShUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted"
-            >
-              <img
-                src="/suggestions/skills-sh.png"
-                alt=""
-                className="size-3.5 rounded object-contain dark:invert"
-              />
-              View in Skills.sh
-            </a>
-          ) : null}
-        </div>
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      <DetailStickyNav>
+        <SkillsBreadcrumb onBack={onBack} />
+        {catalogSkillsShUrl ? (
+          <a
+            href={catalogSkillsShUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted"
+          >
+            <img
+              src="/suggestions/skills-sh.png"
+              alt=""
+              className="size-3.5 rounded object-contain dark:invert"
+            />
+            View in Skills.sh
+          </a>
+        ) : null}
+      </DetailStickyNav>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
         {catalogDetailLoading ? (
           <div className="text-muted-foreground flex min-h-[40vh] items-center justify-center gap-2 text-sm">
             <Loader className="size-4 shrink-0 animate-spin" aria-hidden />
@@ -177,7 +180,10 @@ export function SkillsCatalogDetailView({
                   Summary
                 </p>
                 <div className="bg-card rounded-lg border p-3 text-sm leading-relaxed">
-                  {catalogSummary}
+                  <MarkdownContent
+                    content={catalogSummary}
+                    className="max-w-none text-sm [&_p]:my-0 [&_p+p]:mt-2 [&_ul]:my-2 [&_li]:my-0.5"
+                  />
                 </div>
               </div>
 
@@ -198,10 +204,13 @@ export function SkillsCatalogDetailView({
               source={catalogSource}
               installs={catalogInstalls}
               audits={catalogAudits}
+              githubStars={catalogDetail?.githubStars}
+              firstSeen={catalogDetail?.firstSeen}
             />
           </div>
         )}
-      </div>
-    </ScrollArea>
+        </div>
+      </ScrollArea>
+    </div>
   )
 }

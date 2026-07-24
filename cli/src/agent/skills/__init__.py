@@ -61,10 +61,17 @@ NPX_SKILLS_DIR = CONFIG_DIR / ".claude" / "skills"
 # Default discovery catalog (GitHub ``owner/repo``); skills live under ``skills/``.
 DEFAULT_CATALOG = "fastfold-ai/skills"
 
-# Curated third-party skill collections, grouped by provider. Each ``source`` is a
+# Curated skill collections, grouped by provider. Each ``source`` is a
 # GitHub shorthand installable via ``install_skill`` (native git or npx). Installing
 # a whole-repo source batch-installs all skills it contains.
+# Fastfold AI is first so users can reinstall featured skills after deleting them.
 SUGGESTED_SKILL_SOURCES = [
+    {
+        "provider": "Fastfold AI",
+        "source": "fastfold-ai/skills",
+        "url": "https://github.com/fastfold-ai/skills",
+        "description": "Official Fastfold AI skills for folding, design, and MD",
+    },
     {
         "provider": "K-Dense-AI",
         "source": "K-Dense-AI/scientific-agent-skills",

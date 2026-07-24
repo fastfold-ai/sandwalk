@@ -1,4 +1,5 @@
 import type {
+  AgentCatalogLeaderboardView,
   AgentCatalogSkill,
   AgentSkill,
   AgentSkillBatchAction,
@@ -43,6 +44,7 @@ export function SkillsView({
   onUpload,
   onLoadSuggestedSources,
   onSearchCatalog,
+  onListCatalogLeaderboard,
   onGetCatalogDetail,
   onGetCatalogAudit,
   onBulkAction,
@@ -73,6 +75,17 @@ export function SkillsView({
     query: string,
     signal?: AbortSignal
   ) => Promise<AgentCatalogSkill[]>
+  onListCatalogLeaderboard: (
+    view: AgentCatalogLeaderboardView,
+    options?: { page?: number; perPage?: number },
+    signal?: AbortSignal
+  ) => Promise<{
+    data: AgentCatalogSkill[]
+    total: number
+    allTimeTotal: number
+    hasMore: boolean
+    page: number
+  }>
   onGetCatalogDetail: (
     source: string,
     skill: string,
@@ -105,6 +118,7 @@ export function SkillsView({
     onUpload,
     onLoadSuggestedSources,
     onSearchCatalog,
+    onListCatalogLeaderboard,
     onGetCatalogDetail,
     onGetCatalogAudit,
     onBulkAction,
@@ -189,8 +203,17 @@ export function SkillsView({
       catalogSearchMode={state.catalogSearchMode}
       catalogSearchEnabled={catalogSearchEnabled}
       catalogLoading={state.catalogLoading}
+      catalogLoadingMore={state.catalogLoadingMore}
+      catalogRefreshing={state.catalogRefreshing}
       catalogError={state.catalogError}
       catalogResults={state.catalogResults}
+      catalogTotal={state.catalogTotal}
+      catalogHasMore={state.catalogHasMore}
+      allTimeTotal={state.allTimeTotal}
+      leaderboardView={state.leaderboardView}
+      onLeaderboardViewChange={state.setLeaderboardView}
+      onLoadMoreLeaderboard={state.loadMoreLeaderboard}
+      onRefreshLeaderboard={state.refreshLeaderboard}
       showCatalogEmptyState={state.showCatalogEmptyState}
       batchBusy={state.batchBusy}
       batchToast={state.batchToast}

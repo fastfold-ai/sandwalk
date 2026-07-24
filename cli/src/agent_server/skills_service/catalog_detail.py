@@ -11,6 +11,7 @@ from agent_server.models import (
     CatalogSkillFile,
 )
 from agent_server.skills_service.auth import SKILLS_SH_BASE_URL
+from agent_server.skills_service.page_meta import fetch_skills_sh_page_meta
 
 
 class CatalogDetailMixin:
@@ -49,6 +50,10 @@ class CatalogDetailMixin:
             enriched = self._installs_from_search(source_value, skill_value)
             if enriched is not None and enriched > 0:
                 installs = enriched
+        page_meta = fetch_skills_sh_page_meta(source_value, skill_value)
+        summary = page_meta.get("summary")
+        github_stars = page_meta.get("github_stars")
+        first_seen = page_meta.get("first_seen")
         return CatalogSkillDetail(
             id=str(payload.get("id") or f"{source_value}/{skill_value}"),
             source=str(payload.get("source") or source_value),
@@ -56,6 +61,9 @@ class CatalogDetailMixin:
             installs=installs,
             hash=str(payload.get("hash")) if payload.get("hash") is not None else None,
             files=files,
+            summary=str(summary) if summary else None,
+            github_stars=int(github_stars) if isinstance(github_stars, int) else None,
+            first_seen=str(first_seen) if first_seen else None,
         )
 
     def get_catalog_audit(self, source: str, skill: str) -> CatalogSkillAudit:

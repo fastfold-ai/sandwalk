@@ -36,7 +36,7 @@ export function SandboxListView({
 }) {
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto max-w-4xl space-y-8 px-8 py-10">
+      <div className="mx-auto w-full max-w-7xl space-y-8 p-4 md:p-6">
         <div>
           <h2 className="text-2xl font-semibold">Sandbox</h2>
           <p className="text-muted-foreground mt-2 text-sm">

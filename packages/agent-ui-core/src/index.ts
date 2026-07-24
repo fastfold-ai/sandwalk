@@ -989,6 +989,21 @@ export type AgentCatalogSkill = {
   url: string | null
 }
 
+export type AgentCatalogLeaderboardView = 'all-time' | 'trending' | 'hot'
+
+export type AgentCatalogLeaderboard = {
+  data: AgentCatalogSkill[]
+  view: AgentCatalogLeaderboardView | string
+  page: number
+  perPage: number
+  /** Unique ranked skills (API pagination.total). */
+  total: number
+  /** Homepage All Time badge — e.g. 986330. */
+  allTimeTotal: number
+  hasMore: boolean
+  count: number
+}
+
 export type AgentCatalogSkillFile = {
   path: string
   contents: string
@@ -1001,6 +1016,10 @@ export type AgentCatalogSkillDetail = {
   installs: number
   hash: string | null
   files: AgentCatalogSkillFile[] | null
+  /** skills.sh page Summary (rich markdown), not SKILL.md description. */
+  summary?: string | null
+  githubStars?: number | null
+  firstSeen?: string | null
 }
 
 export type AgentCatalogSkillAuditEntry = {
@@ -1044,6 +1063,14 @@ export interface SkillProvider {
     limit?: number,
     signal?: AbortSignal
   ): Promise<AgentCatalogSkill[]>
+  listSkillCatalogLeaderboard?(
+    options?: {
+      view?: AgentCatalogLeaderboardView
+      page?: number
+      perPage?: number
+    },
+    signal?: AbortSignal
+  ): Promise<AgentCatalogLeaderboard>
   getCatalogSkillDetail(
     source: string,
     skill: string,

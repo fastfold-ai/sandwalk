@@ -112,7 +112,7 @@ export function EnvironmentView({
 
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 py-10">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 md:p-6">
         {onBack ? (
           <div className="flex items-center gap-2 text-sm">
             <button

@@ -86,8 +86,8 @@ export function DoctorView({
       <div
         className={
           embedded
-            ? 'mx-auto flex w-full max-w-3xl flex-col gap-6 px-1 py-2'
-            : 'mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 py-10'
+            ? 'mx-auto flex w-full max-w-7xl flex-col gap-6 px-1 py-2'
+            : 'mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 md:p-6'
         }
       >
         <div className="flex flex-wrap items-start justify-between gap-3">

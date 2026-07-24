@@ -9,6 +9,7 @@ import {
   Unplug
 } from 'lucide-react'
 
+import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -47,7 +48,7 @@ export function McpDetailHeaderBar({
   } = state
 
   return (
-    <div className="flex items-center justify-between gap-3">
+    <DetailStickyNav>
       <div className="flex items-center gap-2 text-sm">
         <button
           type="button"
@@ -167,7 +168,7 @@ export function McpDetailHeaderBar({
           </a>
         ) : null}
       </div>
-    </div>
+    </DetailStickyNav>
   )
 }
 

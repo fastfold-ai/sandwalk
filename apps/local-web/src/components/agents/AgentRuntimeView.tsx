@@ -124,7 +124,7 @@ export function AgentRuntimeView({
         message={overlay?.message || ''}
         description={overlay?.description}
       />
-      <div className="mx-auto max-w-3xl space-y-10 px-8 py-10">
+      <div className="mx-auto w-full max-w-7xl space-y-10 p-4 md:p-6">
         <div>
           <h2 className="text-2xl font-semibold">Runtime</h2>
           <p className="text-muted-foreground mt-2 text-sm">

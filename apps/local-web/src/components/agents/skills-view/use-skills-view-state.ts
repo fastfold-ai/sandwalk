@@ -1,4 +1,5 @@
 import type {
+  AgentCatalogLeaderboardView,
   AgentCatalogSkill,
   AgentCatalogSkillAudit,
   AgentCatalogSkillDetail,
@@ -34,6 +35,17 @@ export type SkillsViewInput = {
     query: string,
     signal?: AbortSignal
   ) => Promise<AgentCatalogSkill[]>
+  onListCatalogLeaderboard: (
+    view: AgentCatalogLeaderboardView,
+    options?: { page?: number; perPage?: number },
+    signal?: AbortSignal
+  ) => Promise<{
+    data: AgentCatalogSkill[]
+    total: number
+    allTimeTotal: number
+    hasMore: boolean
+    page: number
+  }>
   onGetCatalogDetail: (
     source: string,
     skill: string,
@@ -66,6 +78,7 @@ export function useSkillsViewState({
   onUpload,
   onLoadSuggestedSources,
   onSearchCatalog,
+  onListCatalogLeaderboard,
   onGetCatalogDetail,
   onGetCatalogAudit,
   onBulkAction,
@@ -111,6 +124,7 @@ export function useSkillsViewState({
     onOpenCatalogSetup,
     onInstall,
     onSearchCatalog,
+    onListCatalogLeaderboard,
     onGetCatalogDetail,
     onGetCatalogAudit
   })

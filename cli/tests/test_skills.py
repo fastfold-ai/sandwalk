@@ -1266,7 +1266,14 @@ def test_provider_label_for_source():
 
 def test_suggested_skill_sources_present():
     providers = {s["provider"] for s in skills_mod.SUGGESTED_SKILL_SOURCES}
-    assert {"K-Dense-AI", "Anthropic", "DeepMind", "Hugging Face"} <= providers
+    assert {
+        "Fastfold AI",
+        "K-Dense-AI",
+        "Anthropic",
+        "DeepMind",
+        "Hugging Face",
+    } <= providers
+    assert skills_mod.SUGGESTED_SKILL_SOURCES[0]["source"] == "fastfold-ai/skills"
     for s in skills_mod.SUGGESTED_SKILL_SOURCES:
         assert "/" in s["source"]
         assert s["url"].startswith("https://github.com/")
@@ -1278,6 +1285,7 @@ def test_setup_select_suggested_sources_inline(monkeypatch):
     # Non-tty -> inline numbered prompt; pick 'all'
     monkeypatch.setattr("builtins.input", lambda _: "all")
     sources = cli._select_suggested_sources()
+    assert "fastfold-ai/skills" in sources
     assert "K-Dense-AI/scientific-agent-skills" in sources
     assert "anthropics/life-sciences" in sources
     assert "google-deepmind/science-skills" in sources

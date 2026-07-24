@@ -49,7 +49,7 @@ export function OnboardingPage({
   const showSkip = def.skippable && !isLast
 
   return (
-    <main className="bg-background flex h-dvh min-h-0 flex-col items-center overflow-hidden px-5 py-6 sm:py-8">
+    <main className="bg-background flex h-full min-h-0 flex-col items-center overflow-hidden px-5 pt-4 pb-6 sm:pt-5 sm:pb-8">
       <div className={cn(SHELL_CLASS, 'h-full min-h-0 max-h-full')}>
         <div className="relative mb-4 flex h-8 shrink-0 items-center justify-between">
           <span className="size-8" aria-hidden />
@@ -132,7 +132,7 @@ export function OnboardingPage({
           )}
         </div>
 
-        <div className="mt-5 flex h-10 shrink-0 items-center justify-between gap-3">
+        <div className="mt-4 flex h-10 shrink-0 items-center justify-between gap-3">
           <Button
             type="button"
             variant="ghost"

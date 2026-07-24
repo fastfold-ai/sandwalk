@@ -22,12 +22,20 @@ export function useSkillsViewImport({
   onUpload,
   onLoadSuggestedSources
 }: SkillsViewImportInput) {
-  const [githubSource, setGithubSource] = useState('fastfold-ai/skills@skills/fold')
+  const [githubSource, setGithubSource] = useState(
+    'fastfold-ai/skills@skills/fold'
+  )
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const [trustedSources, setTrustedSources] = useState<AgentSkillSource[]>([])
-  const [trustedSelected, setTrustedSelected] = useState<Record<string, boolean>>({})
-  const [trustedLoading, setTrustedLoading] = useState(false)
+  const [trustedSelected, setTrustedSelected] = useState<
+    Record<string, boolean>
+  >({})
+  /** False until the first suggestions fetch settles (avoids empty→skeleton flash). */
+  const [trustedLoaded, setTrustedLoaded] = useState(false)
+  // Parents pass inline lambdas; keep the latest loader without re-firing the effect.
+  const loadSuggestedRef = useRef(onLoadSuggestedSources)
+  loadSuggestedRef.current = onLoadSuggestedSources
 
   useEffect(() => {
     if (mode !== 'import_file') return
@@ -43,9 +51,11 @@ export function useSkillsViewImport({
   useEffect(() => {
     if (mode !== 'trusted_sources') return
     const controller = new AbortController()
-    setTrustedLoading(true)
-    void onLoadSuggestedSources(controller.signal)
+    let active = true
+    void loadSuggestedRef
+      .current(controller.signal)
       .then(items => {
+        if (!active || controller.signal.aborted) return
         setTrustedSources(items)
         setTrustedSelected(current => {
           const next = { ...current }
@@ -54,12 +64,18 @@ export function useSkillsViewImport({
           }
           return next
         })
+        setTrustedLoaded(true)
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setTrustedLoading(false)
+      .catch(() => {
+        if (!active || controller.signal.aborted) return
+        setTrustedSources([])
+        setTrustedLoaded(true)
       })
-    return () => controller.abort()
-  }, [mode, onLoadSuggestedSources])
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [mode])
 
   const submitGithubInstall = async () => {
     if (installing) return
@@ -111,7 +127,7 @@ export function useSkillsViewImport({
     trustedSources,
     trustedSelected,
     setTrustedSelected,
-    trustedLoading,
+    trustedLoading: mode === 'trusted_sources' && !trustedLoaded,
     selectedTrustedSources,
     submitGithubInstall,
     submitFileInstall,

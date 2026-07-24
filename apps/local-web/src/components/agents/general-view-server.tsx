@@ -1,4 +1,4 @@
-import { Pencil } from 'lucide-react'
+import { ExternalLink, Pencil } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import {
@@ -6,6 +6,7 @@ import {
   SandwalkServerCard
 } from '@/components/agents/SandwalkServerCard'
 import { Button } from '@/components/ui/button'
+import { openWebUiInBrowser } from '@/lib/desktop'
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ export function GeneralViewServerSection({
   const [draftUrl, setDraftUrl] = useState(backendUrl)
   const [draftKey, setDraftKey] = useState('')
   const [busy, setBusy] = useState(false)
+  const [openingWeb, setOpeningWeb] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -78,16 +80,34 @@ export function GeneralViewServerSection({
           backendUrl
         })}
         actions={
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground shrink-0"
-            onClick={() => setOpen(true)}
-          >
-            <Pencil className="size-3.5" />
-            Edit
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              disabled={openingWeb}
+              onClick={() => {
+                setOpeningWeb(true)
+                void openWebUiInBrowser(backendUrl).finally(() =>
+                  setOpeningWeb(false)
+                )
+              }}
+            >
+              <ExternalLink className="size-3.5" />
+              {openingWeb ? 'Opening…' : 'Open in Web UI'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => setOpen(true)}
+            >
+              <Pencil className="size-3.5" />
+              Edit
+            </Button>
+          </div>
         }
       />
 

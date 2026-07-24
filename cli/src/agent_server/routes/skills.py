@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 
 from agent_server.app_deps import AppDeps
 from agent_server.models import (
+    CatalogLeaderboard,
     CatalogSkillAudit,
     CatalogSkillDetail,
     CatalogSkillList,
@@ -44,6 +45,22 @@ def register_skill_routes(app: FastAPI, deps: AppDeps) -> None:
         except RuntimeError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         return CatalogSkillList(data=items, query=q, count=len(items))
+
+    @app.get("/v1/skills/catalog/leaderboard", response_model=CatalogLeaderboard)
+    async def list_skill_catalog_leaderboard(
+        view: str = Query(default="all-time", pattern="^(all-time|trending|hot)$"),
+        page: int = Query(default=0, ge=0),
+        per_page: int = Query(default=50, ge=1, le=100),
+    ) -> CatalogLeaderboard:
+        try:
+            return await asyncio.to_thread(
+                skills_service.list_catalog_leaderboard,
+                view,
+                page,
+                per_page,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     @app.get("/v1/skills/catalog/detail", response_model=CatalogSkillDetail)
     async def get_catalog_skill_detail(

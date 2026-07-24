@@ -13,7 +13,10 @@ import {
   IntegrationsDetailFieldsTable,
   IntegrationsDetailVercelPanel
 } from './integrations-view-detail-panels'
-import { IntegrationsDetailHeader } from './integrations-view-detail-header'
+import {
+  IntegrationsDetailHeader,
+  IntegrationsDetailNav
+} from './integrations-view-detail-header'
 import { useIntegrationsDetailView } from './use-integrations-detail-view'
 
 export function IntegrationsDetailView({
@@ -80,63 +83,66 @@ export function IntegrationsDetailView({
   }
 
   return (
-    <ScrollArea className="flex-1">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       <BusyConfirmOverlay
         open={Boolean(view.overlay)}
         phase={view.overlay?.phase || 'working'}
         message={view.overlay?.message || ''}
         description={view.overlay?.description}
       />
-      <div className="mx-auto max-w-6xl px-8 py-8">
-        <IntegrationsDetailHeader
-          selected={selected}
-          setupRunning={view.setupRunning}
-          openingTerminal={view.openingTerminal}
-          onBack={onBack}
-          onLinkProject={handleLinkProject}
-        />
-        {selected.key === 'skills-sh' ? (
-          <IntegrationsDetailVercelPanel
-            terminalClient={terminalClient}
-            setupResult={view.setupResult}
-            terminalOpen={view.terminalOpen}
-            terminalSessionId={view.terminalSessionId}
-            terminalStartupNonce={view.terminalStartupNonce}
-            onCloseTerminal={() => view.setTerminalOpen(false)}
+      <IntegrationsDetailNav
+        selected={selected}
+        setupRunning={view.setupRunning}
+        openingTerminal={view.openingTerminal}
+        onBack={onBack}
+        onLinkProject={handleLinkProject}
+      />
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
+          <IntegrationsDetailHeader selected={selected} />
+          {selected.key === 'skills-sh' ? (
+            <IntegrationsDetailVercelPanel
+              terminalClient={terminalClient}
+              setupResult={view.setupResult}
+              terminalOpen={view.terminalOpen}
+              terminalSessionId={view.terminalSessionId}
+              terminalStartupNonce={view.terminalStartupNonce}
+              onCloseTerminal={() => view.setTerminalOpen(false)}
+            />
+          ) : null}
+          <IntegrationsDetailFieldsTable
+            selected={selected}
+            values={values}
+            onValueChange={onValueChange}
+            onRemove={onRemove}
           />
-        ) : null}
-        <IntegrationsDetailFieldsTable
-          selected={selected}
-          values={values}
-          onValueChange={onValueChange}
-          onRemove={onRemove}
-        />
-        {view.validationMessage ? (
-          <p className="text-muted-foreground mt-3 text-sm">
-            {view.validationMessage}
-          </p>
-        ) : null}
-        <div className="mt-4 flex justify-end gap-2">
-          <Button
-            variant="secondary"
-            disabled={view.validationBusy}
-            onClick={() => void view.runValidate(selected.key)}
-          >
-            {view.validationBusy ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <CircleCheck className="size-4" />
-            )}
-            Test API Key
-          </Button>
-          <Button
-            disabled={!Object.values(values).some(value => value.trim())}
-            onClick={() => void onSave()}
-          >
-            Save Overrides
-          </Button>
+          {view.validationMessage ? (
+            <p className="text-muted-foreground text-sm">
+              {view.validationMessage}
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              disabled={view.validationBusy}
+              onClick={() => void view.runValidate(selected.key)}
+            >
+              {view.validationBusy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CircleCheck className="size-4" />
+              )}
+              Test API Key
+            </Button>
+            <Button
+              disabled={!Object.values(values).some(value => value.trim())}
+              onClick={() => void onSave()}
+            >
+              Save Overrides
+            </Button>
+          </div>
         </div>
-      </div>
-    </ScrollArea>
+      </ScrollArea>
+    </div>
   )
 }

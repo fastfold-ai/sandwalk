@@ -13,6 +13,7 @@ import {
   UserRound
 } from 'lucide-react'
 
+import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -97,74 +98,73 @@ export function SkillsInstalledDetailView({
       : null
 
   return (
-    <>
-      <ScrollArea className="flex-1">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      <DetailStickyNav>
+        <div className="flex items-center gap-2 text-sm">
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+          <span className="text-muted-foreground/40">/</span>
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Skills
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs text-red-600 hover:text-red-700"
+            disabled={Boolean(pendingRemove[detail.name]) || batchBusy}
+            onClick={() => onRemove(detail.name)}
+          >
+            <Trash2 className="mr-1 size-3.5" />
+            Remove
+          </Button>
+          {localSkillsShUrl ? (
+            <a
+              href={localSkillsShUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted"
+            >
+              <img
+                src="/suggestions/skills-sh.png"
+                alt=""
+                className="size-3.5 rounded object-contain dark:invert"
+              />
+              View in Skills.sh
+            </a>
+          ) : null}
+          {detailGithubUrl ? (
+            <a
+              href={detailGithubUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted"
+            >
+              <GitBranch className="h-3.5 w-3.5" />
+              View in GitHub
+            </a>
+          ) : (
+            <span className="text-muted-foreground inline-flex items-center gap-1.5 rounded-md border border-border/60 px-3 py-1.5 text-xs">
+              <GitBranch className="h-3.5 w-3.5" />
+              Source not on GitHub
+            </span>
+          )}
+        </div>
+      </DetailStickyNav>
+      <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm">
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </button>
-              <span className="text-muted-foreground/40">/</span>
-              <button
-                type="button"
-                onClick={onBack}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Skills
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs text-red-600 hover:text-red-700"
-                disabled={Boolean(pendingRemove[detail.name]) || batchBusy}
-                onClick={() => onRemove(detail.name)}
-              >
-                <Trash2 className="mr-1 size-3.5" />
-                Remove
-              </Button>
-              {localSkillsShUrl ? (
-                <a
-                  href={localSkillsShUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted"
-                >
-                  <img
-                    src="/suggestions/skills-sh.png"
-                    alt=""
-                    className="size-3.5 rounded object-contain dark:invert"
-                  />
-                  View in Skills.sh
-                </a>
-              ) : null}
-              {detailGithubUrl ? (
-                <a
-                  href={detailGithubUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted"
-                >
-                  <GitBranch className="h-3.5 w-3.5" />
-                  View in GitHub
-                </a>
-              ) : (
-                <span className="text-muted-foreground inline-flex items-center gap-1.5 rounded-md border border-border/60 px-3 py-1.5 text-xs">
-                  <GitBranch className="h-3.5 w-3.5" />
-                  Source not on GitHub
-                </span>
-              )}
-            </div>
-          </div>
-
           <div
             className={cn(
               'grid items-start gap-4',
@@ -270,6 +270,8 @@ export function SkillsInstalledDetailView({
                 source={localCatalogSource}
                 installs={localCatalogInstalls}
                 audits={localCatalogAudits}
+                githubStars={localCatalogDetail?.githubStars}
+                firstSeen={localCatalogDetail?.firstSeen}
               />
             ) : null}
           </div>
@@ -280,7 +282,7 @@ export function SkillsInstalledDetailView({
         onOpenChange={onRemoveDialogOpenChange}
         onConfirm={onConfirmRemove}
       />
-    </>
+    </div>
   )
 }
 

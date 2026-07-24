@@ -53,8 +53,7 @@ export function useAppBootstrap({
     needsAuthLoginRef: connectBundle.needsAuthLoginRef,
     setNeedsAuthLogin: connectBundle.setNeedsAuthLogin,
     setAuthBootstrapped: connectBundle.setAuthBootstrapped,
-    setConnectionPaused: connectBundle.setConnectionPaused,
-    connectRef
+    setConnectionPaused: connectBundle.setConnectionPaused
   })
 
   return {

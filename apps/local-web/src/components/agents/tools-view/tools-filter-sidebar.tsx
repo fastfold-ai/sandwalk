@@ -1,4 +1,5 @@
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 
 import { filterButtonClass } from './tools-view-shared'
 
@@ -15,7 +16,8 @@ export function ToolsFilterSidebar({
   categoryCounts,
   onTierFilterChange,
   onStatusFilterChange,
-  onCategoryFilterChange
+  onCategoryFilterChange,
+  className
 }: {
   toolsCount: number
   tierFilter: 'all' | 'core' | 'extra'
@@ -30,9 +32,15 @@ export function ToolsFilterSidebar({
   onTierFilterChange: (value: 'all' | 'core' | 'extra') => void
   onStatusFilterChange: (value: 'all' | 'enabled' | 'disabled') => void
   onCategoryFilterChange: (value: string) => void
+  className?: string
 }) {
   return (
-    <aside className="flex w-full shrink-0 flex-col gap-4 max-xl:max-h-[min(28rem,50vh)] xl:h-full xl:min-h-0 xl:w-[280px] xl:self-stretch xl:overflow-hidden">
+    <aside
+      className={cn(
+        'flex w-full shrink-0 flex-col gap-4 xl:h-full xl:min-h-0 xl:w-[280px] xl:self-stretch xl:overflow-hidden',
+        className
+      )}
+    >
       <section className="bg-background/70 shrink-0 rounded-lg p-2">
         <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
           Tier
