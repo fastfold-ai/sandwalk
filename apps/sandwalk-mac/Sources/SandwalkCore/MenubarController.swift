@@ -159,9 +159,9 @@ final class MenubarController: NSObject, NSMenuDelegate {
 
     @objc func restartAll() {
         Task { @MainActor in
-            await supervisor.stopAll()
             do {
-                try supervisor.startAll()
+                // Uses stop → settle → start (longer DB-lock drain than stop+start).
+                try await supervisor.restartAll()
             } catch {
                 NSLog("Sandwalk: restart failed — \(error.localizedDescription)")
                 let alert = NSAlert()

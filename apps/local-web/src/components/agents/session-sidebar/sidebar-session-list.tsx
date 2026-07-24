@@ -212,9 +212,12 @@ export function SidebarSessionList({
                               ) : (
                                 <SessionStatusIcon
                                   status={
-                                    chatBySessionId[item.id]?.runActive
-                                      ? 'running'
-                                      : item.status
+                                    item.status === 'awaiting_approval' ||
+                                    chatBySessionId[item.id]?.pendingApproval
+                                      ? 'awaiting_approval'
+                                      : chatBySessionId[item.id]?.runActive
+                                        ? 'running'
+                                        : item.status
                                   }
                                 />
                               )}

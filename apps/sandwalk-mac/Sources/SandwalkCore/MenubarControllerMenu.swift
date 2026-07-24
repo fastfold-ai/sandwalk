@@ -115,7 +115,13 @@ extension MenubarController {
             canStart = false
             canStop = true
             canRestart = true
-        case .starting, .stopping:
+        case .starting:
+            // Stuck cold-starts used to disable Restart forever; always allow
+            // Stop/Restart so the user can recover from DB-lock / port races.
+            canStart = false
+            canStop = true
+            canRestart = true
+        case .stopping:
             canStart = false
             canStop = false
             canRestart = false

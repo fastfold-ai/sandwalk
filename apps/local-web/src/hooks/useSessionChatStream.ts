@@ -7,6 +7,7 @@ import type {
 import { type Dispatch, type MutableRefObject, type SetStateAction,useEffect, useRef } from 'react'
 
 import { toolsFromEvents } from '@/components/agents/transcript'
+import { notifyApprovalRequired } from '@/lib/browser-notifications'
 import { reduceChatOnAgentEvent } from '@/lib/chat-actions'
 import type { SessionChatState } from '@/lib/sessions'
 
@@ -33,7 +34,8 @@ type UseSessionChatStreamArgs = {
 
 function skillsMutatedFromToolEvent(event: AgentEvent): boolean {
   if (event.type !== 'tool.completed') return false
-  if (event.payload.name !== 'skills.manage') return false
+  const name = event.payload.name
+  if (name !== 'skills.manage' && name !== 'skills_manage') return false
   if (event.payload.isError) return false
   const output = event.payload.output
   if (!output || typeof output !== 'object') return false
@@ -167,6 +169,30 @@ export function useSessionChatStream({
                   messagesLoaded: true
                 }))
               })
+            } else if (event.type === 'run.awaiting_approval') {
+              setSessions(current => {
+                const next = current.map(item =>
+                  item.id === id
+                    ? { ...item, status: 'awaiting_approval' as const }
+                    : item
+                )
+                const session = next.find(item => item.id === id)
+                const first = event.payload.actionRequests?.[0]
+                notifyApprovalRequired({
+                  sessionId: id,
+                  sessionTitle: session?.title,
+                  toolName: first?.name
+                })
+                return next
+              })
+            } else if (event.type === 'run.approval_resolved') {
+              setSessions(current =>
+                current.map(item =>
+                  item.id === id
+                    ? { ...item, status: 'running' as const }
+                    : item
+                )
+              )
             } else if (event.type === 'session.updated') {
               void loadSessionsRef.current?.()
             } else if (

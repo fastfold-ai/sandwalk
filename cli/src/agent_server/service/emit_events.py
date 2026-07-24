@@ -13,6 +13,8 @@ _EVENT_TYPES = {
     "tool_end": "tool.completed",
     "usage": "run.usage",
     "activity": "run.progress",
+    "approval_required": "run.awaiting_approval",
+    "approval_resolved": "run.approval_resolved",
 }
 
 
@@ -32,6 +34,34 @@ def _event_payload(event: str, payload: dict[str, Any]) -> dict[str, Any]:
             "isError": bool(payload.get("is_error")),
             "durationSeconds": float(payload.get("duration_s") or 0.0),
             "toolCallId": str(payload.get("tool_call_id") or ""),
+        }
+    if event == "approval_required":
+        review_configs = []
+        for raw in payload.get("review_configs") or []:
+            if not isinstance(raw, dict):
+                continue
+            review_configs.append(
+                {
+                    "actionName": str(
+                        raw.get("actionName") or raw.get("action_name") or ""
+                    ),
+                    "allowedDecisions": list(
+                        raw.get("allowedDecisions")
+                        or raw.get("allowed_decisions")
+                        or []
+                    ),
+                    "description": raw.get("description"),
+                }
+            )
+        return {
+            "interruptId": str(payload.get("interrupt_id") or ""),
+            "actionRequests": list(payload.get("action_requests") or []),
+            "reviewConfigs": review_configs,
+        }
+    if event == "approval_resolved":
+        return {
+            "interruptId": str(payload.get("interrupt_id") or ""),
+            "decisions": list(payload.get("decisions") or []),
         }
     return dict(payload)
 
@@ -65,6 +95,12 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
         if event_type is None:
             return
         event_payload = _event_payload(event, payload)
+        if event == "approval_required":
+            # Keep runId on the wire for the UI even though payload omits it.
+            event_payload = {**event_payload, "runId": run_id}
+            store.set_session_status(session_id, "awaiting_approval")
+        elif event == "approval_resolved":
+            store.set_session_status(session_id, "running")
         store.append_event(
             session_id=session_id,
             run_id=run_id,

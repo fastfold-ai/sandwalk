@@ -2,7 +2,8 @@ import type {
   AgentMessage,
   AgentPlanCard,
   AgentSession,
-  AgentTodo
+  AgentTodo,
+  PendingHitlApproval
 } from '@sandwalk/agent-ui-core'
 
 import type { TranscriptTool } from '@/components/agents/ToolCard'
@@ -39,6 +40,9 @@ export type SessionChatState = {
   activeBuildPlan: AgentPlanCard | null
   /** Plan paths the user already started building — hide Created Plan cards. */
   builtPlanPaths: string[]
+  /** Pending Deep Agents HITL interrupt awaiting desktop decisions. */
+  pendingApproval: PendingHitlApproval | null
+  approvalSubmitting: boolean
 }
 
 export type QueuedMessage = {
@@ -65,7 +69,9 @@ export function emptySessionChatState(): SessionChatState {
     expandedToolRunKeys: {},
     messagesLoaded: false,
     activeBuildPlan: null,
-    builtPlanPaths: []
+    builtPlanPaths: [],
+    pendingApproval: null,
+    approvalSubmitting: false
   }
 }
 

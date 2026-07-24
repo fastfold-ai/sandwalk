@@ -266,11 +266,14 @@ export function useSessionChatSend({
       runActive: false,
       activeRunId: null,
       liveDelta: '',
+      pendingApproval: null,
+      approvalSubmitting: false,
       activeBuildPlan: null
     }))
     setSessions(current =>
       current.map(item =>
-        item.id === sessionId && item.status === 'running'
+        item.id === sessionId &&
+        (item.status === 'running' || item.status === 'awaiting_approval')
           ? { ...item, status: 'interrupted' as const }
           : item
       )

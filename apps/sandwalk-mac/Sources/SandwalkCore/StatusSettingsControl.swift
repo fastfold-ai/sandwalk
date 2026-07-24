@@ -43,7 +43,7 @@ extension StatusSettingsView {
     @ViewBuilder
     var actionButtons: some View {
         switch overall {
-        case .running, .partial:
+        case .running, .partial, .starting:
             HStack(spacing: 6) {
                 Button {
                     Task { await restart() }
@@ -64,7 +64,7 @@ extension StatusSettingsView {
                 .disabled(busy)
             }
 
-        case .starting, .stopping:
+        case .stopping:
             Button("Working…") {}
                 .buttonStyle(.sandwalk(.normal))
                 .disabled(true)

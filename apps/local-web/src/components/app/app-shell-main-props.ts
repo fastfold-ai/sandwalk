@@ -171,6 +171,11 @@ export type AppShellMainProps = {
   activeBuildPlan: AgentPlanCard | null
   builtPlanPaths: string[]
   liveDelta: string
+  pendingApproval: import('@sandwalk/agent-ui-core').PendingHitlApproval | null
+  approvalSubmitting: boolean
+  onSubmitApprovals: (
+    decisions: import('@sandwalk/agent-ui-core').HitlDecision[]
+  ) => void | Promise<void>
   showScrollToBottom: boolean
   scrollChatToBottom: () => void
   error: string | null

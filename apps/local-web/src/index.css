@@ -31,6 +31,33 @@
   animation: breathe 1.8s ease-in-out infinite;
 }
 
+/* Soft L↔R shimmer; alternate avoids a hard jump on loop restart. */
+@keyframes text-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-text-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    hsl(var(--muted-foreground)) 0%,
+    hsl(var(--muted-foreground)) 40%,
+    hsl(var(--foreground)) 50%,
+    hsl(var(--muted-foreground)) 60%,
+    hsl(var(--muted-foreground)) 100%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: text-shimmer 1.4s ease-in-out infinite alternate;
+}
+
 @layer base {
   :root {
     /* Soft page canvas — barely darker than sidebar; cards stay pure white */

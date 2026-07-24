@@ -6,12 +6,11 @@ import { cn } from '@/lib/utils'
 export function BuildPlanStatusCard({
   plan,
   todos,
-  runActive,
   className
 }: {
   plan: AgentPlanCard
   todos: AgentTodo[]
-  runActive: boolean
+  runActive?: boolean
   className?: string
 }) {
   const total = todos.length
@@ -54,11 +53,6 @@ export function BuildPlanStatusCard({
           )}
         </div>
       </div>
-      {runActive ? (
-        <p className="text-muted-foreground px-1 text-sm italic">
-          {showProgress ? 'Working through the plan' : 'Planning next moves'}
-        </p>
-      ) : null}
     </div>
   )
 }

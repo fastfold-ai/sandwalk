@@ -104,6 +104,9 @@ export function AppShellMain(props: AppShellMainProps) {
             activeBuildPlan={props.activeBuildPlan}
             builtPlanPaths={props.builtPlanPaths}
             liveDelta={props.liveDelta}
+            pendingApproval={props.pendingApproval}
+            approvalSubmitting={props.approvalSubmitting}
+            onSubmitApprovals={props.onSubmitApprovals}
             showScrollToBottom={props.showScrollToBottom}
             scrollChatToBottom={props.scrollChatToBottom}
             error={props.error}

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
@@ -12,6 +12,7 @@ import { useSessionChatSend } from '@/hooks/useSessionChatSend'
 import { useSessionChatState } from '@/hooks/useSessionChatState'
 import { useSessionChatStream } from '@/hooks/useSessionChatStream'
 import { useSessionSandbox } from '@/hooks/useSessionSandbox'
+import { finalizePendingTools } from '@/lib/chat-actions'
 import type { SessionChatState } from '@/lib/sessions'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
@@ -80,7 +81,9 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
 
   const runningCount = computeRunningCount(args.sessions)
   const runningSessionIdsKey = args.sessions
-    .filter(item => item.status === 'running')
+    .filter(
+      item => item.status === 'running' || item.status === 'awaiting_approval'
+    )
     .map(item => item.id)
     .sort()
     .join(',')
@@ -239,13 +242,71 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
   const activeRunTodos = chat.activeRunId
     ? chat.todosByRunId[chat.activeRunId] || []
     : []
-  const activeRunTools = chat.activeRunId
-    ? chat.tools.filter(
-        tool => tool.runId === chat.activeRunId && !tool.messageId
-      )
+  // Live stack: only this run's tools (never pending leftovers from older runs).
+  const activeRunTools = chat.runActive
+    ? chat.tools.filter(tool => {
+        if (tool.messageId) return false
+        const unscoped = tool.runId == null || tool.runId === ''
+        const onActiveRun = Boolean(
+          chat.activeRunId && tool.runId === chat.activeRunId
+        )
+        if (!(onActiveRun || unscoped)) return false
+        return tool.status === 'pending' || onActiveRun
+      })
     : []
   const activeBuildPlan = chat.activeBuildPlan
   const builtPlanPaths = chat.builtPlanPaths
+
+  const submitApprovals = useCallback(
+    async (decisions: import('@sandwalk/agent-ui-core').HitlDecision[]) => {
+      const id = args.sessionId
+      if (!id) return
+      const pending = chat.pendingApproval
+      chat.patchChat(id, prev => ({ ...prev, approvalSubmitting: true }))
+      try {
+        await args.client.submitApprovals(id, decisions, {
+          interruptId: pending?.interruptId
+        })
+      } catch (cause) {
+        const message =
+          cause instanceof Error
+            ? cause.message
+            : 'Unable to submit approval decisions'
+        // Server restart drops in-memory HITL waiters; clear the stale card.
+        const stale =
+          /\b409\b/.test(message) ||
+          /no pending approval/i.test(message)
+        chat.patchChat(id, prev => {
+          if (!stale) {
+            return { ...prev, approvalSubmitting: false }
+          }
+          return {
+            ...prev,
+            approvalSubmitting: false,
+            pendingApproval: null,
+            runActive: false,
+            activeRunId: null,
+            tools: finalizePendingTools(prev.tools, {
+              runId: prev.activeRunId,
+              reason: 'Interrupted'
+            })
+          }
+        })
+        args.setError(
+          stale
+            ? 'Approval expired after a server restart. Stop the run if needed, then ask again.'
+            : message
+        )
+      }
+    },
+    [
+      args.client,
+      args.sessionId,
+      args.setError,
+      chat.patchChat,
+      chat.pendingApproval
+    ]
+  )
 
   return {
     chat,
@@ -260,6 +321,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     activeRunTools,
     activeBuildPlan,
     builtPlanPaths,
+    submitApprovals,
     runningCount,
     runningSessionIdsKey,
     concurrentRunSoftLimit: CONCURRENT_RUN_SOFT_LIMIT

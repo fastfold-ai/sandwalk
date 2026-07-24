@@ -10,6 +10,7 @@ try/except/finally spinner lifecycle that ties those pieces together.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import traceback
@@ -18,6 +19,25 @@ from agent.runner_helpers import _classify_llm_error
 from agent.types import ExecutionResult
 
 logger = logging.getLogger("runner")
+
+
+def _merge_deepagents_chunks(acc: dict, chunk: dict) -> dict:
+    """Merge successive ``process_events`` results across HITL resume loops."""
+    usage = dict(acc.get("token_usage") or {})
+    for key, value in dict(chunk.get("token_usage") or {}).items():
+        try:
+            usage[key] = int(usage.get(key, 0) or 0) + int(value or 0)
+        except (TypeError, ValueError):
+            usage[key] = value
+    return {
+        "full_text": list(acc.get("full_text") or [])
+        + list(chunk.get("full_text") or []),
+        "tool_calls": list(acc.get("tool_calls") or [])
+        + list(chunk.get("tool_calls") or []),
+        "token_usage": usage,
+        "model_call_count": int(acc.get("model_call_count", 0) or 0)
+        + int(chunk.get("model_call_count", 0) or 0),
+    }
 
 
 class DeepAgentsRunMixin:
@@ -221,31 +241,128 @@ class DeepAgentsRunMixin:
                 logger.error("multimodal injection failed: %s", inj_exc)
                 return self._make_error_result(query, str(inj_exc), duration)
 
-            events = agent.astream_events(
-                {"messages": [{"role": "user", "content": user_content}]},
-                version="v2",
-                config={"recursion_limit": recursion_limit},
+            from langgraph.types import Command
+
+            from agent.hitl import (
+                apply_grants_from_decisions,
+                clear_session_grants,
+                collect_decisions_for_interrupt,
+                extract_interrupt_payload,
+                reset_hitl_context,
+                set_hitl_context,
             )
-            result = await process_events(
-                events,
-                trace_renderer=trace_renderer,
-                headless=self._headless,
-                trace_events=trace_events,
-                thinking_status=thinking_status,
-                allow_live_spinner=allow_live_spinner,
-                runner=self,
-                on_activity=progress_callback,
-                code_trace_buffer=code_trace_buffer,
-                display_name_map=display_name_map,
-                group_tools=bool(config.get("agent.group_tool_traces", True)),
-                tool_detail_limit=int(config.get("agent.tool_trace_detail_limit", 8)),
+
+            session_id = str(
+                ctx.get("session_id")
+                or getattr(self.trajectory, "session_id", "")
+                or ""
+            ).strip()
+            thread_id = session_id or f"cli-{id(self)}"
+            run_config = {
+                "configurable": {"thread_id": thread_id},
+                "recursion_limit": recursion_limit,
+            }
+            stream_input: object = {
+                "messages": [{"role": "user", "content": user_content}]
+            }
+            result = {
+                "full_text": [],
+                "tool_calls": [],
+                "token_usage": {},
+                "model_call_count": 0,
+            }
+            # PTC tools.* callables bypass LangGraph interrupt_on; expose the
+            # same approval broker / CLI collector via a per-run contextvar.
+            hitl_token = set_hitl_context(
+                session_id=session_id or None,
+                headless=bool(self._headless),
+                progress_callback=progress_callback,
+                console=getattr(self.session, "console", None),
             )
-            thinking_status = None  # consumed by process_events
+            try:
+                while True:
+                    events = agent.astream_events(
+                        stream_input,
+                        version="v2",
+                        config=run_config,
+                    )
+                    try:
+                        chunk = await process_events(
+                            events,
+                            trace_renderer=trace_renderer,
+                            headless=self._headless,
+                            trace_events=trace_events,
+                            thinking_status=thinking_status,
+                            allow_live_spinner=allow_live_spinner,
+                            runner=self,
+                            on_activity=progress_callback,
+                            code_trace_buffer=code_trace_buffer,
+                            display_name_map=display_name_map,
+                            group_tools=bool(
+                                config.get("agent.group_tool_traces", True)
+                            ),
+                            tool_detail_limit=int(
+                                config.get("agent.tool_trace_detail_limit", 8)
+                            ),
+                        )
+                    except Exception as stream_exc:  # noqa: BLE001
+                        # Some LangGraph versions surface interrupts as GraphInterrupt.
+                        from langgraph.errors import GraphInterrupt
+
+                        if not isinstance(stream_exc, GraphInterrupt):
+                            raise
+                        chunk = {
+                            "full_text": [],
+                            "tool_calls": [],
+                            "token_usage": {},
+                            "model_call_count": 0,
+                        }
+                    thinking_status = None  # consumed by process_events
+                    result = _merge_deepagents_chunks(result, chunk)
+                    interrupt_payload = await asyncio.to_thread(
+                        extract_interrupt_payload, agent, run_config
+                    )
+                    if interrupt_payload is None:
+                        break
+                    decisions = await asyncio.to_thread(
+                        collect_decisions_for_interrupt,
+                        session_id=session_id or None,
+                        action_requests=interrupt_payload["action_requests"],
+                        review_configs=interrupt_payload["review_configs"],
+                        headless=bool(self._headless),
+                        progress_callback=progress_callback,
+                        console=getattr(self.session, "console", None),
+                    )
+                    apply_grants_from_decisions(
+                        decisions,
+                        interrupt_payload["action_requests"],
+                        session_id=session_id or None,
+                    )
+                    if progress_callback is not None:
+                        try:
+                            progress_callback(
+                                "approval_resolved",
+                                decisions=decisions,
+                            )
+                        except Exception:  # noqa: BLE001
+                            logger.debug(
+                                "approval_resolved progress callback failed",
+                                exc_info=True,
+                            )
+                    stream_input = Command(resume={"decisions": decisions})
+            finally:
+                clear_session_grants(session_id or None)
+                reset_hitl_context(hitl_token)
             if sandbox_handle is not None and sandbox_handle.kind == "modal":
                 try:
                     sandbox_handle.pull()
                 except Exception as pull_exc:  # noqa: BLE001
                     logger.warning("Modal workspace pull failed: %s", pull_exc)
+        except InterruptedError:
+            if thinking_status is not None:
+                thinking_status.stop()
+                thinking_status = None
+            raise
         except Exception as e:  # noqa: BLE001
             duration = time.time() - t0
             if thinking_status is not None:

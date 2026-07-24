@@ -33,7 +33,9 @@ export function resolveSelectedIntegrationKey(
 
 export function computeRunningCount(sessions: AgentSession[]) {
   const runningSessionIdsKey = sessions
-    .filter(item => item.status === 'running')
+    .filter(
+      item => item.status === 'running' || item.status === 'awaiting_approval'
+    )
     .map(item => item.id)
     .sort()
     .join(',')

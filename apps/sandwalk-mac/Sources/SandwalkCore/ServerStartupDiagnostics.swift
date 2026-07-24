@@ -18,6 +18,10 @@ enum ServerStartupDiagnostics {
             "Agent database is corrupt — auto-heal failed; see Logs / ~/.sandwalk"
         ),
         (
+            "another sandwalk server already has this database open",
+            "Agent database is locked by another Sandwalk process — Quit Sandwalk, stop leftover serve processes, then Start again"
+        ),
+        (
             "modulenotfounderror",
             "Python dependency missing — reinstall the agent CLI (see Logs)"
         ),

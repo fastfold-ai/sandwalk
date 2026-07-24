@@ -165,11 +165,13 @@ def _create_skill(
     },
     usage_guide=(
         "Use when the user wants to find, craft, add, enable, disable, or remove agent skills. "
-        "Confirm before installing third-party (skills.sh) sources. "
+        "install/remove (and create with install=true) pause for human approval in the "
+        "desktop UI or interactive CLI before running — do not ask the user to confirm in chat "
+        "as a substitute for that gate. "
         "Newly installed/enabled skills are usable on the next user message and in the CLI. "
         "After create/install/enable/disable/remove, always include the skill slash mention "
         "(e.g. /lab-notes) in your user-facing reply so the UI can link to skill details. "
-        "install/remove require skills.allow_agent_install (on by default)."
+        "install/remove also require skills.allow_agent_install (on by default) as a hard kill-switch."
     ),
 )
 def manage(

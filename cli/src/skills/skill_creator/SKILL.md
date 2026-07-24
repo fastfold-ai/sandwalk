@@ -61,6 +61,8 @@ User-authored skills set `author` to the local user name and
    ```
 
    Also valid: GitHub URL or `owner/repo@subpath`.
+   Create-with-install and install/remove pause for desktop UI or interactive CLI
+   approval — do not rely on chat confirmation as the primary gate.
 
 7. **Verify.** `skills.manage(action="list")` — the skill should show your user name as author and category Created by Me.
    Tell the user it appears in the composer `/` menu and is usable on the **next

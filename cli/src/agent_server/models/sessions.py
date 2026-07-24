@@ -5,7 +5,9 @@ from typing import Literal
 
 from agent_server.models.base import ApiModel
 
-SessionStatus = Literal["idle", "running", "interrupted", "error"]
+SessionStatus = Literal[
+    "idle", "running", "awaiting_approval", "interrupted", "error"
+]
 
 
 OrganizeLabel = Literal["pinned", "archive"]
@@ -83,3 +85,21 @@ class DeleteSessionResponse(ApiModel):
 
 class InterruptRunResponse(ApiModel):
     interrupted: bool
+
+
+class HitlDecision(ApiModel):
+    type: Literal["approve", "edit", "reject", "respond"]
+    message: str | None = None
+    edited_action: dict | None = None
+    # "remaining" auto-approves matching skill install/remove calls for this run
+    scope: Literal["remaining", "once"] | None = None
+
+
+class SubmitApprovalsRequest(ApiModel):
+    decisions: list[HitlDecision]
+    interrupt_id: str | None = None
+
+
+class SubmitApprovalsResponse(ApiModel):
+    accepted: bool = True
+    interrupt_id: str | None = None

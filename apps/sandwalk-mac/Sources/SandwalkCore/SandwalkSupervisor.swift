@@ -180,8 +180,9 @@ final class SandwalkSupervisor {
 
     func restartAll() async throws {
         await stopAll()
-        // Let TIME_WAIT / child reaping finish so the next bind can succeed.
-        try await Task.sleep(for: .milliseconds(700))
+        // Let TIME_WAIT / child reaping / SQLite flock drain so the next serve
+        // can open agent-server.db (menubar Restart used to race this).
+        try await Task.sleep(for: .milliseconds(2_000))
         try startAll()
         // Vite may adopt quickly while the API cold-starts — retry API once if
         // we land in "web up · API down".

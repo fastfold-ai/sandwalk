@@ -88,12 +88,44 @@ describe('reduceChatOnAgentEvent', () => {
     expect(next.plansByRunId['run-1']).toHaveLength(1)
   })
 
+  it('stores pending approval on run.awaiting_approval', () => {
+    const prev = emptySessionChatState()
+    const next = reduceChatOnAgentEvent(
+      prev,
+      event('run.awaiting_approval', {
+        interruptId: 'int-1',
+        actionRequests: [
+          { name: 'skills_manage', args: { action: 'install' } }
+        ],
+        reviewConfigs: [
+          {
+            actionName: 'skills_manage',
+            allowedDecisions: ['approve', 'edit', 'reject']
+          }
+        ]
+      })
+    )
+    expect(next.runActive).toBe(true)
+    expect(next.pendingApproval?.interruptId).toBe('int-1')
+    expect(next.pendingApproval?.actionRequests[0]?.name).toBe('skills_manage')
+  })
+
   it('clears live state on run.completed and completes in-progress todos', () => {
     const prev = {
       ...emptySessionChatState(),
       runActive: true,
       activeRunId: 'run-1',
       liveDelta: 'streaming',
+      tools: [
+        {
+          id: 'tool-stuck',
+          runId: 'run-1',
+          messageId: null,
+          name: 'run_python',
+          status: 'pending' as const,
+          startedAt: '2026-07-15T12:00:00.000Z'
+        }
+      ],
       todosByRunId: {
         'run-1': [
           {
@@ -116,6 +148,7 @@ describe('reduceChatOnAgentEvent', () => {
     expect(next.runActive).toBe(false)
     expect(next.activeRunId).toBeNull()
     expect(next.liveDelta).toBe('')
+    expect(next.tools[0]?.status).toBe('error')
     expect(next.todosByRunId['run-1']).toEqual([
       {
         id: 'todo-1',
@@ -128,6 +161,27 @@ describe('reduceChatOnAgentEvent', () => {
         status: 'pending'
       }
     ])
+  })
+
+  it('clears zombie pending tools when a new run starts', () => {
+    const prev = {
+      ...emptySessionChatState(),
+      tools: [
+        {
+          id: 'old-python',
+          runId: 'old-run',
+          messageId: null,
+          name: 'run_python',
+          status: 'pending' as const,
+          startedAt: '2026-07-15T12:00:00.000Z'
+        }
+      ]
+    }
+    const next = reduceChatOnAgentEvent(prev, event('run.started', { messageId: 'u2' }))
+    expect(next.tools[0]?.status).toBe('error')
+    expect(next.tools[0]?.result).toMatchObject({
+      summary: 'Superseded by a new run'
+    })
   })
 
   it('adds tool.started entries and ignores duplicates', () => {
@@ -167,6 +221,28 @@ describe('reduceChatOnAgentEvent', () => {
     expect(next.tools[1]).toMatchObject({
       id: 'tool-2',
       name: 'read_file',
+      status: 'pending'
+    })
+  })
+
+  it('inherits activeRunId when tool.started omits runId', () => {
+    const prev = {
+      ...emptySessionChatState(),
+      activeRunId: 'run-1',
+      runActive: true
+    }
+    const next = reduceChatOnAgentEvent(
+      prev,
+      event(
+        'tool.started',
+        { name: 'run_python', arguments: {}, toolCallId: 'tool-x' },
+        { id: 'evt-x', runId: null }
+      )
+    )
+    expect(next.tools[0]).toMatchObject({
+      id: 'tool-x',
+      runId: 'run-1',
+      name: 'run_python',
       status: 'pending'
     })
   })

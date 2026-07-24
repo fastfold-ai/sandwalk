@@ -39,7 +39,7 @@ export function buildConversationTimeline({
   todosByRunId,
   plansByRunId,
   runIdByMessageId,
-  activeRunId = null
+  activeRunId: _activeRunId = null
 }: {
   messages: AgentMessage[]
   tools: TranscriptTool[]
@@ -58,10 +58,14 @@ export function buildConversationTimeline({
   // message of that run). Later runs that rewrite the same path (follow-ups /
   // Build) must not spawn another Created Plan card.
   const lastAssistantByRun = new Map<string, string>()
+  const lastMessageByRun = new Map<string, string>()
   const planPathFirstRun = new Map<string, { plan: AgentPlanCard; runId: string }>()
+  let unscopedToolSinkId: string | null = null
   for (const message of messages) {
-    if (message.role !== 'assistant') continue
     const runId = runMap[message.id]
+    if (runId) lastMessageByRun.set(runId, message.id)
+    if (message.role !== 'assistant') continue
+    if (!unscopedToolSinkId) unscopedToolSinkId = message.id
     if (!runId) continue
     lastAssistantByRun.set(runId, message.id)
     for (const plan of plansMap[runId] || []) {
@@ -79,20 +83,51 @@ export function buildConversationTimeline({
     planPathToCard.set(path, plan)
   }
 
+  const takeToolsForMessage = (messageId: string, runId: string | null) => {
+    const turnTools = tools.filter(tool => {
+      if (usedToolIds.has(tool.id)) return false
+      if (tool.messageId === messageId) return true
+      // Anchor historical tools on the last message of their run so interrupted
+      // runs (no assistant reply) don't float as forever-orphans at the bottom.
+      if (
+        runId &&
+        tool.runId === runId &&
+        lastMessageByRun.get(runId) === messageId
+      ) {
+        return true
+      }
+      // Unscoped tools, or tools whose run has no messages left in history:
+      // park on the first assistant so they never reappear under later turns.
+      const strandedRun =
+        Boolean(tool.runId) && !lastMessageByRun.has(String(tool.runId))
+      if (
+        !tool.messageId &&
+        tool.status !== 'pending' &&
+        messageId === unscopedToolSinkId &&
+        (!tool.runId || strandedRun)
+      ) {
+        return true
+      }
+      return false
+    })
+    turnTools.forEach(tool => usedToolIds.add(tool.id))
+    return turnTools
+  }
+
   for (const message of messages) {
     if (message.role === 'user' || message.role === 'system') {
       timeline.push({ kind: 'message', message, content: message.content })
+      const runId = runMap[message.id] || null
+      if (runId && lastMessageByRun.get(runId) === message.id) {
+        for (const tool of takeToolsForMessage(message.id, runId)) {
+          timeline.push({ kind: 'tool', tool })
+        }
+      }
       continue
     }
 
     const runId = runMap[message.id] || null
-    const turnTools = tools.filter(tool => {
-      if (usedToolIds.has(tool.id)) return false
-      if (tool.messageId === message.id) return true
-      if (runId && tool.runId === runId) return true
-      return false
-    })
-    turnTools.forEach(tool => usedToolIds.add(tool.id))
+    const turnTools = takeToolsForMessage(message.id, runId)
 
     const split = splitAssistantThought(message.content)
     if (split.thought) {
@@ -138,15 +173,6 @@ export function buildConversationTimeline({
         todos: todosMap[runId]!
       })
     }
-  }
-
-  const orphanTools = tools.filter(tool => {
-    if (usedToolIds.has(tool.id)) return false
-    if (activeRunId && tool.runId === activeRunId) return false
-    return true
-  })
-  for (const tool of orphanTools) {
-    timeline.push({ kind: 'tool', tool })
   }
 
   return timeline
@@ -272,6 +298,29 @@ export function toolsFromEvents(events: AgentEvent[]): {
         endedAt: event.timestamp,
         durationSeconds: event.payload.durationSeconds
       })
+    } else if (
+      event.type === 'run.completed' ||
+      event.type === 'run.failed' ||
+      event.type === 'run.interrupted'
+    ) {
+      const reason =
+        event.type === 'run.interrupted'
+          ? 'Interrupted'
+          : event.type === 'run.failed'
+            ? 'Run failed'
+            : 'Run ended'
+      for (const [id, tool] of toolsById) {
+        if (tool.status !== 'pending') continue
+        const sameRun = Boolean(event.runId && tool.runId === event.runId)
+        const unscoped = tool.runId == null || tool.runId === ''
+        if (event.runId && !sameRun && !unscoped) continue
+        toolsById.set(id, {
+          ...tool,
+          status: 'error',
+          result: { summary: reason },
+          endedAt: event.timestamp
+        })
+      }
     } else if (event.type === 'todos.updated' && event.runId) {
       todosByRunId[event.runId] = event.payload.todos
     } else if (event.type === 'run.usage' && event.runId) {

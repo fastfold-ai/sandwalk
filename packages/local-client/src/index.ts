@@ -15,6 +15,7 @@ import type {
   AgentSkillBatchResult,
   AgentSkillDetail,
   AgentSkillSource,
+  HitlDecision,
   BackendHealth,
   CreateAgentModelInput,
   DatasetSummary,
@@ -681,6 +682,25 @@ export class LocalAgentClient
       { method: 'POST', signal },
     )
     return result.interrupted
+  }
+
+  submitApprovals(
+    sessionId: string,
+    decisions: HitlDecision[],
+    options?: { interruptId?: string | null; signal?: AbortSignal },
+  ): Promise<{ accepted: boolean; interruptId?: string | null }> {
+    return this.request<{ accepted: boolean; interruptId?: string | null }>(
+      `/sessions/${encodeURIComponent(sessionId)}/approvals`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          decisions,
+          interruptId: options?.interruptId ?? null,
+        }),
+        headers: { 'content-type': 'application/json' },
+        signal: options?.signal,
+      },
+    )
   }
 
   async streamEvents(

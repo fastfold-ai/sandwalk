@@ -1,6 +1,6 @@
 ---
 name: skill-find
-description: Discover and install agent skills — first from the official Fastfold catalog (github.com/fastfold-ai/skills), then from the open skills.sh ecosystem (npx skills find). Use when the user wants to find, search, browse, list, add, enable, disable, or remove skills/capabilities (e.g. fold, MD, protein design, Google Calendar).
+description: Discover, try without installing, and install agent skills — first from the official Fastfold catalog (github.com/fastfold-ai/skills), then from the open skills.sh ecosystem (npx skills find / use). Use when the user wants to find, search, browse, list, try/use without installing, add, enable, disable, or remove skills/capabilities (e.g. fold, MD, protein design, Google Calendar).
 ---
 
 # Skill Find
@@ -8,17 +8,19 @@ description: Discover and install agent skills — first from the official Fastf
 > **This skill has no scripts.** Do not run `python scripts/...` for it. Use the
 > `skills.manage` tool (actions: `find`, `list`, `info`, `install`, `remove`,
 > `enable`, `disable`), and only fall back to the `sandwalk skills ...` CLI or
-> `npx skills ...` when the tool is unavailable.
+> `npx skills ...` when the tool is unavailable. Ephemeral try-without-install
+> uses `npx skills use` (there is no `skills.manage` action for that yet).
 
-Help the user discover agent skills and install the ones they want. Search in two
-tiers — the trusted Fastfold catalog first, then the broader open ecosystem — and
-always scan live, because both catalogs grow over time.
+Help the user discover agent skills, try them once without installing, or install
+the ones they want. Search in two tiers — the trusted Fastfold catalog first, then
+the broader open ecosystem — and always scan live, because both catalogs grow over time.
 
 - **Fastfold catalog (first-party, trusted):** https://github.com/fastfold-ai/skills (skills under `skills/<name>/`)
-- **Open ecosystem (skills.sh):** https://skills.sh — the package manager for community skills
+- **Open ecosystem (skills.sh):** https://skills.sh — the package manager for community skills ([vercel-labs/skills](https://github.com/vercel-labs/skills))
 
 ## When to Use This Skill
 - The user asks to "find skills", "search skills", "what skills are available", "list sandwalk skills", or "add a skill".
+- The user asks to "try a skill", "use a skill without installing", or "run this skill once".
 - The user asks "how do I do X", "is there a skill for X", or "can you do X" where X is a specialized capability the agent lacks.
 - The user wants to enable, disable, or remove an installed skill.
 - The user wants to extend the agent with folding, MD, protein design, reporting, or other packaged workflows.
@@ -54,8 +56,37 @@ Do **not** use the desktop Skills UI Vercel login path from the agent — that c
 browser stays Integrations → Vercel only.
 
 ### Confirm
-Ask which skill(s) to install. Ecosystem skills run third-party code; call that out
-before installing anything outside the Fastfold catalog.
+Ask whether to **try once** (no install) or **install** for reuse. Ecosystem skills
+run third-party code; call that out before using or installing anything outside the
+Fastfold catalog. You do **not** need to ask the user to confirm again in chat as a
+gate — `skills.manage` install/remove pauses for desktop UI or interactive CLI
+approval automatically. `npx skills use` does not persist files into Sandwalk skill
+dirs (ephemeral temp prompt only).
+
+### Use without installing (ephemeral)
+Prefer this when the user wants a one-off try, or has not decided to keep the skill.
+`npx skills use` resolves the same sources as `npx skills add`, writes skill files to
+a temp directory, and prints a generated prompt to **stdout**. Capture that output
+(via shell) and follow it for the current task — do **not** pass `--agent` (that
+starts an external coding agent interactively).
+
+```bash
+# owner/repo@skill-name → prompt on stdout
+npx -y skills use <owner>/<repo>@<skill-name>
+
+# equivalent with explicit --skill
+npx -y skills use <owner>/<repo> --skill <skill-name>
+
+# Fastfold catalog example
+npx -y skills use fastfold-ai/skills@fold
+# or
+npx -y skills use fastfold-ai/skills --skill fold
+```
+
+After the prompt is printed, execute those instructions in this session (read any
+paths the prompt references under the temp skill dir if needed). Tell the user the
+skill was **not** installed; offer `skills.manage(action="install", ...)` if they
+want it permanently.
 
 ### Install
 ```
@@ -96,5 +127,8 @@ as when the user inserts a skill via `/` in the composer.
 
 ## Notes
 - Installs use native `git clone` and fall back to `npx skills add` when needed.
+- Try-without-install uses `npx -y skills use <source>` (see
+  [vercel-labs/skills](https://github.com/vercel-labs/skills)); install still goes
+  through `skills.manage` / `sandwalk skills add`.
 - Both catalogs are dynamic — re-run discovery instead of assuming a fixed set.
 - Default to the Fastfold catalog; reach for the open ecosystem only when needed.

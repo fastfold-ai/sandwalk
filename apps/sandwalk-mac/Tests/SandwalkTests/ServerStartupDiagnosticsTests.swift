@@ -47,6 +47,28 @@ final class ServerStartupDiagnosticsTests: XCTestCase {
         XCTAssertFalse(classified.isFatal)
     }
 
+    func testDetectsDatabaseLockInLogTail() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sandwalk-diag-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let log = dir.appendingPathComponent("server.log")
+        let body = """
+        Error: Another Sandwalk server already has this database open (held by pid 55228): /Users/x/.sandwalk/agent-server.db
+        """
+        try body.write(to: log, atomically: true, encoding: .utf8)
+
+        let classified = ServerStartupDiagnostics.classifyExit(
+            code: 1,
+            everHealthy: false,
+            consecutiveStartupFailures: 1,
+            logURL: log
+        )
+        XCTAssertTrue(classified.isFatal)
+        XCTAssertTrue(classified.message.localizedCaseInsensitiveContains("locked"))
+    }
+
     func testStopsAfterRepeatedStartupFailuresWithoutHealthy() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("sandwalk-diag-\(UUID().uuidString)", isDirectory: true)

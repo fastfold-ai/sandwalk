@@ -29,10 +29,11 @@ class ConnectionMixin:
     def _acquire_exclusive_lock(self) -> None:
         """Non-blocking exclusive flock so only one serve owns this DB.
 
-        Retries briefly so a graceful restart (old process shutting down) can
-        release the lock without forcing the user to wait and retry manually.
+        Retries so a graceful restart (old process shutting down) can release
+        the lock. Waits longer than a typical uvicorn drain so menubar Restart
+        does not race into a permanent "starting…" failure.
         """
-        deadline = time.monotonic() + 5.0
+        deadline = time.monotonic() + 15.0
         last_exc: OSError | None = None
         while True:
             fd = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
@@ -54,21 +55,37 @@ class ConnectionMixin:
             except OSError as exc:
                 last_exc = exc
                 holder = ""
+                holder_pid: int | None = None
                 try:
                     os.lseek(fd, 0, os.SEEK_SET)
                     raw = os.read(fd, 64).decode("utf-8", errors="replace").strip()
                     if raw:
                         holder = f" (held by pid {raw})"
+                        try:
+                            holder_pid = int(raw.split()[0])
+                        except ValueError:
+                            holder_pid = None
                 except OSError:
                     pass
                 os.close(fd)
+                # Stale pid in the lock file (process already gone) — keep
+                # retrying; the flock itself is what matters.
+                if holder_pid is not None:
+                    try:
+                        os.kill(holder_pid, 0)
+                    except ProcessLookupError:
+                        time.sleep(0.05)
+                        if time.monotonic() < deadline:
+                            continue
+                    except PermissionError:
+                        pass
                 if time.monotonic() >= deadline:
                     raise AgentStoreLockError(
                         f"Another Sandwalk server already has this database open"
                         f"{holder}: {self.path}. Stop the other process before "
                         "starting a new one."
                     ) from last_exc
-                time.sleep(0.1)
+                time.sleep(0.15)
 
     def _release_exclusive_lock(self) -> None:
         fd = self._lock_fd

@@ -3,13 +3,17 @@ import type {
   AgentMessage,
   AgentPlanCard,
   AgentSession,
-  AgentTodo
+  AgentTodo,
+  HitlDecision,
+  PendingHitlApproval
 } from '@sandwalk/agent-ui-core'
 import { ArrowDown } from 'lucide-react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useMemo } from 'react'
 
+import { AgentStatusText } from '@/components/agents/AgentStatusText'
 import { BuildPlanStatusCard } from '@/components/agents/BuildPlanStatusCard'
+import { HitlDecisionCard } from '@/components/agents/hitl/HitlDecisionCard'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { TodoListInline } from '@/components/agents/TodoListInline'
 import { ToolCard, type TranscriptTool } from '@/components/agents/ToolCard'
@@ -42,6 +46,9 @@ type ChatTranscriptProps = {
   activeBuildPlan?: AgentPlanCard | null
   builtPlanPaths?: string[]
   liveDelta: string
+  pendingApproval?: PendingHitlApproval | null
+  approvalSubmitting?: boolean
+  onSubmitApprovals?: (decisions: HitlDecision[]) => void | Promise<void>
   showScrollToBottom: boolean
   onScrollToBottom: () => void
 }
@@ -70,6 +77,9 @@ export function ChatTranscript({
   activeBuildPlan = null,
   builtPlanPaths = [],
   liveDelta,
+  pendingApproval = null,
+  approvalSubmitting = false,
+  onSubmitApprovals,
   showScrollToBottom,
   onScrollToBottom
 }: ChatTranscriptProps) {
@@ -82,6 +92,17 @@ export function ChatTranscript({
     if (activeBuildPlan?.path) paths.add(activeBuildPlan.path)
     return paths
   }, [activeBuildPlan?.path, builtPlanPaths])
+
+  // Status tracks the same cards the user sees, plus any pending tools that
+  // arrived without a runId (still rendered via the pending filter).
+  const statusTools = useMemo(() => {
+    const pending = tools.filter(tool => tool.status === 'pending')
+    if (pending.length === 0) return activeRunTools
+    const seen = new Set(activeRunTools.map(tool => tool.id))
+    const extras = pending.filter(tool => !seen.has(tool.id))
+    if (extras.length === 0) return activeRunTools
+    return [...activeRunTools, ...extras]
+  }, [activeRunTools, tools])
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -118,7 +139,6 @@ export function ChatTranscript({
                 <BuildPlanStatusCard
                   plan={activeBuildPlan}
                   todos={activeRunTodos}
-                  runActive={runActive}
                 />
               </div>
             ) : null}
@@ -138,6 +158,16 @@ export function ChatTranscript({
                 ))}
               </div>
             ) : null}
+            {pendingApproval && onSubmitApprovals ? (
+              <div className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150">
+                <HitlDecisionCard
+                  actionRequests={pendingApproval.actionRequests}
+                  reviewConfigs={pendingApproval.reviewConfigs}
+                  submitting={approvalSubmitting}
+                  onSubmit={onSubmitApprovals}
+                />
+              </div>
+            ) : null}
             {liveDelta ? (
               <div className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150">
                 <MarkdownContent
@@ -150,9 +180,14 @@ export function ChatTranscript({
               </div>
             ) : null}
             {runActive && !liveDelta ? (
-              <div className="text-muted-foreground mx-auto flex w-full max-w-[44rem] items-center gap-1 px-2 py-2 text-sm">
-                <div className="bg-foreground/80 animate-breathe h-2.5 w-2.5 rounded-full" />
-                <span className="sr-only">Generating</span>
+              <div className="mx-auto flex w-full max-w-[44rem] items-center px-2 py-2 text-sm">
+                {pendingApproval ? (
+                  <span className="animate-text-shimmer font-light">
+                    Pending approval
+                  </span>
+                ) : (
+                  <AgentStatusText tools={statusTools} />
+                )}
               </div>
             ) : null}
             {activeRunTodos.length > 0 && !activeBuildPlan ? (

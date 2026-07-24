@@ -275,6 +275,7 @@ export default function App() {
         activeRunTools: layer.activeRunTools,
         activeBuildPlan: layer.activeBuildPlan,
         builtPlanPaths: layer.builtPlanPaths,
+        submitApprovals: layer.submitApprovals,
         showConnectionLimitWarning,
         runningCount: layer.runningCount,
         prefetchSessionMessages: layer.prefetchSessionMessages,

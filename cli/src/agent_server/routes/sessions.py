@@ -14,6 +14,8 @@ from agent_server.models import (
     DeleteSessionResponse,
     InterruptRunResponse,
     SessionList,
+    SubmitApprovalsRequest,
+    SubmitApprovalsResponse,
     UpdateSessionRequest,
 )
 
@@ -125,3 +127,32 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
         if await asyncio.to_thread(store.get_session, session_id) is None:
             raise HTTPException(status_code=404, detail="Session not found.")
         return InterruptRunResponse(interrupted=service.interrupt(session_id))
+
+    @app.post(
+        "/v1/sessions/{session_id}/approvals",
+        response_model=SubmitApprovalsResponse,
+    )
+    async def submit_approvals(
+        session_id: str,
+        payload: SubmitApprovalsRequest,
+    ) -> SubmitApprovalsResponse:
+        if await asyncio.to_thread(store.get_session, session_id) is None:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        decisions = [item.model_dump(exclude_none=True) for item in payload.decisions]
+        try:
+            result = await asyncio.to_thread(
+                service.submit_approvals,
+                session_id,
+                decisions=decisions,
+                interrupt_id=payload.interrupt_id,
+            )
+        except LookupError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Session not found.") from exc
+        return SubmitApprovalsResponse(
+            accepted=bool(result.get("accepted", True)),
+            interrupt_id=result.get("interrupt_id"),
+        )

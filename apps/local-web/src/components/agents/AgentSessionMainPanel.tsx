@@ -84,6 +84,11 @@ export type AgentSessionMainPanelProps = {
   activeBuildPlan: import('@sandwalk/agent-ui-core').AgentPlanCard | null
   builtPlanPaths: string[]
   liveDelta: string
+  pendingApproval: import('@sandwalk/agent-ui-core').PendingHitlApproval | null
+  approvalSubmitting: boolean
+  onSubmitApprovals: (
+    decisions: import('@sandwalk/agent-ui-core').HitlDecision[]
+  ) => void | Promise<void>
   showScrollToBottom: boolean
   scrollChatToBottom: () => void
   error: string | null
@@ -148,6 +153,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     activeBuildPlan,
     builtPlanPaths,
     liveDelta,
+    pendingApproval,
+    approvalSubmitting,
+    onSubmitApprovals,
     showScrollToBottom,
     scrollChatToBottom,
     error,
@@ -233,6 +241,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             activeBuildPlan={activeBuildPlan}
             builtPlanPaths={builtPlanPaths}
             liveDelta={liveDelta}
+            pendingApproval={pendingApproval}
+            approvalSubmitting={approvalSubmitting}
+            onSubmitApprovals={onSubmitApprovals}
             showScrollToBottom={showScrollToBottom}
             scrollChatToBottom={scrollChatToBottom}
             setFilesPanelCollapsed={setFilesPanelCollapsed}

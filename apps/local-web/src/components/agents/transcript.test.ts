@@ -174,10 +174,10 @@ describe('buildConversationTimeline', () => {
     expect(timeline[0]?.kind).toBe('message')
   })
 
-  it('appends orphan tools except those on the active run', () => {
+  it('does not pin orphan tools at the end of the transcript', () => {
     const tools = [
-      tool({ id: 'orphan', runId: 'old-run', messageId: null }),
-      tool({ id: 'active', runId: 'active-run', messageId: null })
+      tool({ id: 'orphan', runId: 'old-run', messageId: null, status: 'completed' }),
+      tool({ id: 'active', runId: 'active-run', messageId: null, status: 'pending' })
     ]
     const timeline = buildConversationTimeline({
       messages: [],
@@ -187,7 +187,53 @@ describe('buildConversationTimeline', () => {
       runIdByMessageId: {},
       activeRunId: 'active-run'
     })
-    expect(timeline).toEqual([{ kind: 'tool', tool: tools[0] }])
+    expect(timeline).toEqual([])
+  })
+
+  it('anchors interrupted-run tools on the last message of that run', () => {
+    const user = msg({ id: 'u1', role: 'user', content: 'remove skills' })
+    const later = msg({ id: 'a2', role: 'assistant', content: '👍' })
+    const tools = [
+      tool({
+        id: 'stuck',
+        runId: 'run-old',
+        messageId: null,
+        status: 'error',
+        name: 'run_python'
+      })
+    ]
+    const timeline = buildConversationTimeline({
+      messages: [user, later],
+      tools,
+      todosByRunId: {},
+      plansByRunId: {},
+      runIdByMessageId: { u1: 'run-old', a2: 'run-new' },
+      activeRunId: null
+    })
+    expect(timeline.map(entry => entry.kind)).toEqual([
+      'message',
+      'tool',
+      'message'
+    ])
+    expect(timeline[1]).toMatchObject({
+      kind: 'tool',
+      tool: { id: 'stuck' }
+    })
+  })
+
+  it('does not pin pending tools at the end when no run is active', () => {
+    const tools = [
+      tool({ id: 'stuck', runId: 'old-run', messageId: null, status: 'pending' })
+    ]
+    const timeline = buildConversationTimeline({
+      messages: [msg({ id: 'a1', role: 'assistant', content: 'Done.' })],
+      tools,
+      todosByRunId: {},
+      plansByRunId: {},
+      runIdByMessageId: {},
+      activeRunId: null
+    })
+    expect(timeline.every(entry => entry.kind !== 'tool')).toBe(true)
   })
 
   it('tolerates missing plansByRunId / todosByRunId maps', () => {

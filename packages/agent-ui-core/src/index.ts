@@ -178,7 +178,44 @@ export type EnvironmentPackageMutationResult = {
   message: string
 }
 
-export type AgentSessionStatus = 'idle' | 'running' | 'interrupted' | 'error'
+export type AgentSessionStatus =
+  | 'idle'
+  | 'running'
+  | 'awaiting_approval'
+  | 'interrupted'
+  | 'error'
+
+export type HitlDecisionType = 'approve' | 'edit' | 'reject' | 'respond'
+
+export type HitlActionRequest = {
+  name: string
+  args: Record<string, unknown>
+  description?: string | null
+}
+
+export type HitlReviewConfig = {
+  actionName: string
+  allowedDecisions: HitlDecisionType[]
+  description?: string | null
+}
+
+export type HitlDecision = {
+  type: HitlDecisionType
+  message?: string
+  /** Auto-approve matching skill install/remove calls for the rest of this run. */
+  scope?: 'remaining' | 'once'
+  editedAction?: {
+    name: string
+    args: Record<string, unknown>
+  }
+}
+
+export type PendingHitlApproval = {
+  interruptId: string
+  runId: string | null
+  actionRequests: HitlActionRequest[]
+  reviewConfigs: HitlReviewConfig[]
+}
 
 export type AgentProject = {
   id: string
@@ -320,6 +357,22 @@ export type AgentEvent =
   | EventEnvelope<'run.completed', { messageId: string }>
   | EventEnvelope<'run.failed', { error: string }>
   | EventEnvelope<'run.interrupted', { reason: string }>
+  | EventEnvelope<
+      'run.awaiting_approval',
+      {
+        runId?: string
+        interruptId: string
+        actionRequests: HitlActionRequest[]
+        reviewConfigs: HitlReviewConfig[]
+      }
+    >
+  | EventEnvelope<
+      'run.approval_resolved',
+      {
+        interruptId?: string
+        decisions: HitlDecision[]
+      }
+    >
 
 export type IntegrationSummary = {
   key: string
@@ -1200,6 +1253,11 @@ export interface AgentClient {
   ): Promise<void>
   sendMessage(sessionId: string, content: string, signal?: AbortSignal): Promise<{ runId: string }>
   interrupt(sessionId: string, signal?: AbortSignal): Promise<boolean>
+  submitApprovals?(
+    sessionId: string,
+    decisions: HitlDecision[],
+    options?: { interruptId?: string | null; signal?: AbortSignal },
+  ): Promise<{ accepted: boolean; interruptId?: string | null }>
   streamEvents(
     sessionId: string,
     options: {

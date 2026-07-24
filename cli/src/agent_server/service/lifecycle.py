@@ -21,7 +21,16 @@ class _LifecycleMixin:
 
         Past plan-mode approval hangs and crashed workers can leave sessions
         marked ``running`` with no live task. Stop must still unstick them.
+        Also wakes any HITL approval waiter so headless runs do not zombie.
         """
+        try:
+            from agent.hitl import clear_session_grants, get_approval_broker
+
+            get_approval_broker().cancel(session_id, reason="Run interrupted")
+            clear_session_grants(session_id)
+        except Exception:  # noqa: BLE001
+            logger.debug("HITL broker cancel failed", exc_info=True)
+
         task = self._active_runs.get(session_id)
         cancelled = False
         if task is not None and not task.done():
@@ -32,7 +41,7 @@ class _LifecycleMixin:
         if session is None:
             return cancelled
 
-        if session.status != "running":
+        if session.status not in {"running", "awaiting_approval"}:
             return cancelled
 
         # Always clear stuck running status so Stop is reliable even when the
@@ -47,6 +56,33 @@ class _LifecycleMixin:
                 payload={"reason": "Run interrupted"},
             )
         return True
+
+    def submit_approvals(
+        self,
+        session_id: str,
+        *,
+        decisions: list[dict],
+        interrupt_id: str | None = None,
+    ) -> dict:
+        """Resolve a pending HITL interrupt for a headless (desktop) run."""
+        from agent.hitl import get_approval_broker
+
+        session = self.store.get_session(session_id)
+        if session is None:
+            raise KeyError(session_id)
+        broker = get_approval_broker()
+        pending = broker.get_pending(session_id)
+        if pending is None:
+            raise LookupError("No pending approval for this session.")
+        broker.submit(
+            session_id,
+            decisions,
+            interrupt_id=interrupt_id,
+        )
+        return {
+            "accepted": True,
+            "interrupt_id": pending.get("interrupt_id"),
+        }
 
     async def delete_session(self, session_id: str) -> bool:
         task = self._active_runs.get(session_id)

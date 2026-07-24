@@ -41,6 +41,12 @@ class _RunPipelineMixin:
             )
             self._finish_run(session_id, run_id, summary, content)
         except asyncio.CancelledError:
+            try:
+                from agent.hitl import get_approval_broker
+
+                get_approval_broker().cancel(session_id, reason="Run cancelled")
+            except Exception:  # noqa: BLE001
+                pass
             self.store.set_session_status(session_id, "interrupted")
             self.store.append_event(
                 session_id=session_id,
@@ -49,6 +55,14 @@ class _RunPipelineMixin:
                 payload={"reason": "Run cancelled"},
             )
             raise
+        except InterruptedError as exc:
+            self.store.set_session_status(session_id, "interrupted")
+            self.store.append_event(
+                session_id=session_id,
+                run_id=run_id,
+                event_type="run.interrupted",
+                payload={"reason": str(exc) or "Run interrupted"},
+            )
         except Exception:
             logger.exception(
                 "Agent execution failed", extra={"session_id": session_id, "run_id": run_id}

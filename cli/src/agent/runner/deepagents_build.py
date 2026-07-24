@@ -299,6 +299,7 @@ class DeepAgentsBuildMixin:
         backend = sandbox_handle.backend
         agent_skills = sandbox_handle.skills_sources or None
         from agent.deepagents_runtime.subagents import build_domain_subagents
+        from agent.hitl import build_interrupt_on, get_session_checkpointer
 
         agent = create_deep_agent(
             model=model,
@@ -307,6 +308,8 @@ class DeepAgentsBuildMixin:
             skills=agent_skills,
             backend=backend,
             subagents=build_domain_subagents(),
+            interrupt_on=build_interrupt_on(),
+            checkpointer=get_session_checkpointer(session_id),
         )
         return agent, sandbox_handle
 

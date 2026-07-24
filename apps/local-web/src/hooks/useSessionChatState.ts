@@ -34,7 +34,9 @@ export function useSessionChatState(sessionId: string | null) {
     expandedToolRunKeys,
     messagesLoaded,
     activeBuildPlan,
-    builtPlanPaths
+    builtPlanPaths,
+    pendingApproval,
+    approvalSubmitting
   } = chat
 
   const composerLiveRef = useRef(composer)
@@ -139,6 +141,8 @@ export function useSessionChatState(sessionId: string | null) {
     messagesLoaded,
     activeBuildPlan,
     builtPlanPaths,
+    pendingApproval,
+    approvalSubmitting,
     setComposer,
     setComposerSkills,
     setComposerFiles,

@@ -1,7 +1,15 @@
 import type { AgentSession } from '@sandwalk/agent-ui-core'
-import { CircleCheck, Loader } from 'lucide-react'
+import { CircleCheck, Loader, ShieldAlert } from 'lucide-react'
 
 export function SessionStatusIcon({ status }: { status: AgentSession['status'] }) {
+  if (status === 'awaiting_approval') {
+    return (
+      <ShieldAlert
+        className="size-3.5 shrink-0 text-amber-500"
+        aria-label="Awaiting approval"
+      />
+    )
+  }
   if (status === 'running') {
     return (
       <Loader

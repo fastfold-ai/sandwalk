@@ -46,6 +46,7 @@ type AppShellBridgeInput = {
   activeRunTools: AppShellProps['activeRunTools']
   activeBuildPlan: AppShellProps['activeBuildPlan']
   builtPlanPaths: AppShellProps['builtPlanPaths']
+  submitApprovals: AppShellProps['onSubmitApprovals']
   showConnectionLimitWarning: boolean
   runningCount: number
   prefetchSessionMessages: AppShellProps['prefetchSessionMessages']
@@ -209,6 +210,9 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     activeBuildPlan: input.activeBuildPlan,
     builtPlanPaths: input.builtPlanPaths,
     liveDelta: input.chat.liveDelta,
+    pendingApproval: input.chat.pendingApproval,
+    approvalSubmitting: input.chat.approvalSubmitting,
+    onSubmitApprovals: input.submitApprovals,
     showScrollToBottom: input.scroll.showScrollToBottom,
     scrollChatToBottom: input.scroll.scrollChatToBottom,
     error: input.bootstrap.error,

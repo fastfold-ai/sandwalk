@@ -13,6 +13,14 @@ def _make_callable(tool_obj, session):
     """Wrap a registry tool as a plain callable returning its raw result dict."""
 
     def _call(**kwargs):
+        # PTC callables bypass LangGraph interrupt_on — gate sensitive skills
+        # actions here so desktop/CLI HITL still fires for install/remove.
+        if tool_obj.name == "skills.manage":
+            from agent.hitl.ptc_gate import apply_skills_manage_hitl
+
+            blocked = apply_skills_manage_hitl(kwargs)
+            if blocked is not None:
+                return blocked
         # Mirror the native handler's injected context. Domain tools always
         # accept **kwargs, so passing these through is safe even when unused.
         return tool_obj.run(_session=session, _prior_results={}, **kwargs)
