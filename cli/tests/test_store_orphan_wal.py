@@ -127,6 +127,57 @@ def test_store_opens_and_keeps_everything(tmp_path: Path) -> None:
     assert not list(tmp_path.glob("agent.db.corrupt-*"))
 
 
+def test_a_healthy_wal_is_never_discarded(tmp_path: Path) -> None:
+    """The rescue must not throw away a live WAL holding real commits."""
+    db = tmp_path / "agent.db"
+    make_db(db, ["a"])
+
+    connection = sqlite3.connect(db)
+    try:
+        connection.execute("PRAGMA journal_mode=WAL")
+        # Uncheckpointed commits: these live only in the -wal right now.
+        connection.execute("PRAGMA wal_autocheckpoint=0")
+        for index in range(200):
+            connection.execute(
+                "INSERT INTO sessions (id, title, status, created_at, updated_at)"
+                " VALUES (?, ?, 'idle', datetime('now'), datetime('now'))",
+                (f"id-{index}", f"kept-{index}"),
+            )
+        connection.commit()
+        assert Path(f"{db}-wal").exists()
+
+        # A genuine WAL must be left alone even while another handle holds it.
+        assert repair_mismatched_sidecars(db) is None
+        assert Path(f"{db}-wal").exists()
+    finally:
+        connection.close()
+
+    assert not list(tmp_path.glob("agent.db.orphan-*"))
+    store = AgentStore(db, exclusive=True)
+    try:
+        titles = {session.title for session in store.list_sessions()}
+    finally:
+        store.close()
+    assert "kept-199" in titles, "a healthy WAL's commits were dropped"
+
+
+def test_unknown_probe_result_leaves_sidecars_alone(tmp_path: Path) -> None:
+    """"Cannot tell" must never be treated as "corrupt"."""
+    db = tmp_path / "agent.db"
+    make_db(db, ["a"])
+    Path(f"{db}-wal").write_bytes(b"")
+
+    import agent_server.store_heal as heal
+
+    original = heal.readonly_integrity_ok
+    heal.readonly_integrity_ok = lambda path: None
+    try:
+        assert heal.repair_mismatched_sidecars(db) is None
+    finally:
+        heal.readonly_integrity_ok = original
+    assert Path(f"{db}-wal").exists()
+
+
 def test_genuine_corruption_still_heals(tmp_path: Path) -> None:
     """The rescue must not swallow real damage to the main file."""
     db = tmp_path / "agent.db"

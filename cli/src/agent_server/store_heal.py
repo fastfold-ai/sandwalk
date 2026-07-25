@@ -88,20 +88,28 @@ def integrity_ok(path: Path, *, isolate_main: bool = False) -> bool:
             clear_wal_sidecars(tmp)
 
 
-def readonly_integrity_ok(path: Path) -> bool:
+def readonly_integrity_ok(path: Path) -> bool | None:
     """Integrity check that can never write to ``path``.
 
     A read-write open of a database paired with a mismatched ``-wal`` replays
     that WAL into the main file and destroys it. Read-only opens cannot, so
     this is the only safe way to inspect a live database before touching it.
+
+    Returns True for a clean database, False for genuine corruption, and None
+    when the answer is unknown — a locked database, or one whose ``-shm`` this
+    process cannot map. "Unknown" must never be read as "corrupt": acting on it
+    would discard a perfectly good WAL along with the writes it holds.
     """
     if not path.exists() or path.stat().st_size == 0:
-        return False
+        return None
     try:
         with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5)) as c:
             row = c.execute("PRAGMA integrity_check").fetchone()
             return bool(row and str(row[0]) == "ok")
-    except sqlite3.Error:
+    except sqlite3.OperationalError:
+        # Busy, locked, or unable to open — says nothing about the contents.
+        return None
+    except sqlite3.DatabaseError:
         return False
 
 
@@ -349,7 +357,9 @@ def repair_mismatched_sidecars(db_path: Path) -> str | None:
     if not present:
         return None
     # Read-only: probing with a read-write open is the destructive act itself.
-    if readonly_integrity_ok(db_path):
+    # Only a definite "corrupt" justifies touching the sidecars; a database
+    # that is merely busy or unmappable must be left exactly as it is.
+    if readonly_integrity_ok(db_path) is not False:
         return None
     # Only when the main file stands on its own is the sidecar the culprit.
     if not integrity_ok(db_path, isolate_main=True):
