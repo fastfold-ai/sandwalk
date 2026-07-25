@@ -82,7 +82,7 @@ export function useAppRouting(location: Location) {
   const isDashboardGeneral = dashboardSection === 'general'
   const isDashboardAgentRuntime = dashboardSection === 'agent_runtime'
   const isDashboardAgentSandbox = dashboardSection === 'agent_sandbox'
-  const isDashboardAgentPrompts = dashboardSection === 'agent_prompts'
+  const isDashboardAgentPrompts = dashboardSection === 'context'
   const isDashboardModels = dashboardSection === 'models'
   const isDashboardData = dashboardSection === 'datasets'
   const isDashboardTools = dashboardSection === 'tools'

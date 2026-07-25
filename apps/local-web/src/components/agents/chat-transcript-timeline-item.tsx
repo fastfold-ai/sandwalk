@@ -2,7 +2,9 @@ import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentMessage,
   AgentPlanCard,
-  AgentSession
+  AgentSession,
+  AgentSkill,
+  McpServer
 } from '@sandwalk/agent-ui-core'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { memo, type Dispatch, type SetStateAction } from 'react'
@@ -37,6 +39,8 @@ type TimelineItemProps = {
   onInterrupt: (() => void) | undefined
   /** Hide Created Plan UI after Build (and while that plan is running). */
   hiddenPlanPaths?: ReadonlySet<string> | string[]
+  skills?: AgentSkill[]
+  mcpServers?: McpServer[]
 }
 
 /** Memoized: history rows must not re-render on every streamed delta. */
@@ -57,7 +61,9 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
   onOpenFile,
   onBuildPlan,
   onInterrupt,
-  hiddenPlanPaths = []
+  hiddenPlanPaths = [],
+  skills = [],
+  mcpServers = []
 }: TimelineItemProps) {
   const hiddenPlans =
     hiddenPlanPaths instanceof Set
@@ -192,6 +198,8 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
       onOpenFile={onOpenFile}
       client={client}
       sessionId={sessionId}
+      skills={skills}
+      mcpServers={mcpServers}
     />
   )
 })

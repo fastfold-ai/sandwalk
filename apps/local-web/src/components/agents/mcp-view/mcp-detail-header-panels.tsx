@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Unplug
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ export function McpDetailHeaderBar({
   state: McpDetailViewState
   onBack: () => void
 }) {
+  const navigate = useNavigate()
   const {
     showCatalogActions,
     hasBothAuth,
@@ -61,7 +63,7 @@ export function McpDetailHeaderBar({
         <span className="text-muted-foreground/40">/</span>
         <button
           type="button"
-          onClick={onBack}
+          onClick={() => navigate('/dashboard/mcp')}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
           MCPs

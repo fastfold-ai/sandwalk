@@ -1,5 +1,10 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { AgentMessage, AgentSession } from '@sandwalk/agent-ui-core'
+import type {
+  AgentMessage,
+  AgentSession,
+  AgentSkill,
+  McpServer
+} from '@sandwalk/agent-ui-core'
 import {
   Check,
   Copy,
@@ -45,7 +50,9 @@ export function ChatTranscriptMessageEntry({
   session,
   onOpenFile,
   client,
-  sessionId
+  sessionId,
+  skills = [],
+  mcpServers = []
 }: {
   entry: Extract<TranscriptEntry, { kind: 'message' }>
   runActive: boolean
@@ -58,6 +65,8 @@ export function ChatTranscriptMessageEntry({
   onOpenFile: (path: string) => void
   client?: LocalAgentClient | null
   sessionId?: string | null
+  skills?: AgentSkill[]
+  mcpServers?: McpServer[]
 }) {
   const message = entry.message
   const isUser = message.role === 'user'
@@ -84,6 +93,8 @@ export function ChatTranscriptMessageEntry({
               client={client}
               sessionId={sessionId}
               workspacePath={session?.workspacePath}
+              skills={skills}
+              mcpServers={mcpServers}
             />
           </div>
         </div>
@@ -101,6 +112,7 @@ export function ChatTranscriptMessageEntry({
               streaming={hideActionsWhileStreaming}
               onOpenFile={onOpenFile}
               workspacePath={session?.workspacePath}
+              skills={skills}
               className="max-w-full [&_*]:max-w-full [&_pre]:w-full [&_pre]:max-w-full [&_pre_code]:whitespace-pre-wrap [&_table]:w-full [&_table]:table-auto"
             />
           ) : null}

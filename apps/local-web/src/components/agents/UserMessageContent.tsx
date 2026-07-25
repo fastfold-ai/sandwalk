@@ -1,14 +1,21 @@
 import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { McpServer } from '@sandwalk/agent-ui-core'
 import { Plug } from 'lucide-react'
 
-import { mcpIconForChip } from '@/components/agents/composer/composer-mention-utils'
+import {
+  mcpIconForChip,
+  mcpIconForServer
+} from '@/components/agents/composer/composer-mention-utils'
 import { parseMessageParts } from '@/components/agents/composer-parts'
 import {
   MessageFilePreview,
   messageFilePreviewKind
 } from '@/components/agents/message-file-preview'
-import { SkillMentionChip } from '@/components/agents/SkillMentionChip'
+import {
+  SkillMentionChip,
+  type SkillIconSkill
+} from '@/components/agents/SkillMentionChip'
 import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
 import { getFileIcon } from '@/lib/file-icons'
 import { splitTextWithWorkspacePaths } from '@/lib/workspace-file-paths'
@@ -20,7 +27,9 @@ export function UserMessageContent({
   onOpenFile,
   client,
   sessionId,
-  workspacePath
+  workspacePath,
+  skills,
+  mcpServers
 }: {
   content: string
   className?: string
@@ -28,6 +37,8 @@ export function UserMessageContent({
   client?: LocalAgentClient | null
   sessionId?: string | null
   workspacePath?: string | null
+  skills?: SkillIconSkill[]
+  mcpServers?: McpServer[]
 }) {
   const parts = parseMessageParts(content)
   const canPreview = Boolean(client && sessionId)
@@ -131,7 +142,12 @@ export function UserMessageContent({
       )
     }
     if (part.type === 'mcp') {
-      const icon = mcpIconForChip(part.id, part.name)
+      const server = mcpServers?.find(
+        item => item.id === part.id || item.name === part.name
+      )
+      const icon = server
+        ? mcpIconForServer(server)
+        : mcpIconForChip(part.id, part.name)
       return (
         <a
           key={`mcp-${index}-${part.id}`}
@@ -160,6 +176,7 @@ export function UserMessageContent({
       <SkillMentionChip
         key={`skill-${index}-${part.name}`}
         name={part.name}
+        skills={skills}
       />
     )
   })

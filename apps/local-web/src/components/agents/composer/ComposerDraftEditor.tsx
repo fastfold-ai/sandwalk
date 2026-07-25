@@ -17,6 +17,8 @@ import {
   type ComposerPart,
   removeComposerChipAt
 } from '@/components/agents/composer-parts'
+import { cn } from '@/lib/utils'
+
 export function ComposerDraftEditor({
   draft,
   running,
@@ -96,7 +98,11 @@ export function ComposerDraftEditor({
 
   return (
     <div
-      className="min-h-12 max-h-32 overflow-y-auto px-2 py-1 text-[15px] leading-7"
+      className={cn(
+        // Inline chips + text segments share one line box; keep height tight.
+        'max-h-32 overflow-y-auto px-2 py-1.5 text-[15px] leading-7',
+        hasInlineChips ? 'min-h-9' : 'min-h-12'
+      )}
       onClick={event => {
         if (event.target !== event.currentTarget) return
         const lastTextIndex = [...composerParts]

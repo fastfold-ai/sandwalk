@@ -145,7 +145,7 @@ export function AgentPromptsView({
       <div className="mx-auto w-full max-w-7xl space-y-8 p-4 md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-semibold">Prompts</h2>
+            <h2 className="text-2xl font-semibold">Context</h2>
             <p className="text-muted-foreground mt-2 text-sm">
               Live estimate of input token context for the current runtime and
               specialist allowlist.

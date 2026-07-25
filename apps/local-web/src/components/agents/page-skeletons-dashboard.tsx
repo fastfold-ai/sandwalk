@@ -14,7 +14,7 @@ import {
 
 /**
  * Settings-style dashboard pages:
- * General, Status, Agent Runtime, Storage, Environment, Prompts, Sandbox.
+ * General, Status, Agent Runtime, Storage, Environment, Context, Sandbox.
  * Layout: `mx-auto max-w-7xl … p-4 md:p-6` (matches Skills).
  */
 export function DashboardSettingsSkeleton({

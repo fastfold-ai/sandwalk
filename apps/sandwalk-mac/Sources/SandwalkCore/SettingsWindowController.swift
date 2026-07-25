@@ -128,7 +128,7 @@ private struct SettingsDetailScaffold: View {
         switch section {
         case .runtime: RuntimeSettingsView()
         case .sandbox: SandboxSettingsView()
-        case .prompts: PromptsSettingsView()
+        case .context: PromptsSettingsView()
         case .models: ModelsSettingsView()
         case .tools: ToolsSettingsView()
         case .datasets: DatasetsSettingsView()

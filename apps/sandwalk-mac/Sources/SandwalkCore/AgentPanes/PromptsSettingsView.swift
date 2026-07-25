@@ -33,7 +33,7 @@ struct PromptsSettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 SettingsSectionHeader(
-                    "PROMPTS",
+                    "CONTEXT",
                     subtitle: "Live estimate of input token context for the current runtime and specialist allowlist."
                 )
                 Spacer(minLength: 8)

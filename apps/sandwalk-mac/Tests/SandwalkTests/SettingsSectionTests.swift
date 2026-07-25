@@ -37,16 +37,16 @@ final class SettingsSectionTests: XCTestCase {
         XCTAssertEqual(SettingsSection.runtime.symbol, "cpu")
         XCTAssertEqual(SettingsSection.sandbox.title, "Sandbox")
         XCTAssertEqual(SettingsSection.sandbox.symbol, "shippingbox")
-        XCTAssertEqual(SettingsSection.prompts.title, "Prompts")
-        XCTAssertEqual(SettingsSection.prompts.symbol, "text.alignleft")
+        XCTAssertEqual(SettingsSection.context.title, "Context")
+        XCTAssertEqual(SettingsSection.context.symbol, "doc.text")
         XCTAssertEqual(SettingsSection.advanced.title, "Advanced")
         XCTAssertEqual(SettingsSection.advanced.symbol, "gearshape.2")
     }
 
-    func testPromptsDeepLink() {
+    func testContextDeepLink() {
         XCTAssertEqual(
-            SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/prompts")!),
-            .prompts
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/context")!),
+            .context
         )
     }
 

@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import { useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
 
+import type { SkillIconSkill } from '@/components/agents/SkillMentionChip'
 import { cn } from '@/lib/utils'
 
 import { ensureMermaidFences } from './markdown-mermaid-fences'
@@ -21,7 +22,8 @@ export const MarkdownContent = memo(function MarkdownContent({
   className,
   streaming = false,
   onOpenFile,
-  workspacePath
+  workspacePath,
+  skills
 }: {
   content: string
   className?: string
@@ -31,6 +33,8 @@ export const MarkdownContent = memo(function MarkdownContent({
   onOpenFile?: (path: string) => void
   /** Absolute session workspace root, used to recognize in-workspace paths. */
   workspacePath?: string | null
+  /** Installed skills for custom / featured chip icons in chat. */
+  skills?: SkillIconSkill[]
 }) {
   const navigate = useNavigate()
   const prepared = useMemo(() => {
@@ -43,9 +47,10 @@ export const MarkdownContent = memo(function MarkdownContent({
         navigate,
         streaming,
         onOpenFile,
-        workspacePath
+        workspacePath,
+        skills
       }),
-    [navigate, streaming, onOpenFile, workspacePath]
+    [navigate, streaming, onOpenFile, workspacePath, skills]
   )
 
   return (

@@ -336,7 +336,7 @@ Below the workspace, a multi-tab terminal follows your theme. The CLI tab mirror
 | **Datasets** | Local corpora (DepMap, PRISM, L1000, …) |
 | **Specialists** | Skill + MCP + instruction packs |
 | **Integrations** | Modal, Boltz, Fastfold Cloud, LangSmith, Tavily, Slack, … |
-| **Runtime** | Defaults, prompts, sandbox, doctor, storage, env |
+| **Runtime** | Defaults, context, sandbox, doctor, storage, env |
 
 Server process controls (bind, auth, logs) live in the **Sandwalk Server** menubar Settings on macOS, or via `sandwalk serve` / `sandwalk auth` on the CLI.
 

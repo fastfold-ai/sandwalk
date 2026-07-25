@@ -105,7 +105,7 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
       return
     }
     if (args.isDashboardAgentPrompts) {
-      document.title = `Prompts · ${base}`
+      document.title = `Context · ${base}`
       return
     }
     if (args.isDashboardAgentRuntime) {

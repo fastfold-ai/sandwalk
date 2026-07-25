@@ -2,7 +2,12 @@ import type { ReactNode } from 'react'
 import type { Components } from 'react-markdown'
 import type { NavigateFunction } from 'react-router-dom'
 
+import {
+  SkillMentionChip,
+  type SkillIconSkill
+} from '@/components/agents/SkillMentionChip'
 import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
+import { splitTextWithSkillMentions } from '@/lib/skill-mentions'
 import { workspaceRelativeFromPath } from '@/lib/workspace-file-paths'
 
 import { linkifyWorkspacePathChildren } from './markdown-linkify-children'
@@ -13,6 +18,7 @@ export type MarkdownComponentOptions = {
   streaming: boolean
   onOpenFile?: (path: string) => void
   workspacePath?: string | null
+  skills?: SkillIconSkill[]
 }
 
 /** Static markdown element map — identity must stay stable across renders. */
@@ -20,10 +26,11 @@ export function buildMarkdownComponents({
   navigate,
   streaming,
   onOpenFile,
-  workspacePath
+  workspacePath,
+  skills
 }: MarkdownComponentOptions): Components {
   const linkify = (children: ReactNode) =>
-    linkifyWorkspacePathChildren(children, onOpenFile, workspacePath)
+    linkifyWorkspacePathChildren(children, onOpenFile, workspacePath, skills)
 
   return {
     h1({ children }) {
@@ -159,6 +166,15 @@ export function buildMarkdownComponents({
         if (relative && onOpenFile) {
           return (
             <WorkspaceFileChip path={relative} onOpenFile={onOpenFile} />
+          )
+        }
+        const skillParts = splitTextWithSkillMentions(code)
+        if (
+          skillParts.length === 1 &&
+          skillParts[0]?.type === 'skill'
+        ) {
+          return (
+            <SkillMentionChip name={skillParts[0].name} skills={skills} />
           )
         }
         return (

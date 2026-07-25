@@ -3,8 +3,10 @@ import type {
   AgentMessage,
   AgentPlanCard,
   AgentSession,
+  AgentSkill,
   AgentTodo,
   HitlDecision,
+  McpServer,
   PendingHitlApproval
 } from '@sandwalk/agent-ui-core'
 import { ArrowDown } from 'lucide-react'
@@ -52,6 +54,8 @@ type ChatTranscriptProps = {
   onSubmitApprovals?: (decisions: HitlDecision[]) => void | Promise<void>
   showScrollToBottom: boolean
   onScrollToBottom: () => void
+  skills?: AgentSkill[]
+  mcpServers?: McpServer[]
 }
 
 export function ChatTranscript({
@@ -82,7 +86,9 @@ export function ChatTranscript({
   approvalSubmitting = false,
   onSubmitApprovals,
   showScrollToBottom,
-  onScrollToBottom
+  onScrollToBottom,
+  skills = [],
+  mcpServers = []
 }: ChatTranscriptProps) {
   const timelineItems = useMemo(
     () => buildChatTimelineItems(conversationTimeline),
@@ -136,6 +142,8 @@ export function ChatTranscript({
                 onBuildPlan={onBuildPlan}
                 onInterrupt={onInterrupt}
                 hiddenPlanPaths={hiddenPlanPaths}
+                skills={skills}
+                mcpServers={mcpServers}
               />
             ))}
             {runActive && activeBuildPlan ? (
@@ -168,6 +176,7 @@ export function ChatTranscript({
                   streaming
                   onOpenFile={onOpenFile}
                   workspacePath={session?.workspacePath}
+                  skills={skills}
                   className="max-w-full space-y-3 [&_*]:max-w-full"
                 />
               </div>

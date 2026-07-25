@@ -4,7 +4,6 @@ import type {
   AgentSkillDetail
 } from '@sandwalk/agent-ui-core'
 import {
-  ArrowLeft,
   ArrowUp,
   Box,
   CalendarDays,
@@ -25,6 +24,7 @@ import { cn } from '@/lib/utils'
 import {
   InstallCommandBlock,
   SkillEnabledToggle,
+  SkillsBreadcrumb,
   SkillsRemoveDialog,
   SkillsShMetrics,
   SkillsShMetricsLoading
@@ -112,24 +112,7 @@ export function SkillsInstalledDetailView({
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
       <DetailStickyNav>
-        <div className="flex items-center gap-2 text-sm">
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-          <span className="text-muted-foreground/40">/</span>
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Skills
-          </button>
-        </div>
+        <SkillsBreadcrumb onBack={onBack} />
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
             type="button"

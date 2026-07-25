@@ -1,4 +1,5 @@
 import { AlertTriangle, ArrowLeft, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { SpecialistToggle } from '@/components/agents/specialists-view/specialists-view-shared'
@@ -17,6 +18,7 @@ export function SpecialistsEditorHeader({
   state: SpecialistsEditorState
   onBack: () => void
 }) {
+  const navigate = useNavigate()
   const { form, togglePendingId, deleting, saving, toggleSpecialistEnabled, remove } =
     state
 
@@ -34,7 +36,7 @@ export function SpecialistsEditorHeader({
         <span className="text-muted-foreground/40">/</span>
         <button
           type="button"
-          onClick={onBack}
+          onClick={() => navigate('/dashboard/specialists')}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
           Specialists

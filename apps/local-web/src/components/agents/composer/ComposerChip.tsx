@@ -17,7 +17,7 @@ export function ComposerFileChip({
 }) {
   const name = path.split('/').at(-1) || path
   return (
-    <span className="bg-muted/50 border-border/70 inline-flex max-w-full select-none items-center gap-1 rounded-full border px-2 py-0.5 align-middle text-xs">
+    <span className="bg-muted/50 border-border/70 inline-flex max-w-full select-none items-center gap-0.5 rounded-full border px-1.5 py-0 align-middle text-xs leading-5">
       <Icon
         icon={getFileIcon(name)}
         className="text-muted-foreground size-3.5 shrink-0"
@@ -64,7 +64,7 @@ export function ComposerSkillChip({
   const resolved = skillIconForName(name, [skill])
   const invert = skillIconInvertInDark(skill)
   return (
-    <span className="border-primary/30 bg-primary/5 inline-flex max-w-full select-none items-center gap-1 rounded-full border px-2 py-0.5 align-middle text-xs">
+    <span className="border-primary/30 bg-primary/5 inline-flex max-w-full select-none items-center gap-0.5 rounded-full border px-1.5 py-0 align-middle text-xs leading-5">
       {resolved ? (
         <img
           src={resolved}
@@ -118,7 +118,7 @@ export function ComposerMcpChip({
     mcpIconForChip(id, name) ||
     (catalogId ? mcpIconForChip(catalogId, name) : null)
   return (
-    <span className="border-border/70 bg-muted/40 inline-flex max-w-full select-none items-center gap-1 rounded-full border px-2 py-0.5 align-middle text-xs">
+    <span className="border-border/70 bg-muted/40 inline-flex max-w-full select-none items-center gap-0.5 rounded-full border px-1.5 py-0 align-middle text-xs leading-5">
       {icon ? (
         <img
           src={icon.src}

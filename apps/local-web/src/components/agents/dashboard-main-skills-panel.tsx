@@ -1,3 +1,4 @@
+import { navigateBack } from '@/lib/navigate-back'
 import { catalogSkillDetailPath } from '@/lib/skills-catalog'
 
 import type { DashboardMainViewsProps } from './dashboard-main-views-types'
@@ -40,7 +41,7 @@ export function DashboardMainSkillsPanel({
       openCatalogSearchInitially={isCatalogSearchPath}
       onOpen={name => navigate(`/dashboard/skills/${encodeURIComponent(name)}`)}
       onOpenCatalogDetail={skill => navigate(catalogSkillDetailPath(skill))}
-      onBack={() => navigate('/dashboard/skills')}
+      onBack={() => navigateBack(navigate, '/dashboard/skills')}
       onOpenImportGithub={() => navigate('/dashboard/skills/import/github')}
       onOpenImportFile={() => navigate('/dashboard/skills/import/file')}
       onOpenTrustedSources={() => navigate('/dashboard/skills/trusted/sources')}

@@ -77,7 +77,10 @@ export function skillIconForName(
   name: string,
   skills?: Array<Pick<AgentSkill, 'name' | 'iconSrc' | 'author' | 'source'>>
 ): string | null {
-  const match = skills?.find(skill => skill.name === name)
+  const needle = name.trim().toLowerCase()
+  const match = skills?.find(
+    skill => skill.name.trim().toLowerCase() === needle
+  )
   if (match) return composerSkillIcon(match)
   return skillIcon({ name, iconSrc: null })
 }

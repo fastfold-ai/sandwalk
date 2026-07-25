@@ -1,151 +1,15 @@
-import {
-  ArrowLeft,
-  Box,
-  Boxes,
-  Container,
-  Cpu,
-  Database,
-  GitBranch,
-  HardDrive,
-  LayoutDashboard,
-  MessageSquareText,
-  PanelLeft,
-  Plug,
-  Settings2,
-  Sparkles,
-  Stethoscope,
-  Wrench
-} from 'lucide-react'
-import type { ComponentType } from 'react'
+import { ArrowLeft, PanelLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
-import { McpMark } from '@/components/McpMark'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 
-export type DashboardSection =
-  | 'overview'
-  | 'general'
-  | 'agent_runtime'
-  | 'agent_sandbox'
-  | 'agent_prompts'
-  | 'models'
-  | 'datasets'
-  | 'tools'
-  | 'doctor'
-  | 'storage'
-  | 'environment'
-  | 'skills'
-  | 'integrations'
-  | 'mcp'
-  | 'specialists'
+import { DASHBOARD_NAV_GROUPS } from './dashboard-nav'
+import type { DashboardSection } from './dashboard-section'
 
-type NavItem = {
-  id: DashboardSection
-  label: string
-  path: string
-  icon: ComponentType<{ className?: string }>
-}
-
-const NAV_GROUPS: Array<{ label: string | null; items: NavItem[] }> = [
-  {
-    label: null,
-    items: [
-      {
-        id: 'overview',
-        label: 'Overview',
-        path: '/dashboard',
-        icon: LayoutDashboard
-      },
-      {
-        id: 'general',
-        label: 'General',
-        path: '/dashboard/general',
-        icon: Settings2
-      }
-    ]
-  },
-  {
-    label: 'Agent',
-    items: [
-      {
-        id: 'agent_runtime',
-        label: 'Runtime',
-        path: '/dashboard/agent/runtime',
-        icon: Cpu
-      },
-      {
-        id: 'agent_sandbox',
-        label: 'Sandbox',
-        path: '/dashboard/agent/sandbox',
-        icon: Container
-      },
-      {
-        id: 'agent_prompts',
-        label: 'Prompts',
-        path: '/dashboard/agent/prompts',
-        icon: MessageSquareText
-      }
-    ]
-  },
-  {
-    label: 'Capabilities',
-    items: [
-      { id: 'models', label: 'Models', path: '/dashboard/models', icon: Box },
-      { id: 'tools', label: 'Tools', path: '/dashboard/tools', icon: Wrench },
-      {
-        id: 'datasets',
-        label: 'Datasets',
-        path: '/dashboard/datasets',
-        icon: Database
-      },
-      {
-        id: 'skills',
-        label: 'Skills',
-        path: '/dashboard/skills',
-        icon: Sparkles
-      },
-      {
-        id: 'specialists',
-        label: 'Specialists',
-        path: '/dashboard/specialists',
-        icon: GitBranch
-      },
-      {
-        id: 'integrations',
-        label: 'Integrations',
-        path: '/dashboard/integrations',
-        icon: Plug
-      },
-      { id: 'mcp', label: 'MCPs', path: '/dashboard/mcp', icon: McpMark }
-    ]
-  },
-  {
-    label: 'Workspace',
-    items: [
-      {
-        id: 'doctor',
-        label: 'Doctor',
-        path: '/dashboard/doctor',
-        icon: Stethoscope
-      },
-      {
-        id: 'storage',
-        label: 'Storage',
-        path: '/dashboard/storage',
-        icon: HardDrive
-      },
-      {
-        id: 'environment',
-        label: 'Environment',
-        path: '/dashboard/environment',
-        icon: Boxes
-      }
-    ]
-  }
-]
+export type { DashboardSection } from './dashboard-section'
 
 export function DashboardSidebar({
   active,
@@ -194,7 +58,7 @@ export function DashboardSidebar({
 
       <ScrollArea className="flex-1">
         <nav className="space-y-4 p-3">
-          {NAV_GROUPS.map((group, index) => (
+          {DASHBOARD_NAV_GROUPS.map((group, index) => (
             <div key={group.label ?? `group-${index}`} className="space-y-0.5">
               {group.label ? (
                 <div className="text-muted-foreground/80 px-2 py-1 text-[11px] font-medium">

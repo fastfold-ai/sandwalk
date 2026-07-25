@@ -1,11 +1,17 @@
 import { Children, Fragment, type ReactNode } from 'react'
 
-import { SkillMentionChip } from '@/components/agents/SkillMentionChip'
+import {
+  SkillMentionChip,
+  type SkillIconSkill
+} from '@/components/agents/SkillMentionChip'
 import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
 import { splitTextWithSkillMentions } from '@/lib/skill-mentions'
 import { splitTextWithWorkspacePaths } from '@/lib/workspace-file-paths'
 
-function linkifySkillSegments(text: string): ReactNode[] {
+function linkifySkillSegments(
+  text: string,
+  skills?: SkillIconSkill[]
+): ReactNode[] {
   const skillParts = splitTextWithSkillMentions(text)
   return skillParts.map((part, partIndex) => {
     if (part.type === 'text') {
@@ -15,6 +21,7 @@ function linkifySkillSegments(text: string): ReactNode[] {
       <SkillMentionChip
         key={`sk-${partIndex}-${part.name}`}
         name={part.name}
+        skills={skills}
       />
     )
   })
@@ -24,7 +31,8 @@ function linkifySkillSegments(text: string): ReactNode[] {
 export function linkifyWorkspacePathChildren(
   children: ReactNode,
   onOpenFile?: (path: string) => void,
-  workspacePath?: string | null
+  workspacePath?: string | null,
+  skills?: SkillIconSkill[]
 ): ReactNode {
   return Children.map(children, (child, index) => {
     if (typeof child !== 'string') return child
@@ -39,7 +47,7 @@ export function linkifyWorkspacePathChildren(
               if (part.type === 'text') {
                 return (
                   <Fragment key={`t-${partIndex}`}>
-                    {linkifySkillSegments(part.text)}
+                    {linkifySkillSegments(part.text, skills)}
                   </Fragment>
                 )
               }
@@ -62,7 +70,7 @@ export function linkifyWorkspacePathChildren(
     }
     return (
       <Fragment key={`sk-wrap-${index}`}>
-        {linkifySkillSegments(child)}
+        {linkifySkillSegments(child, skills)}
       </Fragment>
     )
   })

@@ -77,8 +77,8 @@ export function resolveDashboardSection(pathname: string) {
   if (pathname.startsWith('/dashboard/agent/sandbox')) {
     return 'agent_sandbox' as const
   }
-  if (pathname.startsWith('/dashboard/agent/prompts')) {
-    return 'agent_prompts' as const
+  if (pathname.startsWith('/dashboard/context')) {
+    return 'context' as const
   }
   if (pathname.startsWith('/dashboard/agent')) {
     return 'agent_runtime' as const

@@ -1,3 +1,4 @@
+import type { AgentSkill } from '@sandwalk/agent-ui-core'
 import { Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -7,15 +8,28 @@ import {
 } from '@/lib/skill-icons'
 import { cn } from '@/lib/utils'
 
+export type SkillIconSkill = Pick<
+  AgentSkill,
+  'name' | 'iconSrc' | 'author' | 'source'
+>
+
 /** Clickable skill chip matching composer `/` mentions. */
 export function SkillMentionChip({
   name,
+  skills,
   className
 }: {
   name: string
+  /** Installed skills — used so custom / featured icons match the composer. */
+  skills?: SkillIconSkill[]
   className?: string
 }) {
-  const skillIcon = skillIconForName(name)
+  const needle = name.trim().toLowerCase()
+  const match = skills?.find(
+    skill => skill.name.trim().toLowerCase() === needle
+  )
+  const skillIcon = skillIconForName(name, skills)
+  const invert = skillIconInvertInDark(match || { name, iconSrc: null })
   return (
     <Link
       to={`/dashboard/skills/${encodeURIComponent(name)}`}
@@ -31,7 +45,7 @@ export function SkillMentionChip({
           alt=""
           className={cn(
             'size-3.5 shrink-0 rounded-sm object-contain',
-            skillIconInvertInDark({ name, iconSrc: null }) && 'dark:invert'
+            invert && 'dark:invert'
           )}
         />
       ) : (

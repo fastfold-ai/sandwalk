@@ -8,6 +8,7 @@ import {
   HardDrive,
   LayoutDashboard,
   Plug,
+  ScrollText,
   Settings2,
   Sparkles,
   Stethoscope,
@@ -101,6 +102,13 @@ export const DASHBOARD_COMMANDS = [
     path: '/dashboard/agent/sandbox',
     value: 'command agent sandbox modal builtin workspace',
     icon: Boxes
+  },
+  {
+    id: 'context',
+    label: 'Context',
+    path: '/dashboard/context',
+    value: 'command context prompts token budget specialist',
+    icon: ScrollText
   },
   {
     id: 'models',

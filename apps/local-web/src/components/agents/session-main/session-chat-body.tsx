@@ -246,6 +246,8 @@ export function SessionChatBody({
               onSubmitApprovals={onSubmitApprovals}
               showScrollToBottom={showScrollToBottom}
               onScrollToBottom={scrollChatToBottom}
+              skills={agentComposerSlotProps.skills}
+              mcpServers={agentComposerSlotProps.mcpServers}
             />
             <div className="bg-background mx-auto w-full max-w-[44rem] shrink-0 px-5 pb-6 pt-2">
               <AgentComposerSlot {...agentComposerSlotProps} />

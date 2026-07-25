@@ -68,7 +68,7 @@ export function resolveActiveTitle(input: {
   if (input.isDashboardStatus) return 'Status'
   if (input.isDashboardGeneral) return 'General'
   if (input.isDashboardAgentRuntime) return 'Runtime'
-  if (input.isDashboardAgentPrompts) return 'Prompts'
+  if (input.isDashboardAgentPrompts) return 'Context'
   if (input.isDashboardModels) return 'Models'
   if (input.isDashboardData) return 'Datasets'
   if (input.isDashboardTools) return 'Tools'

@@ -1,3 +1,5 @@
+import { navigateBack } from '@/lib/navigate-back'
+
 import { McpDetailView, McpView } from './dashboard-main-views-lazy'
 import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 
@@ -37,7 +39,7 @@ export function DashboardMainMcpPanel({
         kind={mcpCatalogDetailId ? 'catalog' : 'server'}
         catalogEntry={mcpDetailCatalogEntry}
         server={mcpDetailServer}
-        onBack={() => navigate('/dashboard/mcp')}
+        onBack={() => navigateBack(navigate, '/dashboard/mcp')}
         onLoadTools={async () => {
           if (mcpCatalogDetailId) {
             return client.validateMcpCatalog(mcpCatalogDetailId)

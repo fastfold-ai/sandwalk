@@ -3,6 +3,7 @@ import type {
   AgentSkill
 } from '@sandwalk/agent-ui-core'
 import { ArrowLeft, Check, Copy, Loader, MoreHorizontal, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 import {
   AlertDialog,
@@ -25,6 +26,7 @@ import { auditStatusBadgeClass } from '@/lib/skills-catalog'
 import { cn } from '@/lib/utils'
 
 export function SkillsBreadcrumb({ onBack }: { onBack: () => void }) {
+  const navigate = useNavigate()
   return (
     <div className="flex items-center gap-2 text-sm">
       <button
@@ -38,7 +40,7 @@ export function SkillsBreadcrumb({ onBack }: { onBack: () => void }) {
       <span className="text-muted-foreground/40">/</span>
       <button
         type="button"
-        onClick={onBack}
+        onClick={() => navigate('/dashboard/skills')}
         className="text-muted-foreground hover:text-foreground transition-colors"
       >
         Skills

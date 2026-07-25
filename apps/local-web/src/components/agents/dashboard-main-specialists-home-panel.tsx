@@ -1,3 +1,5 @@
+import { navigateBack } from '@/lib/navigate-back'
+
 import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 import { HomeView, SpecialistsView } from './dashboard-main-views-lazy'
 
@@ -46,7 +48,7 @@ export function DashboardMainSpecialistsPanel({
       onOpenEdit={id =>
         navigate(`/dashboard/specialists/${encodeURIComponent(id)}`)
       }
-      onBack={() => navigate('/dashboard/specialists')}
+      onBack={() => navigateBack(navigate, '/dashboard/specialists')}
       onManageSkills={() => navigate('/dashboard/skills')}
       onManageMcps={() => navigate('/dashboard/mcp')}
       onOpenSkill={name =>
