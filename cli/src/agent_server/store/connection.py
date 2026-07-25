@@ -89,6 +89,59 @@ class ConnectionMixin:
                     ) from last_exc
                 time.sleep(0.15)
 
+    def _try_exclusive_lock(self) -> bool:
+        """One non-blocking attempt at the flock. True when we now hold it."""
+        if fcntl is None:  # pragma: no cover - Windows
+            return False
+        fd = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            os.close(fd)
+            return False
+        self._lock_fd = fd
+        return True
+
+    def _guard_shared_open(self) -> None:
+        """Stop a CLI-style open from replaying a mismatched WAL.
+
+        The server runs the same repair at startup, but tools, ``--resume`` and
+        every other shared open skip integrity checks for speed and would go
+        straight to a read-write open — the operation that folds a foreign WAL
+        into the main file and destroys it.
+
+        Repairing is only safe when nobody owns the database: moving sidecars
+        out from under a running server would break it for everyone. So take
+        the flock if it is free, and otherwise refuse loudly and leave the
+        files untouched.
+        """
+        if not self.path.exists() or not Path(f"{self.path}-wal").exists():
+            return
+
+        from agent_server.store_heal import readonly_readable
+
+        if readonly_readable(self.path) is not False:
+            return
+
+        from agent_server.store_heal import repair_mismatched_sidecars
+
+        if self._try_exclusive_lock():
+            try:
+                note = repair_mismatched_sidecars(self.path)
+            finally:
+                self._release_exclusive_lock()
+            if note is not None:
+                self.last_heal_note = note
+                logger.warning("%s", note)
+                return
+
+        raise AgentStoreCorruptedError(
+            f"Agent database cannot be read with the WAL beside it: {self.path}. "
+            "Refusing to open it read-write, because that would fold the "
+            "mismatched WAL into the database and lose data. Stop the Sandwalk "
+            "server and run the command again so it can be repaired safely."
+        )
+
     def _release_exclusive_lock(self) -> None:
         fd = self._lock_fd
         self._lock_fd = None

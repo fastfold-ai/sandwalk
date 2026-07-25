@@ -88,6 +88,28 @@ def integrity_ok(path: Path, *, isolate_main: bool = False) -> bool:
             clear_wal_sidecars(tmp)
 
 
+def readonly_readable(path: Path) -> bool | None:
+    """Cheap read-only probe of the main-plus-sidecar pairing.
+
+    A mismatched WAL fails at open or on the first page read, so a trivial
+    query is enough to spot it — and unlike ``readonly_integrity_ok`` this
+    stays O(1), which matters because shared CLI opens run it routinely.
+
+    True readable, False definitely broken, None unknown (busy, or a ``-shm``
+    this process cannot map). "Unknown" must never be read as "broken".
+    """
+    if not path.exists() or path.stat().st_size == 0:
+        return None
+    try:
+        with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5)) as c:
+            c.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
+            return True
+    except sqlite3.OperationalError:
+        return None
+    except sqlite3.DatabaseError:
+        return False
+
+
 def readonly_integrity_ok(path: Path) -> bool | None:
     """Integrity check that can never write to ``path``.
 
