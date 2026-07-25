@@ -6,6 +6,8 @@ import logging
 import os
 import sqlite3
 import time
+from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 from agent_server.store.errors import AgentStoreCorruptedError, AgentStoreLockError
@@ -109,7 +111,23 @@ class ConnectionMixin:
             except OSError:
                 pass
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        """Open, commit/rollback, then always close.
+
+        ``sqlite3``'s own context manager is a *transaction* manager — it does
+        not close the connection. Leaving them open keeps read locks alive,
+        which makes ``wal_checkpoint`` on shutdown fail with "database is
+        locked" and strands committed pages in the WAL.
+        """
+        connection = self._connect_checked()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
+    def _connect_checked(self) -> sqlite3.Connection:
         try:
             return self._open_connection()
         except sqlite3.DatabaseError as exc:
@@ -147,8 +165,20 @@ class ConnectionMixin:
         """Fail loud on a malformed DB — optionally self-heal under exclusive lock."""
         if not self.path.exists():
             return
+
+        # Before the first read-write open: a mismatched -wal is replayed into
+        # the main file on open and destroys it, leaving the heal below with
+        # nothing to recover. Only the exclusive owner may move sidecars, since
+        # no other process can be using them.
+        if allow_heal:
+            from agent_server.store_heal import repair_mismatched_sidecars
+
+            note = repair_mismatched_sidecars(self.path)
+            if note is not None:
+                self.last_heal_note = note
+
         try:
-            with sqlite3.connect(self.path, timeout=5) as connection:
+            with closing(sqlite3.connect(self.path, timeout=5)) as connection:
                 row = connection.execute("PRAGMA integrity_check").fetchone()
                 if row and str(row[0]) == "ok":
                     return
@@ -162,7 +192,7 @@ class ConnectionMixin:
             try:
                 self.last_heal_note = attempt_self_heal(self.path, detail=detail)
                 # Re-check after heal.
-                with sqlite3.connect(self.path, timeout=5) as connection:
+                with closing(sqlite3.connect(self.path, timeout=5)) as connection:
                     row = connection.execute("PRAGMA integrity_check").fetchone()
                     if row and str(row[0]) == "ok":
                         return

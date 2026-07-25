@@ -73,27 +73,36 @@ class AgentStoreBase(ConnectionMixin):
             self._atexit_registered = True
 
     def close(self) -> None:
-        """Checkpoint WAL, fold into main, and release the exclusive lock."""
+        """Checkpoint, then release the exclusive lock.
+
+        Deliberately does **not** switch the journal to DELETE or unlink the
+        ``-wal``/``-shm`` files. SQLite owns those: it checkpoints and removes
+        the WAL itself when the last connection closes, under proper locking.
+        Deleting them from underneath a process that still has the database
+        open destroys the shared-memory index, and the next reader sees
+        "disk image is malformed" — which is what kept corrupting this store.
+
+        A WAL left beside the database is not garbage; it is the committed data
+        SQLite will replay on the next open. Removing it is the data loss.
+        """
         with self._write_lock:
             if self._closed:
                 return
             self._closed = True
+            if not self._exclusive:
+                return
             try:
                 if self.path.exists():
-                    # Use the raw opener so a heal loop cannot run during close.
-                    with self._open_connection() as connection:
-                        connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                        # Fold WAL into the main file so the next process never
-                        # inherits a sidecar from this generation.
-                        connection.execute("PRAGMA journal_mode = DELETE")
+                    # PASSIVE never blocks and never fails on a busy database;
+                    # any pages it cannot fold stay safely in the WAL.
+                    connection = self._open_connection()
+                    try:
+                        connection.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                    finally:
+                        connection.close()
             except sqlite3.Error as exc:
-                logger.warning("WAL checkpoint on close failed: %s", exc)
-            try:
-                from agent_server.store_heal import clear_wal_sidecars
-
-                clear_wal_sidecars(self.path)
-            except Exception as exc:  # noqa: BLE001
-                logger.debug("Clearing WAL sidecars on close failed: %s", exc)
+                # Not fatal: the WAL keeps the data either way.
+                logger.debug("WAL checkpoint on close skipped: %s", exc)
             self._release_exclusive_lock()
 
     def _initialize(self) -> None:

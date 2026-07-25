@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import secrets
 import uuid
@@ -33,6 +34,30 @@ from agent_server.skills_service import SkillsService
 from agent_server.specialists_service import SpecialistsService
 from agent_server.store import AgentStore
 from agent_server.tools_service import ToolsService
+
+# How often to snapshot a known-good copy of the database. If a heal ever does
+# have to run, this bounds the rollback to minutes instead of "everything since
+# the server booted" — which is what made past corruption so expensive.
+BACKUP_REFRESH_SECONDS = 120.0
+
+
+async def _keep_backup_fresh(store: AgentStore) -> None:
+    """Periodically snapshot the database while it is healthy."""
+    import logging
+
+    from agent_server.store_heal import refresh_healthy_backup
+
+    logger = logging.getLogger("agent_server")
+    while True:
+        try:
+            await asyncio.sleep(BACKUP_REFRESH_SECONDS)
+            # Online backup API — safe to run against a live WAL database.
+            await asyncio.to_thread(refresh_healthy_backup, store.path)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug("Periodic DB backup refresh failed", exc_info=True)
+
 
 DEFAULT_LOCAL_ORIGINS = [
     "http://127.0.0.1:8969",
@@ -97,7 +122,11 @@ def create_app(
         except Exception:
             pass
         sandbox_event_bus.bind_loop(asyncio.get_running_loop())
+        backup_task = asyncio.create_task(_keep_backup_fresh(store))
         yield
+        backup_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await backup_task
         await pty_manager.shutdown()
         await service.shutdown()
         store.close()
