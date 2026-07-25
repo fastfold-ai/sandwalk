@@ -3,6 +3,7 @@ export type ThumbKind =
   | 'video'
   | 'audio'
   | 'structure'
+  | 'pdf'
   | 'text'
   | 'table'
   | 'icon'
@@ -30,6 +31,7 @@ export function classify(name: string): ThumbKind {
     return 'audio'
   }
   if (['pdb', 'cif', 'mmcif', 'sdf'].includes(ext)) return 'structure'
+  if (ext === 'pdf') return 'pdf'
   if (['csv', 'tsv'].includes(ext)) return 'table'
   if (
     [

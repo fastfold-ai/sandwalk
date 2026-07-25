@@ -8,12 +8,17 @@ from typing import Any
 def build_anthropic_chat_model(config, *, temperature: float):
     from langchain.chat_models import init_chat_model
 
+    from agent.deepagents_runtime.anthropic_thinking_patch import (
+        apply_anthropic_empty_thinking_patch,
+    )
     from agent.model_catalog import (
         anthropic_model_omits_temperature,
         effective_anthropic_effort,
         get_model_reasoning,
         model_supports_reasoning_effort,
     )
+
+    apply_anthropic_empty_thinking_patch()
 
     model = config.get("llm.model") or "claude-sonnet-4-5-20250929"
     kwargs: dict[str, Any] = {}

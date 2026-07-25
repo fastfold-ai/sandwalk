@@ -5,6 +5,7 @@ import {
   AudioThumb,
   IconFallback,
   ImageThumb,
+  PdfThumb,
   StructureThumb,
   TableThumb,
   TextThumb,
@@ -43,6 +44,13 @@ export function ArtifactGridThumb({
         />
       ) : kind === 'audio' ? (
         <AudioThumb
+          client={client}
+          sessionId={sessionId}
+          path={file.path}
+          name={file.name}
+        />
+      ) : kind === 'pdf' ? (
+        <PdfThumb
           client={client}
           sessionId={sessionId}
           path={file.path}

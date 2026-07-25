@@ -7,6 +7,7 @@ import { mediaObjectUrlFromFile } from '@/lib/media-src'
 import { cn } from '@/lib/utils'
 
 import { AudioPlayPreview } from './AudioPlayPreview'
+import { PdfFirstPagePreview } from './PdfFirstPagePreview'
 import { VideoPlayPreview } from './VideoPlayPreview'
 import { decodeContent, structureFormat } from './artifact-grid-thumb-utils'
 import { Py2dMolMiniPreview } from './py2dmol/Py2dMolMiniPreview'
@@ -244,6 +245,66 @@ export function TextThumb({
     <pre className="text-muted-foreground h-full w-full overflow-hidden p-2 font-mono text-[9px] leading-[1.35]">
       {lines.join('\n')}
     </pre>
+  )
+}
+
+export function PdfThumb({
+  client,
+  sessionId,
+  path,
+  name
+}: {
+  client: LocalAgentClient
+  sessionId: string
+  path: string
+  name: string
+}) {
+  const [base64, setBase64] = useState<string | null>(null)
+  const [url, setUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let objectUrl: string | null = null
+    setFailed(false)
+    setBase64(null)
+    setUrl(null)
+    void client
+      .readFile(sessionId, path, controller.signal)
+      .then(file => {
+        if (controller.signal.aborted) return
+        if (file.encoding === 'base64') {
+          setBase64(file.content)
+          return
+        }
+        objectUrl = URL.createObjectURL(
+          new Blob([file.content], { type: 'application/pdf' })
+        )
+        setUrl(objectUrl)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true)
+      })
+    return () => {
+      controller.abort()
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [client, path, sessionId])
+
+  if (failed) return <IconFallback name={name} />
+  if (!base64 && !url) {
+    return <div className="bg-muted/30 h-full w-full animate-pulse" />
+  }
+  return (
+    <div className="bg-white h-full w-full overflow-hidden">
+      <PdfFirstPagePreview
+        title={name}
+        base64={base64}
+        url={url}
+        zoom={1.2}
+        onError={() => setFailed(true)}
+      />
+    </div>
   )
 }
 

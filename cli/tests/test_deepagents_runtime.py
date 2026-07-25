@@ -246,7 +246,9 @@ class TestHelpers:
             "cache_creation_input_tokens": 2,
             "cache_read_input_tokens": 7,
         }
-        assert dr._usage_from_message(_Msg("no usage")) is None
+        # Empty content + no usage metadata → None (non-empty content may
+        # fall back to an estimated token count for local servers).
+        assert dr._usage_from_message(_Msg("")) is None
 
     def test_args_schema_for_filters_and_required_code(self):
         model = dr._args_schema_for(
