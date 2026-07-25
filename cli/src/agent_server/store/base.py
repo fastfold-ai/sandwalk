@@ -62,7 +62,7 @@ class AgentStoreBase(ConnectionMixin):
             else:
                 # Shared opens skip the integrity check for speed, but must
                 # still never replay a mismatched WAL into the main file.
-                self._guard_shared_open()
+                self._guard_before_write_open()
             self._initialize()
             if exclusive and self.path.exists():
                 from agent_server.store_heal import refresh_healthy_backup

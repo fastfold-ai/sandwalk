@@ -102,18 +102,16 @@ class ConnectionMixin:
         self._lock_fd = fd
         return True
 
-    def _guard_shared_open(self) -> None:
-        """Stop a CLI-style open from replaying a mismatched WAL.
+    def _guard_before_write_open(self) -> None:
+        """Never let a read-write open replay a mismatched WAL.
 
-        The server runs the same repair at startup, but tools, ``--resume`` and
-        every other shared open skip integrity checks for speed and would go
-        straight to a read-write open — the operation that folds a foreign WAL
-        into the main file and destroys it.
+        That open is the destructive act: it folds foreign frames into the main
+        file and wrecks it, which leaves the heal below nothing to recover and
+        forces a fall back to the last backup. It cannot be used to *detect*
+        the problem, so check with a read-only probe beforehand.
 
-        Repairing is only safe when nobody owns the database: moving sidecars
-        out from under a running server would break it for everyone. So take
-        the flock if it is free, and otherwise refuse loudly and leave the
-        files untouched.
+        A stale sidecar can also land beside an already-running server, so this
+        guards every write open rather than only the first one.
         """
         if not self.path.exists() or not Path(f"{self.path}-wal").exists():
             return
@@ -125,11 +123,17 @@ class ConnectionMixin:
 
         from agent_server.store_heal import repair_mismatched_sidecars
 
-        if self._try_exclusive_lock():
+        # The exclusive owner may repair outright; a shared open must first
+        # confirm nobody is serving, since moving sidecars out from under a
+        # running server would break it for everyone.
+        held = getattr(self, "_exclusive", False) and self._lock_fd is not None
+        borrowed = False if held else self._try_exclusive_lock()
+        if held or borrowed:
             try:
                 note = repair_mismatched_sidecars(self.path)
             finally:
-                self._release_exclusive_lock()
+                if borrowed:
+                    self._release_exclusive_lock()
             if note is not None:
                 self.last_heal_note = note
                 logger.warning("%s", note)
@@ -181,6 +185,7 @@ class ConnectionMixin:
             connection.close()
 
     def _connect_checked(self) -> sqlite3.Connection:
+        self._guard_before_write_open()
         try:
             return self._open_connection()
         except sqlite3.DatabaseError as exc:

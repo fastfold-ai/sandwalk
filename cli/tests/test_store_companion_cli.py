@@ -129,6 +129,27 @@ def test_second_server_is_refused_not_corrupted(tmp_path: Path) -> None:
         second.close()
 
 
+def test_server_recovers_when_a_bad_wal_appears_at_runtime(tmp_path: Path) -> None:
+    """A stale WAL landing beside a live server must not take it down."""
+    db = tmp_path / "agent.db"
+    server = AgentStore(db, exclusive=True)
+    try:
+        server.create_session(title="before", workspace_path=None)
+        # Something drops a foreign WAL next to the database mid-run.
+        plant_stale_wal(db)
+
+        # The next operation heals rather than failing or losing rows.
+        titles = {session.title for session in server.list_sessions()}
+        assert "before" in titles
+        server.create_session(title="after", workspace_path=None)
+        assert {"before", "after"} <= {s.title for s in server.list_sessions()}
+    finally:
+        server.close()
+
+    assert not list(tmp_path.glob("agent.db.corrupt-*")), "fell back to a backup"
+    assert sessions(db) == 2
+
+
 def test_shared_open_survives_a_healthy_wal(tmp_path: Path) -> None:
     """The guard must not trip on the ordinary case of a live WAL."""
     db = tmp_path / "agent.db"
