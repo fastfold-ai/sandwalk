@@ -142,8 +142,9 @@ class ConnectionMixin:
         raise AgentStoreCorruptedError(
             f"Agent database cannot be read with the WAL beside it: {self.path}. "
             "Refusing to open it read-write, because that would fold the "
-            "mismatched WAL into the database and lose data. Stop the Sandwalk "
-            "server and run the command again so it can be repaired safely."
+            "mismatched WAL into the database and lose data. The running "
+            "Sandwalk server clears this on its next database write, so try "
+            "again in a moment; if it persists, stop the server and re-run."
         )
 
     def _release_exclusive_lock(self) -> None:
