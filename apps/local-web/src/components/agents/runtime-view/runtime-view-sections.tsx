@@ -1,10 +1,9 @@
 import { cn } from '@/lib/utils'
 
 import {
+  type RuntimeDraft,
   RuntimeNumberField,
-  RuntimeToggle,
-  type RuntimeDraft
-} from './runtime-view-fields'
+  RuntimeToggle} from './runtime-view-fields'
 
 type SectionProps = {
   draft: RuntimeDraft

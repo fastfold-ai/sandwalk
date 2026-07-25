@@ -7,18 +7,18 @@ import type {
   McpServer
 } from '@sandwalk/agent-ui-core'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { memo, type Dispatch, type SetStateAction } from 'react'
+import { type Dispatch, memo, type SetStateAction } from 'react'
 
+import { ChatTranscriptMessageEntry } from '@/components/agents/chat-transcript-message-entry'
+import { type ChatTimelineItem } from '@/components/agents/chat-transcript-timeline'
 import { CreatedPlanCard } from '@/components/agents/CreatedPlanCard'
 import { ReasoningGhost } from '@/components/agents/ReasoningGhost'
 import { TodoListInline } from '@/components/agents/TodoListInline'
 import { ToolCard, type TranscriptTool } from '@/components/agents/ToolCard'
-import { ChatTranscriptMessageEntry } from '@/components/agents/chat-transcript-message-entry'
 import {
   thoughtDurationForTools,
   TOOL_RUN_VISIBLE_COUNT
 } from '@/components/agents/transcript'
-import { type ChatTimelineItem } from '@/components/agents/chat-transcript-timeline'
 
 type TimelineItemProps = {
   timelineItem: ChatTimelineItem

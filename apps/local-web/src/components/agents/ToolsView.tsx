@@ -20,8 +20,8 @@ import {
 } from '@/components/ui/sheet'
 
 import { ToolsFilterSidebar } from './tools-view/tools-filter-sidebar'
-import { useToolsViewData } from './tools-view/use-tools-view-data'
 import { ToolsViewToolRow } from './tools-view/tools-view-tool-row'
+import { useToolsViewData } from './tools-view/use-tools-view-data'
 
 export function ToolsView({
   onListTools,

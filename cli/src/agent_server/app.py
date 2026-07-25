@@ -18,6 +18,7 @@ from _version import __version__
 from agent_server.account_service import AccountService
 from agent_server.app_deps import AppDeps
 from agent_server.auth_settings import load_settings, resolve_effective_api_key
+from agent_server.connectors.service import ConnectorService
 from agent_server.datasets_service import DatasetsService
 from agent_server.integrations_service import IntegrationsService
 from agent_server.library import LibraryService
@@ -87,6 +88,7 @@ def create_app(
         logging.getLogger("agent_server").warning("%s", store.last_heal_note)
     service = AgentService(store)
     library_service = LibraryService(store, service)
+    connector_service = ConnectorService(store, service)
     integrations_service = IntegrationsService()
     pty_manager = PtyManager()
     public_base = (
@@ -122,11 +124,20 @@ def create_app(
         except Exception:
             pass
         sandbox_event_bus.bind_loop(asyncio.get_running_loop())
+        # Inbound connectors are best-effort: a Slack outage must not stop the
+        # server from booting.
+        try:
+            await connector_service.start()
+        except Exception:
+            import logging
+
+            logging.getLogger("agent_server").exception("Connector startup failed")
         backup_task = asyncio.create_task(_keep_backup_fresh(store))
         yield
         backup_task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await backup_task
+        await connector_service.stop()
         await pty_manager.shutdown()
         await service.shutdown()
         store.close()
@@ -157,6 +168,7 @@ def create_app(
         pty_manager=pty_manager,
         mcp_service=mcp_service,
         library_service=library_service,
+        connector_service=connector_service,
         backend_id=backend_id,
         cli_api_key=api_key,
     )

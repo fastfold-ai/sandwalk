@@ -13,13 +13,12 @@ import {
   messageFilePreviewKind
 } from '@/components/agents/message-file-preview'
 import {
-  SkillMentionChip,
-  type SkillIconSkill
-} from '@/components/agents/SkillMentionChip'
+  type SkillIconSkill,
+  SkillMentionChip} from '@/components/agents/SkillMentionChip'
 import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
 import { getFileIcon } from '@/lib/file-icons'
-import { splitTextWithWorkspacePaths } from '@/lib/workspace-file-paths'
 import { cn } from '@/lib/utils'
+import { splitTextWithWorkspacePaths } from '@/lib/workspace-file-paths'
 
 export function UserMessageContent({
   content,

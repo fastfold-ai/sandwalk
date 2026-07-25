@@ -7,9 +7,9 @@ import {
 import { cn } from '@/lib/utils'
 
 import {
+  type DayCell,
   formatLongDate,
   LEVEL_CLASS,
-  type DayCell,
   WEEKDAY_LABELS
 } from './session-activity-heatmap-utils'
 

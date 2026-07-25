@@ -1,3 +1,20 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type {
+  AgentMessage,
+  AgentPlanCard,
+  AgentProject,
+  AgentSession,
+  AgentSkill,
+  AgentSkillDetail,
+  AgentTodo,
+  BackendHealth,
+  IntegrationSummary,
+  McpCatalogEntry,
+  McpServer,
+  RuntimeSettings,
+  SandboxSettings,
+  Specialist
+} from '@sandwalk/agent-ui-core'
 import type { ComponentProps, MutableRefObject, RefObject } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import type { Location, NavigateFunction } from 'react-router-dom'
@@ -8,30 +25,12 @@ import {
 } from '@/components/agents/DashboardMainViews'
 import { type DashboardSection } from '@/components/agents/DashboardSidebar'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
-import { type TranscriptEntry } from '@/components/agents/transcript'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
+import { type TranscriptEntry } from '@/components/agents/transcript'
 import { type SessionChatState } from '@/lib/sessions'
 import {
-  type SkillsViewMode,
-  parseCatalogSkillId
-} from '@/lib/skills-catalog'
-import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type {
-  AgentMessage,
-  AgentProject,
-  AgentSession,
-  AgentSkill,
-  AgentSkillDetail,
-  AgentPlanCard,
-  AgentTodo,
-  BackendHealth,
-  IntegrationSummary,
-  McpCatalogEntry,
-  McpServer,
-  RuntimeSettings,
-  SandboxSettings,
-  Specialist
-} from '@sandwalk/agent-ui-core'
+  parseCatalogSkillId,
+  type SkillsViewMode} from '@/lib/skills-catalog'
 
 export type AppShellMainProps = {
   sidebarCollapsed: boolean

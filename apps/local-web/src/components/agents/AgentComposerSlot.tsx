@@ -11,6 +11,7 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import {
   Composer,
@@ -19,13 +20,12 @@ import {
 import { type SandboxComputeChange } from '@/components/agents/composer/sandbox-utils'
 import { QueuedMessages } from '@/components/agents/QueuedMessages'
 import {
-  resolveComposerModelOption,
-  type ComposerModelOption
-} from '@/lib/composer-models'
-import {
   contentTypeFromPath,
   needsAttachmentPreview
 } from '@/lib/attachment-mime'
+import {
+  type ComposerModelOption,
+  resolveComposerModelOption} from '@/lib/composer-models'
 import { mediaObjectUrlFromFile } from '@/lib/media-src'
 import {
   modelSupportsMultimodalKind,
@@ -33,7 +33,6 @@ import {
   unsupportedMultimodalHint
 } from '@/lib/multimodal-attach'
 import type { QueuedMessage } from '@/lib/sessions'
-import { toast } from 'sonner'
 
 type AgentComposerSlotProps = {
   sessionId: string | null

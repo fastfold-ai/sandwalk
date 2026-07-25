@@ -10,9 +10,9 @@ import {
 } from '@/components/ui/alert-dialog'
 
 import {
+  type EnvironmentConfirmState,
   mutationErrorMessage,
   normalizeName,
-  type EnvironmentConfirmState,
 } from './environment-view-shared'
 
 export function EnvironmentConfirmDialog({

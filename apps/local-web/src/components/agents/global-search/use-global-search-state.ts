@@ -11,10 +11,10 @@ import {
 import {
   ARTIFACT_LIMIT,
   INDEX_SESSION_LIMIT,
-  matchesQuery,
-  SESSION_LIMIT,
   type IndexedArtifact,
+  matchesQuery,
   type SearchScope,
+  SESSION_LIMIT,
   uniqueSessionsByTitle
 } from './global-search-utils'
 

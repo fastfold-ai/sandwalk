@@ -8,9 +8,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 
 import {
   clampInt,
-  settingsToDraft,
-  type RuntimeDraft
-} from './runtime-view/runtime-view-fields'
+  type RuntimeDraft,
+  settingsToDraft} from './runtime-view/runtime-view-fields'
 import {
   RuntimeTimeoutsSection,
   RuntimeToolCallingSection,

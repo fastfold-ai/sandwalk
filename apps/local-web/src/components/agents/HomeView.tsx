@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils'
 
 import {
   HomeEmptySessions,
-  HomeProjectView,
   HomeProjectsList,
+  HomeProjectView,
   HomeRecentSessionsList
 } from './home-view-panels'
 

@@ -6,7 +6,7 @@ import asyncio
 import logging
 import uuid
 
-from agent_server.models import StartRunResponse
+from agent_server.models import MessageSource, StartRunResponse
 
 logger = logging.getLogger("agent_server")
 
@@ -91,7 +91,13 @@ class _LifecycleMixin:
             await asyncio.gather(task, return_exceptions=True)
         return self.store.delete_session(session_id)
 
-    def submit_message(self, *, session_id: str, content: str) -> StartRunResponse:
+    def submit_message(
+        self,
+        *,
+        session_id: str,
+        content: str,
+        source: MessageSource | None = None,
+    ) -> StartRunResponse:
         active = self._active_runs.get(session_id)
         if active is not None and not active.done():
             raise SessionBusyError("This session already has an active run.")
@@ -106,7 +112,9 @@ class _LifecycleMixin:
 
         session = self.ensure_workspace(session_id)
 
-        user_message = self.store.add_message(session_id=session_id, role="user", content=text)
+        user_message = self.store.add_message(
+            session_id=session_id, role="user", content=text, source=source
+        )
         run_id = str(uuid.uuid4())
         self.store.set_session_status(session_id, "running")
         self.store.append_event(

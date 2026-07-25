@@ -1,5 +1,4 @@
 import { type DashboardMainViewsProps } from '@/components/agents/DashboardMainViews'
-
 import { type AppShellMainProps } from '@/components/app/app-shell-main-props'
 
 export function buildDashboardMainViewsProps(

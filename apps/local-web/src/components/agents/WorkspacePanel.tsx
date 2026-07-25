@@ -11,8 +11,6 @@ import { cn } from '@/lib/utils'
 
 import { ArtifactsBrowser } from './ArtifactsBrowser'
 import { TerminalPanel } from './TerminalPanel'
-import { WorkspaceArtifactsModal } from './WorkspaceArtifactsModal'
-import { WorkspaceFileTabsColumn } from './WorkspaceFileTabsColumn'
 import { useWorkspacePanel } from './workspace/use-workspace-panel'
 import { WorkspaceFileBrowserContextMenu } from './workspace/workspace-file-browser-context-menu'
 import { WorkspaceFileTabContextMenu } from './workspace/workspace-file-tab-context-menu'
@@ -22,6 +20,8 @@ import {
   WorkspacePathDialog,
   WorkspaceRenameDialog
 } from './workspace/workspace-panel-dialogs'
+import { WorkspaceArtifactsModal } from './WorkspaceArtifactsModal'
+import { WorkspaceFileTabsColumn } from './WorkspaceFileTabsColumn'
 
 export function WorkspacePanel({
   client,

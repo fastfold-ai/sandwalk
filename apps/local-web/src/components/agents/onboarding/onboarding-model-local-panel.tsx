@@ -6,10 +6,9 @@ import { cn } from '@/lib/utils'
 
 import {
   OnboardingBackendIcon,
+  type OnboardingBackendValue,
   OnboardingChip,
-  PROFILE_BACKENDS,
-  type OnboardingBackendValue
-} from './onboarding-model-shared'
+  PROFILE_BACKENDS} from './onboarding-model-shared'
 
 export function OnboardingModelLocalPanel({
   localBackend,

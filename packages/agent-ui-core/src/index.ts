@@ -260,7 +260,108 @@ export type UseLibraryInChatResult = {
   paths: string[]
 }
 
+/** Where an inbound message came from. Display only — the model sees `content`. */
+export type MessageSource = {
+  connector: 'slack'
+  channelId: string
+  channelName: string | null
+  senderId: string
+  senderName: string | null
+  /** Raw text, without the reply-handle framing added for the model. */
+  text: string
+  permalink?: string | null
+}
+
 export type SessionTitleSource = 'pending' | 'auto' | 'user'
+
+export type SessionSource = 'slack'
+
+/** relay = inbound via FastFold Cloud; socket = inbound via Slack Socket Mode. */
+export type SlackMode = 'relay' | 'socket'
+
+export type SlackRelayState =
+  | 'off'
+  | 'signed_out'
+  | 'auth_expired'
+  | 'reconnecting'
+  | 'live'
+
+export type SlackWorkspace = {
+  teamId: string
+  teamName: string | null
+  domain: string | null
+  mode: SlackMode
+  botUserId: string | null
+  connectionId: string | null
+  assistantEnabled: boolean
+  enabled: boolean
+  /** Tokens are never returned; these only report whether one is stored. */
+  hasBotToken: boolean
+  hasAppToken: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type SlackConnectorStatus = {
+  mode: SlackMode | null
+  relayState: SlackRelayState
+  relayDetail: string | null
+  workspaces: SlackWorkspace[]
+}
+
+export type SlackAllowedUser = {
+  teamId: string
+  slackUserId: string
+  displayName: string | null
+  createdAt: string
+}
+
+export type SlackSubscription = {
+  sessionId: string
+  channel: string
+  createdAt: string
+}
+
+export type SlackParkedMessage = {
+  id: string
+  teamId: string
+  channel: string
+  threadTarget: string | null
+  slackUserId: string
+  userName: string | null
+  text: string
+  createdAt: string
+}
+
+export type SlackDirectoryPerson = {
+  id: string
+  name: string
+  handle: string | null
+  avatarUrl: string | null
+}
+
+export type SlackDirectoryChannel = {
+  id: string
+  name: string
+  isPrivate: boolean
+}
+
+export type SlackDirectory = {
+  people: SlackDirectoryPerson[]
+  channels: SlackDirectoryChannel[]
+}
+
+export type SlackManifest = {
+  appName: string
+  manifest: string
+  steps: string[]
+}
+
+export type SessionConnectorMute = {
+  sessionId: string
+  connector: 'slack'
+  muted: boolean
+}
 
 export type AgentSession = {
   id: string
@@ -273,6 +374,10 @@ export type AgentSession = {
   specialistId: string | null
   sandboxBackend?: 'builtin' | 'modal' | null
   workspacePath: string | null
+  /** Connector that spawned the session; null when it started locally. */
+  source?: SessionSource | null
+  /** Human-readable origin, e.g. "#dev-ops · Acme". */
+  sourceLabel?: string | null
   lastMessageAt: string | null
   createdAt: string
   updatedAt: string
@@ -338,6 +443,8 @@ export type AgentMessage = {
   sessionId: string
   role: AgentMessageRole
   content: string
+  /** Present when the message arrived through a connector, e.g. Slack. */
+  source?: MessageSource | null
   createdAt: string
 }
 

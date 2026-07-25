@@ -4,12 +4,12 @@ import { toast } from 'sonner'
 import { DesktopOnlyCallout } from '@/components/agents/DesktopOnlyCallout'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { copyText } from '@/lib/clipboard'
 import {
+  type DesktopAuth,
   desktopGetAuth,
   desktopPutAuth,
-  isTauri,
-  type DesktopAuth
-} from '@/lib/desktop'
+  isTauri} from '@/lib/desktop'
 
 export function ServerSecurityView() {
   const desktop = isTauri()
@@ -105,8 +105,10 @@ export function ServerSecurityView() {
                     disabled={!auth?.api_key}
                     onClick={() => {
                       if (!auth?.api_key) return
-                      void navigator.clipboard.writeText(auth.api_key)
-                      toast.success('API key copied')
+                      void copyText(auth.api_key).then(ok => {
+                        if (ok) toast.success('API key copied')
+                        else toast.error('Could not copy — select it manually')
+                      })
                     }}
                   >
                     Copy

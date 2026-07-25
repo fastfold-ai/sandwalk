@@ -1,5 +1,12 @@
-import { useEffect, type MutableRefObject } from 'react'
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type {
+  AgentSession,
+  AgentSkillDetail,
+  IntegrationSummary,
+  WorkspaceFile
+} from '@sandwalk/agent-ui-core'
 import type { Dispatch, SetStateAction } from 'react'
+import { type MutableRefObject,useEffect } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { fileChipToken } from '@/components/agents/composer-parts'
@@ -8,13 +15,6 @@ import {
   writeOpenTabsByProject,
   writeProjectScopeId
 } from '@/lib/app-storage'
-import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type {
-  AgentSession,
-  AgentSkillDetail,
-  IntegrationSummary,
-  WorkspaceFile
-} from '@sandwalk/agent-ui-core'
 
 type UseAppSessionEffectsArgs = {
   setIntegrationValues: Dispatch<SetStateAction<Record<string, string>>>

@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { McpMark } from '@/components/McpMark'
 import { cn } from '@/lib/utils'
 
-import { MCP_ICONS } from './mcp-view-shared'
 import { faviconCandidatesForUrl } from './mcp-favicon'
+import { MCP_ICONS } from './mcp-view-shared'
 
 export function transportLabel(server: McpServer): string {
   if (server.transport === 'streamable_http') return 'HTTP'

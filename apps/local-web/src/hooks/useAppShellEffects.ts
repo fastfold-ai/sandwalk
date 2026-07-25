@@ -1,5 +1,11 @@
-import { useEffect } from 'react'
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type {
+  AgentMessage,
+  AgentSession,
+  IntegrationSummary
+} from '@sandwalk/agent-ui-core'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
+import { useEffect } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import type { NavigateFunction } from 'react-router-dom'
 
@@ -10,12 +16,6 @@ import {
   useAppLegacyRouteRedirects,
   useAppPanelPersistence
 } from '@/hooks/useAppShellEffectHelpers'
-import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type {
-  AgentMessage,
-  AgentSession,
-  IntegrationSummary
-} from '@sandwalk/agent-ui-core'
 
 type UseAppShellEffectsArgs = {
   locationPathname: string

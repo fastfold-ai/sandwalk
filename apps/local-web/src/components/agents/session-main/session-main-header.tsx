@@ -21,6 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
 
 export type SessionMainHeaderProps = {
@@ -190,7 +191,7 @@ export function SessionMainHeader({
                     event.preventDefault()
                     event.stopPropagation()
                     if (!sessionId) return
-                    void navigator.clipboard.writeText(
+                    void copyText(
                       `sandwalk --resume ${sessionId}`
                     )
                     setCopiedResumeCommand(true)

@@ -1,5 +1,6 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
+  AgentSession,
   IntegrationSetupResult,
   IntegrationSummary
 } from '@sandwalk/agent-ui-core'
@@ -16,6 +17,7 @@ export function IntegrationsView({
   loading = false,
   selectedKey,
   values,
+  sessions = [],
   featuredOnly = false,
   onShowAll,
   onSelect,
@@ -33,6 +35,7 @@ export function IntegrationsView({
   loading?: boolean
   selectedKey: string | null
   values: Record<string, string>
+  sessions?: AgentSession[]
   featuredOnly?: boolean
   onShowAll?: () => void
   onSelect: (key: string | null) => void
@@ -53,6 +56,7 @@ export function IntegrationsView({
         terminalClient={terminalClient}
         selected={selected}
         values={values}
+        sessions={sessions}
         onBack={() => onSelect(null)}
         onValueChange={onValueChange}
         onSave={onSave}

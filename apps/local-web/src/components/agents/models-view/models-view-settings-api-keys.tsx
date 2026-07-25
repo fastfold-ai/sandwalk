@@ -23,12 +23,12 @@ import { Input } from '@/components/ui/input'
 import { openInSystemBrowser } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
-import type { CloudKeyStatus } from './use-models-view-api-keys'
 import {
   LLM_API_KEY_COPY,
   LLM_API_KEY_ORDER,
   primaryMaskedPreview
 } from './models-view-utils'
+import type { CloudKeyStatus } from './use-models-view-api-keys'
 
 function providerCopy(key: string) {
   return LLM_API_KEY_COPY[key as (typeof LLM_API_KEY_ORDER)[number]]

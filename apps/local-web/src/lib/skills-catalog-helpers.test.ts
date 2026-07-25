@@ -1,3 +1,4 @@
+import type { AgentSkill, AgentSkillSource } from '@sandwalk/agent-ui-core'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -6,7 +7,6 @@ import {
   suggestionSourceIcon,
   suggestionSourceLabel
 } from '@/lib/skills-catalog-helpers'
-import type { AgentSkill, AgentSkillSource } from '@sandwalk/agent-ui-core'
 
 function skill(partial: Partial<AgentSkill>): AgentSkill {
   return {

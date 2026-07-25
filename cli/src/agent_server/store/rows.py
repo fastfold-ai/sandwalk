@@ -12,6 +12,7 @@ from agent_server.models import (
     AgentProject,
     AgentSession,
     McpServer,
+    MessageSource,
     Specialist,
 )
 from agent_server.store.util import parse_sandbox_backend
@@ -39,6 +40,10 @@ def session_from_row(row: sqlite3.Row) -> AgentSession:
     title_source = str(raw_source or "pending").strip().lower()
     if title_source not in {"pending", "auto", "user"}:
         title_source = "pending"
+    raw_origin = row["source"] if "source" in keys else None
+    origin = str(raw_origin or "").strip().lower() or None
+    if origin not in {"slack", None}:
+        origin = None
     return AgentSession(
         id=row["id"],
         title=row["title"],
@@ -49,6 +54,8 @@ def session_from_row(row: sqlite3.Row) -> AgentSession:
         specialist_id=row["specialist_id"] if "specialist_id" in keys else None,
         sandbox_backend=sandbox_backend,
         workspace_path=row["workspace_path"],
+        source=origin,  # type: ignore[arg-type]
+        source_label=(row["source_label"] if "source_label" in keys else None),
         last_message_at=(
             datetime.fromisoformat(row["last_message_at"])
             if row["last_message_at"]
@@ -95,11 +102,23 @@ def project_from_row(row: sqlite3.Row, *, session_count: int = 0) -> AgentProjec
 
 
 def message_from_row(row: sqlite3.Row) -> AgentMessage:
+    keys = set(row.keys())
+    source = None
+    raw = row["metadata"] if "metadata" in keys else None
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                source = MessageSource.model_validate(parsed)
+        except (ValueError, TypeError):
+            # A display sidecar is never worth failing a message read over.
+            source = None
     return AgentMessage(
         id=row["id"],
         session_id=row["session_id"],
         role=row["role"],
         content=row["content"],
+        source=source,
         created_at=datetime.fromisoformat(row["created_at"]),
     )
 

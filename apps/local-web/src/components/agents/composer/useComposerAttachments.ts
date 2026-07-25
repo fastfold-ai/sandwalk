@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { fileChipToken } from '@/components/agents/composer-parts'
 import type { ComposerAttachmentItem } from '@/components/agents/composer/ComposerAttachments'
+import { fileChipToken } from '@/components/agents/composer-parts'
 
 export type UploadedComposerFile = {
   path: string

@@ -6,17 +6,16 @@ import type {
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { defaultModalFields } from './sandbox-modal-section'
-import { createAgentSandboxModalHandlers } from './use-agent-sandbox-modal-handlers'
 import {
   clampNumber,
-  defaultImageDraft,
   DEFAULT_CPU_IMAGE,
   DEFAULT_GPU_IMAGE,
   DEFAULT_IDLE_TTL,
   DEFAULT_MODAL_APP,
-  settingsToImageDraft,
-  type ImageDraft
-} from './sandbox-view-utils'
+  defaultImageDraft,
+  type ImageDraft,
+  settingsToImageDraft} from './sandbox-view-utils'
+import { createAgentSandboxModalHandlers } from './use-agent-sandbox-modal-handlers'
 
 export function useAgentSandboxView({
   connected,

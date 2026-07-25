@@ -1,8 +1,8 @@
 import { navigateBack } from '@/lib/navigate-back'
 import { catalogSkillDetailPath } from '@/lib/skills-catalog'
 
-import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 import { SkillsView } from './dashboard-main-views-lazy'
+import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 
 export function DashboardMainSkillsPanel({
   client,

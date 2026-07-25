@@ -10,12 +10,11 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import type { MutableRefObject } from 'react'
 
-import { type ComposerModelOption } from '@/lib/composer-models'
-
 import {
   type SandboxActionPhase,
   type SandboxComputeChange
 } from '@/components/agents/composer/sandbox-utils'
+import { type ComposerModelOption } from '@/lib/composer-models'
 
 export type { SandboxActionPhase, SandboxComputeChange }
 

@@ -6,12 +6,11 @@ import {
 } from '@/lib/workspace-download'
 
 import { normalizeFileContent } from '../workspace-utils'
-
-import type { WorkspacePanelState } from './use-workspace-panel-state'
 import {
   useWorkspaceFileOpenActions,
   useWorkspaceFileRenameActions
 } from './use-workspace-file-open-rename'
+import type { WorkspacePanelState } from './use-workspace-panel-state'
 
 export function useWorkspaceFileActions(
   state: WorkspacePanelState,

@@ -14,9 +14,8 @@ import {
 
 import {
   buildMirageForm,
-  normalizeMirageId,
-  type CircleDefinition
-} from './mirage-background-form'
+  type CircleDefinition,
+  normalizeMirageId} from './mirage-background-form'
 import {
   MirageBackgroundDefs,
   MirageBackgroundPattern

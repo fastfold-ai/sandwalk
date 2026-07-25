@@ -7,13 +7,13 @@ import { McpDetailToolCard } from './mcp-detail-tool-card'
 import type { McpDetailViewState } from './use-mcp-detail-view'
 
 export {
-  McpDetailApiKeyBar,
-  McpDetailHeaderBar
-} from './mcp-detail-header-panels'
-export {
   McpDetailInfoAside,
   McpDetailStatsAside
 } from './mcp-detail-aside-panels'
+export {
+  McpDetailApiKeyBar,
+  McpDetailHeaderBar
+} from './mcp-detail-header-panels'
 
 export function McpDetailToolsSection({ state }: { state: McpDetailViewState }) {
   const {

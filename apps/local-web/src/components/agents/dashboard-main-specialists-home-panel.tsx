@@ -1,7 +1,7 @@
 import { navigateBack } from '@/lib/navigate-back'
 
-import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 import { HomeView, SpecialistsView } from './dashboard-main-views-lazy'
+import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 
 export function DashboardMainSpecialistsPanel({
   client,

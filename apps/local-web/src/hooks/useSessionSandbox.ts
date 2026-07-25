@@ -18,8 +18,8 @@ import {
 import { type SandboxActionPhase } from '@/components/agents/Composer'
 
 import { syncSandboxPhaseFromStatus } from './session-sandbox-status-sync'
-import { createSessionSandboxActions } from './useSessionSandboxActions'
 import { useSessionSandboxStream } from './use-session-sandbox-stream'
+import { createSessionSandboxActions } from './useSessionSandboxActions'
 
 type UseSessionSandboxArgs = {
   client: LocalAgentClient

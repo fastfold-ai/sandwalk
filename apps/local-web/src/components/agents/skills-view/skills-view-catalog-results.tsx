@@ -3,7 +3,7 @@ import type {
   AgentCatalogSkill
 } from '@sandwalk/agent-ui-core'
 import { Loader2, RefreshCw } from 'lucide-react'
-import { useEffect, useRef, useState, type TouchEvent, type WheelEvent } from 'react'
+import { type TouchEvent, useEffect, useRef, useState, type WheelEvent } from 'react'
 
 import { ListRowsSkeleton } from '@/components/agents/PageSkeletons'
 import { Button } from '@/components/ui/button'

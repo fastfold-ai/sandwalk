@@ -7,11 +7,11 @@ import type {
 import { ArrowUp, Mic, Plus, Square } from 'lucide-react'
 import { useRef } from 'react'
 
+import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelPicker'
 import {
   ComposerModeMenu,
   planModeAccent
 } from '@/components/agents/composer/ComposerModeMenu'
-import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelPicker'
 import { ComposerSandboxPicker } from '@/components/agents/composer/ComposerSandboxPicker'
 import { ComposerSpecialistPicker } from '@/components/agents/composer/ComposerSpecialistPicker'
 import { ComposerTokenUsage } from '@/components/agents/composer/ComposerTokenUsage'

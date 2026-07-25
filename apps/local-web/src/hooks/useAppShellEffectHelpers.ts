@@ -1,5 +1,5 @@
-export { useAppLegacyRouteRedirects } from './useAppLegacyRouteRedirects'
-export { useAppDocumentTitle } from './useAppDocumentTitle'
 export { useAppAutoTitle } from './useAppAutoTitle'
 export { useAppChatSkeleton } from './useAppChatSkeleton'
+export { useAppDocumentTitle } from './useAppDocumentTitle'
+export { useAppLegacyRouteRedirects } from './useAppLegacyRouteRedirects'
 export { useAppPanelPersistence } from './useAppPanelPersistence'

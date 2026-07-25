@@ -2,14 +2,14 @@ import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
 import { Check, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { openInSystemBrowser } from '@/lib/desktop'
-import { cn } from '@/lib/utils'
 import {
   LLM_API_KEY_COPY,
   LLM_API_KEY_ORDER
 } from '@/components/agents/models-view/models-view-utils'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { openInSystemBrowser } from '@/lib/desktop'
+import { cn } from '@/lib/utils'
 
 import { primaryMaskedPreview } from './onboarding-model-shared'
 

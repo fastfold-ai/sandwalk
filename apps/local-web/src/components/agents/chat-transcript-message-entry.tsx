@@ -13,14 +13,16 @@ import {
 } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 
+import { ConnectorMessageCard } from '@/components/agents/ConnectorMessageCard'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
-import { UserMessageContent } from '@/components/agents/UserMessageContent'
 import { type TranscriptEntry } from '@/components/agents/transcript'
+import { UserMessageContent } from '@/components/agents/UserMessageContent'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
+import { copyText } from '@/lib/clipboard'
 import {
   downloadMarkdown,
   formatMessagePopoverDate,
@@ -84,7 +86,14 @@ export function ChatTranscriptMessageEntry({
         isUser ? 'flex justify-end px-2' : ''
       )}
     >
-      {isUser ? (
+      {isUser && message.source ? (
+        <div className="relative min-w-0 max-w-[85%]">
+          <ConnectorMessageCard
+            source={message.source}
+            createdAt={message.createdAt}
+          />
+        </div>
+      ) : isUser ? (
         <div className="relative min-w-0 max-w-[85%]">
           <div className="bg-muted text-foreground peer inline-block w-auto max-w-full break-words rounded-xl px-4 py-2">
             <UserMessageContent
@@ -122,7 +131,7 @@ export function ChatTranscriptMessageEntry({
                 type="button"
                 className="hover:bg-muted hover:text-foreground inline-flex h-6 w-6 items-center justify-center rounded-md"
                 onClick={async () => {
-                  await navigator.clipboard.writeText(message.content)
+                  await copyText(message.content)
                   setCopiedMessageId(message.id)
                   window.setTimeout(() => {
                     setCopiedMessageId(current =>

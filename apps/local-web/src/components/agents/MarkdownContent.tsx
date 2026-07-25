@@ -6,8 +6,8 @@ import remarkGfm from 'remark-gfm'
 import type { SkillIconSkill } from '@/components/agents/SkillMentionChip'
 import { cn } from '@/lib/utils'
 
-import { ensureMermaidFences } from './markdown-mermaid-fences'
 import { buildMarkdownComponents } from './markdown-components'
+import { ensureMermaidFences } from './markdown-mermaid-fences'
 
 export { ensureMermaidFences } from './markdown-mermaid-fences'
 

@@ -6,10 +6,9 @@ import { OnboardingModelCloudPanel } from './onboarding/onboarding-model-cloud-p
 import { OnboardingModelLocalPanel } from './onboarding/onboarding-model-local-panel'
 import {
   LLM_API_KEY_ORDER,
+  type OnboardingBackendValue,
   OnboardingChip,
-  PROFILE_BACKENDS,
-  type OnboardingBackendValue
-} from './onboarding/onboarding-model-shared'
+  PROFILE_BACKENDS} from './onboarding/onboarding-model-shared'
 
 type Mode = 'cloud' | 'local'
 

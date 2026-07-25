@@ -10,9 +10,9 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
+import { McpJsonEditorDialog } from './mcp-view/mcp-json-editor-dialog'
 import { McpFeaturedSection } from './mcp-view/mcp-view-catalog'
 import { McpCustomSection } from './mcp-view/mcp-view-custom'
-import { McpJsonEditorDialog } from './mcp-view/mcp-json-editor-dialog'
 import { useMcpView } from './mcp-view/use-mcp-view'
 
 export function McpView({

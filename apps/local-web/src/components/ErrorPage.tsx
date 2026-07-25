@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { type AppErrorInfo, normalizeAppError } from '@/lib/app-error'
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
 
 function buildDump(error: AppErrorInfo): string {
@@ -57,7 +58,7 @@ export function ErrorPage({
 
   async function copyDump() {
     try {
-      await navigator.clipboard.writeText(dump)
+      await copyText(dump)
     } catch {
       // ignore
     }

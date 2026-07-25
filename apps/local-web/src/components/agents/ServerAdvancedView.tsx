@@ -8,9 +8,8 @@ import {
   desktopGetSettings,
   desktopPutSettings,
   desktopRebuildDashboard,
-  isTauri,
-  type DesktopSettings
-} from '@/lib/desktop'
+  type DesktopSettings,
+  isTauri} from '@/lib/desktop'
 
 export function ServerAdvancedView() {
   const desktop = isTauri()

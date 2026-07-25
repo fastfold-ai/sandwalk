@@ -3,6 +3,7 @@ import { memo, useEffect, useState } from 'react'
 
 import { looksLikeMermaid, MermaidDiagram } from '@/components/agents/MermaidDiagram'
 import { Button } from '@/components/ui/button'
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
 
 function isDarkMode() {
@@ -102,7 +103,7 @@ export const MarkdownCodeBlock = memo(function MarkdownCodeBlock({
               size="icon"
               className="size-7"
               onClick={() => {
-                void navigator.clipboard.writeText(code)
+                void copyText(code)
                 setCopied(true)
                 window.setTimeout(() => setCopied(false), 1200)
               }}

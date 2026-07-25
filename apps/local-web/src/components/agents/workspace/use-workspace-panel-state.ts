@@ -13,7 +13,6 @@ import {
   type ViewMode,
   writeOpenFileTabs
 } from '../workspace-utils'
-
 import { useWorkspaceFileSave } from './use-workspace-file-save'
 
 export type WorkspacePanelState = ReturnType<typeof useWorkspacePanelState>

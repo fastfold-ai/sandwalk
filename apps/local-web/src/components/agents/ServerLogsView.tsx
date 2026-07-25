@@ -4,7 +4,8 @@ import { toast } from 'sonner'
 import { DesktopOnlyCallout } from '@/components/agents/DesktopOnlyCallout'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { desktopTailLogs, isTauri, type DesktopLogs } from '@/lib/desktop'
+import { copyText } from '@/lib/clipboard'
+import { type DesktopLogs,desktopTailLogs, isTauri } from '@/lib/desktop'
 
 export function ServerLogsView() {
   const desktop = isTauri()
@@ -88,8 +89,10 @@ export function ServerLogsView() {
                 disabled={!log?.text}
                 onClick={() => {
                   if (!log?.text) return
-                  void navigator.clipboard.writeText(log.text)
-                  toast.success('Copied')
+                  void copyText(log.text).then(ok => {
+                    if (ok) toast.success('Copied')
+                    else toast.error('Could not copy — select it manually')
+                  })
                 }}
               >
                 Copy

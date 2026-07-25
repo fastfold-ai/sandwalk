@@ -1,12 +1,12 @@
-import { useEffect, useRef } from 'react'
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { AgentMessage, AgentSession } from '@sandwalk/agent-ui-core'
 import type { Dispatch, SetStateAction } from 'react'
+import { useEffect, useRef } from 'react'
 
 import {
   AUTO_TITLE_FIRST_RESPONSE_THRESHOLD,
   isLowSignalTitle
 } from '@/lib/sessions'
-import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { AgentMessage, AgentSession } from '@sandwalk/agent-ui-core'
 
 type AutoTitleArgs = {
   sessionId: string | null

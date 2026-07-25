@@ -14,8 +14,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useHorizontalWheelScroll } from '@/hooks/useHorizontalWheelScroll'
 import { cn } from '@/lib/utils'
 
-import { SessionStatusIcon } from './SessionStatusIcon'
 import { useSessionTabColors } from './session-tab-colors'
+import { SessionSourceIcon } from './SessionSourceIcon'
+import { SessionStatusIcon } from './SessionStatusIcon'
 import {
   TabContextItem,
   TabContextMenuShell,
@@ -123,6 +124,7 @@ export function SessionTabs({
           title={tab.title || 'Untitled'}
         >
           <SessionStatusIcon status={tab.status} />
+          <SessionSourceIcon source={tab.source} label={tab.sourceLabel} />
           {pinned ? (
             <Pin className="text-muted-foreground size-3 shrink-0" aria-hidden />
           ) : null}

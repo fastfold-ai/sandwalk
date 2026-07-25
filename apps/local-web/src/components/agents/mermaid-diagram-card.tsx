@@ -2,15 +2,15 @@ import { Check, Code2, Copy, Eye, Maximize2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
 
 import {
   MERMAID_CARD_CLASS,
   MERMAID_DIAGRAM_SURFACE_CLASS,
   MERMAID_TAG_CLASS,
-  QUICK_BUTTON_CLASS,
-  type MermaidRenderResult
-} from './mermaid-diagram-utils'
+  type MermaidRenderResult,
+  QUICK_BUTTON_CLASS} from './mermaid-diagram-utils'
 
 function MermaidTitleTag() {
   return (
@@ -121,7 +121,7 @@ export function MermaidCard({
 
   const handleCopySource = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(code.trim())
+      await copyText(code.trim())
       setCopied(true)
       if (copyResetTimeoutRef.current) {
         clearTimeout(copyResetTimeoutRef.current)

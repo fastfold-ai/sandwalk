@@ -15,14 +15,14 @@ import { useDeferredValue, useMemo } from 'react'
 
 import { AgentStatusText } from '@/components/agents/AgentStatusText'
 import { BuildPlanStatusCard } from '@/components/agents/BuildPlanStatusCard'
+import { buildChatTimelineItems } from '@/components/agents/chat-transcript-timeline'
+import { ChatTranscriptTimelineItem } from '@/components/agents/chat-transcript-timeline-item'
 import { HitlDecisionCard } from '@/components/agents/hitl/HitlDecisionCard'
+import { LiveToolStack } from '@/components/agents/live-tool-stack'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { TodoListInline } from '@/components/agents/TodoListInline'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
-import { buildChatTimelineItems } from '@/components/agents/chat-transcript-timeline'
-import { ChatTranscriptTimelineItem } from '@/components/agents/chat-transcript-timeline-item'
-import { LiveToolStack } from '@/components/agents/live-tool-stack'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 type ChatTranscriptProps = {

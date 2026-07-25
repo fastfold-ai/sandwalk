@@ -21,9 +21,8 @@ import {
   EnvironmentPythonSection
 } from './environment-view/environment-view-body'
 import {
-  normalizeName,
-  type EnvironmentConfirmState
-} from './environment-view/environment-view-shared'
+  type EnvironmentConfirmState,
+  normalizeName} from './environment-view/environment-view-shared'
 
 export function EnvironmentView({
   onLoad,

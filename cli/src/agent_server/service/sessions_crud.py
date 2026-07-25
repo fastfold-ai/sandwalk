@@ -31,6 +31,8 @@ class _SessionCrudMixin:
         project_id: str | None = None,
         specialist_id: str | None = None,
         sandbox_backend: str | None = None,
+        source: str | None = None,
+        source_label: str | None = None,
     ) -> AgentSession:
         from agent_server import service
 
@@ -46,6 +48,8 @@ class _SessionCrudMixin:
             project_id=project_id,
             specialist_id=specialist_id,
             sandbox_backend=sandbox_backend,
+            source=source,
+            source_label=source_label,
         )
         if normalized_workspace is None:
             workspace = service.default_workspace_path(session.id)

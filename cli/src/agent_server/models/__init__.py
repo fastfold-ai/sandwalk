@@ -16,6 +16,7 @@ from __future__ import annotations
 from agent_server.models.base import ApiModel, to_camel
 from agent_server.models.account import AccountAbout, AccountOrganization, AccountSummary, AccountUser
 from agent_server.models.auth import AuthLoginRequest, AuthSettingsResponse, AuthStatusResponse, UpdateAuthSettingsRequest
+from agent_server.models.connectors import AddSlackSubscriptionRequest, AllowSlackUserRequest, ConnectSlackManualRequest, ConnectorActionResponse, ConnectorName, SessionConnectorMute, SetConnectorMuteRequest, SlackAllowedUser, SlackAllowedUserList, SlackConnectorStatus, SlackDirectory, SlackDirectoryChannel, SlackDirectoryPerson, SlackManifestResponse, SlackMode, SlackParkedMessage, SlackParkedMessageList, SlackSubscription, SlackSubscriptionList, SlackWorkspace, SlackWorkspaceList
 from agent_server.models.datasets_tools import DatasetInstallResponse, DatasetList, DatasetSummary, ToolBatchAction, ToolBatchActionRequest, ToolBatchActionResponse, ToolList, ToolSummary, UpdateToolRequest
 from agent_server.models.doctor import DoctorCheckResult, DoctorDiagnosticsRequest, DoctorReport, DoctorSummary
 from agent_server.models.environment import EnvironmentCorePackage, EnvironmentPackage, EnvironmentPackageGroup, EnvironmentPackageMutationResult, EnvironmentPackageRequest, EnvironmentReport
@@ -28,8 +29,8 @@ from agent_server.models.mcp_servers import CreateMcpServerRequest, McpServer, M
 from agent_server.models.model_profiles import DeleteModelProfileResponse, DiscoverModelEndpointRequest, ModelProfile, ModelProfileList, ModelProfileProbeResult, UpsertModelProfileRequest
 from agent_server.models.models_catalog import AgentModel, AgentModelList, CreateAgentModelRequest, UpdateAgentModelRequest
 from agent_server.models.projects import AgentProject, CreateProjectRequest, DeleteProjectResponse, ProjectList, UpdateProjectRequest
-from agent_server.models.sessions import AgentSession, AutoTitleSessionRequest, CreateSessionRequest, DeleteSessionResponse, HitlDecision, InterruptRunResponse, OrganizeLabel, SandboxBackendChoice, SessionList, SessionSandboxStatus, SessionStatus, SubmitApprovalsRequest, SubmitApprovalsResponse, TitleSource, UpdateSessionRequest
-from agent_server.models.sessions_messages import AgentMessage, EventEnvelope, EventList, MessageFeedbackRequest, MessageFeedbackResponse, MessageList, MessageRole, SendMessageRequest, StartRunResponse
+from agent_server.models.sessions import AgentSession, AutoTitleSessionRequest, CreateSessionRequest, DeleteSessionResponse, HitlDecision, InterruptRunResponse, OrganizeLabel, SandboxBackendChoice, SessionList, SessionSandboxStatus, SessionSource, SessionStatus, SubmitApprovalsRequest, SubmitApprovalsResponse, TitleSource, UpdateSessionRequest
+from agent_server.models.sessions_messages import AgentMessage, EventEnvelope, EventList, MessageFeedbackRequest, MessageFeedbackResponse, MessageList, MessageRole, MessageSource, SendMessageRequest, StartRunResponse
 from agent_server.models.sessions_pty import CreatePtyRequest, PtySessionInfo, PtySessionList, UpdatePtyRequest
 from agent_server.models.sessions_workspace import CreateWorkspaceFolderRequest, MoveWorkspaceFileRequest, WorkspaceFile, WorkspaceFileContent, WorkspaceFileList, WorkspaceMutationResponse, WriteWorkspaceFileRequest
 from agent_server.models.settings import OnboardingSettings, PromptBudgetBucket, PromptBudgetResponse, PromptBudgetToolCounts, RuntimeSettings, SandboxProbeReport, SandboxProbeStep, SandboxSettings, UpdateOnboardingSettingsRequest, UpdateRuntimeSettingsRequest, UpdateSandboxSettingsRequest

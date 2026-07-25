@@ -54,8 +54,16 @@ import type {
   RuntimeSettings,
   SandboxProbeReport,
   SandboxSettings,
+  SessionConnectorMute,
   SessionSandboxStatus,
   SettingsProvider,
+  SlackAllowedUser,
+  SlackConnectorStatus,
+  SlackDirectory,
+  SlackManifest,
+  SlackParkedMessage,
+  SlackSubscription,
+  SlackWorkspace,
   SkillProvider,
   ToolBatchAction,
   ToolBatchResult,
@@ -437,6 +445,204 @@ export class LocalAgentClient
           content: input.content,
           encoding: input.encoding || 'text',
         }),
+        headers: { 'content-type': 'application/json' },
+        signal,
+      },
+    )
+  }
+
+  // --- Slack connector ---------------------------------------------------
+
+  getSlackStatus(signal?: AbortSignal): Promise<SlackConnectorStatus> {
+    return this.request<SlackConnectorStatus>('/connectors/slack/status', {
+      signal,
+    })
+  }
+
+  getSlackManifest(
+    appName?: string,
+    signal?: AbortSignal,
+  ): Promise<SlackManifest> {
+    const query = appName ? `?app_name=${encodeURIComponent(appName)}` : ''
+    return this.request<SlackManifest>(`/connectors/slack/manifest${query}`, {
+      signal,
+    })
+  }
+
+  listSlackWorkspaces(signal?: AbortSignal): Promise<{ data: SlackWorkspace[] }> {
+    return this.request<{ data: SlackWorkspace[] }>(
+      '/connectors/slack/workspaces',
+      { signal },
+    )
+  }
+
+  connectSlackManual(
+    input: { botToken: string; appToken: string },
+    signal?: AbortSignal,
+  ): Promise<SlackWorkspace> {
+    return this.request<SlackWorkspace>('/connectors/slack/connect', {
+      method: 'POST',
+      body: JSON.stringify({
+        bot_token: input.botToken,
+        app_token: input.appToken,
+      }),
+      headers: { 'content-type': 'application/json' },
+      signal,
+    })
+  }
+
+  async disconnectSlackWorkspace(
+    teamId: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await this.request<{ ok: boolean }>(
+      `/connectors/slack/workspaces/${encodeURIComponent(teamId)}`,
+      { method: 'DELETE', signal },
+    )
+  }
+
+  getSlackDirectory(
+    teamId: string,
+    options?: { refresh?: boolean; signal?: AbortSignal },
+  ): Promise<SlackDirectory> {
+    const query = options?.refresh ? '?refresh=true' : ''
+    return this.request<SlackDirectory>(
+      `/connectors/slack/workspaces/${encodeURIComponent(teamId)}/directory${query}`,
+      { signal: options?.signal },
+    )
+  }
+
+  listSlackPeople(
+    teamId: string,
+    signal?: AbortSignal,
+  ): Promise<{ data: SlackAllowedUser[] }> {
+    return this.request<{ data: SlackAllowedUser[] }>(
+      `/connectors/slack/workspaces/${encodeURIComponent(teamId)}/people`,
+      { signal },
+    )
+  }
+
+  allowSlackPerson(
+    input: { teamId: string; slackUserId: string; displayName?: string | null },
+    signal?: AbortSignal,
+  ): Promise<{ data: SlackAllowedUser[] }> {
+    return this.request<{ data: SlackAllowedUser[] }>(
+      '/connectors/slack/people',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          team_id: input.teamId,
+          slack_user_id: input.slackUserId,
+          display_name: input.displayName,
+        }),
+        headers: { 'content-type': 'application/json' },
+        signal,
+      },
+    )
+  }
+
+  async disallowSlackPerson(
+    teamId: string,
+    slackUserId: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await this.request<{ ok: boolean }>(
+      `/connectors/slack/workspaces/${encodeURIComponent(teamId)}` +
+        `/people/${encodeURIComponent(slackUserId)}`,
+      { method: 'DELETE', signal },
+    )
+  }
+
+  listSlackSubscriptions(
+    sessionId?: string,
+    signal?: AbortSignal,
+  ): Promise<{ data: SlackSubscription[] }> {
+    const query = sessionId
+      ? `?session_id=${encodeURIComponent(sessionId)}`
+      : ''
+    return this.request<{ data: SlackSubscription[] }>(
+      `/connectors/slack/subscriptions${query}`,
+      { signal },
+    )
+  }
+
+  addSlackSubscription(
+    input: { sessionId: string; channel: string },
+    signal?: AbortSignal,
+  ): Promise<{ data: SlackSubscription[] }> {
+    return this.request<{ data: SlackSubscription[] }>(
+      '/connectors/slack/subscriptions',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          session_id: input.sessionId,
+          channel: input.channel,
+        }),
+        headers: { 'content-type': 'application/json' },
+        signal,
+      },
+    )
+  }
+
+  async removeSlackSubscription(
+    sessionId: string,
+    channel: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const params = new URLSearchParams({
+      session_id: sessionId,
+      channel,
+    })
+    await this.request<{ ok: boolean }>(
+      `/connectors/slack/subscriptions?${params}`,
+      { method: 'DELETE', signal },
+    )
+  }
+
+  listSlackParked(signal?: AbortSignal): Promise<{ data: SlackParkedMessage[] }> {
+    return this.request<{ data: SlackParkedMessage[] }>(
+      '/connectors/slack/parked',
+      { signal },
+    )
+  }
+
+  async allowSlackParked(messageId: string, signal?: AbortSignal): Promise<void> {
+    await this.request<{ ok: boolean }>(
+      `/connectors/slack/parked/${encodeURIComponent(messageId)}/allow`,
+      { method: 'POST', signal },
+    )
+  }
+
+  async dismissSlackParked(
+    messageId: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await this.request<{ ok: boolean }>(
+      `/connectors/slack/parked/${encodeURIComponent(messageId)}`,
+      { method: 'DELETE', signal },
+    )
+  }
+
+  getSessionSlackMute(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<SessionConnectorMute> {
+    return this.request<SessionConnectorMute>(
+      `/sessions/${encodeURIComponent(sessionId)}/connectors/slack`,
+      { signal },
+    )
+  }
+
+  setSessionSlackMute(
+    sessionId: string,
+    muted: boolean,
+    signal?: AbortSignal,
+  ): Promise<SessionConnectorMute> {
+    return this.request<SessionConnectorMute>(
+      `/sessions/${encodeURIComponent(sessionId)}/connectors/slack`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ muted }),
         headers: { 'content-type': 'application/json' },
         signal,
       },

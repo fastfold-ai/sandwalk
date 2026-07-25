@@ -1,6 +1,6 @@
 import { Icon } from '@iconify/react'
-import type { LibraryItem, LibraryKind } from '@sandwalk/agent-ui-core'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { LibraryItem, LibraryKind } from '@sandwalk/agent-ui-core'
 import {
   Check,
   LayoutGrid,
@@ -21,12 +21,12 @@ import { structureFormat } from '@/components/agents/artifact-grid-thumb-utils'
 import { LibraryPreviewDialog } from '@/components/agents/LibraryPreviewDialog'
 import { PdfFirstPagePreview } from '@/components/agents/PdfFirstPagePreview'
 import { Py2dMolMiniPreview } from '@/components/agents/py2dmol/Py2dMolMiniPreview'
-import { VideoPlayPreview } from '@/components/agents/VideoPlayPreview'
 import {
   TabContextItem,
   TabContextMenuShell,
   TabContextSeparator
 } from '@/components/agents/tab-context-menu'
+import { VideoPlayPreview } from '@/components/agents/VideoPlayPreview'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,

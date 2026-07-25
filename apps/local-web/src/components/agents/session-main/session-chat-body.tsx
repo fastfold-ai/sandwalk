@@ -1,12 +1,11 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentMessage, AgentPlanCard, AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
-import { lazy, Suspense, useCallback, useMemo, useRef, type ComponentProps, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { type ComponentProps, type Dispatch, lazy, type RefObject, type SetStateAction,Suspense, useCallback, useMemo, useRef } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ChatTranscript } from '@/components/agents/ChatTranscript'
-import { startPlanBuild } from '@/lib/plan-build'
 import {
   ChatPageSkeleton,
   DetailPageSkeleton
@@ -14,6 +13,7 @@ import {
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
+import { startPlanBuild } from '@/lib/plan-build'
 import { type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 

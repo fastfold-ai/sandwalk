@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
+import { copyText } from '@/lib/clipboard'
 
 export function FileActionsHeader({
   path,
@@ -91,7 +92,7 @@ export function FileActionsHeader({
             <button
               type="button"
               className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-              onClick={() => void navigator.clipboard.writeText(path)}
+              onClick={() => void copyText(path)}
             >
               <Copy className="size-3.5" />
               Copy path

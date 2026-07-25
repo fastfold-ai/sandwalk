@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS messages (
     session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     role TEXT NOT NULL,
     content TEXT NOT NULL,
+    metadata TEXT,
     created_at TEXT NOT NULL
 );
 
@@ -118,6 +119,71 @@ CREATE TABLE IF NOT EXISTS library_item_sessions (
     item_id TEXT NOT NULL REFERENCES library_items(id) ON DELETE CASCADE,
     session_id TEXT NOT NULL,
     PRIMARY KEY (item_id, session_id)
+);
+
+CREATE TABLE IF NOT EXISTS slack_workspaces (
+    team_id TEXT PRIMARY KEY,
+    team_name TEXT,
+    domain TEXT,
+    mode TEXT NOT NULL,
+    bot_token TEXT,
+    app_token TEXT,
+    bot_user_id TEXT,
+    connection_id TEXT,
+    assistant_enabled INTEGER NOT NULL DEFAULT 0,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS slack_allowed_users (
+    team_id TEXT NOT NULL REFERENCES slack_workspaces(team_id) ON DELETE CASCADE,
+    slack_user_id TEXT NOT NULL,
+    display_name TEXT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (team_id, slack_user_id)
+);
+
+CREATE TABLE IF NOT EXISTS slack_subscriptions (
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (session_id, channel)
+);
+
+CREATE INDEX IF NOT EXISTS slack_subscriptions_channel
+    ON slack_subscriptions(channel);
+
+CREATE TABLE IF NOT EXISTS slack_mention_threads (
+    thread_target TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS slack_mention_threads_session
+    ON slack_mention_threads(session_id);
+
+CREATE TABLE IF NOT EXISTS slack_parked_messages (
+    id TEXT PRIMARY KEY,
+    team_id TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    thread_target TEXT,
+    slack_user_id TEXT NOT NULL,
+    user_name TEXT,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS slack_parked_messages_created
+    ON slack_parked_messages(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS session_connector_mutes (
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    connector TEXT NOT NULL,
+    muted INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (session_id, connector)
 );
 """
 

@@ -1,7 +1,9 @@
+import type { AgentSession } from '@sandwalk/agent-ui-core'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
-import type { AppShellProps } from '@/components/app-shell-props'
+import type { TranscriptEntry } from '@/components/agents/transcript'
 import type { buildAgentComposerSlotProps } from '@/components/app/build-agent-composer-slot-props'
+import type { AppShellProps } from '@/components/app-shell-props'
 import type { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import type { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
 import type { useAppRouting } from '@/hooks/useAppRouting'
@@ -11,8 +13,6 @@ import type { useSessionActions } from '@/hooks/useSessionActions'
 import type { useSessionChatState } from '@/hooks/useSessionChatState'
 import type { useSessionSandbox } from '@/hooks/useSessionSandbox'
 import type { groupSessions } from '@/lib/sessions'
-import type { TranscriptEntry } from '@/components/agents/transcript'
-import type { AgentSession } from '@sandwalk/agent-ui-core'
 
 type AppShellBridgeInput = {
   ui: ReturnType<typeof useAppUiState>

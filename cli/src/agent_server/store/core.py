@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from agent_server.store.base import AgentStoreBase
+from agent_server.store.connectors import ConnectorMixin
 from agent_server.store.events import EventMixin
 from agent_server.store.library import LibraryMixin
 from agent_server.store.mcp_servers import McpServerMixin
@@ -26,6 +27,7 @@ class AgentStore(
     EventMixin,
     McpServerMixin,
     LibraryMixin,
+    ConnectorMixin,
     AgentStoreBase,
 ):
     """Small durable store shared by CLI and web transports.

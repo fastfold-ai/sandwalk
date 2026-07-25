@@ -1,23 +1,11 @@
-import type { ComponentProps, Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react'
-import type { ImperativePanelHandle } from 'react-resizable-panels'
-import type { Location, NavigateFunction } from 'react-router-dom'
-
-import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
-import { type DashboardMainViewsProps } from '@/components/agents/DashboardMainViews'
-import { type DashboardSection } from '@/components/agents/DashboardSidebar'
-import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
-import { type TranscriptEntry } from '@/components/agents/transcript'
-import { type TranscriptTool } from '@/components/agents/ToolCard'
-import { type SessionChatState, groupSessions } from '@/lib/sessions'
-import { type SkillsViewMode, type parseCatalogSkillId } from '@/lib/skills-catalog'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentMessage,
+  AgentPlanCard,
   AgentProject,
   AgentSession,
   AgentSkill,
   AgentSkillDetail,
-  AgentPlanCard,
   AgentTodo,
   BackendHealth,
   IntegrationSummary,
@@ -28,6 +16,18 @@ import type {
   Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
+import type { ComponentProps, Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react'
+import type { ImperativePanelHandle } from 'react-resizable-panels'
+import type { Location, NavigateFunction } from 'react-router-dom'
+
+import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
+import { type DashboardMainViewsProps } from '@/components/agents/DashboardMainViews'
+import { type DashboardSection } from '@/components/agents/DashboardSidebar'
+import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
+import { type TranscriptTool } from '@/components/agents/ToolCard'
+import { type TranscriptEntry } from '@/components/agents/transcript'
+import { groupSessions,type SessionChatState } from '@/lib/sessions'
+import { type parseCatalogSkillId,type SkillsViewMode } from '@/lib/skills-catalog'
 
 export type AppShellProps = {
   sidebarPanelRef: RefObject<ImperativePanelHandle | null>

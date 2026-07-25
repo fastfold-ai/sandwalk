@@ -1,8 +1,8 @@
 import { ChevronDown, HardDrive, Mic, Monitor } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
-import { DesktopOnlyCallout } from '@/components/agents/DesktopOnlyCallout'
 import { VoiceLevelBars } from '@/components/agents/composer/VoiceLevelBars'
+import { DesktopOnlyCallout } from '@/components/agents/DesktopOnlyCallout'
 import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,9 +17,9 @@ import {
   browserDictationStatus,
   cancelDictationModelDownload,
   deleteDictationModel,
-  downloadDictationModel,
   type DictationDownloadProgress,
   type DictationStatus,
+  downloadDictationModel,
   getDictationLevel,
   getDictationStatus,
   listenDictationDownloadProgress,

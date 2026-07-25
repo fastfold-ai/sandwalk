@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException
 
 from agent_server.account_service import AccountService
 from agent_server.auth_settings import load_settings, resolve_effective_api_key
+from agent_server.connectors.service import ConnectorService
 from agent_server.datasets_service import DatasetsService
 from agent_server.integrations_service import IntegrationsService
 from agent_server.library import LibraryService
@@ -44,6 +45,7 @@ class AppDeps:
     pty_manager: PtyManager
     mcp_service: McpService
     library_service: LibraryService
+    connector_service: ConnectorService
     backend_id: str
     cli_api_key: str | None
 

@@ -2,6 +2,7 @@ import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
 
 export function ArtifactsBrowserPathFooter({
@@ -38,7 +39,7 @@ export function ArtifactsBrowserPathFooter({
         title="Copy absolute path"
         aria-label="Copy absolute path"
         onClick={() => {
-          void navigator.clipboard.writeText(absolute).then(() => {
+          void copyText(absolute).then(() => {
             setCopied(true)
             window.setTimeout(() => setCopied(false), 1500)
           })

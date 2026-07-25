@@ -1,6 +1,3 @@
-import { useCallback, useRef, type MutableRefObject, type SetStateAction } from 'react'
-
-import { resolveSelectedIntegrationKey } from '@/components/app/app-display'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentProject,
@@ -9,7 +6,9 @@ import type {
   McpCatalogEntry,
   McpServer
 } from '@sandwalk/agent-ui-core'
+import { type MutableRefObject, type SetStateAction,useCallback, useRef } from 'react'
 
+import { resolveSelectedIntegrationKey } from '@/components/app/app-display'
 import type { SessionChatState } from '@/lib/sessions'
 
 type UseAppRouteContextInput = {

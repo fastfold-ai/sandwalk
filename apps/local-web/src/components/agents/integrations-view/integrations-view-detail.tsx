@@ -1,5 +1,6 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
+  AgentSession,
   IntegrationSetupResult,
   IntegrationSummary
 } from '@sandwalk/agent-ui-core'
@@ -10,19 +11,21 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 import {
-  IntegrationsDetailFieldsTable,
-  IntegrationsDetailVercelPanel
-} from './integrations-view-detail-panels'
-import {
   IntegrationsDetailHeader,
   IntegrationsDetailNav
 } from './integrations-view-detail-header'
+import {
+  IntegrationsDetailFieldsTable,
+  IntegrationsDetailVercelPanel
+} from './integrations-view-detail-panels'
+import { SlackConnectorPanel } from './slack/SlackConnectorPanel'
 import { useIntegrationsDetailView } from './use-integrations-detail-view'
 
 export function IntegrationsDetailView({
   terminalClient,
   selected,
   values,
+  sessions = [],
   onBack,
   onValueChange,
   onSave,
@@ -35,6 +38,7 @@ export function IntegrationsDetailView({
   terminalClient: LocalAgentClient
   selected: IntegrationSummary
   values: Record<string, string>
+  sessions?: AgentSession[]
   onBack: () => void
   onValueChange: (envName: string, value: string) => void
   onSave: () => Promise<void>
@@ -100,6 +104,18 @@ export function IntegrationsDetailView({
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
           <IntegrationsDetailHeader selected={selected} />
+          {selected.key === 'slack' ? (
+            <>
+              <SlackConnectorPanel client={terminalClient} sessions={sessions} />
+              <div className="border-border/70 mt-2 border-t pt-4">
+                <h3 className="text-[13px] font-medium">Report notifications</h3>
+                <p className="text-muted-foreground mt-0.5 text-[12px]">
+                  Separate from the connector above — this token is what the
+                  agent uses to post reports to a channel.
+                </p>
+              </div>
+            </>
+          ) : null}
           {selected.key === 'skills-sh' ? (
             <IntegrationsDetailVercelPanel
               terminalClient={terminalClient}

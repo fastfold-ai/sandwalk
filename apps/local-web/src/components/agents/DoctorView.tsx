@@ -5,12 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
+import { DoctorScanProgress } from './doctor-scan-progress'
 import {
   DoctorCheckGroups,
   DoctorSummaryCards
 } from './doctor-view-checks'
 import { DoctorDiagnosticsSection } from './doctor-view-diagnostics'
-import { DoctorScanProgress } from './doctor-scan-progress'
 import {
   collectUiDiagnostics,
   groupDoctorChecks,

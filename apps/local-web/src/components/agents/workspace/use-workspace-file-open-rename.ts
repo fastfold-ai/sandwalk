@@ -1,7 +1,6 @@
 import type { WorkspaceFile } from '@sandwalk/agent-ui-core'
 
 import { normalizeFileContent } from '../workspace-utils'
-
 import type { WorkspacePanelState } from './use-workspace-panel-state'
 
 export function useWorkspaceFileRenameActions(state: WorkspacePanelState) {

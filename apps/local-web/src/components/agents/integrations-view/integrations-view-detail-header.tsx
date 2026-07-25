@@ -132,6 +132,11 @@ export function IntegrationsDetailHeader({
             Modal tokens for sandbox chats. App defaults and images live under
             Modal Settings.
           </p>
+        ) : selected.key === 'slack' ? (
+          <p className="text-muted-foreground mt-1 text-sm">
+            Connect a workspace so mentions open a session here and the answer
+            goes back as a thread reply.
+          </p>
         ) : (
           <p className="text-muted-foreground mt-1 text-sm">
             Preset provider env keys. Fill values and save.

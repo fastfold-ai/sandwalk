@@ -1,10 +1,10 @@
 import { memo, useMemo } from 'react'
 
 import { MermaidCard } from './mermaid-diagram-card'
-import { renderMermaid, type MermaidDiagramProps } from './mermaid-diagram-utils'
+import { type MermaidDiagramProps,renderMermaid } from './mermaid-diagram-utils'
 
-export { looksLikeMermaid } from './mermaid-diagram-utils'
 export type { MermaidDiagramProps } from './mermaid-diagram-utils'
+export { looksLikeMermaid } from './mermaid-diagram-utils'
 
 export const MermaidDiagram = memo(function MermaidDiagram({
   code,

@@ -1,3 +1,4 @@
+import type { AgentSkillDetail, WorkspaceFile } from '@sandwalk/agent-ui-core'
 import { useRef, useState } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 
@@ -11,7 +12,6 @@ import {
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   TERMINAL_OPEN_STORAGE_KEY
 } from '@/lib/app-storage'
-import type { AgentSkillDetail, WorkspaceFile } from '@sandwalk/agent-ui-core'
 
 export function useAppUiState() {
   const [connectionLimitDismissed, setConnectionLimitDismissed] =

@@ -10,11 +10,11 @@ import { cn, relativeTime } from '@/lib/utils'
 
 import { ArtifactGridThumb } from './ArtifactGridThumb'
 import {
+  type ArtifactGroup,
   childrenOf,
   compareArtifacts,
   groupRootPath,
   parentDir,
-  type ArtifactGroup,
   type ViewMode
 } from './workspace-utils'
 

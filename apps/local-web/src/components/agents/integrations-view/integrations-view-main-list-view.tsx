@@ -11,8 +11,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { isFeaturedIntegration } from '@/lib/skills-catalog'
 
-import { IntegrationCard } from './integrations-view-shared'
 import { IntegrationsListSidebar } from './integrations-view-list-sidebar'
+import { IntegrationCard } from './integrations-view-shared'
 
 export function IntegrationsMainListView({
   integrations,

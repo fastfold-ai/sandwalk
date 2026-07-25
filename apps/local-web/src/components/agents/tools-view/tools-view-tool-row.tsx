@@ -6,10 +6,9 @@ import { cn } from '@/lib/utils'
 import {
   statusClass,
   tierClass,
-  ToolToggle,
   toolIsToggleable,
-  toolTier
-} from './tools-view-shared'
+  toolTier,
+  ToolToggle} from './tools-view-shared'
 
 export function ToolsViewToolRow({
   tool,

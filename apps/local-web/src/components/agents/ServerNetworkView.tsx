@@ -7,9 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   desktopGetSettings,
   desktopPutSettings,
-  isTauri,
-  type DesktopSettings
-} from '@/lib/desktop'
+  type DesktopSettings,
+  isTauri} from '@/lib/desktop'
 
 export function ServerNetworkView() {
   const desktop = isTauri()

@@ -10,11 +10,29 @@ from agent_server.models.base import ApiModel
 MessageRole = Literal["user", "assistant", "system"]
 
 
+class MessageSource(ApiModel):
+    """Where an inbound message came from, for display only.
+
+    The model still sees the framed ``content``; this drives the card the UI
+    renders above it so a Slack message reads as a Slack message.
+    """
+
+    connector: Literal["slack"]
+    channel_id: str
+    channel_name: str | None = None
+    sender_id: str
+    sender_name: str | None = None
+    # Raw message text, without the reply-handle framing the model needs.
+    text: str
+    permalink: str | None = None
+
+
 class AgentMessage(ApiModel):
     id: str
     session_id: str
     role: MessageRole
     content: str
+    source: MessageSource | None = None
     created_at: datetime
 
 

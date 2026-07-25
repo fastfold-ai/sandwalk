@@ -170,6 +170,21 @@ export const openExternalUrl = (url: string) =>
   invokeStrict<void>('open_external_url', { url })
 
 /**
+ * Copy via the native shell. Returns false when unavailable (browser) or when
+ * the shell reports failure, so callers can fall back or surface an error.
+ */
+export const copyViaDesktop = async (text: string): Promise<boolean> => {
+  const api = tauri()
+  if (!api?.core?.invoke) return false
+  try {
+    await api.core.invoke('copy_to_clipboard', { text })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Save text via the native shell (Downloads + reveal). WebView `<a download>`
  * does not write files in Tauri.
  */

@@ -16,9 +16,10 @@ import {
 } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
-import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
-import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
 import { useSessionTabColors } from '@/components/agents/session-tab-colors'
+import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
+import { SessionSourceIcon } from '@/components/agents/SessionSourceIcon'
+import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
 import {
   Popover,
   PopoverContent,
@@ -228,6 +229,10 @@ export function SidebarSessionList({
                                   }
                                 />
                               )}
+                              <SessionSourceIcon
+                                source={item.source}
+                                label={item.sourceLabel}
+                              />
                               {item.organizeLabel === 'pinned' ? (
                                 <Pin className="text-muted-foreground/70 size-3 shrink-0" />
                               ) : null}

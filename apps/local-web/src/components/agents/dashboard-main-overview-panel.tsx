@@ -6,13 +6,13 @@ import {
   navigateToIntegration,
   openVercelIntegrationTerminal
 } from './dashboard-main-view-helpers'
-import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 import {
   DashboardOverviewView,
   IntegrationsView,
   McpView,
   SkillsView
 } from './dashboard-main-views-lazy'
+import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 
 export function DashboardMainOverviewPanel({
   client,

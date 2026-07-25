@@ -6,11 +6,11 @@ import { getFileIcon } from '@/lib/file-icons'
 import { mediaObjectUrlFromFile } from '@/lib/media-src'
 import { cn } from '@/lib/utils'
 
+import { decodeContent, structureFormat } from './artifact-grid-thumb-utils'
 import { AudioPlayPreview } from './AudioPlayPreview'
 import { PdfFirstPagePreview } from './PdfFirstPagePreview'
-import { VideoPlayPreview } from './VideoPlayPreview'
-import { decodeContent, structureFormat } from './artifact-grid-thumb-utils'
 import { Py2dMolMiniPreview } from './py2dmol/Py2dMolMiniPreview'
+import { VideoPlayPreview } from './VideoPlayPreview'
 
 export function IconFallback({
   name,

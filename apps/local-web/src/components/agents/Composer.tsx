@@ -3,6 +3,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import {
+  type ComposerProps,
+  type SandboxActionPhase,
+  type SandboxComputeChange
+} from '@/components/agents/composer/composer-props'
+import {
   ComposerAtMenu,
   type ComposerAtMenuHandle
 } from '@/components/agents/composer/ComposerAtMenu'
@@ -14,11 +19,6 @@ import {
 } from '@/components/agents/composer/ComposerSlashMenu'
 import { ComposerToolbar } from '@/components/agents/composer/ComposerToolbar'
 import { ComposerVoiceBar } from '@/components/agents/composer/ComposerVoiceBar'
-import {
-  type ComposerProps,
-  type SandboxActionPhase,
-  type SandboxComputeChange
-} from '@/components/agents/composer/composer-props'
 import { useComposerAttachments } from '@/components/agents/composer/useComposerAttachments'
 import {
   useComposerDraftState,
@@ -101,8 +101,9 @@ export function Composer({
   } = useComposerAttachments(onUpload, focusKey)
 
   useEffect(() => {
-    const pending = pendingAttachmentsRef?.current
-    if (!focusKey || !pending?.paths.length) return
+    const attachmentsRef = pendingAttachmentsRef
+    const pending = attachmentsRef?.current
+    if (!attachmentsRef || !focusKey || !pending?.paths.length) return
     if (pending.sessionId !== focusKey) return
     let cancelled = false
     const paths = [...pending.paths]
@@ -122,8 +123,8 @@ export function Composer({
       )
       if (cancelled) return
       // Clear only after a successful seed so Strict Mode remounts can retry.
-      if (pendingAttachmentsRef.current === pending) {
-        pendingAttachmentsRef.current = null
+      if (attachmentsRef.current === pending) {
+        attachmentsRef.current = null
       }
       seedReadyAttachments(seeded)
     })()

@@ -23,11 +23,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   desktopServerRestart,
   desktopServerStart,
+  type DesktopServerStatus,
   desktopServerStatus,
   desktopServerStop,
-  isTauri,
-  type DesktopServerStatus
-} from '@/lib/desktop'
+  isTauri} from '@/lib/desktop'
 
 import {
   ServerStatusCacheSection,

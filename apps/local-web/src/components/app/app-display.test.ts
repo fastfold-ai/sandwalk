@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveSelectedIntegrationKey } from './app-display'
 import { integrationRouteSegment } from '@/components/agents/dashboard-main-view-helpers'
+
+import { resolveSelectedIntegrationKey } from './app-display'
 
 const integrations = [
   {

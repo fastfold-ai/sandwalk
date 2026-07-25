@@ -18,6 +18,9 @@ SandboxBackendChoice = Literal["builtin", "modal"]
 # pending = still eligible for auto-title; auto = model-generated; user = manual rename
 TitleSource = Literal["pending", "auto", "user"]
 
+# Connector that spawned the session; None means it started locally.
+SessionSource = Literal["slack"]
+
 
 class AgentSession(ApiModel):
     id: str
@@ -29,6 +32,9 @@ class AgentSession(ApiModel):
     specialist_id: str | None = None
     sandbox_backend: SandboxBackendChoice | None = None
     workspace_path: str | None = None
+    source: SessionSource | None = None
+    # Human-readable origin, e.g. "#dev-ops · Acme" — shown next to the source icon.
+    source_label: str | None = None
     last_message_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

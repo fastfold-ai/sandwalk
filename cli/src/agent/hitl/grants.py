@@ -10,7 +10,11 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from agent.hitl.config import SKILLS_MANAGE_TOOL
+from agent.hitl.config import (
+    SKILLS_MANAGE_TOOL,
+    SLACK_SEND_TOOL,
+    grant_key_for_slack_target,
+)
 from agent.hitl.context import HitlRunContext, get_hitl_context
 
 _LOCK = threading.Lock()
@@ -35,6 +39,10 @@ def grant_key_for_action(action: dict[str, Any] | None) -> str | None:
         return None
     name = str(action.get("name") or "").strip()
     args = action.get("args") if isinstance(action.get("args"), dict) else {}
+    if name == SLACK_SEND_TOOL:
+        # Scoped to the destination: approving one channel must not silently
+        # authorize every other channel for the rest of the run.
+        return grant_key_for_slack_target(str(args.get("target") or ""))
     if name != SKILLS_MANAGE_TOOL:
         return None
     act = _normalize_action(str(args.get("action") or ""))

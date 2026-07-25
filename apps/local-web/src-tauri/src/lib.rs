@@ -9,8 +9,9 @@ mod dictation;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -320,6 +321,55 @@ fn open_external_url(url: String) -> Result<(), String> {
     }
 }
 
+/// Write text to the system clipboard.
+///
+/// The webview's JS clipboard APIs are unreliable here: `navigator.clipboard`
+/// needs a focused, permitted, secure context and `document.execCommand` is
+/// deprecated, so both can fail silently inside WKWebView. The shell owns this
+/// the same way it owns saving files.
+#[tauri::command]
+fn copy_to_clipboard(text: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let candidates: Vec<Vec<&str>> = vec![vec!["pbcopy"]];
+    #[cfg(target_os = "windows")]
+    let candidates: Vec<Vec<&str>> = vec![vec!["clip"]];
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    let candidates: Vec<Vec<&str>> = vec![
+        vec!["wl-copy"],
+        vec!["xclip", "-selection", "clipboard"],
+        vec!["xsel", "--clipboard", "--input"],
+    ];
+
+    let mut last_error = String::from("no clipboard helper available");
+    for parts in candidates {
+        let (program, args) = parts.split_first().expect("non-empty command");
+        let spawned = Command::new(program).args(args).stdin(Stdio::piped()).spawn();
+        let mut child = match spawned {
+            Ok(child) => child,
+            Err(err) => {
+                last_error = format!("{program}: {err}");
+                continue;
+            }
+        };
+        let write_result = child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| format!("{program}: no stdin"))
+            .and_then(|stdin| stdin.write_all(text.as_bytes()).map_err(|e| e.to_string()));
+        if let Err(err) = write_result {
+            last_error = err;
+            let _ = child.kill();
+            continue;
+        }
+        match child.wait() {
+            Ok(status) if status.success() => return Ok(()),
+            Ok(status) => last_error = format!("{program} exited with {status}"),
+            Err(err) => last_error = format!("{program}: {err}"),
+        }
+    }
+    Err(last_error)
+}
+
 #[derive(Clone, Serialize)]
 struct NavigatePayload {
     path: String,
@@ -431,6 +481,7 @@ pub fn run() {
             start_window_drag,
             toggle_maximize,
             open_external_url,
+            copy_to_clipboard,
             save_text_file,
             save_bytes_file,
             dictation::get_dictation_status,

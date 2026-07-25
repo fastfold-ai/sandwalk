@@ -1,8 +1,8 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
-import { ToolCard, type TranscriptTool } from '@/components/agents/ToolCard'
 import { groupConsecutiveSameNameTools } from '@/components/agents/chat-transcript-timeline'
+import { ToolCard, type TranscriptTool } from '@/components/agents/ToolCard'
 import { TOOL_RUN_VISIBLE_COUNT } from '@/components/agents/transcript'
 
 type LiveToolStackProps = {

@@ -6,13 +6,11 @@ export {
   ListRowsSkeleton,
   SettingsBlockSkeleton
 } from './page-skeletons-blocks'
-
 export {
   DashboardDoctorSkeleton,
   DashboardListSkeleton,
   DashboardOverviewSkeleton,
   DashboardPageSkeleton,
   DashboardSettingsSkeleton,
-  HomePageSkeleton,
-  type DashboardSkeletonKind
-} from './page-skeletons-dashboard'
+  type DashboardSkeletonKind,
+  HomePageSkeleton} from './page-skeletons-dashboard'

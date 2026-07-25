@@ -19,15 +19,14 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 import {
+  type KnowledgeLevel,
   KnowledgeLevelControl,
-  knowledgeLevelFromSettings,
-  type KnowledgeLevel
-} from './prompts-view/knowledge-level-control'
+  knowledgeLevelFromSettings} from './prompts-view/knowledge-level-control'
 import { PromptBudgetResults } from './prompts-view/prompt-budget-results'
 import {
-  promptBudgetCache,
   patchPromptBudgetSpecialists,
   PROMPT_BUDGET_CACHE_TTL_MS,
+  promptBudgetCache,
   readTokenCountMethod,
   type TokenCountMethod,
   writePromptBudgetCache,

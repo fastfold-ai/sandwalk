@@ -4,8 +4,8 @@ import {
   navigateToIntegration,
   openVercelIntegrationTerminal
 } from './dashboard-main-view-helpers'
-import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 import { IntegrationsView } from './dashboard-main-views-lazy'
+import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 
 export function DashboardMainIntegrationsPanel({
   client,
@@ -40,6 +40,7 @@ export function DashboardMainIntegrationsPanel({
       loading={connecting && integrations.length === 0}
       selectedKey={selectedIntegrationKey}
       values={integrationValues}
+      sessions={sessions}
       onValueChange={(envName, value) =>
         setIntegrationValues(current => ({
           ...current,

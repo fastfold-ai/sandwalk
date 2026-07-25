@@ -1,6 +1,3 @@
-import type { ComponentProps } from 'react'
-
-import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentSession,
@@ -10,6 +7,9 @@ import type {
   Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
+import type { ComponentProps } from 'react'
+
+import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 
 type AgentComposerSlotProps = ComponentProps<typeof AgentComposerSlot>
 

@@ -11,8 +11,6 @@ import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
-import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
-import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import {
   useAppRouteContext,
   useChatBySessionIdBridge
@@ -22,6 +20,8 @@ import { useAppSessionEffects } from '@/hooks/useAppSessionEffects'
 import { useAppSessionLayer } from '@/hooks/useAppSessionLayer'
 import { useAppShellEffects } from '@/hooks/useAppShellEffects'
 import { useAppUiState } from '@/hooks/useAppUiState'
+import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
+import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { visibleSessionIds } from '@/lib/sessions'
 
 export default function App() {

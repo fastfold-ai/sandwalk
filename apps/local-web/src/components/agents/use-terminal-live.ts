@@ -2,8 +2,9 @@ import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { PtySessionInfo } from '@sandwalk/agent-ui-core'
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { useCallback, useEffect, useRef, type RefObject } from 'react'
+import { type RefObject,useCallback, useEffect, useRef } from 'react'
 
+import { copyText } from '@/lib/clipboard'
 import {
   buildTerminalTheme,
   isDocumentDark,
@@ -93,7 +94,7 @@ export function useTerminalLive({
           (event.metaKey || event.ctrlKey) &&
           term.hasSelection()
         ) {
-          void navigator.clipboard.writeText(term.getSelection())
+          void copyText(term.getSelection())
           return false
         }
 

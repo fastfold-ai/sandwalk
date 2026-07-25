@@ -1,5 +1,5 @@
 import type { Specialist, ToolCatalog, ToolSummary } from '@sandwalk/agent-ui-core'
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import { type Dispatch, type SetStateAction,useEffect, useMemo, useState } from 'react'
 
 import type { SpecialistFormState } from '@/components/agents/specialists-view/specialists-view-utils'
 

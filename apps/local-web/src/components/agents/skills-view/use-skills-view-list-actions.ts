@@ -5,6 +5,7 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import { useCallback, useEffect, useState } from 'react'
 
+import { copyText } from '@/lib/clipboard'
 import { skillInstallSource, type SkillsViewMode } from '@/lib/skills-catalog'
 
 import { resolveInstalledDetailPresentation } from './skills-view-installed-detail'
@@ -69,7 +70,7 @@ export function useSkillsViewListActions({
 
   const handleCopyInstall = useCallback(() => {
     if (!detailInstallCommand) return
-    void navigator.clipboard.writeText(detailInstallCommand).then(() => {
+    void copyText(detailInstallCommand).then(() => {
       setCopiedInstall(true)
       window.setTimeout(() => setCopiedInstall(false), 2000)
     })

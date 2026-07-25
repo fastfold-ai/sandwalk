@@ -2,10 +2,9 @@ import type { ITheme } from '@xterm/xterm'
 
 import {
   getStoredPalette,
-  type ThemePaletteId,
+  PALETTE_CHANGE_EVENT,
   THEME_CHANGE_EVENT,
-  PALETTE_CHANGE_EVENT
-} from '@/lib/theme'
+  type ThemePaletteId} from '@/lib/theme'
 
 type AnsiTheme = Pick<
   ITheme,

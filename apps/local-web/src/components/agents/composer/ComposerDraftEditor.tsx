@@ -4,13 +4,13 @@ import {
   useMemo
 } from 'react'
 
+import { createDraftEditorHandlers } from '@/components/agents/composer/composer-draft-editor-handlers'
+import type { ComposerAtMenuHandle } from '@/components/agents/composer/ComposerAtMenu'
 import {
   ComposerFileChip,
   ComposerMcpChip,
   ComposerSkillChip
 } from '@/components/agents/composer/ComposerChip'
-import type { ComposerAtMenuHandle } from '@/components/agents/composer/ComposerAtMenu'
-import { createDraftEditorHandlers } from '@/components/agents/composer/composer-draft-editor-handlers'
 import { ComposerDraftTextPart } from '@/components/agents/composer/ComposerDraftTextPart'
 import type { ComposerSlashMenuHandle } from '@/components/agents/composer/ComposerSlashMenu'
 import {

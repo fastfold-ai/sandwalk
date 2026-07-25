@@ -1,11 +1,10 @@
 import { Pause, Play } from 'lucide-react'
 import {
+  type MouseEvent,
+  type SyntheticEvent,
   useEffect,
   useRef,
-  useState,
-  type MouseEvent,
-  type SyntheticEvent
-} from 'react'
+  useState} from 'react'
 
 import { cn } from '@/lib/utils'
 

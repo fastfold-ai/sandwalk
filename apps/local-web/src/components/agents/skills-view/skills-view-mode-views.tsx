@@ -1,3 +1,4 @@
+import { copyText } from '@/lib/clipboard'
 import {
   catalogSkillInstallCommand,
   catalogSkillInstallTarget
@@ -51,7 +52,7 @@ export function SkillsViewCatalogMode({
       onBack={onBack}
       onCopyInstall={() => {
         if (!catalogInstallCommand) return
-        void navigator.clipboard.writeText(catalogInstallCommand).then(() => {
+        void copyText(catalogInstallCommand).then(() => {
           state.setCopiedCatalogInstall(true)
         })
       }}

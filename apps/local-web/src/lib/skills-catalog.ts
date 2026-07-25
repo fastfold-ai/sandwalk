@@ -7,12 +7,10 @@ export {
   isUserCreatedSkill,
   skillAuthorLabel,
   skillMetaText,
+  type SkillsViewMode,
   stripFrontmatter,
   suggestionSourceIcon,
-  suggestionSourceLabel,
-  type SkillsViewMode
-} from './skills-catalog-helpers'
-
+  suggestionSourceLabel} from './skills-catalog-helpers'
 export {
   catalogSkillInstallCommand,
   catalogSkillInstallSource,
@@ -23,7 +21,6 @@ export {
   OWNER_REPO_RE,
   parseCatalogSkillId
 } from './skills-catalog-install'
-
 export {
   catalogCoordsFromInstalledSkill,
   catalogSkillDetailPath,

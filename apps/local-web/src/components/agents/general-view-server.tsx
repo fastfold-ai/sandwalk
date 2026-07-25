@@ -6,7 +6,6 @@ import {
   SandwalkServerCard
 } from '@/components/agents/SandwalkServerCard'
 import { Button } from '@/components/ui/button'
-import { openWebUiInBrowser } from '@/lib/desktop'
 import {
   Dialog,
   DialogContent,
@@ -17,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { DEFAULT_BACKEND_URL } from '@/lib/backend-url'
+import { openWebUiInBrowser } from '@/lib/desktop'
 
 export function GeneralViewServerSection({
   backendUrl,

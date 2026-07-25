@@ -3,15 +3,14 @@ import type { Components } from 'react-markdown'
 import type { NavigateFunction } from 'react-router-dom'
 
 import {
-  SkillMentionChip,
-  type SkillIconSkill
-} from '@/components/agents/SkillMentionChip'
+  type SkillIconSkill,
+  SkillMentionChip} from '@/components/agents/SkillMentionChip'
 import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
 import { splitTextWithSkillMentions } from '@/lib/skill-mentions'
 import { workspaceRelativeFromPath } from '@/lib/workspace-file-paths'
 
-import { linkifyWorkspacePathChildren } from './markdown-linkify-children'
 import { MarkdownCodeBlock } from './markdown-code-block'
+import { linkifyWorkspacePathChildren } from './markdown-linkify-children'
 
 export type MarkdownComponentOptions = {
   navigate: NavigateFunction

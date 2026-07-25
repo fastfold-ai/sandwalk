@@ -1,7 +1,3 @@
-import {
-  type ComposerModelOption,
-  formatReasoningEffortLabel
-} from '@/lib/composer-models'
 import { Check } from 'lucide-react'
 
 import {
@@ -9,6 +5,10 @@ import {
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
+import {
+  type ComposerModelOption,
+  formatReasoningEffortLabel
+} from '@/lib/composer-models'
 import { cn } from '@/lib/utils'
 
 export function ComposerModelEffortMenu({

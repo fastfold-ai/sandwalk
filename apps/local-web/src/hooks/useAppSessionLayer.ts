@@ -1,19 +1,3 @@
-import { useCallback, useMemo } from 'react'
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import type { Location, NavigateFunction } from 'react-router-dom'
-
-import { buildConversationTimeline } from '@/components/agents/transcript'
-import { buildAgentComposerSlotProps } from '@/components/app/build-agent-composer-slot-props'
-import { CONCURRENT_RUN_SOFT_LIMIT, computeRunningCount } from '@/components/app/app-display'
-import { usePrefetchSessionMessages } from '@/hooks/useAppRouteContext'
-import { useChatScroll } from '@/hooks/useChatScroll'
-import { useSessionActions } from '@/hooks/useSessionActions'
-import { useSessionChatSend } from '@/hooks/useSessionChatSend'
-import { useSessionChatState } from '@/hooks/useSessionChatState'
-import { useSessionChatStream } from '@/hooks/useSessionChatStream'
-import { useSessionSandbox } from '@/hooks/useSessionSandbox'
-import { finalizePendingTools } from '@/lib/chat-actions'
-import type { SessionChatState } from '@/lib/sessions'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentProject,
@@ -25,7 +9,23 @@ import type {
   Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
+import { useCallback, useMemo } from 'react'
+import type { Location, NavigateFunction } from 'react-router-dom'
+
+import { buildConversationTimeline } from '@/components/agents/transcript'
+import { computeRunningCount,CONCURRENT_RUN_SOFT_LIMIT } from '@/components/app/app-display'
+import { buildAgentComposerSlotProps } from '@/components/app/build-agent-composer-slot-props'
+import { usePrefetchSessionMessages } from '@/hooks/useAppRouteContext'
+import { useChatScroll } from '@/hooks/useChatScroll'
+import { useSessionActions } from '@/hooks/useSessionActions'
+import { useSessionChatSend } from '@/hooks/useSessionChatSend'
+import { useSessionChatState } from '@/hooks/useSessionChatState'
+import { useSessionChatStream } from '@/hooks/useSessionChatStream'
+import { useSessionSandbox } from '@/hooks/useSessionSandbox'
+import { finalizePendingTools } from '@/lib/chat-actions'
 import type { ComposerModelOption } from '@/lib/composer-models'
+import type { SessionChatState } from '@/lib/sessions'
 
 type SessionLayerArgs = {
   client: LocalAgentClient

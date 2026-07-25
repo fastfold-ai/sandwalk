@@ -1,3 +1,4 @@
+import type { WorkspaceFile } from '@sandwalk/agent-ui-core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { createChipInserters } from '@/components/agents/composer/composer-chip-insert'
@@ -6,7 +7,6 @@ import {
   computeAtFileQuery,
   computeSlashSkillQuery
 } from '@/components/agents/skill-examples'
-import type { WorkspaceFile } from '@sandwalk/agent-ui-core'
 
 export function useComposerDraftState({
   value,

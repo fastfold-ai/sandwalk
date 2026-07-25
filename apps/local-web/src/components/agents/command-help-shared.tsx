@@ -1,6 +1,7 @@
 import { Check, Copy, Terminal } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
 
 export function CommandRow({
@@ -50,7 +51,7 @@ export function copyCommand(
   command: string,
   setCopiedId: Dispatch<SetStateAction<string | null>>
 ) {
-  void navigator.clipboard.writeText(command)
+  void copyText(command)
   setCopiedId(id)
   window.setTimeout(() => {
     setCopiedId(current => (current === id ? null : current))

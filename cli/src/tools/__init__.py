@@ -39,6 +39,7 @@ _TOOL_MODULES = (
     "compute",
     "experiment",
     "notification",
+    "slack",
     "code",
     "files",
     "claude",

@@ -1,9 +1,8 @@
 import { Children, Fragment, type ReactNode } from 'react'
 
 import {
-  SkillMentionChip,
-  type SkillIconSkill
-} from '@/components/agents/SkillMentionChip'
+  type SkillIconSkill,
+  SkillMentionChip} from '@/components/agents/SkillMentionChip'
 import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
 import { splitTextWithSkillMentions } from '@/lib/skill-mentions'
 import { splitTextWithWorkspacePaths } from '@/lib/workspace-file-paths'

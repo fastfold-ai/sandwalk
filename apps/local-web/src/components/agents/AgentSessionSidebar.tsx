@@ -13,10 +13,11 @@ import {
   Send
 } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
-import { useLocation, type NavigateFunction } from 'react-router-dom'
+import { type NavigateFunction,useLocation } from 'react-router-dom'
 
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
+import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,7 +26,6 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip'
-import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import { groupSessions, type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 

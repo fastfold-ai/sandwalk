@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 
-from agent_server.models import AgentMessage, MessageRole
+from agent_server.models import AgentMessage, MessageRole, MessageSource
 from agent_server.store.rows import message_from_row
 from agent_server.store.util import utc_now
 
@@ -21,6 +22,7 @@ class MessageMixin:
         session_id: str,
         role: MessageRole,
         content: str,
+        source: MessageSource | None = None,
         created_at: datetime | None = None,
         message_id: str | None = None,
     ) -> AgentMessage:
@@ -30,19 +32,25 @@ class MessageMixin:
             session_id=session_id,
             role=role,
             content=content,
+            source=source,
             created_at=timestamp,
         )
         with self._write_lock, self._connect() as connection:
             connection.execute(
                 """
-                INSERT INTO messages(id, session_id, role, content, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO messages(id, session_id, role, content, metadata, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message.id,
                     message.session_id,
                     message.role,
                     message.content,
+                    (
+                        json.dumps(source.model_dump(mode="json", by_alias=True))
+                        if source is not None
+                        else None
+                    ),
                     message.created_at.isoformat(),
                 ),
             )

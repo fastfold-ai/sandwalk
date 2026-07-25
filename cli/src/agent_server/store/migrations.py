@@ -24,6 +24,12 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE sessions ADD COLUMN specialist_id TEXT")
     if "sandbox_backend" not in columns:
         connection.execute("ALTER TABLE sessions ADD COLUMN sandbox_backend TEXT")
+    # Connector-spawned sessions (e.g. a Slack mention) carry their origin so the
+    # UI can badge them; NULL means the session started locally.
+    if "source" not in columns:
+        connection.execute("ALTER TABLE sessions ADD COLUMN source TEXT")
+    if "source_label" not in columns:
+        connection.execute("ALTER TABLE sessions ADD COLUMN source_label TEXT")
     if "title_source" not in columns:
         connection.execute(
             "ALTER TABLE sessions ADD COLUMN title_source TEXT NOT NULL DEFAULT 'pending'"
@@ -70,6 +76,15 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
         """,
         placeholders,
     )
+
+    message_columns = {
+        row["name"]
+        for row in connection.execute("PRAGMA table_info(messages)").fetchall()
+    }
+    # Display-only sidecar (e.g. which Slack channel a message came from). The
+    # model-facing text stays in `content`.
+    if "metadata" not in message_columns:
+        connection.execute("ALTER TABLE messages ADD COLUMN metadata TEXT")
 
     specialist_columns = {
         row["name"]

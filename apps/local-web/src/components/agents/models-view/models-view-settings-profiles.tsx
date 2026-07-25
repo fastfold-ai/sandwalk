@@ -10,12 +10,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-import type { ProfileProbeStatus } from './use-models-view-profiles'
 import { ProfileBackendIcon } from './models-view-shared'
 import {
   PROFILE_BACKENDS,
   profileBackend
 } from './models-view-utils'
+import type { ProfileProbeStatus } from './use-models-view-profiles'
 
 export function ModelsProfilesSection({
   open,

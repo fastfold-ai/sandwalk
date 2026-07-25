@@ -1,5 +1,5 @@
-import { AppDialogs } from '@/components/AppDialogs'
 import type { AppShellProps } from '@/components/app-shell-props'
+import { AppDialogs } from '@/components/AppDialogs'
 import { AppShellMain } from '@/components/AppShellMain'
 import { AppShellSidebar } from '@/components/AppShellSidebar'
 import { DesktopTitleBar } from '@/components/DesktopTitleBar'

@@ -1,11 +1,10 @@
 import {
+  MIRAGE_CX,
+  MIRAGE_RADIUS,
   mirageBuildBlobPath,
   mirageBuildEdgeStroke,
   mirageBuildRibbonPath,
-  mirageCapsulePath,
-  MIRAGE_CX,
-  MIRAGE_RADIUS
-} from '@/components/mirageGeometry'
+  mirageCapsulePath} from '@/components/mirageGeometry'
 
 export type CircleDefinition = {
   cx: number

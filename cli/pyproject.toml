@@ -42,6 +42,9 @@ dependencies = [
     "pydantic>=2.8",
     "python-multipart>=0.0.20",
     "langchain-mcp-adapters>=0.3.0",
+    # Slack connector (Socket Mode). ~4MB — small enough to always ship so the
+    # feature can never half-exist at connect time.
+    "slack-bolt>=1.21",
     "mcp>=1.28.1",
     # Modal sandbox backend (Agent → Sandbox). Kept as a default so Mac/app
     # installs work without a separate ``pip install -e '.[modal]'`` step.
@@ -51,6 +54,8 @@ dependencies = [
 
 [project.optional-dependencies]
 notebook = ["nbconvert>=7.0"]
+# Kept for older install commands; packages are now in core dependencies.
+slack = ["slack-bolt>=1.21"]
 chemistry = ["rdkit>=2023.03"]
 biology = ["biopython>=1.81"]
 singlecell = [

@@ -1,5 +1,4 @@
-export {
-  SpecialistsEditorHeader,
-  SpecialistsEditorCapabilityBanner
-} from './specialists-editor-header-banner'
 export { SpecialistsEditorAppearanceFields } from './specialists-editor-appearance-fields'
+export {
+  SpecialistsEditorCapabilityBanner,
+  SpecialistsEditorHeader} from './specialists-editor-header-banner'

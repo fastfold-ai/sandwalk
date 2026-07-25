@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
 import type { RefObject } from 'react'
+import { useEffect } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 
 import {

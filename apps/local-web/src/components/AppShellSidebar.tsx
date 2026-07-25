@@ -1,3 +1,5 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { AgentProject, AgentSession, BackendHealth } from '@sandwalk/agent-ui-core'
 import type { RefObject } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import type { NavigateFunction } from 'react-router-dom'
@@ -8,9 +10,7 @@ import {
   DashboardSidebar
 } from '@/components/agents/DashboardSidebar'
 import { ResizablePanel } from '@/components/ui/resizable'
-import { type SessionChatState, groupSessions } from '@/lib/sessions'
-import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { AgentProject, AgentSession, BackendHealth } from '@sandwalk/agent-ui-core'
+import { groupSessions,type SessionChatState } from '@/lib/sessions'
 
 export type AppShellSidebarProps = {
   sidebarPanelRef: RefObject<ImperativePanelHandle | null>
