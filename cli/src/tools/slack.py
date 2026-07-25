@@ -38,6 +38,42 @@ def _resolve_tokens(team_id: str) -> tuple[str | None, str | None]:
         store.close()
 
 
+def _specialist_footer(parsed) -> str | None:  # type: ignore[no-untyped-def]
+    """Name the specialist that answered, when a non-default one is active.
+
+    The session title only echoes the question that opened the thread, so it
+    earns no space in Slack; which specialist replied does. Best effort - a
+    failed lookup must never stop the reply going out.
+    """
+    if not parsed.thread_ts:
+        return None
+    try:
+        from agent_server.connectors.addressing import format_target
+        from agent_server.store import AgentStore
+
+        store = AgentStore()
+        try:
+            session_id = store.get_slack_mention_session(
+                format_target(parsed.team_id, parsed.channel_id, parsed.thread_ts)
+            )
+            if not session_id:
+                return None
+            session = store.get_session(session_id)
+            if session is None or not session.specialist_id:
+                return None
+            specialist = store.get_specialist(session.specialist_id)
+            return f"Answered by *{specialist.name}*" if specialist else None
+        finally:
+            store.close()
+    except Exception:  # noqa: BLE001 - decoration only
+        import logging
+
+        logging.getLogger("agent_server.connectors").debug(
+            "Could not resolve the Slack reply footer", exc_info=True
+        )
+        return None
+
+
 def _post(path: str, token: str, payload: dict) -> dict:
     """POST to the Slack Web API and return the parsed body.
 
@@ -97,12 +133,20 @@ def send_message(target: str, text: str, **kwargs) -> dict:
     if token is None:
         return {"summary": error or "Slack is not connected.", "ok": False}
 
+    from agent_server.connectors.slack_blocks import build_blocks, fallback_text
+
+    # `text` stays populated even with blocks: it is what Slack shows in the
+    # sidebar and in mobile push, and omitting it renders "This content can't
+    # be displayed" there.
     payload: dict[str, object] = {
         "channel": parsed.channel_id,
-        "text": body,
+        "text": fallback_text(body),
         "unfurl_links": False,
         "unfurl_media": False,
     }
+    blocks = build_blocks(body, footer=_specialist_footer(parsed))
+    if blocks:
+        payload["blocks"] = blocks
     if parsed.thread_ts:
         payload["thread_ts"] = parsed.thread_ts
 

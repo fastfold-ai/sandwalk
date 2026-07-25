@@ -174,6 +174,62 @@ def test_post_rejects_a_non_dict_body(
     assert result["ok"] is False
 
 
+# --- block kit rendering ---------------------------------------------------
+
+
+def test_send_posts_block_kit_with_a_text_fallback(
+    store: AgentStore, posted: list[dict]
+) -> None:
+    slack_tool.send_message(target="slack:T1/C1", text="**hi** there")
+    payload = posted[0]["payload"]
+
+    assert payload["blocks"][0]["text"]["text"] == "*hi* there"
+    # Without `text`, Slack notifications read "This content can't be displayed".
+    assert payload["text"] == "*hi* there"
+
+
+def test_send_splits_a_long_reply_across_sections(
+    store: AgentStore, posted: list[dict]
+) -> None:
+    slack_tool.send_message(target="slack:T1/C1", text="\n\n".join(["y" * 2500] * 3))
+    sections = [b for b in posted[0]["payload"]["blocks"] if b["type"] == "section"]
+
+    assert len(sections) == 3
+    assert all(len(b["text"]["text"]) <= 3000 for b in sections)
+
+
+def test_send_names_the_specialist_that_answered(
+    store: AgentStore, posted: list[dict]
+) -> None:
+    specialist = store.get_specialist_by_slug("fast-computational-scientist")
+    assert specialist is not None
+    session = store.create_session(
+        title="Slack", workspace_path=None, source="slack"
+    )
+    store.update_session(
+        session.id, specialist_id=specialist.id, update_specialist_id=True
+    )
+    target = "slack:T1/C1:1712000000.000100"
+    store.set_slack_mention_session(
+        thread_target=target, session_id=session.id, channel="slack:T1/C1"
+    )
+
+    slack_tool.send_message(target=target, text="done")
+    footer = posted[0]["payload"]["blocks"][-1]
+
+    assert footer["type"] == "context"
+    assert specialist.name in footer["elements"][0]["text"]
+
+
+def test_send_omits_the_footer_without_a_specialist(
+    store: AgentStore, posted: list[dict]
+) -> None:
+    slack_tool.send_message(target="slack:T1/C1", text="done")
+    assert not any(
+        b["type"] == "context" for b in posted[0]["payload"]["blocks"]
+    )
+
+
 # --- approval gating -------------------------------------------------------
 
 
