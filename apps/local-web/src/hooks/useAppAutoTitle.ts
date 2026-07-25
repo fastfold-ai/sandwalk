@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 
-import { AUTO_TITLE_FIRST_RESPONSE_THRESHOLD } from '@/lib/sessions'
+import {
+  AUTO_TITLE_FIRST_RESPONSE_THRESHOLD,
+  isLowSignalTitle
+} from '@/lib/sessions'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentMessage, AgentSession } from '@sandwalk/agent-ui-core'
 
@@ -15,9 +18,14 @@ type AutoTitleArgs = {
   setSessions: Dispatch<SetStateAction<AgentSession[]>>
 }
 
-function isTitlePending(source: AgentSession['titleSource']): boolean {
+function isTitlePending(
+  source: AgentSession['titleSource'],
+  title: string | undefined
+): boolean {
   // Missing source (older payloads) — treat as pending so old chats can catch up.
-  return source == null || source === 'pending'
+  if (source == null || source === 'pending') return true
+  // Heal create bug that marked "Untitled session" as a settled user rename.
+  return source === 'user' && isLowSignalTitle(title || '')
 }
 
 export function useAppAutoTitle({
@@ -43,7 +51,7 @@ export function useAppAutoTitle({
       message => message.role === 'user' || message.role === 'assistant'
     ).length
     if (conversationCount < AUTO_TITLE_FIRST_RESPONSE_THRESHOLD) return
-    if (!isTitlePending(titleSource)) return
+    if (!isTitlePending(titleSource, sessionTitle)) return
     if ((autoTitlePassCountRef.current[sessionId] || 0) >= 3) return
 
     autoTitleInFlightRef.current[sessionId] = true

@@ -207,6 +207,60 @@ def test_auto_title_session_skips_settled_user_title(tmp_path: Path, monkeypatch
     assert result.title_source == "user"
 
 
+def test_create_untitled_session_stays_pending_for_auto_title(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.setattr("agent_server.service.CONFIG_DIR", tmp_path / "cfg")
+    store = AgentStore(tmp_path / "agent.db")
+    svc = AgentService(store)
+    # Desktop historically created chats with this placeholder title.
+    session = store.create_session(title="Untitled session", workspace_path=None)
+    assert session.title_source == "pending"
+
+    store.add_message(session_id=session.id, role="user", content="Fold 4KW4")
+    store.add_message(session_id=session.id, role="assistant", content="Folding.")
+    store.add_message(session_id=session.id, role="user", content="Show pLDDT")
+    store.add_message(session_id=session.id, role="assistant", content="High.")
+
+    monkeypatch.setattr(
+        "agent_server.title.generate_session_title",
+        lambda *args, **kwargs: __import__(
+            "agent_server.title", fromlist=["TitleResult"]
+        ).TitleResult(title="Fold 4KW4", final=True),
+    )
+    result = svc.auto_title_session(session.id)
+    assert result.title == "Fold 4KW4"
+    assert result.title_source == "auto"
+
+
+def test_auto_title_heals_placeholder_marked_as_user(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("agent_server.service.CONFIG_DIR", tmp_path / "cfg")
+    store = AgentStore(tmp_path / "agent.db")
+    svc = AgentService(store)
+    session = store.create_session(title="Untitled session", workspace_path=None)
+    # Simulate the pre-fix bug: placeholder stuck as a settled user title.
+    stuck = store.update_session(
+        session.id, title="Untitled session", title_source="user"
+    )
+    assert stuck is not None
+    assert stuck.title_source == "user"
+
+    store.add_message(session_id=session.id, role="user", content="Design a binder")
+    store.add_message(session_id=session.id, role="assistant", content="Designing.")
+    store.add_message(session_id=session.id, role="user", content="Rank designs")
+    store.add_message(session_id=session.id, role="assistant", content="Ranked.")
+
+    monkeypatch.setattr(
+        "agent_server.title.generate_session_title",
+        lambda *args, **kwargs: __import__(
+            "agent_server.title", fromlist=["TitleResult"]
+        ).TitleResult(title="Binder design", final=True),
+    )
+    result = svc.auto_title_session(session.id)
+    assert result.title == "Binder design"
+    assert result.title_source == "auto"
+
+
 def test_auto_title_session_uses_interim_fallback_before_four_messages(
     tmp_path: Path, monkeypatch
 ):

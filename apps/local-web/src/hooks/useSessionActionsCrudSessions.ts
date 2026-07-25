@@ -67,7 +67,8 @@ export function useSessionActionsCrudSessions({
         const id = projectId ?? activeProjectId ?? null
         const scopeKey = projectTabsKey(id)
         const created = await client.createSession({
-          title: 'Untitled session',
+          // Omit title so the server keeps title_source=pending and auto-titles
+          // after the second agent response.
           projectId: id || undefined,
           sandboxBackend: 'builtin'
         })

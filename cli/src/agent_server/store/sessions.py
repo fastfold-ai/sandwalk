@@ -14,8 +14,15 @@ DEFAULT_SESSION_TITLE = "New research session"
 
 
 def initial_title_source(title: str | None) -> TitleSource:
+    """Placeholder create titles stay ``pending`` so auto-title can run later.
+
+    The desktop app historically created sessions as ``Untitled session``. That
+    must not be treated as a manual rename (``user``), or auto-title never fires.
+    """
+    from agent_server.title import is_placeholder_title
+
     cleaned = (title or "").strip()
-    if not cleaned or cleaned == DEFAULT_SESSION_TITLE:
+    if not cleaned or is_placeholder_title(cleaned):
         return "pending"
     return "user"
 

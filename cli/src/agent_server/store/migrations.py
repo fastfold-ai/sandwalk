@@ -48,6 +48,29 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
             placeholders,
         )
 
+    # Desktop used to create sessions as "Untitled session", which
+    # initial_title_source incorrectly marked as user and blocked auto-title.
+    # Re-open auto-title for any remaining placeholder titles stuck as user.
+    placeholders = (
+        "untitled",
+        "untitled session",
+        "untitled thread",
+        "new chat",
+        "new agent",
+        "new agent session",
+        "new research session",
+    )
+    placeholders_sql = ", ".join("?" for _ in placeholders)
+    connection.execute(
+        f"""
+        UPDATE sessions
+        SET title_source = 'pending'
+        WHERE title_source = 'user'
+          AND lower(trim(title)) IN ({placeholders_sql})
+        """,
+        placeholders,
+    )
+
     specialist_columns = {
         row["name"]
         for row in connection.execute("PRAGMA table_info(specialists)").fetchall()

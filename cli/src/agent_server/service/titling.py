@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 from agent_server.models import AgentSession
+from agent_server.title import is_placeholder_title
 
 
 class _TitlingMixin:
     @staticmethod
     def _should_auto_title(session: AgentSession | None) -> bool:
-        return bool(session is not None and session.title_source == "pending")
+        if session is None:
+            return False
+        if session.title_source == "pending":
+            return True
+        # Heal create/rename bugs that marked a placeholder as a settled user title.
+        return session.title_source == "user" and is_placeholder_title(session.title)
 
     def auto_title_session(self, session_id: str, *, force: bool = False) -> AgentSession:
         """Generate a title while ``title_source`` is still ``pending``.
