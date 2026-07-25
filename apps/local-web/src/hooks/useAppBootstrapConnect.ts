@@ -29,6 +29,9 @@ import type { useAppBootstrapLoaders } from './useAppBootstrapLoaders'
 
 type LoaderBundle = ReturnType<typeof useAppBootstrapLoaders>
 
+/** Slow enough to be invisible in CPU terms, quick enough to feel live. */
+const SESSION_LIST_REFRESH_MS = 10_000
+
 type UseAppBootstrapConnectArgs = {
   client: LocalAgentClient
   backendUrl: string
@@ -237,6 +240,29 @@ export function useAppBootstrapConnect({
     if (needsAuthLogin || connectionPaused) return
     void connect()
   }, [connect, connectionPaused, needsAuthLogin])
+
+  // Work can arrive from outside this client: a `sandwalk` CLI session, or a
+  // Slack mention spawning one. Neither goes through the UI, and session
+  // events only reach the stream of a session that is already open, so the
+  // list would otherwise sit stale until the next reconnect. Re-fetch on a
+  // gentle timer while the window is visible, and immediately when it regains
+  // focus. `loadSessions` keeps the previous array when nothing changed, so a
+  // quiet backend costs no re-renders.
+  useEffect(() => {
+    if (needsAuthLogin || connectionPaused || !health) return
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return
+      void loadSessions()
+    }
+    const timer = window.setInterval(refresh, SESSION_LIST_REFRESH_MS)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [connectionPaused, health, loadSessions, needsAuthLogin])
 
   useEffect(() => {
     if (needsAuthLogin || connectionPaused || health || connecting) return

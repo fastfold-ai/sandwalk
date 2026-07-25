@@ -27,6 +27,23 @@ type UseAppBootstrapLoadersArgs = {
   >
 }
 
+/** Fields the sidebar renders — enough to tell a real change from a re-fetch. */
+export function sessionsUnchanged(a: AgentSession[], b: AgentSession[]) {
+  if (a.length !== b.length) return false
+  return a.every((item, index) => {
+    const other = b[index]
+    return (
+      item.id === other.id &&
+      item.title === other.title &&
+      item.status === other.status &&
+      item.updatedAt === other.updatedAt &&
+      item.lastMessageAt === other.lastMessageAt &&
+      item.organizeLabel === other.organizeLabel &&
+      item.projectId === other.projectId
+    )
+  })
+}
+
 export function useAppBootstrapLoaders({
   client,
   setChatBySessionId
@@ -59,7 +76,11 @@ export function useAppBootstrapLoaders({
   const loadSessions = useCallback(async () => {
     const key = `sessions:${client.baseUrl}`
     const nextSessions = await dedupeAsync(key, () => client.listSessions())
-    setSessions(nextSessions)
+    // Keep the previous array when nothing moved, so the periodic refresh that
+    // picks up CLI and Slack activity cannot re-render the sidebar on a timer.
+    setSessions(current =>
+      sessionsUnchanged(current, nextSessions) ? current : nextSessions
+    )
     setChatBySessionId(current => {
       let changed = false
       const next = { ...current }
