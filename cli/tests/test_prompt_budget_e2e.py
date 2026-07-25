@@ -159,5 +159,9 @@ def test_prompt_budget_fast_specialist_scopes_skills(tmp_path: Path):
 
     est = asyncio.run(_run())
     skills = next(b for b in est.buckets if b.id == "skills")
-    assert skills.count == len(fast.skill_names)
+    # Only the specialist's skills that are installed here can be indexed.
+    installed = {s.name for s in list_skills(enabled_only=False)}
+    scoped = installed & set(fast.skill_names)
+    assert skills.count == len(scoped)
+    assert skills.count < len(installed) or len(installed) == len(scoped)
     assert est.tool_counts.mcp == 0

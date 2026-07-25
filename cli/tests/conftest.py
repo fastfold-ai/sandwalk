@@ -2,6 +2,7 @@
 
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,17 @@ import pytest
 SRC_PATH = Path(__file__).resolve().parents[1] / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
+
+# Keep the suite off the developer's own ~/.sandwalk. A dozen call sites build
+# ``AgentStore()`` with no path, which resolves through ``Path.home()`` to the
+# database the user is actually working in — running the suite used to rewrite
+# it, and a half-written store then looked corrupt on the next start. The
+# per-test CONFIG_DIR fixture below cannot cover this on its own: constants are
+# bound at import time and subprocesses inherit the environment, not monkey
+# patches. This must run before anything imports ``agent.config``.
+_FAKE_HOME = Path(tempfile.mkdtemp(prefix="sandwalk-test-home-"))
+os.environ["HOME"] = str(_FAKE_HOME)
+os.environ["USERPROFILE"] = str(_FAKE_HOME)
 
 
 def _env_flag(name: str) -> bool:
