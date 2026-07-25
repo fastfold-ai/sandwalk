@@ -66,9 +66,9 @@ export function StorageView({
           <div>
             <h2 className="text-2xl font-semibold">Storage</h2>
             <p className="text-muted-foreground mt-2 text-sm">
-              Where FastFold Agent keeps projects, datasets, chat files, and
-              history on this machine — plus the Python environment used by the
-              built-in code sandbox.
+              Where Sandwalk keeps projects, datasets, chat files, voice
+              models, and history on this machine — plus the Python environment
+              used by the built-in code sandbox.
             </p>
           </div>
           <Button

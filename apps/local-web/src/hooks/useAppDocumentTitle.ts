@@ -24,6 +24,7 @@ type DocumentTitleArgs = {
   isSandboxLocalDetail: boolean
   isSandboxModalDetail: boolean
   isDashboardAgentPrompts: boolean
+  isDashboardVoice: boolean
   isDashboardAgentRuntime: boolean
   isDashboardMcp: boolean
 }
@@ -108,6 +109,10 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
       document.title = `Context · ${base}`
       return
     }
+    if (args.isDashboardVoice) {
+      document.title = `Voice · ${base}`
+      return
+    }
     if (args.isDashboardAgentRuntime) {
       document.title = `Runtime · ${base}`
       return
@@ -129,6 +134,7 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     args.isDashboardEnvironment,
     args.isDashboardAgentSandbox,
     args.isDashboardAgentPrompts,
+    args.isDashboardVoice,
     args.isDashboardAgentRuntime,
     args.isSandboxLocalDetail,
     args.isSandboxModalDetail,

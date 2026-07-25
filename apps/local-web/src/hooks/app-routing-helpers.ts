@@ -80,6 +80,9 @@ export function resolveDashboardSection(pathname: string) {
   if (pathname.startsWith('/dashboard/context')) {
     return 'context' as const
   }
+  if (pathname.startsWith('/dashboard/voice')) {
+    return 'voice' as const
+  }
   if (pathname.startsWith('/dashboard/agent')) {
     return 'agent_runtime' as const
   }

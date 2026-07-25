@@ -434,3 +434,19 @@ html.sandwalk-mac-overlay .sandwalk-floating-sidebar-toggle {
 .sandwalk-main-with-floating-sidebar-toggle {
   padding-left: 2.75rem;
 }
+
+/* Live mic RMS strip — height is set from real samples, no decorative animation */
+.voice-listen-bars {
+  height: 18px;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2.5px;
+  color: currentColor;
+}
+.voice-listen-bars i {
+  display: block;
+  width: 2.5px;
+  border-radius: 999px;
+  background: currentColor;
+  transition: height 80ms linear;
+}

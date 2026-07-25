@@ -76,10 +76,16 @@ def test_storage_report_categories_and_other_bucket(tmp_path: Path):
     assert "cache" in ids
     assert "datasets" in ids
     assert "sessions" in ids
+    assert "models" in ids
     assert "other" in ids
     assert report.location.path == str(home)
     assert report.total_bytes > 0
     assert report.available_bytes == 999
+
+    models = next(item for item in report.categories if item.id == "models")
+    assert models.label == "Models"
+    assert models.path is not None
+    assert models.path.endswith("models") or "Sandwalk" in models.path
 
     sessions = next(item for item in report.categories if item.id == "sessions")
     assert sessions.path is not None

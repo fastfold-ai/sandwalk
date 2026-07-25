@@ -11,7 +11,8 @@ import {
   ModelsView,
   SandboxListView,
   StorageView,
-  ToolsView
+  ToolsView,
+  VoiceView
 } from './dashboard-main-views-lazy'
 import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 
@@ -27,6 +28,7 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     isDashboardGeneral,
     isDashboardAgentRuntime,
     isDashboardAgentPrompts,
+    isDashboardVoice,
     isDashboardAgentSandbox,
     isSandboxLocalDetail,
     isSandboxModalDetail,
@@ -96,6 +98,10 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         }}
       />
     )
+  }
+
+  if (isDashboardVoice) {
+    return <VoiceView />
   }
 
   if (isDashboardAgentSandbox) {

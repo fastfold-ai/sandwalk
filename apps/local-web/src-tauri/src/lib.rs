@@ -4,6 +4,8 @@
 //! helper (menubar) owns the agent. Native commands proxy to its control plane at
 //! `~/Library/Application Support/Sandwalk/control.json`.
 
+mod dictation;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
@@ -431,8 +433,19 @@ pub fn run() {
             open_external_url,
             save_text_file,
             save_bytes_file,
+            dictation::get_dictation_status,
+            dictation::start_dictation,
+            dictation::stop_dictation,
+            dictation::cancel_dictation,
+            dictation::download_dictation_model,
+            dictation::cancel_dictation_model_download,
+            dictation::verify_dictation_model,
+            dictation::mark_dictation_test_passed,
+            dictation::delete_dictation_model,
+            dictation::dictation_level,
         ])
         .setup(|app| {
+            dictation::manage_dictation(app);
             ensure_server_helper();
             let script = inject_api_base();
             let mut win = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))

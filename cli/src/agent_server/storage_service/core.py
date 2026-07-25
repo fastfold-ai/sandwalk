@@ -112,8 +112,12 @@ class StorageService:
                 )
             )
 
-        # Location total stays scoped to ~/.sandwalk; bar total includes env.
-        home_bytes = sum(item.bytes for item in categories if item.id != "python_env")
+        # Location total stays scoped to ~/.sandwalk; bar total includes
+        # desktop Models (app-data) and the Python env when present.
+        outside_home = {"python_env", "models"}
+        home_bytes = sum(
+            item.bytes for item in categories if item.id not in outside_home
+        )
         total_bytes = sum(item.bytes for item in categories)
         try:
             disk = shutil.disk_usage(root)

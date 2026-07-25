@@ -103,3 +103,6 @@ export const StorageView = lazy(() =>
 export const ToolsView = lazy(() =>
   import('@/components/agents/ToolsView').then(m => ({ default: m.ToolsView }))
 )
+export const VoiceView = lazy(() =>
+  import('@/components/agents/VoiceView').then(m => ({ default: m.VoiceView }))
+)

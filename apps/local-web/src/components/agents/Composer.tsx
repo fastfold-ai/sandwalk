@@ -13,6 +13,7 @@ import {
   type ComposerSlashMenuHandle
 } from '@/components/agents/composer/ComposerSlashMenu'
 import { ComposerToolbar } from '@/components/agents/composer/ComposerToolbar'
+import { ComposerVoiceBar } from '@/components/agents/composer/ComposerVoiceBar'
 import {
   type ComposerProps,
   type SandboxActionPhase,
@@ -24,6 +25,7 @@ import {
   useComposerMentionFocus
 } from '@/components/agents/composer/useComposerDraftState'
 import { useComposerFileDrop } from '@/components/agents/composer/useComposerFileDrop'
+import { useComposerVoice } from '@/components/agents/composer/useComposerVoice'
 import { parseComposerParts } from '@/components/agents/composer-parts'
 import { cn } from '@/lib/utils'
 
@@ -105,10 +107,17 @@ export function Composer({
     draftState.focusActiveComposerInput
   )
 
+  const voice = useComposerVoice({
+    draft: draftState.draft,
+    commitDraft: draftState.commitDraft,
+    focusInput: draftState.focusActiveComposerInput
+  })
+
   const selectedSpecialist =
     specialists.find(item => item.id === selectedSpecialistId) || null
 
   const handleSend = () => {
+    if (voice.active || voice.busy) return
     const text = draftState.draftRef.current
     const prefix = attachmentSendPrefix()
     if ((!text.trim() && !prefix) || isUploading) return
@@ -182,6 +191,14 @@ export function Composer({
             </button>
           </div>
         ) : null}
+        {voice.error ? (
+          <div
+            className="mb-2 px-1 text-[12px] text-red-600 dark:text-red-400"
+            role="alert"
+          >
+            {voice.error}
+          </div>
+        ) : null}
         <form
           onSubmit={event => {
             event.preventDefault()
@@ -195,13 +212,19 @@ export function Composer({
             void addFiles(files)
           }}
           className={cn(
-            'bg-card focus-within:border-muted-foreground/40 border-border relative rounded-3xl border p-2 shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',
-            dragging && 'border-sky-500/60 ring-2 ring-sky-500/20',
+            'relative rounded-3xl border p-2 shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',
+            voice.active
+              ? 'border-white/10 bg-[#212121] shadow-none focus-within:border-white/15'
+              : 'bg-card focus-within:border-muted-foreground/40 border-border',
+            dragging &&
+              !voice.active &&
+              'border-sky-500/60 ring-2 ring-sky-500/20',
             editingQueued &&
+              !voice.active &&
               'rounded-t-none border-x-0 border-b-0 border-t border-sky-500/25 shadow-none focus-within:border-sky-500/40'
           )}
         >
-          {dragging ? (
+          {dragging && !voice.active ? (
             <div
               className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 rounded-[inherit] bg-sky-500/10 backdrop-blur-[1px]"
               aria-hidden
@@ -212,63 +235,79 @@ export function Composer({
               </p>
             </div>
           ) : null}
-          <ComposerAttachments
-            attachments={attachments}
-            onRemove={removeAttachment}
-          />
-          <ComposerDraftEditor
-            draft={draftState.draft}
-            running={running}
-            autoFocus={autoFocus}
-            focusKey={focusKey}
-            composerParts={composerParts}
-            skills={skills}
-            mcpServers={mcpServers}
-            textInputRefs={draftState.textInputRefs}
-            pendingCaretRef={draftState.pendingCaretRef}
-            autoFocusedKeyRef={draftState.autoFocusedKeyRef}
-            draftRef={draftState.draftRef}
-            focusedPartIndex={draftState.focusedPartIndex}
-            setFocusedPartIndex={draftState.setFocusedPartIndex}
-            setCaretPos={draftState.setCaretPos}
-            setLocalDraft={draftState.setLocalDraft}
-            commitDraft={draftState.commitDraft}
-            onSkillChipsChange={onSkillChipsChange}
-            onFileChipsChange={onFileChipsChange}
-            onOpenFile={onOpenFile}
-            onSend={handleSend}
-            atOpen={draftState.atOpen}
-            slashOpen={draftState.slashOpen}
-            atMenuRef={atMenuRef}
-            slashMenuRef={slashMenuRef}
-          />
-          <ComposerToolbar
-            running={running}
-            showStopButton={showStopButton}
-            sendDisabled={isUploading || (!hasDraft && !running)}
-            modelOptions={modelOptions}
-            runtimeSettings={runtimeSettings}
-            specialists={specialists}
-            selectedSpecialistId={selectedSpecialistId ?? null}
-            sandboxStatus={sandboxStatus ?? null}
-            sandboxPhase={sandboxPhase}
-            tokenUsage={tokenUsage}
-            onUpload={files => void addFiles(files)}
-            onModelSelect={onModelSelect}
-            onReasoningSettingsChange={onReasoningSettingsChange}
-            onSpecialistSelect={onSpecialistSelect}
-            onCreateSpecialist={onCreateSpecialist}
-            onManageSpecialists={onManageSpecialists}
-            onAddModels={onAddModels}
-            onSandboxBackendSelect={onSandboxBackendSelect}
-            onSandboxComputeChange={onSandboxComputeChange}
-            onSandboxStart={onSandboxStart}
-            onSandboxStop={onSandboxStop}
-            onSandboxRestart={onSandboxRestart}
-            onLoadLocalSystem={onLoadLocalSystem}
-            onPlanModeChange={onPlanModeChange}
-            onStop={onStop}
-          />
+          {voice.active ? (
+            <ComposerVoiceBar
+              recording={voice.recording}
+              transcribing={voice.transcribing}
+              levels={voice.levels}
+              onCancel={() => void voice.cancel()}
+              onConfirm={() => void voice.toggle()}
+            />
+          ) : (
+            <>
+              <ComposerAttachments
+                attachments={attachments}
+                onRemove={removeAttachment}
+              />
+              <ComposerDraftEditor
+                draft={draftState.draft}
+                running={running}
+                autoFocus={autoFocus}
+                focusKey={focusKey}
+                composerParts={composerParts}
+                skills={skills}
+                mcpServers={mcpServers}
+                textInputRefs={draftState.textInputRefs}
+                pendingCaretRef={draftState.pendingCaretRef}
+                autoFocusedKeyRef={draftState.autoFocusedKeyRef}
+                draftRef={draftState.draftRef}
+                focusedPartIndex={draftState.focusedPartIndex}
+                setFocusedPartIndex={draftState.setFocusedPartIndex}
+                setCaretPos={draftState.setCaretPos}
+                setLocalDraft={draftState.setLocalDraft}
+                commitDraft={draftState.commitDraft}
+                onSkillChipsChange={onSkillChipsChange}
+                onFileChipsChange={onFileChipsChange}
+                onOpenFile={onOpenFile}
+                onSend={handleSend}
+                atOpen={draftState.atOpen}
+                slashOpen={draftState.slashOpen}
+                atMenuRef={atMenuRef}
+                slashMenuRef={slashMenuRef}
+              />
+              <ComposerToolbar
+                running={running}
+                showStopButton={showStopButton}
+                sendDisabled={isUploading || (!hasDraft && !running)}
+                modelOptions={modelOptions}
+                runtimeSettings={runtimeSettings}
+                specialists={specialists}
+                selectedSpecialistId={selectedSpecialistId ?? null}
+                sandboxStatus={sandboxStatus ?? null}
+                sandboxPhase={sandboxPhase}
+                tokenUsage={tokenUsage}
+                showMic={voice.showMic}
+                voiceReady={voice.ready}
+                voiceBusy={voice.busy}
+                onVoiceToggle={() => void voice.toggle()}
+                onUpload={files => void addFiles(files)}
+                onModelSelect={onModelSelect}
+                onReasoningSettingsChange={onReasoningSettingsChange}
+                onSpecialistSelect={onSpecialistSelect}
+                onCreateSpecialist={onCreateSpecialist}
+                onManageSpecialists={onManageSpecialists}
+                onAddModels={onAddModels}
+                onSandboxBackendSelect={onSandboxBackendSelect}
+                onSandboxComputeChange={onSandboxComputeChange}
+                onSandboxStart={onSandboxStart}
+                onSandboxStop={onSandboxStop}
+                onSandboxRestart={onSandboxRestart}
+                onLoadLocalSystem={onLoadLocalSystem}
+                onPlanModeChange={onPlanModeChange}
+                onStop={onStop}
+              />
+            </>
+          )}
         </form>
       </div>
     </div>

@@ -2,12 +2,33 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from agent.config import Config
 from agent_server.models import StorageCategory
 from agent_server.storage_service.path_size import _path_size_bytes
+
+
+def desktop_models_dir() -> Path:
+    """Local STT / desktop model weights (Tauri app-data ``models/``).
+
+    Mirrors ``apps/local-web/src-tauri/src/dictation.rs`` ``models_dir``.
+    """
+    home = Path.home()
+    if sys.platform == "darwin":
+        return home / "Library" / "Application Support" / "Sandwalk" / "models"
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "Sandwalk" / "models"
+        return home / "AppData" / "Roaming" / "Sandwalk" / "models"
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    if xdg:
+        return Path(xdg) / "sandwalk" / "models"
+    return home / ".config" / "sandwalk" / "models"
 
 
 @dataclass(frozen=True)
@@ -102,5 +123,11 @@ def _category_specs(home: Path, cfg: Config) -> list[_CategorySpec]:
             label="Cache",
             color="#eab308",
             paths=(home / "cache",),
+        ),
+        _CategorySpec(
+            id="models",
+            label="Models",
+            color="#ec4899",
+            paths=(desktop_models_dir(),),
         ),
     ]

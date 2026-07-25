@@ -7,6 +7,7 @@ import {
   GitBranch,
   HardDrive,
   LayoutDashboard,
+  Mic,
   Plug,
   ScrollText,
   Settings2,
@@ -70,6 +71,12 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
         label: 'Context',
         path: '/dashboard/context',
         icon: ScrollText
+      },
+      {
+        id: 'voice',
+        label: 'Voice',
+        path: '/dashboard/voice',
+        icon: Mic
       }
     ]
   },

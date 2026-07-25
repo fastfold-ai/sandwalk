@@ -4,6 +4,7 @@ export type DashboardSection =
   | 'agent_runtime'
   | 'agent_sandbox'
   | 'context'
+  | 'voice'
   | 'models'
   | 'datasets'
   | 'tools'

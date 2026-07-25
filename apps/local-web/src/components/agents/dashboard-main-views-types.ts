@@ -64,6 +64,7 @@ export type DashboardMainViewsProps = {
   isDashboardGeneral: boolean
   isDashboardAgentRuntime: boolean
   isDashboardAgentPrompts: boolean
+  isDashboardVoice: boolean
   isDashboardAgentSandbox: boolean
   isDashboardModels: boolean
   isDashboardData: boolean

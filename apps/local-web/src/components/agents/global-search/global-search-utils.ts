@@ -7,6 +7,7 @@ import {
   GitBranch,
   HardDrive,
   LayoutDashboard,
+  Mic,
   Plug,
   ScrollText,
   Settings2,
@@ -109,6 +110,13 @@ export const DASHBOARD_COMMANDS = [
     path: '/dashboard/context',
     value: 'command context prompts token budget specialist',
     icon: ScrollText
+  },
+  {
+    id: 'voice',
+    label: 'Voice',
+    path: '/dashboard/voice',
+    value: 'command voice input microphone dictation whisper speech',
+    icon: Mic
   },
   {
     id: 'models',

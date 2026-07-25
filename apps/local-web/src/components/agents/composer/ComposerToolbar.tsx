@@ -4,14 +4,13 @@ import type {
   SessionSandboxStatus,
   Specialist
 } from '@sandwalk/agent-ui-core'
-import { ArrowUp, Plus, Square } from 'lucide-react'
+import { ArrowUp, Mic, Plus, Square } from 'lucide-react'
 import { useRef } from 'react'
 
 import {
   ComposerModeMenu,
   planModeAccent
 } from '@/components/agents/composer/ComposerModeMenu'
-import { cn } from '@/lib/utils'
 import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelPicker'
 import { ComposerSandboxPicker } from '@/components/agents/composer/ComposerSandboxPicker'
 import { ComposerSpecialistPicker } from '@/components/agents/composer/ComposerSpecialistPicker'
@@ -25,6 +24,7 @@ import {
   type ComposerModelOption,
   resolveComposerModelOption
 } from '@/lib/composer-models'
+import { cn } from '@/lib/utils'
 
 export function ComposerToolbar({
   running,
@@ -37,6 +37,10 @@ export function ComposerToolbar({
   sandboxStatus,
   sandboxPhase,
   tokenUsage,
+  showMic = false,
+  voiceReady = false,
+  voiceBusy = null,
+  onVoiceToggle,
   onUpload,
   onModelSelect,
   onReasoningSettingsChange,
@@ -63,6 +67,10 @@ export function ComposerToolbar({
   sandboxStatus: SessionSandboxStatus | null
   sandboxPhase: SandboxActionPhase
   tokenUsage: { inputTokens: number; outputTokens: number }
+  showMic?: boolean
+  voiceReady?: boolean
+  voiceBusy?: string | null
+  onVoiceToggle?: () => void
   onUpload: (files: FileList) => void
   onModelSelect: (
     provider: string,
@@ -160,6 +168,34 @@ export function ComposerToolbar({
               ?.contextWindow
           }
         />
+        {showMic ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'size-7 shrink-0 rounded-full',
+              voiceBusy && 'opacity-60',
+              !voiceReady && 'opacity-40'
+            )}
+            disabled={Boolean(voiceBusy)}
+            onClick={onVoiceToggle}
+            title={
+              voiceBusy ||
+              (voiceReady
+                ? 'Start local voice dictation'
+                : 'Configure Voice Input in Settings')
+            }
+            aria-label={
+              voiceReady
+                ? 'Start dictation'
+                : 'Configure Voice Input in Settings'
+            }
+            aria-disabled={!voiceReady}
+          >
+            <Mic className="size-4" />
+          </Button>
+        ) : null}
         <Button
           type={showStopButton ? 'button' : 'submit'}
           size="icon"

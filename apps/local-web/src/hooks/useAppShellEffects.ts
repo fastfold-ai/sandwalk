@@ -44,6 +44,7 @@ type UseAppShellEffectsArgs = {
   isSandboxLocalDetail: boolean
   isSandboxModalDetail: boolean
   isDashboardAgentPrompts: boolean
+  isDashboardVoice: boolean
   isDashboardAgentRuntime: boolean
   isDashboardMcp: boolean
   sidebarCollapsed: boolean
@@ -97,6 +98,7 @@ export function useAppShellEffects(args: UseAppShellEffectsArgs) {
     isSandboxLocalDetail: args.isSandboxLocalDetail,
     isSandboxModalDetail: args.isSandboxModalDetail,
     isDashboardAgentPrompts: args.isDashboardAgentPrompts,
+    isDashboardVoice: args.isDashboardVoice,
     isDashboardAgentRuntime: args.isDashboardAgentRuntime,
     isDashboardMcp: args.isDashboardMcp
   })
