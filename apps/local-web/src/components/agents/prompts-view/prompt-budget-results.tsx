@@ -7,17 +7,24 @@ import { cn } from '@/lib/utils'
 import {
   BUCKET_COLORS,
   formatTokens,
-  PromptBucketRow
+  PromptBucketRow,
+  type TokenCountMethod
 } from './prompt-budget-shared'
 
 export function PromptBudgetResults({
   budget,
   selectedSpecialist,
-  isEstimating
+  isEstimating,
+  tokenCountMethod,
+  onTokenCountMethodChange,
+  countingDisabled = false
 }: {
   budget: PromptBudgetResponse
   selectedSpecialist: Specialist | null
   isEstimating: boolean
+  tokenCountMethod: TokenCountMethod
+  onTokenCountMethodChange: (method: TokenCountMethod) => void
+  countingDisabled?: boolean
 }) {
   const toolCounts = budget.toolCounts
   const cap = toolCounts?.openaiCap || 128
@@ -73,19 +80,51 @@ export function PromptBudgetResults({
                 {budget.model ? ` · ${budget.model}` : ''}
               </p>
             </div>
-            {selectedSpecialist ? (
-              <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                <SpecialistAvatar
-                  color={selectedSpecialist.color}
-                  icon={selectedSpecialist.icon}
-                  className="size-6 rounded-md"
-                />
-                <span className="truncate">{selectedSpecialist.name}</span>
+            <div className="flex flex-col items-end gap-2">
+              <div
+                className="bg-muted/40 flex rounded-lg p-0.5"
+                role="group"
+                aria-label="Token counting method"
+              >
+                {(
+                  [
+                    { id: 'tiktoken', label: 'tiktoken' },
+                    { id: 'provider', label: 'Provider' }
+                  ] as const
+                ).map(option => {
+                  const active = tokenCountMethod === option.id
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      disabled={countingDisabled}
+                      className={cn(
+                        'rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                        active
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                      onClick={() => onTokenCountMethodChange(option.id)}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                })}
               </div>
-            ) : null}
+              {selectedSpecialist ? (
+                <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                  <SpecialistAvatar
+                    color={selectedSpecialist.color}
+                    icon={selectedSpecialist.icon}
+                    className="size-6 rounded-md"
+                  />
+                  <span className="truncate">{selectedSpecialist.name}</span>
+                </div>
+              ) : null}
+            </div>
           </div>
 
-          <div className="bg-muted/40 flex h-3 overflow-hidden rounded-full">
+          <div className="bg-muted/15 flex h-3 overflow-hidden rounded-full">
             {stacked.map(slice => (
               <div
                 key={slice.id}
@@ -123,11 +162,11 @@ export function PromptBudgetResults({
                 {totalTools} / {cap}
               </span>
             </div>
-            <div className="bg-muted h-2 overflow-hidden rounded-full">
+            <div className="bg-muted/15 h-2 overflow-hidden rounded-full">
               <div
                 className={cn(
                   'h-full rounded-full transition-all',
-                  totalTools > cap ? 'bg-amber-500' : 'bg-sky-500'
+                  totalTools > cap ? 'bg-amber-500/80' : 'bg-sky-500/80'
                 )}
                 style={{ width: `${toolShare}%` }}
               />
@@ -141,7 +180,7 @@ export function PromptBudgetResults({
                   ['Total', toolCounts.total]
                 ] as const
               ).map(([label, value]) => (
-                <div key={label} className="bg-muted/30 rounded-lg px-3 py-2">
+                <div key={label} className="bg-muted/15 rounded-lg px-3 py-2">
                   <p className="text-muted-foreground text-[11px]">{label}</p>
                   <p className="mt-0.5 font-mono text-sm font-medium">{value}</p>
                 </div>

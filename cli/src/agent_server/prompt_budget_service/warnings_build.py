@@ -13,6 +13,8 @@ def build_warnings(
     deepagents_count: int,
     total_tokens: int,
     specialist: Specialist | None,
+    billed_matched: bool = False,
+    token_count_method: str = "tiktoken",
 ) -> list[str]:
     warnings: list[str] = []
     if provider == "openai" and uncapped_total > 128:
@@ -32,8 +34,31 @@ def build_warnings(
             "This specialist has an empty tool allowlist — only runtime "
             "pins (run_python / search_tools / shell) remain."
         )
-    warnings.append(
-        "Estimate is tiktoken on assembled text/schemas. Provider-billed "
-        "input_tokens can be ~5–15% higher due to tools JSON envelope overhead."
-    )
+    supported = {"anthropic", "openai", "google"}
+    if billed_matched:
+        label = {
+            "anthropic": "Anthropic count_tokens",
+            "openai": "OpenAI input_tokens",
+            "google": "Gemini count_tokens",
+        }.get(provider, f"{provider} count_tokens")
+        warnings.append(
+            f"Total uses {label} on the assembled first-turn request "
+            "(same tokenizer family as chat Input for this provider)."
+        )
+    elif token_count_method == "provider" and provider not in supported:
+        warnings.append(
+            f"Provider counting is not available for {provider or 'this provider'}; "
+            "fell back to tiktoken. Supported: Anthropic, OpenAI, Google."
+        )
+    elif token_count_method == "provider":
+        warnings.append(
+            "Provider counting failed (missing/invalid API key or endpoint); "
+            "fell back to tiktoken."
+        )
+    else:
+        warnings.append(
+            "Estimate is tiktoken on assembled text/schemas. Switch counting "
+            "method to Provider to match chat Input more closely "
+            "(Anthropic, OpenAI, or Google)."
+        )
     return warnings

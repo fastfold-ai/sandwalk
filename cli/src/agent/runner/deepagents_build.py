@@ -323,17 +323,34 @@ class DeepAgentsBuildMixin:
         agent_skills = sandbox_handle.skills_sources or None
         from agent.deepagents_runtime.subagents import build_domain_subagents
         from agent.hitl import build_interrupt_on, get_session_checkpointer
+        from agent.knowledge_level import knowledge_flags
 
-        agent = create_deep_agent(
-            model=model,
-            tools=tools,
-            system_prompt=system_prompt,
-            skills=agent_skills,
-            backend=backend,
-            subagents=build_domain_subagents(),
-            interrupt_on=build_interrupt_on(),
-            checkpointer=get_session_checkpointer(session_id),
-        )
+        flags = knowledge_flags(config=config)
+        create_kwargs: dict = {
+            "model": model,
+            "tools": tools,
+            "system_prompt": system_prompt,
+            "skills": agent_skills,
+            "backend": backend,
+            "interrupt_on": build_interrupt_on(),
+            "checkpointer": get_session_checkpointer(session_id),
+        }
+        if flags.include_domain_subagents:
+            create_kwargs["subagents"] = build_domain_subagents()
+        if flags.excluded_deepagents_tools:
+            # Strip excluded tools *and* their middleware system prompts
+            # (write_todos / task). Plain _ToolExclusionMiddleware leaves those
+            # prompts in place and inflates billed input_tokens vs Context.
+            from agent.deepagents_runtime.knowledge_level_middleware import (
+                KnowledgeLevelMiddleware,
+            )
+
+            create_kwargs["middleware"] = (
+                KnowledgeLevelMiddleware(
+                    excluded=frozenset(flags.excluded_deepagents_tools)
+                ),
+            )
+        agent = create_deep_agent(**create_kwargs)
         return agent, sandbox_handle
 
     def _build_deepagents_exec_result(

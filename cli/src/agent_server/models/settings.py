@@ -12,6 +12,7 @@ class RuntimeSettings(ApiModel):
     openai_profile_id: str | None = None
     agent_profile: str
     tool_mode: str
+    knowledge_level: str = "high"
     reasoning_effort: str = "medium"
     reasoning_fast: bool = False
     recursion_limit: int = 100_000
@@ -33,6 +34,7 @@ class UpdateRuntimeSettingsRequest(ApiModel):
     openai_base_url: str | None = None
     agent_profile: str | None = None
     tool_mode: str | None = None
+    knowledge_level: str | None = None
     reasoning_effort: str | None = None
     reasoning_fast: bool | None = None
     recursion_limit: int | None = None
@@ -119,6 +121,8 @@ class PromptBudgetResponse(ApiModel):
     total_chars: int = 0
     tokenizer: str = "chars/4"
     tool_mode: str = "ptc"
+    knowledge_level: str = "high"
+    token_count_method: str = "tiktoken"
     provider: str | None = None
     model: str | None = None
     specialist_id: str | None = None

@@ -14,12 +14,18 @@ def measure_deepagents_builtin_tool_schemas(
     skills_sources: list[str],
     config: Any | None = None,
     workspace_root: str | None = None,
+    excluded_tools: frozenset[str] | set[str] | None = None,
+    include_domain_subagents: bool = True,
 ) -> tuple[str, list[str]]:
     """Return (schema_text, tool_names) for deepagents-injected builtins.
 
     Builds a real ``create_deep_agent`` graph (FakeListChatModel, no provider
     call) and reads ToolNode tools. Domain tools are excluded so Prompts can
     attribute filesystem / todos / task / execute separately.
+
+    ``excluded_tools`` mirrors Knowledge Level filtering (model-request
+    exclusion); names are omitted from the counted schema text for budget
+    parity with runtime.
 
     Per Deep Agents docs, input context = custom system prompt + BASE harness
     guidance + skills index + tool schemas
@@ -38,6 +44,7 @@ def measure_deepagents_builtin_tool_schemas(
         for t in domain_tools
         if getattr(t, "name", None)
     }
+    excluded = {str(name) for name in (excluded_tools or ()) if str(name)}
     model = FakeListChatModel(responses=["ok"])
     root = workspace_root or tempfile.mkdtemp(prefix="sandwalk-budget-")
     Path(root).mkdir(parents=True, exist_ok=True)
@@ -50,13 +57,26 @@ def measure_deepagents_builtin_tool_schemas(
         backend_override="builtin",
         sync_workspace=False,
     )
-    agent = create_deep_agent(
-        model=model,
-        tools=list(domain_tools),
-        system_prompt=system_prompt or "You are a helpful assistant.",
-        skills=handle.skills_sources or (skills_sources or None),
-        backend=handle.backend,
-    )
+    create_kwargs: dict[str, Any] = {
+        "model": model,
+        "tools": list(domain_tools),
+        "system_prompt": system_prompt or "You are a helpful assistant.",
+        "skills": handle.skills_sources or (skills_sources or None),
+        "backend": handle.backend,
+    }
+    if include_domain_subagents:
+        from agent.deepagents_runtime.subagents import build_domain_subagents
+
+        create_kwargs["subagents"] = build_domain_subagents()
+    if excluded:
+        from agent.deepagents_runtime.knowledge_level_middleware import (
+            KnowledgeLevelMiddleware,
+        )
+
+        create_kwargs["middleware"] = (
+            KnowledgeLevelMiddleware(excluded=frozenset(excluded)),
+        )
+    agent = create_deep_agent(**create_kwargs)
 
     def _find_toolnodes(
         obj: Any, seen: set[int] | None = None, depth: int = 0
@@ -103,10 +123,18 @@ def measure_deepagents_builtin_tool_schemas(
     builtin = [
         tool
         for name, tool in sorted(tools_by_name.items())
-        if name and name not in domain_names
+        if name and name not in domain_names and name not in excluded
     ]
 
     def _schema_text(tool: Any) -> str:
+        try:
+            from langchain_anthropic.chat_models import convert_to_anthropic_tool
+
+            converted = convert_to_anthropic_tool(tool)
+            if isinstance(converted, dict):
+                return json.dumps(converted, ensure_ascii=True, default=str)
+        except Exception:  # noqa: BLE001
+            pass
         name = str(getattr(tool, "name", "") or "")
         description = str(getattr(tool, "description", "") or "")
         schema: Any = {}

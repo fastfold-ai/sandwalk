@@ -28,6 +28,9 @@ def register_settings_routes(app: FastAPI, deps: AppDeps) -> None:
         specialist_id: str | None = Query(default=None, alias="specialistId"),
         project_id: str | None = Query(default=None, alias="projectId"),
         sample_query: str | None = Query(default=None, alias="sampleQuery"),
+        token_count_method: str | None = Query(
+            default=None, alias="tokenCountMethod"
+        ),
     ) -> PromptBudgetResponse:
         from agent_server.prompt_budget_service import PromptBudgetService
 
@@ -35,6 +38,7 @@ def register_settings_routes(app: FastAPI, deps: AppDeps) -> None:
             specialist_id=specialist_id,
             project_id=project_id,
             sample_query=sample_query,
+            token_count_method=token_count_method,
         )
 
     @app.get("/v1/settings/runtime", response_model=RuntimeSettings)

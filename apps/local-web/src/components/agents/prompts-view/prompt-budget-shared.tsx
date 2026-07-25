@@ -1,6 +1,7 @@
 import type {
   PromptBudgetBucket,
   PromptBudgetResponse,
+  PromptBudgetTokenCountMethod,
   Specialist
 } from '@sandwalk/agent-ui-core'
 import { ChevronDown } from 'lucide-react'
@@ -19,9 +20,32 @@ export const BUCKET_COLORS = [
   'bg-teal-500'
 ]
 
+export type TokenCountMethod = PromptBudgetTokenCountMethod
+
+const TOKEN_COUNT_METHOD_KEY = 'sandwalk.promptBudget.tokenCountMethod'
+
+export function readTokenCountMethod(): TokenCountMethod {
+  try {
+    const raw = localStorage.getItem(TOKEN_COUNT_METHOD_KEY)
+    if (raw === 'provider' || raw === 'tiktoken') return raw
+  } catch {
+    /* ignore */
+  }
+  return 'tiktoken'
+}
+
+export function writeTokenCountMethod(method: TokenCountMethod) {
+  try {
+    localStorage.setItem(TOKEN_COUNT_METHOD_KEY, method)
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Survive route unmount so switching dashboard tabs does not force a full re-estimate. */
 export type PromptBudgetCache = {
   specialistId: string
+  tokenCountMethod: TokenCountMethod
   specialists: Specialist[]
   budget: PromptBudgetResponse
   at: number

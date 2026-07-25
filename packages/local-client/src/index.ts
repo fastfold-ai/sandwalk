@@ -466,6 +466,7 @@ export class LocalAgentClient
       specialistId?: string | null
       projectId?: string | null
       sampleQuery?: string | null
+      tokenCountMethod?: 'tiktoken' | 'provider' | string | null
     },
     signal?: AbortSignal,
   ): Promise<PromptBudgetResponse> {
@@ -474,6 +475,9 @@ export class LocalAgentClient
     if (options?.projectId) params.set('projectId', options.projectId)
     if (options?.sampleQuery != null && options.sampleQuery !== '') {
       params.set('sampleQuery', options.sampleQuery)
+    }
+    if (options?.tokenCountMethod) {
+      params.set('tokenCountMethod', String(options.tokenCountMethod))
     }
     const query = params.toString()
     return this.request<PromptBudgetResponse>(
@@ -1156,6 +1160,7 @@ export class LocalAgentClient
         openai_base_url: changes.openaiBaseUrl,
         agent_profile: changes.agentProfile,
         tool_mode: changes.toolMode,
+        knowledge_level: changes.knowledgeLevel,
         reasoning_effort: changes.reasoningEffort,
         reasoning_fast: changes.reasoningFast,
         recursion_limit: changes.recursionLimit,

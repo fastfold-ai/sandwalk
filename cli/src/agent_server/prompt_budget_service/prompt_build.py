@@ -22,6 +22,7 @@ class PromptBuild:
     skill_count: int = 0
     deepagents_text: str = ""
     deepagents_names: list[str] = field(default_factory=list)
+    middleware_text: str = ""
 
 
 def build_prompt(
@@ -99,12 +100,21 @@ def build_prompt(
     result.skills_text, result.skill_count = build_skills_index_text(ctx.allowed_skill_names)
     skills_sources = resolve_skill_source_dirs(ctx.allowed_skill_names)
 
+    from agent.deepagents_runtime.middleware_prompts import middleware_system_prompt_text
+    from agent.knowledge_level import knowledge_flags
+
+    flags = knowledge_flags(config=cfg)
+    result.middleware_text = middleware_system_prompt_text(
+        excluded_tools=flags.excluded_deepagents_tools
+    )
     try:
         deepagents_text, deepagents_names = measure_deepagents_builtin_tool_schemas(
             domain_tools=final_tools,
             system_prompt=result.user_system_prompt,
             skills_sources=skills_sources,
             config=cfg,
+            excluded_tools=flags.excluded_deepagents_tools,
+            include_domain_subagents=flags.include_domain_subagents,
         )
         result.deepagents_text, result.deepagents_names = deepagents_text, deepagents_names
     except Exception as exc:  # noqa: BLE001

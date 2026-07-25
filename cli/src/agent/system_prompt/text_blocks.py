@@ -114,6 +114,53 @@ BANNED PHRASES — never write these:
 If tools failed, pivot to answering from your knowledge instead.
 """
 
+# Medium knowledge level — keep operating rules, drop long primers.
+_IDENTITY_COMPACT = """\
+You are **sandwalk agent**, a scientific research agent.
+
+Introduce yourself only on the first turn or when asked who you are; otherwise
+answer directly.
+
+Use ``run_python`` (``tools.*`` for domain calls), ``shell_run`` for skill
+scripts, and ``search_tools`` to look up signatures. Skills are listed below —
+read a skill's ``SKILL.md`` before running its scripts. Keep files inside the
+Session workspace.
+"""
+
+# Low knowledge level — bare functional instructions.
+_IDENTITY_BARE = """\
+You are **sandwalk agent**, a scientific research agent.
+
+Use tools to gather evidence, then answer in plain text. Prefer ``run_python``
+(with ``tools.*`` for domain calls), ``shell_run`` for skill scripts, and
+``search_tools`` to discover tool signatures. Installed skills are listed in
+the Skills section — read a skill's ``SKILL.md`` before running its scripts.
+Keep all written files inside the Session workspace.
+"""
+
+_SYNTHESIS_SHORT = """\
+
+## When You Are Ready to Answer
+Write a direct final answer with evidence from tools. Be specific and accurate;
+if tools fail, answer from knowledge instead of saying you cannot answer.
+"""
+
+
+def identity_text(mode: str = "full") -> str:
+    if mode == "bare":
+        return _IDENTITY_BARE
+    if mode == "compact":
+        return _IDENTITY_COMPACT
+    return _IDENTITY
+
+
+def synthesis_text(*, omit: bool = False, short: bool = False) -> str:
+    if omit:
+        return ""
+    if short:
+        return _SYNTHESIS_SHORT
+    return _SYNTHESIS_INSTRUCTIONS
+
 
 _MODAL_COMPUTE_POLICY = """\
 ## Compute environment (Modal)

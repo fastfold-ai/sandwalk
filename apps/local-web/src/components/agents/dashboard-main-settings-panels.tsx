@@ -88,6 +88,12 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
           client.getPromptBudget(options, signal)
         }
         onListSpecialists={signal => client.listSpecialists(signal)}
+        onGetRuntimeSettings={signal => client.getRuntimeSettings(signal)}
+        onUpdateRuntimeSettings={async (changes, signal) => {
+          const next = await client.updateRuntimeSettings(changes, signal)
+          setRuntimeSettings(next)
+          return next
+        }}
       />
     )
   }

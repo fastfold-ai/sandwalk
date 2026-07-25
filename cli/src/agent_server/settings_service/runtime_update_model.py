@@ -17,6 +17,12 @@ def apply_provider_updates(config: Config, payload: UpdateRuntimeSettingsRequest
         if value is not None:
             config.set(key, value)
 
+    if payload.knowledge_level is not None:
+        level = str(payload.knowledge_level or "").strip().lower()
+        if level not in {"low", "medium", "high"}:
+            raise ValueError("knowledge_level must be one of: low, medium, high")
+        config.set("agent.knowledge_level", level)
+
 
 def apply_model_update(config: Config, payload: UpdateRuntimeSettingsRequest) -> None:
     provider = str(config.get("llm.provider") or "").strip().lower()

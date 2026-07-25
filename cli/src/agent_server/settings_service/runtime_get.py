@@ -29,6 +29,9 @@ def get_runtime_settings(config: Config) -> RuntimeSettings:
         openai_profile_id=str(config.get("llm.openai_active_profile") or "").strip() or None,
         agent_profile=str(config.get("agent.profile") or "research"),
         tool_mode=str(config.get("agent.tool_mode") or "ptc"),
+        knowledge_level=(
+            str(config.get("agent.knowledge_level") or "high").strip().lower() or "high"
+        ),
         reasoning_effort=effort,
         reasoning_fast=fast,
         recursion_limit=recursion_limit_from_config(config),

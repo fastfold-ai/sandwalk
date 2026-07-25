@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import logging
 
+from agent.knowledge_level import knowledge_flags
+
 from .credentials_section import build_credentials_section
 from .knowledge_section import build_knowledge_sections
 from .mode_section import build_mode_section
 from .skills_section import build_skills_section
-from .text_blocks import _IDENTITY, _SYNTHESIS_INSTRUCTIONS
+from .text_blocks import identity_text, synthesis_text
 from .tools_section import build_tools_section
 from .workspace_section import build_workspace_section
 
@@ -58,9 +60,19 @@ def build_system_prompt(
     Returns:
         The complete system prompt string.
     """
-    parts: list[str] = [_IDENTITY]
+    config = getattr(session, "config", None)
+    flags = knowledge_flags(config=config)
 
-    parts.append(build_workspace_section(workspace_path, sandbox_backend))
+    compact_support = flags.level in {"medium", "low"}
+    parts: list[str] = [identity_text(flags.identity)]
+
+    parts.append(
+        build_workspace_section(
+            workspace_path,
+            sandbox_backend,
+            compact=compact_support,
+        )
+    )
     parts.append(build_credentials_section())
 
     plan_mode = bool(getattr(session, "config", None) and session.config.get("agent.plan_preview", False))
@@ -77,7 +89,13 @@ def build_system_prompt(
         parts.append(str(specialist_instructions).strip())
 
     parts.append(
-        build_tools_section(tool_mode, tool_names, exclude_categories, exclude_tools)
+        build_tools_section(
+            tool_mode,
+            tool_names,
+            exclude_categories,
+            exclude_tools,
+            ptc_catalog=flags.ptc_catalog,
+        )
     )
 
     # Installed agent skills (fold, etc.) — injected before workflow guides.
@@ -88,11 +106,16 @@ def build_system_prompt(
             include_skills=include_skills,
             runtime=runtime,
             sandbox_backend=sandbox_backend,
+            compact=compact_support,
         )
     )
 
-    parts.append(build_knowledge_sections())
-    parts.append(_SYNTHESIS_INSTRUCTIONS)
+    if not flags.omit_workflow_index:
+        parts.append(build_knowledge_sections())
+
+    synth = synthesis_text(omit=flags.omit_synthesis, short=flags.short_synthesis)
+    if synth:
+        parts.append(synth)
 
     if data_context:
         parts.append("\n## Data Context\n")
@@ -104,8 +127,9 @@ def build_system_prompt(
 
     prompt = "\n".join(parts)
     logger.info(
-        "Built system prompt: %d chars, %d sections",
+        "Built system prompt: %d chars, %d sections (knowledge_level=%s)",
         len(prompt),
         len(parts),
+        flags.level,
     )
     return prompt

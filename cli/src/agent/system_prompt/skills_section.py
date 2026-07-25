@@ -39,6 +39,7 @@ def build_skills_section(
     include_skills: bool,
     runtime: str,
     sandbox_backend: str | None,
+    compact: bool = False,
 ) -> str:
     """Embed an installed-skills catalog, or deepagents filesystem-skills guidance."""
     if include_skills:
@@ -51,6 +52,15 @@ def build_skills_section(
 
     if runtime != "deepagents":
         return ""
+
+    if compact:
+        return (
+            "\n## Skills\n"
+            "Skills are listed in the Skills System section below. Read a skill's "
+            "``SKILL.md`` with ``read_file`` before following it. Run skill scripts "
+            "with ``shell_run`` on the **host** skill path "
+            "(``$SANDWALK_SKILLS_DIR/<skill>/scripts/...``).\n"
+        )
 
     modal_on = str(sandbox_backend or "").strip().lower() == "modal"
     skills_exec = (

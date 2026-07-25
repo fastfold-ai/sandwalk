@@ -441,6 +441,8 @@ export type RuntimeSettings = {
   openaiProfileId?: string | null
   agentProfile: string
   toolMode: string
+  /** Always-on prompt / Deep Agents surface: low | medium | high. */
+  knowledgeLevel?: 'low' | 'medium' | 'high' | string
   /** Stored effort level: low | medium | high (Fast maps to API none). */
   reasoningEffort?: string
   /** When true, API reasoning_effort is none regardless of reasoningEffort. */
@@ -696,11 +698,15 @@ export type PromptBudgetToolCounts = {
   openaiCap: number
 }
 
+export type PromptBudgetTokenCountMethod = 'tiktoken' | 'provider'
+
 export type PromptBudgetResponse = {
   totalTokens: number
   totalChars: number
   tokenizer: string
   toolMode: string
+  knowledgeLevel?: 'low' | 'medium' | 'high' | string
+  tokenCountMethod?: PromptBudgetTokenCountMethod | string
   provider: string | null
   model: string | null
   specialistId: string | null
@@ -1209,6 +1215,7 @@ export interface AgentClient {
       specialistId?: string | null
       projectId?: string | null
       sampleQuery?: string | null
+      tokenCountMethod?: PromptBudgetTokenCountMethod | string | null
     },
     signal?: AbortSignal,
   ): Promise<PromptBudgetResponse>

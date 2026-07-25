@@ -37,6 +37,15 @@ def estimate_tokens(text: str, *, model: str | None = None) -> tuple[int, str]:
 
 
 def tool_schema_text(tool: Any) -> str:
+    """Serialize a tool the way providers bill it (Anthropic shape when possible)."""
+    try:
+        from langchain_anthropic.chat_models import convert_to_anthropic_tool
+
+        converted = convert_to_anthropic_tool(tool)
+        if isinstance(converted, dict):
+            return json.dumps(converted, ensure_ascii=True, default=str)
+    except Exception:
+        pass
     name = str(getattr(tool, "name", "") or "")
     description = str(getattr(tool, "description", "") or "")
     schema: Any = {}

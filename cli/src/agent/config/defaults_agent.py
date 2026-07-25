@@ -30,6 +30,9 @@ DEFAULTS_AGENT = {
     # removes the OpenAI tool-count ceiling. Set to "native" to restore per-tool
     # schemas.
     "agent.tool_mode": "ptc",
+    # Always-on prompt / Deep Agents surface size: high | medium | low.
+    # high = full (default); medium ≈5k context; low ≈2.5–3k. Skills stay on.
+    "agent.knowledge_level": "high",
     # Tool-call rendering (deepagents runtime only). When True, the most recent
     # `agent.tool_trace_detail_limit` tool calls in a consecutive batch stay in
     # full detail (name, args, output) and older ones collapse progressively to a
