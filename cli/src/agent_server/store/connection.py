@@ -89,19 +89,6 @@ class ConnectionMixin:
                     ) from last_exc
                 time.sleep(0.15)
 
-    def _try_exclusive_lock(self) -> bool:
-        """One non-blocking attempt at the flock. True when we now hold it."""
-        if fcntl is None:  # pragma: no cover - Windows
-            return False
-        fd = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            os.close(fd)
-            return False
-        self._lock_fd = fd
-        return True
-
     def _guard_before_write_open(self) -> None:
         """Never let a read-write open replay a mismatched WAL.
 
@@ -113,27 +100,25 @@ class ConnectionMixin:
         A stale sidecar can also land beside an already-running server, so this
         guards every write open rather than only the first one.
         """
-        if not self.path.exists() or not Path(f"{self.path}-wal").exists():
-            return
+        from agent_server.store_heal import (
+            readonly_readable,
+            repair_mismatched_sidecars,
+        )
 
-        from agent_server.store_heal import readonly_readable
+        # Retry because a server and a CLI can reach this at the same moment;
+        # whichever loses the rename finds the work already done.
+        for _ in range(3):
+            if not self.path.exists() or not Path(f"{self.path}-wal").exists():
+                return
+            if readonly_readable(self.path) is not False:
+                return
 
-        if readonly_readable(self.path) is not False:
-            return
-
-        from agent_server.store_heal import repair_mismatched_sidecars
-
-        # The exclusive owner may repair outright; a shared open must first
-        # confirm nobody is serving, since moving sidecars out from under a
-        # running server would break it for everyone.
-        held = getattr(self, "_exclusive", False) and self._lock_fd is not None
-        borrowed = False if held else self._try_exclusive_lock()
-        if held or borrowed:
-            try:
-                note = repair_mismatched_sidecars(self.path)
-            finally:
-                if borrowed:
-                    self._release_exclusive_lock()
+            # No flock is required here, and deliberately so. SQLite has just
+            # told us it cannot read this pairing, which means *no* process
+            # can: a running server is no more able to use that WAL than we
+            # are, so there is no in-flight state to protect. Waiting for the
+            # lock would only stop the CLI from being used alongside the UI.
+            note = repair_mismatched_sidecars(self.path)
             if note is not None:
                 self.last_heal_note = note
                 logger.warning("%s", note)
@@ -142,9 +127,7 @@ class ConnectionMixin:
         raise AgentStoreCorruptedError(
             f"Agent database cannot be read with the WAL beside it: {self.path}. "
             "Refusing to open it read-write, because that would fold the "
-            "mismatched WAL into the database and lose data. The running "
-            "Sandwalk server clears this on its next database write, so try "
-            "again in a moment; if it persists, stop the server and re-run."
+            "mismatched WAL into the database and lose data."
         )
 
     def _release_exclusive_lock(self) -> None:

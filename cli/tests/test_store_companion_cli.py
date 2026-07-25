@@ -38,6 +38,34 @@ def test_shared_open_never_replays_a_mismatched_wal(tmp_path: Path) -> None:
     assert sessions(db) == 2, "a shared open destroyed the main database"
 
 
+def test_cli_starts_while_the_server_holds_the_lock(tmp_path: Path) -> None:
+    """`sandwalk --resume` must work with the UI running, bad WAL or not.
+
+    An unreadable WAL is unusable by the server too, so blocking the CLI on the
+    flock would break the companion workflow for no gain.
+    """
+    db = tmp_path / "agent.db"
+    server = AgentStore(db, exclusive=True)
+    try:
+        server.create_session(title="from-ui", workspace_path=None)
+        plant_stale_wal(db)
+
+        cli = AgentStore(db)
+        try:
+            cli.create_session(title="from-cli", workspace_path=None)
+            assert {"from-ui", "from-cli"} <= {
+                s.title for s in cli.list_sessions()
+            }
+        finally:
+            cli.close()
+
+        # The server carries on against the same repaired database.
+        assert {"from-ui", "from-cli"} <= {s.title for s in server.list_sessions()}
+    finally:
+        server.close()
+    assert sessions(db) == 2
+
+
 def test_cli_and_server_write_the_same_database(tmp_path: Path) -> None:
     """The companion case: server (exclusive) and CLI (shared) both writing."""
     db = tmp_path / "agent.db"
