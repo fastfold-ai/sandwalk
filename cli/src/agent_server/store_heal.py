@@ -405,7 +405,10 @@ def repair_mismatched_sidecars(db_path: Path) -> str | None:
             f"Dropped a mismatched WAL sidecar that made {db_path.name} unreadable; "
             f"all data kept (set aside as {names})"
         )
-        logger.warning(note)
+        # Routine, non-destructive maintenance: record it, but keep it out of
+        # the CLI's face. Anything above INFO reaches stderr via the last-resort
+        # handler, and nothing is wrong from the user's point of view.
+        logger.info(note)
         return note
 
     # Wrong diagnosis — restore exactly what was there and heal for real.

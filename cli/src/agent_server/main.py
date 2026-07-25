@@ -5,6 +5,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# Long enough for in-flight requests to finish, short enough that a restart
+# never looks stuck to whoever is waiting on it.
+SHUTDOWN_GRACE_SECONDS = 5
+
 
 def run_server(
     *,
@@ -110,7 +114,15 @@ def run_server(
     except AgentStoreCorruptedError as exc:
         raise SystemExit(f"Error: {exc}") from exc
 
-    run_kwargs = {"log_level": "info"}
+    run_kwargs = {
+        "log_level": "info",
+        # The desktop UI holds event streams open for as long as it is running,
+        # and uvicorn's graceful shutdown waits for open connections forever.
+        # Without a bound, SIGTERM leaves the server sitting in "Waiting for
+        # connections to close" whenever the UI is up, and a restart looks hung
+        # — which invites a hard kill on a database mid-write.
+        "timeout_graceful_shutdown": SHUTDOWN_GRACE_SECONDS,
+    }
     if log_config is not None:
         run_kwargs["log_config"] = log_config
 

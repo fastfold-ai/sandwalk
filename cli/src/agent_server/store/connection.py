@@ -120,8 +120,9 @@ class ConnectionMixin:
             # lock would only stop the CLI from being used alongside the UI.
             note = repair_mismatched_sidecars(self.path)
             if note is not None:
+                # repair_mismatched_sidecars already logged it; callers that
+                # want to surface it read last_heal_note.
                 self.last_heal_note = note
-                logger.warning("%s", note)
                 return
 
         raise AgentStoreCorruptedError(
