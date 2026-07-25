@@ -8,7 +8,9 @@ cloud relay, because two inbound sources would answer the same mention twice.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
+import time
 
 from agent_server.connectors.addressing import parse_target
 from agent_server.connectors.directory import (
@@ -32,6 +34,17 @@ from agent_server.service import AgentService, SessionBusyError
 from agent_server.store import AgentStore
 
 logger = logging.getLogger("agent_server.connectors")
+
+# Progress feedback on the mention itself, rather than a message in the channel.
+WORKING_REACTION = "eyes"
+DONE_REACTION = "white_check_mark"
+FAILED_REACTION = "warning"
+
+_BUSY_STATUSES = {"running", "queued", "starting"}
+_POLL_SECONDS = 1.0
+# How long to allow for a run to show up as busy before deciding it is already
+# done — a fast answer can settle before the first poll.
+_START_GRACE_SECONDS = 5.0
 
 _MISSING_SDK = (
     "Slack support is not installed in this environment. "
@@ -72,6 +85,7 @@ class ConnectorService:
         self.agent_service = agent_service
         self.gateway = SlackGateway(store)
         self._sockets: dict[str, SlackSocketAdapter] = {}
+        self._progress_tasks: set[asyncio.Task] = set()
         self._relay_state: str = "off"
         self._relay_detail: str | None = None
         self._started = False
@@ -96,6 +110,11 @@ class ConnectorService:
 
     async def stop(self) -> None:
         self._started = False
+        for task in list(self._progress_tasks):
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+        self._progress_tasks.clear()
         async with self._lock:
             adapters = list(self._sockets.values())
             self._sockets.clear()
@@ -272,10 +291,67 @@ class ConnectorService:
             )
             return
         if decision.action == "spawn":
-            self._spawn_session(message, decision)
+            session_id = self._spawn_session(message, decision)
+            if session_id:
+                self._track_progress(message, [session_id])
             return
         for session_id in decision.session_ids:
             self._deliver(session_id, message, first_message=False)
+        if decision.session_ids:
+            self._track_progress(message, list(decision.session_ids))
+
+    def _track_progress(self, message: InboundMessage, session_ids: list[str]) -> None:
+        """Mark the Slack message as being worked on, and clear it when done.
+
+        Answers can take a minute, and without this the person who asked has no
+        signal that anything is happening. A reaction is the least intrusive
+        option: it needs no extra message in the channel, and it degrades
+        quietly on a workspace whose app predates the reactions scope.
+        """
+        task = asyncio.create_task(self._run_progress(message, session_ids))
+        # Hold a reference; asyncio only keeps weak ones and will cancel a task
+        # that gets collected mid-run.
+        self._progress_tasks.add(task)
+        task.add_done_callback(self._progress_tasks.discard)
+
+    async def _run_progress(
+        self, message: InboundMessage, session_ids: list[str]
+    ) -> None:
+        adapter = self._sockets.get(message.team_id)
+        if adapter is None:
+            return
+        await adapter.set_reaction(
+            channel_id=message.channel_id, ts=message.ts, add=WORKING_REACTION
+        )
+        results = [await self._wait_for_idle(session_id) for session_id in session_ids]
+        await adapter.set_reaction(
+            channel_id=message.channel_id,
+            ts=message.ts,
+            remove=WORKING_REACTION,
+            add=DONE_REACTION if all(results) else FAILED_REACTION,
+        )
+
+    async def _wait_for_idle(self, session_id: str, timeout: float = 900.0) -> bool:
+        """Poll until the run settles. True when it finished without erroring.
+
+        Session events are only exposed as an SSE feed over the store, so there
+        is nothing in-process to await. A short run can finish before the first
+        poll, hence the grace window before concluding it never started.
+        """
+        deadline = time.monotonic() + timeout
+        grace = time.monotonic() + _START_GRACE_SECONDS
+        started = False
+        while time.monotonic() < deadline:
+            session = await asyncio.to_thread(self.store.get_session, session_id)
+            if session is None:
+                return False
+            status = (session.status or "").strip().lower()
+            if status in _BUSY_STATUSES:
+                started = True
+            elif started or time.monotonic() > grace:
+                return status != "error"
+            await asyncio.sleep(_POLL_SECONDS)
+        return False
 
     async def allow_parked(self, message_id: str) -> bool:
         """Allow the sender, then actually deliver the message they sent.
@@ -376,6 +452,7 @@ class ConnectorService:
             channel_name=message.channel_name,
             sender_id=message.user_id,
             sender_name=message.user_name,
+            sender_avatar_url=message.user_avatar_url,
             text=message.text,
         )
         try:

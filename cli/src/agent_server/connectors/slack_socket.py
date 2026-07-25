@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import time
 from collections.abc import Awaitable, Callable
 
 from agent_server.connectors.gateway import InboundMessage
@@ -24,6 +25,9 @@ InboundHandler = Callable[[InboundMessage], Awaitable[None]]
 # its own, but it can give up after a transient error during Slack's periodic
 # connection cycling and leave a dead socket that never recovers. Poll for that.
 _WATCHDOG_INTERVAL = 20.0
+
+# `users.list` is rate limited, so cap how often an unrecognised id re-fetches.
+_DIRECTORY_MIN_REFRESH = 60.0
 
 
 class SlackSocketAdapter:
@@ -49,9 +53,12 @@ class SlackSocketAdapter:
         self._watchdog_task: asyncio.Task | None = None
         self._closing = False
         self._bot_user_id: str | None = None
+        self._bot_name: str | None = None
         self.reconnects = 0
         self._user_names: dict[str, str] = {}
+        self._user_avatars: dict[str, str] = {}
         self._channel_names: dict[str, str] = {}
+        self._directory_loaded_at = 0.0
 
     @property
     def bot_user_id(self) -> str | None:
@@ -90,6 +97,9 @@ class SlackSocketAdapter:
         try:
             auth = await self._app.client.auth_test()
             self._bot_user_id = auth.get("user_id")
+            # The directory omits bots, so without this the agent's own handle
+            # stays a raw id in the text a mention is titled from.
+            self._bot_name = str(auth.get("user") or "").strip() or None
         except Exception:
             logger.exception("Slack auth_test failed for team %s", self.team_id)
             return False
@@ -101,6 +111,10 @@ class SlackSocketAdapter:
         @self._app.event("app_mention")
         async def _on_app_mention(event, _say) -> None:  # type: ignore[no-untyped-def]
             await self._handle_event(event)
+
+        # Load names up front so even the first mention renders as a person and
+        # a channel rather than a pair of ids.
+        await self._load_directory()
 
         self._closing = False
         self._socket = AsyncSocketModeHandler(self._app, self.app_token)
@@ -130,13 +144,81 @@ class SlackSocketAdapter:
         self._socket = None
         self._app = None
 
+    async def set_reaction(
+        self, *, channel_id: str, ts: str, add: str | None, remove: str | None = None
+    ) -> None:
+        """Best-effort reaction toggle used to show progress on a mention.
+
+        Never raises: a missing ``reactions:write`` scope, or an app installed
+        before that scope existed, must not stop the agent from answering.
+        """
+        client = getattr(self._app, "client", None)
+        if client is None or not channel_id or not ts:
+            return
+        if remove:
+            with contextlib.suppress(Exception):
+                await client.reactions_remove(
+                    channel=channel_id, timestamp=ts, name=remove
+                )
+        if add:
+            try:
+                await client.reactions_add(channel=channel_id, timestamp=ts, name=add)
+            except Exception as exc:  # noqa: BLE001
+                # already_reacted is normal on a retry and not worth a line.
+                if "already_reacted" not in str(exc):
+                    logger.debug("Slack reaction %s failed: %s", add, exc)
+
+    async def _load_directory(self, *, force: bool = False) -> None:
+        """Fill the id → name maps so nobody reads a ``U0123`` in the UI."""
+        from agent_server.connectors.directory import fetch_directory
+
+        try:
+            people, channels = await fetch_directory(
+                self.team_id, self.bot_token, force=force
+            )
+        except Exception as exc:  # noqa: BLE001 - names are a nicety, not critical
+            logger.warning(
+                "Could not load the Slack directory for %s: %s", self.team_id, exc
+            )
+            return
+        self._user_names = {person.id: person.name for person in people}
+        if self._bot_user_id and self._bot_name:
+            self._user_names[self._bot_user_id] = self._bot_name
+        self._user_avatars = {
+            person.id: person.avatar_url for person in people if person.avatar_url
+        }
+        self._channel_names = {channel.id: channel.name for channel in channels}
+        self._directory_loaded_at = time.monotonic()
+
+    async def _ensure_known(self, event: dict) -> None:
+        """Refresh once when a sender or channel is new since the last fetch.
+
+        People join workspaces and channels get created after we connect, and
+        falling back to a raw id is exactly the thing this avoids. Rate limited
+        so an id we genuinely cannot resolve (a shared-channel guest, say) does
+        not re-fetch on every message.
+        """
+        user_id = str(event.get("user") or "").strip()
+        channel_id = str(event.get("channel") or "").strip()
+        known = (not user_id or user_id in self._user_names) and (
+            not channel_id or channel_id in self._channel_names
+        )
+        if known:
+            return
+        if time.monotonic() - self._directory_loaded_at < _DIRECTORY_MIN_REFRESH:
+            return
+        await self._load_directory(force=True)
+
     async def _handle_event(self, event: dict) -> None:
+        if isinstance(event, dict):
+            await self._ensure_known(event)
         inbound = event_to_inbound(
             event,
             team_id=self.team_id,
             bot_user_id=self._bot_user_id,
             channel_names=self._channel_names,
             user_names=self._user_names,
+            user_avatars=self._user_avatars,
         )
         if inbound is None:
             return

@@ -22,6 +22,7 @@ class MessageSource(ApiModel):
     channel_name: str | None = None
     sender_id: str
     sender_name: str | None = None
+    sender_avatar_url: str | None = None
     # Raw message text, without the reply-handle framing the model needs.
     text: str
     permalink: str | None = None

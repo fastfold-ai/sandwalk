@@ -34,6 +34,7 @@ class InboundMessage:
     thread_ts: str | None = None
     channel_name: str | None = None
     user_name: str | None = None
+    user_avatar_url: str | None = None
     mentions_me: bool = False
 
     @property

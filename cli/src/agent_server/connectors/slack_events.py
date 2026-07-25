@@ -48,6 +48,7 @@ def event_to_inbound(
     bot_user_id: str | None = None,
     channel_names: dict[str, str] | None = None,
     user_names: dict[str, str] | None = None,
+    user_avatars: dict[str, str] | None = None,
 ) -> InboundMessage | None:
     """Map a Slack ``message``/``app_mention`` event, or ``None`` to skip it."""
     if not isinstance(event, dict):
@@ -88,6 +89,7 @@ def event_to_inbound(
         thread_ts=thread_ts,
         channel_name=(channel_names or {}).get(channel_id),
         user_name=(user_names or {}).get(user_id),
+        user_avatar_url=(user_avatars or {}).get(user_id),
         mentions_me=mentions_me,
     )
 

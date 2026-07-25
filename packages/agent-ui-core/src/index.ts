@@ -267,6 +267,7 @@ export type MessageSource = {
   channelName: string | null
   senderId: string
   senderName: string | null
+  senderAvatarUrl?: string | null
   /** Raw text, without the reply-handle framing added for the model. */
   text: string
   permalink?: string | null

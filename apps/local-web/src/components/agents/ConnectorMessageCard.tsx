@@ -36,6 +36,7 @@ export function ConnectorMessageCard({
     : source.channelId
   const sender = source.senderName || source.senderId
   const when = relativeTime(createdAt)
+  const initial = sender.trim().charAt(0).toUpperCase() || '?'
 
   return (
     <div
@@ -57,6 +58,17 @@ export function ConnectorMessageCard({
           {channel}
         </span>
         <span className="text-muted-foreground">·</span>
+        {source.senderAvatarUrl ? (
+          <img
+            src={source.senderAvatarUrl}
+            alt=""
+            className="size-4 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span className="bg-muted text-muted-foreground flex size-4 shrink-0 items-center justify-center rounded-full text-[9px] font-medium">
+            {initial}
+          </span>
+        )}
         <span className="truncate text-[12px]" title={`id ${source.senderId}`}>
           {sender}
         </span>
