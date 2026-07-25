@@ -13,9 +13,9 @@ Update these values when providers revise their published limits:
 - Moonshot:  https://platform.kimi.ai/docs/models
 
 As of July 2026:
-- Anthropic 1M context is GA (default, no beta header) on Opus 4.8/4.7/4.6,
-  Sonnet 5, Sonnet 4.6, and Fable 5. The ``context-1m-2025-08-07`` beta was
-  retired 2026-04-30; Sonnet 4.5 and older remain 200k.
+- Anthropic 1M context is GA (default, no beta header) on Opus 5, Fable 5,
+  Sonnet 5, Opus 4.8/4.7/4.6, and Sonnet 4.6. The ``context-1m-2025-08-07``
+  beta was retired 2026-04-30; Sonnet 4.5 and older remain 200k.
 - OpenAI GPT-5.6 (Sol/Terra/Luna) has a 1.05M window; earlier GPT-5.x are 400k.
 """
 
@@ -40,6 +40,7 @@ _EXACT_CONTEXT_WINDOWS: dict[str, int] = {
 # Longest-prefix rules for model families (checked after exact matches).
 _PREFIX_CONTEXT_WINDOWS: list[tuple[str, int]] = [
     # Anthropic — 1M GA (default, no beta header) on modern models.
+    ("claude-opus-5", 1_000_000),
     ("claude-opus-4-8", 1_000_000),
     ("claude-opus-4-7", 1_000_000),
     ("claude-opus-4-6", 1_000_000),

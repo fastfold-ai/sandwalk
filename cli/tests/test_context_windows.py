@@ -7,6 +7,7 @@ from agent.model_catalog import context_window_for_model
 
 def test_anthropic_modern_models_have_1m():
     # 1M context is GA (default, no beta header) on modern Anthropic models.
+    assert context_window_for_model("claude-opus-5") == 1_000_000
     assert context_window_for_model("claude-fable-5") == 1_000_000
     assert context_window_for_model("claude-opus-4-8") == 1_000_000
     assert context_window_for_model("claude-sonnet-5") == 1_000_000

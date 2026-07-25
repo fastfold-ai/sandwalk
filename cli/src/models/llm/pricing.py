@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-# Pricing per million tokens (USD) — updated Feb 2026
+# Pricing per million tokens (USD) — updated Jul 2026
 MODEL_PRICING = {
-    # Anthropic
+    # Anthropic (https://platform.claude.com/docs/en/about-claude/models/overview)
+    "claude-opus-5": {"input": 5.00, "output": 25.00},
+    "claude-sonnet-5": {"input": 3.00, "output": 15.00},
+    "claude-fable-5": {"input": 10.00, "output": 50.00},
     "claude-sonnet-4-5-20250929": {"input": 3.00, "output": 15.00},
-    "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
-    "claude-opus-4-6": {"input": 15.00, "output": 75.00},
+    "claude-haiku-4-5-20251001": {"input": 1.00, "output": 5.00},
+    "claude-opus-4-8": {"input": 5.00, "output": 25.00},
+    "claude-opus-4-6": {"input": 5.00, "output": 25.00},
     # OpenAI
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},

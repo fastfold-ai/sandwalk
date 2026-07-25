@@ -17,11 +17,16 @@ class CatalogModel(TypedDict):
 # the catalog but are disabled by default (see DEFAULT_DISABLED_MODELS).
 AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
     "anthropic": [
-        ("claude-opus-4-8", "Opus 4.8", "Most capable Anthropic model for complex reasoning"),
-        ("claude-sonnet-5", "Sonnet 5", "Flagship Sonnet for everyday coding and reasoning"),
+        (
+            "claude-opus-5",
+            "Opus 5",
+            "Powerful model for complex agentic coding and enterprise work (1M context)",
+        ),
+        ("claude-sonnet-5", "Sonnet 5", "Best combination of speed and intelligence"),
+        ("claude-fable-5", "Fable 5", "Next-generation intelligence for long-running agents"),
         ("claude-sonnet-4-6", "Sonnet 4.6", "Fast, balanced Sonnet for most tasks"),
-        ("claude-fable-5", "Fable 5", "Creative Anthropic model for writing and ideation"),
         # Legacy (disabled by default)
+        ("claude-opus-4-8", "Opus 4.8", "Previous-generation Opus"),
         ("claude-sonnet-4-5-20250929", "Sonnet 4.5", "Previous-generation Sonnet"),
         ("claude-haiku-4-5-20251001", "Haiku 4.5", "Fastest previous-generation Anthropic option"),
         ("claude-opus-4-6", "Opus 4.6", "Previous-generation Opus"),
@@ -159,12 +164,13 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
 }
 
 # Bump when the default-enabled set changes so existing configs get migrated once.
-CATALOG_DEFAULTS_VERSION = 3
+CATALOG_DEFAULTS_VERSION = 4
 
 # Models present in the catalog but hidden by default. Users can re-enable them
 # from Dashboard → Models; toggling simply removes them from the hidden list.
 DEFAULT_DISABLED_MODELS: frozenset[str] = frozenset(
     {
+        "claude-opus-4-8",
         "claude-sonnet-4-5-20250929",
         "claude-haiku-4-5-20251001",
         "claude-opus-4-6",

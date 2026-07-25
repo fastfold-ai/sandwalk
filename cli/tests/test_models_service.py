@@ -44,6 +44,7 @@ def isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def test_cloud_catalog_excludes_custom_entry():
     ids = {item["id"] for item in cloud_catalog_models()}
     assert "__custom_openai_compatible__" not in ids
+    assert "claude-opus-5" in ids
     assert "claude-sonnet-5" in ids
     assert "gpt-5.5" in ids
 
@@ -65,7 +66,9 @@ def test_catalog_defaults_migration(tmp_path, monkeypatch):
     hidden = set(migrated.hidden_models())
     assert DEFAULT_DISABLED_MODELS.issubset(hidden)
     # New-generation models remain enabled by default.
+    assert "claude-opus-5" not in hidden
     assert "claude-sonnet-5" not in hidden
+    assert "claude-opus-4-8" in hidden
     assert "gpt-5.6-sol" not in hidden
     assert "gpt-5.5" not in hidden
 
@@ -330,6 +333,7 @@ def test_model_supports_reasoning_effort():
     assert model_supports_reasoning_effort("openai", "gpt-5.6-sol") is True
     assert model_supports_reasoning_effort("openai", "o3-mini") is True
     assert model_supports_reasoning_effort("opencode", "gpt-5.2") is True
+    assert model_supports_reasoning_effort("anthropic", "claude-opus-5") is True
     assert model_supports_reasoning_effort("anthropic", "claude-opus-4-8") is True
     assert model_supports_reasoning_effort("anthropic", "claude-sonnet-5") is True
     assert model_supports_reasoning_effort("anthropic", "claude-fable-5") is True
@@ -403,6 +407,7 @@ def test_model_supports_reasoning_effort():
 def test_anthropic_model_omits_temperature():
     from agent.model_catalog import anthropic_model_omits_temperature
 
+    assert anthropic_model_omits_temperature("claude-opus-5") is True
     assert anthropic_model_omits_temperature("claude-opus-4-8") is True
     assert anthropic_model_omits_temperature("claude-sonnet-5") is True
     assert anthropic_model_omits_temperature("claude-fable-5") is True

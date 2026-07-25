@@ -175,13 +175,13 @@ def generate_session_title(
         title = sanitize_generated_title(response.content)
         if title and not is_placeholder_title(title):
             return TitleResult(title=title, final=True)
-        logger.warning(
+        logger.debug(
             "Session title model returned empty/placeholder title (provider=%s model=%s)",
             getattr(llm, "provider", "?"),
             getattr(llm, "model", "?"),
         )
     except Exception as exc:
         # Title generation is best-effort — never break the session for it.
-        logger.warning("Session title generation skipped: %s", exc)
+        logger.debug("Session title generation skipped: %s", exc)
 
     return TitleResult(title=fallback, final=False)

@@ -93,6 +93,8 @@ def anthropic_model_supports_effort(model_id: str | None) -> bool:
     value = str(model_id or "").strip().lower()
     if not value:
         return False
+    if value.startswith("claude-opus-5"):
+        return True
     if value.startswith("claude-sonnet-5"):
         return True
     if value.startswith("claude-fable-5") or value.startswith("claude-mythos-5"):
@@ -108,7 +110,7 @@ def anthropic_model_supports_effort(model_id: str | None) -> bool:
 def anthropic_model_omits_temperature(model_id: str | None) -> bool:
     """Return True when Anthropic rejects non-default sampling params.
 
-    Opus 4.7+, Sonnet 5, Fable 5, and Mythos 5 return HTTP 400 if
+    Opus 5, Opus 4.7+, Sonnet 5, Fable 5, and Mythos 5 return HTTP 400 if
     ``temperature`` / ``top_p`` / ``top_k`` are set to non-default values.
     """
     import re
@@ -116,6 +118,8 @@ def anthropic_model_omits_temperature(model_id: str | None) -> bool:
     value = str(model_id or "").strip().lower()
     if not value:
         return False
+    if value.startswith("claude-opus-5"):
+        return True
     if value.startswith("claude-sonnet-5"):
         return True
     if value.startswith("claude-fable-5") or value.startswith("claude-mythos-5"):
