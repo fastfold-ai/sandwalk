@@ -91,6 +91,34 @@ CREATE TABLE IF NOT EXISTS store_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS library_items (
+    id TEXT PRIMARY KEY,
+    sha256 TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    mime TEXT,
+    original_name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    origin_session_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS library_items_updated
+    ON library_items(updated_at DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS library_items_kind_updated
+    ON library_items(kind, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS library_items_sha256
+    ON library_items(sha256);
+
+CREATE TABLE IF NOT EXISTS library_item_sessions (
+    item_id TEXT NOT NULL REFERENCES library_items(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL,
+    PRIMARY KEY (item_id, session_id)
+);
 """
 
 

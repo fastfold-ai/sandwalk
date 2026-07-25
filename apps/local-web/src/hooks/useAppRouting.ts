@@ -109,10 +109,13 @@ export function useAppRouting(location: Location) {
   const isDashboardOverview = isDashboard && dashboardSection === 'overview'
   const isHome =
     location.pathname === '/' || location.pathname === '/agents/home'
+  const isLibrary =
+    location.pathname === '/library' ||
+    location.pathname.startsWith('/library/')
   const isProjectHome = Boolean(routeProjectId)
   const isInspect = new URLSearchParams(location.search).get('inspect') === '1'
   const dashboardSkeletonKind: DashboardSkeletonKind = (() => {
-    if (isHome || isProjectHome) return 'home'
+    if (isHome || isLibrary || isProjectHome) return 'home'
     if (isDashboardOverview) return 'overview'
     if (isDashboardDoctor) return 'doctor'
     if (
@@ -145,6 +148,7 @@ export function useAppRouting(location: Location) {
     !isSkills &&
     !isIntegrations &&
     !isHome &&
+    !isLibrary &&
     !isProjectHome &&
     routes.sessionRoute?.params.sessionId &&
     routes.sessionRoute.params.sessionId !== 'home' &&
@@ -194,6 +198,7 @@ export function useAppRouting(location: Location) {
     isDashboardSpecialists,
     isDashboardOverview,
     isHome,
+    isLibrary,
     isProjectHome,
     isInspect,
     dashboardSkeletonKind,

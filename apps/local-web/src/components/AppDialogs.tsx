@@ -49,7 +49,7 @@ type AppDialogsProps = {
   openSessionTab: (id: string) => void
   setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
   setPendingOpenPath: Dispatch<SetStateAction<string | null>>
-  pendingMentionRef: MutableRefObject<string | null>
+  pendingMentionRef: MutableRefObject<string | string[] | null>
   setComposer: Dispatch<SetStateAction<string>>
   setComposerFiles: Dispatch<SetStateAction<string[]>>
   createSession: (projectId?: string | null) => Promise<void>

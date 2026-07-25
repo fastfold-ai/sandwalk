@@ -18,6 +18,7 @@ type UseAgentComposerSlotPropsInput = {
   session: AgentSession | null
   client: LocalAgentClient
   navigate: AgentComposerSlotProps['navigate']
+  pendingAttachmentsRef: AgentComposerSlotProps['pendingAttachmentsRef']
   composerLiveRef: AgentComposerSlotProps['composerLiveRef']
   queuedMessages: AgentComposerSlotProps['queuedMessages']
   editingQueuedId: AgentComposerSlotProps['editingQueuedId']
@@ -66,6 +67,7 @@ export function buildAgentComposerSlotProps(
     session: input.session,
     client: input.client,
     navigate: input.navigate,
+    pendingAttachmentsRef: input.pendingAttachmentsRef,
     composerLiveRef: input.composerLiveRef,
     queuedMessages: input.queuedMessages,
     editingQueuedId: input.editingQueuedId,

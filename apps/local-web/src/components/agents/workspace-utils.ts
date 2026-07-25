@@ -96,7 +96,7 @@ export function titleFromPlanPath(path: string) {
 }
 
 export function isTextLike(path: string) {
-  return /\.(json|md|mdx|markdown|txt|ya?ml|py|ts|tsx|js|jsx|css|html?|xml|cif|mmcif|pdb|sdf)$/i.test(
+  return /\.(json|md|mdx|markdown|txt|ya?ml|py|ts|tsx|js|jsx|css|html?|xml|cif|mmcif|pdb|sdf|jinja|jinja2|j2|toml)$/i.test(
     path
   )
 }

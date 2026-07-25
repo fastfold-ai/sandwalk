@@ -7,12 +7,13 @@ import type {
 import {
   Folder,
   LayoutDashboard,
+  LibraryBig,
   PanelLeft,
   Search,
   Send
 } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { NavigateFunction } from 'react-router-dom'
+import { useLocation, type NavigateFunction } from 'react-router-dom'
 
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
@@ -127,6 +128,8 @@ export function AgentSessionSidebar({
   onLogout,
   onRefreshUser
 }: AgentSessionSidebarProps) {
+  const location = useLocation()
+  const isLibrary = location.pathname === '/library' || location.pathname.startsWith('/library/')
   return (
     <>
       <div className="sandwalk-sidebar-chrome shrink-0 p-3">
@@ -208,6 +211,19 @@ export function AgentSessionSidebar({
         >
           <LayoutDashboard className="size-3.5" />
           Dashboard
+        </button>
+        <button
+          type="button"
+          className={cn(
+            'mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px]',
+            isLibrary
+              ? 'bg-sidebar-accent text-foreground'
+              : 'text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground'
+          )}
+          onClick={() => navigate('/library')}
+        >
+          <LibraryBig className="size-3.5" />
+          Library
         </button>
       </div>
       <SidebarBatchBar

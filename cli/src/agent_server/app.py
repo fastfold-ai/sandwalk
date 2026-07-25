@@ -19,6 +19,7 @@ from agent_server.app_deps import AppDeps
 from agent_server.auth_settings import load_settings, resolve_effective_api_key
 from agent_server.datasets_service import DatasetsService
 from agent_server.integrations_service import IntegrationsService
+from agent_server.library import LibraryService
 from agent_server.mcp_service import McpService
 from agent_server.models_service import ModelsService
 from agent_server.pty_manager import PtyManager
@@ -60,6 +61,7 @@ def create_app(
 
         logging.getLogger("agent_server").warning("%s", store.last_heal_note)
     service = AgentService(store)
+    library_service = LibraryService(store, service)
     integrations_service = IntegrationsService()
     pty_manager = PtyManager()
     public_base = (
@@ -125,6 +127,7 @@ def create_app(
         tools_service=ToolsService(),
         pty_manager=pty_manager,
         mcp_service=mcp_service,
+        library_service=library_service,
         backend_id=backend_id,
         cli_api_key=api_key,
     )

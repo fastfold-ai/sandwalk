@@ -228,6 +228,38 @@ export type AgentProject = {
   updatedAt: string
 }
 
+export type LibraryKind = 'image' | 'document' | 'structure' | 'code' | 'other'
+
+export type LibraryItem = {
+  id: string
+  sha256: string
+  bytes: number
+  mime: string | null
+  originalName: string
+  displayName: string
+  kind: LibraryKind
+  originSessionId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type LibraryPagination = {
+  page: number
+  perPage: number
+  total: number
+  hasMore: boolean
+}
+
+export type LibraryItemList = {
+  data: LibraryItem[]
+  pagination: LibraryPagination
+}
+
+export type UseLibraryInChatResult = {
+  sessionId: string
+  paths: string[]
+}
+
 export type SessionTitleSource = 'pending' | 'auto' | 'user'
 
 export type AgentSession = {
@@ -1175,6 +1207,41 @@ export interface AgentClient {
     options?: { projectId?: string | null; signal?: AbortSignal },
   ): Promise<AgentSession[]>
   listProjects?(signal?: AbortSignal): Promise<AgentProject[]>
+  listLibrary?(
+    options?: {
+      kind?: LibraryKind | null
+      q?: string | null
+      page?: number
+      perPage?: number
+      signal?: AbortSignal
+    },
+  ): Promise<LibraryItemList>
+  uploadLibraryFile?(file: File, signal?: AbortSignal): Promise<LibraryItem>
+  updateLibraryItem?(
+    itemId: string,
+    input: { displayName: string },
+    signal?: AbortSignal,
+  ): Promise<LibraryItem>
+  deleteLibraryItem?(itemId: string, signal?: AbortSignal): Promise<void>
+  useLibraryInChat?(
+    input: {
+      itemIds: string[]
+      projectId?: string | null
+      title?: string | null
+    },
+    signal?: AbortSignal,
+  ): Promise<UseLibraryInChatResult>
+  getLibraryContentUrl?(itemId: string): string
+  fetchLibraryContent?(itemId: string, signal?: AbortSignal): Promise<Blob>
+  readLibraryFile?(
+    itemId: string,
+    signal?: AbortSignal,
+  ): Promise<WorkspaceFileContent>
+  writeLibraryFile?(
+    itemId: string,
+    input: { content: string; encoding?: 'text' | 'base64' },
+    signal?: AbortSignal,
+  ): Promise<WorkspaceFileContent>
   listSpecialists?(signal?: AbortSignal): Promise<Specialist[]>
   getSpecialist?(specialistId: string, signal?: AbortSignal): Promise<Specialist>
   createSpecialist?(

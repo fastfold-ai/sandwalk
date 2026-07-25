@@ -12,7 +12,7 @@ import type {
   SandboxSettings,
   Specialist
 } from '@sandwalk/agent-ui-core'
-import type { Dispatch, SetStateAction } from 'react'
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
 import type { DashboardSection } from '@/components/agents/DashboardSidebar'
@@ -77,9 +77,16 @@ export type DashboardMainViewsProps = {
   isDashboardMcp: boolean
   isDashboardSpecialists: boolean
   isHome: boolean
+  isLibrary: boolean
   isProjectHome: boolean
   isSandboxLocalDetail: boolean
   isSandboxModalDetail: boolean
+  pendingMentionRef: MutableRefObject<string | string[] | null>
+  pendingAttachmentsRef: MutableRefObject<{
+    sessionId: string
+    paths: string[]
+  } | null>
+  openSessionTab: (id: string, scopeKey?: string) => void
   setSkillDetail: Dispatch<SetStateAction<AgentSkillDetail | null>>
   setIntegrationValues: Dispatch<SetStateAction<Record<string, string>>>
   setRuntimeSettings: Dispatch<SetStateAction<RuntimeSettings | null>>

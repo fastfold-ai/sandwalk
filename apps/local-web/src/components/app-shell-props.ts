@@ -85,6 +85,7 @@ export type AppShellProps = {
   setConnectionLimitDismissed: Dispatch<SetStateAction<boolean>>
   showSessionTabs: boolean
   isHome: boolean
+  isLibrary: boolean
   isProjectHome: boolean
   activeTitle: string
   isDashboardOverview: boolean
@@ -210,7 +211,11 @@ export type AppShellProps = {
   newProjectOpen: boolean
   activeProject: AgentProject | null
   workspaceFiles: WorkspaceFile[]
-  pendingMentionRef: MutableRefObject<string | null>
+  pendingMentionRef: MutableRefObject<string | string[] | null>
+  pendingAttachmentsRef: MutableRefObject<{
+    sessionId: string
+    paths: string[]
+  } | null>
   createProject: (input: {
     name: string
     description: string

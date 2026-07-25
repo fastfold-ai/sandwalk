@@ -23,6 +23,11 @@ import {
   type ComposerModelOption
 } from '@/lib/composer-models'
 import {
+  contentTypeFromPath,
+  needsAttachmentPreview
+} from '@/lib/attachment-mime'
+import { mediaObjectUrlFromFile } from '@/lib/media-src'
+import {
   modelSupportsMultimodalKind,
   multimodalKindForFile,
   unsupportedMultimodalHint
@@ -35,6 +40,10 @@ type AgentComposerSlotProps = {
   session: AgentSession | null
   client: LocalAgentClient
   navigate: NavigateFunction
+  pendingAttachmentsRef: MutableRefObject<{
+    sessionId: string
+    paths: string[]
+  } | null>
   composerLiveRef: MutableRefObject<string>
   queuedMessages: QueuedMessage[]
   editingQueuedId: string | null
@@ -83,6 +92,7 @@ export function AgentComposerSlot({
   session,
   client,
   navigate,
+  pendingAttachmentsRef,
   composerLiveRef,
   queuedMessages,
   editingQueuedId,
@@ -147,6 +157,30 @@ export function AgentComposerSlot({
         showAura={false}
         autoFocus
         focusKey={sessionId}
+        pendingAttachmentsRef={pendingAttachmentsRef}
+        onResolveAttachment={async path => {
+          if (!sessionId) return null
+          const name = path.split('/').at(-1) || path
+          const contentType = contentTypeFromPath(path)
+          if (!needsAttachmentPreview(contentType, path)) {
+            return { name, contentType }
+          }
+          try {
+            const file = await client.readFile(sessionId, path)
+            return {
+              name,
+              contentType: file.mimeType || contentType,
+              previewUrl: mediaObjectUrlFromFile({
+                encoding: file.encoding,
+                content: file.content,
+                mimeType: file.mimeType || contentType,
+                name
+              })
+            }
+          } catch {
+            return { name, contentType }
+          }
+        }}
         editingQueued={Boolean(editingQueuedId)}
         onCancelEditQueued={cancelEditQueuedMessage}
         onChange={setComposer}

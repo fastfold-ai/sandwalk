@@ -86,6 +86,7 @@ export function AppShell(props: AppShellProps) {
           setConnectionLimitDismissed={props.setConnectionLimitDismissed}
           showSessionTabs={props.showSessionTabs}
           isHome={props.isHome}
+          isLibrary={props.isLibrary}
           isProjectHome={props.isProjectHome}
           isDashboard={props.isDashboard}
           activeTitle={props.activeTitle}
@@ -172,6 +173,8 @@ export function AppShell(props: AppShellProps) {
           sessionId={props.sessionId}
           session={props.session}
           openSessionTab={props.openSessionTab}
+          pendingMentionRef={props.pendingMentionRef}
+          pendingAttachmentsRef={props.pendingAttachmentsRef}
           prefetchSessionMessages={props.prefetchSessionMessages}
           closeSessionTab={props.closeSessionTab}
           closeOtherSessionTabs={props.closeOtherSessionTabs}

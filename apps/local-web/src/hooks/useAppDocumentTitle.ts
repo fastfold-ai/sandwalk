@@ -27,6 +27,7 @@ type DocumentTitleArgs = {
   isDashboardVoice: boolean
   isDashboardAgentRuntime: boolean
   isDashboardMcp: boolean
+  isLibrary: boolean
 }
 
 export function useAppDocumentTitle(args: DocumentTitleArgs) {
@@ -39,6 +40,10 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     }
     if (args.sessionTitle) {
       document.title = `${args.sessionTitle} · ${base}`
+      return
+    }
+    if (args.isLibrary) {
+      document.title = `Library · ${base}`
       return
     }
     if (args.isDashboardOverview) {
@@ -139,6 +144,7 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     args.isSandboxLocalDetail,
     args.isSandboxModalDetail,
     args.isDashboardMcp,
+    args.isLibrary,
     args.isDashboardOverview,
     args.isDashboardStatus,
     args.isDashboardGeneral,

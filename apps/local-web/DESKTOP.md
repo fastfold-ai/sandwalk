@@ -51,6 +51,21 @@ Menubar listens on `127.0.0.1:18787` (or an ephemeral port) and writes:
 
 Auth: `Authorization: Bearer <token>` (file mode `0600`).
 
+## Voice input
+
+Local speech-to-text for the composer (not available in the browser SPA).
+
+| Piece | Detail |
+|-------|--------|
+| Engine | `sandwalk-stt` (Whisper Base English via `whisper-rs`) inside the Tauri process |
+| Setup | Dashboard → **Voice**: install model → mic check → composer mic unlocks |
+| Privacy | Mic audio stays in memory while recording; no agent-server / cloud STT |
+| Models dir | macOS `~/Library/Application Support/Sandwalk/models/`; Windows `%APPDATA%\Sandwalk\models\`; Linux `~/.config/sandwalk/models/` |
+| Packaging | `NSMicrophoneUsageDescription` + `com.apple.security.device.audio-input` |
+| Platforms | macOS 12+ Apple Silicon; Windows 10 22H2 / 11 x64 |
+
+Composer: mic before Send → listening bar (live mic levels) → confirm inserts text into the draft. Escape cancels.
+
 ## Menubar actions
 
 | Item | Behavior |

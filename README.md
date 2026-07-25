@@ -51,6 +51,7 @@ Use the CLI, the web dashboard, or the macOS desktop app: same sessions, workspa
 - **Create skills with the agent**: scaffold, author, validate, and install new skills via `skill-creator` — they land under **Created by Me** and show up in the composer `/` menu.
 - **Human-in-the-loop approvals**: skill install/remove (and related lifecycle actions) pause for **Approve / Edit / Reject** in the desktop chat or interactive CLI; one approve can cover the rest of a run.
 - **Specialists**: reusable skill + MCP + instruction packs for focused research modes.
+- **Voice input (desktop)**: dictate into the composer with on-device Whisper.
 - **Viewers**: structures, plots, and artifacts beside the chat.
 
 ### Tools, data, and models
@@ -231,6 +232,8 @@ The composer drives every turn: model and effort, specialist, sandbox, plus `@` 
 </p>
 
 **Multimodal.** `@`-attach workspace files in the same composer. Gemini models accept image, PDF, audio, and video natively; Dashboard → **Models** → **Multimodal support** lists what each model can take.
+
+**Voice input (desktop).** In Sandwalk.app, Dashboard → **Voice** installs OpenAI Whisper Base (English) locally, then a mic check unlocks dictation in the composer. Speak, confirm, and the transcript lands in the draft (nothing is auto-sent). Capture and transcription run in the Tauri process; model weights live under Sandwalk app data `models/` (also listed on Dashboard → **Storage**). Browser builds show a desktop-only notice — no Web Speech / cloud STT fallback. Supported on macOS 12+ Apple Silicon and Windows 10 22H2 / 11 x64.
 
 ### Skills and MCPs
 

@@ -8,6 +8,7 @@ import type {
   Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
+import type { MutableRefObject } from 'react'
 
 import { type ComposerModelOption } from '@/lib/composer-models'
 
@@ -34,6 +35,17 @@ export type ComposerProps = {
   showAura?: boolean
   autoFocus?: boolean
   focusKey?: string | null
+  /** Workspace paths to attach as upload-style previews when the session opens. */
+  pendingAttachmentsRef?: MutableRefObject<{
+    sessionId: string
+    paths: string[]
+  } | null>
+  /** Resolve mime + optional preview URL for a workspace path already on disk. */
+  onResolveAttachment?: (path: string) => Promise<{
+    name: string
+    contentType: string
+    previewUrl?: string
+  } | null>
   onChange: (value: string) => void
   onLiveDraftChange?: (value: string) => void
   onSkillChipsChange: (skills: string[]) => void

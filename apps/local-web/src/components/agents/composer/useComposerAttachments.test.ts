@@ -60,4 +60,29 @@ describe('useComposerAttachments', () => {
       expect(result.current.attachments).toHaveLength(0)
     })
   })
+
+  it('seeds ready workspace attachments for library → chat', async () => {
+    const onUpload = vi.fn(async () => [])
+    const { result } = renderHook(() =>
+      useComposerAttachments(onUpload, 'session-1')
+    )
+
+    act(() => {
+      result.current.seedReadyAttachments([
+        {
+          path: 'uploads/sample_plot.png',
+          name: 'sample_plot.png',
+          contentType: 'image/png',
+          previewUrl: 'blob:preview'
+        }
+      ])
+    })
+
+    expect(result.current.attachments).toHaveLength(1)
+    expect(result.current.attachments[0]?.status).toBe('ready')
+    expect(result.current.attachments[0]?.path).toBe('uploads/sample_plot.png')
+    expect(result.current.attachmentSendPrefix()).toBe(
+      '⟦@:uploads/sample_plot.png⟧'
+    )
+  })
 })

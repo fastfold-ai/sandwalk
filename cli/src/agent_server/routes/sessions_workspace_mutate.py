@@ -44,6 +44,13 @@ def register_workspace_mutate_routes(app: FastAPI, deps: AppDeps) -> None:
             content = await asyncio.to_thread(workspace.upload, relative_path, data)
         except Exception as exc:
             raise deps.workspace_http_error(exc) from exc
+        await asyncio.to_thread(
+            deps.library_service.try_ingest_upload,
+            data,
+            filename=safe_name,
+            mime=file.content_type,
+            session_id=session_id,
+        )
         try:
             from agent.sandbox_backend import push_paths_for_session
 

@@ -62,9 +62,11 @@ export function resolveActiveTitle(input: {
   isIntegrations: boolean
   isDashboardMcp: boolean
   isHome: boolean
+  isLibrary: boolean
   isProjectHome: boolean
   sessionTitle: string | undefined
 }) {
+  if (input.isLibrary) return 'Library'
   if (input.isDashboardOverview) return 'Overview'
   if (input.isDashboardStatus) return 'Status'
   if (input.isDashboardGeneral) return 'General'
@@ -88,6 +90,7 @@ export function resolveActiveTitle(input: {
 export function computeShowSessionTabs(input: {
   isDashboard: boolean
   isHome: boolean
+  isLibrary: boolean
   isProjectHome: boolean
   isSkills: boolean
   isIntegrations: boolean
@@ -97,6 +100,7 @@ export function computeShowSessionTabs(input: {
   return (
     !input.isDashboard &&
     !input.isHome &&
+    !input.isLibrary &&
     !input.isProjectHome &&
     !input.isSkills &&
     !input.isIntegrations &&

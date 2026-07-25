@@ -155,6 +155,7 @@ export function VideoThumb({
       src={src}
       mode="thumb"
       muted
+      interactive={false}
       onError={() => setFailed(true)}
     />
   )

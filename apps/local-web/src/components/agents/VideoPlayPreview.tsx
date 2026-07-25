@@ -1,14 +1,36 @@
 import { Pause, Play } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type SyntheticEvent
+} from 'react'
 
 import { cn } from '@/lib/utils'
 
 type VideoPlayMode = 'card' | 'thumb' | 'panel'
 
+/** Seek past t=0 so browsers decode a visible poster frame (metadata-only is often black). */
+export function seekVideoPosterFrame(video: HTMLVideoElement) {
+  const duration = video.duration
+  const target =
+    Number.isFinite(duration) && duration > 0
+      ? Math.min(0.1, Math.max(0.001, duration * 0.01))
+      : 0.001
+  try {
+    if (Math.abs(video.currentTime - target) > 0.0005) {
+      video.currentTime = target
+    }
+  } catch {
+    // Some sources reject seeks until more data arrives.
+  }
+}
+
 /**
  * Video preview with centered play/pause.
  * - card: chat inline, natural aspect (no letterbox)
- * - thumb: fills parent with cover crop (artifacts grid)
+ * - thumb: fills parent with cover crop (artifacts grid / library / composer)
  * - panel: fits inside parent without overflow (file preview)
  */
 export function VideoPlayPreview({
@@ -16,12 +38,15 @@ export function VideoPlayPreview({
   className,
   mode = 'card',
   muted = false,
+  interactive = true,
   onError
 }: {
   src: string
   className?: string
   mode?: VideoPlayMode
   muted?: boolean
+  /** When false, show a frame + play badge but don't toggle playback. */
+  interactive?: boolean
   onError?: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -36,11 +61,11 @@ export function VideoPlayPreview({
     const video = videoRef.current
     if (video) {
       video.pause()
-      video.currentTime = 0
     }
   }, [src])
 
   const toggle = async () => {
+    if (!interactive) return
     const video = videoRef.current
     if (!video) return
     if (video.paused) {
@@ -56,41 +81,94 @@ export function VideoPlayPreview({
     }
   }
 
+  const onMeta = (el: HTMLVideoElement) => {
+    if (el.videoWidth > 0 && el.videoHeight > 0) {
+      setAspect(el.videoWidth / el.videoHeight)
+    }
+    seekVideoPosterFrame(el)
+    // If seek is a no-op / already painted, mark ready immediately.
+    if (el.readyState >= 2) setReady(true)
+  }
+
   const ratio = aspect ?? 9 / 16
+  const overlaySize = mode === 'thumb' ? 'size-8' : 'size-12'
+  const iconSize = mode === 'thumb' ? 'size-3' : 'size-4'
 
   const playOverlay = (
     <div
       role="presentation"
       className={cn(
         'absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-200',
-        playing ? 'opacity-0 hover:opacity-100' : 'opacity-100'
+        playing ? 'opacity-0 hover:opacity-100' : 'opacity-100',
+        !interactive && 'pointer-events-none'
       )}
-      onClick={event => {
-        event.preventDefault()
-        event.stopPropagation()
-        void toggle()
-      }}
+      onClick={
+        interactive
+          ? event => {
+              event.preventDefault()
+              event.stopPropagation()
+              void toggle()
+            }
+          : undefined
+      }
     >
       <span
         className={cn(
-          'relative grid size-12 place-items-center rounded-full',
+          'relative grid place-items-center rounded-full',
+          overlaySize,
           'bg-white/18 text-white shadow-[0_8px_32px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.45)]',
           'ring-1 ring-white/40 backdrop-blur-xl backdrop-saturate-150',
-          'transition-transform duration-200 hover:scale-105 active:scale-95',
+          interactive &&
+            'transition-transform duration-200 hover:scale-105 active:scale-95',
           'before:pointer-events-none before:absolute before:inset-0 before:rounded-full',
           'before:bg-gradient-to-b before:from-white/35 before:to-transparent before:opacity-80'
         )}
         aria-hidden
       >
         {playing ? (
-          <Pause className="relative size-4 fill-current drop-shadow-sm" />
+          <Pause
+            className={cn('relative fill-current drop-shadow-sm', iconSize)}
+          />
         ) : (
-          <Play className="relative ml-0.5 size-4 fill-current drop-shadow-sm" />
+          <Play
+            className={cn(
+              'relative ml-0.5 fill-current drop-shadow-sm',
+              iconSize
+            )}
+          />
         )}
       </span>
-      <span className="sr-only">{playing ? 'Pause video' : 'Play video'}</span>
+      {interactive ? (
+        <span className="sr-only">{playing ? 'Pause video' : 'Play video'}</span>
+      ) : null}
     </div>
   )
+
+  const videoProps = {
+    ref: videoRef,
+    src,
+    playsInline: true as const,
+    preload: 'metadata' as const,
+    muted,
+    onLoadedMetadata: (event: SyntheticEvent<HTMLVideoElement>) => {
+      onMeta(event.currentTarget)
+    },
+    onLoadedData: (event: SyntheticEvent<HTMLVideoElement>) => {
+      seekVideoPosterFrame(event.currentTarget)
+      setReady(true)
+    },
+    onSeeked: () => setReady(true),
+    onPlay: () => setPlaying(true),
+    onPause: () => setPlaying(false),
+    onEnded: () => setPlaying(false),
+    onError: () => onError?.(),
+    onClick: interactive
+      ? (event: MouseEvent<HTMLVideoElement>) => {
+          event.stopPropagation()
+          void toggle()
+        }
+      : undefined
+  }
 
   if (mode === 'panel') {
     return (
@@ -101,27 +179,8 @@ export function VideoPlayPreview({
         )}
       >
         <video
-          ref={videoRef}
-          src={src}
-          playsInline
-          preload="metadata"
-          muted={muted}
+          {...videoProps}
           className="block max-h-full max-w-full object-contain"
-          onLoadedMetadata={event => {
-            const el = event.currentTarget
-            if (el.videoWidth > 0 && el.videoHeight > 0) {
-              setAspect(el.videoWidth / el.videoHeight)
-            }
-            setReady(true)
-          }}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onEnded={() => setPlaying(false)}
-          onError={() => onError?.()}
-          onClick={event => {
-            event.stopPropagation()
-            void toggle()
-          }}
         />
         {!ready ? (
           <div
@@ -152,30 +211,11 @@ export function VideoPlayPreview({
       }
     >
       <video
-        ref={videoRef}
-        src={src}
-        playsInline
-        preload="metadata"
-        muted={muted}
+        {...videoProps}
         className={cn(
           'h-full w-full',
           mode === 'thumb' ? 'object-cover' : 'object-contain'
         )}
-        onLoadedMetadata={event => {
-          const el = event.currentTarget
-          if (el.videoWidth > 0 && el.videoHeight > 0) {
-            setAspect(el.videoWidth / el.videoHeight)
-          }
-          setReady(true)
-        }}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
-        onError={() => onError?.()}
-        onClick={event => {
-          event.stopPropagation()
-          void toggle()
-        }}
       />
 
       {!ready ? (

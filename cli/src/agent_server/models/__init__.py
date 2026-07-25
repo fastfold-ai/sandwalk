@@ -21,6 +21,7 @@ from agent_server.models.doctor import DoctorCheckResult, DoctorDiagnosticsReque
 from agent_server.models.environment import EnvironmentCorePackage, EnvironmentPackage, EnvironmentPackageGroup, EnvironmentPackageMutationResult, EnvironmentPackageRequest, EnvironmentReport
 from agent_server.models.health import Capabilities, HealthResponse, ServerCacheInfo, ServerLifecycleResult, ServerStatusReport, ServerSystemInfo
 from agent_server.models.integrations import IntegrationField, IntegrationList, IntegrationProvider, IntegrationSetupRequest, IntegrationSetupResponse, IntegrationSetupStep, UpdateIntegrationRequest, ValidateIntegrationResponse
+from agent_server.models.library import DeleteLibraryItemResponse, LibraryItem, LibraryItemList, LibraryKind, LibraryPagination, LibrarySyncResponse, UpdateLibraryItemRequest, UseLibraryInChatRequest, UseLibraryInChatResponse
 from agent_server.models.mcp_catalog import ConnectMcpCatalogRequest, ConnectMcpCatalogResponse, McpCatalogEntryStatus, McpCatalogList, UpdateMcpCatalogRequest
 from agent_server.models.mcp_json_config import McpJsonConfigRequest, McpJsonConfigResponse
 from agent_server.models.mcp_servers import CreateMcpServerRequest, McpServer, McpServerList, McpToolDetail, UpdateMcpServerRequest, ValidateMcpResponse

@@ -70,6 +70,10 @@ type SessionLayerArgs = {
   workspaceFiles: WorkspaceFile[]
   setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
   setPendingOpenPath: Dispatch<SetStateAction<string | null>>
+  pendingAttachmentsRef: MutableRefObject<{
+    sessionId: string
+    paths: string[]
+  } | null>
   setChatBySessionIdRef: MutableRefObject<
     Dispatch<SetStateAction<Record<string, SessionChatState>>> | null
   >
@@ -201,6 +205,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     session: args.session,
     client: args.client,
     navigate: args.navigate,
+    pendingAttachmentsRef: args.pendingAttachmentsRef,
     composerLiveRef: chat.composerLiveRef,
     queuedMessages: chat.queuedMessages,
     editingQueuedId: chat.editingQueuedId,

@@ -7,6 +7,7 @@ import {
   GitBranch,
   HardDrive,
   LayoutDashboard,
+  LibraryBig,
   Mic,
   Plug,
   ScrollText,
@@ -82,6 +83,13 @@ export const DASHBOARD_COMMANDS = [
     path: '/dashboard',
     value: 'command overview dashboard',
     icon: LayoutDashboard
+  },
+  {
+    id: 'library',
+    label: 'Library',
+    path: '/library',
+    value: 'command library files documents images uploads',
+    icon: LibraryBig
   },
   {
     id: 'general',

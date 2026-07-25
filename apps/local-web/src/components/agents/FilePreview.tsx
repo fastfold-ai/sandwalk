@@ -1,10 +1,11 @@
 import Editor from '@monaco-editor/react'
 import type { WorkspaceFileContent } from '@sandwalk/agent-ui-core'
 import { Code2, Eye, ListChecks } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { planModeAccent } from '@/components/agents/composer/ComposerModeMenu'
 import { Button } from '@/components/ui/button'
+import { mediaObjectUrlFromFile } from '@/lib/media-src'
 import { cn } from '@/lib/utils'
 
 import { AudioPlayPreview } from './AudioPlayPreview'
@@ -21,6 +22,35 @@ import {
   isTextLike,
   languageFor
 } from './workspace-utils'
+
+function VideoFilePreview({ active }: { active: WorkspaceFileContent }) {
+  const [src, setSrc] = useState<string | null>(null)
+
+  useEffect(() => {
+    const url = mediaObjectUrlFromFile({
+      encoding: active.encoding,
+      content: active.content,
+      mimeType: active.mimeType,
+      name: active.path
+    })
+    setSrc(url)
+    return () => URL.revokeObjectURL(url)
+  }, [active.content, active.encoding, active.mimeType, active.path])
+
+  if (!src) {
+    return (
+      <div className="text-muted-foreground grid h-full place-items-center text-sm">
+        Loading video…
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden p-4">
+      <VideoPlayPreview src={src} mode="panel" muted />
+    </div>
+  )
+}
 
 function TablePreview({ content, path }: { content: string; path: string }) {
   const separator = path.toLowerCase().endsWith('.tsv') ? '\t' : ','
@@ -303,22 +333,7 @@ export function FilePreview({
     active.mimeType.startsWith('video/') ||
     /\.(mp4|webm|mov|avi|mpeg|mpg|wmv|flv|3gpp)$/i.test(active.path)
   ) {
-    const src =
-      active.encoding === 'base64'
-        ? `data:${active.mimeType.startsWith('video/') ? active.mimeType : 'video/mp4'};base64,${active.content}`
-        : undefined
-    if (!src) {
-      return (
-        <div className="text-muted-foreground grid h-full place-items-center text-sm">
-          Video preview unavailable
-        </div>
-      )
-    }
-    return (
-      <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden p-4">
-        <VideoPlayPreview src={src} mode="panel" />
-      </div>
-    )
+    return <VideoFilePreview active={active} />
   }
   if (
     active.mimeType.startsWith('audio/') ||

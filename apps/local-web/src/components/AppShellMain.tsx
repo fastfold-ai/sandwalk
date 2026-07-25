@@ -18,9 +18,17 @@ export type { AppShellMainProps } from '@/components/app/app-shell-main-props'
 export function AppShellMain(props: AppShellMainProps) {
   const showSimpleTitleBar =
     !props.showSessionTabs &&
-    !(props.isHome || props.isProjectHome || props.isDashboard)
+    !(
+      props.isHome ||
+      props.isLibrary ||
+      props.isProjectHome ||
+      props.isDashboard
+    )
   const showFloatingSidebarToggle =
-    (props.isHome || props.isProjectHome || props.isDashboard) &&
+    (props.isHome ||
+      props.isLibrary ||
+      props.isProjectHome ||
+      props.isDashboard) &&
     props.sidebarCollapsed
 
   return (

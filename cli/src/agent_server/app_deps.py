@@ -11,6 +11,7 @@ from agent_server.account_service import AccountService
 from agent_server.auth_settings import load_settings, resolve_effective_api_key
 from agent_server.datasets_service import DatasetsService
 from agent_server.integrations_service import IntegrationsService
+from agent_server.library import LibraryService
 from agent_server.mcp_service import McpService
 from agent_server.models_service import ModelsService
 from agent_server.pty_manager import PtyManager
@@ -42,6 +43,7 @@ class AppDeps:
     tools_service: ToolsService
     pty_manager: PtyManager
     mcp_service: McpService
+    library_service: LibraryService
     backend_id: str
     cli_api_key: str | None
 

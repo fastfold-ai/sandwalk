@@ -6,7 +6,11 @@ import type {
   AgentModel,
   AgentProject,
   AgentSession,
+  LibraryItem,
+  LibraryItemList,
+  LibraryKind,
   Specialist,
+  UseLibraryInChatResult,
   AgentCatalogLeaderboard,
   AgentCatalogLeaderboardView,
   AgentCatalogSkill,
@@ -313,6 +317,130 @@ export class LocalAgentClient
   async listProjects(signal?: AbortSignal): Promise<AgentProject[]> {
     const result = await this.request<{ data: AgentProject[] }>('/projects', { signal })
     return result.data
+  }
+
+  async listLibrary(options?: {
+    kind?: LibraryKind | null
+    q?: string | null
+    page?: number
+    perPage?: number
+    signal?: AbortSignal
+  }): Promise<LibraryItemList> {
+    const params = new URLSearchParams()
+    if (options?.kind) params.set('kind', options.kind)
+    if (options?.q) params.set('q', options.q)
+    if (options?.page != null) params.set('page', String(options.page))
+    if (options?.perPage != null) params.set('per_page', String(options.perPage))
+    const query = params.toString()
+    return this.request<LibraryItemList>(
+      `/library${query ? `?${query}` : ''}`,
+      { signal: options?.signal },
+    )
+  }
+
+  async uploadLibraryFile(file: File, signal?: AbortSignal): Promise<LibraryItem> {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await fetch(`${this.baseUrl}/v1/library/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+      headers: this.headers(),
+      signal,
+    })
+    if (!response.ok) {
+      throw new Error(`FastFold Agent API ${response.status}: ${await response.text()}`)
+    }
+    return (await response.json()) as LibraryItem
+  }
+
+  updateLibraryItem(
+    itemId: string,
+    input: { displayName: string },
+    signal?: AbortSignal,
+  ): Promise<LibraryItem> {
+    return this.request<LibraryItem>(`/library/${encodeURIComponent(itemId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ display_name: input.displayName }),
+      headers: { 'content-type': 'application/json' },
+      signal,
+    })
+  }
+
+  async deleteLibraryItem(itemId: string, signal?: AbortSignal): Promise<void> {
+    await this.request<{ deleted: boolean }>(
+      `/library/${encodeURIComponent(itemId)}`,
+      { method: 'DELETE', signal },
+    )
+  }
+
+  useLibraryInChat(
+    input: {
+      itemIds: string[]
+      projectId?: string | null
+      title?: string | null
+    },
+    signal?: AbortSignal,
+  ): Promise<UseLibraryInChatResult> {
+    return this.request<UseLibraryInChatResult>('/library/use-in-chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        item_ids: input.itemIds,
+        project_id: input.projectId,
+        title: input.title,
+      }),
+      headers: { 'content-type': 'application/json' },
+      signal,
+    })
+  }
+
+  getLibraryContentUrl(itemId: string): string {
+    return `${this.baseUrl}/v1/library/${encodeURIComponent(itemId)}/content`
+  }
+
+  async fetchLibraryContent(
+    itemId: string,
+    signal?: AbortSignal,
+  ): Promise<Blob> {
+    const response = await fetch(this.getLibraryContentUrl(itemId), {
+      method: 'GET',
+      credentials: 'include',
+      headers: this.headers(),
+      signal,
+    })
+    if (!response.ok) {
+      throw new Error(`FastFold Agent API ${response.status}: ${await response.text()}`)
+    }
+    return response.blob()
+  }
+
+  readLibraryFile(
+    itemId: string,
+    signal?: AbortSignal,
+  ): Promise<WorkspaceFileContent> {
+    return this.request<WorkspaceFileContent>(
+      `/library/${encodeURIComponent(itemId)}/file`,
+      { signal },
+    )
+  }
+
+  writeLibraryFile(
+    itemId: string,
+    input: { content: string; encoding?: 'text' | 'base64' },
+    signal?: AbortSignal,
+  ): Promise<WorkspaceFileContent> {
+    return this.request<WorkspaceFileContent>(
+      `/library/${encodeURIComponent(itemId)}/content`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          content: input.content,
+          encoding: input.encoding || 'text',
+        }),
+        headers: { 'content-type': 'application/json' },
+        signal,
+      },
+    )
   }
 
   getProject(projectId: string, signal?: AbortSignal): Promise<AgentProject> {

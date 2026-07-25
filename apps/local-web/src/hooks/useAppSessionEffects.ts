@@ -36,7 +36,7 @@ type UseAppSessionEffectsArgs = {
   skillRouteName: string | null | undefined
   setSkillDetail: Dispatch<SetStateAction<AgentSkillDetail | null>>
   setError: Dispatch<SetStateAction<string | null>>
-  pendingMentionRef: MutableRefObject<string | null>
+  pendingMentionRef: MutableRefObject<string | string[] | null>
   setComposer: Dispatch<SetStateAction<string>>
   setComposerFiles: Dispatch<SetStateAction<string[]>>
 }
@@ -191,10 +191,12 @@ export function useAppSessionEffects({
   }, [client, skillRouteName])
 
   useEffect(() => {
-    const path = pendingMentionRef.current
-    if (!sessionId || !path) return
+    const pending = pendingMentionRef.current
+    if (!sessionId || !pending) return
     pendingMentionRef.current = null
-    setComposer(current => `${current}${fileChipToken(path)}`)
-    setComposerFiles([])
-  }, [sessionId, setComposer, setComposerFiles])
+    const paths = Array.isArray(pending) ? pending : [pending]
+    if (!paths.length) return
+    setComposer(current => `${current}${paths.map(fileChipToken).join('')}`)
+    setComposerFiles(paths)
+  }, [sessionId, setComposer, setComposerFiles, pendingMentionRef])
 }

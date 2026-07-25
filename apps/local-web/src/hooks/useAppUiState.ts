@@ -30,7 +30,11 @@ export function useAppUiState() {
   const [skillDetail, setSkillDetail] = useState<AgentSkillDetail | null>(null)
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
   const [pendingOpenPath, setPendingOpenPath] = useState<string | null>(null)
-  const pendingMentionRef = useRef<string | null>(null)
+  const pendingMentionRef = useRef<string | string[] | null>(null)
+  const pendingAttachmentsRef = useRef<{
+    sessionId: string
+    paths: string[]
+  } | null>(null)
   const sidebarPanelRef = useRef<ImperativePanelHandle>(null)
   const filesPanelRef = useRef<ImperativePanelHandle>(null)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
@@ -91,6 +95,7 @@ export function useAppUiState() {
     pendingOpenPath,
     setPendingOpenPath,
     pendingMentionRef,
+    pendingAttachmentsRef,
     sidebarPanelRef,
     filesPanelRef,
     copiedMessageId,

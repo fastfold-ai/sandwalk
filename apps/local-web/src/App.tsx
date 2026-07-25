@@ -102,6 +102,7 @@ export default function App() {
     workspaceFiles: ui.workspaceFiles,
     setFilesPanelCollapsed: ui.setFilesPanelCollapsed,
     setPendingOpenPath: ui.setPendingOpenPath,
+    pendingAttachmentsRef: ui.pendingAttachmentsRef,
     setChatBySessionIdRef
   })
 
@@ -141,6 +142,7 @@ export default function App() {
     isDashboardVoice: route.isDashboardVoice,
     isDashboardAgentRuntime: route.isDashboardAgentRuntime,
     isDashboardMcp: route.isDashboardMcp,
+    isLibrary: route.isLibrary,
     sidebarCollapsed: ui.sidebarCollapsed,
     filesPanelCollapsed: ui.filesPanelCollapsed,
     terminalOpen: ui.terminalOpen,
@@ -198,6 +200,7 @@ export default function App() {
   const showSessionTabs = computeShowSessionTabs({
     isDashboard: route.isDashboard,
     isHome: route.isHome,
+    isLibrary: route.isLibrary,
     isProjectHome: route.isProjectHome,
     isSkills: route.isSkills,
     isIntegrations: route.isIntegrations,
@@ -222,6 +225,7 @@ export default function App() {
     isIntegrations: route.isIntegrations,
     isDashboardMcp: route.isDashboardMcp,
     isHome: route.isHome,
+    isLibrary: route.isLibrary,
     isProjectHome: route.isProjectHome,
     sessionTitle: context.session?.title
   })

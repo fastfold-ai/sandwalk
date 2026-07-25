@@ -1,4 +1,4 @@
-import type { ComponentProps, RefObject } from 'react'
+import type { ComponentProps, MutableRefObject, RefObject } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
@@ -41,6 +41,7 @@ export type AppShellMainProps = {
   setConnectionLimitDismissed: (value: boolean | ((current: boolean) => boolean)) => void
   showSessionTabs: boolean
   isHome: boolean
+  isLibrary: boolean
   isProjectHome: boolean
   isDashboard: boolean
   activeTitle: string
@@ -127,6 +128,11 @@ export type AppShellMainProps = {
   sessionId: string | null
   session: AgentSession | null
   openSessionTab: (id: string, scopeKey?: string) => void
+  pendingMentionRef: MutableRefObject<string | string[] | null>
+  pendingAttachmentsRef: MutableRefObject<{
+    sessionId: string
+    paths: string[]
+  } | null>
   prefetchSessionMessages: (id: string, signal?: AbortSignal) => void | Promise<void>
   closeSessionTab: (sessionId: string) => void
   closeOtherSessionTabs: (sessionId: string) => void
@@ -208,6 +214,7 @@ export function isDashboardMainView(props: AppShellMainProps) {
     props.isDashboardMcp ||
     props.isDashboardSpecialists ||
     props.isHome ||
+    props.isLibrary ||
     props.isProjectHome
   )
 }

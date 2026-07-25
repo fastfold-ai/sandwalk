@@ -1,6 +1,7 @@
 import { FileText, Loader2, Music2, X } from 'lucide-react'
 import { useState } from 'react'
 
+import { VideoPlayPreview } from '@/components/agents/VideoPlayPreview'
 import { cn } from '@/lib/utils'
 
 export type ComposerAttachmentItem = {
@@ -64,12 +65,11 @@ function AttachmentThumb({ item }: { item: ComposerAttachmentItem }) {
   if (video && item.previewUrl) {
     return (
       <div className="bg-muted relative size-14 overflow-hidden rounded-xl">
-        <video
+        <VideoPlayPreview
           src={item.previewUrl}
+          mode="thumb"
           muted
-          playsInline
-          preload="metadata"
-          className="size-full object-cover"
+          interactive={false}
         />
       </div>
     )

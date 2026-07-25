@@ -14,6 +14,7 @@ import {
   DashboardMainHomePanel,
   DashboardMainSpecialistsPanel
 } from './dashboard-main-specialists-home-panel'
+import { LibraryView } from './dashboard-main-views-lazy'
 export type { DashboardMainViewsProps } from './dashboard-main-views-types'
 import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 
@@ -28,7 +29,14 @@ export function DashboardMainViews(props: DashboardMainViewsProps) {
     isDashboardMcp,
     isDashboardSpecialists,
     isHome,
-    isProjectHome
+    isLibrary,
+    isProjectHome,
+    client,
+    navigate,
+    activeProjectId,
+    pendingAttachmentsRef,
+    openSessionTab,
+    loadSessions
   } = props
 
   const settingsPanel = DashboardMainSettingsPanels(props)
@@ -54,6 +62,15 @@ export function DashboardMainViews(props: DashboardMainViewsProps) {
             <DashboardMainMcpPanel {...props} />
           ) : isDashboardSpecialists ? (
             <DashboardMainSpecialistsPanel {...props} />
+          ) : isLibrary ? (
+            <LibraryView
+              client={client}
+              navigate={navigate}
+              projectId={activeProjectId}
+              pendingAttachmentsRef={pendingAttachmentsRef}
+              openSessionTab={openSessionTab}
+              loadSessions={loadSessions}
+            />
           ) : isHome || isProjectHome ? (
             <DashboardMainHomePanel {...props} />
           ) : null}

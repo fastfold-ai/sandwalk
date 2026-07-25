@@ -33,6 +33,31 @@ export function useComposerAttachments(
     clearAttachments()
   }, [resetKey, clearAttachments])
 
+  const seedReadyAttachments = useCallback(
+    (
+      items: Array<{
+        path: string
+        name?: string
+        contentType?: string
+        previewUrl?: string
+      }>
+    ) => {
+      if (!items.length) return
+      setAttachments(current => [
+        ...current,
+        ...items.map(item => ({
+          id: crypto.randomUUID(),
+          name: item.name || item.path.split('/').at(-1) || item.path,
+          contentType: item.contentType || 'application/octet-stream',
+          previewUrl: item.previewUrl,
+          path: item.path,
+          status: 'ready' as const
+        }))
+      ])
+    },
+    []
+  )
+
   const removeAttachment = useCallback(
     (id: string) => {
       setAttachments(current => {
@@ -49,18 +74,23 @@ export function useComposerAttachments(
       const files = Array.from(fileList)
       if (files.length === 0) return
 
-      const pending: ComposerAttachmentItem[] = files.map(file => ({
-        id: crypto.randomUUID(),
-        name: file.name,
-        contentType: file.type || 'application/octet-stream',
-        previewUrl:
+      const pending: ComposerAttachmentItem[] = files.map(file => {
+        const byExt = /\.(png|jpe?g|gif|webp|svg|bmp|mp4|webm|mov|avi|mpeg|mpg|mp3|wav|m4a|aac|ogg|flac)$/i.test(
+          file.name
+        )
+        const media =
           file.type.startsWith('image/') ||
           file.type.startsWith('video/') ||
-          file.type.startsWith('audio/')
-            ? URL.createObjectURL(file)
-            : undefined,
-        status: 'uploading'
-      }))
+          file.type.startsWith('audio/') ||
+          byExt
+        return {
+          id: crypto.randomUUID(),
+          name: file.name,
+          contentType: file.type || 'application/octet-stream',
+          previewUrl: media ? URL.createObjectURL(file) : undefined,
+          status: 'uploading' as const
+        }
+      })
 
       setAttachments(current => [...current, ...pending])
 
@@ -119,6 +149,7 @@ export function useComposerAttachments(
     addFiles,
     removeAttachment,
     clearAttachments,
+    seedReadyAttachments,
     attachmentSendPrefix,
     hasReadyAttachments,
     isUploading

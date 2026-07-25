@@ -1,5 +1,5 @@
 import { Upload } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import {
@@ -47,6 +47,8 @@ export function Composer({
   showAura = true,
   autoFocus = true,
   focusKey,
+  pendingAttachmentsRef,
+  onResolveAttachment,
   onChange,
   onLiveDraftChange,
   onSkillChipsChange,
@@ -92,10 +94,43 @@ export function Composer({
     addFiles,
     removeAttachment,
     clearAttachments,
+    seedReadyAttachments,
     attachmentSendPrefix,
     hasReadyAttachments,
     isUploading
   } = useComposerAttachments(onUpload, focusKey)
+
+  useEffect(() => {
+    const pending = pendingAttachmentsRef?.current
+    if (!focusKey || !pending?.paths.length) return
+    if (pending.sessionId !== focusKey) return
+    let cancelled = false
+    const paths = [...pending.paths]
+    void (async () => {
+      const seeded = await Promise.all(
+        paths.map(async path => {
+          const resolved = onResolveAttachment
+            ? await onResolveAttachment(path)
+            : null
+          return {
+            path,
+            name: resolved?.name || path.split('/').at(-1) || path,
+            contentType: resolved?.contentType || 'application/octet-stream',
+            previewUrl: resolved?.previewUrl
+          }
+        })
+      )
+      if (cancelled) return
+      // Clear only after a successful seed so Strict Mode remounts can retry.
+      if (pendingAttachmentsRef.current === pending) {
+        pendingAttachmentsRef.current = null
+      }
+      seedReadyAttachments(seeded)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [focusKey, onResolveAttachment, pendingAttachmentsRef, seedReadyAttachments])
 
   const { dragging, dropHandlers } = useComposerFileDrop(files => {
     void addFiles(files)
