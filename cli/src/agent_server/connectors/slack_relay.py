@@ -63,6 +63,8 @@ class SlackRelayWorkspace:
         self.bot_token = bot_token
         self._bot_user_id = bot_user_id
         self._client = None
+        self._assistant = None
+        self.specialist_names: list[str] = []
         self.user_names: dict[str, str] = {}
         self.user_avatars: dict[str, str] = {}
         self.channel_names: dict[str, str] = {}
@@ -121,8 +123,38 @@ class SlackRelayWorkspace:
                 if "already_reacted" not in str(exc):
                     logger.debug("Slack reaction %s failed: %s", add, exc)
 
+    @property
+    def assistant(self):  # type: ignore[no-untyped-def]
+        if self._assistant is None:
+            from agent_server.connectors.slack_assistant import SlackAssistant
+
+            self._assistant = SlackAssistant(bot_token=self.bot_token)
+        return self._assistant
+
+    async def on_assistant_event(self, event: dict) -> None:
+        """Greet a newly opened assistant thread with starter prompts.
+
+        No-ops on workspaces without the feature; the container simply never
+        appears there and mentions carry on as before.
+        """
+        from agent_server.connectors.slack_assistant import prompts_for, thread_ref
+
+        channel_id, thread_ts = thread_ref(event)
+        if not channel_id or not thread_ts:
+            return
+        if str(event.get("type") or "") != "assistant_thread_started":
+            # A context change only tells us which channel the user is looking
+            # at; nothing to show for it.
+            return
+        await self.assistant.set_prompts(
+            channel_id=channel_id,
+            thread_ts=thread_ts,
+            prompts=prompts_for(self.specialist_names),
+        )
+
     async def disconnect(self) -> None:
         self._client = None
+        self._assistant = None
 
 
 class SlackRelayClient:
@@ -260,6 +292,13 @@ class SlackRelayClient:
         event = payload.get("event")
         if not isinstance(event, dict):
             return
+
+        from agent_server.connectors.slack_assistant import is_assistant_event
+
+        if is_assistant_event(event):
+            await workspace.on_assistant_event(event)
+            return
+
         if not _known(event, workspace):
             await workspace.load_directory(force=True)
 

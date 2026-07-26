@@ -435,6 +435,11 @@ class ConnectorService:
             bot_token=bot_token,
             bot_user_id=workspace.bot_user_id,
         )
+        # Drives the assistant container's suggested prompts.
+        with contextlib.suppress(Exception):
+            adapter.specialist_names = [
+                specialist.name for specialist in self.store.list_specialists()
+            ]
         await adapter.load_directory()
         relay.add_workspace(adapter)
         async with self._lock:
@@ -517,10 +522,34 @@ class ConnectorService:
         adapter = self._sockets.get(message.team_id)
         if adapter is None:
             return
-        await adapter.set_reaction(
-            channel_id=message.channel_id, ts=message.ts, add=WORKING_REACTION
-        )
+
+        # Inside an assistant thread Slack renders a native "is thinking"
+        # indicator, which is tidier than decorating the message. It only
+        # applies there, so channel mentions keep the reaction.
+        assistant = getattr(adapter, "assistant", None) if message.thread_ts else None
+        used_status = False
+        if assistant is not None:
+            from agent_server.connectors.slack_assistant import THINKING_STATUS
+
+            used_status = await assistant.set_status(
+                channel_id=message.channel_id,
+                thread_ts=message.thread_ts or "",
+                status=THINKING_STATUS,
+            )
+        if not used_status:
+            await adapter.set_reaction(
+                channel_id=message.channel_id, ts=message.ts, add=WORKING_REACTION
+            )
+
         results = [await self._wait_for_idle(session_id) for session_id in session_ids]
+
+        if used_status and assistant is not None:
+            # Slack clears this itself once the app replies; doing it here too
+            # covers a run that ended without one.
+            await assistant.clear_status(
+                channel_id=message.channel_id, thread_ts=message.thread_ts or ""
+            )
+            return
         await adapter.set_reaction(
             channel_id=message.channel_id,
             ts=message.ts,
