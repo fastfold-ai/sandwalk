@@ -157,9 +157,16 @@ def test_fetch_vercel_oidc_via_cli(tmp_path: Path, monkeypatch):
     assert err == ""
 
 
-def test_fetch_vercel_oidc_cli_missing():
-    svc = IntegrationsService()
+def test_fetch_vercel_oidc_cli_missing(monkeypatch):
+    """Force the CLI to be absent rather than hoping it is.
+
+    This previously called through to whatever `vercel` was on PATH. On a
+    machine that has it installed and no saved credentials, that starts an
+    OAuth device flow and blocks until the 45s subprocess timeout.
+    """
+    monkeypatch.setattr(
+        "agent_server.integrations_service.shutil.which", lambda _name: None
+    )
     token, err = IntegrationsService._fetch_vercel_oidc_token_via_cli(Path("/tmp"))
-    # shutil.which may or may not find vercel; if missing:
-    if err:
-        assert "not installed" in err.lower() or token == ""
+    assert token == ""
+    assert "not installed" in err.lower()
