@@ -59,10 +59,10 @@ export function DashboardSidebar({
                     key={item.id}
                     type="button"
                     className={cn(
-                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]',
+                      'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px]',
                       selected
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                        : 'text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground'
+                        ? 'bg-sidebar-accent/55 text-sidebar-accent-foreground'
+                        : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                     )}
                     onClick={() => navigate(item.path)}
                   >

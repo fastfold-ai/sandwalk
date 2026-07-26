@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { openInSystemBrowser } from '@/lib/desktop'
 
 import type { McpDetailViewState } from './use-mcp-detail-view'
 
@@ -158,11 +159,15 @@ export function McpDetailHeaderBar({
           Refresh tools
         </Button>
         {docsUrl ? (
-          <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs" asChild>
-            <a href={docsUrl} target="_blank" rel="noreferrer">
-              Docs
-              <ExternalLink className="size-3.5" />
-            </a>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={() => void openInSystemBrowser(docsUrl)}
+          >
+            Docs
+            <ExternalLink className="size-3.5" />
           </Button>
         ) : null}
       </div>
@@ -221,19 +226,20 @@ export function McpDetailApiKeyBar({ state }: { state: McpDetailViewState }) {
         Cancel
       </Button>
       {catalogEntry?.setupUrl || catalogEntry?.id === 'huggingface' ? (
-        <a
-          href={
-            catalogEntry?.id === 'huggingface'
-              ? 'https://huggingface.co/settings/tokens'
-              : catalogEntry?.setupUrl || '#'
-          }
-          target="_blank"
-          rel="noreferrer"
+        <button
+          type="button"
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
+          onClick={() =>
+            void openInSystemBrowser(
+              catalogEntry?.id === 'huggingface'
+                ? 'https://huggingface.co/settings/tokens'
+                : catalogEntry?.setupUrl || ''
+            )
+          }
         >
           Get API token
           <ExternalLink className="size-3" />
-        </a>
+        </button>
       ) : null}
     </div>
   )

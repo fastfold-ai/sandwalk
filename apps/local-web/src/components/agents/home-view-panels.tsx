@@ -62,7 +62,7 @@ export function HomeProjectSessions({
         <button
           key={item.id}
           type="button"
-          className="bg-card hover:bg-muted/40 flex min-h-[8.5rem] flex-col rounded-xl border p-4 text-left transition-colors"
+          className="bg-card sandwalk-surface-shadow hover:bg-muted/40 flex min-h-[8.5rem] flex-col rounded-xl p-4 text-left transition-colors"
           onClick={() => onOpenSession(item.id)}
           title={previews[item.id] || undefined}
         >
@@ -237,7 +237,7 @@ export function HomeRecentSessionsList({
   }
 
   return (
-    <div className="bg-card divide-y rounded-xl border">
+    <div className="bg-card sandwalk-surface-shadow divide-y rounded-xl">
       {sessions.map(item => (
         <button
           key={item.id}

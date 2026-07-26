@@ -129,7 +129,7 @@ export function AppShellSidebar({
       onExpand={() => setSidebarCollapsed(false)}
       className="min-w-0"
     >
-      <aside className="bg-sidebar flex h-full flex-col overflow-hidden">
+      <aside className="sandwalk-shell-sidebar bg-sidebar flex h-full flex-col overflow-hidden">
         <div
           className={cn(
             'sandwalk-shell-nav-fade',

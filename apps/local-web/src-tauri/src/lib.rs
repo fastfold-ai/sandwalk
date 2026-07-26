@@ -12,9 +12,60 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+#[cfg(target_os = "macos")]
+use tauri_plugin_liquid_glass::{GlassMaterialVariant, LiquidGlassConfig, LiquidGlassExt};
+
+/// SPA theme preference for native glass tint (light wash vs dark wash).
+static SIDEBAR_GLASS_DARK: AtomicBool = AtomicBool::new(false);
+
+/// Frosted sidebar glass — tint follows light/dark theme.
+///
+/// Native glass stays installed for the life of the window. Tearing it down on
+/// blur removes macOS traffic lights with the overlay title bar — so unfocused
+/// “no glass” is done by painting the SPA sidebar opaque instead.
+#[cfg(target_os = "macos")]
+fn sidebar_glass_config() -> LiquidGlassConfig {
+    let dark = SIDEBAR_GLASS_DARK.load(Ordering::Relaxed);
+    LiquidGlassConfig {
+        enabled: true,
+        // 0 — avoid a frosted “frame” rim around the window.
+        corner_radius: 0.0,
+        // ~64% tint — a touch more transparent so wallpaper still reads through.
+        tint_color: Some(if dark {
+            "#000000A3".into()
+        } else {
+            "#ffffffA3".into()
+        }),
+        // Regular blurs harder than Sidebar (less “focused” wallpaper).
+        variant: GlassMaterialVariant::Regular,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn apply_sidebar_glass(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
+    let _ = app
+        .liquid_glass()
+        .set_effect(window, sidebar_glass_config());
+}
+
+/// Sync native liquid-glass tint with the SPA light/dark theme.
+#[tauri::command]
+fn set_sidebar_glass_dark(app: tauri::AppHandle, dark: bool) -> Result<(), String> {
+    SIDEBAR_GLASS_DARK.store(dark, Ordering::Relaxed);
+    #[cfg(target_os = "macos")]
+    if let Some(window) = app.get_webview_window("main") {
+        apply_sidebar_glass(&app, &window);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone, Deserialize)]
 struct ControlFile {
@@ -86,7 +137,7 @@ fn inject_api_base() -> String {
 fn inject_bootstrap_script(initial_route: Option<&str>) -> String {
     let os = std::env::consts::OS;
     let overlay = if os == "macos" {
-        "try{document.documentElement.classList.add('sandwalk-mac-overlay');document.documentElement.dataset.platform='macos';}catch(e){}"
+        "try{document.documentElement.classList.add('sandwalk-mac-overlay','sandwalk-mac-glass');document.documentElement.dataset.platform='macos';}catch(e){}"
     } else {
         ""
     };
@@ -209,6 +260,12 @@ fn toggle_maximize(window: tauri::WebviewWindow) -> Result<bool, String> {
         window.maximize().map_err(|e| e.to_string())?;
         Ok(true)
     }
+}
+
+/// Native fullscreen (green button / Ctrl+Cmd+F). Used to drop traffic-light pad.
+#[tauri::command]
+fn window_is_fullscreen(window: tauri::WebviewWindow) -> Result<bool, String> {
+    window.is_fullscreen().map_err(|e| e.to_string())
 }
 
 fn sanitize_download_filename(name: &str) -> String {
@@ -543,6 +600,7 @@ pub fn run() {
     }));
 
     builder
+        .plugin(tauri_plugin_liquid_glass::init())
         .invoke_handler(tauri::generate_handler![
             desktop_server_status,
             desktop_server_start,
@@ -560,10 +618,12 @@ pub fn run() {
             desktop_menubar_available,
             start_window_drag,
             toggle_maximize,
+            window_is_fullscreen,
             open_external_url,
             copy_to_clipboard,
             save_text_file,
             save_bytes_file,
+            set_sidebar_glass_dark,
             dictation::get_dictation_status,
             dictation::start_dictation,
             dictation::stop_dictation,
@@ -592,9 +652,10 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             {
-                // Overlay title bar: traffic lights float over the UI; inset so the
-                // sidebar chrome can pad left to clear them.
+                // Overlay title bar + transparent webview so liquid glass / vibrancy
+                // shows through the sidebar; main pane paints an opaque canvas.
                 win = win
+                    .transparent(true)
                     .title_bar_style(tauri::TitleBarStyle::Overlay)
                     .hidden_title(true)
                     .traffic_light_position(tauri::LogicalPosition::new(19.0, 24.0));
@@ -602,12 +663,36 @@ pub fn run() {
 
             let window = win.build()?;
 
+            #[cfg(target_os = "macos")]
+            {
+                // Native glass behind the transparent sidebar (always installed;
+                // SPA paints solid on blur so traffic lights stay intact).
+                apply_sidebar_glass(app.handle(), &window);
+                let _ = window.emit("sandwalk-window-glass-active", true);
+            }
+
             // Close hides the window; menubar keeps the agent running.
+            // Also emit fullscreen so the SPA can drop traffic-light left pad.
             let win_clone = window.clone();
             window.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = win_clone.hide();
+                match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        let _ = win_clone.hide();
+                    }
+                    tauri::WindowEvent::Resized(_)
+                    | tauri::WindowEvent::ScaleFactorChanged { .. } => {
+                        if let Ok(fullscreen) = win_clone.is_fullscreen() {
+                            let _ = win_clone.emit("sandwalk-window-fullscreen", fullscreen);
+                        }
+                    }
+                    #[cfg(target_os = "macos")]
+                    tauri::WindowEvent::Focused(focused) => {
+                        // Never tear down native glass (that hides traffic lights).
+                        // SPA covers it with a solid sidebar while unfocused.
+                        let _ = win_clone.emit("sandwalk-window-glass-active", *focused);
+                    }
+                    _ => {}
                 }
             });
 

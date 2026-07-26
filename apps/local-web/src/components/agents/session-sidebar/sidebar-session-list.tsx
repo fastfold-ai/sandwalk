@@ -133,7 +133,7 @@ export function SidebarSessionList({
               <div key={section.id} className="space-y-1">
                 <button
                   type="button"
-                  className="text-muted-foreground/80 hover:text-foreground flex w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-[13px]"
+                  className="text-muted-foreground/80 hover:text-foreground flex w-full items-center gap-1 rounded-lg px-2 py-0.5 text-left text-[13px]"
                   aria-expanded={!collapsed}
                   onClick={() =>
                     setCollapsedSidebarSections(current => ({
@@ -164,10 +164,10 @@ export function SidebarSessionList({
                         <li key={item.id}>
                           <div
                             className={cn(
-                              'hover:bg-sidebar-accent/70 group grid grid-cols-[minmax(0,1fr)_2.75rem] items-center rounded px-1.5 py-1.5',
-                              item.id === sessionId && 'bg-sidebar-accent',
+                              'hover:bg-sidebar-accent/50 group grid grid-cols-[minmax(0,1fr)_2.75rem] items-center rounded-lg px-2 py-1.5',
+                              item.id === sessionId && 'bg-sidebar-accent/55',
                               isSelected &&
-                                'bg-sidebar-accent ring-primary/30 ring-1'
+                                'bg-sidebar-accent/55 ring-primary/30 ring-1'
                             )}
                             onContextMenu={event => {
                               event.preventDefault()

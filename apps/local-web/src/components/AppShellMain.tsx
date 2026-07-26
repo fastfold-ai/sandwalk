@@ -44,7 +44,7 @@ export function AppShellMain(props: AppShellMainProps) {
       minSize={40}
       className="min-w-0"
     >
-      <div className="relative flex h-full min-w-0 flex-col">
+      <div className="sandwalk-shell-main relative flex h-full min-w-0 flex-col bg-background">
         {/* Layout-neutral drag hit target — every main view, does not shift content. */}
         <AppShellMainDragStrip />
         {props.showConnectionLimitWarning ? (

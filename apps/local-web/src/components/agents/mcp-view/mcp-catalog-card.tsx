@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { openInSystemBrowser } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
 import {
@@ -225,15 +226,16 @@ export function McpCatalogCard({
           </Button>
         )}
         {view.docsUrl ? (
-          <a
-            href={view.docsUrl}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
             className="text-muted-foreground hover:text-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-xs"
-            onClick={event => event.stopPropagation()}
+            onClick={event => {
+              event.stopPropagation()
+              void openInSystemBrowser(view.docsUrl!)
+            }}
           >
             Docs <ExternalLink className="size-3" />
-          </a>
+          </button>
         ) : null}
       </div>
 
@@ -268,19 +270,20 @@ export function McpCatalogCard({
             Cancel
           </Button>
           {view.setupUrl || view.id === 'huggingface' ? (
-            <a
-              href={
-                view.id === 'huggingface'
-                  ? 'https://huggingface.co/settings/tokens'
-                  : view.setupUrl || '#'
-              }
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
+              onClick={() =>
+                void openInSystemBrowser(
+                  view.id === 'huggingface'
+                    ? 'https://huggingface.co/settings/tokens'
+                    : view.setupUrl || ''
+                )
+              }
             >
               Get API token
               <ExternalLink className="size-3" />
-            </a>
+            </button>
           ) : null}
         </div>
       ) : null}

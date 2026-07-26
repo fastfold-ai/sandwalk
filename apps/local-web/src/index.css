@@ -60,10 +60,10 @@
 
 @layer base {
   :root {
-    /* Soft page canvas — barely darker than sidebar; cards stay pure white */
-    --background: 0 0% 97.3%; /* ≈ #F8F8F8 */
+    /* Main canvas — pure white (theme-aware; .dark overrides below) */
+    --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
-    /* Elevated cards stay pure white */
+    /* Elevated cards match canvas; lift via sandwalk-surface-shadow */
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
@@ -82,14 +82,14 @@
     --input: 0 0% 90%;
     --ring: 240 5% 64.9%;
     --radius: 0.5rem;
-    /* Sidebar is lighter than the page (≈ #F9F9F9) */
-    --sidebar-background: 0 0% 97.6%;
+    /* Sidebar: bright surface; mac glass makes it transparent (see below) */
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 0 0% 94.5%;
+    --sidebar-accent: 0 0% 94%;
     --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 0 0% 91%;
+    --sidebar-border: 0 0% 90%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -146,11 +146,150 @@
   }
 }
 
+/*
+ * macOS desktop glass shell — window is transparent; native liquid glass /
+ * vibrancy shows through the sidebar while focused. On blur, the sidebar
+ * paints solid (native glass stays installed so traffic lights remain).
+ * Main stays opaque either way.
+ */
+html.sandwalk-mac-glass,
+html.sandwalk-mac-glass body,
+html.sandwalk-mac-glass #root {
+  background: transparent !important;
+}
+
+/*
+ * Light glass nav: subtle gray selected/hover pill (macOS-sidebar soft),
+ * charcoal labels. Accent is light so /70–/80 stays a whisper, not a slab.
+ */
+html.sandwalk-mac-glass:not(.dark) {
+  --sidebar-accent: 0 0% 90%;
+  --sidebar-accent-foreground: 0 0% 18%;
+  --sidebar-border: 0 0% 0% / 0.08;
+}
+
+html.sandwalk-mac-glass:not(.dark) .sandwalk-shell-sidebar {
+  --muted-foreground: 0 0% 34%;
+  --foreground: 0 0% 18%;
+  color: hsl(0 0% 28%);
+}
+
+html.sandwalk-mac-glass .sandwalk-shell {
+  background: transparent !important;
+}
+
+html.sandwalk-mac-glass .sandwalk-shell-main {
+  background-color: hsl(var(--background));
+}
+
+/* Continuous glass column — nav strip is not a separate painted bar. */
+html.sandwalk-mac-glass .sandwalk-shell-nav-strip,
+html.sandwalk-mac-glass .sandwalk-shell-nav-strip.bg-sidebar {
+  background-color: transparent !important;
+}
+
+/* Kill the hard ResizableHandle stroke (defaults to bg-border). */
+html.sandwalk-mac-glass .sandwalk-shell-resize-handle {
+  width: 0 !important;
+  background-color: transparent !important;
+}
+
+html.sandwalk-mac-glass .sandwalk-shell-sidebar .bg-sidebar {
+  background-color: transparent !important;
+}
+
+html.sandwalk-mac-glass .sandwalk-shell-sidebar {
+  position: relative;
+  z-index: 1;
+  border-right: none;
+}
+
+/*
+ * Focused: translucent wash so native glass shows through.
+ * Unfocused: solid sidebar (native glass effect is removed entirely).
+ */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-sidebar {
+  background-color: rgb(255 255 255 / 0.42) !important;
+  border-color: transparent;
+  box-shadow: inset -14px 0 22px -12px rgb(0 0 0 / 0.07);
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-sidebar {
+  background-color: rgb(0 0 0 / 0.45) !important;
+  border-color: transparent;
+  box-shadow: inset -16px 0 26px -12px rgb(0 0 0 / 0.32);
+}
+
+html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active) .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off.sandwalk-mac-glass-active .sandwalk-shell-sidebar {
+  background-color: hsl(var(--sidebar-background)) !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-shell-sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  pointer-events: none;
+  z-index: 5;
+  background: linear-gradient(
+    to left,
+    rgb(0 0 0 / 0.04),
+    rgb(0 0 0 / 0.015) 40%,
+    transparent 85%
+  );
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-sidebar::after {
+  background: linear-gradient(
+    to left,
+    rgb(0 0 0 / 0.14),
+    rgb(0 0 0 / 0.04) 45%,
+    transparent 85%
+  );
+}
+
+html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active) .sandwalk-shell-sidebar::after,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off .sandwalk-shell-sidebar::after {
+  content: none;
+}
+
+html.sandwalk-mac-glass .sandwalk-shell-main {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  border-left: 1px solid hsl(var(--border));
+  box-shadow: none;
+}
+
+/* Soft “shadow border” — replaces hard strokes on elevated surfaces. */
+.sandwalk-surface-shadow {
+  border-color: transparent !important;
+  box-shadow:
+    0 0 0 0.5px hsl(var(--foreground) / 0.06),
+    0 1px 2px hsl(var(--foreground) / 0.04),
+    0 3px 10px hsl(var(--foreground) / 0.04);
+}
+
+.dark .sandwalk-surface-shadow {
+  box-shadow:
+    0 0 0 0.5px hsl(0 0% 100% / 0.08),
+    0 1px 3px hsl(0 0% 0% / 0.35),
+    0 4px 14px hsl(0 0% 0% / 0.25);
+}
+
 /* ── Color palettes (data-palette on <html>) ─────────────────────────────── */
 /* Each palette overrides tokens for both light (:root) and dark (.dark).    */
 
 :root[data-palette='mirage'] {
-  --background: 20 30% 97%;
+  --background: 20 40% 99%;
   --foreground: 15 25% 12%;
   --card: 0 0% 100%;
   --card-foreground: 15 25% 12%;
@@ -206,9 +345,9 @@
 }
 
 :root[data-palette='mahal'] {
-  --background: 36 40% 96%;
+  --background: 36 45% 99%;
   --foreground: 24 48% 16%;
-  --card: 40 45% 99%;
+  --card: 0 0% 100%;
   --card-foreground: 24 48% 16%;
   --popover: 40 45% 99%;
   --popover-foreground: 24 48% 16%;
@@ -262,7 +401,7 @@
 }
 
 :root[data-palette='darwin'] {
-  --background: 140 20% 97%;
+  --background: 140 25% 99%;
   --foreground: 155 35% 12%;
   --card: 0 0% 100%;
   --card-foreground: 155 35% 12%;
@@ -432,10 +571,15 @@
   transition: padding-left 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Tighter continuous column on glass sidebar — less “title bar” band. */
+html.sandwalk-mac-glass .sandwalk-shell-sidebar > .sandwalk-shell-nav-fade .sandwalk-shell-nav-strip {
+  height: 2.5rem;
+}
+
 /*
  * Invisible window-drag hit target. Absolute — does not affect layout/spacing.
- * Tall enough to grab without hugging the window edge; interactive chrome sits
- * above it (z-index) with no-drag.
+ * Passes pointer events through when over interactive controls underneath
+ * (see AppShellMainDragStrip).
  */
 .sandwalk-main-drag-strip {
   height: 2.75rem; /* match shell nav strip */
@@ -447,6 +591,14 @@ html.sandwalk-mac-overlay .sandwalk-shell-nav-strip-mac {
    * then breathing room before the sidebar toggle.
    */
   padding-left: 6rem; /* 96px */
+}
+
+/*
+ * Native fullscreen: traffic lights are gone. Match sidebar chrome `px-3` so the
+ * toggle icon lines up with the Sandwalk logo below.
+ */
+html.sandwalk-mac-overlay.sandwalk-mac-fullscreen .sandwalk-shell-nav-strip-mac {
+  padding-left: 0.75rem; /* px-3 */
 }
 
 /* Animate shell sidebar open/close — skip while the user is actively dragging. */

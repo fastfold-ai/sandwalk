@@ -507,18 +507,16 @@ export function LibraryView({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 pt-3 pb-6 md:px-10">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-baseline gap-2.5">
-            <div className="flex items-center gap-2">
-              <LibraryBig className="text-muted-foreground size-5" />
-              <h1 className="text-lg font-semibold tracking-tight">Library</h1>
-            </div>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <LibraryBig className="text-muted-foreground size-5 shrink-0" />
+            <h1 className="text-lg font-semibold tracking-tight">Library</h1>
             {!loading ? (
-              <span className="text-muted-foreground text-[12px] tabular-nums">
+              <span className="text-muted-foreground text-sm leading-none tabular-nums">
                 {formatFileCount(total)}
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Input
               value={query}
               onChange={event => setQuery(event.target.value)}
@@ -533,8 +531,9 @@ export function LibraryView({
               onChange={event => void onUpload(event.target.files)}
             />
             <Button
+              type="button"
               size="sm"
-              variant="outline"
+              variant="ghost"
               className="h-8 gap-1.5"
               disabled={busy}
               onClick={() => fileInputRef.current?.click()}
@@ -543,9 +542,10 @@ export function LibraryView({
               Upload
             </Button>
             <Button
+              type="button"
               size="sm"
-              variant={selectMode ? 'secondary' : 'outline'}
-              className="h-8 gap-1.5"
+              variant="ghost"
+              className={cn('h-8 gap-1.5', selectMode && 'bg-muted')}
               onClick={() => {
                 if (selectMode) exitSelectMode()
                 else setSelectMode(true)
@@ -563,26 +563,22 @@ export function LibraryView({
                 </>
               )}
             </Button>
-            <div className="border-border flex overflow-hidden rounded-md border">
+            <div className="flex items-center">
               <Button
+                type="button"
                 size="icon"
                 variant="ghost"
-                className={cn(
-                  'size-8 rounded-none',
-                  layout === 'grid' && 'bg-muted'
-                )}
+                className={cn('size-8', layout === 'grid' && 'bg-muted')}
                 onClick={() => setLayout('grid')}
                 aria-label="Grid view"
               >
                 <LayoutGrid className="size-3.5" />
               </Button>
               <Button
+                type="button"
                 size="icon"
                 variant="ghost"
-                className={cn(
-                  'size-8 rounded-none',
-                  layout === 'list' && 'bg-muted'
-                )}
+                className={cn('size-8', layout === 'list' && 'bg-muted')}
                 onClick={() => setLayout('list')}
                 aria-label="List view"
               >
@@ -592,16 +588,16 @@ export function LibraryView({
           </div>
         </div>
 
-        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        <div className="no-scrollbar -mx-1 flex gap-0.5 overflow-x-auto px-1 pb-1">
           {FILTERS.map(pill => (
             <button
               key={pill.id}
               type="button"
               className={cn(
-                'shrink-0 rounded-full px-3 py-1 text-[12px] font-medium transition-colors',
+                'hover:bg-muted hover:text-foreground shrink-0 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors',
                 filter === pill.id
-                  ? 'bg-foreground text-background'
-                  : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground'
               )}
               onClick={() => setFilter(pill.id)}
             >

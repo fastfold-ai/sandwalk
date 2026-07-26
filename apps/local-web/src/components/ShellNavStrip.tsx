@@ -133,7 +133,8 @@ export function ShellNavStrip({
       asTitleBar={overlay}
       className={cn(
         'sandwalk-shell-nav-strip relative z-20 flex w-full shrink-0 items-center pr-2',
-        surface === 'sidebar' ? 'bg-sidebar' : 'bg-background',
+        // Sidebar: transparent so glass reads as one column (not a title-bar band).
+        surface === 'sidebar' ? 'bg-transparent' : 'bg-background',
         padForTrafficLights ? 'sandwalk-shell-nav-strip-mac' : 'pl-2'
       )}
     >

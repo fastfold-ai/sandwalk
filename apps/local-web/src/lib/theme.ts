@@ -1,3 +1,5 @@
+import { syncSidebarGlassTheme } from '@/lib/desktop'
+
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 /** Color palette layered on top of light/dark mode. */
@@ -13,9 +15,13 @@ export type ThemePaletteMeta = {
 
 const THEME_STORAGE_KEY = 'fastfold.theme'
 const PALETTE_STORAGE_KEY = 'sandwalk.theme-palette'
+const LIQUID_GLASS_STORAGE_KEY = 'sandwalk.liquid-glass'
 
 export const THEME_CHANGE_EVENT = 'sandwalk:theme-change'
 export const PALETTE_CHANGE_EVENT = 'sandwalk:palette-change'
+export const LIQUID_GLASS_CHANGE_EVENT = 'sandwalk:liquid-glass-change'
+
+const LIQUID_GLASS_OFF_CLASS = 'sandwalk-liquid-glass-off'
 
 export const THEME_PALETTES: ThemePaletteMeta[] = [
   {
@@ -72,6 +78,30 @@ export function getStoredPalette(): ThemePaletteId {
   return 'default'
 }
 
+/** macOS desktop sidebar glass — enabled by default. */
+export function getStoredLiquidGlass(): boolean {
+  try {
+    const value = localStorage.getItem(LIQUID_GLASS_STORAGE_KEY)
+    if (value === 'off' || value === '0' || value === 'false') return false
+  } catch {
+    // ignore
+  }
+  return true
+}
+
+/** Persist liquid-glass preference and update the document class immediately. */
+export function applyLiquidGlass(enabled: boolean) {
+  document.documentElement.classList.toggle(LIQUID_GLASS_OFF_CLASS, !enabled)
+  try {
+    localStorage.setItem(LIQUID_GLASS_STORAGE_KEY, enabled ? 'on' : 'off')
+  } catch {
+    // ignore
+  }
+  window.dispatchEvent(
+    new CustomEvent<boolean>(LIQUID_GLASS_CHANGE_EVENT, { detail: enabled })
+  )
+}
+
 export function resolveDark(mode: ThemeMode = getStoredTheme()) {
   if (mode === 'dark') return true
   if (mode === 'light') return false
@@ -99,6 +129,7 @@ export function applyTheme(mode: ThemeMode) {
   const dark = resolveDark(mode)
   document.documentElement.classList.toggle('dark', dark)
   syncFavicon(dark)
+  void syncSidebarGlassTheme(dark)
   try {
     localStorage.setItem(THEME_STORAGE_KEY, mode)
   } catch {

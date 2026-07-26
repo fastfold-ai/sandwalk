@@ -9,6 +9,7 @@ import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { openInSystemBrowser } from '@/lib/desktop'
 import {
   catalogSkillInstallCommand,
   catalogSkillInstallTarget,
@@ -125,15 +126,19 @@ export function SkillsCatalogDetailView({
             {installBusy ? 'Installing…' : alreadyInstalled ? 'Update' : 'Install'}
           </Button>
           {catalogSkillsShUrl ? (
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
-              <a href={catalogSkillsShUrl} target="_blank" rel="noreferrer">
-                <img
-                  src="/suggestions/skills-sh.png"
-                  alt=""
-                  className="mr-1 size-3.5 rounded object-contain dark:invert"
-                />
-                View in Skills.sh
-              </a>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => void openInSystemBrowser(catalogSkillsShUrl)}
+            >
+              <img
+                src="/suggestions/skills-sh.png"
+                alt=""
+                className="mr-1 size-3.5 rounded object-contain dark:invert"
+              />
+              View in Skills.sh
             </Button>
           ) : null}
         </div>

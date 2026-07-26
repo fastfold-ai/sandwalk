@@ -165,6 +165,35 @@ export const startWindowDrag = () => invoke<boolean>('start_window_drag')
 /** Double-click title bar — toggle maximized (native macOS behavior). */
 export const toggleMaximize = () => invoke<boolean>('toggle_maximize')
 
+/** Native window fullscreen (not browser Fullscreen API). */
+export const windowIsFullscreen = () => invoke<boolean>('window_is_fullscreen')
+
+/** Listen for native fullscreen enter/exit (emitted on resize). */
+export async function listenWindowFullscreen(
+  handler: (fullscreen: boolean) => void
+): Promise<() => void> {
+  const listen = tauri()?.event?.listen
+  if (!listen) return () => {}
+  return listen('sandwalk-window-fullscreen', event => {
+    handler(Boolean(event.payload))
+  })
+}
+
+/** Listen for sidebar glass on/off (tied to window key focus). */
+export async function listenWindowGlassActive(
+  handler: (active: boolean) => void
+): Promise<() => void> {
+  const listen = tauri()?.event?.listen
+  if (!listen) return () => {}
+  return listen('sandwalk-window-glass-active', event => {
+    handler(Boolean(event.payload))
+  })
+}
+
+/** Sync native sidebar glass tint with light/dark theme (macOS desktop). */
+export const syncSidebarGlassTheme = (dark: boolean) =>
+  invoke<void>('set_sidebar_glass_dark', { dark })
+
 /** Open a URL in the system browser. */
 export const openExternalUrl = (url: string) =>
   invokeStrict<void>('open_external_url', { url })

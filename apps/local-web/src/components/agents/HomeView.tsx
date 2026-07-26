@@ -154,7 +154,7 @@ export function HomeView({
         <div className="grid gap-8 lg:grid-cols-2">
           <section>
             <h3 className="mb-3 text-sm font-medium">Projects</h3>
-            <div className="bg-card divide-y rounded-xl border">
+            <div className="bg-card sandwalk-surface-shadow divide-y rounded-xl">
               <HomeProjectsList
                 projects={orderedProjects}
                 onOpenProject={onOpenProject}

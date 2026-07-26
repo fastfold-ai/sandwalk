@@ -19,7 +19,7 @@ export function AppShell(props: AppShellProps) {
         divider must run edge-to-edge. Traffic-light clearance
         lives in .sandwalk-sidebar-chrome under mac overlay.
       */}
-      <div className="bg-background flex h-full w-full flex-col overflow-hidden">
+      <div className="sandwalk-shell bg-background flex h-full w-full flex-col overflow-hidden">
         <ResizablePanelGroup
           direction="horizontal"
           autoSaveId={SHELL_PANELS_AUTO_SAVE_ID}
@@ -73,8 +73,9 @@ export function AppShell(props: AppShellProps) {
         />
 
         <ResizableHandle
+          withHandle={false}
           className={cn(
-            'sandwalk-shell-resize-handle w-px',
+            'sandwalk-shell-resize-handle w-px !bg-transparent',
             props.sidebarCollapsed && 'pointer-events-none opacity-0'
           )}
         />

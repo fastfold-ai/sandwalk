@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  applyLiquidGlass,
   applyPalette,
   applyTheme,
+  getStoredLiquidGlass,
   getStoredPalette,
   getStoredTheme,
+  LIQUID_GLASS_CHANGE_EVENT,
   PALETTE_CHANGE_EVENT,
   previewPalette,
   resolveDark,
@@ -69,6 +72,7 @@ describe('theme', () => {
   it('reads and falls back for stored theme/palette', () => {
     expect(getStoredTheme()).toBe('system')
     expect(getStoredPalette()).toBe('default')
+    expect(getStoredLiquidGlass()).toBe(true)
 
     localStorage.setItem('fastfold.theme', 'dark')
     localStorage.setItem('sandwalk.theme-palette', 'mirage')
@@ -79,6 +83,27 @@ describe('theme', () => {
     localStorage.setItem('sandwalk.theme-palette', 'nope')
     expect(getStoredTheme()).toBe('system')
     expect(getStoredPalette()).toBe('default')
+  })
+
+  it('applyLiquidGlass persists preference and toggles off class', () => {
+    const handler = vi.fn()
+    window.addEventListener(LIQUID_GLASS_CHANGE_EVENT, handler as EventListener)
+    applyLiquidGlass(false)
+    expect(getStoredLiquidGlass()).toBe(false)
+    expect(
+      document.documentElement.classList.contains('sandwalk-liquid-glass-off')
+    ).toBe(true)
+    expect(localStorage.getItem('sandwalk.liquid-glass')).toBe('off')
+    applyLiquidGlass(true)
+    expect(getStoredLiquidGlass()).toBe(true)
+    expect(
+      document.documentElement.classList.contains('sandwalk-liquid-glass-off')
+    ).toBe(false)
+    expect(handler).toHaveBeenCalled()
+    window.removeEventListener(
+      LIQUID_GLASS_CHANGE_EVENT,
+      handler as EventListener
+    )
   })
 
   it('resolveDark honors explicit mode and system preference', () => {

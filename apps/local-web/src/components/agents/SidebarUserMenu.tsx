@@ -115,7 +115,7 @@ export function SidebarUserMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="hover:bg-muted/60 data-[state=open]:bg-muted flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors"
+          className="hover:bg-sidebar-accent/50 data-[state=open]:bg-sidebar-accent/55 flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors"
         >
           <span className="bg-muted text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
             {initials}

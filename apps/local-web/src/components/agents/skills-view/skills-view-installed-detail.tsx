@@ -18,6 +18,7 @@ import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { openInSystemBrowser } from '@/lib/desktop'
 import { catalogCoordsFromInstalledSkill, skillsShSkillUrl, stripFrontmatter } from '@/lib/skills-catalog'
 import { cn } from '@/lib/utils'
 
@@ -155,23 +156,31 @@ export function SkillsInstalledDetailView({
             Remove
           </Button>
           {localSkillsShUrl ? (
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
-              <a href={localSkillsShUrl} target="_blank" rel="noreferrer">
-                <img
-                  src="/suggestions/skills-sh.png"
-                  alt=""
-                  className="mr-1 size-3.5 rounded object-contain dark:invert"
-                />
-                View in Skills.sh
-              </a>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => void openInSystemBrowser(localSkillsShUrl)}
+            >
+              <img
+                src="/suggestions/skills-sh.png"
+                alt=""
+                className="mr-1 size-3.5 rounded object-contain dark:invert"
+              />
+              View in Skills.sh
             </Button>
           ) : null}
           {detailGithubUrl ? (
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
-              <a href={detailGithubUrl} target="_blank" rel="noreferrer">
-                <GitBranch className="mr-1 h-3.5 w-3.5" />
-                View in GitHub
-              </a>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => void openInSystemBrowser(detailGithubUrl)}
+            >
+              <GitBranch className="mr-1 h-3.5 w-3.5" />
+              View in GitHub
             </Button>
           ) : (
             <span className="text-muted-foreground inline-flex h-7 items-center gap-1.5 px-2 text-xs">
@@ -246,14 +255,13 @@ export function SkillsInstalledDetailView({
                         Author:
                       </span>
                       {detailAuthorUrl ? (
-                        <a
-                          href={detailAuthorUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
                           className="truncate underline-offset-2 hover:underline"
+                          onClick={() => void openInSystemBrowser(detailAuthorUrl)}
                         >
                           {detail.author || 'fastfold-ai'}
-                        </a>
+                        </button>
                       ) : (
                         <span className="truncate">{detail.author || 'unknown'}</span>
                       )}

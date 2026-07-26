@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { openInSystemBrowser } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
 import {
@@ -442,15 +443,14 @@ export function McpCustomServerList({
                   Save
                 </Button>
                 {tokenSetupUrl ? (
-                  <a
-                    href={tokenSetupUrl}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
                     className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
+                    onClick={() => void openInSystemBrowser(tokenSetupUrl)}
                   >
                     Get API token
                     <ExternalLink className="size-3" />
-                  </a>
+                  </button>
                 ) : null}
               </div>
             ) : null}

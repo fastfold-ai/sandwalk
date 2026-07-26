@@ -34,7 +34,7 @@ export function SidebarBatchBar({
   if (selectedCount <= 0) return null
 
   return (
-    <div className="border-border/60 mx-2 mb-1 space-y-2 rounded-lg border bg-sidebar-accent/40 px-2.5 py-2">
+    <div className="mx-2 mb-1 space-y-2 rounded-2xl border border-black/5 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-white/10">
       <div className="flex items-center justify-between gap-2">
         <span className="text-foreground text-[12px] font-medium">
           {selectedCount} selected

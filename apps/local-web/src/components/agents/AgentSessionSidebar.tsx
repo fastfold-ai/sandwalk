@@ -122,16 +122,17 @@ export function AgentSessionSidebar({
   const isLibrary = location.pathname === '/library' || location.pathname.startsWith('/library/')
   return (
     <>
-      <div className="sandwalk-sidebar-chrome shrink-0 p-3">
-        <div className="mb-2 flex items-center gap-1">
+      <div className="sandwalk-sidebar-chrome shrink-0 px-3 pt-0.5 pb-2">
+        {/* Same px-2.5 as nav rows; mark is larger but left-aligned to the icon column. */}
+        <div className="mb-2 flex items-center gap-1.5 px-2.5">
           <button
             type="button"
-            className="hover:bg-sidebar-accent/70 inline-flex size-8 shrink-0 items-center justify-center rounded-md"
+            className="hover:bg-sidebar-accent/50 -ml-0.5 inline-flex h-8 w-5 shrink-0 items-center justify-start rounded-md"
             onClick={onNavigateHome}
             aria-label="Home"
             title="Home"
           >
-            <SandwalkMark className="h-5 w-5" />
+            <SandwalkMark className="size-5" />
           </button>
           <ProjectSelector
             projects={projects}
@@ -161,18 +162,18 @@ export function AgentSessionSidebar({
         </div>
         <button
           type="button"
-          className="text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[13px]"
+          className="text-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-[13px]"
           onClick={() => void onCreateSession()}
         >
           <span className="inline-flex items-center gap-2">
             <Send className="size-3.5" />
             New Agent
           </span>
-          <span className="text-muted-foreground/70 text-[11px]">⌘N</span>
+          <span className="text-muted-foreground/80 text-[11px]">⌘N</span>
         </button>
         <button
           type="button"
-          className="text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px]"
+          className="text-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground mt-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px]"
           onClick={() => navigate('/dashboard')}
         >
           <LayoutDashboard className="size-3.5" />
@@ -181,10 +182,10 @@ export function AgentSessionSidebar({
         <button
           type="button"
           className={cn(
-            'mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px]',
+            'mt-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px]',
             isLibrary
-              ? 'bg-sidebar-accent text-foreground'
-              : 'text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground'
+              ? 'bg-sidebar-accent/55 text-foreground'
+              : 'text-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground'
           )}
           onClick={() => navigate('/library')}
         >
