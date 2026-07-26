@@ -89,6 +89,12 @@ class SessionList(ApiModel):
     data: list[AgentSession]
 
 
+class SessionRevision(ApiModel):
+    """Cheap watermark for session-list polling (count + newest update + running)."""
+
+    revision: str
+
+
 class DeleteSessionResponse(ApiModel):
     deleted: bool = True
 

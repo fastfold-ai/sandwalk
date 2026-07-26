@@ -14,6 +14,7 @@ from agent_server.models import (
     DeleteSessionResponse,
     InterruptRunResponse,
     SessionList,
+    SessionRevision,
     SubmitApprovalsRequest,
     SubmitApprovalsResponse,
     UpdateSessionRequest,
@@ -30,6 +31,12 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
     ) -> SessionList:
         return SessionList(
             data=await asyncio.to_thread(store.list_sessions, project_id=project_id)
+        )
+
+    @app.get("/v1/sessions/revision", response_model=SessionRevision)
+    async def get_sessions_revision() -> SessionRevision:
+        return SessionRevision(
+            revision=await asyncio.to_thread(store.sessions_revision)
         )
 
     @app.get("/v1/sessions/search", response_model=SessionList)

@@ -34,7 +34,9 @@ type SessionLayerArgs = {
   setSessions: Dispatch<SetStateAction<AgentSession[]>>
   setError: Dispatch<SetStateAction<string | null>>
   loadSessions: () => Promise<void>
-  loadSessionsRef: MutableRefObject<(() => Promise<void>) | null>
+  loadSessionsRef: MutableRefObject<
+    ((options?: { force?: boolean }) => Promise<void>) | null
+  >
   loadSkillsRef: MutableRefObject<(() => Promise<void>) | null>
   loadProjects: () => Promise<void>
   setSandboxSettings: Dispatch<SetStateAction<import('@sandwalk/agent-ui-core').SandboxSettings | null>>

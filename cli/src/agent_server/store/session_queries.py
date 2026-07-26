@@ -7,6 +7,23 @@ from agent_server.store.rows import session_from_row
 
 
 class SessionQueryMixin:
+    def sessions_revision(self) -> str:
+        """Compact watermark for list polling — one aggregate row, no payloads."""
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*),
+                       COALESCE(MAX(updated_at), ''),
+                       COALESCE(
+                         SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END),
+                         0
+                       )
+                FROM sessions
+                """
+            ).fetchone()
+        count, updated_at, running = row[0], row[1], row[2]
+        return f"{count}:{updated_at}:{running}"
+
     def list_sessions(self, *, project_id: str | None = None) -> list[AgentSession]:
         with self._connect() as connection:
             if project_id:

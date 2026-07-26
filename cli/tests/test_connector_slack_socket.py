@@ -143,6 +143,29 @@ def test_connected_is_false_without_a_socket() -> None:
     assert adapter(on_message).connected is False
 
 
+def test_connected_handles_async_sdk_is_connected() -> None:
+    """slack_sdk's aiohttp SocketModeClient.is_connected is a coroutine."""
+
+    class AsyncFakeClient:
+        closed = False
+        stale = False
+
+        def __init__(self) -> None:
+            self.current_session = type("S", (), {"closed": False})()
+
+        async def is_connected(self) -> bool:
+            return True
+
+    async def on_message(_message: InboundMessage) -> None:
+        return None
+
+    subject = adapter(on_message)
+    subject._socket = type("Sock", (), {"client": AsyncFakeClient()})()
+    assert subject.connected is True
+    subject._socket.client.current_session.closed = True
+    assert subject.connected is False
+
+
 def test_connect_without_the_sdk_reports_failure(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     import builtins
 

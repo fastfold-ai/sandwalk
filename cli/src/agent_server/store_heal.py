@@ -286,12 +286,50 @@ def backup_age_seconds(db_path: Path) -> float | None:
     return max(0.0, time.time() - backup.stat().st_mtime)
 
 
-def refresh_healthy_backup(db_path: Path) -> None:
-    """Copy a verified DB to ``*.recovered`` for the next self-heal."""
-    # Live path — do not strip WAL; use the online backup API instead.
-    if not integrity_ok(db_path, isolate_main=False):
-        return
+def database_fingerprint(db_path: Path) -> tuple[int, int, int, int]:
+    """Cheap change detector: main + WAL size/mtime (no SQLite open)."""
+    main_size = 0
+    main_mtime_ns = 0
+    if db_path.exists():
+        st = db_path.stat()
+        main_size = st.st_size
+        main_mtime_ns = st.st_mtime_ns
+    wal = Path(f"{db_path}-wal")
+    wal_size = 0
+    wal_mtime_ns = 0
+    if wal.exists():
+        st = wal.stat()
+        wal_size = st.st_size
+        wal_mtime_ns = st.st_mtime_ns
+    return (main_size, main_mtime_ns, wal_size, wal_mtime_ns)
+
+
+def refresh_healthy_backup(db_path: Path, *, force: bool = True) -> bool | None:
+    """Copy a verified DB to ``*.recovered`` for the next self-heal.
+
+    Returns True when a new backup was written, False when skipped because the
+    live fingerprint matches the existing backup, and None on failure. With
+    ``force=False``, idle servers do not rewrite multi‑MB snapshots on every
+    poll.
+    """
     backup = backup_path_for(db_path)
+    fingerprint = database_fingerprint(db_path)
+    meta = Path(f"{backup}.fp")
+    if not force and backup.exists() and meta.exists():
+        try:
+            if meta.read_text(encoding="utf-8").strip() == repr(fingerprint):
+                return False
+        except OSError:
+            pass
+
+    # Cheap probe on the live DB — full integrity_check is O(n) and belongs on
+    # the snapshot we just wrote, not on every idle poll.
+    readable = readonly_readable(db_path)
+    if readable is False:
+        return None
+    if readable is None and not integrity_ok(db_path, isolate_main=False):
+        return None
+
     tmp = backup.with_suffix(backup.suffix + ".tmp")
     clear_wal_sidecars(tmp)
     try:
@@ -303,19 +341,28 @@ def refresh_healthy_backup(db_path: Path) -> None:
                 src.backup(dst)
                 dst.execute("PRAGMA journal_mode = DELETE")
         clear_wal_sidecars(tmp)
-        if not integrity_ok(tmp, isolate_main=True):
+        # Fresh DELETE-mode file with no sidecars — check in place (no extra copy).
+        if not integrity_ok(tmp, isolate_main=False):
             tmp.unlink(missing_ok=True)
             clear_wal_sidecars(tmp)
-            return
+            return None
         clear_wal_sidecars(backup)
         tmp.replace(backup)
         clear_wal_sidecars(backup)
         clear_wal_sidecars(tmp)
-        logger.info("Refreshed healthy agent DB backup → %s", backup)
+        # Record post-backup fingerprint so a checkpoint that rewrites the WAL
+        # during backup still triggers one more pass, then goes quiet.
+        try:
+            meta.write_text(repr(database_fingerprint(db_path)), encoding="utf-8")
+        except OSError:
+            meta.unlink(missing_ok=True)
+        logger.debug("Refreshed healthy agent DB backup → %s", backup)
+        return True
     except (OSError, sqlite3.Error) as exc:
         logger.warning("Could not refresh DB backup: %s", exc)
         tmp.unlink(missing_ok=True)
         clear_wal_sidecars(tmp)
+        return None
 
 
 # Enough history to investigate a bad heal without hoarding gigabytes.

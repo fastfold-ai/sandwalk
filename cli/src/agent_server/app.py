@@ -36,24 +36,43 @@ from agent_server.specialists_service import SpecialistsService
 from agent_server.store import AgentStore
 from agent_server.tools_service import ToolsService
 
-# How often to snapshot a known-good copy of the database. If a heal ever does
-# have to run, this bounds the rollback to minutes instead of "everything since
-# the server booted" — which is what made past corruption so expensive.
-BACKUP_REFRESH_SECONDS = 120.0
+# Cheap fingerprint poll. Full online backups only run when the live DB
+# changed and at least BACKUP_MIN_INTERVAL_SECONDS have passed — so idle
+# servers stay quiet, and heavy write bursts coalesce instead of copying
+# the whole file every couple of minutes.
+BACKUP_POLL_SECONDS = 60.0
+BACKUP_MIN_INTERVAL_SECONDS = 300.0
 
 
 async def _keep_backup_fresh(store: AgentStore) -> None:
-    """Periodically snapshot the database while it is healthy."""
+    """Snapshot the database when it changes, coalesced to a few minutes."""
     import logging
+    import time
 
-    from agent_server.store_heal import refresh_healthy_backup
+    from agent_server.store_heal import database_fingerprint, refresh_healthy_backup
 
     logger = logging.getLogger("agent_server")
+    last_backup_at = 0.0
+    last_fp = database_fingerprint(store.path)
     while True:
         try:
-            await asyncio.sleep(BACKUP_REFRESH_SECONDS)
-            # Online backup API — safe to run against a live WAL database.
-            await asyncio.to_thread(refresh_healthy_backup, store.path)
+            await asyncio.sleep(BACKUP_POLL_SECONDS)
+            fp = database_fingerprint(store.path)
+            if fp == last_fp:
+                continue
+            now = time.monotonic()
+            if now - last_backup_at < BACKUP_MIN_INTERVAL_SECONDS:
+                continue
+            # Online backup API — safe against a live WAL database.
+            wrote = await asyncio.to_thread(
+                refresh_healthy_backup, store.path, force=False
+            )
+            if wrote is True:
+                last_backup_at = now
+                last_fp = database_fingerprint(store.path)
+            elif wrote is False:
+                last_fp = fp
+            # wrote is None → failed; keep last_fp so the next eligible poll retries.
         except asyncio.CancelledError:
             raise
         except Exception:

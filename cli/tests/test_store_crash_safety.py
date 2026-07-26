@@ -177,3 +177,23 @@ def test_periodic_refresh_captures_recent_writes(tmp_path: Path) -> None:
         assert "Later" in titles
     finally:
         store.close()
+
+
+def test_refresh_skips_when_fingerprint_unchanged(tmp_path: Path) -> None:
+    from agent_server.store import AgentStore
+    from agent_server.store_heal import backup_path_for, refresh_healthy_backup
+
+    db = tmp_path / "agent.db"
+    store = AgentStore(db, exclusive=True)
+    try:
+        store.create_session(title="Stable", workspace_path=None)
+        assert refresh_healthy_backup(db, force=True) is True
+        backup = backup_path_for(db)
+        mtime = backup.stat().st_mtime_ns
+        assert refresh_healthy_backup(db, force=False) is False
+        assert backup.stat().st_mtime_ns == mtime
+        store.create_session(title="Changed", workspace_path=None)
+        time.sleep(0.01)
+        assert refresh_healthy_backup(db, force=False) is True
+    finally:
+        store.close()

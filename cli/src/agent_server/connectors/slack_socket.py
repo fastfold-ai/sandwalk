@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import logging
 import os
 import time
@@ -28,6 +29,17 @@ _WATCHDOG_INTERVAL = 20.0
 
 # `users.list` is rate limited, so cap how often an unrecognised id re-fetches.
 _DIRECTORY_MIN_REFRESH = 60.0
+
+
+def _session_looks_alive(client: object) -> bool:
+    """Sync proxy for async SocketModeClient.is_connected (no ping/pong)."""
+    session = getattr(client, "current_session", None)
+    return (
+        not getattr(client, "closed", True)
+        and not getattr(client, "stale", True)
+        and session is not None
+        and not getattr(session, "closed", True)
+    )
 
 
 class SlackSocketAdapter:
@@ -70,7 +82,27 @@ class SlackSocketAdapter:
         if client is None:
             return False
         try:
-            return bool(client.is_connected())
+            probe = client.is_connected()
+            # Async slack_sdk: is_connected() is a coroutine. Awaiting here is
+            # impossible from a sync status property; use session flags instead
+            # (bool(coro) is always True and would hide disconnects).
+            if inspect.isawaitable(probe):
+                with contextlib.suppress(Exception):
+                    probe.close()
+                return _session_looks_alive(client)
+            return bool(probe)
+        except Exception:
+            return False
+
+    async def _connected(self) -> bool:
+        client = getattr(self._socket, "client", None)
+        if client is None:
+            return False
+        try:
+            probe = client.is_connected()
+            if inspect.isawaitable(probe):
+                return bool(await probe)
+            return bool(probe)
         except Exception:
             return False
 
@@ -236,7 +268,7 @@ class SlackSocketAdapter:
                 break
             if self._closing or self._socket is None:
                 break
-            if self.connected:
+            if await self._connected():
                 continue
             logger.warning(
                 "Slack Socket Mode dropped for team %s — reconnecting", self.team_id

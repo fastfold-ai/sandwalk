@@ -322,6 +322,13 @@ export class LocalAgentClient
     return result.data
   }
 
+  async getSessionsRevision(signal?: AbortSignal): Promise<string> {
+    const result = await this.request<{ revision: string }>('/sessions/revision', {
+      signal,
+    })
+    return result.revision
+  }
+
   async listProjects(signal?: AbortSignal): Promise<AgentProject[]> {
     const result = await this.request<{ data: AgentProject[] }>('/projects', { signal })
     return result.data

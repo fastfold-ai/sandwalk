@@ -182,3 +182,20 @@ def test_resume_pulls_ui_history_into_cli(tmp_path: Path, monkeypatch):
     assert len(loop.trajectory.turns) == 2
     assert loop.trajectory.turns[-1].query == "from ui"
     assert "nothing" in loop.trajectory.turns[-1].answer
+
+
+def test_sessions_revision_moves_when_list_changes(tmp_path: Path):
+    store = AgentStore(tmp_path / "agent.db", exclusive=True)
+    try:
+        empty = store.sessions_revision()
+        assert empty.startswith("0:")
+        store.create_session(title="One", workspace_path=None)
+        one = store.sessions_revision()
+        assert one.startswith("1:")
+        assert one != empty
+        store.create_session(title="Two", workspace_path=None)
+        two = store.sessions_revision()
+        assert two.startswith("2:")
+        assert two != one
+    finally:
+        store.close()

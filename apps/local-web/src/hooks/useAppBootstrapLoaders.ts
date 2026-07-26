@@ -65,37 +65,60 @@ export function useAppBootstrapLoaders({
   const [sandboxSettings, setSandboxSettings] =
     useState<SandboxSettings | null>(null)
   const [modelOptions, setModelOptions] = useState<ComposerModelOption[]>([])
-  const loadSessionsRef = useRef<(() => Promise<void>) | null>(null)
+  const loadSessionsRef = useRef<
+    ((options?: { force?: boolean }) => Promise<void>) | null
+  >(null)
   const loadSkillsRef = useRef<(() => Promise<void>) | null>(null)
+  const sessionsRevisionRef = useRef<string | null>(null)
   const sessionPreviewsRef = useRef<Record<string, string>>({})
   const previewInFlightRef = useRef(new Set<string>())
   const specialistsRef = useRef(specialists)
   sessionPreviewsRef.current = sessionPreviews
   specialistsRef.current = specialists
 
-  const loadSessions = useCallback(async () => {
-    const key = `sessions:${client.baseUrl}`
-    const nextSessions = await dedupeAsync(key, () => client.listSessions())
-    // Keep the previous array when nothing moved, so the periodic refresh that
-    // picks up CLI and Slack activity cannot re-render the sidebar on a timer.
-    setSessions(current =>
-      sessionsUnchanged(current, nextSessions) ? current : nextSessions
-    )
-    setChatBySessionId(current => {
-      let changed = false
-      const next = { ...current }
-      for (const item of nextSessions) {
-        const prev = next[item.id]
-        if (!prev) continue
-        const shouldRun = item.status === 'running'
-        if (prev.runActive === shouldRun) continue
-        next[item.id] = { ...prev, runActive: shouldRun }
-        changed = true
+  const loadSessions = useCallback(
+    async (options?: { force?: boolean }) => {
+      const key = `sessions:${client.baseUrl}`
+      // Cheap watermark first: idle UIs only hit a tiny aggregate query until
+      // CLI / Slack / another client actually changes the session list.
+      if (!options?.force) {
+        try {
+          const revision = await dedupeAsync(`${key}:rev`, () =>
+            client.getSessionsRevision()
+          )
+          if (revision === sessionsRevisionRef.current) return
+        } catch {
+          // Older servers without /sessions/revision fall through to full list.
+        }
       }
-      return changed ? next : current
-    })
-    // Previews load lazily from Home via loadSessionPreviews.
-  }, [client, setChatBySessionId])
+      const nextSessions = await dedupeAsync(key, () => client.listSessions())
+      try {
+        sessionsRevisionRef.current = await client.getSessionsRevision()
+      } catch {
+        sessionsRevisionRef.current = null
+      }
+      // Keep the previous array when nothing moved, so a forced refresh cannot
+      // re-render the sidebar on a timer when the payload is identical.
+      setSessions(current =>
+        sessionsUnchanged(current, nextSessions) ? current : nextSessions
+      )
+      setChatBySessionId(current => {
+        let changed = false
+        const next = { ...current }
+        for (const item of nextSessions) {
+          const prev = next[item.id]
+          if (!prev) continue
+          const shouldRun = item.status === 'running'
+          if (prev.runActive === shouldRun) continue
+          next[item.id] = { ...prev, runActive: shouldRun }
+          changed = true
+        }
+        return changed ? next : current
+      })
+      // Previews load lazily from Home via loadSessionPreviews.
+    },
+    [client, setChatBySessionId]
+  )
 
   loadSessionsRef.current = loadSessions
 

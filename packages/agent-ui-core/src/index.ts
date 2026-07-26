@@ -1316,6 +1316,7 @@ export interface AgentClient {
   listSessions(
     options?: { projectId?: string | null; signal?: AbortSignal },
   ): Promise<AgentSession[]>
+  getSessionsRevision?(signal?: AbortSignal): Promise<string>
   listProjects?(signal?: AbortSignal): Promise<AgentProject[]>
   listLibrary?(
     options?: {

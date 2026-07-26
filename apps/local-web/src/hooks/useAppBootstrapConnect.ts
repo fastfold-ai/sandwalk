@@ -29,8 +29,8 @@ import type { useAppBootstrapLoaders } from './useAppBootstrapLoaders'
 
 type LoaderBundle = ReturnType<typeof useAppBootstrapLoaders>
 
-/** Slow enough to be invisible in CPU terms, quick enough to feel live. */
-const SESSION_LIST_REFRESH_MS = 10_000
+/** Revision poll cadence. Full /sessions only runs when the watermark moves. */
+const SESSION_LIST_REFRESH_MS = 30_000
 
 type UseAppBootstrapConnectArgs = {
   client: LocalAgentClient
@@ -152,7 +152,7 @@ export function useAppBootstrapConnect({
       setNeedsAuthLogin(false)
       setHealth(nextHealth)
       const [, , , , , , , settings, sandbox] = await Promise.all([
-        loadSessions(),
+        loadSessions({ force: true }),
         loadProjects(),
         loadSkills(),
         loadIntegrations(),
@@ -244,10 +244,9 @@ export function useAppBootstrapConnect({
   // Work can arrive from outside this client: a `sandwalk` CLI session, or a
   // Slack mention spawning one. Neither goes through the UI, and session
   // events only reach the stream of a session that is already open, so the
-  // list would otherwise sit stale until the next reconnect. Re-fetch on a
-  // gentle timer while the window is visible, and immediately when it regains
-  // focus. `loadSessions` keeps the previous array when nothing changed, so a
-  // quiet backend costs no re-renders.
+  // list would otherwise sit stale until the next reconnect. Poll a tiny
+  // revision watermark while visible; full /sessions only when it moves.
+  // Focus / visibility regain still checks immediately.
   useEffect(() => {
     if (needsAuthLogin || connectionPaused || !health) return
     const refresh = () => {
