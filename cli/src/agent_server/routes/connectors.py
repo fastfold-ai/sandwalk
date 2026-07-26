@@ -26,10 +26,12 @@ from agent_server.models.connectors import (
     SlackDirectoryChannel,
     SlackDirectoryPerson,
     SlackManifestResponse,
+    SlackOneClickStart,
     SlackParkedMessageList,
     SlackSubscriptionList,
     SlackWorkspace,
     SlackWorkspaceList,
+    StartSlackOneClickRequest,
 )
 
 CONNECTOR = "slack"
@@ -56,6 +58,37 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
     @app.get("/v1/connectors/slack/workspaces", response_model=SlackWorkspaceList)
     async def list_workspaces() -> SlackWorkspaceList:
         return SlackWorkspaceList(data=store.list_slack_workspaces())
+
+    @app.post(
+        "/v1/connectors/slack/connect/one-click",
+        response_model=SlackOneClickStart,
+    )
+    async def start_one_click(
+        payload: StartSlackOneClickRequest | None = None,
+    ) -> SlackOneClickStart:
+        """Hand back the Slack install URL for the user's browser."""
+        try:
+            url = await connectors.start_one_click(
+                return_to=payload.return_to if payload else None
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return SlackOneClickStart(auth_url=url)
+
+    @app.post(
+        "/v1/connectors/slack/connect/one-click/import",
+        response_model=SlackWorkspaceList,
+    )
+    async def import_one_click() -> SlackWorkspaceList:
+        """Pick up installs finished in the browser.
+
+        Polled by the UI after opening the install URL, since the desktop never
+        sees the OAuth callback itself.
+        """
+        try:
+            return SlackWorkspaceList(data=await connectors.import_one_click_connections())
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post(
         "/v1/connectors/slack/connect",

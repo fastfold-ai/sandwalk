@@ -41,6 +41,35 @@ WORKING_REACTION = "eyes"
 DONE_REACTION = "white_check_mark"
 FAILED_REACTION = "warning"
 
+def _cloud_request(
+    method: str, url: str, api_key: str, body: dict | None
+) -> tuple[dict | None, str | None]:
+    """Blocking JSON call to FastFold Cloud, returning ``(payload, error)``.
+
+    Errors come back as readable text rather than exceptions so the UI can show
+    the reason instead of a status code.
+    """
+    import json
+    import urllib.error
+    import urllib.request
+
+    data = json.dumps(body).encode() if body is not None else None
+    request = urllib.request.Request(url, data=data, method=method)
+    request.add_header("Authorization", f"Bearer {api_key}")
+    if data is not None:
+        request.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read() or b"{}"), None
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            return None, "FastFold rejected the API key. Reconnect FastFold Cloud."
+        detail = exc.read().decode("utf-8", errors="replace")[:200]
+        return None, f"FastFold returned {exc.code}: {detail}"
+    except Exception as exc:  # noqa: BLE001
+        return None, f"Could not reach FastFold Cloud: {exc}"
+
+
 _BUSY_STATUSES = {"running", "queued", "starting"}
 _POLL_SECONDS = 1.0
 # How long to allow for a run to show up as busy before deciding it is already
@@ -172,6 +201,97 @@ class ConnectorService:
         await self._stop_workspace(team_id)
         clear_directory_cache(team_id)
         return self.store.delete_slack_workspace(team_id)
+
+    # --- one-click (relay) ------------------------------------------------
+
+    async def start_one_click(self, *, return_to: str | None = None) -> str:
+        """Ask FastFold Cloud for a Slack install URL.
+
+        Raises ValueError carrying something worth showing, because the common
+        failure - not signed in to FastFold Cloud - is the user's to fix and a
+        bare HTTP error would not say so.
+        """
+        from agent_server.account_service.helpers import api_key, cloud_base_url
+
+        key = api_key()
+        if not key:
+            raise ValueError(
+                "Connect FastFold Cloud first — one-click Slack needs an API key "
+                "so the relay knows which desktop to deliver to."
+            )
+
+        body: dict[str, Any] = {"app": "sandwalk"}
+        if return_to:
+            body["return_to"] = return_to
+        payload, error = await asyncio.to_thread(
+            _cloud_request, "POST", f"{cloud_base_url()}/v1/slack/oauth/start", key, body
+        )
+        if error:
+            raise ValueError(error)
+        url = str((payload or {}).get("auth_url") or "").strip()
+        if not url:
+            raise ValueError("FastFold did not return a Slack install URL.")
+        return url
+
+    async def import_one_click_connections(self) -> list[SlackWorkspace]:
+        """Adopt installs that were completed in the browser.
+
+        The desktop never sees the OAuth callback, so after sending the user to
+        Slack it polls the cloud for installs it has no token for, collects
+        each one, and starts relaying. Holding the token locally is what keeps
+        the outbound path identical to Socket Mode.
+        """
+        from agent_server.account_service.helpers import api_key, cloud_base_url
+
+        key = api_key()
+        if not key:
+            raise ValueError("Connect FastFold Cloud first.")
+
+        base = cloud_base_url()
+        listing, error = await asyncio.to_thread(
+            _cloud_request, "GET", f"{base}/v1/slack/connections", key, None
+        )
+        if error:
+            raise ValueError(error)
+
+        imported: list[SlackWorkspace] = []
+        for item in (listing or {}).get("data") or []:
+            team_id = str(item.get("team_id") or "").strip()
+            connection_id = str(item.get("id") or "").strip()
+            if not team_id or not connection_id:
+                continue
+            existing_token, _ = self.store.get_slack_tokens(team_id)
+            if existing_token:
+                continue
+
+            token_payload, token_error = await asyncio.to_thread(
+                _cloud_request,
+                "GET",
+                f"{base}/v1/slack/connections/{connection_id}",
+                key,
+                None,
+            )
+            if token_error or not token_payload:
+                logger.warning(
+                    "Could not fetch the Slack token for %s: %s", team_id, token_error
+                )
+                continue
+
+            workspace = self.store.upsert_slack_workspace(
+                team_id=team_id,
+                mode="relay",
+                team_name=str(item.get("team_name") or "") or None,
+                bot_token=str(token_payload.get("bot_token") or ""),
+                bot_user_id=(
+                    str(token_payload.get("bot_user_id") or "")
+                    or str(item.get("bot_user_id") or "")
+                    or None
+                ),
+                connection_id=connection_id,
+            )
+            await self._start_workspace(workspace)
+            imported.append(workspace)
+        return imported
 
     async def directory(
         self, team_id: str, *, force: bool = False

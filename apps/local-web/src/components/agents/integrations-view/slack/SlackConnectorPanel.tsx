@@ -178,6 +178,7 @@ export function SlackConnectorPanel({
           setAddOpen(next)
           if (!next) setUpdating(null)
         }}
+        onImported={() => void run(async () => undefined)}
         onConnect={input =>
           run(() =>
             client.connectSlackManual({

@@ -1,6 +1,6 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { Check, Copy, ExternalLink, Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -17,13 +17,18 @@ import { cn } from '@/lib/utils'
 
 type Mode = 'one-click' | 'manual'
 
+/** Long enough to read Slack's consent screen without hanging forever. */
+const ONE_CLICK_TIMEOUT_MS = 5 * 60 * 1000
+const ONE_CLICK_POLL_MS = 2000
+
 export function SlackAddWorkspaceModal({
   open,
   client,
   busy,
   updatingWorkspace,
   onOpenChange,
-  onConnect
+  onConnect,
+  onImported
 }: {
   open: boolean
   client: LocalAgentClient
@@ -32,6 +37,8 @@ export function SlackAddWorkspaceModal({
   updatingWorkspace?: string | null
   onOpenChange: (open: boolean) => void
   onConnect: (input: { botToken: string; appToken: string }) => Promise<boolean>
+  /** Called once a one-click install has been adopted, so the panel reloads. */
+  onImported?: () => void
 }) {
   const updating = Boolean(updatingWorkspace)
   const [mode, setMode] = useState<Mode>('manual')
@@ -42,6 +49,10 @@ export function SlackAddWorkspaceModal({
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
     'idle'
   )
+  const [waiting, setWaiting] = useState(false)
+  const [oneClickError, setOneClickError] = useState<string | null>(null)
+  // Stops the poll loop writing state after the modal closes.
+  const cancelledRef = useRef(false)
 
   useEffect(() => {
     if (!open || manifest) return
@@ -58,15 +69,62 @@ export function SlackAddWorkspaceModal({
   }, [client, manifest, open])
 
   useEffect(() => {
+    cancelledRef.current = !open
     if (open) return
     setBotToken('')
     setAppToken('')
     setCopyState('idle')
+    setWaiting(false)
+    setOneClickError(null)
   }, [open])
 
   const submit = async () => {
     const ok = await onConnect({ botToken, appToken })
     if (ok) onOpenChange(false)
+  }
+
+  /**
+   * Open Slack's install page, then poll until the install lands.
+   *
+   * The desktop never sees the OAuth callback — it happens in the browser
+   * against FastFold Cloud — so the only way to know it finished is to ask.
+   */
+  const startOneClick = async () => {
+    setOneClickError(null)
+    let authUrl: string
+    try {
+      authUrl = (await client.startSlackOneClick()).authUrl
+    } catch (error) {
+      setOneClickError(
+        error instanceof Error
+          ? error.message
+          : 'Could not start the Slack install.'
+      )
+      return
+    }
+
+    openInSystemBrowser(authUrl)
+    setWaiting(true)
+    const deadline = Date.now() + ONE_CLICK_TIMEOUT_MS
+    while (Date.now() < deadline) {
+      await new Promise(resolve => window.setTimeout(resolve, ONE_CLICK_POLL_MS))
+      if (cancelledRef.current) return
+      try {
+        const result = await client.importSlackOneClick()
+        if (result.data.length > 0) {
+          setWaiting(false)
+          onImported?.()
+          onOpenChange(false)
+          return
+        }
+      } catch {
+        // Transient while the user is still in the browser; keep polling.
+      }
+    }
+    setWaiting(false)
+    setOneClickError(
+      'No workspace arrived. Finish the approval in Slack and try again.'
+    )
   }
 
   const copyManifest = async () => {
@@ -123,22 +181,45 @@ export function SlackAddWorkspaceModal({
                 Approve Sandwalk for your workspace in the browser — no tokens to
                 copy, and it works for any number of workspaces.
               </p>
-              <div className="border-border/70 bg-muted/30 rounded-lg border p-3">
-                <p className="text-[12px] font-medium">Not available yet</p>
-                <p className="text-muted-foreground mt-1 text-[12px] leading-relaxed">
-                  One-click needs the FastFold Cloud relay to deliver Slack
-                  events to this machine. Until that ships, use Manual — it does
-                  the same thing over Socket Mode and needs no FastFold account.
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-3 h-8"
-                  onClick={() => setMode('manual')}
-                >
-                  Use Manual setup
-                </Button>
-              </div>
+
+              {oneClickError ? (
+                <div className="border-destructive/40 bg-destructive/5 rounded-lg border p-3">
+                  <p className="text-[12px] leading-relaxed">{oneClickError}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-3 h-8"
+                    onClick={() => setMode('manual')}
+                  >
+                    Use Manual setup instead
+                  </Button>
+                </div>
+              ) : null}
+
+              {waiting ? (
+                <div className="border-border/70 bg-muted/30 flex items-center gap-2 rounded-lg border p-3">
+                  <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                  <p className="text-[12px] leading-relaxed">
+                    Waiting for you to approve Sandwalk in Slack…
+                  </p>
+                </div>
+              ) : null}
+
+              <Button
+                size="sm"
+                className="h-8"
+                disabled={busy || waiting}
+                onClick={() => void startOneClick()}
+              >
+                {waiting ? 'Waiting…' : 'Add to Slack'}
+                <ExternalLink className="ml-1.5 size-3.5" />
+              </Button>
+
+              <p className="text-muted-foreground text-[12px] leading-relaxed">
+                One click routes Slack messages through FastFold Cloud, so it
+                needs an API key. Manual runs entirely on this machine and needs
+                no account — the better choice for sensitive workspaces.
+              </p>
             </div>
           ) : (
             <div className="space-y-4">

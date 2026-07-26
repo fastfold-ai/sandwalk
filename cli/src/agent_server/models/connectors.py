@@ -72,6 +72,16 @@ class ConnectSlackManualRequest(ApiModel):
     app_token: str = Field(min_length=1)
 
 
+class StartSlackOneClickRequest(ApiModel):
+    return_to: str | None = None
+
+
+class SlackOneClickStart(ApiModel):
+    """Where to send the browser to install the Sandwalk Slack app."""
+
+    auth_url: str
+
+
 class AllowSlackUserRequest(ApiModel):
     team_id: str = Field(min_length=1)
     slack_user_id: str = Field(min_length=1)

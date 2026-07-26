@@ -476,6 +476,35 @@ export class LocalAgentClient
     )
   }
 
+  /** Ask FastFold Cloud for the Slack install URL to open in the browser. */
+  startSlackOneClick(
+    input?: { returnTo?: string },
+    signal?: AbortSignal,
+  ): Promise<{ authUrl: string }> {
+    return this.request<{ authUrl: string }>(
+      '/connectors/slack/connect/one-click',
+      {
+        method: 'POST',
+        body: JSON.stringify({ return_to: input?.returnTo ?? null }),
+        headers: { 'content-type': 'application/json' },
+        signal,
+      },
+    )
+  }
+
+  /**
+   * Pick up an install completed in the browser.
+   *
+   * The desktop never sees the OAuth callback, so the UI polls this after
+   * opening the install URL.
+   */
+  importSlackOneClick(signal?: AbortSignal): Promise<{ data: SlackWorkspace[] }> {
+    return this.request<{ data: SlackWorkspace[] }>(
+      '/connectors/slack/connect/one-click/import',
+      { method: 'POST', signal },
+    )
+  }
+
   connectSlackManual(
     input: { botToken: string; appToken: string },
     signal?: AbortSignal,
