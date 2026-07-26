@@ -15,6 +15,10 @@ import {
   normalizeBackendUrl,
   persistBackendUrl
 } from '@/lib/backend-url'
+import {
+  clearRememberedApiKey,
+  persistRememberedApiKey
+} from '@/lib/remembered-auth'
 import { cloudAccountDisplayName } from '@/lib/skills-catalog'
 
 type UseAppBootstrapAuthArgs = {
@@ -120,6 +124,11 @@ export function useAppBootstrapAuth({
         // (tauri:// origin → http://127.0.0.1), so Authorization must be set first.
         // Do not call connect() with the current (keyless) client — the connect
         // effect re-runs after clientApiKey + needsAuthLogin update.
+        if (remember) {
+          persistRememberedApiKey(client.baseUrl, key)
+        } else {
+          clearRememberedApiKey(client.baseUrl)
+        }
         setClientApiKey(key)
         setBackendApiKey('')
         needsAuthLoginRef.current = false
@@ -171,9 +180,11 @@ export function useAppBootstrapAuth({
     setAuthBootstrapped(true)
     setBackendApiKey('')
     setClientApiKey(undefined)
+    clearRememberedApiKey(client.baseUrl)
     setRuntimeSettings(null)
     setCloudUserName(null)
   }, [
+    client.baseUrl,
     needsAuthLoginRef,
     setAuthBootstrapped,
     setBackendApiKey,
@@ -247,6 +258,7 @@ export function useAppBootstrapAuth({
     setAuthBootstrapped(true)
     setBackendApiKey('')
     setClientApiKey(undefined)
+    clearRememberedApiKey(client.baseUrl)
     setRuntimeSettings(null)
     if (location.pathname !== '/' || location.search) {
       navigate('/', { replace: true })

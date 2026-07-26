@@ -5,6 +5,7 @@ import {
   normalizeBackendUrl,
   readStoredBackendUrl
 } from '@/lib/backend-url'
+import { readRememberedApiKey } from '@/lib/remembered-auth'
 
 export function useAppBootstrapClient() {
   const [backendUrl, setBackendUrlState] = useState(readStoredBackendUrl)
@@ -12,7 +13,11 @@ export function useAppBootstrapClient() {
     setBackendUrlState(normalizeBackendUrl(value))
   }
   const [backendApiKey, setBackendApiKey] = useState('')
-  const [clientApiKey, setClientApiKey] = useState<string | undefined>()
+  // Cookie sessions do not stick in the Tauri shell (cross-origin). Restore the
+  // remembered Authorization key so quit/reopen does not force login again.
+  const [clientApiKey, setClientApiKey] = useState<string | undefined>(() =>
+    readRememberedApiKey(readStoredBackendUrl())
+  )
   const client = useMemo(
     () =>
       new LocalAgentClient({

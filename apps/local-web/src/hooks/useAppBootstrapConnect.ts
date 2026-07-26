@@ -17,8 +17,9 @@ import {
   nextFromSearch,
   sanitizeAuthReturnTo
 } from '@/lib/auth-routing'
-import { isLocalBackendUrl,persistBackendUrl } from '@/lib/backend-url'
+import { isLocalBackendUrl, persistBackendUrl } from '@/lib/backend-url'
 import { dedupeAsync } from '@/lib/dedupe-async'
+import { clearRememberedApiKey } from '@/lib/remembered-auth'
 import {
   clampOnboardingStep,
   isOnboardingPath,
@@ -40,6 +41,7 @@ type UseAppBootstrapConnectArgs = {
   isDashboardModels: boolean
   loaders: LoaderBundle
   connectRef: MutableRefObject<(() => Promise<void>) | null>
+  setClientApiKey: (value: string | undefined) => void
 }
 
 export function useAppBootstrapConnect({
@@ -49,7 +51,8 @@ export function useAppBootstrapConnect({
   location,
   isDashboardModels,
   loaders,
-  connectRef
+  connectRef,
+  setClientApiKey
 }: UseAppBootstrapConnectArgs) {
   const [health, setHealth] = useState<BackendHealth | null>(null)
   const [needsAuthLogin, setNeedsAuthLogin] = useState(false)
@@ -91,6 +94,11 @@ export function useAppBootstrapConnect({
         loc.pathname === '/'
           ? null
           : sanitizeAuthReturnTo(`${loc.pathname}${loc.search}${loc.hash}`)
+      // Drop a stale remembered key so we don't immediately re-fail auth.
+      if (client.apiKey) {
+        clearRememberedApiKey(backendUrl)
+        setClientApiKey(undefined)
+      }
       needsAuthLoginRef.current = true
       setHealth(null)
       setNeedsAuthLogin(true)
@@ -227,6 +235,7 @@ export function useAppBootstrapConnect({
     loadModelOptions,
     loadProjects,
     loadSessions,
+    setClientApiKey,
     loadSkills,
     loadSpecialists,
     navigate,

@@ -624,6 +624,14 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Sandwalk");
+        .build(tauri::generate_context!())
+        .expect("error while building Sandwalk")
+        .run(|app_handle, event| {
+            // Close hides the window so the Dock stays dotted. Clicking the
+            // Dock icon fires Reopen — show/focus the main window again.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                focus_main_window(app_handle);
+            }
+        });
 }

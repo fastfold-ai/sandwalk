@@ -7,12 +7,14 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import { AppErrorBoundary } from './components/AppErrorBoundary.tsx'
 import { Toaster } from './components/ui/sonner.tsx'
+import { installBlockBrowserBackspace } from './lib/block-browser-backspace.ts'
 import { isMacDesktopOverlay, platformOS } from './lib/desktop.ts'
 import { applyPalette, applyTheme, getStoredPalette, getStoredTheme, watchSystemTheme } from './lib/theme.ts'
 
 applyTheme(getStoredTheme())
 applyPalette(getStoredPalette())
 watchSystemTheme()
+installBlockBrowserBackspace()
 
 document.documentElement.dataset.platform = platformOS()
 if (isMacDesktopOverlay()) {

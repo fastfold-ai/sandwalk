@@ -37,7 +37,8 @@ export function useAppBootstrap({
     location,
     isDashboardModels,
     loaders,
-    connectRef
+    connectRef,
+    setClientApiKey: clientBundle.setClientApiKey
   })
   const auth = useAppBootstrapAuth({
     client: clientBundle.client,
