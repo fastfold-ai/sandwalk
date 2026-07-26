@@ -52,6 +52,7 @@ Use the CLI, the web dashboard, or the macOS desktop app: same sessions, workspa
 - **Human-in-the-loop approvals**: skill install/remove (and related lifecycle actions) pause for **Approve / Edit / Reject** in the desktop chat or interactive CLI; one approve can cover the rest of a run.
 - **Specialists**: reusable skill + MCP + instruction packs for focused research modes.
 - **Voice input (desktop)**: dictate into the composer with on-device Whisper.
+- **Slack**: talk to Sandwalk from Slack DMs or `@mentions` — one-click via Fastfold Cloud, or manual Socket Mode with your own app tokens.
 - **Viewers**: structures, plots, and artifacts beside the chat.
 
 ### Tools, data, and models
@@ -60,7 +61,7 @@ We ship a curated toolkit out of the box (targets and genetics, chemistry, prote
 
 **Models** (via `sandwalk setup`, the dashboard, or `sandwalk config`): Anthropic, OpenAI, Google Gemini, xAI (Grok), Kimi (Moonshot), NVIDIA, OpenCode Zen, DeepSeek, MiniMax, Mistral, Qwen (Alibaba), Together AI, plus local OpenAI-compatible endpoints like Ollama, Unsloth, oMLX, DS4, llama.cpp, and LM Studio.
 
-**Integrations** (`sandwalk keys` / Dashboard → Integrations): Modal, LangSmith, Tavily, Slack, Vercel, NVIDIA, OpenCode Zen.
+**Integrations** (`sandwalk keys` / Dashboard → Integrations): Modal, LangSmith, Tavily, Slack (one-click or Socket Mode), Vercel, NVIDIA, OpenCode Zen.
 
 **MCP catalog** (seeded in Dashboard → MCPs): Tamarind Bio, Paperclip, Latch Bio, Neurosnap, plus Linear, Lucid, and any custom URL.
 
@@ -307,6 +308,19 @@ Open a skill for the install command, enable/disable toggle, links to Skills.sh 
   </picture>
 </p>
 
+### Integrations — Slack
+
+Connect Slack from Dashboard → **Integrations** → **Slack** on the desktop (or local web UI). Two modes:
+
+| Mode | How it works |
+|------|----------------|
+| **One-click** | Sign in to Fastfold Cloud, authorize Slack, and Sandwalk receives Events API traffic over a cloud relay — no bot/app tokens to paste. After OAuth, the browser returns to a local success page and the desktop imports the workspace automatically. |
+| **Manual Socket Mode** | Paste bot + app-level tokens for your own Slack app; Sandwalk opens a Socket Mode connection locally. |
+
+Both modes support DMs and channel `@mentions`, Slack’s **Agents & AI Apps** messaging container, and Block Kit replies (not a single text blob). Pause or resume a workspace to stop/start the agent without disconnecting; Disconnect removes the connection. You can run different workspaces in different modes at once (one mode per workspace).
+
+Fastfold Cloud → Integrations → **Sandwalk** is view/revoke only — connect and manage live status from the Sandwalk desktop.
+
 ### Artifacts and terminal
 
 When the agent produces structures, plots, or reports, open them in **Artifacts** beside the chat: JSON, SVG (PAE, pLDDT), and CIF/PDB in a 3D viewer.
@@ -338,7 +352,7 @@ Below the workspace, a multi-tab terminal follows your theme. The CLI tab mirror
 | **Skills / MCPs** | Installs, skills.sh, GitHub import, `mcp.json` |
 | **Datasets** | Local corpora (DepMap, PRISM, L1000, …) |
 | **Specialists** | Skill + MCP + instruction packs |
-| **Integrations** | Modal, Boltz, Fastfold Cloud, LangSmith, Tavily, Slack, … |
+| **Integrations** | Modal, Boltz, Fastfold Cloud, LangSmith, Tavily, Slack (one-click / Socket Mode), … |
 | **Runtime** | Defaults, context, sandbox, doctor, storage, env |
 
 Server process controls (bind, auth, logs) live in the **Sandwalk Server** menubar Settings on macOS, or via `sandwalk serve` / `sandwalk auth` on the CLI.

@@ -2,19 +2,28 @@ import type {
   AgentSession,
   SlackAllowedUser,
   SlackDirectory,
+  SlackRelayState,
   SlackSubscription,
   SlackWorkspace
 } from '@sandwalk/agent-ui-core'
-import { RefreshCw, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 
+import { McpToggle } from '@/components/agents/mcp-view/mcp-view-shared'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 import {
   Avatar,
   type PickerOption,
   SlackPickerPopover
 } from './SlackPickerPopover'
+
+const RELAY_ISSUE_LABEL: Partial<Record<SlackRelayState, string>> = {
+  signed_out: 'Sign in to Fastfold Cloud to receive mentions',
+  auth_expired: 'Fastfold Cloud sign-in expired — reconnect to receive mentions',
+  reconnecting: 'Reconnecting…'
+}
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -70,7 +79,9 @@ export function SlackWorkspaceCard({
   onAddSubscription,
   onRemoveSubscription,
   onUpdateTokens,
-  onDisconnect
+  onDisconnect,
+  onSetEnabled,
+  relayState
 }: {
   workspace: SlackWorkspace
   people: SlackAllowedUser[]
@@ -78,6 +89,8 @@ export function SlackWorkspaceCard({
   subscriptions: SlackSubscription[]
   sessions: AgentSession[]
   busy: boolean
+  /** One shared relay connection serves every relay-mode workspace. */
+  relayState: SlackRelayState
   onAllowPerson: (
     teamId: string,
     slackUserId: string,
@@ -88,6 +101,8 @@ export function SlackWorkspaceCard({
   onRemoveSubscription: (sessionId: string, channel: string) => void
   onUpdateTokens: (workspace: SlackWorkspace) => void
   onDisconnect: (teamId: string) => void
+  /** Pause/resume - keeps tokens and settings, unlike disconnect. */
+  onSetEnabled: (teamId: string, enabled: boolean) => void
 }) {
   const allowed = new Set(people.map(person => person.slackUserId))
   const knownPeople = directory?.people ?? []
@@ -124,18 +139,67 @@ export function SlackWorkspaceCard({
     return known ? `#${known.name}` : id
   }
 
+  const relayIssue =
+    workspace.enabled && workspace.mode === 'relay'
+      ? RELAY_ISSUE_LABEL[relayState]
+      : null
+
+  const isReconnecting =
+    workspace.mode === 'relay' && relayState === 'reconnecting'
+  const statusDotClass = !workspace.enabled
+    ? 'bg-muted-foreground/50'
+    : workspace.live
+      ? 'bg-emerald-500'
+      : isReconnecting
+        ? 'bg-amber-500'
+        : 'bg-red-500'
+  const statusLabel = !workspace.enabled
+    ? 'Paused'
+    : workspace.live
+      ? 'Live'
+      : isReconnecting
+        ? 'Reconnecting…'
+        : 'Error'
+  const statusTextClass = !workspace.enabled
+    ? 'text-muted-foreground'
+    : workspace.live
+      ? 'text-emerald-500'
+      : isReconnecting
+        ? 'text-amber-500'
+        : 'text-red-500'
+
   return (
-    <section className="border-border/70 rounded-xl border">
-      <div className="flex items-center justify-between px-4 py-3">
+    <section
+      className={cn(
+        'border-border/70 rounded-xl border',
+        !workspace.enabled && 'opacity-60'
+      )}
+    >
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-medium">
+          <div className="flex items-center gap-1.5">
+            <span className={cn('size-1.5 shrink-0 rounded-full', statusDotClass)} aria-hidden />
+            <span className={cn('text-[11px] font-medium', statusTextClass)}>{statusLabel}</span>
+          </div>
+          <p className="mt-0.5 truncate text-[13px] font-medium">
             {workspace.teamName || workspace.teamId}
           </p>
           <p className="text-muted-foreground truncate text-[11px]">
             {workspace.domain || workspace.teamId} ·{' '}
             {workspace.mode === 'relay' ? 'relay' : 'socket mode'}
           </p>
+          {relayIssue ? (
+            <p className="mt-0.5 truncate text-[11px] text-amber-500">
+              {relayIssue}
+            </p>
+          ) : null}
         </div>
+        <McpToggle
+          enabled={workspace.enabled}
+          pending={busy}
+          label={workspace.enabled ? 'Pause this workspace' : 'Resume this workspace'}
+          onToggle={() => onSetEnabled(workspace.teamId, !workspace.enabled)}
+        />
       </div>
 
       <Row label="People">
@@ -216,16 +280,22 @@ export function SlackWorkspaceCard({
       </Row>
 
       <div className="border-border/70 flex items-center justify-between border-t px-4 py-2.5">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1.5 text-[12px]"
-          disabled={busy}
-          onClick={() => onUpdateTokens(workspace)}
-        >
-          <RefreshCw className="size-3.5" />
-          Update tokens
-        </Button>
+        {/* Only socket-mode workspaces have tokens to update - relay ones are
+            connected via the shared Sandwalk app with no credentials of the
+            user's own to paste in; reconnecting one-click is how those refresh. */}
+        {workspace.mode === 'socket' ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-[12px]"
+            disabled={busy}
+            onClick={() => onUpdateTokens(workspace)}
+          >
+            Update
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button
           size="sm"
           variant="ghost"
@@ -233,7 +303,7 @@ export function SlackWorkspaceCard({
           disabled={busy}
           onClick={() => onDisconnect(workspace.teamId)}
         >
-          Disconnect workspace
+          Disconnect
         </Button>
       </div>
     </section>

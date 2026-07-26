@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from unittest.mock import patch
 
 from agent_server.connectors.slack_events import event_to_inbound
 from agent_server.connectors.slack_relay import (
@@ -143,6 +144,103 @@ class TestFrameHandling:
         )
         relay.add_workspace(workspace())
         run(relay._handle_frame(json.dumps(envelope())))
+
+
+class FakeWeb:
+    def __init__(self, auth_user: str | None = None) -> None:
+        self.calls: list[tuple[str, dict]] = []
+        self._auth_user = auth_user
+
+    def __getattr__(self, name):
+        async def call(**kwargs):
+            self.calls.append((name, kwargs))
+            if name == "auth_test":
+                return {"ok": True, "user": self._auth_user}
+            return {"ok": True}
+
+        return call
+
+
+class TestBotNameInDirectory:
+    """The directory omits bots, so the agent's own mention needs a separate fix."""
+
+    def test_the_bots_own_mention_resolves_to_its_name(self):
+        space = workspace(bot_user_id="BBOT")
+        space.user_names = {}
+        web = FakeWeb(auth_user="Sandwalk")
+        space._client = web  # type: ignore[attr-defined]
+
+        with patch(
+            "agent_server.connectors.directory.fetch_directory",
+            return_value=([], []),
+        ):
+            run(space.load_directory())
+
+        assert space.user_names.get("BBOT") == "Sandwalk"
+
+    def test_auth_test_is_not_repeated_once_the_name_is_known(self):
+        space = workspace(bot_user_id="BBOT")
+        web = FakeWeb(auth_user="Sandwalk")
+        space._client = web  # type: ignore[attr-defined]
+
+        with patch(
+            "agent_server.connectors.directory.fetch_directory",
+            return_value=([], []),
+        ):
+            run(space.load_directory())
+            run(space.load_directory(force=True))
+
+        assert [name for name, _ in web.calls].count("auth_test") == 1
+
+
+def assistant_envelope(**event):
+    base = {"type": "app_home_opened", "tab": "messages", "channel": "D1"}
+    base.update(event)
+    return {"type": "event_callback", "team_id": "T1", "event": base}
+
+
+class TestAssistantEvent:
+    """Agent-experience DM detection, routed through the relay dispatcher."""
+
+    def test_opening_the_dm_sets_starter_prompts(self):
+        space = workspace()
+        web = FakeWeb()
+        space.assistant._client = web  # type: ignore[attr-defined]
+        relay = client_with(space, [])
+
+        run(relay._handle_frame(json.dumps(assistant_envelope())))
+
+        assert web.calls
+        name, kwargs = web.calls[0]
+        assert name == "assistant_threads_setSuggestedPrompts"
+        assert kwargs["channel_id"] == "D1"
+        assert "thread_ts" not in kwargs
+
+    def test_context_change_alone_does_nothing(self):
+        space = workspace()
+        web = FakeWeb()
+        space.assistant._client = web  # type: ignore[attr-defined]
+        relay = client_with(space, [])
+
+        run(relay._handle_frame(json.dumps(assistant_envelope(type="app_context_changed"))))
+
+        assert web.calls == []
+
+    def test_home_tab_is_not_a_dm_open(self):
+        space = workspace()
+        web = FakeWeb()
+        space.assistant._client = web  # type: ignore[attr-defined]
+        relay = client_with(space, [])
+
+        run(relay._handle_frame(json.dumps(assistant_envelope(tab="home"))))
+
+        assert web.calls == []
+
+    def test_assistant_event_is_not_treated_as_a_message(self):
+        received: list = []
+        relay = client_with(workspace(), received)
+        run(relay._handle_frame(json.dumps(assistant_envelope())))
+        assert received == []
 
 
 class TestState:

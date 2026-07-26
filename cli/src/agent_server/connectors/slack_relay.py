@@ -62,6 +62,7 @@ class SlackRelayWorkspace:
         self.team_id = team_id
         self.bot_token = bot_token
         self._bot_user_id = bot_user_id
+        self._bot_name: str | None = None
         self._client = None
         self._assistant = None
         self.specialist_names: list[str] = []
@@ -101,6 +102,15 @@ class SlackRelayWorkspace:
             )
             return
         self.user_names = {person.id: person.name for person in people}
+        # The directory omits bots, so without this the agent's own handle
+        # stays a raw id in the text a mention is titled from - matches the
+        # equivalent fix in SlackSocketAdapter._load_directory.
+        if self._bot_name is None:
+            with contextlib.suppress(Exception):
+                auth = await self._web().auth_test()
+                self._bot_name = str(auth.get("user") or "").strip() or None
+        if self._bot_user_id and self._bot_name:
+            self.user_names[self._bot_user_id] = self._bot_name
         self.user_avatars = {
             person.id: person.avatar_url for person in people if person.avatar_url
         }
@@ -132,23 +142,26 @@ class SlackRelayWorkspace:
         return self._assistant
 
     async def on_assistant_event(self, event: dict) -> None:
-        """Greet a newly opened assistant thread with starter prompts.
+        """Greet a newly opened DM with starter prompts.
 
         No-ops on workspaces without the feature; the container simply never
         appears there and mentions carry on as before.
         """
-        from agent_server.connectors.slack_assistant import prompts_for, thread_ref
+        from agent_server.connectors.slack_assistant import (
+            channel_ref,
+            is_dm_opened,
+            prompts_for,
+        )
 
-        channel_id, thread_ts = thread_ref(event)
-        if not channel_id or not thread_ts:
+        if not is_dm_opened(event):
+            # app_context_changed only tells us which channel the user is
+            # looking at; nothing to show for it.
             return
-        if str(event.get("type") or "") != "assistant_thread_started":
-            # A context change only tells us which channel the user is looking
-            # at; nothing to show for it.
+        channel_id = channel_ref(event)
+        if not channel_id:
             return
         await self.assistant.set_prompts(
             channel_id=channel_id,
-            thread_ts=thread_ts,
             prompts=prompts_for(self.specialist_names),
         )
 

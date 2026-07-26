@@ -25,6 +25,7 @@ from agent_server.models.connectors import (
     SlackDirectory,
     SlackDirectoryChannel,
     SlackDirectoryPerson,
+    SetSlackWorkspaceEnabledRequest,
     SlackManifestResponse,
     SlackOneClickStart,
     SlackParkedMessageList,
@@ -112,6 +113,19 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
         if not removed:
             raise HTTPException(status_code=404, detail="Workspace not connected.")
         return ConnectorActionResponse()
+
+    @app.patch(
+        "/v1/connectors/slack/workspaces/{team_id}/enabled",
+        response_model=SlackWorkspace,
+    )
+    async def set_workspace_enabled(
+        team_id: str, payload: SetSlackWorkspaceEnabledRequest
+    ) -> SlackWorkspace:
+        """Pause/resume - keeps tokens and settings, unlike disconnect."""
+        try:
+            return await connectors.set_workspace_enabled(team_id, enabled=payload.enabled)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Workspace not connected.") from exc
 
     @app.get(
         "/v1/connectors/slack/workspaces/{team_id}/directory",

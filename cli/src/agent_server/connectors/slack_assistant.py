@@ -10,6 +10,15 @@ everything here must no-op cleanly when Slack refuses - mention-based flow has
 to keep working regardless. And ``assistant.threads.setStatus`` only applies to
 assistant threads, so channel mentions keep the reaction-based progress signal
 rather than being migrated.
+
+Slack's Agent messaging experience (``agent_view``) is what new apps get - the
+older Assistant messaging experience (``assistant_view``) is being phased out
+and cannot even be selected for a new app. It changes the event shape: there is
+no ``assistant_thread_started`` any more, so opening the DM is detected from an
+ordinary ``app_home_opened`` event instead, and the API calls below no longer
+need a ``thread_ts`` (Agent-experience threads are just message groups, not a
+separate container the user opens first). See
+https://docs.slack.dev/ai/developing-agents/#migrating.
 """
 
 from __future__ import annotations
@@ -19,9 +28,7 @@ import os
 
 logger = logging.getLogger("agent_server.connectors.slack")
 
-ASSISTANT_EVENTS = frozenset(
-    {"assistant_thread_started", "assistant_thread_context_changed"}
-)
+ASSISTANT_EVENTS = frozenset({"app_home_opened", "app_context_changed"})
 
 # Shown while the agent works. Slack clears it automatically once the app
 # replies, and expires it after roughly two minutes if nothing arrives.
@@ -48,20 +55,31 @@ def is_assistant_event(event: dict) -> bool:
     return isinstance(event, dict) and str(event.get("type") or "") in ASSISTANT_EVENTS
 
 
+def is_dm_opened(event: dict) -> bool:
+    """Whether this is the Agent-experience signal for "user opened the DM".
+
+    Replaces ``assistant_thread_started``, which no longer fires under
+    ``agent_view``. ``app_home_opened`` fires for other tabs too, so it only
+    counts when ``tab`` is ``"messages"``.
+    """
+    return (
+        isinstance(event, dict)
+        and str(event.get("type") or "") == "app_home_opened"
+        and str(event.get("tab") or "") == "messages"
+    )
+
+
 def unsupported(exc: Exception) -> bool:
     """Whether Slack is saying the workspace cannot host an assistant."""
     text = str(exc).lower()
     return any(marker in text for marker in _UNSUPPORTED)
 
 
-def thread_ref(event: dict) -> tuple[str | None, str | None]:
-    """Channel and thread timestamp for an assistant event."""
-    thread = event.get("assistant_thread")
-    if not isinstance(thread, dict):
-        return None, None
-    channel_id = str(thread.get("channel_id") or "").strip() or None
-    thread_ts = str(thread.get("thread_ts") or "").strip() or None
-    return channel_id, thread_ts
+def channel_ref(event: dict) -> str | None:
+    """DM channel id for an app_home_opened / app_context_changed event."""
+    if not isinstance(event, dict):
+        return None
+    return str(event.get("channel") or "").strip() or None
 
 
 def prompts_for(specialist_names: list[str] | None = None) -> list[dict]:
@@ -142,13 +160,15 @@ class SlackAssistant:
         )
 
     async def set_prompts(
-        self, *, channel_id: str, thread_ts: str, prompts: list[dict]
+        self, *, channel_id: str, thread_ts: str | None = None, prompts: list[dict]
     ) -> bool:
-        if not prompts:
+        """Show starter prompts. Under agent_view these sit atop the Messages
+        tab rather than inside a thread, so ``thread_ts`` is optional - Slack's
+        own docs say it "is not needed" in the Agent messaging experience.
+        """
+        if not prompts or not channel_id:
             return False
-        return await self._call(
-            "assistant_threads_setSuggestedPrompts",
-            channel_id=channel_id,
-            thread_ts=thread_ts,
-            prompts=prompts,
-        )
+        kwargs: dict = {"channel_id": channel_id, "prompts": prompts}
+        if thread_ts:
+            kwargs["thread_ts"] = thread_ts
+        return await self._call("assistant_threads_setSuggestedPrompts", **kwargs)

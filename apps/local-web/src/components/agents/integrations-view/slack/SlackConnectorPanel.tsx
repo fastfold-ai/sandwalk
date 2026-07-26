@@ -9,21 +9,12 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 import { SlackAddWorkspaceModal } from './SlackAddWorkspaceModal'
 import { SlackHowItWorks } from './SlackHowItWorks'
 import { SlackParkedQueue } from './SlackParkedQueue'
 import { SlackWorkspaceCard } from './SlackWorkspaceCard'
 import { useSlackConnector } from './use-slack-connector'
-
-const RELAY_LABEL: Record<string, string> = {
-  off: 'Not relaying',
-  signed_out: 'Sign-in needed — relaying is paused',
-  auth_expired: 'Sign-in expired — relaying is paused',
-  reconnecting: 'Reconnecting…',
-  live: 'Live'
-}
 
 export function SlackConnectorPanel({
   client,
@@ -52,10 +43,10 @@ export function SlackConnectorPanel({
 
   const workspaces = slack.status?.workspaces ?? []
   const connected = workspaces.length > 0
-  const socketMode = slack.status?.mode === 'socket'
-  const stateLabel = socketMode
-    ? 'Live · socket mode'
-    : RELAY_LABEL[slack.status?.relayState ?? 'off']
+  // One shared relay connection serves every relay-mode workspace, so this
+  // only matters for those cards — shown there instead of as a global
+  // summary, since a socket-mode workspace couldn't care less about it.
+  const relayState = slack.status?.relayState ?? 'off'
 
   const run = async (operation: () => Promise<unknown>) => {
     const ok = await slack.act(operation)
@@ -74,19 +65,7 @@ export function SlackConnectorPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              'size-1.5 rounded-full',
-              connected ? 'bg-emerald-500' : 'bg-muted-foreground/40'
-            )}
-            aria-hidden
-          />
-          <span className="text-muted-foreground text-[12px]">
-            {connected ? stateLabel : 'No workspace connected'}
-          </span>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <Button
           size="sm"
           className="h-8 gap-1.5"
@@ -146,6 +125,10 @@ export function SlackConnectorPanel({
             onDisconnect={teamId =>
               void run(() => client.disconnectSlackWorkspace(teamId))
             }
+            onSetEnabled={(teamId, enabled) =>
+              void run(() => client.setSlackWorkspaceEnabled(teamId, enabled))
+            }
+            relayState={relayState}
           />
         ))
       ) : (

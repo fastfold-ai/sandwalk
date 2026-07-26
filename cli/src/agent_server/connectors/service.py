@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 import time
 from typing import Any
 
@@ -40,6 +41,18 @@ logger = logging.getLogger("agent_server.connectors")
 WORKING_REACTION = "eyes"
 DONE_REACTION = "white_check_mark"
 FAILED_REACTION = "warning"
+
+# Where FastFold Cloud's OAuth callback sends the browser back to once the
+# token exchange is done. Served by this same process (see
+# agent_server.routes.slack_oauth_return), so it works with whatever host/port
+# `sandwalk serve` was actually started with rather than assuming 8787.
+LOCAL_OAUTH_CALLBACK_PATH = "/oauth/callback"
+
+
+def local_oauth_return_url() -> str:
+    host = os.environ.get("FASTFOLD_SERVE_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    port = os.environ.get("FASTFOLD_SERVE_PORT", "8787").strip() or "8787"
+    return f"http://{host}:{port}{LOCAL_OAUTH_CALLBACK_PATH}"
 
 def _cloud_request(
     method: str, url: str, api_key: str, body: dict | None
@@ -202,6 +215,23 @@ class ConnectorService:
         clear_directory_cache(team_id)
         return self.store.delete_slack_workspace(team_id)
 
+    async def set_workspace_enabled(self, team_id: str, *, enabled: bool) -> SlackWorkspace:
+        """Pause or resume a workspace without disconnecting it.
+
+        Keeps tokens and settings (people, channels) intact - unlike
+        disconnect, this is meant to be reversible. Independent per workspace,
+        so pausing "Fastfold Community" (socket) has no effect on "Fastfold"
+        (relay) even though both are Slack under the hood.
+        """
+        workspace = self.store.set_slack_workspace_flags(team_id, enabled=enabled)
+        if workspace is None:
+            raise KeyError(team_id)
+        if enabled:
+            await self._start_workspace(workspace)
+        else:
+            await self._stop_workspace(team_id)
+        return self.store.get_slack_workspace(team_id) or workspace
+
     # --- one-click (relay) ------------------------------------------------
 
     async def start_one_click(self, *, return_to: str | None = None) -> str:
@@ -220,9 +250,11 @@ class ConnectorService:
                 "so the relay knows which desktop to deliver to."
             )
 
-        body: dict[str, Any] = {"app": "sandwalk"}
-        if return_to:
-            body["return_to"] = return_to
+        # Land the browser back on this machine rather than a cloud page: the
+        # desktop is already polling for the result, so a generic cloud
+        # "loading" screen would be a dead end for a flow that has nothing
+        # left for the user to do.
+        body: dict[str, Any] = {"app": "sandwalk", "return_to": return_to or local_oauth_return_url()}
         payload, error = await asyncio.to_thread(
             _cloud_request, "POST", f"{cloud_base_url()}/v1/slack/oauth/start", key, body
         )
@@ -394,12 +426,19 @@ class ConnectorService:
         the rest just register. The bot token is still local - handed over
         after OAuth - so outbound and the directory work as they do in Socket
         Mode, and only inbound comes down the wire.
+
+        Switching an existing Socket Mode workspace to relay (the one-click
+        flow lands here for a team already connected the manual way) has to
+        tear down that socket first - otherwise both stay live and every
+        mention gets answered twice.
         """
         from agent_server.account_service.helpers import api_key, cloud_base_url
         from agent_server.connectors.slack_relay import (
             SlackRelayClient,
             SlackRelayWorkspace,
         )
+
+        await self._stop_workspace(workspace.team_id)
 
         key = api_key()
         if not key:
@@ -706,11 +745,20 @@ class ConnectorService:
             mode = "socket"
         elif any(item.mode == "relay" for item in workspaces):
             mode = "relay"
+        # A paused workspace is never live regardless of what its (possibly
+        # stale) adapter thinks; socket_connected covers both socket and relay
+        # adapters since SlackRelayWorkspace exposes the same `.connected`.
+        live_workspaces = [
+            workspace.model_copy(
+                update={"live": workspace.enabled and self.socket_connected(workspace.team_id)}
+            )
+            for workspace in workspaces
+        ]
         return SlackConnectorStatus(
             mode=mode,  # type: ignore[arg-type]
             relay_state=self._relay_state,  # type: ignore[arg-type]
             relay_detail=self._relay_detail,
-            workspaces=workspaces,
+            workspaces=live_workspaces,
         )
 
     def socket_connected(self, team_id: str) -> bool:

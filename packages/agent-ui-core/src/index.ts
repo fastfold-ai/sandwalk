@@ -296,6 +296,8 @@ export type SlackWorkspace = {
   connectionId: string | null
   assistantEnabled: boolean
   enabled: boolean
+  /** Actually receiving mentions right now, not just "enabled". */
+  live: boolean
   /** Tokens are never returned; these only report whether one is stored. */
   hasBotToken: boolean
   hasAppToken: boolean

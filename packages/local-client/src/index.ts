@@ -530,6 +530,23 @@ export class LocalAgentClient
     )
   }
 
+  /** Pause/resume - keeps tokens and settings, unlike disconnect. */
+  setSlackWorkspaceEnabled(
+    teamId: string,
+    enabled: boolean,
+    signal?: AbortSignal,
+  ): Promise<SlackWorkspace> {
+    return this.request<SlackWorkspace>(
+      `/connectors/slack/workspaces/${encodeURIComponent(teamId)}/enabled`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled }),
+        headers: { 'content-type': 'application/json' },
+        signal,
+      },
+    )
+  }
+
   getSlackDirectory(
     teamId: string,
     options?: { refresh?: boolean; signal?: AbortSignal },

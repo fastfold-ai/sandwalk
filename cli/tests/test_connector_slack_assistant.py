@@ -12,9 +12,10 @@ import asyncio
 from agent_server.connectors.slack_assistant import (
     DEFAULT_PROMPTS,
     SlackAssistant,
+    channel_ref,
     is_assistant_event,
+    is_dm_opened,
     prompts_for,
-    thread_ref,
     unsupported,
 )
 
@@ -47,21 +48,27 @@ def assistant_with(error: Exception | None = None) -> tuple[SlackAssistant, Fake
 
 class TestEventRecognition:
     def test_spots_assistant_events(self):
-        assert is_assistant_event({"type": "assistant_thread_started"})
-        assert is_assistant_event({"type": "assistant_thread_context_changed"})
+        assert is_assistant_event({"type": "app_home_opened"})
+        assert is_assistant_event({"type": "app_context_changed"})
 
     def test_ignores_ordinary_events(self):
         assert not is_assistant_event({"type": "app_mention"})
         assert not is_assistant_event({"type": "message"})
         assert not is_assistant_event(None)
 
-    def test_reads_the_thread_reference(self):
-        event = {"assistant_thread": {"channel_id": "D1", "thread_ts": "1.1"}}
-        assert thread_ref(event) == ("D1", "1.1")
+    def test_dm_opened_requires_the_messages_tab(self):
+        assert is_dm_opened({"type": "app_home_opened", "tab": "messages"})
+        assert not is_dm_opened({"type": "app_home_opened", "tab": "home"})
+        assert not is_dm_opened({"type": "app_context_changed", "tab": "messages"})
+        assert not is_dm_opened(None)
 
-    def test_missing_thread_reference(self):
-        assert thread_ref({}) == (None, None)
-        assert thread_ref({"assistant_thread": {}}) == (None, None)
+    def test_reads_the_channel_reference(self):
+        event = {"type": "app_home_opened", "tab": "messages", "channel": "D1"}
+        assert channel_ref(event) == "D1"
+
+    def test_missing_channel_reference(self):
+        assert channel_ref({}) is None
+        assert channel_ref(None) is None
 
 
 class TestUnsupportedDetection:
@@ -120,7 +127,7 @@ class TestDegradation:
         assistant, _ = assistant_with(RuntimeError("boom"))
         assert not run(assistant.set_title(channel_id="D1", thread_ts="1.1", title="t"))
         assert not run(
-            assistant.set_prompts(channel_id="D1", thread_ts="1.1", prompts=[{"title": "a", "message": "b"}])
+            assistant.set_prompts(channel_id="D1", prompts=[{"title": "a", "message": "b"}])
         )
 
 
@@ -147,3 +154,18 @@ class TestPrompts:
         assistant, web = assistant_with()
         run(assistant.set_title(channel_id="D1", thread_ts="1.1", title="z" * 500))
         assert len(web.calls[0][1]["title"]) <= 120
+
+    def test_prompts_do_not_need_a_thread(self):
+        """Agent-experience prompts sit above the composer, not inside a thread."""
+        assistant, web = assistant_with()
+        assert run(
+            assistant.set_prompts(channel_id="D1", prompts=[{"title": "a", "message": "b"}])
+        )
+        name, kwargs = web.calls[0]
+        assert name == "assistant_threads_setSuggestedPrompts"
+        assert "thread_ts" not in kwargs
+
+    def test_prompts_need_a_channel(self):
+        assistant, web = assistant_with()
+        assert not run(assistant.set_prompts(channel_id="", prompts=[{"title": "a", "message": "b"}]))
+        assert web.calls == []

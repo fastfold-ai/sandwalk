@@ -25,6 +25,12 @@ class SlackWorkspace(ApiModel):
     # Whether this workspace supports Slack's Agents & AI Apps container.
     assistant_enabled: bool = False
     enabled: bool = True
+    # Whether this workspace is actually receiving mentions right now - not
+    # just "enabled", which only means it should be. Computed by
+    # ConnectorService.status() from the live socket/relay connection state;
+    # defaults True elsewhere since those endpoints return the row right
+    # after acting on it, before the caller's next status() refresh.
+    live: bool = True
     # True when a usable bot token is stored locally; the token itself is never
     # returned over the API.
     has_bot_token: bool = False
@@ -74,6 +80,10 @@ class ConnectSlackManualRequest(ApiModel):
 
 class StartSlackOneClickRequest(ApiModel):
     return_to: str | None = None
+
+
+class SetSlackWorkspaceEnabledRequest(ApiModel):
+    enabled: bool
 
 
 class SlackOneClickStart(ApiModel):
