@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import logging
 import time
+from typing import Any
 
 from agent_server.connectors.addressing import parse_target
 from agent_server.connectors.directory import (
@@ -84,7 +85,10 @@ class ConnectorService:
         self.store = store
         self.agent_service = agent_service
         self.gateway = SlackGateway(store)
-        self._sockets: dict[str, SlackSocketAdapter] = {}
+        # Holds socket adapters and relay workspaces alike; both present the
+        # same surface, so callers need not know which mode a team uses.
+        self._sockets: dict[str, Any] = {}
+        self._relay: Any = None
         self._progress_tasks: set[asyncio.Task] = set()
         self._relay_state: str = "off"
         self._relay_detail: str | None = None
@@ -118,6 +122,11 @@ class ConnectorService:
         async with self._lock:
             adapters = list(self._sockets.values())
             self._sockets.clear()
+            relay = self._relay
+            self._relay = None
+        if relay is not None:
+            with contextlib.suppress(Exception):
+                await relay.stop()
         for adapter in adapters:
             try:
                 await adapter.disconnect()
@@ -222,9 +231,10 @@ class ConnectorService:
     # --- adapter supervision --------------------------------------------
 
     async def _start_workspace(self, workspace: SlackWorkspace) -> None:
+        if workspace.mode == "relay":
+            await self._start_relay_workspace(workspace)
+            return
         if workspace.mode != "socket":
-            # Relay-backed workspaces are driven by the shared relay client,
-            # which lands in a later phase.
             return
         if not slack_sdk_available():
             self._relay_detail = _MISSING_SDK
@@ -257,9 +267,76 @@ class ConnectorService:
         async with self._lock:
             self._sockets[workspace.team_id] = adapter
 
+    async def _start_relay_workspace(self, workspace: SlackWorkspace) -> None:
+        """Attach a one-click workspace to the shared relay socket.
+
+        One socket serves every relay workspace, so the first one starts it and
+        the rest just register. The bot token is still local - handed over
+        after OAuth - so outbound and the directory work as they do in Socket
+        Mode, and only inbound comes down the wire.
+        """
+        from agent_server.account_service.helpers import api_key, cloud_base_url
+        from agent_server.connectors.slack_relay import (
+            SlackRelayClient,
+            SlackRelayWorkspace,
+        )
+
+        key = api_key()
+        if not key:
+            # Distinct from "off": the workspace is connected, but nothing can
+            # be delivered until the user signs in to FastFold Cloud.
+            self._relay_state = "signed_out"
+            self._relay_detail = "Connect FastFold Cloud to receive Slack messages."
+            logger.warning(
+                "Slack workspace %s needs a FastFold API key to relay", workspace.team_id
+            )
+            return
+
+        bot_token, _ = self.store.get_slack_tokens(workspace.team_id)
+        if not bot_token:
+            logger.warning(
+                "Slack workspace %s is in relay mode but has no bot token",
+                workspace.team_id,
+            )
+            return
+
+        async with self._lock:
+            if self._relay is None:
+                self._relay = SlackRelayClient(
+                    base_url=cloud_base_url(),
+                    api_key=key,
+                    on_message=self._on_inbound,
+                    on_state=self._set_relay_state,
+                )
+            relay = self._relay
+
+        adapter = SlackRelayWorkspace(
+            team_id=workspace.team_id,
+            bot_token=bot_token,
+            bot_user_id=workspace.bot_user_id,
+        )
+        await adapter.load_directory()
+        relay.add_workspace(adapter)
+        async with self._lock:
+            # Registered in the same map as socket adapters so progress
+            # reactions and status find it without caring which mode it is.
+            self._sockets[workspace.team_id] = adapter
+        await relay.start()
+
+    def _set_relay_state(self, state: str, detail: str | None) -> None:
+        self._relay_state = state
+        self._relay_detail = detail
+
     async def _stop_workspace(self, team_id: str) -> None:
         async with self._lock:
             adapter = self._sockets.pop(team_id, None)
+            relay = self._relay
+        if relay is not None:
+            relay.remove_workspace(team_id)
+            if not relay.teams:
+                await relay.stop()
+                async with self._lock:
+                    self._relay = None
         if adapter is not None:
             try:
                 await adapter.disconnect()
