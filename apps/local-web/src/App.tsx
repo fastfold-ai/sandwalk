@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import {
@@ -27,7 +27,6 @@ import { visibleSessionIds } from '@/lib/sessions'
 export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
-  useDesktopNavigate(navigate)
   useMacDesktopOverlay()
   const ui = useAppUiState()
   const route = useAppRouting(location)
@@ -40,6 +39,18 @@ export default function App() {
     setChatBySessionId: setChatBySessionIdBridge,
     isDashboardModels: route.isDashboardModels
   })
+
+  const onDesktopRoute = useCallback(
+    (path: string) => {
+      // Menubar New Agent / recent chats create sessions outside this window —
+      // force-refresh so the sidebar + tab strip include them immediately.
+      if (path.startsWith('/agents/')) {
+        void bootstrap.loadSessions({ force: true })
+      }
+    },
+    [bootstrap.loadSessions]
+  )
+  useDesktopNavigate(navigate, onDesktopRoute)
 
   const tabs = useAppOpenTabs(
     ui.projectScopeId,

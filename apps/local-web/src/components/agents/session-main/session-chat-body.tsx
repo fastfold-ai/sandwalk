@@ -185,13 +185,9 @@ export function SessionChatBody({
         )}
       >
         {!messagesLoaded && !runActive ? (
-          showChatSkeleton ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              <ChatPageSkeleton />
-            </div>
-          ) : (
-            <div className="flex min-h-0 flex-1 flex-col" />
-          )
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {showChatSkeleton || sessionId ? <ChatPageSkeleton /> : null}
+          </div>
         ) : messages.length === 0 && !runActive ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 pb-20">
             <AuraIconPulse className="text-muted-foreground/70 mb-6 h-12 w-12" />

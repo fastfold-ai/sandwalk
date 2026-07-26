@@ -130,10 +130,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// `sandwalk://settings/security` → Settings → Security (and other sections).
+    /// `sandwalk://settings/security` → Settings → Security.
+    /// `sandwalk://open/agents/…` → forward to the Tauri desktop client.
     private func handleDeepLink(_ url: URL) {
         guard url.scheme?.lowercased() == "sandwalk" else { return }
-        let section = SettingsSection.fromDeepLink(url)
+        let host = (url.host ?? "").lowercased()
+        if host == "open" {
+            let path = url.path.isEmpty ? "/" : url.path
+            _ = TauriDesktopLauncher.open(path: path)
+            return
+        }
+        // Only open Settings when the URL actually names a settings section —
+        // unknown sandwalk:// links must not pop the Server Settings window.
+        guard let section = SettingsSection.fromDeepLink(url) else { return }
         DispatchQueue.main.async {
             SettingsWindowController.shared.show(section: section)
         }

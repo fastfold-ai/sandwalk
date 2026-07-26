@@ -89,6 +89,9 @@ final class SettingsSectionTests: XCTestCase {
     func testFromDeepLinkReturnsNilForUnknownSection() {
         XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/unknown")!))
         XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://not-a-section")!))
+        // Desktop client routes must not parse as Settings sections.
+        XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://open/agents/abc")!))
+        XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://open/")!))
     }
 
     func testFromDeepLinkRejectsSectionHostWithExtraPath() {

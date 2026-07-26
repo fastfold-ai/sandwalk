@@ -80,29 +80,43 @@ fn control_request(method: &str, path: &str, body: Option<Value>) -> Result<Valu
 }
 
 fn inject_api_base() -> String {
+    inject_bootstrap_script(None)
+}
+
+fn inject_bootstrap_script(initial_route: Option<&str>) -> String {
     let os = std::env::consts::OS;
     let overlay = if os == "macos" {
         "try{document.documentElement.classList.add('sandwalk-mac-overlay');document.documentElement.dataset.platform='macos';}catch(e){}"
     } else {
         ""
     };
+    let route_js = initial_route
+        .filter(|r| is_spa_route(r))
+        .map(|r| {
+            format!(
+                "window.__SANDWALK_INITIAL_ROUTE__={};",
+                serde_json::to_string(r).unwrap_or_else(|_| "\"/\"".into())
+            )
+        })
+        .unwrap_or_default();
     if let Ok(ctl) = read_control() {
         if let Some(api) = ctl.api_base {
             let trimmed = api.trim_end_matches('/').to_string();
             if !trimmed.is_empty() {
                 return format!(
-                    "window.__SANDWALK_HTTP__={};window.__SANDWALK_PLATFORM__='{}';{}",
-                    serde_json::to_string(&trimmed).unwrap_or_else(|_| "\"http://127.0.0.1:8787\"".into()),
+                    "window.__SANDWALK_HTTP__={};window.__SANDWALK_PLATFORM__='{}';{}{}",
+                    serde_json::to_string(&trimmed)
+                        .unwrap_or_else(|_| "\"http://127.0.0.1:8787\"".into()),
                     os,
+                    route_js,
                     overlay
                 );
             }
         }
     }
     format!(
-        "window.__SANDWALK_HTTP__='http://127.0.0.1:8787';window.__SANDWALK_PLATFORM__='{}';{}",
-        os,
-        overlay
+        "window.__SANDWALK_HTTP__='http://127.0.0.1:8787';window.__SANDWALK_PLATFORM__='{}';{}{}",
+        os, route_js, overlay
     )
 }
 
@@ -375,6 +389,77 @@ struct NavigatePayload {
     path: String,
 }
 
+/// True for in-app routes only — never absolute filesystem paths.
+///
+/// `std::env::args()` / single-instance argv often include the executable
+/// (`/Users/.../sandwalk-desktop`). Taking the first `/…` string used to
+/// navigate there and leave a blank "New Chat" shell.
+fn is_spa_route(path: &str) -> bool {
+    if path == "/" {
+        return true;
+    }
+    let Some(rest) = path.strip_prefix('/') else {
+        return false;
+    };
+    if rest.is_empty() || rest.starts_with('/') {
+        return false;
+    }
+    let head = rest.split('/').next().unwrap_or("");
+    matches!(
+        head,
+        "agents" | "dashboard" | "library" | "projects" | "onboarding"
+    )
+}
+
+/// SPA path from env, argv (`-- /agents/<id>`), or menubar pending-route file.
+fn initial_desktop_route() -> Option<String> {
+    if let Ok(env_route) = std::env::var("SANDWALK_DESKTOP_ROUTE") {
+        if is_spa_route(&env_route) {
+            return Some(env_route);
+        }
+    }
+    if let Some(arg) = std::env::args().skip(1).find(|arg| is_spa_route(arg)) {
+        return Some(arg);
+    }
+    read_pending_desktop_route()
+}
+
+fn pending_desktop_route_path() -> Option<PathBuf> {
+    Some(support_dir().join("pending-desktop-route"))
+}
+
+fn read_pending_desktop_route() -> Option<String> {
+    let path = pending_desktop_route_path()?;
+    let text = std::fs::read_to_string(&path).ok()?;
+    let route = text.trim();
+    if is_spa_route(route) {
+        Some(route.to_string())
+    } else {
+        None
+    }
+}
+
+fn clear_pending_desktop_route() {
+    if let Some(path) = pending_desktop_route_path() {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+fn focus_main_window(app: &tauri::AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.unminimize();
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
+fn emit_navigate(app: &tauri::AppHandle, path: String) {
+    if !is_spa_route(&path) {
+        return;
+    }
+    let _ = app.emit("sandwalk://navigate", NavigatePayload { path });
+}
+
 /// True when the menubar control plane answers (file alone can be stale).
 fn control_plane_alive() -> bool {
     let Ok(ctl) = read_control() else {
@@ -441,24 +526,19 @@ fn ensure_server_helper() {}
 pub fn run() {
     let mut builder = tauri::Builder::default();
     builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-        if let Some(win) = app.get_webview_window("main") {
-            let _ = win.unminimize();
-            let _ = win.show();
-            let _ = win.set_focus();
-        }
-        // argv may include a route like `/dashboard/status`
-        if let Some(route) = argv.iter().find(|a| a.starts_with('/')) {
-            let _ = app.emit("sandwalk://navigate", NavigatePayload { path: route.clone() });
-        }
-        if let Ok(env_route) = std::env::var("SANDWALK_DESKTOP_ROUTE") {
-            if env_route.starts_with('/') {
-                let _ = app.emit(
-                    "sandwalk://navigate",
-                    NavigatePayload {
-                        path: env_route,
-                    },
-                );
-            }
+        focus_main_window(app);
+        // Menubar uses `open -n` so this callback runs and can revive a
+        // hide-on-close window. Prefer argv SPA routes, then the pending file.
+        // Skip argv[0] / absolute binary paths — they also start with `/`.
+        let route = argv
+            .iter()
+            .skip(1)
+            .find(|a| is_spa_route(a))
+            .cloned()
+            .or_else(read_pending_desktop_route);
+        if let Some(path) = route {
+            emit_navigate(app, path);
+            clear_pending_desktop_route();
         }
     }));
 
@@ -498,7 +578,9 @@ pub fn run() {
         .setup(|app| {
             dictation::manage_dictation(app);
             ensure_server_helper();
-            let script = inject_api_base();
+            // Consume pending route once so inject + delayed emit share it.
+            let cold_route = initial_desktop_route();
+            let script = inject_bootstrap_script(cold_route.as_deref());
             let mut win = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("Sandwalk")
                 .inner_size(1280.0, 860.0)
@@ -529,13 +611,15 @@ pub fn run() {
                 }
             });
 
-            if let Ok(route) = std::env::var("SANDWALK_DESKTOP_ROUTE") {
-                if route.starts_with('/') {
-                    let _ = app.emit(
-                        "sandwalk://navigate",
-                        NavigatePayload { path: route },
-                    );
-                }
+            // Emit after the SPA can subscribe (setup emit is usually dropped).
+            if let Some(route) = cold_route {
+                let handle = app.handle().clone();
+                thread::spawn(move || {
+                    thread::sleep(Duration::from_millis(600));
+                    focus_main_window(&handle);
+                    emit_navigate(&handle, route);
+                    clear_pending_desktop_route();
+                });
             }
 
             Ok(())

@@ -111,8 +111,13 @@ export function useSessionChatStream({
     if (chatBySessionIdRef.current[sessionId]?.messagesLoaded) return
 
     // Empty/new sessions: show the empty composer immediately, hydrate in background.
+    // Menubar "New Agent" navigates here before loadSessions includes the row —
+    // treat a missing meta the same as a fresh idle session so we don't sit on
+    // a blank main pane waiting for the list poll.
     const meta = sessions.find(item => item.id === sessionId)
-    if (meta && !meta.lastMessageAt && meta.status === 'idle') {
+    const looksEmpty =
+      !meta || (!meta.lastMessageAt && meta.status === 'idle')
+    if (looksEmpty) {
       patchChat(sessionId, prev =>
         prev.messagesLoaded
           ? prev
@@ -153,6 +158,9 @@ export function useSessionChatStream({
         if (!controller.signal.aborted) {
           setError(
             cause instanceof Error ? cause.message : 'Unable to load messages'
+          )
+          patchChat(sessionId, prev =>
+            prev.messagesLoaded ? prev : { ...prev, messagesLoaded: true }
           )
         }
       })

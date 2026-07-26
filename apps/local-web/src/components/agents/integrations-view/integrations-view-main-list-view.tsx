@@ -1,13 +1,21 @@
 import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
-import { Search } from 'lucide-react'
+import { ListFilter, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import {
   CardGridSkeleton,
   ListRowsSkeleton
 } from '@/components/agents/PageSkeletons'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle
+} from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { isFeaturedIntegration } from '@/lib/skills-catalog'
 
@@ -30,6 +38,7 @@ export function IntegrationsMainListView({
   const [integrationStatus, setIntegrationStatus] = useState<
     'all' | 'configured' | 'not_configured'
   >('all')
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const categories = useMemo(
     () =>
@@ -49,6 +58,9 @@ export function IntegrationsMainListView({
       }, {}),
     [integrations]
   )
+  const activeFilterCount =
+    (integrationStatus !== 'all' ? 1 : 0) +
+    (integrationCategory !== 'all' ? 1 : 0)
 
   const { featuredVisible, nonFeaturedVisible, visibleIntegrations } =
     useMemo(() => {
@@ -90,18 +102,37 @@ export function IntegrationsMainListView({
       integrations
     ])
 
+  const sidebarProps = {
+    integrations,
+    integrationStatus,
+    integrationCategory,
+    categories,
+    categoryCounts,
+    configuredCount,
+    notConfiguredCount,
+    featuredCount,
+    onStatusChange: setIntegrationStatus,
+    onCategoryChange: setIntegrationCategory
+  }
+
   return (
-    <ScrollArea className={embedded ? 'h-[min(28rem,55vh)]' : 'flex-1'}>
+    <div
+      className={
+        embedded
+          ? 'flex h-[min(28rem,55vh)] min-h-0 flex-1 flex-col overflow-hidden'
+          : 'flex h-full min-h-0 flex-1 flex-col overflow-hidden'
+      }
+    >
       <div
         className={
           embedded
-            ? 'mx-auto flex w-full max-w-5xl flex-col gap-6 p-1 xl:flex-row'
-            : 'mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 xl:flex-row'
+            ? 'mx-auto flex h-full min-h-0 w-full max-w-5xl flex-1 flex-col gap-4 overflow-hidden p-1 xl:flex-row xl:items-stretch xl:gap-6'
+            : 'mx-auto flex h-full min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden p-4 md:p-6 xl:flex-row xl:items-stretch xl:gap-6'
         }
       >
-        <div className="min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {!embedded ? (
-            <div className="mb-4">
+            <div className="mb-3 shrink-0">
               <h2 className="text-2xl font-semibold">Integrations</h2>
               <p className="text-muted-foreground mt-1 text-sm">
                 Connect API keys and services the agent uses for models, search,
@@ -109,8 +140,9 @@ export function IntegrationsMainListView({
               </p>
             </div>
           ) : null}
-          <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-2 pb-3 pt-2 backdrop-blur">
-            <div className="relative min-w-[280px] max-w-3xl flex-1">
+
+          <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+            <div className="relative min-w-[200px] flex-1">
               <Search className="text-muted-foreground/70 pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
               <Input
                 value={integrationSearch}
@@ -119,9 +151,25 @@ export function IntegrationsMainListView({
                 className="border-border/70 bg-background/70 h-11 pl-10"
               />
             </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-10 xl:hidden"
+              onClick={() => setFiltersOpen(true)}
+            >
+              <ListFilter className="mr-1.5 size-3.5" />
+              Filters
+              {activeFilterCount > 0 ? (
+                <span className="bg-foreground text-background ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-medium tabular-nums">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </Button>
           </div>
+
           {loading ? (
-            <div className="space-y-4 pb-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-auto pb-4">
               <section className="space-y-2">
                 <Skeleton className="h-3 w-24" />
                 <CardGridSkeleton cards={4} columns={2} />
@@ -138,55 +186,69 @@ export function IntegrationsMainListView({
               No integrations match the current search/filter.
             </div>
           ) : (
-            <div className="space-y-4 pb-4">
-              {featuredVisible.length > 0 ? (
-                <section className="space-y-2">
-                  <p className="text-muted-foreground text-xs font-medium">
-                    Featured ({featuredVisible.length})
-                  </p>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {featuredVisible.map(item => (
-                      <IntegrationCard
-                        key={item.key}
-                        item={item}
-                        onSelect={onSelect}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-              {integrationCategory !== 'featured' ? (
-                <section className="space-y-2">
-                  <p className="text-muted-foreground text-xs font-medium">
-                    All ({nonFeaturedVisible.length})
-                  </p>
-                  <div className="space-y-2">
-                    {nonFeaturedVisible.map(item => (
-                      <IntegrationCard
-                        key={item.key}
-                        item={item}
-                        onSelect={onSelect}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-            </div>
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="space-y-4 pb-4">
+                {featuredVisible.length > 0 ? (
+                  <section className="space-y-2">
+                    <p className="text-muted-foreground text-xs font-medium">
+                      Featured ({featuredVisible.length})
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {featuredVisible.map(item => (
+                        <IntegrationCard
+                          key={item.key}
+                          item={item}
+                          onSelect={onSelect}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+                {integrationCategory !== 'featured' ? (
+                  <section className="space-y-2">
+                    <p className="text-muted-foreground text-xs font-medium">
+                      All ({nonFeaturedVisible.length})
+                    </p>
+                    <div className="space-y-2">
+                      {nonFeaturedVisible.map(item => (
+                        <IntegrationCard
+                          key={item.key}
+                          item={item}
+                          onSelect={onSelect}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+              </div>
+            </ScrollArea>
           )}
         </div>
-        <IntegrationsListSidebar
-          integrations={integrations}
-          integrationStatus={integrationStatus}
-          integrationCategory={integrationCategory}
-          categories={categories}
-          categoryCounts={categoryCounts}
-          configuredCount={configuredCount}
-          notConfiguredCount={notConfiguredCount}
-          featuredCount={featuredCount}
-          onStatusChange={setIntegrationStatus}
-          onCategoryChange={setIntegrationCategory}
-        />
+
+        <div className="hidden xl:flex xl:h-full xl:min-h-0">
+          <IntegrationsListSidebar {...sidebarProps} />
+        </div>
       </div>
-    </ScrollArea>
+
+      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <SheetContent
+          side="right"
+          className="w-[min(100vw,22rem)] gap-0 overflow-hidden p-0 sm:max-w-[22rem]"
+        >
+          <SheetHeader className="border-border/60 border-b px-4 py-3">
+            <SheetTitle>Filters</SheetTitle>
+            <SheetDescription>
+              Narrow integrations by status or category.
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="h-[calc(100dvh-5.5rem)] px-3 py-3">
+            <IntegrationsListSidebar
+              {...sidebarProps}
+              className="xl:static xl:h-auto xl:w-full xl:overflow-visible"
+            />
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
+    </div>
   )
 }
