@@ -5,10 +5,8 @@ import type {
   BackendHealth
 } from '@sandwalk/agent-ui-core'
 import {
-  Folder,
   LayoutDashboard,
   LibraryBig,
-  PanelLeft,
   Search,
   Send
 } from 'lucide-react'
@@ -45,8 +43,6 @@ type AgentSessionSidebarProps = {
   selectedSessionIds: Set<string>
   threadMenuOpenId: string | null
   batchBusy: boolean
-  canShowFilesPanel: boolean
-  filesPanelCollapsed: boolean
   sidebarUserName: string | null
   health: BackendHealth | null
   backendUrl: string | null
@@ -57,9 +53,7 @@ type AgentSessionSidebarProps = {
   onOpenProjectSettings: () => void
   onNewProject: () => void
   onOpenGlobalSearch: () => void
-  onCollapseSidebar: () => void
   onCreateSession: () => void
-  onToggleFilesPanel: () => void
   onClearSessionSelection: () => void
   onBatchArchiveSelected: () => void | Promise<void>
   onBatchMoveSelected: (projectId: string | null) => void | Promise<void>
@@ -94,8 +88,6 @@ export function AgentSessionSidebar({
   selectedSessionIds,
   threadMenuOpenId,
   batchBusy,
-  canShowFilesPanel,
-  filesPanelCollapsed,
   sidebarUserName,
   health,
   backendUrl,
@@ -106,9 +98,7 @@ export function AgentSessionSidebar({
   onOpenProjectSettings,
   onNewProject,
   onOpenGlobalSearch,
-  onCollapseSidebar,
   onCreateSession,
-  onToggleFilesPanel,
   onClearSessionSelection,
   onBatchArchiveSelected,
   onBatchMoveSelected,
@@ -158,25 +148,16 @@ export function AgentSessionSidebar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-8 shrink-0"
+                  className="text-muted-foreground hover:text-foreground size-6 shrink-0"
                   onClick={onOpenGlobalSearch}
                   aria-label="Search"
                 >
-                  <Search className="size-4" />
+                  <Search className="size-3" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Search ⌘K</TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8 shrink-0"
-            onClick={onCollapseSidebar}
-            aria-label="Hide sidebar"
-          >
-            <PanelLeft className="size-4" />
-          </Button>
         </div>
         <button
           type="button"
@@ -189,21 +170,6 @@ export function AgentSessionSidebar({
           </span>
           <span className="text-muted-foreground/70 text-[11px]">⌘N</span>
         </button>
-        {canShowFilesPanel ? (
-          <button
-            type="button"
-            className={cn(
-              'mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px]',
-              !filesPanelCollapsed
-                ? 'bg-sidebar-accent text-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground'
-            )}
-            onClick={onToggleFilesPanel}
-          >
-            <Folder className="size-3.5" />
-            Files
-          </button>
-        ) : null}
         <button
           type="button"
           className="text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px]"

@@ -145,7 +145,7 @@ export function ModelsView({
       <div
         className={cn(
           'mx-auto w-full space-y-8',
-          embedded ? 'max-w-5xl p-1' : 'max-w-7xl p-4 md:p-6'
+          embedded ? 'max-w-5xl p-1' : 'max-w-7xl px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6'
         )}
       >
         {!embedded ? (

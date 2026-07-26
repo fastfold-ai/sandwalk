@@ -2,7 +2,6 @@ import type { AppShellProps } from '@/components/app-shell-props'
 import { AppDialogs } from '@/components/AppDialogs'
 import { AppShellMain } from '@/components/AppShellMain'
 import { AppShellSidebar } from '@/components/AppShellSidebar'
-import { DesktopTitleBar } from '@/components/DesktopTitleBar'
 import {
   ResizableHandle,
   ResizablePanelGroup
@@ -15,18 +14,23 @@ export type { AppShellProps } from '@/components/app-shell-props'
 export function AppShell(props: AppShellProps) {
   return (
     <>
+      {/*
+        No full-width title bar above the split — the sidebar|main vertical
+        divider must run edge-to-edge. Traffic-light clearance
+        lives in .sandwalk-sidebar-chrome under mac overlay.
+      */}
       <div className="bg-background flex h-full w-full flex-col overflow-hidden">
-        <DesktopTitleBar />
         <ResizablePanelGroup
           direction="horizontal"
           autoSaveId={SHELL_PANELS_AUTO_SAVE_ID}
-          className="min-h-0 w-full flex-1 overflow-hidden"
+          className="sandwalk-shell-panels min-h-0 w-full flex-1 overflow-hidden"
         >
         <AppShellSidebar
           sidebarPanelRef={props.sidebarPanelRef}
           isDashboard={props.isDashboard}
           dashboardSection={props.dashboardSection}
           sidebarUserName={props.sidebarUserName}
+          sidebarCollapsed={props.sidebarCollapsed}
           setSidebarCollapsed={props.setSidebarCollapsed}
           logoutSession={props.logoutSession}
           refreshCloudUserName={props.refreshCloudUserName}
@@ -42,8 +46,6 @@ export function AppShell(props: AppShellProps) {
           selectedSessionIds={props.selectedSessionIds}
           threadMenuOpenId={props.threadMenuOpenId}
           batchBusy={props.batchBusy}
-          canShowFilesPanel={props.canShowFilesPanel}
-          filesPanelCollapsed={props.filesPanelCollapsed}
           navigate={props.navigate}
           setProjectScopeId={props.setProjectScopeId}
           selectAllProjects={props.selectAllProjects}
@@ -52,7 +54,6 @@ export function AppShell(props: AppShellProps) {
           setNewProjectOpen={props.setNewProjectOpen}
           setGlobalSearchOpen={props.setGlobalSearchOpen}
           createSession={props.createSession}
-          setFilesPanelCollapsed={props.setFilesPanelCollapsed}
           clearSessionSelection={props.clearSessionSelection}
           batchArchiveSelected={props.batchArchiveSelected}
           batchMoveSelected={props.batchMoveSelected}
@@ -73,7 +74,7 @@ export function AppShell(props: AppShellProps) {
 
         <ResizableHandle
           className={cn(
-            'w-px',
+            'sandwalk-shell-resize-handle w-px',
             props.sidebarCollapsed && 'pointer-events-none opacity-0'
           )}
         />

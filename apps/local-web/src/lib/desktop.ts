@@ -68,7 +68,7 @@ export const isTauri = (): boolean => {
   return typeof g.__TAURI__ !== 'undefined' || typeof g.__TAURI_INTERNALS__ !== 'undefined'
 }
 
-/** Tailwind classes: clear macOS traffic lights (OpenWorker-aligned). */
+/** Tailwind classes: clear macOS traffic lights. */
 export const MAC_OVERLAY_SIDEBAR_PAD = 'pl-[84px] pt-[12px]'
 export const MAC_OVERLAY_MAIN_PAD = 'pt-[12px]'
 

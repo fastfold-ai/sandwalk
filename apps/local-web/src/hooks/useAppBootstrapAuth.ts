@@ -109,8 +109,14 @@ export function useAppBootstrapAuth({
     return () => controller.abort()
   }, [health, refreshCloudUserName])
 
-  const sidebarUserName =
-    cloudUserName?.trim() || health?.userName?.trim() || null
+  // Prefer a real name/username over a bare email in the sidebar footer.
+  const sidebarUserName = (() => {
+    const cloud = cloudUserName?.trim() || null
+    const local = health?.userName?.trim() || null
+    if (cloud && !cloud.includes('@')) return cloud
+    if (local) return local
+    return cloud
+  })()
 
   const submitAuthLogin = useCallback(
     async (apiKey: string, remember: boolean) => {

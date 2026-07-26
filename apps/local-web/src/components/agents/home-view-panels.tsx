@@ -98,7 +98,7 @@ export function HomeProjectView({
 }) {
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-5xl px-6 py-8 md:px-10">
+      <div className="mx-auto w-full max-w-5xl px-6 pt-3 pb-8 md:px-10">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
             <h2 className="truncate text-xl font-semibold">{project.name}</h2>

@@ -1,4 +1,4 @@
-import { ArrowLeft, PanelLeft } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
@@ -14,7 +14,6 @@ export type { DashboardSection } from './dashboard-section'
 export function DashboardSidebar({
   active,
   userName,
-  onCollapse,
   onLogout,
   onRefreshUser,
   backendVersion = null,
@@ -23,7 +22,6 @@ export function DashboardSidebar({
 }: {
   active: DashboardSection
   userName: string | null
-  onCollapse: () => void
   onLogout?: () => void | Promise<void>
   onRefreshUser?: () => void | Promise<void>
   backendVersion?: string | null
@@ -34,30 +32,18 @@ export function DashboardSidebar({
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
-      <div className="sandwalk-sidebar-chrome shrink-0 border-b p-3">
-        <div className="flex items-center gap-1">
-          <button
+      <ScrollArea className="flex-1">
+        <nav className="space-y-4 p-3">
+          <Button
             type="button"
-            className="hover:bg-sidebar-accent/70 text-muted-foreground hover:text-foreground inline-flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground h-8 w-full justify-start gap-2 px-2 text-[13px] font-normal"
             onClick={() => navigate('/')}
           >
             <ArrowLeft className="size-3.5 shrink-0" />
             <span className="truncate">Back to Agents</span>
-          </button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8 shrink-0"
-            onClick={onCollapse}
-            aria-label="Hide sidebar"
-          >
-            <PanelLeft className="size-4" />
           </Button>
-        </div>
-      </div>
-
-      <ScrollArea className="flex-1">
-        <nav className="space-y-4 p-3">
           {DASHBOARD_NAV_GROUPS.map((group, index) => (
             <div key={group.label ?? `group-${index}`} className="space-y-0.5">
               {group.label ? (

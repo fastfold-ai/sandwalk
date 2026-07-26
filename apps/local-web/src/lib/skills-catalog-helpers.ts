@@ -165,12 +165,12 @@ export type SkillsViewMode =
   | 'import_file'
   | 'trusted_sources'
 
-/** Prefer linked Fastfold Cloud email; otherwise username. */
+/** Prefer username; fall back to linked Fastfold Cloud email. */
 export function cloudAccountDisplayName(account: AccountSummary | null): string | null {
   if (!account?.configured) return null
-  const email = account.user?.email?.trim()
-  if (email) return email
   const username = account.user?.username?.trim()
   if (username) return username
+  const email = account.user?.email?.trim()
+  if (email) return email
   return null
 }

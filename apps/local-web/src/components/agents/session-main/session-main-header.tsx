@@ -5,7 +5,6 @@ import {
   Copy,
   Download,
   Folder,
-  PanelLeft,
   PanelRight,
   SquareTerminal,
   Terminal
@@ -13,7 +12,12 @@ import {
 import type { Dispatch, SetStateAction } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
+import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import { SessionTabs } from '@/components/agents/SessionTabs'
+import {
+  SHELL_SIDEBAR_MOTION_MS,
+  ShellNavControlsSlot
+} from '@/components/ShellNavStrip'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -21,6 +25,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { useCrossfadeFlag } from '@/hooks/useDeferredTrue'
+import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
 
@@ -80,19 +86,31 @@ export function SessionMainHeader({
   filesPanelCollapsed,
   setFilesPanelCollapsed
 }: SessionMainHeaderProps) {
+  const overlay = useMacDesktopOverlay()
+  // Collapse: reveal after panel closes. Expand: keep briefly so icons don't gap.
+  const showCollapsedNav = useCrossfadeFlag(
+    sidebarCollapsed,
+    SHELL_SIDEBAR_MOTION_MS,
+    100
+  )
+  // Collapsed: one chrome row — traffic lights → toggle/arrows → tabs → actions.
+  const padForTrafficLights = showCollapsedNav && overlay
+
   return (
-    <div className="border-border/60 flex h-11 shrink-0 items-center gap-1 border-b px-1.5 md:px-2">
-      {sidebarCollapsed ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0"
-          onClick={() => setSidebarCollapsed(false)}
-          aria-label="Show sidebar"
-        >
-          <PanelLeft className="size-4" />
-        </Button>
-      ) : null}
+    <DesktopDragRegion
+      asTitleBar={padForTrafficLights}
+      className={cn(
+        'sandwalk-shell-nav-strip flex h-11 shrink-0 items-center gap-1.5 pr-2',
+        padForTrafficLights
+          ? 'sandwalk-shell-nav-strip-mac'
+          : 'px-1.5 md:px-2'
+      )}
+    >
+      <ShellNavControlsSlot
+        visible={showCollapsedNav}
+        sidebarCollapsed
+        onToggleSidebar={() => setSidebarCollapsed(false)}
+      />
       <SessionTabs
         tabs={openTabs}
         activeId={sessionId}
@@ -282,6 +300,6 @@ export function SessionMainHeader({
           />
         </Button>
       </div>
-    </div>
+    </DesktopDragRegion>
   )
 }

@@ -1,8 +1,5 @@
-import { PanelLeft } from 'lucide-react'
-
 import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 export function ConnectionLimitBanner({
   runningCount,
@@ -34,34 +31,9 @@ export function ConnectionLimitBanner({
   )
 }
 
-export function AppShellTitleBar({
-  sidebarCollapsed,
-  setSidebarCollapsed,
-  activeTitle
-}: {
-  sidebarCollapsed: boolean
-  setSidebarCollapsed: (value: boolean | ((current: boolean) => boolean)) => void
-  activeTitle: string
-}) {
+export function AppShellTitleBar({ activeTitle }: { activeTitle: string }) {
   return (
-    <DesktopDragRegion
-      className={cn(
-        'sandwalk-titlebar flex h-10 shrink-0 items-center gap-1 border-b px-1.5 md:px-2',
-        sidebarCollapsed && 'sandwalk-titlebar-collapsed'
-      )}
-    >
-      {sidebarCollapsed ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0"
-          data-no-window-drag
-          onClick={() => setSidebarCollapsed(false)}
-          aria-label="Show sidebar"
-        >
-          <PanelLeft className="size-4" />
-        </Button>
-      ) : null}
+    <DesktopDragRegion className="sandwalk-titlebar flex h-11 shrink-0 items-center gap-1 px-1.5 md:px-2">
       <span className="min-w-0 flex-1 truncate px-2 text-sm font-medium">
         {activeTitle}
       </span>
@@ -69,23 +41,18 @@ export function AppShellTitleBar({
   )
 }
 
-/** Floating reopen control when the nav sidebar is collapsed (dashboard/home). */
-export function AppShellFloatingSidebarToggle({
-  setSidebarCollapsed
-}: {
-  setSidebarCollapsed: (value: boolean | ((current: boolean) => boolean)) => void
-}) {
+/**
+ * Thin absolute drag band for home / dashboard / library when the sidebar is
+ * open (nav chrome lives in the sidebar). Keeps window dragging without a
+ * tall empty spacer above page content.
+ */
+export function AppShellMainDragStrip() {
   return (
-    <div className="sandwalk-floating-sidebar-toggle absolute left-2 top-2 z-20">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="bg-background/80 size-8 shrink-0 shadow-sm backdrop-blur-sm"
-        onClick={() => setSidebarCollapsed(false)}
-        aria-label="Show sidebar"
-      >
-        <PanelLeft className="size-4" />
-      </Button>
-    </div>
+    <DesktopDragRegion
+      asTitleBar
+      className="sandwalk-main-drag-strip absolute inset-x-0 top-0 z-20 w-full"
+      title="Drag to move window"
+      aria-hidden
+    />
   )
 }

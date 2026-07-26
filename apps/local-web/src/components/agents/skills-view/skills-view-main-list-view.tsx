@@ -174,7 +174,7 @@ export function SkillsMainListView({
           className={
             embedded
               ? 'mx-auto flex w-full max-w-5xl flex-col gap-6 p-1 xl:flex-row'
-              : 'mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6 xl:flex-row'
+              : 'mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6 xl:flex-row'
           }
         >
           <div className="min-w-0 flex-1">

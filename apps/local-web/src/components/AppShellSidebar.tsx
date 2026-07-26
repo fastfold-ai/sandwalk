@@ -9,14 +9,17 @@ import {
   type DashboardSection,
   DashboardSidebar
 } from '@/components/agents/DashboardSidebar'
+import { ShellNavStrip } from '@/components/ShellNavStrip'
 import { ResizablePanel } from '@/components/ui/resizable'
-import { groupSessions,type SessionChatState } from '@/lib/sessions'
+import { groupSessions, type SessionChatState } from '@/lib/sessions'
+import { cn } from '@/lib/utils'
 
 export type AppShellSidebarProps = {
   sidebarPanelRef: RefObject<ImperativePanelHandle | null>
   isDashboard: boolean
   dashboardSection: DashboardSection
   sidebarUserName: string | null
+  sidebarCollapsed: boolean
   setSidebarCollapsed: (value: boolean | ((current: boolean) => boolean)) => void
   logoutSession: () => void | Promise<void>
   refreshCloudUserName: () => void | Promise<void>
@@ -32,8 +35,6 @@ export type AppShellSidebarProps = {
   selectedSessionIds: Set<string>
   threadMenuOpenId: string | null
   batchBusy: boolean
-  canShowFilesPanel: boolean
-  filesPanelCollapsed: boolean
   navigate: NavigateFunction
   setProjectScopeId: (value: string | null | ((current: string | null) => string | null)) => void
   selectAllProjects: () => void
@@ -42,7 +43,6 @@ export type AppShellSidebarProps = {
   setNewProjectOpen: (value: boolean | ((current: boolean) => boolean)) => void
   setGlobalSearchOpen: (value: boolean | ((current: boolean) => boolean)) => void
   createSession: (projectId?: string | null) => Promise<void>
-  setFilesPanelCollapsed: (value: boolean | ((current: boolean) => boolean)) => void
   clearSessionSelection: () => void
   batchArchiveSelected: () => void | Promise<void>
   batchMoveSelected: (projectId: string | null) => void | Promise<void>
@@ -73,6 +73,7 @@ export function AppShellSidebar({
   isDashboard,
   dashboardSection,
   sidebarUserName,
+  sidebarCollapsed,
   setSidebarCollapsed,
   logoutSession,
   refreshCloudUserName,
@@ -88,8 +89,6 @@ export function AppShellSidebar({
   selectedSessionIds,
   threadMenuOpenId,
   batchBusy,
-  canShowFilesPanel,
-  filesPanelCollapsed,
   navigate,
   setProjectScopeId,
   selectAllProjects,
@@ -98,7 +97,6 @@ export function AppShellSidebar({
   setNewProjectOpen,
   setGlobalSearchOpen,
   createSession,
-  setFilesPanelCollapsed,
   clearSessionSelection,
   batchArchiveSelected,
   batchMoveSelected,
@@ -124,18 +122,30 @@ export function AppShellSidebar({
       collapsible
       collapsedSize={0}
       defaultSize={18}
-      minSize={12}
-      maxSize={30}
+      // Open floor. Drag past ~halfway to collapsedSize → collapses (hide sidebar).
+      minSize={16}
+      maxSize={32}
       onCollapse={() => setSidebarCollapsed(true)}
       onExpand={() => setSidebarCollapsed(false)}
       className="min-w-0"
     >
       <aside className="bg-sidebar flex h-full flex-col overflow-hidden">
+        <div
+          className={cn(
+            'sandwalk-shell-nav-fade',
+            sidebarCollapsed && 'pointer-events-none opacity-0'
+          )}
+        >
+          <ShellNavStrip
+            sidebarCollapsed={false}
+            surface="sidebar"
+            onToggleSidebar={() => setSidebarCollapsed(true)}
+          />
+        </div>
         {isDashboard ? (
           <DashboardSidebar
             active={dashboardSection}
             userName={sidebarUserName}
-            onCollapse={() => setSidebarCollapsed(true)}
             onLogout={logoutSession}
             onRefreshUser={refreshCloudUserName}
             backendVersion={health?.version ?? null}
@@ -154,8 +164,6 @@ export function AppShellSidebar({
             selectedSessionIds={selectedSessionIds}
             threadMenuOpenId={threadMenuOpenId}
             batchBusy={batchBusy}
-            canShowFilesPanel={canShowFilesPanel}
-            filesPanelCollapsed={filesPanelCollapsed}
             sidebarUserName={sidebarUserName}
             health={health}
             backendUrl={backendUrl}
@@ -169,11 +177,7 @@ export function AppShellSidebar({
             onOpenProjectSettings={() => setProjectSettingsOpen(true)}
             onNewProject={() => setNewProjectOpen(true)}
             onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
-            onCollapseSidebar={() => setSidebarCollapsed(true)}
             onCreateSession={() => createSession(activeProjectId)}
-            onToggleFilesPanel={() =>
-              setFilesPanelCollapsed(current => !current)
-            }
             onClearSessionSelection={clearSessionSelection}
             onBatchArchiveSelected={batchArchiveSelected}
             onBatchMoveSelected={batchMoveSelected}

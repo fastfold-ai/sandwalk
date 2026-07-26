@@ -102,7 +102,7 @@ export function IntegrationsDetailView({
         onLinkProject={handleLinkProject}
       />
       <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6">
           <IntegrationsDetailHeader selected={selected} />
           {selected.key === 'slack' ? (
             <>

@@ -71,7 +71,7 @@ export function SpecialistsListView({
 
   return (
     <div className="chat-scrollbar flex-1 overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6">
         <div className="mb-0">
           <h2 className="text-2xl font-semibold">Specialists</h2>
           <p className="text-muted-foreground mt-1 text-sm">

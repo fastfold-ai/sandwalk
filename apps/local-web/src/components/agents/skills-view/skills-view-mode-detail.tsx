@@ -21,7 +21,7 @@ export function SkillsViewDetailMode({
   if (!state.detailPresentation) {
     return (
       <ScrollArea className="flex-1">
-        <div className="mx-auto w-full max-w-3xl px-6 py-8 md:px-10">
+        <div className="mx-auto w-full max-w-3xl px-6 pt-3 pb-8 md:px-10">
           <SkillsBreadcrumb onBack={onBack} />
           <DetailPageSkeleton bare />
         </div>

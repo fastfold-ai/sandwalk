@@ -61,7 +61,7 @@ export function StorageView({
 
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 md:p-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold">Storage</h2>

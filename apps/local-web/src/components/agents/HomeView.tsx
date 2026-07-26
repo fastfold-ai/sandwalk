@@ -46,7 +46,7 @@ export function HomeView({
   const hour = new Date().getHours()
   const greeting =
     hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-  const pagePad = 'mx-auto w-full px-6 py-8 md:px-10'
+  const pagePad = 'mx-auto w-full px-6 pt-3 pb-8 md:px-10'
   const activeProject =
     projects.find(project => project.id === activeProjectId) || null
   const recent = useMemo(

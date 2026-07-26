@@ -14,7 +14,7 @@ export function DashboardOverviewView({
 }) {
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-7xl space-y-10 p-4 md:p-6">
+      <div className="mx-auto w-full max-w-7xl space-y-10 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6">
         <SessionActivityHeatmap sessions={sessions} />
         <div className="space-y-10">{children}</div>
       </div>

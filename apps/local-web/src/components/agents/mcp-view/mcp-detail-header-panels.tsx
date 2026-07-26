@@ -33,7 +33,6 @@ export function McpDetailHeaderBar({
   const {
     showCatalogActions,
     hasBothAuth,
-    needsReconnect,
     connectPending,
     disconnectPending,
     connectLabel,
@@ -77,7 +76,7 @@ export function McpDetailHeaderBar({
                 <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
-                    variant={needsReconnect ? 'default' : 'outline'}
+                    variant="ghost"
                     size="sm"
                     className="h-7 gap-1.5 px-2 text-xs"
                     disabled={connectPending || disconnectPending}
@@ -110,7 +109,7 @@ export function McpDetailHeaderBar({
             ) : (
               <Button
                 type="button"
-                variant={needsReconnect ? 'default' : 'outline'}
+                variant="ghost"
                 size="sm"
                 className="h-7 gap-1.5 px-2 text-xs"
                 disabled={connectPending || disconnectPending}
@@ -127,7 +126,7 @@ export function McpDetailHeaderBar({
             {configured && onDisconnectCatalog ? (
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 className="h-7 gap-1.5 px-2 text-xs"
                 disabled={connectPending || disconnectPending}
@@ -145,7 +144,7 @@ export function McpDetailHeaderBar({
         ) : null}
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           size="sm"
           className="h-7 gap-1.5 px-2 text-xs"
           disabled={loading || refreshing || connectPending}
@@ -159,15 +158,12 @@ export function McpDetailHeaderBar({
           Refresh tools
         </Button>
         {docsUrl ? (
-          <a
-            href={docsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 py-1.5 text-xs hover:bg-muted"
-          >
-            Docs
-            <ExternalLink className="size-3.5" />
-          </a>
+          <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs" asChild>
+            <a href={docsUrl} target="_blank" rel="noreferrer">
+              Docs
+              <ExternalLink className="size-3.5" />
+            </a>
+          </Button>
         ) : null}
       </div>
     </DetailStickyNav>

@@ -86,33 +86,31 @@ Prerequisites: [uv](https://docs.astral.sh/uv/), Python 3.11+, Node 20+, pnpm. F
 | **Sandwalk.app** | Tauri desktop client (Dock / Launchpad) |
 | **Sandwalk Server** | Nested menubar helper (no Dock icon): Start / Stop / Restart, Server Settings |
 
-**Build and install a DMG** (Apple Silicon, ad-hoc signed for local use):
+From the repo root after `pnpm install`.
+
+**1. Packaged Mac app** — build, install to `~/Applications`, and open (Apple Silicon, ad-hoc signed):
 
 ```bash
-./apps/packaging/package-macos-dmg.sh
-
-# Install the assembled app for local QA
-INSTALL=1 ./apps/packaging/package-macos-dmg.sh
-open ~/Applications/Sandwalk.app
+osascript -e 'quit app "Sandwalk"' 2>/dev/null || true
+pkill -x sandwalk-desktop 2>/dev/null || true
+INSTALL=1 pnpm --filter @sandwalk/agent-local-web package:dmg && open ~/Applications/Sandwalk.app
 ```
 
-Output: `apps/packaging/dist/Sandwalk-<version>-macos-arm64.dmg`. Details: [`apps/packaging/README.md`](apps/packaging/README.md).
+DMG also lands at `apps/packaging/dist/Sandwalk-<version>-macos-arm64.dmg`. Details: [`apps/packaging/README.md`](apps/packaging/README.md). Releases: [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases).
 
-When releases are published, you can also download the DMG from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases).
-
-**Dev without packaging** — run the API, then the Tauri client (and optionally the menubar helper):
+**2. Tauri + agent server (hot reload)** — paste once; server in background, Tauri in the foreground. Quit with Ctrl+C (then stop the server if you want):
 
 ```bash
-# Terminal 1 — agent API
-cd cli && uv sync && uv run sandwalk serve
-
-# Terminal 2 — Tauri desktop client
+osascript -e 'quit app "Sandwalk"' 2>/dev/null || true
+pkill -x sandwalk-desktop 2>/dev/null || true
+pkill -f 'sandwalk serve' 2>/dev/null || true
+(cd cli && uv sync && uv run sandwalk serve --host 127.0.0.1 --port 8787) &
 pnpm --filter @sandwalk/agent-local-web tauri:dev
-
-# Optional — menubar helper only (no Dock icon)
-cd apps/sandwalk-mac && ./scripts/package-app.sh
-open ~/Applications/Sandwalk\ Server.app
+# optional cleanup after Ctrl+C:
+# pkill -f 'sandwalk serve'
 ```
+
+Tauri does **not** start the API — `sandwalk serve` on `:8787` is required. Optional menubar helper only: `cd apps/sandwalk-mac && ./scripts/package-app.sh && open ~/Applications/Sandwalk\ Server.app`.
 
 #### CLI + Web UI
 
@@ -406,11 +404,7 @@ cd cli && uv sync && uv run sandwalk serve          # agent API (:8787)
 pnpm --filter @sandwalk/agent-local-web dev         # web UI (Vite)
 # optional science stacks:
 # cd cli && uv sync --extra all
-# macOS helper / Tauri:
-# cd apps/sandwalk-mac && ./scripts/package-app.sh
-# pnpm --filter @sandwalk/agent-local-web tauri:dev
-# packaged DMG:
-# ./apps/packaging/package-macos-dmg.sh
+# macOS packaged app / Tauri+server one-liners: see Install → macOS above
 ```
 
 `uv sync` installs the CLI, Local Sandbox, and agent server. `--extra all` adds chemistry / single-cell / ML / DuckDB.

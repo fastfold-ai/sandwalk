@@ -505,7 +505,7 @@ export function LibraryView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-6 md:px-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 pt-3 pb-6 md:px-10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-baseline gap-2.5">
             <div className="flex items-center gap-2">

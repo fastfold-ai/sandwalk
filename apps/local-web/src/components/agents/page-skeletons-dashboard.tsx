@@ -15,7 +15,7 @@ import {
 /**
  * Settings-style dashboard pages:
  * General, Status, Agent Runtime, Storage, Environment, Context, Sandbox.
- * Layout: `mx-auto max-w-7xl … p-4 md:p-6` (matches Skills).
+ * Layout: `mx-auto max-w-7xl … px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6` (matches Skills).
  */
 export function DashboardSettingsSkeleton({
   className,
@@ -27,7 +27,7 @@ export function DashboardSettingsSkeleton({
   return (
     <ScrollArea className={cn('flex-1', className)}>
       <div
-        className="mx-auto w-full max-w-7xl space-y-10 p-4 md:p-6"
+        className="mx-auto w-full max-w-7xl space-y-10 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6"
         aria-busy="true"
       >
         <PageHeaderSkeleton titleWidth="w-40" subtitleWidth="w-80" />
@@ -46,13 +46,13 @@ export function DashboardSettingsSkeleton({
 
 /**
  * Doctor page — settings column + check groups.
- * Layout: `mx-auto max-w-7xl … p-4 md:p-6` (matches Skills).
+ * Layout: `mx-auto max-w-7xl … px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6` (matches Skills).
  */
 export function DashboardDoctorSkeleton({ className }: { className?: string }) {
   return (
     <ScrollArea className={cn('flex-1', className)}>
       <div
-        className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 md:p-6"
+        className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6"
         aria-busy="true"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -67,7 +67,7 @@ export function DashboardDoctorSkeleton({ className }: { className?: string }) {
 
 /**
  * Wide list/catalog pages: Models, Tools, Data, Skills, Integrations, MCP, Specialists.
- * Layout: `mx-auto max-w-7xl … p-4 md:p-6`
+ * Layout: `mx-auto max-w-7xl … px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6`
  */
 export function DashboardListSkeleton({
   className,
@@ -82,7 +82,7 @@ export function DashboardListSkeleton({
     <ScrollArea className={cn('flex-1', className)}>
       <div
         className={cn(
-          'mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6',
+          'mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6',
           withSidebar && 'xl:flex-row'
         )}
         aria-busy="true"
@@ -135,7 +135,7 @@ export function DashboardListSkeleton({
 
 /**
  * Dashboard Overview — heatmap + featured sections.
- * Layout: `mx-auto max-w-7xl … p-4 md:p-6` (matches Skills).
+ * Layout: `mx-auto max-w-7xl … px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6` (matches Skills).
  */
 export function DashboardOverviewSkeleton({
   className
@@ -145,7 +145,7 @@ export function DashboardOverviewSkeleton({
   return (
     <ScrollArea className={cn('flex-1', className)}>
       <div
-        className="mx-auto w-full max-w-7xl space-y-10 p-4 md:p-6"
+        className="mx-auto w-full max-w-7xl space-y-10 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6"
         aria-busy="true"
       >
         <section className="space-y-3">
@@ -188,13 +188,13 @@ export function DashboardOverviewSkeleton({
 
 /**
  * Home / project home — greeting column + recent cards.
- * Layout: `mx-auto max-w-5xl px-6 py-8 md:px-10`
+ * Layout: `mx-auto max-w-5xl px-6 pt-3 pb-8 md:px-10`
  */
 export function HomePageSkeleton({ className }: { className?: string }) {
   return (
     <ScrollArea className={cn('flex-1', className)}>
       <div
-        className="mx-auto w-full max-w-5xl px-6 py-8 md:px-10"
+        className="mx-auto w-full max-w-5xl px-6 pt-3 pb-8 md:px-10"
         aria-busy="true"
       >
         <div className="mb-10 space-y-3">

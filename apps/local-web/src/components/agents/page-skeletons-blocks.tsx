@@ -173,7 +173,7 @@ export function DetailPageSkeleton({
   const body = (
     <div
       className={cn(
-        bare ? 'mt-4 space-y-6' : 'mx-auto w-full max-w-3xl space-y-6 px-6 py-8 md:px-10',
+        bare ? 'mt-4 space-y-6' : 'mx-auto w-full max-w-3xl space-y-6 px-6 pt-3 pb-8 md:px-10',
         className
       )}
       aria-busy="true"

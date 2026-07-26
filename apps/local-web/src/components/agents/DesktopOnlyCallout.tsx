@@ -1,6 +1,6 @@
 import { Monitor } from 'lucide-react'
 
-/** OpenWorker-style gate for menubar/Tauri-only actions. */
+/** Gate for menubar/Tauri-only actions. */
 export function DesktopOnlyCallout({
   feature = 'This feature'
 }: {

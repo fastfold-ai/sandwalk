@@ -592,8 +592,8 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             {
-                // Overlay title bar: traffic lights float over the UI. Position matches
-                // OpenWorker so the sidebar chrome can pad left/top to clear them.
+                // Overlay title bar: traffic lights float over the UI; inset so the
+                // sidebar chrome can pad left to clear them.
                 win = win
                     .title_bar_style(tauri::TitleBarStyle::Overlay)
                     .hidden_title(true)

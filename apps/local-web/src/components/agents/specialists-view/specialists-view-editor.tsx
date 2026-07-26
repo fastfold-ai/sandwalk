@@ -113,7 +113,7 @@ export function SpecialistsEditorView({
   if (mode === 'edit' && !state.editing && !loading) {
     return (
       <div className="chat-scrollbar flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6">
           <p className="text-sm">Specialist not found.</p>
           <div>
             <Button type="button" variant="ghost" size="sm" onClick={onBack}>
@@ -134,7 +134,7 @@ export function SpecialistsEditorView({
         onBack={onBack}
       />
       <div className="chat-scrollbar min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 pb-8 md:gap-8 md:p-6 md:pb-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-2 pb-8 md:gap-8 md:px-6 md:pt-3 md:pb-10">
           <SpecialistsEditorCapabilityBanner state={state} />
           <SpecialistsEditorAppearanceFields state={state} />
 

@@ -1,7 +1,7 @@
 import { AgentSessionMainPanel } from '@/components/agents/AgentSessionMainPanel'
 import { DashboardMainViews } from '@/components/agents/DashboardMainViews'
 import {
-  AppShellFloatingSidebarToggle,
+  AppShellMainDragStrip,
   AppShellTitleBar,
   ConnectionLimitBanner
 } from '@/components/app/app-shell-main-chrome'
@@ -10,8 +10,12 @@ import {
   isDashboardMainView
 } from '@/components/app/app-shell-main-props'
 import { buildDashboardMainViewsProps } from '@/components/app/build-dashboard-main-views-props'
+import {
+  SHELL_SIDEBAR_MOTION_MS,
+  ShellNavStrip
+} from '@/components/ShellNavStrip'
 import { ResizablePanel } from '@/components/ui/resizable'
-import { cn } from '@/lib/utils'
+import { useCrossfadeFlag } from '@/hooks/useDeferredTrue'
 
 export type { AppShellMainProps } from '@/components/app/app-shell-main-props'
 
@@ -24,12 +28,18 @@ export function AppShellMain(props: AppShellMainProps) {
       props.isProjectHome ||
       props.isDashboard
     )
-  const showFloatingSidebarToggle =
-    (props.isHome ||
-      props.isLibrary ||
-      props.isProjectHome ||
-      props.isDashboard) &&
-    props.sidebarCollapsed
+  // Collapsed: toggle + back/forward on the main pane.
+  // With session tabs, those controls live in SessionMainHeader (one row).
+  // Open + no session tabs: empty drag band aligned with the sidebar strip.
+  const showCollapsedNavStrip = useCrossfadeFlag(
+    props.sidebarCollapsed && !props.showSessionTabs,
+    SHELL_SIDEBAR_MOTION_MS,
+    100
+  )
+  const showMainDragStrip =
+    !showCollapsedNavStrip &&
+    !props.showSessionTabs &&
+    !showSimpleTitleBar
 
   return (
     <ResizablePanel
@@ -46,25 +56,21 @@ export function AppShellMain(props: AppShellMainProps) {
             onDismiss={() => props.setConnectionLimitDismissed(true)}
           />
         ) : null}
-        {showSimpleTitleBar ? (
-          <AppShellTitleBar
-            sidebarCollapsed={props.sidebarCollapsed}
-            setSidebarCollapsed={props.setSidebarCollapsed}
-            activeTitle={props.activeTitle}
-          />
+        {showCollapsedNavStrip ? (
+          <div className="fade-in animate-in duration-200">
+            <ShellNavStrip
+              sidebarCollapsed
+              surface="main"
+              onToggleSidebar={() => props.setSidebarCollapsed(false)}
+            />
+          </div>
         ) : null}
-        {showFloatingSidebarToggle ? (
-          <AppShellFloatingSidebarToggle
-            setSidebarCollapsed={props.setSidebarCollapsed}
-          />
+        {showMainDragStrip ? <AppShellMainDragStrip /> : null}
+        {showSimpleTitleBar ? (
+          <AppShellTitleBar activeTitle={props.activeTitle} />
         ) : null}
 
-        <div
-          className={cn(
-            'flex min-h-0 min-w-0 flex-1 flex-col',
-            showFloatingSidebarToggle && 'sandwalk-main-with-floating-sidebar-toggle'
-          )}
-        >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {isDashboardMainView(props) ? (
           <DashboardMainViews {...buildDashboardMainViewsProps(props)} />
         ) : (

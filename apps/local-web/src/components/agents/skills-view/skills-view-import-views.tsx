@@ -29,7 +29,7 @@ export function SkillsImportGithubView({
 }) {
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-3xl px-6 py-8 md:px-10">
+      <div className="mx-auto w-full max-w-3xl px-6 pt-3 pb-8 md:px-10">
         <SkillsBreadcrumb onBack={onBack} />
         <section className="bg-card mt-4 space-y-4 rounded-xl border p-6">
           <div>
@@ -86,7 +86,7 @@ export function SkillsImportFileView({
 }) {
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-3xl px-6 py-8 md:px-10">
+      <div className="mx-auto w-full max-w-3xl px-6 pt-3 pb-8 md:px-10">
         <SkillsBreadcrumb onBack={onBack} />
         <section className="bg-card mt-4 space-y-4 rounded-xl border p-6">
           <div>
@@ -150,7 +150,7 @@ export function SkillsTrustedSourcesView({
 }) {
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-4xl px-6 py-8 md:px-10">
+      <div className="mx-auto w-full max-w-4xl px-6 pt-3 pb-8 md:px-10">
         <SkillsBreadcrumb onBack={onBack} />
         <section className="bg-card mt-4 space-y-4 rounded-xl border p-6">
           <div>

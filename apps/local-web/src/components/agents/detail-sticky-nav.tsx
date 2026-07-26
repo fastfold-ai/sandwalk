@@ -19,13 +19,13 @@ export function DetailStickyNav({
   return (
     <div
       className={cn(
-        'bg-background shrink-0 border-b border-border/60',
+        'bg-background shrink-0',
         className
       )}
     >
       <div
         className={cn(
-          'mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6',
+          'mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-3 md:px-6',
           contentClassName
         )}
       >
