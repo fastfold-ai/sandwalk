@@ -34,14 +34,14 @@ fn sidebar_glass_config() -> LiquidGlassConfig {
         enabled: true,
         // 0 — avoid a frosted “frame” rim around the window.
         corner_radius: 0.0,
-        // ~64% tint — a touch more transparent so wallpaper still reads through.
+        // Dark charcoal (not pure black, not gray) — Codex-like frosted dark glass.
         tint_color: Some(if dark {
-            "#000000A3".into()
+            "#1C1C1FC2".into()
         } else {
-            "#ffffffA3".into()
+            "#ffffffD0".into()
         }),
-        // Regular blurs harder than Sidebar (less “focused” wallpaper).
-        variant: GlassMaterialVariant::Regular,
+        // Sidebar material matches system sidebar glass density/blur.
+        variant: GlassMaterialVariant::Sidebar,
     }
 }
 

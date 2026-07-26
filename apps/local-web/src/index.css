@@ -209,15 +209,17 @@ html.sandwalk-mac-glass .sandwalk-shell-sidebar {
  * Unfocused: solid sidebar (native glass effect is removed entirely).
  */
 html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-sidebar {
-  background-color: rgb(255 255 255 / 0.42) !important;
+  /* Denser wash — soft frost, not see-through. */
+  background-color: rgb(255 255 255 / 0.62) !important;
   border-color: transparent;
-  box-shadow: inset -14px 0 22px -12px rgb(0 0 0 / 0.07);
+  box-shadow: inset -14px 0 22px -12px rgb(0 0 0 / 0.06);
 }
 
 html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-sidebar {
-  background-color: rgb(0 0 0 / 0.45) !important;
+  /* Dark charcoal frost — Codex-like; color bleeds through the blur, not flat gray. */
+  background-color: rgb(28 28 31 / 0.62) !important;
   border-color: transparent;
-  box-shadow: inset -16px 0 26px -12px rgb(0 0 0 / 0.32);
+  box-shadow: inset -16px 0 26px -12px rgb(0 0 0 / 0.28);
 }
 
 html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active) .sandwalk-shell-sidebar,
@@ -259,13 +261,19 @@ html.sandwalk-mac-glass.sandwalk-liquid-glass-off .sandwalk-shell-sidebar::after
   content: none;
 }
 
+/* Sidebar | main hairline — web + desktop (mac glass also uses this). */
+.sandwalk-shell-main {
+  border-left: 1px solid hsl(var(--border));
+}
+
 html.sandwalk-mac-glass .sandwalk-shell-main {
   position: relative;
   z-index: 2;
   margin: 0;
   border-radius: 0;
-  border: none;
-  border-left: 1px solid hsl(var(--border));
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
   box-shadow: none;
 }
 
