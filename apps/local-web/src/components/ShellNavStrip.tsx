@@ -132,7 +132,7 @@ export function ShellNavStrip({
     <DesktopDragRegion
       asTitleBar={overlay}
       className={cn(
-        'sandwalk-shell-nav-strip flex w-full shrink-0 items-center pr-2',
+        'sandwalk-shell-nav-strip relative z-20 flex w-full shrink-0 items-center pr-2',
         surface === 'sidebar' ? 'bg-sidebar' : 'bg-background',
         padForTrafficLights ? 'sandwalk-shell-nav-strip-mac' : 'pl-2'
       )}

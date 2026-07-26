@@ -100,7 +100,7 @@ export function SessionMainHeader({
     <DesktopDragRegion
       asTitleBar={padForTrafficLights}
       className={cn(
-        'sandwalk-shell-nav-strip flex h-11 shrink-0 items-center gap-1.5 pr-2',
+        'sandwalk-shell-nav-strip relative z-20 flex h-11 shrink-0 items-center gap-1.5 pr-2',
         padForTrafficLights
           ? 'sandwalk-shell-nav-strip-mac'
           : 'px-1.5 md:px-2'

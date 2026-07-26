@@ -179,7 +179,7 @@ export function WorkspacePanel({
 
   return (
     <>
-      <aside className="bg-card flex h-full w-full min-w-0 flex-col">
+      <aside className="bg-card relative z-20 flex h-full w-full min-w-0 flex-col">
         {terminalMounted ? (
           <ResizablePanelGroup
             direction="vertical"

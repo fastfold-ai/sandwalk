@@ -51,7 +51,9 @@ export function WorkspaceFileTabsBar({
   onUploadChange: (files: FileList | null) => void
 }) {
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 px-1.5">
+    // Match session header (h-11) and stay above the shell drag overlay (z-10)
+    // so the Files tab isn't clipped / unclickable on first paint.
+    <div className="relative z-20 flex h-11 shrink-0 items-center gap-1 px-1.5">
       <div className="chat-scrollbar-x flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto">
         <div
           className={cn(

@@ -42,15 +42,15 @@ export function AppShellTitleBar({ activeTitle }: { activeTitle: string }) {
 }
 
 /**
- * Thin absolute drag band for home / dashboard / library when the sidebar is
- * open (nav chrome lives in the sidebar). Keeps window dragging without a
- * tall empty spacer above page content.
+ * Invisible absolute drag band on the main pane. Layout-neutral — does not
+ * push content. Keep chrome (nav strip / session header) at a higher z-index
+ * so buttons stay clickable.
  */
 export function AppShellMainDragStrip() {
   return (
     <DesktopDragRegion
       asTitleBar
-      className="sandwalk-main-drag-strip absolute inset-x-0 top-0 z-20 w-full"
+      className="sandwalk-main-drag-strip absolute inset-x-0 top-0 z-10 w-full"
       title="Drag to move window"
       aria-hidden
     />

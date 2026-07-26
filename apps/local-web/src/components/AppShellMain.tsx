@@ -30,16 +30,11 @@ export function AppShellMain(props: AppShellMainProps) {
     )
   // Collapsed: toggle + back/forward on the main pane.
   // With session tabs, those controls live in SessionMainHeader (one row).
-  // Open + no session tabs: empty drag band aligned with the sidebar strip.
   const showCollapsedNavStrip = useCrossfadeFlag(
     props.sidebarCollapsed && !props.showSessionTabs,
     SHELL_SIDEBAR_MOTION_MS,
     100
   )
-  const showMainDragStrip =
-    !showCollapsedNavStrip &&
-    !props.showSessionTabs &&
-    !showSimpleTitleBar
 
   return (
     <ResizablePanel
@@ -50,6 +45,8 @@ export function AppShellMain(props: AppShellMainProps) {
       className="min-w-0"
     >
       <div className="relative flex h-full min-w-0 flex-col">
+        {/* Layout-neutral drag hit target — every main view, does not shift content. */}
+        <AppShellMainDragStrip />
         {props.showConnectionLimitWarning ? (
           <ConnectionLimitBanner
             runningCount={props.runningCount}
@@ -57,7 +54,7 @@ export function AppShellMain(props: AppShellMainProps) {
           />
         ) : null}
         {showCollapsedNavStrip ? (
-          <div className="fade-in animate-in duration-200">
+          <div className="relative z-20 fade-in animate-in duration-200">
             <ShellNavStrip
               sidebarCollapsed
               surface="main"
@@ -65,9 +62,10 @@ export function AppShellMain(props: AppShellMainProps) {
             />
           </div>
         ) : null}
-        {showMainDragStrip ? <AppShellMainDragStrip /> : null}
         {showSimpleTitleBar ? (
-          <AppShellTitleBar activeTitle={props.activeTitle} />
+          <div className="relative z-20">
+            <AppShellTitleBar activeTitle={props.activeTitle} />
+          </div>
         ) : null}
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
