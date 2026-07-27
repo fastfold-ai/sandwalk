@@ -28,6 +28,7 @@ import {
 import { useCrossfadeFlag } from '@/hooks/useDeferredTrue'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { copyText } from '@/lib/clipboard'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { cn } from '@/lib/utils'
 
 export type SessionMainHeaderProps = {
@@ -95,6 +96,10 @@ export function SessionMainHeader({
   )
   // Collapsed: one chrome row — traffic lights → toggle/arrows → tabs → actions.
   const padForTrafficLights = showCollapsedNav && overlay
+  const isDraft = isDraftAgentSessionId(sessionId)
+  // Draft has no session workspace — keep terminal (home cwd), hide CLI/files.
+  const showTerminalAction = Boolean(sessionId)
+  const showCliAndFilesActions = Boolean(sessionId) && !isDraft
 
   return (
     <DesktopDragRegion
@@ -138,168 +143,179 @@ export function SessionMainHeader({
         }
         onDelete={item => setDeleteTarget(item)}
       />
-      <div className="flex h-8 shrink-0 items-center gap-0.5">
-        {session?.projectId
-          ? (() => {
-              const projectName =
-                projects.find(p => p.id === session.projectId)
-                  ?.name || null
-              if (!projectName) return null
-              return (
-                <button
+      {showTerminalAction || showCliAndFilesActions ? (
+        <div className="flex h-8 shrink-0 items-center gap-0.5">
+          {showCliAndFilesActions && session?.projectId
+            ? (() => {
+                const projectName =
+                  projects.find(p => p.id === session.projectId)
+                    ?.name || null
+                if (!projectName) return null
+                return (
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground mr-1 inline-flex max-w-[12rem] items-center gap-1.5 rounded-md px-1.5 py-1 text-xs"
+                    title={projectName}
+                    onClick={() =>
+                      selectProjectScope(session.projectId!)
+                    }
+                  >
+                    <Folder className="size-3.5 shrink-0" />
+                    <span className="truncate">{projectName}</span>
+                  </button>
+                )
+              })()
+            : null}
+          {showCliAndFilesActions ? (
+            <DropdownMenu
+              open={cliMenuOpen}
+              onOpenChange={open => {
+                setCliMenuOpen(open)
+                if (!open) setCopiedResumeCommand(false)
+              }}
+            >
+              <DropdownMenuTrigger asChild>
+                <Button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground mr-1 inline-flex max-w-[12rem] items-center gap-1.5 rounded-md px-1.5 py-1 text-xs"
-                  title={projectName}
-                  onClick={() =>
-                    selectProjectScope(session.projectId!)
-                  }
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  aria-label="Resume in Agent CLI"
+                  title="Resume in Agent CLI"
                 >
-                  <Folder className="size-3.5 shrink-0" />
-                  <span className="truncate">{projectName}</span>
-                </button>
-              )
-            })()
-          : null}
-        <DropdownMenu
-          open={cliMenuOpen}
-          onOpenChange={open => {
-            setCliMenuOpen(open)
-            if (!open) setCopiedResumeCommand(false)
-          }}
-        >
-          <DropdownMenuTrigger asChild>
+                  <Terminal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                sideOffset={6}
+                className="w-[22rem] overflow-hidden rounded-xl p-0"
+                onCloseAutoFocus={event => event.preventDefault()}
+              >
+                <div className="px-4 pt-3">
+                  <p className="text-foreground text-sm font-semibold">
+                    Resume in Agent CLI
+                  </p>
+                </div>
+                <div className="px-4 pb-3 pt-2">
+                  <div className="border-border/80 bg-muted/35 flex items-center gap-2 rounded-lg border p-2.5">
+                    <Terminal className="text-muted-foreground size-4 shrink-0" />
+                    <code className="min-w-0 flex-1 truncate font-mono text-[13px]">
+                      {`sandwalk --resume ${sessionId}`}
+                    </code>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 shrink-0 rounded-md"
+                      onClick={event => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        if (!sessionId) return
+                        void copyText(
+                          `sandwalk --resume ${sessionId}`
+                        )
+                        setCopiedResumeCommand(true)
+                        window.setTimeout(
+                          () => setCopiedResumeCommand(false),
+                          2000
+                        )
+                      }}
+                      aria-label="Copy resume command"
+                      title="Copy resume command"
+                    >
+                      {copiedResumeCommand ? (
+                        <Check className="size-3.5" />
+                      ) : (
+                        <Copy className="size-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-muted-foreground mt-2 text-xs">
+                    Continue this session in your local sandwalk CLI.
+                  </p>
+                </div>
+                <div className="border-border/70 border-t px-4 py-3">
+                  <DropdownMenuItem
+                    className="h-10 cursor-pointer gap-2 rounded-lg px-3 text-sm"
+                    disabled={!session}
+                    onSelect={() => {
+                      if (!session) return
+                      void exportTranscript(session)
+                    }}
+                  >
+                    <Download className="size-4" />
+                    Export transcript
+                  </DropdownMenuItem>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+          {showTerminalAction ? (
             <Button
               type="button"
               variant="ghost"
               size="icon"
               className="size-8"
-              aria-label="Resume in Agent CLI"
-              title="Resume in Agent CLI"
-              disabled={!sessionId}
+              onClick={() => {
+                if (terminalOpen) {
+                  setTerminalOpen(false)
+                  return
+                }
+                if (!isDraft) setFilesPanelCollapsed(false)
+                setTerminalOpen(true)
+              }}
+              aria-label={
+                terminalOpen ? 'Hide terminal' : 'Show terminal'
+              }
+              title={
+                isDraft
+                  ? terminalOpen
+                    ? 'Hide terminal'
+                    : 'Open terminal in home'
+                  : terminalOpen
+                    ? 'Hide terminal'
+                    : 'Show terminal'
+              }
             >
-              <Terminal className="size-4" />
+              <SquareTerminal
+                className={cn(
+                  'size-4',
+                  terminalOpen && 'text-foreground'
+                )}
+              />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            sideOffset={6}
-            className="w-[22rem] overflow-hidden rounded-xl p-0"
-            onCloseAutoFocus={event => event.preventDefault()}
-          >
-            <div className="px-4 pt-3">
-              <p className="text-foreground text-sm font-semibold">
-                Resume in Agent CLI
-              </p>
-            </div>
-            <div className="px-4 pb-3 pt-2">
-              <div className="border-border/80 bg-muted/35 flex items-center gap-2 rounded-lg border p-2.5">
-                <Terminal className="text-muted-foreground size-4 shrink-0" />
-                <code className="min-w-0 flex-1 truncate font-mono text-[13px]">
-                  {sessionId
-                    ? `sandwalk --resume ${sessionId}`
-                    : 'sandwalk --resume <chat_id>'}
-                </code>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 shrink-0 rounded-md"
-                  disabled={!sessionId}
-                  onClick={event => {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    if (!sessionId) return
-                    void copyText(
-                      `sandwalk --resume ${sessionId}`
-                    )
-                    setCopiedResumeCommand(true)
-                    window.setTimeout(
-                      () => setCopiedResumeCommand(false),
-                      2000
-                    )
-                  }}
-                  aria-label="Copy resume command"
-                  title="Copy resume command"
-                >
-                  {copiedResumeCommand ? (
-                    <Check className="size-3.5" />
-                  ) : (
-                    <Copy className="size-3.5" />
-                  )}
-                </Button>
-              </div>
-              <p className="text-muted-foreground mt-2 text-xs">
-                Continue this session in your local sandwalk CLI.
-              </p>
-            </div>
-            <div className="border-border/70 border-t px-4 py-3">
-              <DropdownMenuItem
-                className="h-10 cursor-pointer gap-2 rounded-lg px-3 text-sm"
-                disabled={!session}
-                onSelect={() => {
-                  if (!session) return
-                  void exportTranscript(session)
-                }}
-              >
-                <Download className="size-4" />
-                Export transcript
-              </DropdownMenuItem>
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          disabled={!sessionId}
-          onClick={() => {
-            if (terminalOpen) {
-              setTerminalOpen(false)
-              return
-            }
-            setFilesPanelCollapsed(false)
-            setTerminalOpen(true)
-          }}
-          aria-label={
-            terminalOpen ? 'Hide terminal' : 'Show terminal'
-          }
-          title={terminalOpen ? 'Hide terminal' : 'Show terminal'}
-        >
-          <SquareTerminal
-            className={cn(
-              'size-4',
-              terminalOpen && 'text-foreground'
-            )}
-          />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          onClick={() =>
-            setFilesPanelCollapsed(current => !current)
-          }
-          aria-label={
-            filesPanelCollapsed
-              ? 'Show files panel'
-              : 'Hide files panel'
-          }
-          title={
-            filesPanelCollapsed
-              ? 'Show files panel'
-              : 'Hide files panel'
-          }
-        >
-          <PanelRight
-            className={cn(
-              'size-4',
-              !filesPanelCollapsed && 'text-foreground'
-            )}
-          />
-        </Button>
-      </div>
+          ) : null}
+          {showCliAndFilesActions ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={() =>
+                setFilesPanelCollapsed(current => !current)
+              }
+              aria-label={
+                filesPanelCollapsed
+                  ? 'Show files panel'
+                  : 'Hide files panel'
+              }
+              title={
+                filesPanelCollapsed
+                  ? 'Show files panel'
+                  : 'Hide files panel'
+              }
+            >
+              <PanelRight
+                className={cn(
+                  'size-4',
+                  !filesPanelCollapsed && 'text-foreground'
+                )}
+              />
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </DesktopDragRegion>
   )
 }

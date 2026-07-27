@@ -11,6 +11,7 @@ import type { NavigateFunction } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { fileChipToken } from '@/components/agents/composer-parts'
+import { TerminalPanel } from '@/components/agents/TerminalPanel'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import { WorkspacePanel } from '@/components/agents/WorkspacePanel'
@@ -20,7 +21,10 @@ import {
   ResizablePanelGroup
 } from '@/components/ui/resizable'
 import { SESSION_PANELS_AUTO_SAVE_ID } from '@/lib/app-storage'
-import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import {
+  HOST_TERMINAL_SESSION_ID,
+  isDraftAgentSessionId
+} from '@/lib/draft-agent'
 import { planCardFromPath, startPlanBuild } from '@/lib/plan-build'
 import { type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
@@ -169,6 +173,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     setComposerFiles
   } = props
 
+  const isDraft = isDraftAgentSessionId(sessionId)
+  // Draft has no artifacts pane — terminal alone takes the side column.
+  const showDraftTerminal = isDraft && terminalOpen
+
   return (
     <ResizablePanelGroup
       direction="horizontal"
@@ -274,7 +282,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             onExpand={() => setFilesPanelCollapsed(false)}
             className="min-w-0"
           >
-            {sessionId && !isDraftAgentSessionId(sessionId) ? (
+            {sessionId && !isDraft ? (
               <WorkspacePanel
                 key={sessionId}
                 client={client}
@@ -335,6 +343,30 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 onOpenTerminal={() => setTerminalOpen(true)}
               />
             ) : null}
+          </ResizablePanel>
+        </>
+      ) : null}
+      {showDraftTerminal ? (
+        <>
+          <ResizableHandle className="w-px" />
+          <ResizablePanel
+            id="draft-terminal"
+            order={3}
+            defaultSize={40}
+            minSize={25}
+            maxSize={70}
+            className="min-w-0"
+          >
+            <aside className="bg-card relative z-20 flex h-full w-full min-h-0 min-w-0 flex-col">
+              <TerminalPanel
+                client={client}
+                sessionId={HOST_TERMINAL_SESSION_ID}
+                visible={terminalOpen}
+                autoCreateOnEmpty
+                onClose={() => setTerminalOpen(false)}
+                className="border-t-0"
+              />
+            </aside>
           </ResizablePanel>
         </>
       ) : null}

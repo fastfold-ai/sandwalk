@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket
 
@@ -10,16 +11,32 @@ from agent_server.app_deps import AppDeps
 from agent_server.auth_settings import SESSION_COOKIE, key_matches, request_is_authenticated
 from agent_server.models import CreatePtyRequest, PtySessionInfo, PtySessionList, UpdatePtyRequest
 
+# Terminals opened outside an agent chat (draft home) — cwd is the user home.
+HOST_TERMINAL_SESSION_ID = "host"
+
 
 def register_pty_routes(app: FastAPI, deps: AppDeps) -> None:
     store = deps.store
     service = deps.service
     pty_manager = deps.pty_manager
 
-    @app.get("/v1/sessions/{session_id}/pty", response_model=PtySessionList)
-    async def list_pty_sessions(session_id: str) -> PtySessionList:
+    async def _require_agent_session(session_id: str) -> None:
+        if session_id == HOST_TERMINAL_SESSION_ID:
+            return
         if await asyncio.to_thread(store.get_session, session_id) is None:
             raise HTTPException(status_code=404, detail="Session not found.")
+
+    def _pty_cwd(session_id: str) -> str:
+        if session_id == HOST_TERMINAL_SESSION_ID:
+            return str(Path.home().expanduser().resolve())
+        session = service.ensure_workspace(session_id)
+        if not session.workspace_path:
+            raise HTTPException(status_code=409, detail="Session has no workspace.")
+        return session.workspace_path
+
+    @app.get("/v1/sessions/{session_id}/pty", response_model=PtySessionList)
+    async def list_pty_sessions(session_id: str) -> PtySessionList:
+        await _require_agent_session(session_id)
         return PtySessionList(
             data=[
                 PtySessionInfo(**info.to_dict())
@@ -36,13 +53,11 @@ def register_pty_routes(app: FastAPI, deps: AppDeps) -> None:
         session_id: str,
         payload: CreatePtyRequest | None = None,
     ) -> PtySessionInfo:
-        session = service.ensure_workspace(session_id)
-        if not session.workspace_path:
-            raise HTTPException(status_code=409, detail="Session has no workspace.")
+        await _require_agent_session(session_id)
         body = payload or CreatePtyRequest()
         info = await pty_manager.create(
             session_id=session_id,
-            cwd=session.workspace_path,
+            cwd=_pty_cwd(session_id),
             title=body.title,
             cols=body.cols,
             rows=body.rows,
@@ -114,9 +129,10 @@ def register_pty_routes(app: FastAPI, deps: AppDeps) -> None:
             if not valid:
                 await websocket.close(code=4401)
                 return
-        if await asyncio.to_thread(store.get_session, session_id) is None:
-            await websocket.close(code=4404)
-            return
+        if session_id != HOST_TERMINAL_SESSION_ID:
+            if await asyncio.to_thread(store.get_session, session_id) is None:
+                await websocket.close(code=4404)
+                return
         if pty_manager.get(session_id, pty_id) is None:
             await websocket.close(code=4404)
             return

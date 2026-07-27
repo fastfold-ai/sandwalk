@@ -3,6 +3,8 @@ import '@xterm/xterm/css/xterm.css'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { useEffect, useRef } from 'react'
 
+import { cn } from '@/lib/utils'
+
 import { TerminalTabBar } from './terminal-tab-bar'
 import { TerminalTabContextMenu } from './terminal-tab-context-menu'
 import { TerminalViewport } from './terminal-viewport'
@@ -16,6 +18,7 @@ type TerminalPanelProps = {
   startupCommand?: string | null
   startupNonce?: number
   onClose?: () => void
+  className?: string
 }
 
 export function TerminalPanel({
@@ -25,7 +28,8 @@ export function TerminalPanel({
   autoCreateOnEmpty = false,
   startupCommand = null,
   startupNonce = 0,
-  onClose
+  onClose,
+  className
 }: TerminalPanelProps) {
   const lastStartupNonceRef = useRef<number>(-1)
 
@@ -87,7 +91,12 @@ export function TerminalPanel({
   }, [activeId, livesRef, sendCommandToLive, startupCommand, startupNonce, tabs])
 
   return (
-    <div className="bg-card border-border flex h-full min-h-0 flex-col border-t">
+    <div
+      className={cn(
+        'bg-card border-border flex h-full min-h-0 flex-col border-t',
+        className
+      )}
+    >
       <TerminalTabBar
         tabs={tabs}
         activeId={activeId}

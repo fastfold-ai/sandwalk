@@ -73,7 +73,7 @@ export function useTerminalLive({
       const term = new XTerm({
         cursorBlink: true,
         cursorStyle: 'bar',
-        fontSize: 12.5,
+        fontSize: 11,
         lineHeight: 1.35,
         letterSpacing: 0,
         fontFamily:
