@@ -20,14 +20,20 @@ import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
 import { SessionSourceIcon } from '@/components/agents/SessionSourceIcon'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
+import { TAB_INLINE_COLORS } from '@/components/agents/tab-context-menu'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { groupSessions, relativeTime, type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
+
+/** Same Blue pastel as the tab color tag — marks unread notification sessions. */
+const UNREAD_DOT_COLOR =
+  TAB_INLINE_COLORS.find(item => item.name === 'Blue')?.value ?? '#8BB8F5'
 
 type SessionSection = ReturnType<typeof groupSessions>[number]
 
@@ -87,6 +93,7 @@ export function SidebarSessionList({
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
   const { tabColors, setTabColor } = useSessionTabColors()
+  const attentionIds = useSessionAttentionIds()
   const previousScopeRef = useRef(scopeKey)
   const sectionsRef = useRef(sections)
   sectionsRef.current = sections
@@ -235,6 +242,13 @@ export function SidebarSessionList({
                               />
                               {item.organizeLabel === 'pinned' ? (
                                 <Pin className="text-muted-foreground/70 size-3 shrink-0" />
+                              ) : null}
+                              {attentionIds.has(item.id) ? (
+                                <span
+                                  className="size-2 shrink-0 rounded-full border border-black/10"
+                                  style={{ backgroundColor: UNREAD_DOT_COLOR }}
+                                  aria-label="Unread"
+                                />
                               ) : null}
                               {tabColor ? (
                                 <span

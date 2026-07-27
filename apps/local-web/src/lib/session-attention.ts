@@ -1,4 +1,7 @@
-/** Per-session attention → macOS Dock badge when unread events pile up. */
+/**
+ * Per-session unread attention.
+ * Drives the macOS Dock badge and the in-app blue unread dots on tabs/sidebar.
+ */
 
 import { setDockBadge } from '@/lib/desktop'
 

@@ -12,7 +12,14 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useHorizontalWheelScroll } from '@/hooks/useHorizontalWheelScroll'
+import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { cn } from '@/lib/utils'
+
+import { TAB_INLINE_COLORS } from './tab-context-menu'
+
+/** Same Blue pastel as the tab color tag — marks unread notification sessions. */
+const UNREAD_DOT_COLOR =
+  TAB_INLINE_COLORS.find(item => item.name === 'Blue')?.value ?? '#8BB8F5'
 
 import { useSessionTabColors } from './session-tab-colors'
 import { SessionSourceIcon } from './SessionSourceIcon'
@@ -57,6 +64,7 @@ export function SessionTabs({
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
   const { tabColors, setTabColor } = useSessionTabColors()
+  const attentionIds = useSessionAttentionIds()
   const activeTabRef = useRef<HTMLDivElement | null>(null)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   useHorizontalWheelScroll(scrollerRef)
@@ -98,6 +106,7 @@ export function SessionTabs({
     const active = tab.id === activeId
     const color = tabColors[tab.id]
     const pinned = tab.organizeLabel === 'pinned'
+    const unread = attentionIds.has(tab.id)
     return (
       <div
         key={tab.id}
@@ -127,6 +136,13 @@ export function SessionTabs({
           <SessionSourceIcon source={tab.source} label={tab.sourceLabel} />
           {pinned ? (
             <Pin className="text-muted-foreground size-3 shrink-0" aria-hidden />
+          ) : null}
+          {unread ? (
+            <span
+              className="size-2 shrink-0 rounded-full border border-black/10"
+              style={{ backgroundColor: UNREAD_DOT_COLOR }}
+              aria-label="Unread"
+            />
           ) : null}
           {color ? (
             <span
