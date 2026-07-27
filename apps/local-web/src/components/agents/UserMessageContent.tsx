@@ -2,12 +2,14 @@ import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { McpServer } from '@sandwalk/agent-ui-core'
 import { Plug } from 'lucide-react'
+import { Fragment, type ReactNode } from 'react'
 
 import {
   mcpIconForChip,
   mcpIconForServer
 } from '@/components/agents/composer/composer-mention-utils'
 import { parseMessageParts } from '@/components/agents/composer-parts'
+import { ExternalUrlLink } from '@/components/agents/ExternalUrlLink'
 import {
   MessageFilePreview,
   messageFilePreviewKind
@@ -16,9 +18,27 @@ import {
   type SkillIconSkill,
   SkillMentionChip} from '@/components/agents/SkillMentionChip'
 import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
+import { splitTextWithUrls } from '@/lib/chat-urls'
 import { getFileIcon } from '@/lib/file-icons'
 import { cn } from '@/lib/utils'
 import { splitTextWithWorkspacePaths } from '@/lib/workspace-file-paths'
+
+function linkifyUrlsInText(text: string): ReactNode {
+  const segments = splitTextWithUrls(text)
+  if (segments.length === 1 && segments[0]?.type === 'text') {
+    return text
+  }
+  return segments.map((segment, index) => {
+    if (segment.type === 'text') {
+      return <Fragment key={`t-${index}`}>{segment.text}</Fragment>
+    }
+    return (
+      <ExternalUrlLink key={`u-${index}-${segment.href}`} href={segment.href}>
+        {segment.text}
+      </ExternalUrlLink>
+    )
+  })
+}
 
 export function UserMessageContent({
   content,
@@ -62,8 +82,13 @@ export function UserMessageContent({
           segment => segment.type === 'file'
         )
     )
+  const hasUrls = parts.some(
+    part =>
+      part.type === 'text' &&
+      splitTextWithUrls(part.text).some(segment => segment.type === 'url')
+  )
 
-  if (!hasChips && !hasInlinePreviews && !hasWorkspacePaths) {
+  if (!hasChips && !hasInlinePreviews && !hasWorkspacePaths && !hasUrls) {
     return (
       <p
         className={cn(
@@ -80,7 +105,7 @@ export function UserMessageContent({
     if (!onOpenFile) {
       return (
         <span key={key} className="whitespace-pre-wrap">
-          {text}
+          {linkifyUrlsInText(text)}
         </span>
       )
     }
@@ -88,7 +113,13 @@ export function UserMessageContent({
     return (
       <span key={key} className="whitespace-pre-wrap">
         {segments.map((segment, segmentIndex) => {
-          if (segment.type === 'text') return segment.text
+          if (segment.type === 'text') {
+            return (
+              <Fragment key={`${key}-t-${segmentIndex}`}>
+                {linkifyUrlsInText(segment.text)}
+              </Fragment>
+            )
+          }
           return (
             <WorkspaceFileChip
               key={`${key}-ws-${segmentIndex}`}

@@ -29,4 +29,12 @@ describe('splitTextWithSkillMentions', () => {
       { type: 'text', text: '.' }
     ])
   })
+
+  it('does not treat URL path segments as skills', () => {
+    const text = 'read https://news.ycombinator.com/ then /lab-notes'
+    expect(splitTextWithSkillMentions(text)).toEqual([
+      { type: 'text', text: 'read https://news.ycombinator.com/ then ' },
+      { type: 'skill', name: 'lab-notes' }
+    ])
+  })
 })

@@ -1,8 +1,11 @@
+import { findUrlRanges, rangeOverlapsUrl } from '@/lib/chat-urls'
+
 /**
  * Split plain text into skill mentions and residual text.
  *
  * Supports composer tokens `⟦/:name⟧` and slash mentions `/name` at word
- * boundaries (so filesystem paths like `/Users/...` are left alone).
+ * boundaries (so filesystem paths like `/Users/...` and URL paths like
+ * `https://news.ycombinator.com/` are left alone).
  */
 export type SkillMentionSegment =
   | { type: 'text'; text: string }
@@ -16,6 +19,7 @@ const SKILL_SLASH_RE =
 export function splitTextWithSkillMentions(text: string): SkillMentionSegment[] {
   type Hit = { start: number; end: number; name: string }
   const hits: Hit[] = []
+  const urls = findUrlRanges(text)
 
   for (const match of text.matchAll(SKILL_TOKEN_RE)) {
     const name = (match[1] || '').trim()
@@ -31,8 +35,9 @@ export function splitTextWithSkillMentions(text: string): SkillMentionSegment[] 
     const full = match[0]
     const start = (match.index ?? 0) + full.indexOf(raw)
     const end = start + raw.length
-    // Skip if overlapping a token hit.
+    // Skip if overlapping a token hit or an http(s) URL.
     if (hits.some(hit => start < hit.end && end > hit.start)) continue
+    if (rangeOverlapsUrl(urls, start, end)) continue
     hits.push({ start, end, name })
   }
 

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { Components } from 'react-markdown'
 import type { NavigateFunction } from 'react-router-dom'
 
+import { ExternalUrlLink } from '@/components/agents/ExternalUrlLink'
 import {
   type SkillIconSkill,
   SkillMentionChip} from '@/components/agents/SkillMentionChip'
@@ -115,12 +116,15 @@ export function buildMarkdownComponents({
           </a>
         )
       }
+      if (typeof href === 'string' && /^https?:\/\//i.test(href)) {
+        return <ExternalUrlLink href={href}>{children}</ExternalUrlLink>
+      }
       return (
         <a
           href={href}
           target="_blank"
           rel="noreferrer"
-          className="text-foreground font-medium"
+          className="text-blue-600 font-medium dark:text-blue-400"
         >
           {children}
         </a>
