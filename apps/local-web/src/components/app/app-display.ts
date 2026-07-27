@@ -1,6 +1,7 @@
 import type { AgentSession, IntegrationSummary } from '@sandwalk/agent-ui-core'
 
 import { slugifyIntegrationRoute } from '@/components/agents/dashboard-main-view-helpers'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { groupSessions } from '@/lib/sessions'
 
 const CONCURRENT_RUN_SOFT_LIMIT = 3
@@ -99,6 +100,9 @@ export function computeShowSessionTabs(input: {
   sessionId: string | null
   openTabsLength: number
 }) {
+  const realSession = Boolean(
+    input.sessionId && !isDraftAgentSessionId(input.sessionId)
+  )
   return (
     !input.isDashboard &&
     !input.isHome &&
@@ -106,7 +110,7 @@ export function computeShowSessionTabs(input: {
     !input.isProjectHome &&
     !input.isSkills &&
     !input.isIntegrations &&
-    (Boolean(input.sessionId) || input.openTabsLength > 0)
+    (realSession || input.openTabsLength > 0)
   )
 }
 

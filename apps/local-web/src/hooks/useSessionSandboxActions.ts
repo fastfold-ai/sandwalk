@@ -11,6 +11,7 @@ import {
 } from 'react'
 
 import { type SandboxActionPhase } from '@/components/agents/Composer'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 
 type SandboxActionsArgs = {
   client: LocalAgentClient
@@ -27,6 +28,10 @@ type SandboxActionsArgs = {
   loadSessions: () => Promise<void>
   loadProjects: () => Promise<void>
   refreshSessionSandbox: (targetSessionId?: string | null) => Promise<SessionSandboxStatus | null>
+  ensureAgentSession: (
+    projectId?: string | null,
+    options?: { navigate?: boolean }
+  ) => Promise<string | null>
 }
 
 export function createSessionSandboxActions({
@@ -43,19 +48,21 @@ export function createSessionSandboxActions({
   setError,
   loadSessions,
   loadProjects,
-  refreshSessionSandbox
+  refreshSessionSandbox,
+  ensureAgentSession
 }: SandboxActionsArgs) {
   const selectSessionSandboxBackend = async (
     backend: 'builtin' | 'modal'
   ) => {
-    if (!session) return
+    const ensuredId = session?.id ?? (await ensureAgentSession())
+    if (!ensuredId || isDraftAgentSessionId(ensuredId)) return
     if (
       backend === 'modal' &&
       sessionSandboxStatus?.modalConfigured !== true
     ) {
       return
     }
-    const targetId = session.id
+    const targetId = ensuredId
     try {
       if (backend === 'builtin' && sessionSandboxStatus?.status === 'running') {
         sandboxActionSessionRef.current = targetId
@@ -120,9 +127,9 @@ export function createSessionSandboxActions({
   }
 
   const startSessionSandbox = async () => {
-    if (!sessionId) return
-    const targetId = sessionId
     if (sessionSandboxPhase !== 'idle') return
+    const targetId = await ensureAgentSession()
+    if (!targetId || isDraftAgentSessionId(targetId)) return
     sandboxActionSessionRef.current = targetId
     setSessionSandboxPhase('starting')
     try {
@@ -146,7 +153,7 @@ export function createSessionSandboxActions({
   }
 
   const stopSessionSandbox = async () => {
-    if (!sessionId) return
+    if (!sessionId || isDraftAgentSessionId(sessionId)) return
     const targetId = sessionId
     if (sessionSandboxPhase !== 'idle') return
     sandboxActionSessionRef.current = targetId
@@ -172,9 +179,9 @@ export function createSessionSandboxActions({
   }
 
   const restartSessionSandbox = async () => {
-    if (!sessionId) return
-    const targetId = sessionId
     if (sessionSandboxPhase !== 'idle') return
+    const targetId = await ensureAgentSession()
+    if (!targetId || isDraftAgentSessionId(targetId)) return
     sandboxActionSessionRef.current = targetId
     setSessionSandboxPhase('restarting')
     try {

@@ -8,6 +8,7 @@ import {
   useEffect} from 'react'
 
 import { buildSendContent } from '@/lib/chat-actions'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import type { SessionChatState } from '@/lib/sessions'
 
 /** Soft warn: live SSE streams start crowding the browser's ~6 conn/host limit. */
@@ -42,6 +43,10 @@ type UseSessionChatSendArgs = {
   setSessions: Dispatch<SetStateAction<AgentSession[]>>
   setError: Dispatch<SetStateAction<string | null>>
   setConnectionLimitDismissed: Dispatch<SetStateAction<boolean>>
+  ensureAgentSession: (
+    projectId?: string | null,
+    options?: { navigate?: boolean }
+  ) => Promise<string | null>
 }
 
 export function useSessionChatSend({
@@ -62,7 +67,8 @@ export function useSessionChatSend({
   patchChat,
   setSessions,
   setError,
-  setConnectionLimitDismissed
+  setConnectionLimitDismissed,
+  ensureAgentSession
 }: UseSessionChatSendArgs) {
   const sendMessage = async (composerOverride?: string) => {
     const composerText = composerOverride ?? composerLiveRef.current ?? composer
@@ -71,9 +77,11 @@ export function useSessionChatSend({
       composerSkills,
       composerFiles
     })
-    if (!sessionId || !content || runActive) return
+    if (!content || runActive) return
+    const targetSessionId = await ensureAgentSession()
+    if (!targetSessionId || isDraftAgentSessionId(targetSessionId)) return
     const othersRunning = sessions.filter(
-      item => item.status === 'running' && item.id !== sessionId
+      item => item.status === 'running' && item.id !== targetSessionId
     ).length
     if (othersRunning + 1 >= CONCURRENT_RUN_HARD_LIMIT) {
       const proceed = window.confirm(
@@ -85,42 +93,43 @@ export function useSessionChatSend({
     } else if (othersRunning + 1 >= CONCURRENT_RUN_SOFT_LIMIT) {
       setConnectionLimitDismissed(false)
     }
-    const targetSessionId = sessionId
     const previousComposer = composerText
     const previousSkills = composerSkills
     const previousFiles = composerFiles
     composerLiveRef.current = ''
+    // Optimistic: dock the composer immediately so draft → chat does not wait
+    // on the network round-trip before the layout animates.
     patchChat(targetSessionId, {
       composer: '',
       composerSkills: [],
-      composerFiles: []
+      composerFiles: [],
+      runActive: true,
+      messagesLoaded: true
     })
+    setSessions(current =>
+      current.map(item =>
+        item.id === targetSessionId
+          ? { ...item, status: 'running' as const }
+          : item
+      )
+    )
     setError(null)
     try {
       await client.sendMessage(targetSessionId, content)
-      patchChat(targetSessionId, prev => ({
-        ...prev,
-        runActive: true
-      }))
-      setSessions(current =>
-        current.map(item =>
-          item.id === targetSessionId
-            ? { ...item, status: 'running' as const }
-            : item
-        )
-      )
       const history = await client.listMessages(targetSessionId)
       patchChat(targetSessionId, prev => ({
         ...prev,
         messages: history,
-        messagesLoaded: true
+        messagesLoaded: true,
+        runActive: true
       }))
     } catch (cause) {
       composerLiveRef.current = previousComposer
       patchChat(targetSessionId, {
         composer: previousComposer,
         composerSkills: previousSkills,
-        composerFiles: previousFiles
+        composerFiles: previousFiles,
+        runActive: false
       })
       setError(
         cause instanceof Error ? cause.message : 'Unable to send message'
@@ -141,11 +150,11 @@ export function useSessionChatSend({
   )
 
   const handleComposerSend = (text: string) => {
-    if (!sessionId) return
     const trimmed = text.trim()
     if (!trimmed) return
+    if (!sessionId) return
 
-    if (editingQueuedId) {
+    if (editingQueuedId && !isDraftAgentSessionId(sessionId)) {
       patchChat(sessionId, prev => ({
         ...prev,
         queuedMessages: prev.queuedMessages.map(item =>
@@ -157,7 +166,7 @@ export function useSessionChatSend({
       return
     }
 
-    if (runActive) {
+    if (runActive && !isDraftAgentSessionId(sessionId)) {
       patchChat(sessionId, prev => ({
         ...prev,
         queuedMessages: [

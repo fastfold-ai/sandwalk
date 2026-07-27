@@ -110,6 +110,34 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     loadSkillsRef: args.loadSkillsRef
   })
 
+  const actions = useSessionActions({
+    client: args.client,
+    navigate: args.navigate,
+    activeProjectId: args.activeProjectId,
+    tabsScopeKey: args.tabsScopeKey,
+    sessionId: args.sessionId,
+    sessionIdRef: args.sessionIdRef,
+    session: args.session,
+    sessions: args.sessions,
+    setSessions: args.setSessions,
+    activeProject: args.activeProject,
+    openTabsByProject: args.openTabsByProject,
+    setOpenTabsByProject: args.setOpenTabsByProject,
+    lastSessionByScope: args.lastSessionByScope,
+    setLastSessionByScope: args.setLastSessionByScope,
+    setProjectScopeId: args.setProjectScopeId,
+    setRecentProjectIds: args.setRecentProjectIds,
+    patchOpenTabs: args.patchOpenTabs,
+    setOpenTabIds: args.setOpenTabIds,
+    patchChat: chat.patchChat,
+    setChatBySessionId: chat.setChatBySessionId,
+    composerLiveRef: chat.composerLiveRef,
+    loadSessions: args.loadSessions,
+    loadProjects: args.loadProjects,
+    setError: args.setError,
+    setCollapsedSidebarSections: args.setCollapsedSidebarSections
+  })
+
   const send = useSessionChatSend({
     client: args.client,
     sessionId: args.sessionId,
@@ -128,7 +156,8 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     patchChat: chat.patchChat,
     setSessions: args.setSessions,
     setError: args.setError,
-    setConnectionLimitDismissed: args.setConnectionLimitDismissed
+    setConnectionLimitDismissed: args.setConnectionLimitDismissed,
+    ensureAgentSession: actions.ensureAgentSession
   })
 
   const prefetchSessionMessages = usePrefetchSessionMessages(
@@ -146,33 +175,8 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     loadSessions: args.loadSessions,
     loadProjects: args.loadProjects,
     setSandboxSettings: args.setSandboxSettings,
-    setError: args.setError
-  })
-
-  const actions = useSessionActions({
-    client: args.client,
-    navigate: args.navigate,
-    activeProjectId: args.activeProjectId,
-    tabsScopeKey: args.tabsScopeKey,
-    sessionId: args.sessionId,
-    session: args.session,
-    sessions: args.sessions,
-    setSessions: args.setSessions,
-    activeProject: args.activeProject,
-    openTabsByProject: args.openTabsByProject,
-    setOpenTabsByProject: args.setOpenTabsByProject,
-    lastSessionByScope: args.lastSessionByScope,
-    setLastSessionByScope: args.setLastSessionByScope,
-    setProjectScopeId: args.setProjectScopeId,
-    setRecentProjectIds: args.setRecentProjectIds,
-    patchOpenTabs: args.patchOpenTabs,
-    setOpenTabIds: args.setOpenTabIds,
-    patchChat: chat.patchChat,
-    setChatBySessionId: chat.setChatBySessionId,
-    loadSessions: args.loadSessions,
-    loadProjects: args.loadProjects,
     setError: args.setError,
-    setCollapsedSidebarSections: args.setCollapsedSidebarSections
+    ensureAgentSession: actions.ensureAgentSession
   })
 
   const conversationTimeline = useMemo(
@@ -208,6 +212,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     client: args.client,
     navigate: args.navigate,
     pendingAttachmentsRef: args.pendingAttachmentsRef,
+    ensureAgentSession: actions.ensureAgentSession,
     composerLiveRef: chat.composerLiveRef,
     queuedMessages: chat.queuedMessages,
     editingQueuedId: chat.editingQueuedId,

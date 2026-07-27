@@ -12,6 +12,7 @@ import {
   notifyRunCompleted
 } from '@/lib/browser-notifications'
 import { reduceChatOnAgentEvent } from '@/lib/chat-actions'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { markSessionAttention } from '@/lib/session-attention'
 import type { SessionChatState } from '@/lib/sessions'
 
@@ -112,6 +113,15 @@ export function useSessionChatStream({
 
   useEffect(() => {
     if (!health || !sessionId) return
+    // Draft /agents/new has no API session yet.
+    if (isDraftAgentSessionId(sessionId)) {
+      patchChat(sessionId, prev =>
+        prev.messagesLoaded
+          ? prev
+          : { ...prev, messages: [], messagesLoaded: true }
+      )
+      return
+    }
     if (chatBySessionIdRef.current[sessionId]?.messagesLoaded) return
 
     // Empty/new sessions: show the empty composer immediately, hydrate in background.
@@ -190,10 +200,13 @@ export function useSessionChatStream({
     // Only stream the active session + any currently running sessions.
     // An SSE per open tab exhausts the browser's ~6 HTTP/1.1 connections/host,
     // which leaves file content fetches stuck in (pending).
+    // Draft /agents/new has no API session — never open a stream for it.
     const wanted = new Set<string>()
-    if (sessionId) wanted.add(sessionId)
+    if (sessionId && !isDraftAgentSessionId(sessionId)) {
+      wanted.add(sessionId)
+    }
     for (const id of runningSessionIdsKey.split(',').filter(Boolean)) {
-      wanted.add(id)
+      if (!isDraftAgentSessionId(id)) wanted.add(id)
     }
 
     for (const [id, controller] of [...streamControllersRef.current]) {

@@ -15,6 +15,7 @@ import {
   writeOpenTabsByProject,
   writeProjectScopeId
 } from '@/lib/app-storage'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { clearSessionAttention } from '@/lib/session-attention'
 
 type UseAppSessionEffectsArgs = {
@@ -79,7 +80,7 @@ export function useAppSessionEffects({
   }, [integrations, isIntegrations, navigate, selectedIntegrationKey])
 
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId || isDraftAgentSessionId(sessionId)) return
     const item = sessions.find(session => session.id === sessionId)
     // Keep project tab strips clean: only pin sessions that belong to the scope.
     if (activeProjectId && item && item.projectId !== activeProjectId) return
@@ -89,7 +90,7 @@ export function useAppSessionEffects({
 
   // Clear Dock badge for the open session when the window is focused again.
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId || isDraftAgentSessionId(sessionId)) return
     const onFocus = () => clearSessionAttention(sessionId)
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
@@ -116,7 +117,7 @@ export function useAppSessionEffects({
   }, [activeProjectId, sessions])
 
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId || isDraftAgentSessionId(sessionId)) return
     setLastSessionByScope(current => {
       if (current[tabsScopeKey] === sessionId) return current
       const next = { ...current, [tabsScopeKey]: sessionId }
@@ -162,7 +163,7 @@ export function useAppSessionEffects({
   }, [sessions])
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!sessionId || isDraftAgentSessionId(sessionId)) {
       setWorkspaceFiles([])
       return
     }

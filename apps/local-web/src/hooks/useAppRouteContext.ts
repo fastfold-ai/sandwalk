@@ -9,6 +9,7 @@ import type {
 import { type MutableRefObject, type SetStateAction,useCallback, useRef } from 'react'
 
 import { resolveSelectedIntegrationKey } from '@/components/app/app-display'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import type { SessionChatState } from '@/lib/sessions'
 
 type UseAppRouteContextInput = {
@@ -72,6 +73,7 @@ export function usePrefetchSessionMessages(
 ) {
   return useCallback(
     async (id: string, signal?: AbortSignal) => {
+      if (isDraftAgentSessionId(id)) return
       if (chatBySessionIdRef.current[id]?.messagesLoaded) return
       try {
         const history = await client.listMessages(id, signal)

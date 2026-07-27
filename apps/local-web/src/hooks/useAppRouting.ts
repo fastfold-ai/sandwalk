@@ -12,6 +12,11 @@ import {
   onboardingStepFromSlug
 } from '@/lib/onboarding'
 import {
+  DRAFT_AGENT_SESSION_ID,
+  isDraftAgentSessionId,
+  isReservedAgentRouteId
+} from '@/lib/draft-agent'
+import {
   parseCatalogSkillId,
   type SkillsViewMode
 } from '@/lib/skills-catalog'
@@ -114,6 +119,8 @@ export function useAppRouting(location: Location) {
     location.pathname === '/library' ||
     location.pathname.startsWith('/library/')
   const isProjectHome = Boolean(routeProjectId)
+  const isDraftAgent =
+    location.pathname === `/agents/${DRAFT_AGENT_SESSION_ID}`
   const isInspect = new URLSearchParams(location.search).get('inspect') === '1'
   const dashboardSkeletonKind: DashboardSkeletonKind = (() => {
     if (isHome || isLibrary || isProjectHome) return 'home'
@@ -145,6 +152,9 @@ export function useAppRouting(location: Location) {
     }
     return 'detail'
   })()
+  const routeSessionId = routes.sessionRoute?.params.sessionId ?? null
+  // Draft uses the client sentinel "new" so composer/chat state have a key,
+  // but API callers must skip reserved ids via isDraftAgentSessionId.
   const sessionId =
     !isDashboard &&
     !isSkills &&
@@ -152,11 +162,10 @@ export function useAppRouting(location: Location) {
     !isHome &&
     !isLibrary &&
     !isProjectHome &&
-    routes.sessionRoute?.params.sessionId &&
-    routes.sessionRoute.params.sessionId !== 'home' &&
-    routes.sessionRoute.params.sessionId !== 'skills' &&
-    routes.sessionRoute.params.sessionId !== 'integrations'
-      ? routes.sessionRoute.params.sessionId
+    routeSessionId &&
+    (!isReservedAgentRouteId(routeSessionId) ||
+      isDraftAgentSessionId(routeSessionId))
+      ? routeSessionId
       : null
 
   return {
@@ -203,6 +212,7 @@ export function useAppRouting(location: Location) {
     isHome,
     isLibrary,
     isProjectHome,
+    isDraftAgent,
     isInspect,
     dashboardSkeletonKind,
     sessionId

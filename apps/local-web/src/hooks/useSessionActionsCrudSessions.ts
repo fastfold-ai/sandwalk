@@ -8,7 +8,11 @@ import {
   writeOpenTabsByProject,
   writeRecentProjectIds
 } from '@/lib/app-storage'
-import { downloadMarkdown } from '@/lib/sessions'
+import {
+  DRAFT_AGENT_SESSION_ID,
+  isDraftAgentSessionId
+} from '@/lib/draft-agent'
+import { downloadMarkdown, emptySessionChatState } from '@/lib/sessions'
 
 import type { UseSessionActionsArgs } from './useSessionActionsTypes'
 
@@ -19,6 +23,7 @@ type SessionCrudArgs = Pick<
   | 'activeProjectId'
   | 'tabsScopeKey'
   | 'sessionId'
+  | 'sessionIdRef'
   | 'session'
   | 'sessions'
   | 'setSessions'
@@ -27,12 +32,29 @@ type SessionCrudArgs = Pick<
   | 'setProjectScopeId'
   | 'setRecentProjectIds'
   | 'patchOpenTabs'
-  | 'patchChat'
   | 'setChatBySessionId'
+  | 'composerLiveRef'
   | 'loadSessions'
   | 'loadProjects'
   | 'setError'
 >
+
+function applyProjectScope(
+  projectId: string | null,
+  setProjectScopeId: SessionCrudArgs['setProjectScopeId'],
+  setRecentProjectIds: SessionCrudArgs['setRecentProjectIds']
+) {
+  if (!projectId) return
+  setProjectScopeId(projectId)
+  setRecentProjectIds(current => {
+    const next = [projectId, ...current.filter(item => item !== projectId)].slice(
+      0,
+      10
+    )
+    writeRecentProjectIds(next)
+    return next
+  })
+}
 
 export function useSessionActionsCrudSessions({
   client,
@@ -40,6 +62,7 @@ export function useSessionActionsCrudSessions({
   activeProjectId,
   tabsScopeKey,
   sessionId,
+  sessionIdRef,
   session,
   sessions,
   setSessions,
@@ -48,76 +71,213 @@ export function useSessionActionsCrudSessions({
   setProjectScopeId,
   setRecentProjectIds,
   patchOpenTabs,
-  patchChat,
   setChatBySessionId,
+  composerLiveRef,
   loadSessions,
   loadProjects,
   setError
 }: SessionCrudArgs) {
   const createSessionInFlightRef = useRef(false)
+  const ensureInFlightRef = useRef<Promise<string | null> | null>(null)
+  // Real session created under /agents/new (upload/sandbox) before navigate.
+  // Kept separate from sessionIdRef so the draft route cannot stick to an old
+  // session and mix uploads / history across chats.
+  const materializedDraftSessionRef = useRef<string | null>(null)
   const [renameTarget, setRenameTarget] = useState<AgentSession | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<AgentSession | null>(null)
 
+  /** Open the local draft composer — no API session until first real action. */
   const createSession = useCallback(
     async (projectId?: string | null) => {
-      if (createSessionInFlightRef.current) return
-      createSessionInFlightRef.current = true
-      try {
-        const id = projectId ?? activeProjectId ?? null
-        const scopeKey = projectTabsKey(id)
-        const created = await client.createSession({
-          // Omit title so the server keeps title_source=pending and auto-titles
-          // after the second agent response.
-          projectId: id || undefined,
-          sandboxBackend: 'builtin'
-        })
-        if (id) {
-          setProjectScopeId(id)
-          setRecentProjectIds(current => {
-            const next = [id, ...current.filter(item => item !== id)].slice(
-              0,
-              10
-            )
-            writeRecentProjectIds(next)
-            return next
-          })
-        }
-        patchOpenTabs(scopeKey, current =>
-          current.includes(created.id) ? current : [...current, created.id]
-        )
-        patchChat(created.id, {
-          messages: [],
+      const id = projectId ?? activeProjectId ?? null
+      applyProjectScope(id, setProjectScopeId, setRecentProjectIds)
+      materializedDraftSessionRef.current = null
+      setChatBySessionId(current => ({
+        ...current,
+        [DRAFT_AGENT_SESSION_ID]: {
+          ...emptySessionChatState(),
           messagesLoaded: true
-        })
+        }
+      }))
+      composerLiveRef.current = ''
+      sessionIdRef.current = DRAFT_AGENT_SESSION_ID
+      navigate(`/agents/${DRAFT_AGENT_SESSION_ID}`)
+    },
+    [
+      activeProjectId,
+      composerLiveRef,
+      navigate,
+      sessionIdRef,
+      setChatBySessionId,
+      setProjectScopeId,
+      setRecentProjectIds
+    ]
+  )
+
+  /** Copy draft composer fields onto a real session id — never messages/tools. */
+  const adoptDraftChat = useCallback(
+    (realId: string) => {
+      const liveComposer = composerLiveRef.current
+      setChatBySessionId(current => {
+        const draft = current[DRAFT_AGENT_SESSION_ID]
+        const existing = current[realId] ?? emptySessionChatState()
+        const next = { ...current }
+        delete next[DRAFT_AGENT_SESSION_ID]
+        next[realId] = {
+          ...existing,
+          messagesLoaded: true,
+          composer: liveComposer || draft?.composer || '',
+          composerSkills: draft?.composerSkills ?? [],
+          composerFiles: draft?.composerFiles ?? []
+        }
+        return next
+      })
+      composerLiveRef.current = liveComposer
+    },
+    [composerLiveRef, setChatBySessionId]
+  )
+
+  const bindMaterializedSession = useCallback(
+    (createdId: string, projectId: string | null, shouldNavigate: boolean) => {
+      const scopeKey = projectTabsKey(projectId)
+      if (shouldNavigate) {
+        patchOpenTabs(scopeKey, current =>
+          current.includes(createdId) ? current : [...current, createdId]
+        )
         setLastSessionByScope(current => {
-          const next = { ...current, [scopeKey]: created.id }
+          const next = { ...current, [scopeKey]: createdId }
           writeLastSessionByScope(next)
           return next
         })
-        await loadSessions()
-        if (id) await loadProjects()
-        navigate(`/agents/${created.id}`)
-      } catch (cause) {
-        setError(
-          cause instanceof Error ? cause.message : 'Unable to create agent'
+        adoptDraftChat(createdId)
+        materializedDraftSessionRef.current = null
+        sessionIdRef.current = createdId
+        navigate(`/agents/${createdId}`, { replace: true })
+        return
+      }
+      // Stay on /agents/new — composer keeps the draft chat key.
+      materializedDraftSessionRef.current = createdId
+      setChatBySessionId(current => {
+        const draft =
+          current[DRAFT_AGENT_SESSION_ID] ?? emptySessionChatState()
+        return {
+          ...current,
+          [DRAFT_AGENT_SESSION_ID]: {
+            ...draft,
+            messagesLoaded: true
+          }
+        }
+      })
+    },
+    [
+      adoptDraftChat,
+      navigate,
+      patchOpenTabs,
+      sessionIdRef,
+      setChatBySessionId,
+      setLastSessionByScope
+    ]
+  )
+
+  /**
+   * Materialize a real session if the UI is on the draft route (or has no id).
+   * Returns the real session id, or null on failure.
+   * Pass `{ navigate: false }` to create the session without leaving /agents/new
+   * (keeps the composer mounted — used for uploads).
+   */
+  const ensureAgentSession = useCallback(
+    async (
+      projectId?: string | null,
+      options?: { navigate?: boolean }
+    ): Promise<string | null> => {
+      const shouldNavigate = options?.navigate !== false
+
+      // Already on a real session route — use it.
+      if (sessionId && !isDraftAgentSessionId(sessionId)) {
+        materializedDraftSessionRef.current = null
+        return sessionId
+      }
+
+      const finishDraft = (id: string | null) => {
+        if (
+          !id ||
+          !shouldNavigate ||
+          !materializedDraftSessionRef.current ||
+          materializedDraftSessionRef.current !== id
+        ) {
+          return id
+        }
+        bindMaterializedSession(
+          id,
+          projectId ?? activeProjectId ?? null,
+          true
         )
+        return id
+      }
+
+      // Draft route with a session created earlier in this draft (e.g. upload).
+      const existingDraft = materializedDraftSessionRef.current
+      if (existingDraft) {
+        return finishDraft(existingDraft)
+      }
+
+      if (ensureInFlightRef.current) {
+        return ensureInFlightRef.current.then(finishDraft)
+      }
+
+      const scopeId = projectId ?? activeProjectId ?? null
+      const run = (async () => {
+        if (createSessionInFlightRef.current) return null
+        createSessionInFlightRef.current = true
+        try {
+          const created = await client.createSession({
+            // Omit title so the server keeps title_source=pending and auto-titles
+            // after the second agent response.
+            projectId: scopeId || undefined,
+            sandboxBackend: 'builtin'
+          })
+          applyProjectScope(scopeId, setProjectScopeId, setRecentProjectIds)
+          setSessions(current => {
+            if (current.some(item => item.id === created.id)) return current
+            return [created, ...current]
+          })
+          // Always park as silent materialization first; navigate callers
+          // finish via finishDraft so concurrent upload+send share one session.
+          bindMaterializedSession(created.id, scopeId, false)
+          await loadSessions()
+          if (scopeId) await loadProjects()
+          return created.id
+        } catch (cause) {
+          setError(
+            cause instanceof Error ? cause.message : 'Unable to create agent'
+          )
+          return null
+        } finally {
+          createSessionInFlightRef.current = false
+        }
+      })()
+
+      ensureInFlightRef.current = run
+      try {
+        return await run.then(finishDraft)
       } finally {
-        createSessionInFlightRef.current = false
+        if (ensureInFlightRef.current === run) {
+          ensureInFlightRef.current = null
+        }
       }
     },
     [
       activeProjectId,
+      bindMaterializedSession,
       client,
       loadProjects,
       loadSessions,
-      navigate,
-      patchChat,
-      patchOpenTabs,
-      setLastSessionByScope,
+      sessionId,
+      setError,
       setProjectScopeId,
       setRecentProjectIds,
-      setError
+      setSessions
     ]
   )
 
@@ -165,9 +325,10 @@ export function useSessionActionsCrudSessions({
   }
 
   const selectSessionSpecialist = async (specialistId: string | null) => {
-    if (!session) return
+    const targetId = await ensureAgentSession()
+    if (!targetId) return
     try {
-      const updated = await client.updateSession(session.id, { specialistId })
+      const updated = await client.updateSession(targetId, { specialistId })
       setSessions(current =>
         current.map(item => (item.id === updated.id ? updated : item))
       )
@@ -289,6 +450,7 @@ export function useSessionActionsCrudSessions({
     deleteTarget,
     setDeleteTarget,
     createSession,
+    ensureAgentSession,
     updateSession,
     selectSessionSpecialist,
     deleteSession,

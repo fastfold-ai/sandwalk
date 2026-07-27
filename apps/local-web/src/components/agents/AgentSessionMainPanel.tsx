@@ -20,6 +20,7 @@ import {
   ResizablePanelGroup
 } from '@/components/ui/resizable'
 import { SESSION_PANELS_AUTO_SAVE_ID } from '@/lib/app-storage'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { planCardFromPath, startPlanBuild } from '@/lib/plan-build'
 import { type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
@@ -273,7 +274,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             onExpand={() => setFilesPanelCollapsed(false)}
             className="min-w-0"
           >
-            {sessionId ? (
+            {sessionId && !isDraftAgentSessionId(sessionId) ? (
               <WorkspacePanel
                 key={sessionId}
                 client={client}

@@ -16,6 +16,7 @@ import {
 } from 'react'
 
 import { type SandboxActionPhase } from '@/components/agents/Composer'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 
 import { syncSandboxPhaseFromStatus } from './session-sandbox-status-sync'
 import { useSessionSandboxStream } from './use-session-sandbox-stream'
@@ -31,6 +32,10 @@ type UseSessionSandboxArgs = {
   loadProjects: () => Promise<void>
   setSandboxSettings: Dispatch<SetStateAction<SandboxSettings | null>>
   setError: Dispatch<SetStateAction<string | null>>
+  ensureAgentSession: (
+    projectId?: string | null,
+    options?: { navigate?: boolean }
+  ) => Promise<string | null>
 }
 
 export function useSessionSandbox({
@@ -42,7 +47,8 @@ export function useSessionSandbox({
   loadSessions,
   loadProjects,
   setSandboxSettings,
-  setError
+  setError,
+  ensureAgentSession
 }: UseSessionSandboxArgs) {
   const [sessionSandboxStatus, setSessionSandboxStatus] =
     useState<SessionSandboxStatus | null>(null)
@@ -63,7 +69,7 @@ export function useSessionSandbox({
   const refreshSessionSandbox = useCallback(
     async (targetSessionId?: string | null) => {
       const id = targetSessionId ?? sessionId
-      if (!id) {
+      if (!id || isDraftAgentSessionId(id)) {
         setSessionSandboxStatus(null)
         return null
       }
@@ -90,7 +96,7 @@ export function useSessionSandbox({
   )
 
   useEffect(() => {
-    if (!sessionId || !health) return
+    if (!sessionId || !health || isDraftAgentSessionId(sessionId)) return
     const pending =
       sessionSandboxPhase !== 'idle' ||
       sessionSandboxStatus?.status === 'starting' ||
@@ -128,7 +134,8 @@ export function useSessionSandbox({
     setError,
     loadSessions,
     loadProjects,
-    refreshSessionSandbox
+    refreshSessionSandbox,
+    ensureAgentSession
   })
 
   return {

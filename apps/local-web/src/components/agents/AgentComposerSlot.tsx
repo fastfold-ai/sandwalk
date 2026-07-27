@@ -26,6 +26,7 @@ import {
 import {
   type ComposerModelOption,
   resolveComposerModelOption} from '@/lib/composer-models'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { mediaObjectUrlFromFile } from '@/lib/media-src'
 import {
   modelSupportsMultimodalKind,
@@ -43,6 +44,10 @@ type AgentComposerSlotProps = {
     sessionId: string
     paths: string[]
   } | null>
+  ensureAgentSession: (
+    projectId?: string | null,
+    options?: { navigate?: boolean }
+  ) => Promise<string | null>
   composerLiveRef: MutableRefObject<string>
   queuedMessages: QueuedMessage[]
   editingQueuedId: string | null
@@ -92,6 +97,7 @@ export function AgentComposerSlot({
   client,
   navigate,
   pendingAttachmentsRef,
+  ensureAgentSession,
   composerLiveRef,
   queuedMessages,
   editingQueuedId,
@@ -140,7 +146,8 @@ export function AgentComposerSlot({
         onRemove={removeQueuedMessage}
       />
       <Composer
-        key={sessionId ?? 'empty-composer'}
+        // Stable across draft → real session so first send does not remount.
+        key="session-composer"
         value={composer}
         running={runActive}
         skills={skills}
@@ -155,17 +162,25 @@ export function AgentComposerSlot({
         sandboxPhase={sessionSandboxPhase}
         showAura={false}
         autoFocus
-        focusKey={sessionId}
+        focusKey={
+          sessionId && !isDraftAgentSessionId(sessionId)
+            ? sessionId
+            : 'draft'
+        }
         pendingAttachmentsRef={pendingAttachmentsRef}
         onResolveAttachment={async path => {
-          if (!sessionId) return null
+          const id =
+            sessionId && !isDraftAgentSessionId(sessionId)
+              ? sessionId
+              : await ensureAgentSession(undefined, { navigate: false })
+          if (!id || isDraftAgentSessionId(id)) return null
           const name = path.split('/').at(-1) || path
           const contentType = contentTypeFromPath(path)
           if (!needsAttachmentPreview(contentType, path)) {
             return { name, contentType }
           }
           try {
-            const file = await client.readFile(sessionId, path)
+            const file = await client.readFile(id, path)
             return {
               name,
               contentType: file.mimeType || contentType,
@@ -196,7 +211,10 @@ export function AgentComposerSlot({
         onStop={() => void handleStop()}
         onLoadSkill={loadSkillDetail}
         onUpload={async files => {
-          if (!sessionId) return []
+          // Stay on /agents/new after materializing so the composer does not
+          // remount (no skeleton / thumbnail flicker). Route swaps on send.
+          const id = await ensureAgentSession(undefined, { navigate: false })
+          if (!id || isDraftAgentSessionId(id)) return []
           const activeModel = resolveComposerModelOption(modelOptions, {
             provider: runtimeSettings?.provider || '',
             model: runtimeSettings?.model || '',
@@ -212,7 +230,7 @@ export function AgentComposerSlot({
             }
           }
           const uploaded = await Promise.all(
-            files.map(file => client.uploadFile(sessionId, file))
+            files.map(file => client.uploadFile(id, file))
           )
           setWorkspaceVersion(current => current + 1)
           return uploaded.map(item => ({

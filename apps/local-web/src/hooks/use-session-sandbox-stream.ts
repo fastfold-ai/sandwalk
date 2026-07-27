@@ -8,6 +8,7 @@ import {
 } from 'react'
 
 import type { SandboxActionPhase } from '@/components/agents/Composer'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 
 import { syncSandboxPhaseFromStatus } from './session-sandbox-status-sync'
 
@@ -29,7 +30,7 @@ export function useSessionSandboxStream({
   setSessionSandboxPhase: Dispatch<SetStateAction<SandboxActionPhase>>
 }) {
   useEffect(() => {
-    if (!sessionId || !health) {
+    if (!sessionId || !health || isDraftAgentSessionId(sessionId)) {
       setSessionSandboxStatus(null)
       setSessionSandboxPhase('idle')
       sandboxActionSessionRef.current = null

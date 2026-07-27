@@ -22,6 +22,7 @@ import { useAppShellEffects } from '@/hooks/useAppShellEffects'
 import { useAppUiState } from '@/hooks/useAppUiState'
 import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { visibleSessionIds } from '@/lib/sessions'
 
 export default function App() {
@@ -117,6 +118,8 @@ export default function App() {
     setChatBySessionIdRef
   })
 
+  // Route wins. Draft materialization uses a separate ref inside session CRUD
+  // so /agents/new never "sticks" to a previous real session id.
   ui.sessionIdRef.current = route.sessionId
 
   const showConnectionLimitWarning =
@@ -242,7 +245,9 @@ export default function App() {
     isProjectHome: route.isProjectHome,
     sessionTitle: context.session?.title
   })
-  const canShowFilesPanel = Boolean(route.sessionId)
+  const canShowFilesPanel = Boolean(
+    route.sessionId && !isDraftAgentSessionId(route.sessionId)
+  )
 
   const gate = AppGates({
     authBootstrapped: bootstrap.authBootstrapped,

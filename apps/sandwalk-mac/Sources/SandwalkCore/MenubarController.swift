@@ -125,12 +125,12 @@ final class MenubarController: NSObject, NSMenuDelegate {
     @objc func newAgent() {
         Task { @MainActor in
             do {
-                // Ensure stack is up before creating.
+                // Ensure stack is up, then open the draft composer (session is
+                // created on first send / upload / sandbox start in the UI).
                 if !supervisor.overall.isLive {
                     try supervisor.startAll()
                 }
-                let session = try await SessionsAPI.createSession(config: supervisor.config)
-                let path = "/agents/\(session.id)"
+                let path = "/agents/new"
                 if TauriDesktopLauncher.open(path: path) {
                     return
                 }

@@ -6,10 +6,7 @@ import type { NavigateFunction } from 'react-router-dom'
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ChatTranscript } from '@/components/agents/ChatTranscript'
-import {
-  ChatPageSkeleton,
-  DetailPageSkeleton
-} from '@/components/agents/PageSkeletons'
+import { DetailPageSkeleton } from '@/components/agents/PageSkeletons'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
@@ -82,9 +79,9 @@ export function SessionChatBody({
   isInspect,
   messages,
   tools,
-  messagesLoaded,
+  messagesLoaded: _messagesLoaded,
   runActive,
-  showChatSkeleton,
+  showChatSkeleton: _showChatSkeleton,
   agentComposerSlotProps,
   projects,
   recentProjectIds,
@@ -167,6 +164,10 @@ export function SessionChatBody({
     [sessionId]
   )
 
+  // One continuous layout: empty = composer centered; active = transcript +
+  // composer docked at the bottom. No skeleton swap — flex-grow animates.
+  const showTranscript = messages.length > 0 || runActive
+
   return (
     <>
       {isInspect ? (
@@ -184,35 +185,16 @@ export function SessionChatBody({
           isInspect && 'hidden'
         )}
       >
-        {!messagesLoaded && !runActive ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {showChatSkeleton || sessionId ? <ChatPageSkeleton /> : null}
-          </div>
-        ) : messages.length === 0 && !runActive ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 pb-20">
-            <AuraIconPulse className="text-muted-foreground/70 mb-6 h-12 w-12" />
-            <div className="bg-background w-full max-w-[44rem]">
-              <div className="mb-2 flex items-center px-1">
-                <ProjectPicker
-                  projects={projects}
-                  value={session?.projectId ?? activeProjectId}
-                  recentIds={recentProjectIds}
-                  noneLabel="All"
-                  onNewProject={onNewProject}
-                  onChange={projectId => {
-                    if (session) {
-                      void updateSession(session, { projectId })
-                    }
-                    if (projectId) selectProjectScope(projectId)
-                    else selectAllProjects()
-                  }}
-                />
-              </div>
-              <AgentComposerSlot {...agentComposerSlotProps} />
-            </div>
-          </div>
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
+        <div
+          className="min-h-0 overflow-hidden transition-[flex-grow,opacity] duration-500 ease-out"
+          style={{
+            flexGrow: showTranscript ? 1 : 0,
+            flexShrink: 1,
+            flexBasis: 0,
+            opacity: showTranscript ? 1 : 0
+          }}
+        >
+          {showTranscript ? (
             <ChatTranscript
               chatScrollRef={chatScrollRef}
               chatEndRef={chatEndRef}
@@ -245,11 +227,50 @@ export function SessionChatBody({
               skills={agentComposerSlotProps.skills}
               mcpServers={agentComposerSlotProps.mcpServers}
             />
-            <div className="bg-background mx-auto w-full max-w-[44rem] shrink-0 px-5 pb-6 pt-2">
-              <AgentComposerSlot {...agentComposerSlotProps} />
+          ) : null}
+        </div>
+
+        <div
+          className={cn(
+            'bg-background mx-auto flex w-full max-w-[44rem] flex-col px-5 transition-[flex-grow,padding] duration-500 ease-out',
+            showTranscript ? 'justify-end' : 'justify-center'
+          )}
+          style={{
+            flexGrow: showTranscript ? 0 : 1,
+            flexShrink: 0,
+            flexBasis: 'auto',
+            paddingBottom: showTranscript ? '1.5rem' : '5rem',
+            paddingTop: showTranscript ? '0.5rem' : 0
+          }}
+        >
+          <div
+            className={cn(
+              'flex flex-col items-center overflow-hidden transition-[max-height,opacity,margin] duration-300 ease-out',
+              showTranscript
+                ? 'mb-0 max-h-0 opacity-0'
+                : 'mb-2 max-h-40 opacity-100'
+            )}
+          >
+            <AuraIconPulse className="text-muted-foreground/70 mb-6 h-12 w-12" />
+            <div className="mb-2 flex w-full items-center px-1">
+              <ProjectPicker
+                projects={projects}
+                value={session?.projectId ?? activeProjectId}
+                recentIds={recentProjectIds}
+                noneLabel="All"
+                onNewProject={onNewProject}
+                onChange={projectId => {
+                  if (session) {
+                    void updateSession(session, { projectId })
+                  }
+                  if (projectId) selectProjectScope(projectId)
+                  else selectAllProjects()
+                }}
+              />
             </div>
           </div>
-        )}
+          <AgentComposerSlot {...agentComposerSlotProps} />
+        </div>
       </div>
       {error ? (
         <div className="bg-destructive text-destructive-foreground absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md px-3 py-1.5 text-xs">
