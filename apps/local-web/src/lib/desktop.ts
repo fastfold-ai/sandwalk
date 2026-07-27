@@ -209,6 +209,13 @@ export const setSidebarGlassOptions = (variant: string, tintStrength: number) =>
 export const setDockIcon = (variant: string) =>
   invoke<void>('set_dock_icon', { variant })
 
+/**
+ * Set / clear the macOS Dock badge (red notification indicator).
+ * Pass a count/label string, or null/empty to clear. No-op outside Tauri.
+ */
+export const setDockBadge = (label: string | null) =>
+  invoke<void>('set_dock_badge', { label })
+
 /** Open a URL in the system browser. */
 export const openExternalUrl = (url: string) =>
   invokeStrict<void>('open_external_url', { url })

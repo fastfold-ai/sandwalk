@@ -3385,9 +3385,11 @@ name = "sandwalk-desktop"
 version = "0.0.1"
 dependencies = [
  "base64 0.22.1",
+ "block2",
  "dirs 5.0.1",
  "objc2",
  "objc2-app-kit",
+ "objc2-core-foundation",
  "objc2-foundation",
  "reqwest 0.12.28",
  "sandwalk-stt",

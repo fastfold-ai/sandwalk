@@ -147,45 +147,143 @@ static DOCK_ICON_DARK: &[u8] = include_bytes!("../icons/dock/dock-dark.png");
 #[cfg(target_os = "macos")]
 static DOCK_ICON_GOLDEN: &[u8] = include_bytes!("../icons/dock/dock-golden.png");
 
+#[cfg(target_os = "macos")]
+static DOCK_VARIANT: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+#[cfg(target_os = "macos")]
+static DOCK_BADGE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Custom dock icons are pre-rounded squircles. Feeding them through
+/// `setApplicationIconImage` makes AppKit draw `badgeLabel` inset on top of
+/// the artwork (unlike Messages, where the badge overhangs the corner).
+///
+/// Fix: when a badge is present, draw the icon slightly inset into a larger
+/// transparent canvas so the system badge sits in the padding and visually
+/// hangs off the icon corner like a normal macOS Dock badge.
+#[cfg(target_os = "macos")]
+fn refresh_dock_tile() -> Result<(), String> {
+    use block2::RcBlock;
+    use objc2::AnyThread as _;
+    use objc2::runtime::Bool;
+    use objc2_app_kit::{NSApplication, NSCompositingOperation, NSImage};
+    use objc2_core_foundation::{CGPoint, CGRect, CGSize};
+    use objc2_foundation::{MainThreadMarker, NSData, NSInsetRect, NSRect, NSString};
+
+    let mtm = MainThreadMarker::new()
+        .ok_or_else(|| "dock tile updates must run on the main thread".to_string())?;
+    let app = NSApplication::sharedApplication(mtm);
+    let tile = app.dockTile();
+
+    let variant = DOCK_VARIANT
+        .lock()
+        .map_err(|_| "dock variant lock poisoned".to_string())?
+        .clone();
+    let badge = DOCK_BADGE
+        .lock()
+        .map_err(|_| "dock badge lock poisoned".to_string())?
+        .clone();
+    let badge = badge
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+
+    let bytes: Option<&[u8]> = match variant.as_str() {
+        "light" => Some(DOCK_ICON_LIGHT),
+        "dark" => Some(DOCK_ICON_DARK),
+        "golden" => Some(DOCK_ICON_GOLDEN),
+        _ => None,
+    };
+
+    // Clear any previous custom content view so badgeLabel uses the app tile.
+    tile.setContentView(None);
+
+    match bytes {
+        Some(bytes) => {
+            let data = NSData::with_bytes(bytes);
+            let base = NSImage::initWithData(NSImage::alloc(), &data)
+                .ok_or_else(|| "failed to decode dock icon".to_string())?;
+            let base_size = base.size();
+
+            let image = if badge.is_some() {
+                // ~10% padding each side → badge lands in the transparent rim.
+                let full = CGRect::new(CGPoint::new(0.0, 0.0), base_size);
+                let content = NSInsetRect(full, base_size.width * 0.10, base_size.height * 0.10);
+                let empty = CGRect::new(CGPoint::new(0.0, 0.0), CGSize::new(0.0, 0.0));
+                NSImage::imageWithSize_flipped_drawingHandler(
+                    base_size,
+                    false,
+                    &RcBlock::new(move |_rect: NSRect| {
+                        base.drawInRect_fromRect_operation_fraction(
+                            content,
+                            empty,
+                            NSCompositingOperation::SourceOver,
+                            1.0,
+                        );
+                        Bool::YES
+                    }),
+                )
+            } else {
+                base
+            };
+
+            unsafe { app.setApplicationIconImage(Some(&image)) };
+        }
+        None => {
+            // Restore the bundle's default icon.
+            unsafe { app.setApplicationIconImage(None) };
+        }
+    }
+
+    match badge.as_deref() {
+        Some(value) => tile.setBadgeLabel(Some(&NSString::from_str(value))),
+        None => tile.setBadgeLabel(None),
+    }
+    tile.display();
+    Ok(())
+}
+
 /// Swap the Dock tile at runtime via `NSApplication.applicationIconImage`.
 /// There is no cross-platform Tauri API for this (window icons on macOS do
 /// not affect the Dock) — it is native AppKit, restored to the bundle icon
-/// when `variant` is anything other than "light"/"dark".
+/// when `variant` is anything other than "light"/"dark"/"golden".
 #[tauri::command]
 fn set_dock_icon(variant: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        use objc2::AnyThread as _;
-        use objc2_app_kit::{NSApplication, NSImage};
-        use objc2_foundation::{MainThreadMarker, NSData};
-
-        let bytes: Option<&[u8]> = match variant.as_str() {
-            "light" => Some(DOCK_ICON_LIGHT),
-            "dark" => Some(DOCK_ICON_DARK),
-            "golden" => Some(DOCK_ICON_GOLDEN),
-            _ => None,
-        };
-
-        // Tauri commands run on the main thread by default; this is required
-        // by NSApplication::sharedApplication.
-        let mtm = MainThreadMarker::new()
-            .ok_or_else(|| "set_dock_icon must run on the main thread".to_string())?;
-        let app = NSApplication::sharedApplication(mtm);
-        match bytes {
-            Some(bytes) => {
-                let data = NSData::with_bytes(bytes);
-                let image = NSImage::initWithData(NSImage::alloc(), &data);
-                unsafe { app.setApplicationIconImage(image.as_deref()) };
-            }
-            None => {
-                // Restore the bundle's default icon.
-                unsafe { app.setApplicationIconImage(None) };
-            }
+        {
+            let mut current = DOCK_VARIANT
+                .lock()
+                .map_err(|_| "dock variant lock poisoned".to_string())?;
+            *current = variant;
         }
+        refresh_dock_tile()?;
     }
     #[cfg(not(target_os = "macos"))]
     {
         let _ = variant;
+    }
+    Ok(())
+}
+
+/// Set / clear the macOS Dock badge (red notification count).
+/// Pass `None` or an empty string to clear; any other label shows the red badge.
+#[tauri::command]
+fn set_dock_badge(label: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        {
+            let mut current = DOCK_BADGE
+                .lock()
+                .map_err(|_| "dock badge lock poisoned".to_string())?;
+            *current = label
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
+        }
+        refresh_dock_tile()?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = label;
     }
     Ok(())
 }
@@ -746,6 +844,7 @@ pub fn run() {
             set_sidebar_glass_dark,
             set_sidebar_glass_options,
             set_dock_icon,
+            set_dock_badge,
             dictation::get_dictation_status,
             dictation::start_dictation,
             dictation::stop_dictation,

@@ -1,4 +1,5 @@
 import type { AccountSummary } from '@sandwalk/agent-ui-core'
+import { WandSparkles } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import {
@@ -127,17 +128,10 @@ export function GeneralView({
         />
 
         {onOpenSetupWizard ? (
-          <section className="space-y-3">
-            <div>
-              <h3 className="text-base font-semibold">Setup wizard</h3>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Short guided setup — model, keys, tools, sandbox.
-              </p>
-            </div>
-            <Button type="button" variant="ghost" onClick={onOpenSetupWizard}>
-              Run setup wizard
-            </Button>
-          </section>
+          <Button type="button" variant="outline" onClick={onOpenSetupWizard}>
+            <WandSparkles />
+            Run wizard
+          </Button>
         ) : null}
 
         <GeneralViewNotificationsSection />

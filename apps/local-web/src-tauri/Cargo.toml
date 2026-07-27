@@ -31,5 +31,7 @@ sandwalk-stt = { path = "../stt" }
 # default-features = false + a narrow feature list keeps this from pulling in
 # AppKit's full surface (306 features by default) and slowing the build.
 objc2 = { version = "0.6", default-features = false, features = ["std"] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData"] }
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSImage", "NSResponder"] }
+block2 = "0.6"
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFCGTypes"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSGeometry", "NSString", "objc2-core-foundation"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSCell", "NSControl", "NSDockTile", "NSGraphics", "NSImage", "NSImageView", "NSResponder", "NSView", "block2"] }

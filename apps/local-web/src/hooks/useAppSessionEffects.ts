@@ -15,6 +15,7 @@ import {
   writeOpenTabsByProject,
   writeProjectScopeId
 } from '@/lib/app-storage'
+import { clearSessionAttention } from '@/lib/session-attention'
 
 type UseAppSessionEffectsArgs = {
   setIntegrationValues: Dispatch<SetStateAction<Record<string, string>>>
@@ -83,7 +84,16 @@ export function useAppSessionEffects({
     // Keep project tab strips clean: only pin sessions that belong to the scope.
     if (activeProjectId && item && item.projectId !== activeProjectId) return
     openSessionTab(sessionId)
+    clearSessionAttention(sessionId)
   }, [activeProjectId, openSessionTab, sessionId, sessions])
+
+  // Clear Dock badge for the open session when the window is focused again.
+  useEffect(() => {
+    if (!sessionId) return
+    const onFocus = () => clearSessionAttention(sessionId)
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [sessionId])
 
   useEffect(() => {
     // Wait until sessions are loaded — otherwise every persisted tab looks

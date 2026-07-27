@@ -226,7 +226,7 @@ export function GeneralViewNotificationsSection() {
       <div>
         <h3 className="text-base font-semibold">Notifications</h3>
         <p className="text-muted-foreground mt-1 text-sm">
-          In-app toasts and macOS Notification Center alerts for agent activity.
+          macOS Notification Center alerts and a Dock badge for agent activity.
         </p>
       </div>
 

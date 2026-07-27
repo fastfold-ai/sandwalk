@@ -12,6 +12,7 @@ import {
   notifyRunCompleted
 } from '@/lib/browser-notifications'
 import { reduceChatOnAgentEvent } from '@/lib/chat-actions'
+import { markSessionAttention } from '@/lib/session-attention'
 import type { SessionChatState } from '@/lib/sessions'
 
 type UseSessionChatStreamArgs = {
@@ -271,6 +272,14 @@ export function useSessionChatStream({
                 )
                 const session = next.find(item => item.id === id)
                 const first = event.payload.actionRequests?.[0]
+                // Dock badge when the user isn't looking at this session.
+                if (
+                  sessionIdRef.current !== id ||
+                  (typeof document !== 'undefined' &&
+                    (document.hidden || !document.hasFocus()))
+                ) {
+                  markSessionAttention(id)
+                }
                 notifyApprovalRequired({
                   sessionId: id,
                   sessionTitle: session?.title,
@@ -308,6 +317,13 @@ export function useSessionChatStream({
                   event.type === 'run.failed'
                 ) {
                   const session = next.find(item => item.id === id)
+                  if (
+                    sessionIdRef.current !== id ||
+                    (typeof document !== 'undefined' &&
+                      (document.hidden || !document.hasFocus()))
+                  ) {
+                    markSessionAttention(id)
+                  }
                   notifyRunCompleted({
                     sessionId: id,
                     sessionTitle: session?.title,

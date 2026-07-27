@@ -1,6 +1,4 @@
-/** Best-effort in-app + OS notifications for agent HITL / completion alerts. */
-
-import { toast } from 'sonner'
+/** Best-effort OS notifications for agent HITL / completion alerts. */
 
 import { isTauri } from '@/lib/desktop'
 import {
@@ -70,8 +68,7 @@ async function sendOsNotification(input: {
       )
       sendNotification({
         title: input.title,
-        body: input.body,
-        // Some plugin versions accept `extra`; tag is best-effort via body only.
+        body: input.body
       })
       return true
     } catch {
@@ -170,8 +167,6 @@ export function notifyApprovalRequired(input: {
     ? `${session}: ${tool} is waiting for your approval.`
     : `${tool} is waiting for your approval.`
 
-  toast.message(title, { description: body })
-
   void sendOsNotification({
     title,
     body,
@@ -197,12 +192,6 @@ export function notifyRunCompleted(input: {
     : input.ok
       ? 'Your agent finished responding.'
       : 'Your agent run failed.'
-
-  if (input.ok) {
-    toast.success(title, { description: body })
-  } else {
-    toast.error(title, { description: body })
-  }
 
   void sendOsNotification({
     title,
