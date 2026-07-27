@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LibraryBig,
   Mic,
+  Paintbrush,
   Plug,
   ScrollText,
   Settings2,
@@ -97,6 +98,13 @@ export const DASHBOARD_COMMANDS = [
     path: '/dashboard/general',
     value: 'command general settings',
     icon: Settings2
+  },
+  {
+    id: 'appearance',
+    label: 'Appearance',
+    path: '/dashboard/appearance',
+    value: 'command appearance theme palette color font sidebar glass',
+    icon: Paintbrush
   },
   {
     id: 'agent_runtime',

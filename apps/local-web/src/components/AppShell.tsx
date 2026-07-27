@@ -95,6 +95,7 @@ export function AppShell(props: AppShellProps) {
           isDashboardOverview={props.isDashboardOverview}
           isDashboardStatus={props.isDashboardStatus}
           isDashboardGeneral={props.isDashboardGeneral}
+          isDashboardAppearance={props.isDashboardAppearance}
           isDashboardAgentRuntime={props.isDashboardAgentRuntime}
           isDashboardAgentSandbox={props.isDashboardAgentSandbox}
           isDashboardAgentPrompts={props.isDashboardAgentPrompts}

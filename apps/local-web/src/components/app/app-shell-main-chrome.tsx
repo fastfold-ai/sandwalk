@@ -36,7 +36,7 @@ export function ConnectionLimitBanner({
 
 export function AppShellTitleBar({ activeTitle }: { activeTitle: string }) {
   return (
-    <DesktopDragRegion className="sandwalk-titlebar flex h-11 shrink-0 items-center gap-1 px-1.5 md:px-2">
+    <DesktopDragRegion className="sandwalk-shell-nav-strip sandwalk-titlebar flex shrink-0 items-center gap-1 px-1.5 md:px-2">
       <span className="min-w-0 flex-1 truncate px-2 text-sm font-medium">
         {activeTitle}
       </span>

@@ -74,6 +74,9 @@ export function resolveDashboardSection(pathname: string) {
   ) {
     return 'general' as const
   }
+  if (pathname.startsWith('/dashboard/appearance')) {
+    return 'appearance' as const
+  }
   if (pathname.startsWith('/dashboard/agent/sandbox')) {
     return 'agent_sandbox' as const
   }

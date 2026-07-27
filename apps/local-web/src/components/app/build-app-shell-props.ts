@@ -113,6 +113,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     isDashboardOverview: input.route.isDashboardOverview,
     isDashboardStatus: input.route.isDashboardStatus,
     isDashboardGeneral: input.route.isDashboardGeneral,
+    isDashboardAppearance: input.route.isDashboardAppearance,
     isDashboardAgentRuntime: input.route.isDashboardAgentRuntime,
     isDashboardAgentSandbox: input.route.isDashboardAgentSandbox,
     isDashboardAgentPrompts: input.route.isDashboardAgentPrompts,

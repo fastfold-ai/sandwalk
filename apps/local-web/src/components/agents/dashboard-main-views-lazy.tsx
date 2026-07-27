@@ -15,6 +15,11 @@ export const AgentSandboxView = lazy(() =>
     default: m.AgentSandboxView
   }))
 )
+export const AppearanceView = lazy(() =>
+  import('@/components/agents/AppearanceView').then(m => ({
+    default: m.AppearanceView
+  }))
+)
 export const DashboardOverviewView = lazy(() =>
   import('@/components/agents/DashboardOverviewView').then(m => ({
     default: m.DashboardOverviewView

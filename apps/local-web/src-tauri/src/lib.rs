@@ -12,7 +12,7 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::thread;
 use std::time::Duration;
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -21,8 +21,46 @@ use tauri_plugin_liquid_glass::{GlassMaterialVariant, LiquidGlassConfig, LiquidG
 
 /// SPA theme preference for native glass tint (light wash vs dark wash).
 static SIDEBAR_GLASS_DARK: AtomicBool = AtomicBool::new(false);
+/// Native tint alpha, 0-100 (how strong the color wash reads through the blur).
+static SIDEBAR_GLASS_TINT_STRENGTH: AtomicU8 = AtomicU8::new(80);
+/// Native glass view corner radius, in px (0-24).
+static SIDEBAR_GLASS_CORNER_RADIUS: AtomicU8 = AtomicU8::new(0);
+/// Native glass material — index into `GLASS_VARIANTS` below.
+static SIDEBAR_GLASS_VARIANT: AtomicU8 = AtomicU8::new(0);
 
-/// Frosted sidebar glass — tint follows light/dark theme.
+/// Every `GlassMaterialVariant` the native plugin exposes (all experimental,
+/// per Apple's private `NSGlassEffectView` API) — no curated subset, the
+/// Appearance UI just lists these raw.
+#[cfg(target_os = "macos")]
+const GLASS_VARIANTS: &[(&str, GlassMaterialVariant)] = &[
+    ("regular", GlassMaterialVariant::Regular),
+    ("clear", GlassMaterialVariant::Clear),
+    ("dock", GlassMaterialVariant::Dock),
+    ("app_icons", GlassMaterialVariant::AppIcons),
+    ("widgets", GlassMaterialVariant::Widgets),
+    ("text", GlassMaterialVariant::Text),
+    ("avplayer", GlassMaterialVariant::Avplayer),
+    ("facetime", GlassMaterialVariant::Facetime),
+    ("control_center", GlassMaterialVariant::ControlCenter),
+    ("notification_center", GlassMaterialVariant::NotificationCenter),
+    ("monogram", GlassMaterialVariant::Monogram),
+    ("bubbles", GlassMaterialVariant::Bubbles),
+    ("identity", GlassMaterialVariant::Identity),
+    ("focus_border", GlassMaterialVariant::FocusBorder),
+    ("focus_platter", GlassMaterialVariant::FocusPlatter),
+    ("keyboard", GlassMaterialVariant::Keyboard),
+    ("sidebar", GlassMaterialVariant::Sidebar),
+    ("abutted_sidebar", GlassMaterialVariant::AbuttedSidebar),
+    ("inspector", GlassMaterialVariant::Inspector),
+    ("control", GlassMaterialVariant::Control),
+    ("loupe", GlassMaterialVariant::Loupe),
+    ("slider", GlassMaterialVariant::Slider),
+    ("camera", GlassMaterialVariant::Camera),
+    ("cartouche_popover", GlassMaterialVariant::CartouchePopover)
+];
+
+/// Frosted sidebar glass — tint, material, and corner radius are all
+/// user-tunable from Appearance → Sidebar appearance.
 ///
 /// Native glass stays installed for the life of the window. Tearing it down on
 /// blur removes macOS traffic lights with the overlay title bar — so unfocused
@@ -30,18 +68,25 @@ static SIDEBAR_GLASS_DARK: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 fn sidebar_glass_config() -> LiquidGlassConfig {
     let dark = SIDEBAR_GLASS_DARK.load(Ordering::Relaxed);
+    let tint_strength = SIDEBAR_GLASS_TINT_STRENGTH.load(Ordering::Relaxed).min(100);
+    let corner_radius = SIDEBAR_GLASS_CORNER_RADIUS.load(Ordering::Relaxed).min(24);
+    let variant_index = SIDEBAR_GLASS_VARIANT.load(Ordering::Relaxed) as usize;
+    let variant = GLASS_VARIANTS
+        .get(variant_index)
+        .map(|(_, v)| *v)
+        .unwrap_or(GlassMaterialVariant::Sidebar);
+
+    // Alpha byte from the 0-100 tint strength; clamp away from fully
+    // transparent/opaque so the effect always reads as glass.
+    let alpha = ((tint_strength as f64 / 100.0) * 255.0).round().clamp(1.0, 255.0) as u8;
+    let base = if dark { "#1C1C1F" } else { "#ffffff" };
+    let tint_color = format!("{base}{alpha:02X}");
+
     LiquidGlassConfig {
         enabled: true,
-        // 0 — avoid a frosted “frame” rim around the window.
-        corner_radius: 0.0,
-        // Dark charcoal (not pure black, not gray) — Codex-like frosted dark glass.
-        tint_color: Some(if dark {
-            "#1C1C1FC2".into()
-        } else {
-            "#ffffffD0".into()
-        }),
-        // Sidebar material matches system sidebar glass density/blur.
-        variant: GlassMaterialVariant::Sidebar,
+        corner_radius: corner_radius as f64,
+        tint_color: Some(tint_color),
+        variant,
     }
 }
 
@@ -63,6 +108,83 @@ fn set_sidebar_glass_dark(app: tauri::AppHandle, dark: bool) -> Result<(), Strin
     #[cfg(not(target_os = "macos"))]
     {
         let _ = app;
+    }
+    Ok(())
+}
+
+/// Update native glass material/tint-strength/corner-radius from Appearance.
+#[tauri::command]
+fn set_sidebar_glass_options(
+    app: tauri::AppHandle,
+    variant: String,
+    tint_strength: u8,
+    corner_radius: u8,
+) -> Result<(), String> {
+    SIDEBAR_GLASS_TINT_STRENGTH.store(tint_strength.min(100), Ordering::Relaxed);
+    SIDEBAR_GLASS_CORNER_RADIUS.store(corner_radius.min(24), Ordering::Relaxed);
+    #[cfg(target_os = "macos")]
+    {
+        let index = GLASS_VARIANTS
+            .iter()
+            .position(|(key, _)| *key == variant)
+            .unwrap_or(0);
+        SIDEBAR_GLASS_VARIANT.store(index as u8, Ordering::Relaxed);
+        if let Some(window) = app.get_webview_window("main") {
+            apply_sidebar_glass(&app, &window);
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, variant);
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+static DOCK_ICON_LIGHT: &[u8] = include_bytes!("../icons/dock/dock-light.png");
+#[cfg(target_os = "macos")]
+static DOCK_ICON_DARK: &[u8] = include_bytes!("../icons/dock/dock-dark.png");
+#[cfg(target_os = "macos")]
+static DOCK_ICON_GOLDEN: &[u8] = include_bytes!("../icons/dock/dock-golden.png");
+
+/// Swap the Dock tile at runtime via `NSApplication.applicationIconImage`.
+/// There is no cross-platform Tauri API for this (window icons on macOS do
+/// not affect the Dock) — it is native AppKit, restored to the bundle icon
+/// when `variant` is anything other than "light"/"dark".
+#[tauri::command]
+fn set_dock_icon(variant: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use cocoa::appkit::{NSApp, NSApplication, NSImage};
+        use cocoa::base::{id, nil};
+        use cocoa::foundation::NSData;
+
+        let bytes: Option<&[u8]> = match variant.as_str() {
+            "light" => Some(DOCK_ICON_LIGHT),
+            "dark" => Some(DOCK_ICON_DARK),
+            "golden" => Some(DOCK_ICON_GOLDEN),
+            _ => None,
+        };
+
+        unsafe {
+            let app = NSApp();
+            match bytes {
+                Some(bytes) => {
+                    let data =
+                        NSData::dataWithBytes_length_(nil, bytes.as_ptr() as *const _, bytes.len() as u64);
+                    let image: id = NSImage::initWithData_(NSImage::alloc(nil), data);
+                    app.setApplicationIconImage_(image);
+                }
+                None => {
+                    // Restore the bundle's default icon.
+                    app.setApplicationIconImage_(nil);
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = variant;
     }
     Ok(())
 }
@@ -624,6 +746,8 @@ pub fn run() {
             save_text_file,
             save_bytes_file,
             set_sidebar_glass_dark,
+            set_sidebar_glass_options,
+            set_dock_icon,
             dictation::get_dictation_status,
             dictation::start_dictation,
             dictation::stop_dictation,
@@ -658,7 +782,9 @@ pub fn run() {
                     .transparent(true)
                     .title_bar_style(tauri::TitleBarStyle::Overlay)
                     .hidden_title(true)
-                    .traffic_light_position(tauri::LogicalPosition::new(19.0, 24.0));
+                    // Center traffic lights in the 52px shell nav strip
+                    // (~12px buttons → top at y=20 puts centers on the icon row).
+                    .traffic_light_position(tauri::LogicalPosition::new(19.0, 20.0));
             }
 
             let window = win.build()?;

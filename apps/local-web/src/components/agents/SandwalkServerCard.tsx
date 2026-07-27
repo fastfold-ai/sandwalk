@@ -41,6 +41,7 @@ export function SandwalkServerCard({
         className={cn(
           'rounded-full',
           compact ? 'size-1' : 'size-1.5',
+          running && 'sandwalk-presence-dot',
           running ? 'bg-emerald-500' : 'bg-destructive'
         )}
       />

@@ -11,6 +11,7 @@ type DocumentTitleArgs = {
   isDashboardOverview: boolean
   isDashboardStatus: boolean
   isDashboardGeneral: boolean
+  isDashboardAppearance: boolean
   isDashboardModels: boolean
   isDashboardTools: boolean
   isDashboardDoctor: boolean
@@ -56,6 +57,10 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     }
     if (args.isDashboardGeneral) {
       document.title = `General · ${base}`
+      return
+    }
+    if (args.isDashboardAppearance) {
+      document.title = `Appearance · ${base}`
       return
     }
     if (args.isDashboardModels) {
@@ -148,6 +153,7 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     args.isDashboardOverview,
     args.isDashboardStatus,
     args.isDashboardGeneral,
+    args.isDashboardAppearance,
     args.isDashboardModels,
     args.isDashboardData,
     args.isDashboardTools,

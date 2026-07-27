@@ -144,7 +144,7 @@ export function SkillsCatalogDetailView({
         </div>
       </DetailStickyNav>
       <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8">
         {catalogDetailLoading ? (
           <div className="text-muted-foreground flex min-h-[40vh] items-center justify-center gap-2 text-sm">
             <Loader className="size-4 shrink-0 animate-spin" aria-hidden />

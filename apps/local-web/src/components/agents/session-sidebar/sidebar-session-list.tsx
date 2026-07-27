@@ -151,7 +151,7 @@ export function SidebarSessionList({
                   <span className="min-w-0 flex-1 truncate">
                     {section.title}
                   </span>
-                  <span className="text-muted-foreground/60 shrink-0 text-[11px] tabular-nums">
+                  <span className="sandwalk-notification-count text-muted-foreground/60 shrink-0 text-[11px] tabular-nums">
                     {section.items.length}
                   </span>
                 </button>

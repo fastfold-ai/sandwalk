@@ -80,6 +80,7 @@ export function useAppRouting(location: Location) {
     Boolean(routes.legacyIntegrationRoute)
   const isDashboardStatus = false
   const isDashboardGeneral = dashboardSection === 'general'
+  const isDashboardAppearance = dashboardSection === 'appearance'
   const isDashboardAgentRuntime = dashboardSection === 'agent_runtime'
   const isDashboardAgentSandbox = dashboardSection === 'agent_sandbox'
   const isDashboardAgentPrompts = dashboardSection === 'context'
@@ -121,6 +122,7 @@ export function useAppRouting(location: Location) {
     if (
       isDashboardStatus ||
       isDashboardGeneral ||
+      isDashboardAppearance ||
       isDashboardAgentRuntime ||
       isDashboardAgentPrompts ||
       isDashboardVoice ||
@@ -178,6 +180,7 @@ export function useAppRouting(location: Location) {
     isIntegrations,
     isDashboardStatus,
     isDashboardGeneral,
+    isDashboardAppearance,
     isDashboardAgentRuntime,
     isDashboardAgentSandbox,
     isDashboardAgentPrompts,

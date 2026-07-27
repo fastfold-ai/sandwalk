@@ -64,10 +64,13 @@ const DEFAULT_DARK_ANSI: AnsiTheme = {
   brightWhite: '#FFFFFF'
 }
 
-/** Palette-tinted ANSI sets so the terminal feels native to Mirage / Mahal / Darwin. */
-const PALETTE_ANSI: Record<
-  Exclude<ThemePaletteId, 'default'>,
-  { light: AnsiTheme; dark: AnsiTheme }
+/**
+ * Palette-tinted ANSI sets so the terminal feels native to Mirage / Mahal /
+ * Darwin. Newer palettes (Ember, Verdant, Custom) fall back to the default
+ * ANSI set — `readDocumentPalette()` already maps them to "default".
+ */
+const PALETTE_ANSI: Partial<
+  Record<Exclude<ThemePaletteId, 'default'>, { light: AnsiTheme; dark: AnsiTheme }>
 > = {
   mirage: {
     light: {
@@ -221,11 +224,9 @@ export function buildTerminalTheme(
   palette: ThemePaletteId = readDocumentPalette()
 ): ITheme {
   const ansi =
-    palette === 'default'
-      ? dark
-        ? DEFAULT_DARK_ANSI
-        : DEFAULT_LIGHT_ANSI
-      : PALETTE_ANSI[palette][dark ? 'dark' : 'light']
+    (palette === 'default' ? undefined : PALETTE_ANSI[palette])?.[
+      dark ? 'dark' : 'light'
+    ] ?? (dark ? DEFAULT_DARK_ANSI : DEFAULT_LIGHT_ANSI)
 
   const background = cssHsl(
     '--card',

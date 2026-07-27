@@ -194,6 +194,21 @@ export async function listenWindowGlassActive(
 export const syncSidebarGlassTheme = (dark: boolean) =>
   invoke<void>('set_sidebar_glass_dark', { dark })
 
+/** Update native glass material + tint strength (macOS desktop). */
+export const setSidebarGlassOptions = (variant: string, tintStrength: number) =>
+  invoke<void>('set_sidebar_glass_options', {
+    variant,
+    tintStrength: Math.round(tintStrength),
+    cornerRadius: 0
+  })
+
+/**
+ * Swap the Dock tile (macOS desktop only). `variant` is "light" | "dark";
+ * anything else restores the bundle's default icon. No-op outside Tauri.
+ */
+export const setDockIcon = (variant: string) =>
+  invoke<void>('set_dock_icon', { variant })
+
 /** Open a URL in the system browser. */
 export const openExternalUrl = (url: string) =>
   invokeStrict<void>('open_external_url', { url })

@@ -206,7 +206,7 @@ html.sandwalk-mac-glass .sandwalk-shell-sidebar {
 
 /*
  * Focused: translucent wash so native glass shows through.
- * Unfocused: solid sidebar (native glass effect is removed entirely).
+ * Unfocused: solid sidebar (native glass stays installed but is covered).
  */
 html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-sidebar {
   /* Denser wash — soft frost, not see-through. */
@@ -408,6 +408,65 @@ html.sandwalk-mac-glass .sandwalk-shell-main {
   --sidebar-ring: 40 71% 59%;
 }
 
+/* Dorado — matches the golden dock icon (cream → gold, terracotta mark). */
+:root[data-palette='sandwalk'] {
+  --background: 42 55% 98%;
+  --foreground: 25 40% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 25 40% 16%;
+  --popover: 42 50% 99%;
+  --popover-foreground: 25 40% 16%;
+  --primary: 25 40% 40%;
+  --primary-foreground: 42 72% 94%;
+  --secondary: 40 40% 92%;
+  --secondary-foreground: 25 35% 22%;
+  --muted: 40 30% 93%;
+  --muted-foreground: 28 18% 40%;
+  --accent: 40 55% 92%;
+  --accent-foreground: 25 45% 28%;
+  --border: 38 28% 86%;
+  --input: 38 28% 86%;
+  --ring: 40 71% 59%;
+  --sidebar-background: 40 71% 79%;
+  --sidebar-foreground: 25 40% 18%;
+  --sidebar-primary: 25 40% 40%;
+  --sidebar-primary-foreground: 42 72% 94%;
+  --sidebar-accent: 25 40% 40%;
+  --sidebar-accent-foreground: 42 72% 94%;
+  --sidebar-border: 38 35% 72%;
+  --sidebar-ring: 40 71% 59%;
+  --sidebar-gradient-end: 40 71% 59%;
+}
+
+.dark[data-palette='sandwalk'] {
+  --background: 30 28% 8%;
+  --foreground: 40 50% 92%;
+  --card: 30 24% 11%;
+  --card-foreground: 40 50% 92%;
+  --popover: 30 24% 11%;
+  --popover-foreground: 40 50% 92%;
+  --primary: 40 71% 59%;
+  --primary-foreground: 25 40% 12%;
+  --secondary: 30 20% 16%;
+  --secondary-foreground: 40 40% 88%;
+  --muted: 30 18% 15%;
+  --muted-foreground: 40 20% 62%;
+  --accent: 30 28% 18%;
+  --accent-foreground: 40 71% 70%;
+  --border: 30 18% 20%;
+  --input: 30 18% 20%;
+  --ring: 40 71% 59%;
+  --sidebar-background: 30 35% 14%;
+  --sidebar-foreground: 40 55% 90%;
+  --sidebar-primary: 40 71% 59%;
+  --sidebar-primary-foreground: 25 40% 12%;
+  --sidebar-accent: 40 45% 28%;
+  --sidebar-accent-foreground: 40 70% 92%;
+  --sidebar-border: 30 22% 18%;
+  --sidebar-ring: 40 71% 59%;
+  --sidebar-gradient-end: 40 55% 22%;
+}
+
 :root[data-palette='darwin'] {
   --background: 140 25% 99%;
   --foreground: 155 35% 12%;
@@ -462,6 +521,391 @@ html.sandwalk-mac-glass .sandwalk-shell-main {
   --sidebar-accent-foreground: 148 50% 68%;
   --sidebar-border: 155 16% 16%;
   --sidebar-ring: 148 40% 55%;
+}
+
+/* ── Vision-assistive palettes ────────────────────────────────────────────── */
+
+:root[data-palette='tritanopia'] {
+  --background: 230 40% 99%;
+  --foreground: 235 30% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 235 30% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 235 30% 14%;
+  --primary: 231 48% 48%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 230 25% 94%;
+  --secondary-foreground: 235 30% 20%;
+  --muted: 230 20% 94%;
+  --muted-foreground: 235 10% 40%;
+  --accent: 330 45% 95%;
+  --accent-foreground: 330 65% 35%;
+  --border: 230 18% 88%;
+  --input: 230 18% 88%;
+  --ring: 231 48% 48%;
+  --sidebar-background: 230 28% 97.5%;
+  --sidebar-foreground: 235 18% 28%;
+  --sidebar-primary: 231 48% 48%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 231 45% 94%;
+  --sidebar-accent-foreground: 231 55% 35%;
+  --sidebar-border: 230 16% 90%;
+  --sidebar-ring: 231 48% 48%;
+}
+
+.dark[data-palette='tritanopia'] {
+  --background: 235 30% 8%;
+  --foreground: 230 20% 96%;
+  --card: 235 24% 11%;
+  --card-foreground: 230 20% 96%;
+  --popover: 235 24% 11%;
+  --popover-foreground: 230 20% 96%;
+  --primary: 231 70% 65%;
+  --primary-foreground: 235 30% 10%;
+  --secondary: 235 16% 16%;
+  --secondary-foreground: 230 15% 92%;
+  --muted: 235 14% 16%;
+  --muted-foreground: 230 10% 62%;
+  --accent: 330 30% 18%;
+  --accent-foreground: 330 80% 72%;
+  --border: 235 16% 18%;
+  --input: 235 16% 18%;
+  --ring: 231 70% 65%;
+  --sidebar-background: 235 24% 9%;
+  --sidebar-foreground: 230 12% 92%;
+  --sidebar-primary: 231 70% 65%;
+  --sidebar-primary-foreground: 235 30% 10%;
+  --sidebar-accent: 231 40% 20%;
+  --sidebar-accent-foreground: 231 70% 78%;
+  --sidebar-border: 235 14% 16%;
+  --sidebar-ring: 231 70% 65%;
+}
+
+:root[data-palette='protanopia'] {
+  --background: 258 40% 99%;
+  --foreground: 258 25% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 258 25% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 258 25% 14%;
+  --primary: 262 71% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 258 25% 95%;
+  --secondary-foreground: 258 20% 20%;
+  --muted: 258 18% 94%;
+  --muted-foreground: 258 10% 40%;
+  --accent: 217 55% 93%;
+  --accent-foreground: 217 60% 32%;
+  --border: 258 18% 88%;
+  --input: 258 18% 88%;
+  --ring: 262 71% 58%;
+  --sidebar-background: 258 45% 97.5%;
+  --sidebar-foreground: 258 20% 24%;
+  --sidebar-primary: 262 71% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 262 55% 93%;
+  --sidebar-accent-foreground: 262 60% 40%;
+  --sidebar-border: 258 18% 90%;
+  --sidebar-ring: 262 71% 58%;
+}
+
+.dark[data-palette='protanopia'] {
+  --background: 258 24% 8%;
+  --foreground: 258 20% 96%;
+  --card: 258 20% 11%;
+  --card-foreground: 258 20% 96%;
+  --popover: 258 20% 11%;
+  --popover-foreground: 258 20% 96%;
+  --primary: 262 80% 72%;
+  --primary-foreground: 258 30% 10%;
+  --secondary: 258 16% 16%;
+  --secondary-foreground: 258 15% 90%;
+  --muted: 258 14% 16%;
+  --muted-foreground: 258 10% 62%;
+  --accent: 217 35% 18%;
+  --accent-foreground: 217 70% 74%;
+  --border: 258 16% 18%;
+  --input: 258 16% 18%;
+  --ring: 262 80% 72%;
+  --sidebar-background: 258 30% 14%;
+  --sidebar-foreground: 258 15% 92%;
+  --sidebar-primary: 262 80% 72%;
+  --sidebar-primary-foreground: 258 30% 10%;
+  --sidebar-accent: 262 45% 22%;
+  --sidebar-accent-foreground: 262 75% 85%;
+  --sidebar-border: 258 16% 16%;
+  --sidebar-ring: 262 80% 72%;
+}
+
+:root[data-palette='ember'] {
+  --background: 0 40% 99%;
+  --foreground: 236 30% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 236 30% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 236 30% 14%;
+  --primary: 236 70% 40%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 25% 94%;
+  --secondary-foreground: 236 30% 20%;
+  --muted: 0 20% 94%;
+  --muted-foreground: 236 10% 40%;
+  --accent: 0 55% 95%;
+  --accent-foreground: 0 70% 35%;
+  --border: 0 18% 88%;
+  --input: 0 18% 88%;
+  --ring: 236 70% 40%;
+  --sidebar-background: 0 100% 97%;
+  --sidebar-foreground: 236 30% 22%;
+  --sidebar-primary: 236 70% 32%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 236 84% 92%;
+  --sidebar-accent-foreground: 236 84% 22%;
+  --sidebar-border: 0 16% 90%;
+  --sidebar-ring: 236 70% 40%;
+  --sidebar-gradient-end: 236 84% 90%;
+}
+
+.dark[data-palette='ember'] {
+  --background: 236 30% 8%;
+  --foreground: 0 20% 96%;
+  --card: 236 24% 11%;
+  --card-foreground: 0 20% 96%;
+  --popover: 236 24% 11%;
+  --popover-foreground: 0 20% 96%;
+  --primary: 0 70% 55%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 236 16% 16%;
+  --secondary-foreground: 0 15% 92%;
+  --muted: 236 14% 16%;
+  --muted-foreground: 0 10% 62%;
+  --accent: 236 30% 18%;
+  --accent-foreground: 0 80% 72%;
+  --border: 236 16% 18%;
+  --input: 236 16% 18%;
+  --ring: 0 70% 55%;
+  --sidebar-background: 0 100% 15%;
+  --sidebar-foreground: 0 20% 92%;
+  --sidebar-primary: 0 70% 55%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 236 60% 20%;
+  --sidebar-accent-foreground: 0 20% 95%;
+  --sidebar-border: 236 16% 16%;
+  --sidebar-ring: 0 70% 55%;
+  --sidebar-gradient-end: 236 84% 10%;
+}
+
+:root[data-palette='verdant'] {
+  --background: 251 40% 99%;
+  --foreground: 251 20% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 251 20% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 251 20% 14%;
+  --primary: 139 40% 30%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 251 25% 95%;
+  --secondary-foreground: 251 20% 20%;
+  --muted: 251 18% 94%;
+  --muted-foreground: 251 10% 40%;
+  --accent: 139 45% 93%;
+  --accent-foreground: 139 55% 24%;
+  --border: 251 18% 88%;
+  --input: 251 18% 88%;
+  --ring: 139 40% 36%;
+  --sidebar-background: 251 60% 97%;
+  --sidebar-foreground: 251 20% 24%;
+  --sidebar-primary: 139 40% 30%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 139 51% 90%;
+  --sidebar-accent-foreground: 139 55% 24%;
+  --sidebar-border: 251 18% 90%;
+  --sidebar-ring: 139 40% 36%;
+  --sidebar-gradient-end: 139 51% 88%;
+}
+
+.dark[data-palette='verdant'] {
+  --background: 251 24% 8%;
+  --foreground: 139 20% 96%;
+  --card: 251 20% 11%;
+  --card-foreground: 139 20% 96%;
+  --popover: 251 20% 11%;
+  --popover-foreground: 139 20% 96%;
+  --primary: 139 51% 55%;
+  --primary-foreground: 251 30% 10%;
+  --secondary: 251 16% 16%;
+  --secondary-foreground: 139 15% 90%;
+  --muted: 251 14% 16%;
+  --muted-foreground: 139 10% 62%;
+  --accent: 251 30% 18%;
+  --accent-foreground: 139 60% 70%;
+  --border: 251 16% 18%;
+  --input: 251 16% 18%;
+  --ring: 139 51% 55%;
+  --sidebar-background: 251 60% 16%;
+  --sidebar-foreground: 139 15% 92%;
+  --sidebar-primary: 139 51% 55%;
+  --sidebar-primary-foreground: 251 30% 10%;
+  --sidebar-accent: 139 51% 22%;
+  --sidebar-accent-foreground: 139 30% 95%;
+  --sidebar-border: 251 16% 16%;
+  --sidebar-ring: 139 51% 55%;
+  --sidebar-gradient-end: 251 40% 6%;
+}
+
+/*
+ * Gradient sidebars (Sandwalk Dorado, Ember, Verdant) — blend the sidebar
+ * background into `--sidebar-gradient-end` top-to-bottom. Wins over the
+ * plain solid unfocused/liquid-glass-off fallback (tie broken by source
+ * order) *and* over the focused-glass frost wash below.
+ */
+html.sandwalk-mac-glass[data-palette='sandwalk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='ember'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='verdant'] .sandwalk-shell-sidebar,
+html[data-palette='sandwalk']:not(.sandwalk-mac-glass) .sandwalk-shell-sidebar,
+html[data-palette='ember']:not(.sandwalk-mac-glass) .sandwalk-shell-sidebar,
+html[data-palette='verdant']:not(.sandwalk-mac-glass) .sandwalk-shell-sidebar {
+  background: linear-gradient(
+    165deg,
+    hsl(var(--sidebar-background)) 0%,
+    hsl(var(--sidebar-gradient-end)) 140%
+  ) !important;
+}
+
+/* Same gradient, translucent, while the native glass wash is focused/active. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='sandwalk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='ember'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='verdant'] .sandwalk-shell-sidebar {
+  background: linear-gradient(
+    165deg,
+    hsl(var(--sidebar-background) / 0.62) 0%,
+    hsl(var(--sidebar-gradient-end) / 0.62) 140%
+  ) !important;
+}
+
+/*
+ * Custom theme (data-palette="custom") — four colors picked in Appearance →
+ * Sidebar appearance → Custom theme. `--sandwalk-custom-*-hsl` are set
+ * inline by applyCustomTheme(); harmless everywhere else since only these
+ * `[data-palette='custom']`-scoped rules read them.
+ */
+html[data-palette='custom'] {
+  --sidebar-background: var(--sandwalk-custom-nav-hsl, 0 0% 100%);
+  --sidebar-accent: var(--sandwalk-custom-selected-hsl, 0 0% 94%);
+  --sidebar-accent-foreground: 0 0% 100%;
+}
+
+html.sandwalk-mac-glass[data-palette='custom'].sandwalk-custom-gradient .sandwalk-shell-sidebar,
+html[data-palette='custom'].sandwalk-custom-gradient:not(.sandwalk-mac-glass) .sandwalk-shell-sidebar {
+  background: linear-gradient(
+    165deg,
+    hsl(var(--sidebar-background)) 0%,
+    hsl(var(--sidebar-accent)) 140%
+  ) !important;
+}
+
+html[data-palette='custom'] .sandwalk-presence-dot {
+  background-color: var(--sandwalk-custom-presence) !important;
+}
+
+/*
+ * Custom theme sidebar text — nav items use `text-foreground` /
+ * `text-muted-foreground` (not `text-sidebar-foreground`), so remap those
+ * tokens inside the sidebar. Beats the glass hard-coded gray via equal
+ * specificity + later source order. `--sandwalk-custom-text-hsl` is always
+ * set by applyCustomTheme (explicit pick, or auto from nav luminance).
+ */
+html[data-palette='custom'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='custom'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass:not(.dark)[data-palette='custom'] .sandwalk-shell-sidebar {
+  --sidebar-foreground: var(--sandwalk-custom-text-hsl);
+  --foreground: var(--sandwalk-custom-text-hsl);
+  --muted-foreground: var(--sandwalk-custom-text-hsl);
+  color: hsl(var(--sandwalk-custom-text-hsl));
+}
+
+/*
+ * Accent color (data-accent on <html>) — recolors just the sidebar selected/
+ * hover pill, independent of the palette. "none" (default) keeps the
+ * neutral gray highlight already used everywhere. Same specificity as the
+ * mac-glass sidebar-accent rule (adds one more attribute selector) so it
+ * always wins regardless of source order.
+ */
+:root[data-accent='blue'],
+html.sandwalk-mac-glass[data-accent='blue']:not(.dark) {
+  --sidebar-accent: 217 89% 89%;
+  --sidebar-accent-foreground: 217 70% 32%;
+}
+.dark[data-accent='blue'],
+html.sandwalk-mac-glass[data-accent='blue'].dark {
+  --sidebar-accent: 217 45% 22%;
+  --sidebar-accent-foreground: 213 90% 78%;
+}
+
+:root[data-accent='teal'],
+html.sandwalk-mac-glass[data-accent='teal']:not(.dark) {
+  --sidebar-accent: 173 70% 88%;
+  --sidebar-accent-foreground: 173 65% 26%;
+}
+.dark[data-accent='teal'],
+html.sandwalk-mac-glass[data-accent='teal'].dark {
+  --sidebar-accent: 173 40% 20%;
+  --sidebar-accent-foreground: 168 70% 72%;
+}
+
+:root[data-accent='green'],
+html.sandwalk-mac-glass[data-accent='green']:not(.dark) {
+  --sidebar-accent: 142 65% 89%;
+  --sidebar-accent-foreground: 142 55% 27%;
+}
+.dark[data-accent='green'],
+html.sandwalk-mac-glass[data-accent='green'].dark {
+  --sidebar-accent: 142 35% 20%;
+  --sidebar-accent-foreground: 142 55% 70%;
+}
+
+:root[data-accent='red'],
+html.sandwalk-mac-glass[data-accent='red']:not(.dark) {
+  --sidebar-accent: 0 80% 92%;
+  --sidebar-accent-foreground: 0 65% 40%;
+}
+.dark[data-accent='red'],
+html.sandwalk-mac-glass[data-accent='red'].dark {
+  --sidebar-accent: 0 40% 22%;
+  --sidebar-accent-foreground: 0 80% 78%;
+}
+
+:root[data-accent='pink'],
+html.sandwalk-mac-glass[data-accent='pink']:not(.dark) {
+  --sidebar-accent: 330 75% 92%;
+  --sidebar-accent-foreground: 330 60% 38%;
+}
+.dark[data-accent='pink'],
+html.sandwalk-mac-glass[data-accent='pink'].dark {
+  --sidebar-accent: 330 40% 22%;
+  --sidebar-accent-foreground: 330 80% 78%;
+}
+
+:root[data-accent='purple'],
+html.sandwalk-mac-glass[data-accent='purple']:not(.dark) {
+  --sidebar-accent: 262 70% 92%;
+  --sidebar-accent-foreground: 262 55% 42%;
+}
+.dark[data-accent='purple'],
+html.sandwalk-mac-glass[data-accent='purple'].dark {
+  --sidebar-accent: 262 40% 25%;
+  --sidebar-accent-foreground: 262 80% 80%;
+}
+
+:root[data-accent='orange'],
+html.sandwalk-mac-glass[data-accent='orange']:not(.dark) {
+  --sidebar-accent: 25 90% 90%;
+  --sidebar-accent-foreground: 22 70% 34%;
+}
+.dark[data-accent='orange'],
+html.sandwalk-mac-glass[data-accent='orange'].dark {
+  --sidebar-accent: 22 45% 22%;
+  --sidebar-accent-foreground: 25 85% 72%;
 }
 
 .chat-scrollbar {
@@ -574,14 +1018,9 @@ html.sandwalk-mac-glass .sandwalk-shell-main {
 
 /* Shell nav strip: sidebar toggle + back/forward under traffic lights. */
 .sandwalk-shell-nav-strip {
-  height: 2.75rem; /* h-11 — aligned with traffic_light_position y=24 */
+  height: 3.25rem; /* 52px — room above; centers with traffic_light_position y=20 */
   align-items: center;
   transition: padding-left 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* Tighter continuous column on glass sidebar — less “title bar” band. */
-html.sandwalk-mac-glass .sandwalk-shell-sidebar > .sandwalk-shell-nav-fade .sandwalk-shell-nav-strip {
-  height: 2.5rem;
 }
 
 /*
@@ -590,12 +1029,12 @@ html.sandwalk-mac-glass .sandwalk-shell-sidebar > .sandwalk-shell-nav-fade .sand
  * (see AppShellMainDragStrip).
  */
 .sandwalk-main-drag-strip {
-  height: 2.75rem; /* match shell nav strip */
+  height: 3.25rem; /* match shell nav strip */
 }
 
 html.sandwalk-mac-overlay .sandwalk-shell-nav-strip-mac {
   /*
-   * Traffic lights at (19, 24) in lib.rs; cluster ~58px wide → clear ~77px,
+   * Traffic lights at (19, 20) in lib.rs; cluster ~58px wide → clear ~77px,
    * then breathing room before the sidebar toggle.
    */
   padding-left: 6rem; /* 96px */

@@ -3,8 +3,15 @@ import AppKit
 import Foundation
 
 /// Renders a bright Dock/App Store–style master icon:
-/// full-bleed light background (system masks to squircle) + Aura bars.
-/// Usage: generate_app_icon.swift <out.png> [size]
+/// full-bleed light background + Aura bars.
+/// Usage: generate_app_icon.swift <out.png> [size] [--squircle]
+///
+/// --squircle bakes in macOS's rounded-square icon shape (with transparent
+/// corners). Needed for images set at runtime via
+/// NSApplication.applicationIconImage (the Dock icon picker in Appearance) —
+/// that API shows the image as-is with no automatic masking, unlike the
+/// bundle .icns pipeline. Omit it for the master bundle icon (Xcode/iconutil
+/// masks that one automatically).
 
 let outPath = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
@@ -12,6 +19,7 @@ let outPath = CommandLine.arguments.count > 1
 let size = CommandLine.arguments.count > 2
     ? (Int(CommandLine.arguments[2]) ?? 1024)
     : 1024
+let squircle = CommandLine.arguments.contains("--squircle")
 
 let barColors: [NSColor] = Array(
     repeating: NSColor(srgbRed: 0.08, green: 0.08, blue: 0.09, alpha: 1),
@@ -54,6 +62,16 @@ guard let ctx = NSGraphicsContext(bitmapImageRep: rep) else {
 NSGraphicsContext.current = ctx
 
 let bounds = NSRect(x: 0, y: 0, width: size, height: size)
+
+if squircle {
+    // macOS Big Sur+ rounded-square icon shape — ~22.3% corner radius.
+    let squircleRadius = CGFloat(size) * 0.2226
+    NSBezierPath(
+        roundedRect: bounds,
+        xRadius: squircleRadius,
+        yRadius: squircleRadius
+    ).addClip()
+}
 
 // Bright full-bleed wash (ChatGPT / Ollama style — system applies squircle).
 let gradient = NSGradient(colors: [

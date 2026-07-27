@@ -13,7 +13,7 @@ export function DesktopTitleBar() {
   return (
     <DesktopDragRegion
       asTitleBar
-      className="bg-background flex h-11 w-full shrink-0 items-center pl-[78px]"
+      className="sandwalk-shell-nav-strip bg-background flex w-full shrink-0 items-center pl-[78px]"
       title="Drag to move window"
     >
       {/* Empty fill — hold-click and drag anywhere here to move the window. */}

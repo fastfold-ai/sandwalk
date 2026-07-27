@@ -8,6 +8,7 @@ import {
   HardDrive,
   LayoutDashboard,
   Mic,
+  Paintbrush,
   Plug,
   ScrollText,
   Settings2,
@@ -48,6 +49,12 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
         label: 'General',
         path: '/dashboard/general',
         icon: Settings2
+      },
+      {
+        id: 'appearance',
+        label: 'Appearance',
+        path: '/dashboard/appearance',
+        icon: Paintbrush
       }
     ]
   },

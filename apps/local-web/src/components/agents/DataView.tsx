@@ -139,7 +139,7 @@ export function DataView({
           ? 'flex w-full flex-col'
           : embedded
             ? 'mx-auto flex w-full max-w-5xl flex-col p-1'
-            : 'mx-auto flex w-full max-w-7xl flex-col px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6'
+            : 'mx-auto flex w-full max-w-7xl flex-col px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8'
       }
     >
       {!embedded && !bare ? (

@@ -63,9 +63,14 @@ describe('theme', () => {
   it('exposes palette metadata', () => {
     expect(THEME_PALETTES.map(p => p.id)).toEqual([
       'default',
+      'sandwalk',
+      'ember',
+      'verdant',
       'mirage',
       'mahal',
-      'darwin'
+      'darwin',
+      'tritanopia',
+      'protanopia'
     ])
   })
 
@@ -78,6 +83,11 @@ describe('theme', () => {
     localStorage.setItem('sandwalk.theme-palette', 'mirage')
     expect(getStoredTheme()).toBe('dark')
     expect(getStoredPalette()).toBe('mirage')
+
+    localStorage.setItem('sandwalk.theme-palette', 'sandwalk')
+    expect(getStoredPalette()).toBe('sandwalk')
+    localStorage.setItem('sandwalk.theme-palette', 'tritanopia')
+    expect(getStoredPalette()).toBe('tritanopia')
 
     localStorage.setItem('fastfold.theme', 'nope')
     localStorage.setItem('sandwalk.theme-palette', 'nope')

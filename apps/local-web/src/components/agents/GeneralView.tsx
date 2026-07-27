@@ -13,16 +13,10 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  getStoredPalette,
-  PALETTE_CHANGE_EVENT,
-  type ThemePaletteId
-} from '@/lib/theme'
 
 import { GeneralViewAboutSection } from './general-view-about'
 import { GeneralViewAccountSection } from './general-view-account'
 import { GeneralViewServerSection } from './general-view-server'
-import { GeneralViewThemesSection } from './general-view-themes'
 
 export function GeneralView({
   backendUrl,
@@ -53,15 +47,6 @@ export function GeneralView({
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [palette, setPalette] = useState<ThemePaletteId>(() => getStoredPalette())
-
-  useEffect(() => {
-    const onChange = (event: Event) => {
-      setPalette((event as CustomEvent<ThemePaletteId>).detail)
-    }
-    window.addEventListener(PALETTE_CHANGE_EVENT, onChange)
-    return () => window.removeEventListener(PALETTE_CHANGE_EVENT, onChange)
-  }, [])
 
   const loadAccount = useCallback(
     async (checkUpdates = false, signal?: AbortSignal) => {
@@ -110,11 +95,12 @@ export function GeneralView({
 
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-7xl space-y-10 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6">
+      <div className="mx-auto w-full max-w-7xl space-y-10 px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8">
         <div>
           <h2 className="text-2xl font-semibold">General</h2>
           <p className="text-muted-foreground mt-2 text-sm">
-            Account, themes, agent server connection, and app details.
+            Account, agent server connection, and app details. Theme and
+            sidebar appearance live under Appearance.
           </p>
         </div>
 
@@ -138,8 +124,6 @@ export function GeneralView({
           signingOut={signingOut}
           onSignOutClick={() => setConfirmSignOut(true)}
         />
-
-        <GeneralViewThemesSection palette={palette} />
 
         {onOpenSetupWizard ? (
           <section className="space-y-3">

@@ -1,6 +1,7 @@
 export type DashboardSection =
   | 'overview'
   | 'general'
+  | 'appearance'
   | 'agent_runtime'
   | 'agent_sandbox'
   | 'context'

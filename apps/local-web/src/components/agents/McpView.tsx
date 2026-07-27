@@ -108,7 +108,7 @@ export function McpView({
         className={
           embedded
             ? 'mx-auto w-full max-w-5xl space-y-6 p-1'
-            : 'mx-auto w-full max-w-7xl space-y-6 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6'
+            : 'mx-auto w-full max-w-7xl space-y-6 px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8'
         }
       >
         {!embedded ? (

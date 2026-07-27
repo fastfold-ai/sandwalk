@@ -4,6 +4,7 @@ import {
   AgentPromptsView,
   AgentRuntimeView,
   AgentSandboxView,
+  AppearanceView,
   DataView,
   DoctorView,
   EnvironmentView,
@@ -26,6 +27,7 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     runtimeSettings,
     sandboxSettings,
     isDashboardGeneral,
+    isDashboardAppearance,
     isDashboardAgentRuntime,
     isDashboardAgentPrompts,
     isDashboardVoice,
@@ -66,6 +68,10 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         }}
       />
     )
+  }
+
+  if (isDashboardAppearance) {
+    return <AppearanceView />
   }
 
   if (isDashboardAgentRuntime) {

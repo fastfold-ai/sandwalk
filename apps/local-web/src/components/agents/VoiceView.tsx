@@ -232,7 +232,7 @@ export function VoiceView() {
 
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-7xl space-y-8 px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6">
+      <div className="mx-auto w-full max-w-7xl space-y-8 px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8">
         <div>
           <h2 className="text-2xl font-semibold">Voice</h2>
           <p className="text-muted-foreground mt-2 max-w-2xl text-sm">

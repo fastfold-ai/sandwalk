@@ -10,17 +10,35 @@ import { Toaster } from './components/ui/sonner.tsx'
 import { installBlockBrowserBackspace } from './lib/block-browser-backspace.ts'
 import { isMacDesktopOverlay, platformOS } from './lib/desktop.ts'
 import {
+  applyAccentColor,
+  applyAppFont,
+  applyCustomTheme,
+  applyDockIcon,
+  applyGlassMaterial,
+  applyGlassTintStrength,
   applyLiquidGlass,
   applyPalette,
   applyTheme,
+  applyUiFontSize,
+  getStoredAccentColor,
+  getStoredAppFont,
+  getStoredCustomTheme,
+  getStoredDockIcon,
+  getStoredGlassMaterial,
+  getStoredGlassTintStrength,
   getStoredLiquidGlass,
   getStoredPalette,
   getStoredTheme,
+  getStoredUiFontSize,
   watchSystemTheme
 } from './lib/theme.ts'
 
 applyTheme(getStoredTheme())
 applyPalette(getStoredPalette())
+applyAccentColor(getStoredAccentColor())
+applyCustomTheme(getStoredCustomTheme())
+applyUiFontSize(getStoredUiFontSize())
+applyAppFont(getStoredAppFont())
 watchSystemTheme()
 installBlockBrowserBackspace()
 
@@ -32,6 +50,9 @@ if (isMacDesktopOverlay()) {
     'sandwalk-mac-glass-active'
   )
   applyLiquidGlass(getStoredLiquidGlass())
+  applyGlassMaterial(getStoredGlassMaterial())
+  applyGlassTintStrength(getStoredGlassTintStrength())
+  applyDockIcon(getStoredDockIcon())
 }
 
 createRoot(document.getElementById('root')!).render(
