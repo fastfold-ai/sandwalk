@@ -132,6 +132,10 @@ CREATE TABLE IF NOT EXISTS slack_workspaces (
     connection_id TEXT,
     assistant_enabled INTEGER NOT NULL DEFAULT 0,
     enabled INTEGER NOT NULL DEFAULT 1,
+    -- Set when an outbound Slack call fails with an auth error (e.g. the bot
+    -- token was rotated by a reinstall) — the UI turns this into a prominent
+    -- "reconnect" prompt instead of a generic connectivity error.
+    needs_reauth INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

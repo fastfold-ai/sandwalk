@@ -53,9 +53,7 @@ def test_manifest_is_valid_json_with_socket_mode(client: TestClient) -> None:
 
 
 def test_manifest_honours_a_custom_app_name(client: TestClient) -> None:
-    body = client.get(
-        "/v1/connectors/slack/manifest", params={"app_name": "Acme Bot"}
-    ).json()
+    body = client.get("/v1/connectors/slack/manifest", params={"app_name": "Acme Bot"}).json()
     manifest = json.loads(body["manifest"])
     assert manifest["display_information"]["name"] == "Acme Bot"
     assert manifest["features"]["bot_user"]["display_name"] == "Acme Bot"
@@ -79,6 +77,27 @@ def test_workspaces_never_expose_tokens(client: TestClient) -> None:
     body = client.get("/v1/connectors/slack/workspaces").json()
     assert body["data"][0]["hasBotToken"] is True
     assert "xoxb-secret" not in json.dumps(body)
+
+
+def test_workspace_needs_reauth_round_trips(client: TestClient) -> None:
+    connect_workspace(client)
+    store = client.app.state.store
+    assert store.get_slack_workspace("T1").needs_reauth is False
+
+    store.set_slack_workspace_reauth("T1", needs_reauth=True)
+    body = client.get("/v1/connectors/slack/workspaces").json()
+    assert body["data"][0]["needsReauth"] is True
+
+
+def test_import_one_click_accepts_a_reauth_team_id(client: TestClient) -> None:
+    """Routing/param wiring only — no FastFold Cloud key is configured here,
+    so this exercises the same "not signed in" error either way."""
+    response = client.post(
+        "/v1/connectors/slack/connect/one-click/import",
+        params={"reauth_team_id": "T1"},
+    )
+    assert response.status_code == 400
+    assert "Connect FastFold Cloud" in response.json()["detail"]
 
 
 def test_people_allowlist_round_trip(client: TestClient) -> None:
@@ -223,10 +242,7 @@ def test_session_mute_round_trip(client: TestClient) -> None:
 
 def test_session_mute_requires_a_real_session(client: TestClient) -> None:
     assert client.get("/v1/sessions/nope/connectors/slack").status_code == 404
-    assert (
-        client.put("/v1/sessions/nope/connectors/slack", json={"muted": True}).status_code
-        == 404
-    )
+    assert client.put("/v1/sessions/nope/connectors/slack", json={"muted": True}).status_code == 404
 
 
 def test_disconnect_removes_the_workspace(client: TestClient) -> None:

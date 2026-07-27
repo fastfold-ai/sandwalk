@@ -18,22 +18,38 @@ def _api_base() -> str:
     return os.environ.get("SLACK_API_URL", _SLACK_API).rstrip("/")
 
 
-def _resolve_tokens(team_id: str) -> tuple[str | None, str | None]:
+def _resolve_tokens(team_id: str) -> tuple[str | None, str | None, bool]:
+    """Return ``(bot_token, error, needs_reauth)``."""
     from agent_server.store import AgentStore
 
     store = AgentStore()
     try:
         workspace = store.get_slack_workspace(team_id)
         if workspace is None:
-            return None, f"Slack workspace {team_id} is not connected."
+            return None, f"Slack workspace {team_id} is not connected.", False
         if not workspace.enabled:
-            return None, f"Slack workspace {team_id} is disabled."
+            return None, f"Slack workspace {team_id} is disabled.", False
         bot_token, _ = store.get_slack_tokens(team_id)
         if not bot_token:
-            return None, (
-                f"No Slack bot token stored for {team_id}. Reconnect the workspace."
+            return (
+                None,
+                (f"No Slack bot token stored for {team_id}. Reconnect the workspace."),
+                False,
             )
-        return bot_token, None
+        return bot_token, None, workspace.needs_reauth
+    finally:
+        store.close()
+
+
+def _set_reauth_flag(team_id: str, *, needed: bool) -> None:
+    """Best effort - a failed status write must not affect the reply itself."""
+    from agent_server.store import AgentStore
+
+    store = AgentStore()
+    try:
+        store.set_slack_workspace_reauth(team_id, needs_reauth=needed)
+    except Exception:  # noqa: BLE001
+        pass
     finally:
         store.close()
 
@@ -105,8 +121,7 @@ def _post(path: str, token: str, payload: dict) -> dict:
     category="slack",
     parameters={
         "target": (
-            "Reply handle from the incoming message, e.g. "
-            "slack:T0123/C0456:1712000000.000100"
+            "Reply handle from the incoming message, e.g. slack:T0123/C0456:1712000000.000100"
         ),
         "text": "Message text (Slack mrkdwn)",
     },
@@ -129,7 +144,7 @@ def send_message(target: str, text: str, **kwargs) -> dict:
     except ValueError as exc:
         return {"summary": f"Invalid Slack target: {exc}", "ok": False}
 
-    token, error = _resolve_tokens(parsed.team_id)
+    token, error, needed_reauth = _resolve_tokens(parsed.team_id)
     if token is None:
         return {"summary": error or "Slack is not connected.", "ok": False}
 
@@ -153,6 +168,19 @@ def send_message(target: str, text: str, **kwargs) -> dict:
     response = _post("chat.postMessage", token, payload)
     if not response.get("ok"):
         detail = str(response.get("error") or response.get("summary") or "unknown error")
+        from agent_server.connectors.slack_errors import is_token_invalid_error
+
+        if is_token_invalid_error(detail):
+            _set_reauth_flag(parsed.team_id, needed=True)
+            return {
+                "summary": (
+                    "Slack rejected the message: the bot token no longer works "
+                    f"({detail}). Reconnect this workspace in Sandwalk's "
+                    "Integrations panel."
+                ),
+                "ok": False,
+                "error": detail,
+            }
         if detail == "not_in_channel":
             return {
                 "summary": (
@@ -162,8 +190,12 @@ def send_message(target: str, text: str, **kwargs) -> dict:
                 "ok": False,
                 "error": detail,
             }
-        return {"summary": f"Slack rejected the message: {detail}", "ok": False,
-                "error": detail}
+        return {"summary": f"Slack rejected the message: {detail}", "ok": False, "error": detail}
+
+    if needed_reauth:
+        # The token clearly works now - whatever tripped the flag earlier
+        # (a stale reinstall check, a transient blip) is no longer true.
+        _set_reauth_flag(parsed.team_id, needed=False)
 
     return {
         "summary": f"Replied in Slack ({parsed.channel_id}).",

@@ -20,12 +20,12 @@ from agent_server.models.connectors import (
     ConnectSlackManualRequest,
     SessionConnectorMute,
     SetConnectorMuteRequest,
+    SetSlackWorkspaceEnabledRequest,
     SlackAllowedUserList,
     SlackConnectorStatus,
     SlackDirectory,
     SlackDirectoryChannel,
     SlackDirectoryPerson,
-    SetSlackWorkspaceEnabledRequest,
     SlackManifestResponse,
     SlackOneClickStart,
     SlackParkedMessageList,
@@ -69,9 +69,7 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
     ) -> SlackOneClickStart:
         """Hand back the Slack install URL for the user's browser."""
         try:
-            url = await connectors.start_one_click(
-                return_to=payload.return_to if payload else None
-            )
+            url = await connectors.start_one_click(return_to=payload.return_to if payload else None)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return SlackOneClickStart(auth_url=url)
@@ -80,14 +78,20 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
         "/v1/connectors/slack/connect/one-click/import",
         response_model=SlackWorkspaceList,
     )
-    async def import_one_click() -> SlackWorkspaceList:
+    async def import_one_click(
+        reauth_team_id: str | None = Query(default=None),
+    ) -> SlackWorkspaceList:
         """Pick up installs finished in the browser.
 
         Polled by the UI after opening the install URL, since the desktop never
-        sees the OAuth callback itself.
+        sees the OAuth callback itself. ``reauth_team_id`` marks this as a
+        reconnect for a team we already have a (possibly stale) token for, so
+        that one gets overwritten instead of skipped.
         """
         try:
-            return SlackWorkspaceList(data=await connectors.import_one_click_connections())
+            return SlackWorkspaceList(
+                data=await connectors.import_one_click_connections(reauth_team_id=reauth_team_id)
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -137,9 +141,7 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
         try:
             people, channels = await connectors.directory(team_id, force=refresh)
         except KeyError as exc:
-            raise HTTPException(
-                status_code=404, detail="Workspace not connected."
-            ) from exc
+            raise HTTPException(status_code=404, detail="Workspace not connected.") from exc
         return SlackDirectory(
             people=[
                 SlackDirectoryPerson(
@@ -181,20 +183,14 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
             slack_user_id=payload.slack_user_id,
             display_name=payload.display_name,
         )
-        return SlackAllowedUserList(
-            data=store.list_slack_allowed_users(payload.team_id)
-        )
+        return SlackAllowedUserList(data=store.list_slack_allowed_users(payload.team_id))
 
     @app.delete(
         "/v1/connectors/slack/workspaces/{team_id}/people/{slack_user_id}",
         response_model=ConnectorActionResponse,
     )
-    async def disallow_person(
-        team_id: str, slack_user_id: str
-    ) -> ConnectorActionResponse:
-        removed = store.disallow_slack_user(
-            team_id=team_id, slack_user_id=slack_user_id
-        )
+    async def disallow_person(team_id: str, slack_user_id: str) -> ConnectorActionResponse:
+        removed = store.disallow_slack_user(team_id=team_id, slack_user_id=slack_user_id)
         if not removed:
             raise HTTPException(status_code=404, detail="Person not on the list.")
         return ConnectorActionResponse()
@@ -205,9 +201,7 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
     async def list_subscriptions(
         session_id: str | None = Query(default=None),
     ) -> SlackSubscriptionList:
-        return SlackSubscriptionList(
-            data=store.list_slack_subscriptions(session_id=session_id)
-        )
+        return SlackSubscriptionList(data=store.list_slack_subscriptions(session_id=session_id))
 
     @app.post(
         "/v1/connectors/slack/subscriptions",
@@ -222,9 +216,7 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
         workspaces = store.list_slack_workspaces()
         default_team = workspaces[0].team_id if len(workspaces) == 1 else None
         try:
-            channel = resolve_channel_input(
-                payload.channel, default_team_id=default_team
-            )
+            channel = resolve_channel_input(payload.channel, default_team_id=default_team)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         store.add_slack_subscription(session_id=payload.session_id, channel=channel)
@@ -239,9 +231,7 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
     async def remove_subscription(
         session_id: str = Query(...), channel: str = Query(...)
     ) -> ConnectorActionResponse:
-        removed = store.remove_slack_subscription(
-            session_id=session_id, channel=channel
-        )
+        removed = store.remove_slack_subscription(session_id=session_id, channel=channel)
         if not removed:
             raise HTTPException(status_code=404, detail="Subscription not found.")
         return ConnectorActionResponse()
@@ -283,9 +273,7 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
         return SessionConnectorMute(
             session_id=session_id,
             connector=CONNECTOR,
-            muted=store.is_session_connector_muted(
-                session_id=session_id, connector=CONNECTOR
-            ),
+            muted=store.is_session_connector_muted(session_id=session_id, connector=CONNECTOR),
         )
 
     @app.put(
@@ -300,9 +288,7 @@ def register_connector_routes(app: FastAPI, deps: AppDeps) -> None:
         store.set_session_connector_mute(
             session_id=session_id, connector=CONNECTOR, muted=payload.muted
         )
-        return SessionConnectorMute(
-            session_id=session_id, connector=CONNECTOR, muted=payload.muted
-        )
+        return SessionConnectorMute(session_id=session_id, connector=CONNECTOR, muted=payload.muted)
 
     def _require_workspace(team_id: str) -> None:
         if store.get_slack_workspace(team_id) is None:

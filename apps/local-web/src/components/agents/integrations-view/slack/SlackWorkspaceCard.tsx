@@ -146,27 +146,36 @@ export function SlackWorkspaceCard({
 
   const isReconnecting =
     workspace.mode === 'relay' && relayState === 'reconnecting'
-  const statusDotClass = !workspace.enabled
-    ? 'bg-muted-foreground/50'
-    : workspace.live
-      ? 'bg-emerald-500'
-      : isReconnecting
-        ? 'bg-amber-500'
-        : 'bg-red-500'
-  const statusLabel = !workspace.enabled
-    ? 'Paused'
-    : workspace.live
-      ? 'Live'
-      : isReconnecting
-        ? 'Reconnecting…'
-        : 'Error'
-  const statusTextClass = !workspace.enabled
-    ? 'text-muted-foreground'
-    : workspace.live
-      ? 'text-emerald-500'
-      : isReconnecting
-        ? 'text-amber-500'
-        : 'text-red-500'
+  // A rotated/invalid bot token is a distinct, more actionable state than a
+  // dropped connection — it needs a click, not a wait, so it takes priority
+  // over every other status.
+  const statusDotClass = workspace.needsReauth
+    ? 'bg-red-500'
+    : !workspace.enabled
+      ? 'bg-muted-foreground/50'
+      : workspace.live
+        ? 'bg-emerald-500'
+        : isReconnecting
+          ? 'bg-amber-500'
+          : 'bg-red-500'
+  const statusLabel = workspace.needsReauth
+    ? 'Reconnect needed'
+    : !workspace.enabled
+      ? 'Paused'
+      : workspace.live
+        ? 'Live'
+        : isReconnecting
+          ? 'Reconnecting…'
+          : 'Error'
+  const statusTextClass = workspace.needsReauth
+    ? 'text-red-500'
+    : !workspace.enabled
+      ? 'text-muted-foreground'
+      : workspace.live
+        ? 'text-emerald-500'
+        : isReconnecting
+          ? 'text-amber-500'
+          : 'text-red-500'
 
   return (
     <section
@@ -188,7 +197,11 @@ export function SlackWorkspaceCard({
             {workspace.domain || workspace.teamId} ·{' '}
             {workspace.mode === 'relay' ? 'relay' : 'socket mode'}
           </p>
-          {relayIssue ? (
+          {workspace.needsReauth ? (
+            <p className="mt-0.5 truncate text-[11px] text-red-500">
+              Slack rejected the last message — the bot token needs refreshing.
+            </p>
+          ) : relayIssue ? (
             <p className="mt-0.5 truncate text-[11px] text-amber-500">
               {relayIssue}
             </p>
@@ -280,18 +293,22 @@ export function SlackWorkspaceCard({
       </Row>
 
       <div className="border-border/70 flex items-center justify-between border-t px-4 py-2.5">
-        {/* Only socket-mode workspaces have tokens to update - relay ones are
-            connected via the shared Sandwalk app with no credentials of the
-            user's own to paste in; reconnecting one-click is how those refresh. */}
-        {workspace.mode === 'socket' ? (
+        {/* Socket Mode always offers "Update" (re-pasting tokens). Relay has
+            no tokens of its own to paste, so it only gets a button once a
+            failure actually calls for a reconnect — the same one-click flow
+            the initial connect used. */}
+        {workspace.mode === 'socket' || workspace.needsReauth ? (
           <Button
             size="sm"
-            variant="ghost"
-            className="h-7 text-[12px]"
+            variant={workspace.needsReauth ? 'outline' : 'ghost'}
+            className={cn(
+              'h-7 text-[12px]',
+              workspace.needsReauth && 'border-red-500/40 text-red-500'
+            )}
             disabled={busy}
             onClick={() => onUpdateTokens(workspace)}
           >
-            Update
+            {workspace.needsReauth ? 'Reconnect' : 'Update'}
           </Button>
         ) : (
           <span />

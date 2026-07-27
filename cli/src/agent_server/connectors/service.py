@@ -54,6 +54,7 @@ def local_oauth_return_url() -> str:
     port = os.environ.get("FASTFOLD_SERVE_PORT", "8787").strip() or "8787"
     return f"http://{host}:{port}{LOCAL_OAUTH_CALLBACK_PATH}"
 
+
 def _cloud_request(
     method: str, url: str, api_key: str, body: dict | None
 ) -> tuple[dict | None, str | None]:
@@ -134,6 +135,10 @@ class ConnectorService:
         self._progress_tasks: set[asyncio.Task] = set()
         self._relay_state: str = "off"
         self._relay_detail: str | None = None
+        # Cached once per process — resolving it hits FastFold Cloud, and the
+        # signed-in account does not change while sandwalk is running.
+        self._account_email: str | None = None
+        self._account_user_id: str | None = None
         self._started = False
         self._lock = asyncio.Lock()
 
@@ -150,9 +155,7 @@ class ConnectorService:
             try:
                 await self._start_workspace(workspace)
             except Exception:
-                logger.exception(
-                    "Failed to start Slack workspace %s", workspace.team_id
-                )
+                logger.exception("Failed to start Slack workspace %s", workspace.team_id)
 
     async def stop(self) -> None:
         self._started = False
@@ -254,7 +257,10 @@ class ConnectorService:
         # desktop is already polling for the result, so a generic cloud
         # "loading" screen would be a dead end for a flow that has nothing
         # left for the user to do.
-        body: dict[str, Any] = {"app": "sandwalk", "return_to": return_to or local_oauth_return_url()}
+        body: dict[str, Any] = {
+            "app": "sandwalk",
+            "return_to": return_to or local_oauth_return_url(),
+        }
         payload, error = await asyncio.to_thread(
             _cloud_request, "POST", f"{cloud_base_url()}/v1/slack/oauth/start", key, body
         )
@@ -265,13 +271,20 @@ class ConnectorService:
             raise ValueError("FastFold did not return a Slack install URL.")
         return url
 
-    async def import_one_click_connections(self) -> list[SlackWorkspace]:
+    async def import_one_click_connections(
+        self, *, reauth_team_id: str | None = None
+    ) -> list[SlackWorkspace]:
         """Adopt installs that were completed in the browser.
 
         The desktop never sees the OAuth callback, so after sending the user to
         Slack it polls the cloud for installs it has no token for, collects
         each one, and starts relaying. Holding the token locally is what keeps
         the outbound path identical to Socket Mode.
+
+        ``reauth_team_id`` is the one exception to "skip if we already have a
+        token": that is exactly the reconnect flow (a reinstall rotated the
+        Slack-side token, ours is now stale), so for that one team the fresh
+        token overwrites the old one instead of being skipped.
         """
         from agent_server.account_service.helpers import api_key, cloud_base_url
 
@@ -292,8 +305,9 @@ class ConnectorService:
             connection_id = str(item.get("id") or "").strip()
             if not team_id or not connection_id:
                 continue
+            is_reauth_target = reauth_team_id is not None and team_id == reauth_team_id
             existing_token, _ = self.store.get_slack_tokens(team_id)
-            if existing_token:
+            if existing_token and not is_reauth_target:
                 continue
 
             token_payload, token_error = await asyncio.to_thread(
@@ -304,9 +318,7 @@ class ConnectorService:
                 None,
             )
             if token_error or not token_payload:
-                logger.warning(
-                    "Could not fetch the Slack token for %s: %s", team_id, token_error
-                )
+                logger.warning("Could not fetch the Slack token for %s: %s", team_id, token_error)
                 continue
 
             workspace = self.store.upsert_slack_workspace(
@@ -451,6 +463,10 @@ class ConnectorService:
             )
             return
 
+        if self._account_email is None and self._account_user_id is None:
+            with contextlib.suppress(Exception):
+                await asyncio.to_thread(self._resolve_account_identity, key)
+
         bot_token, _ = self.store.get_slack_tokens(workspace.team_id)
         if not bot_token:
             logger.warning(
@@ -479,17 +495,89 @@ class ConnectorService:
             adapter.specialist_names = [
                 specialist.name for specialist in self.store.list_specialists()
             ]
+        adapter.home_sessions = self._recent_slack_home_sessions
+        adapter.home_status = lambda team_id=workspace.team_id: self._slack_home_status(team_id)
+        adapter.on_token_invalid = lambda detail, team_id=workspace.team_id: (
+            self._mark_slack_token_invalid(team_id, detail)
+        )
         await adapter.load_directory()
         relay.add_workspace(adapter)
         async with self._lock:
             # Registered in the same map as socket adapters so progress
             # reactions and status find it without caring which mode it is.
             self._sockets[workspace.team_id] = adapter
+        already_live = relay.connected
         await relay.start()
+        if already_live:
+            # The relay was already up (e.g. a second workspace connecting) —
+            # `_set_relay_state` won't fire again, so publish now while the
+            # status is accurate. A cold start publishes from there instead,
+            # once the socket actually reports live rather than racing it.
+            self._republish_home(workspace.team_id)
+
+    def _resolve_account_identity(self, key: str) -> None:
+        from agent_server.account_service import _resolve_user
+        from agent_server.account_service.helpers import cloud_base_url
+
+        _user_id, email, _username = _resolve_user(key, cloud_base_url())
+        user_id = _user_id
+        self._account_email = email
+        self._account_user_id = user_id
 
     def _set_relay_state(self, state: str, detail: str | None) -> None:
         self._relay_state = state
         self._relay_detail = detail
+        if state == "live":
+            # Recent Threads was correct all along — only the status line was
+            # stale (published before the socket actually reported live).
+            for team_id in list(self._sockets):
+                self._republish_home(team_id)
+
+    def _recent_slack_home_sessions(self) -> list:
+        """Slack-originated sessions for the App Home Recent threads list."""
+        from agent_server.connectors.slack_home import RECENT_LIMIT, HomeSessionRow
+
+        rows: list[HomeSessionRow] = []
+        for session in self.store.list_sessions():
+            if session.source != "slack":
+                continue
+            rows.append(
+                HomeSessionRow(
+                    id=session.id,
+                    title=session.title,
+                    source_label=session.source_label,
+                    updated_at=session.updated_at,
+                )
+            )
+            if len(rows) >= RECENT_LIMIT:
+                break
+        return rows
+
+    def _mark_slack_token_invalid(self, team_id: str, detail: str) -> None:
+        """An outbound Slack call reported the bot token itself is dead.
+
+        Distinct from relay connectivity (``_relay_state``): the socket can be
+        perfectly live while the bot token is stale, e.g. after a reinstall
+        rotates it - this is what turns that into a visible "reconnect" prompt
+        instead of a silently failing reply.
+        """
+        logger.warning("Slack bot token for %s needs reconnecting: %s", team_id, detail)
+        with contextlib.suppress(Exception):
+            self.store.set_slack_workspace_reauth(team_id, needs_reauth=True)
+
+    def _slack_home_status(self, team_id: str):
+        """Relay/account state for the App Home Integration status section."""
+        from agent_server.connectors.slack_home import HomeStatus
+
+        status = self.status()
+        workspace = self.store.get_slack_workspace(team_id)
+        return HomeStatus(
+            relay_state=status.relay_state,
+            relay_detail=status.relay_detail,
+            team_name=workspace.team_name if workspace else None,
+            account_email=self._account_email,
+            account_user_id=self._account_user_id,
+        )
 
     async def _stop_workspace(self, team_id: str) -> None:
         async with self._lock:
@@ -512,9 +600,7 @@ class ConnectorService:
     async def _on_inbound(self, message: InboundMessage) -> None:
         decision = self.gateway.route(message)
         if decision.action == "ignore":
-            logger.debug(
-                "Slack inbound ignored (%s) for %s", decision.reason, message.channel
-            )
+            logger.debug("Slack inbound ignored (%s) for %s", decision.reason, message.channel)
             return
         if decision.action == "park":
             self.store.park_slack_message(
@@ -555,9 +641,7 @@ class ConnectorService:
         self._progress_tasks.add(task)
         task.add_done_callback(self._progress_tasks.discard)
 
-    async def _run_progress(
-        self, message: InboundMessage, session_ids: list[str]
-    ) -> None:
+    async def _run_progress(self, message: InboundMessage, session_ids: list[str]) -> None:
         adapter = self._sockets.get(message.team_id)
         if adapter is None:
             return
@@ -625,11 +709,7 @@ class ConnectorService:
         waiting on a reply that never comes.
         """
         parked = next(
-            (
-                item
-                for item in self.store.list_slack_parked_messages()
-                if item.id == message_id
-            ),
+            (item for item in self.store.list_slack_parked_messages() if item.id == message_id),
             None,
         )
         if parked is None:
@@ -652,9 +732,7 @@ class ConnectorService:
         """Rebuild the original message so it can run through routing again."""
         try:
             channel = parse_target(parked.channel)
-            thread = (
-                parse_target(parked.thread_target) if parked.thread_target else None
-            )
+            thread = parse_target(parked.thread_target) if parked.thread_target else None
         except ValueError:
             logger.warning("Parked message %s has an unreadable target", parked.id)
             return None
@@ -671,9 +749,7 @@ class ConnectorService:
             mentions_me=True,
         )
 
-    def _spawn_session(
-        self, message: InboundMessage, decision: RouteDecision
-    ) -> str | None:
+    def _spawn_session(self, message: InboundMessage, decision: RouteDecision) -> str | None:
         if self.agent_service is None:
             logger.warning("No agent service wired — dropping Slack mention")
             return None
@@ -698,7 +774,23 @@ class ConnectorService:
             channel=message.channel,
         )
         self._deliver(session.id, message, first_message=True)
+        # Recent threads just changed — refresh Home for whoever can see it.
+        # Fire-and-forget: a slow/failed publish must not delay the reply.
+        self._republish_home(message.team_id)
         return session.id
+
+    def _republish_home(self, team_id: str) -> None:
+        adapter = self._sockets.get(team_id)
+        publish = getattr(adapter, "publish_home_for_users", None)
+        if not callable(publish):
+            # Socket Mode workspaces have no App Home surface yet.
+            return
+        allowed = [person.slack_user_id for person in self.store.list_slack_allowed_users(team_id)]
+        if not allowed:
+            return
+        task = asyncio.create_task(publish(allowed))
+        self._progress_tasks.add(task)
+        task.add_done_callback(self._progress_tasks.discard)
 
     def _dm_channel_name(self, message: InboundMessage) -> str | None:
         """Bot @handle for DM cards — resolved from the live adapter's auth."""
@@ -709,25 +801,19 @@ class ConnectorService:
         if isinstance(bot_name, str) and bot_name.strip():
             return bot_name.strip()
         bot_id = getattr(adapter, "bot_user_id", None)
-        names = getattr(adapter, "user_names", None) or getattr(
-            adapter, "_user_names", None
-        )
+        names = getattr(adapter, "user_names", None) or getattr(adapter, "_user_names", None)
         if bot_id and isinstance(names, dict):
             resolved = names.get(bot_id)
             if isinstance(resolved, str) and resolved.strip():
                 return resolved.strip()
         return None
 
-    def _deliver(
-        self, session_id: str, message: InboundMessage, *, first_message: bool
-    ) -> None:
+    def _deliver(self, session_id: str, message: InboundMessage, *, first_message: bool) -> None:
         if self.agent_service is None:
             logger.warning("No agent service wired — dropping Slack message")
             return
         label = self.gateway.source_label(message)
-        content = frame_inbound(
-            message, channel_label=label, first_message=first_message
-        )
+        content = frame_inbound(message, channel_label=label, first_message=first_message)
         # The model reads the framed content; the UI renders a card from this.
         # DMs have no channel name in Slack's directory — use the bot handle so
         # the card can show "@sandwalk" instead of a raw D… id.
@@ -744,16 +830,12 @@ class ConnectorService:
             text=message.text,
         )
         try:
-            self.agent_service.submit_message(
-                session_id=session_id, content=content, source=source
-            )
+            self.agent_service.submit_message(session_id=session_id, content=content, source=source)
         except SessionBusyError:
             # The agent is still working on this thread. Dropping is better than
             # queueing: by the time it finishes, the earlier question is usually
             # already covered by the answer in flight.
-            logger.info(
-                "Slack message skipped — session %s is still running", session_id
-            )
+            logger.info("Slack message skipped — session %s is still running", session_id)
         except KeyError:
             logger.warning("Slack message for missing session %s", session_id)
         except Exception:

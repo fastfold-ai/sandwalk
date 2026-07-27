@@ -58,9 +58,7 @@ def test_start_skips_socket_workspaces_missing_tokens(
     run(service.stop())
 
 
-def test_start_ignores_disabled_workspaces(
-    store: AgentStore, service: ConnectorService
-) -> None:
+def test_start_ignores_disabled_workspaces(store: AgentStore, service: ConnectorService) -> None:
     store.upsert_slack_workspace(
         team_id="T1", mode="socket", bot_token="xoxb-x", app_token="xapp-x"
     )
@@ -83,11 +81,7 @@ def test_connect_rejects_a_bot_token_pasted_as_the_app_token(
     # Socket Mode never connects without xapp- and Slack reports no error, so
     # this is the single most common setup failure.
     with pytest.raises(ValueError, match="xapp-"):
-        run(
-            service.connect_socket_mode(
-                bot_token="xoxb-real", app_token="xoxb-oops", team_id="T1"
-            )
-        )
+        run(service.connect_socket_mode(bot_token="xoxb-real", app_token="xoxb-oops", team_id="T1"))
 
 
 def test_connect_reports_a_missing_sdk_clearly(
@@ -95,15 +89,9 @@ def test_connect_reports_a_missing_sdk_clearly(
 ) -> None:
     # The SDK ships in core deps, but a broken environment must say so instead
     # of failing silently the way an optional extra would.
-    monkeypatch.setattr(
-        "agent_server.connectors.service.slack_sdk_available", lambda: False
-    )
+    monkeypatch.setattr("agent_server.connectors.service.slack_sdk_available", lambda: False)
     with pytest.raises(ValueError, match="not installed"):
-        run(
-            service.connect_socket_mode(
-                bot_token="xoxb-x", app_token="xapp-x", team_id="T1"
-            )
-        )
+        run(service.connect_socket_mode(bot_token="xoxb-x", app_token="xapp-x", team_id="T1"))
 
 
 def test_granted_scopes_parsing() -> None:
@@ -113,13 +101,12 @@ def test_granted_scopes_parsing() -> None:
         def __init__(self, headers: dict) -> None:
             self.headers = headers
 
-    assert _granted_scopes(
-        Response({"x-oauth-scopes": "chat:write, app_mentions:read"})
-    ) == {"chat:write", "app_mentions:read"}
-    # Slack sometimes hands headers back as lists.
-    assert _granted_scopes(Response({"x-oauth-scopes": ["chat:write"]})) == {
-        "chat:write"
+    assert _granted_scopes(Response({"x-oauth-scopes": "chat:write, app_mentions:read"})) == {
+        "chat:write",
+        "app_mentions:read",
     }
+    # Slack sometimes hands headers back as lists.
+    assert _granted_scopes(Response({"x-oauth-scopes": ["chat:write"]})) == {"chat:write"}
     assert _granted_scopes(Response({})) == set()
     assert _granted_scopes(object()) == set()
 
@@ -141,9 +128,7 @@ def test_directory_error_surfaces_the_missing_scope() -> None:
     assert _why(RuntimeError("boom")) == "boom"
 
 
-def test_inbound_parks_unauthorized_mentions(
-    store: AgentStore, service: ConnectorService
-) -> None:
+def test_inbound_parks_unauthorized_mentions(store: AgentStore, service: ConnectorService) -> None:
     store.upsert_slack_workspace(team_id="T1", mode="socket", bot_user_id="BBOT")
 
     run(service._on_inbound(message()))
@@ -154,9 +139,7 @@ def test_inbound_parks_unauthorized_mentions(
     assert parked[0].thread_target == "slack:T1/C1:1712000000.000100"
 
 
-def test_inbound_ignores_unknown_workspace(
-    store: AgentStore, service: ConnectorService
-) -> None:
+def test_inbound_ignores_unknown_workspace(store: AgentStore, service: ConnectorService) -> None:
     run(service._on_inbound(message(team_id="T-nope")))
     assert store.list_slack_parked_messages() == []
 
@@ -201,9 +184,7 @@ def test_disconnect_clears_the_allowlist(store: AgentStore) -> None:
     assert store.list_slack_allowed_users("T1") == []
 
 
-def test_status_reports_mode_and_workspaces(
-    store: AgentStore, service: ConnectorService
-) -> None:
+def test_status_reports_mode_and_workspaces(store: AgentStore, service: ConnectorService) -> None:
     assert service.status().mode is None
 
     store.upsert_slack_workspace(team_id="T1", mode="relay", team_name="Acme")
@@ -217,10 +198,75 @@ def test_status_reports_mode_and_workspaces(
     assert service.status().mode == "socket"
 
 
-def test_disconnect_removes_the_workspace(
-    store: AgentStore, service: ConnectorService
-) -> None:
+def test_disconnect_removes_the_workspace(store: AgentStore, service: ConnectorService) -> None:
     store.upsert_slack_workspace(team_id="T1", mode="socket")
     assert run(service.disconnect_workspace("T1")) is True
     assert store.list_slack_workspaces() == []
     assert run(service.disconnect_workspace("T1")) is False
+
+
+def test_reauth_import_overwrites_an_existing_stale_token(
+    store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A reinstall rotated the token — the reauth-targeted team must not be
+    skipped just because we already have a (now stale) one on file."""
+    store.upsert_slack_workspace(
+        team_id="T1", mode="relay", bot_token="xoxb-old", connection_id="conn-1"
+    )
+    store.set_slack_workspace_reauth("T1", needs_reauth=True)
+
+    monkeypatch.setattr("agent_server.account_service.helpers.api_key", lambda cfg=None: "sk-x")
+    monkeypatch.setattr(
+        "agent_server.account_service.helpers.cloud_base_url",
+        lambda: "https://api.test",
+    )
+
+    async def fake_start_workspace(self, workspace):  # type: ignore[no-untyped-def]
+        return None
+
+    monkeypatch.setattr(ConnectorService, "_start_workspace", fake_start_workspace)
+
+    def fake_cloud_request(method, url, key, body):  # type: ignore[no-untyped-def]
+        if url.endswith("/v1/slack/connections"):
+            return {"data": [{"team_id": "T1", "id": "conn-1"}]}, None
+        if url.endswith("/v1/slack/connections/conn-1"):
+            return {"bot_token": "xoxb-new", "bot_user_id": "BBOT"}, None
+        raise AssertionError(f"unexpected url {url}")
+
+    monkeypatch.setattr("agent_server.connectors.service._cloud_request", fake_cloud_request)
+
+    imported = run(service.import_one_click_connections(reauth_team_id="T1"))
+
+    assert [w.team_id for w in imported] == ["T1"]
+    bot, _app = store.get_slack_tokens("T1")
+    assert bot == "xoxb-new"
+    assert store.get_slack_workspace("T1").needs_reauth is False
+
+
+def test_import_without_reauth_still_skips_an_existing_token(
+    store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unchanged behavior for the normal "add a new workspace" scan."""
+    store.upsert_slack_workspace(team_id="T1", mode="relay", bot_token="xoxb-old")
+
+    monkeypatch.setattr("agent_server.account_service.helpers.api_key", lambda cfg=None: "sk-x")
+    monkeypatch.setattr(
+        "agent_server.account_service.helpers.cloud_base_url",
+        lambda: "https://api.test",
+    )
+
+    called: list[str] = []
+
+    def fake_cloud_request(method, url, key, body):  # type: ignore[no-untyped-def]
+        called.append(url)
+        return {"data": [{"team_id": "T1", "id": "conn-1"}]}, None
+
+    monkeypatch.setattr("agent_server.connectors.service._cloud_request", fake_cloud_request)
+
+    imported = run(service.import_one_click_connections())
+
+    assert imported == []
+    # Never even fetched the per-connection token — skipped before that call.
+    assert called == ["https://api.test/v1/slack/connections"]
+    bot, _app = store.get_slack_tokens("T1")
+    assert bot == "xoxb-old"

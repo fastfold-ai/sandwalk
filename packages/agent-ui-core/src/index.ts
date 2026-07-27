@@ -301,6 +301,10 @@ export type SlackWorkspace = {
   /** Tokens are never returned; these only report whether one is stored. */
   hasBotToken: boolean
   hasAppToken: boolean
+  /** An outbound Slack call recently failed with an auth error (e.g. the bot
+   * token was rotated by a reinstall) — distinct from `live`, which only
+   * reflects the inbound socket/relay connection. */
+  needsReauth: boolean
   createdAt: string
   updatedAt: string
 }

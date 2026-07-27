@@ -1,4 +1,5 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { SlackWorkspace } from '@sandwalk/agent-ui-core'
 import { Check, Copy, ExternalLink, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -33,14 +34,20 @@ export function SlackAddWorkspaceModal({
   open: boolean
   client: LocalAgentClient
   busy: boolean
-  /** Workspace name when re-pasting tokens rather than adding a new one. */
-  updatingWorkspace?: string | null
+  /** Set when reconnecting an existing workspace rather than adding a new one. */
+  updatingWorkspace?: SlackWorkspace | null
   onOpenChange: (open: boolean) => void
   onConnect: (input: { botToken: string; appToken: string }) => Promise<boolean>
   /** Called once a one-click install has been adopted, so the panel reloads. */
   onImported?: () => void
 }) {
   const updating = Boolean(updatingWorkspace)
+  const updatingLabel =
+    updatingWorkspace?.teamName || updatingWorkspace?.teamId || ''
+  // Relay workspaces have no token of their own to paste — a reinstall's new
+  // bot token can only be picked up the same way the first connect was, via
+  // one-click. Socket Mode keeps the manual paste-new-tokens flow.
+  const isRelayUpdate = updating && updatingWorkspace?.mode === 'relay'
   const [mode, setMode] = useState<Mode>('manual')
   const [botToken, setBotToken] = useState('')
   const [appToken, setAppToken] = useState('')
@@ -110,7 +117,9 @@ export function SlackAddWorkspaceModal({
       await new Promise(resolve => window.setTimeout(resolve, ONE_CLICK_POLL_MS))
       if (cancelledRef.current) return
       try {
-        const result = await client.importSlackOneClick()
+        const result = await client.importSlackOneClick(
+          isRelayUpdate ? updatingWorkspace?.teamId : undefined
+        )
         if (result.data.length > 0) {
           setWaiting(false)
           onImported?.()
@@ -138,7 +147,7 @@ export function SlackAddWorkspaceModal({
       <DialogContent className="flex max-h-[min(90dvh,48rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
         <DialogHeader className="space-y-1.5 px-5 pt-5 text-left">
           <DialogTitle className="text-base">
-            {updating ? `Update tokens · ${updatingWorkspace}` : 'Add a workspace'}
+            {updating ? `Reconnect · ${updatingLabel}` : 'Add a workspace'}
           </DialogTitle>
           <DialogDescription className="text-[12px]">
             {updating
@@ -175,24 +184,27 @@ export function SlackAddWorkspaceModal({
         )}
 
         <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
-          {mode === 'one-click' && !updating ? (
+          {(mode === 'one-click' && !updating) || isRelayUpdate ? (
             <div className="space-y-3">
               <p className="text-muted-foreground text-[13px] leading-relaxed">
-                Approve Sandwalk for your workspace in the browser — no tokens to
-                copy, and it works for any number of workspaces.
+                {isRelayUpdate
+                  ? 'Approve Sandwalk again in the browser. The fresh bot token replaces the old one automatically — your People and Listening settings are kept.'
+                  : 'Approve Sandwalk for your workspace in the browser — no tokens to copy, and it works for any number of workspaces.'}
               </p>
 
               {oneClickError ? (
                 <div className="border-destructive/40 bg-destructive/5 rounded-lg border p-3">
                   <p className="text-[12px] leading-relaxed">{oneClickError}</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-3 h-8"
-                    onClick={() => setMode('manual')}
-                  >
-                    Use Manual setup instead
-                  </Button>
+                  {isRelayUpdate ? null : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-3 h-8"
+                      onClick={() => setMode('manual')}
+                    >
+                      Use Manual setup instead
+                    </Button>
+                  )}
                 </div>
               ) : null}
 
@@ -211,15 +223,17 @@ export function SlackAddWorkspaceModal({
                 disabled={busy || waiting}
                 onClick={() => void startOneClick()}
               >
-                {waiting ? 'Waiting…' : 'Add to Slack'}
+                {waiting ? 'Waiting…' : isRelayUpdate ? 'Reconnect' : 'Add to Slack'}
                 <ExternalLink className="ml-1.5 size-3.5" />
               </Button>
 
-              <p className="text-muted-foreground text-[12px] leading-relaxed">
-                One click routes Slack messages through FastFold Cloud, so it
-                needs an API key. Manual runs entirely on this machine and needs
-                no account — the better choice for sensitive workspaces.
-              </p>
+              {isRelayUpdate ? null : (
+                <p className="text-muted-foreground text-[12px] leading-relaxed">
+                  One click routes Slack messages through FastFold Cloud, so it
+                  needs an API key. Manual runs entirely on this machine and needs
+                  no account — the better choice for sensitive workspaces.
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-4">

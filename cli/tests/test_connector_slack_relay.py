@@ -139,9 +139,7 @@ class TestFrameHandling:
         async def boom(_message):
             raise RuntimeError("handler exploded")
 
-        relay = SlackRelayClient(
-            base_url="https://api.test", api_key="sk-x", on_message=boom
-        )
+        relay = SlackRelayClient(base_url="https://api.test", api_key="sk-x", on_message=boom)
         relay.add_workspace(workspace())
         run(relay._handle_frame(json.dumps(envelope())))
 
@@ -226,15 +224,58 @@ class TestAssistantEvent:
 
         assert web.calls == []
 
-    def test_home_tab_is_not_a_dm_open(self):
+    def test_home_tab_publishes_app_home(self):
         space = workspace()
         web = FakeWeb()
-        space.assistant._client = web  # type: ignore[attr-defined]
+        space._client = web  # type: ignore[attr-defined]
+        space._bot_name = "sandwalk"
+        space.home_sessions = lambda: []
         relay = client_with(space, [])
 
-        run(relay._handle_frame(json.dumps(assistant_envelope(tab="home"))))
+        run(relay._handle_frame(json.dumps(assistant_envelope(tab="home", user="U1"))))
 
-        assert web.calls == []
+        assert web.calls
+        name, kwargs = web.calls[0]
+        assert name == "views_publish"
+        assert kwargs["user_id"] == "U1"
+        assert kwargs["view"]["type"] == "home"
+        assert any("Welcome to Sandwalk" in str(block) for block in kwargs["view"]["blocks"])
+
+    def test_home_publish_auth_failure_flags_reconnect(self):
+        """A rotated bot token surfaces as a reconnect prompt, not a silent 404."""
+
+        class _DeadTokenWeb:
+            async def views_publish(self, **_kwargs):  # type: ignore[no-untyped-def]
+                raise RuntimeError("SlackApiError (error: invalid_auth)")
+
+        space = workspace()
+        space._client = _DeadTokenWeb()  # type: ignore[attr-defined]
+        space.home_sessions = lambda: []
+        flagged: list[tuple[str, str]] = []
+        space.on_token_invalid = lambda detail: flagged.append((space.team_id, detail))
+        relay = client_with(space, [])
+
+        run(relay._handle_frame(json.dumps(assistant_envelope(tab="home", user="U1"))))
+
+        assert flagged
+        assert flagged[0][0] == "T1"
+        assert "invalid_auth" in flagged[0][1]
+
+    def test_home_publish_other_failures_do_not_flag_reconnect(self):
+        class _FlakyWeb:
+            async def views_publish(self, **_kwargs):  # type: ignore[no-untyped-def]
+                raise RuntimeError("connection reset by peer")
+
+        space = workspace()
+        space._client = _FlakyWeb()  # type: ignore[attr-defined]
+        space.home_sessions = lambda: []
+        flagged: list[str] = []
+        space.on_token_invalid = lambda detail: flagged.append(detail)
+        relay = client_with(space, [])
+
+        run(relay._handle_frame(json.dumps(assistant_envelope(tab="home", user="U1"))))
+
+        assert flagged == []
 
     def test_assistant_event_is_not_treated_as_a_message(self):
         received: list = []

@@ -48,9 +48,7 @@ def posted(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
 
 
 def test_send_threads_the_reply(store: AgentStore, posted: list[dict]) -> None:
-    result = slack_tool.send_message(
-        target="slack:T1/C1:1712000000.000100", text="Here you go"
-    )
+    result = slack_tool.send_message(target="slack:T1/C1:1712000000.000100", text="Here you go")
 
     assert result["ok"] is True
     assert posted[0]["token"] == "xoxb-secret"
@@ -60,9 +58,7 @@ def test_send_threads_the_reply(store: AgentStore, posted: list[dict]) -> None:
     assert payload["text"] == "Here you go"
 
 
-def test_send_to_a_channel_omits_thread_ts(
-    store: AgentStore, posted: list[dict]
-) -> None:
+def test_send_to_a_channel_omits_thread_ts(store: AgentStore, posted: list[dict]) -> None:
     slack_tool.send_message(target="slack:T1/C1", text="hi")
     assert "thread_ts" not in posted[0]["payload"]
 
@@ -80,9 +76,7 @@ def test_send_rejects_empty_text(store: AgentStore, posted: list[dict]) -> None:
     assert posted == []
 
 
-def test_send_to_an_unconnected_workspace(
-    store: AgentStore, posted: list[dict]
-) -> None:
+def test_send_to_an_unconnected_workspace(store: AgentStore, posted: list[dict]) -> None:
     result = slack_tool.send_message(target="slack:T-other/C1", text="hi")
     assert result["ok"] is False
     assert "not connected" in result["summary"]
@@ -114,15 +108,38 @@ def test_not_in_channel_gives_an_actionable_message(
     assert "/invite" in result["summary"]
 
 
-def test_slack_api_errors_surface(
-    store: AgentStore, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_slack_api_errors_surface(store: AgentStore, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         slack_tool, "_post", lambda *_a, **_k: {"ok": False, "error": "rate_limited"}
     )
     result = slack_tool.send_message(target="slack:T1/C1", text="hi")
     assert result["ok"] is False
     assert "rate_limited" in result["summary"]
+    # Not an auth failure, so the workspace must not be flagged for reconnect.
+    assert store.get_slack_workspace("T1").needs_reauth is False
+
+
+def test_invalid_auth_flags_the_workspace_for_reconnect(
+    store: AgentStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        slack_tool, "_post", lambda *_a, **_k: {"ok": False, "error": "invalid_auth"}
+    )
+    result = slack_tool.send_message(target="slack:T1/C1", text="hi")
+
+    assert result["ok"] is False
+    assert "Reconnect this workspace" in result["summary"]
+    assert store.get_slack_workspace("T1").needs_reauth is True
+
+
+def test_a_successful_send_clears_a_stale_reauth_flag(
+    store: AgentStore, posted: list[dict]
+) -> None:
+    store.set_slack_workspace_reauth("T1", needs_reauth=True)
+
+    slack_tool.send_message(target="slack:T1/C1", text="hi")
+
+    assert store.get_slack_workspace("T1").needs_reauth is False
 
 
 def test_post_unpacks_the_http_client_contract(
@@ -141,9 +158,7 @@ def test_post_unpacks_the_http_client_contract(
 
     monkeypatch.setattr("tools.http_client.request_json", fake_request_json)
 
-    result = slack_tool.send_message(
-        target="slack:T1/C1:1712000000.000100", text="Here you go"
-    )
+    result = slack_tool.send_message(target="slack:T1/C1:1712000000.000100", text="Here you go")
 
     assert result["ok"] is True
     assert result["ts"] == "1712000111.000200"
@@ -164,12 +179,8 @@ def test_post_folds_transport_errors_into_the_slack_shape(
     assert "connection refused" in result["summary"]
 
 
-def test_post_rejects_a_non_dict_body(
-    store: AgentStore, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "tools.http_client.request_json", lambda *a, **k: (["nope"], None)
-    )
+def test_post_rejects_a_non_dict_body(store: AgentStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("tools.http_client.request_json", lambda *a, **k: (["nope"], None))
     result = slack_tool.send_message(target="slack:T1/C1", text="hi")
     assert result["ok"] is False
 
@@ -177,9 +188,7 @@ def test_post_rejects_a_non_dict_body(
 # --- block kit rendering ---------------------------------------------------
 
 
-def test_send_posts_block_kit_with_a_text_fallback(
-    store: AgentStore, posted: list[dict]
-) -> None:
+def test_send_posts_block_kit_with_a_text_fallback(store: AgentStore, posted: list[dict]) -> None:
     slack_tool.send_message(target="slack:T1/C1", text="**hi** there")
     payload = posted[0]["payload"]
 
@@ -188,9 +197,7 @@ def test_send_posts_block_kit_with_a_text_fallback(
     assert payload["text"] == "*hi* there"
 
 
-def test_send_splits_a_long_reply_across_sections(
-    store: AgentStore, posted: list[dict]
-) -> None:
+def test_send_splits_a_long_reply_across_sections(store: AgentStore, posted: list[dict]) -> None:
     slack_tool.send_message(target="slack:T1/C1", text="\n\n".join(["y" * 2500] * 3))
     sections = [b for b in posted[0]["payload"]["blocks"] if b["type"] == "section"]
 
@@ -198,17 +205,11 @@ def test_send_splits_a_long_reply_across_sections(
     assert all(len(b["text"]["text"]) <= 3000 for b in sections)
 
 
-def test_send_names_the_specialist_that_answered(
-    store: AgentStore, posted: list[dict]
-) -> None:
+def test_send_names_the_specialist_that_answered(store: AgentStore, posted: list[dict]) -> None:
     specialist = store.get_specialist_by_slug("fast-computational-scientist")
     assert specialist is not None
-    session = store.create_session(
-        title="Slack", workspace_path=None, source="slack"
-    )
-    store.update_session(
-        session.id, specialist_id=specialist.id, update_specialist_id=True
-    )
+    session = store.create_session(title="Slack", workspace_path=None, source="slack")
+    store.update_session(session.id, specialist_id=specialist.id, update_specialist_id=True)
     target = "slack:T1/C1:1712000000.000100"
     store.set_slack_mention_session(
         thread_target=target, session_id=session.id, channel="slack:T1/C1"
@@ -221,13 +222,9 @@ def test_send_names_the_specialist_that_answered(
     assert specialist.name in footer["elements"][0]["text"]
 
 
-def test_send_omits_the_footer_without_a_specialist(
-    store: AgentStore, posted: list[dict]
-) -> None:
+def test_send_omits_the_footer_without_a_specialist(store: AgentStore, posted: list[dict]) -> None:
     slack_tool.send_message(target="slack:T1/C1", text="done")
-    assert not any(
-        b["type"] == "context" for b in posted[0]["payload"]["blocks"]
-    )
+    assert not any(b["type"] == "context" for b in posted[0]["payload"]["blocks"])
 
 
 # --- approval gating -------------------------------------------------------

@@ -33,6 +33,7 @@ def slack_workspace_from_row(row: sqlite3.Row) -> SlackWorkspace:
         enabled=bool(row["enabled"]),
         has_bot_token=bool(row["bot_token"]),
         has_app_token=bool(row["app_token"]),
+        needs_reauth=bool(row["needs_reauth"]) if "needs_reauth" in row.keys() else False,
         created_at=datetime.fromisoformat(str(row["created_at"])),
         updated_at=datetime.fromisoformat(str(row["updated_at"])),
     )
@@ -80,6 +81,13 @@ class ConnectorMixin:
                     connection_id = COALESCE(
                         excluded.connection_id, slack_workspaces.connection_id
                     ),
+                    -- A freshly supplied token means whatever was wrong is
+                    -- fixed; an omitted one (most upserts, e.g. team_name
+                    -- refresh) leaves the flag as ConnectorService found it.
+                    needs_reauth = CASE
+                        WHEN excluded.bot_token IS NOT NULL THEN 0
+                        ELSE slack_workspaces.needs_reauth
+                    END,
                     updated_at = excluded.updated_at
                 """,
                 (
@@ -149,6 +157,25 @@ class ConnectorMixin:
             cursor = connection.execute(
                 f"UPDATE slack_workspaces SET {', '.join(sets)} WHERE team_id = ?",
                 params,
+            )
+            if cursor.rowcount == 0:
+                return None
+        return self.get_slack_workspace(team_id)
+
+    def set_slack_workspace_reauth(
+        self, team_id: str, *, needs_reauth: bool
+    ) -> SlackWorkspace | None:
+        """Flip the "reconnect needed" flag — set on an auth failure, cleared
+        by :meth:`upsert_slack_workspace` once a fresh token is stored.
+        """
+        with self._write_lock, self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE slack_workspaces
+                SET needs_reauth = ?, updated_at = ?
+                WHERE team_id = ?
+                """,
+                (1 if needs_reauth else 0, utc_now().isoformat(), team_id),
             )
             if cursor.rowcount == 0:
                 return None
@@ -250,9 +277,7 @@ class ConnectorMixin:
 
     # --- channel subscriptions -----------------------------------------
 
-    def add_slack_subscription(
-        self, *, session_id: str, channel: str
-    ) -> SlackSubscription:
+    def add_slack_subscription(self, *, session_id: str, channel: str) -> SlackSubscription:
         now = utc_now()
         with self._write_lock, self._connect() as connection:
             connection.execute(
@@ -264,9 +289,7 @@ class ConnectorMixin:
                 """,
                 (session_id, channel, now.isoformat()),
             )
-        return SlackSubscription(
-            session_id=session_id, channel=channel, created_at=now
-        )
+        return SlackSubscription(session_id=session_id, channel=channel, created_at=now)
 
     def remove_slack_subscription(self, *, session_id: str, channel: str) -> bool:
         with self._write_lock, self._connect() as connection:
@@ -410,9 +433,7 @@ class ConnectorMixin:
 
     # --- per-session connector mutes ------------------------------------
 
-    def set_session_connector_mute(
-        self, *, session_id: str, connector: str, muted: bool
-    ) -> None:
+    def set_session_connector_mute(self, *, session_id: str, connector: str, muted: bool) -> None:
         with self._write_lock, self._connect() as connection:
             connection.execute(
                 """

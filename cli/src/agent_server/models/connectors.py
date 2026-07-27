@@ -35,6 +35,10 @@ class SlackWorkspace(ApiModel):
     # returned over the API.
     has_bot_token: bool = False
     has_app_token: bool = False
+    # Set when an outbound Slack call recently failed with an auth error (e.g.
+    # the bot token was rotated by a reinstall) - distinct from `live`, which
+    # only reflects whether the inbound socket/relay is connected.
+    needs_reauth: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -150,8 +154,6 @@ class ConnectorActionResponse(ApiModel):
 class SlackConnectorStatus(ApiModel):
     mode: SlackMode | None = None
     # signed_out / auth_expired / reconnecting / live / off
-    relay_state: Literal[
-        "off", "signed_out", "auth_expired", "reconnecting", "live"
-    ] = "off"
+    relay_state: Literal["off", "signed_out", "auth_expired", "reconnecting", "live"] = "off"
     relay_detail: str | None = None
     workspaces: list[SlackWorkspace] = []

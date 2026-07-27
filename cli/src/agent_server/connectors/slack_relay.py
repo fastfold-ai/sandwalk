@@ -69,6 +69,14 @@ class SlackRelayWorkspace:
         self.user_names: dict[str, str] = {}
         self.user_avatars: dict[str, str] = {}
         self.channel_names: dict[str, str] = {}
+        # Optional: ConnectorService supplies recent Slack sessions and relay
+        # status for App Home.
+        self.home_sessions: Callable[[], list] | None = None
+        self.home_status: Callable[[], object] | None = None
+        # Optional: ConnectorService flags the workspace as needing reconnect
+        # when an outbound call fails with an auth error (e.g. a reinstall
+        # rotated the bot token).
+        self.on_token_invalid: Callable[[str], None] | None = None
 
     @property
     def bot_user_id(self) -> str | None:
@@ -93,13 +101,9 @@ class SlackRelayWorkspace:
         from agent_server.connectors.directory import fetch_directory
 
         try:
-            people, channels = await fetch_directory(
-                self.team_id, self.bot_token, force=force
-            )
+            people, channels = await fetch_directory(self.team_id, self.bot_token, force=force)
         except Exception as exc:  # noqa: BLE001 - names are a nicety
-            logger.warning(
-                "Could not load the Slack directory for %s: %s", self.team_id, exc
-            )
+            logger.warning("Could not load the Slack directory for %s: %s", self.team_id, exc)
             return
         self.user_names = {person.id: person.name for person in people}
         # The directory omits bots, so without this the agent's own handle
@@ -111,9 +115,7 @@ class SlackRelayWorkspace:
                 self._bot_name = str(auth.get("user") or "").strip() or None
         if self._bot_user_id and self._bot_name:
             self.user_names[self._bot_user_id] = self._bot_name
-        self.user_avatars = {
-            person.id: person.avatar_url for person in people if person.avatar_url
-        }
+        self.user_avatars = {person.id: person.avatar_url for person in people if person.avatar_url}
         self.channel_names = {channel.id: channel.name for channel in channels}
 
     async def set_reaction(
@@ -141,17 +143,60 @@ class SlackRelayWorkspace:
             self._assistant = SlackAssistant(bot_token=self.bot_token)
         return self._assistant
 
-    async def on_assistant_event(self, event: dict) -> None:
-        """Greet a newly opened DM with starter prompts.
+    async def publish_home(self, user_id: str) -> bool:
+        """Push the App Home view for one Slack user via ``views.publish``."""
+        from agent_server.connectors.slack_home import build_home_view
 
-        No-ops on workspaces without the feature; the container simply never
-        appears there and mentions carry on as before.
+        if not user_id:
+            return False
+        sessions = self.home_sessions() if self.home_sessions else []
+        status = self.home_status() if self.home_status else None
+        view = build_home_view(sessions, bot_name=self._bot_name, status=status)
+        try:
+            await self._web().views_publish(user_id=user_id, view=view)
+            logger.info(
+                "Published Slack App Home for %s (%d recent session(s))",
+                user_id,
+                len(sessions),
+            )
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Slack views.publish failed for %s: %s", user_id, exc)
+            from agent_server.connectors.slack_errors import is_token_invalid_exception
+
+            if is_token_invalid_exception(exc) and self.on_token_invalid:
+                self.on_token_invalid(str(exc))
+            return False
+
+    async def publish_home_for_users(self, user_ids: list[str]) -> None:
+        for user_id in user_ids:
+            await self.publish_home(user_id)
+
+    async def on_assistant_event(self, event: dict) -> None:
+        """App Home publish + Messages-tab starter prompts.
+
+        No-ops on workspaces without the feature; mentions carry on as before.
         """
         from agent_server.connectors.slack_assistant import (
             channel_ref,
             is_dm_opened,
             prompts_for,
         )
+        from agent_server.connectors.slack_home import is_home_opened, user_ref
+
+        logger.info(
+            "Slack assistant event type=%s tab=%s user=%s team=%s",
+            event.get("type"),
+            event.get("tab"),
+            event.get("user"),
+            self.team_id,
+        )
+
+        if is_home_opened(event):
+            user_id = user_ref(event)
+            if user_id:
+                await self.publish_home(user_id)
+            return
 
         if not is_dm_opened(event):
             # app_context_changed only tells us which channel the user is
@@ -272,7 +317,9 @@ class SlackRelayClient:
         # The header kwarg was renamed between websockets releases; support both
         # so this does not depend on which one the environment resolved.
         try:
-            connect = websockets.connect(url, additional_headers=headers, open_timeout=_OPEN_TIMEOUT)
+            connect = websockets.connect(
+                url, additional_headers=headers, open_timeout=_OPEN_TIMEOUT
+            )
         except TypeError:
             connect = websockets.connect(url, extra_headers=headers, open_timeout=_OPEN_TIMEOUT)
 
@@ -309,7 +356,10 @@ class SlackRelayClient:
         from agent_server.connectors.slack_assistant import is_assistant_event
 
         if is_assistant_event(event):
-            await workspace.on_assistant_event(event)
+            try:
+                await workspace.on_assistant_event(event)
+            except Exception:
+                logger.exception("Slack assistant handler failed for team %s", team_id)
             return
 
         if not _known(event, workspace):

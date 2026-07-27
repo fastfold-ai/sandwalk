@@ -503,11 +503,19 @@ export class LocalAgentClient
    * Pick up an install completed in the browser.
    *
    * The desktop never sees the OAuth callback, so the UI polls this after
-   * opening the install URL.
+   * opening the install URL. Pass `reauthTeamId` when this is a reconnect for
+   * a workspace we already have a (possibly stale) token for — that team's
+   * fresh token overwrites the old one instead of being skipped.
    */
-  importSlackOneClick(signal?: AbortSignal): Promise<{ data: SlackWorkspace[] }> {
+  importSlackOneClick(
+    reauthTeamId?: string,
+    signal?: AbortSignal,
+  ): Promise<{ data: SlackWorkspace[] }> {
+    const query = reauthTeamId
+      ? `?reauth_team_id=${encodeURIComponent(reauthTeamId)}`
+      : ''
     return this.request<{ data: SlackWorkspace[] }>(
-      '/connectors/slack/connect/one-click/import',
+      `/connectors/slack/connect/one-click/import${query}`,
       { method: 'POST', signal },
     )
   }

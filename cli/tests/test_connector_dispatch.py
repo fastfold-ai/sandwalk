@@ -87,6 +87,65 @@ def test_spawn_records_the_thread_mapping(
     assert mapped == session_id
 
 
+class _HomeAdapter:
+    """Records republish calls the way a SlackRelayWorkspace would receive them."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    async def publish_home_for_users(self, user_ids: list[str]) -> None:
+        self.calls.append(list(user_ids))
+
+
+def test_spawning_a_session_republishes_app_home(
+    store: AgentStore, connectors: ConnectorService
+) -> None:
+    adapter = _HomeAdapter()
+    connectors._sockets["T1"] = adapter
+
+    async def _drive() -> None:
+        await connectors._on_inbound(message())
+        # Let the fire-and-forget republish task run once.
+        await asyncio.sleep(0)
+
+    run(_drive())
+
+    assert adapter.calls == [["U1"]]
+
+
+def test_republish_is_skipped_for_socket_mode_adapters(
+    store: AgentStore, connectors: ConnectorService
+) -> None:
+    """Socket Mode workspaces have no App Home surface yet — no-op, not an error."""
+
+    class _SocketAdapter:
+        pass
+
+    connectors._sockets["T1"] = _SocketAdapter()
+    run(connectors._on_inbound(message()))  # must not raise
+
+
+def test_relay_going_live_republishes_home_for_every_team(
+    store: AgentStore, connectors: ConnectorService
+) -> None:
+    """Status only becomes accurate once the socket actually reports live —
+    publishing eagerly right after ``relay.start()`` would show stale state."""
+    adapter = _HomeAdapter()
+    connectors._sockets["T1"] = adapter
+
+    async def _drive() -> None:
+        connectors._set_relay_state("reconnecting", "still trying")
+        await asyncio.sleep(0)
+        assert adapter.calls == []  # not live yet — no publish
+
+        connectors._set_relay_state("live", None)
+        await asyncio.sleep(0)
+
+    run(_drive())
+
+    assert adapter.calls == [["U1"]]
+
+
 def test_first_message_carries_the_reply_handle(
     store: AgentStore, connectors: ConnectorService
 ) -> None:

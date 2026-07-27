@@ -53,22 +53,51 @@ def test_workspace_upsert_preserves_tokens(store: AgentStore) -> None:
     assert "xoxb-secret" not in created.model_dump_json()
 
     # A later upsert that omits tokens must not wipe them.
-    updated = store.upsert_slack_workspace(
-        team_id="T123", mode="socket", domain="acme"
-    )
+    updated = store.upsert_slack_workspace(team_id="T123", mode="socket", domain="acme")
     assert updated.has_bot_token is True
     assert updated.domain == "acme"
-    assert updated.team_name == "Acme"
 
     bot, app = store.get_slack_tokens("T123")
     assert bot == "xoxb-secret"
     assert app == "xapp-secret"
 
 
+def test_needs_reauth_defaults_false_and_can_be_set(store: AgentStore) -> None:
+    workspace = store.upsert_slack_workspace(team_id="T1", mode="relay")
+    assert workspace.needs_reauth is False
+
+    flagged = store.set_slack_workspace_reauth("T1", needs_reauth=True)
+    assert flagged is not None
+    assert flagged.needs_reauth is True
+    assert store.get_slack_workspace("T1").needs_reauth is True
+
+
+def test_set_reauth_on_an_unknown_workspace_is_a_no_op(store: AgentStore) -> None:
+    assert store.set_slack_workspace_reauth("T-missing", needs_reauth=True) is None
+
+
+def test_a_fresh_token_clears_needs_reauth(store: AgentStore) -> None:
+    store.upsert_slack_workspace(team_id="T1", mode="relay", bot_token="xoxb-old")
+    store.set_slack_workspace_reauth("T1", needs_reauth=True)
+    assert store.get_slack_workspace("T1").needs_reauth is True
+
+    # Reconnecting supplies a new bot_token - that alone clears the flag.
+    updated = store.upsert_slack_workspace(team_id="T1", mode="relay", bot_token="xoxb-new")
+    assert updated.needs_reauth is False
+
+
+def test_an_upsert_without_a_token_does_not_clear_the_flag(store: AgentStore) -> None:
+    store.upsert_slack_workspace(team_id="T1", mode="relay", bot_token="xoxb-old")
+    store.set_slack_workspace_reauth("T1", needs_reauth=True)
+
+    # e.g. just refreshing team_name - no token supplied, flag must survive.
+    updated = store.upsert_slack_workspace(team_id="T1", mode="relay", team_name="Acme")
+    assert updated.needs_reauth is True
+    assert updated.team_name == "Acme"
+
+
 def test_clear_bot_token_on_revocation(store: AgentStore) -> None:
-    store.upsert_slack_workspace(
-        team_id="T1", mode="relay", bot_token="xoxb-cached"
-    )
+    store.upsert_slack_workspace(team_id="T1", mode="relay", bot_token="xoxb-cached")
     store.clear_slack_bot_token("T1")
     bot, _ = store.get_slack_tokens("T1")
     assert bot is None
@@ -111,10 +140,7 @@ def test_subscriptions_lookup_by_channel(store: AgentStore) -> None:
     for_session = store.list_slack_subscriptions(session_id=second.id)
     assert {item.channel for item in for_session} == {"slack:T1/C1", "slack:T1/C2"}
 
-    assert (
-        store.remove_slack_subscription(session_id=first.id, channel="slack:T1/C1")
-        is True
-    )
+    assert store.remove_slack_subscription(session_id=first.id, channel="slack:T1/C1") is True
     assert len(store.list_slack_subscriptions(channel="slack:T1/C1")) == 1
 
 
@@ -161,26 +187,13 @@ def test_parked_messages_queue_and_resolve(store: AgentStore) -> None:
 
 def test_session_connector_mute_defaults_off(store: AgentStore) -> None:
     session = store.create_session(title="Muted", workspace_path=None)
-    assert (
-        store.is_session_connector_muted(session_id=session.id, connector="slack")
-        is False
-    )
+    assert store.is_session_connector_muted(session_id=session.id, connector="slack") is False
 
-    store.set_session_connector_mute(
-        session_id=session.id, connector="slack", muted=True
-    )
-    assert (
-        store.is_session_connector_muted(session_id=session.id, connector="slack")
-        is True
-    )
+    store.set_session_connector_mute(session_id=session.id, connector="slack", muted=True)
+    assert store.is_session_connector_muted(session_id=session.id, connector="slack") is True
 
-    store.set_session_connector_mute(
-        session_id=session.id, connector="slack", muted=False
-    )
-    assert (
-        store.is_session_connector_muted(session_id=session.id, connector="slack")
-        is False
-    )
+    store.set_session_connector_mute(session_id=session.id, connector="slack", muted=False)
+    assert store.is_session_connector_muted(session_id=session.id, connector="slack") is False
 
 
 def test_deleting_workspace_cascades_allowlist(store: AgentStore) -> None:

@@ -154,9 +154,7 @@ export function SlackConnectorPanel({
         open={addOpen}
         client={client}
         busy={slack.busy}
-        updatingWorkspace={
-          updating ? updating.teamName || updating.teamId : null
-        }
+        updatingWorkspace={updating}
         onOpenChange={next => {
           setAddOpen(next)
           if (!next) setUpdating(null)

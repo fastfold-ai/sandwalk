@@ -10,10 +10,7 @@ import sqlite3
 
 
 def apply_migrations(connection: sqlite3.Connection) -> None:
-    columns = {
-        row["name"]
-        for row in connection.execute("PRAGMA table_info(sessions)").fetchall()
-    }
+    columns = {row["name"] for row in connection.execute("PRAGMA table_info(sessions)").fetchall()}
     if "organize_label" not in columns:
         connection.execute("ALTER TABLE sessions ADD COLUMN organize_label TEXT")
     if "last_message_at" not in columns:
@@ -78,8 +75,7 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
     )
 
     message_columns = {
-        row["name"]
-        for row in connection.execute("PRAGMA table_info(messages)").fetchall()
+        row["name"] for row in connection.execute("PRAGMA table_info(messages)").fetchall()
     }
     # Display-only sidecar (e.g. which Slack channel a message came from). The
     # model-facing text stays in `content`.
@@ -87,8 +83,7 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE messages ADD COLUMN metadata TEXT")
 
     specialist_columns = {
-        row["name"]
-        for row in connection.execute("PRAGMA table_info(specialists)").fetchall()
+        row["name"] for row in connection.execute("PRAGMA table_info(specialists)").fetchall()
     }
     if "mcp_catalog_ids" not in specialist_columns:
         connection.execute(
@@ -99,9 +94,7 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
             "ALTER TABLE specialists ADD COLUMN tool_names TEXT NOT NULL DEFAULT '[]'"
         )
     if "enabled" not in specialist_columns:
-        connection.execute(
-            "ALTER TABLE specialists ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1"
-        )
+        connection.execute("ALTER TABLE specialists ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
 
     connection.execute(
         """
@@ -117,8 +110,7 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
     )
 
     mcp_columns = {
-        row["name"]
-        for row in connection.execute("PRAGMA table_info(mcp_servers)").fetchall()
+        row["name"] for row in connection.execute("PRAGMA table_info(mcp_servers)").fetchall()
     }
     if "catalog_id" not in mcp_columns:
         connection.execute("ALTER TABLE mcp_servers ADD COLUMN catalog_id TEXT")
@@ -141,3 +133,11 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
             WHERE catalog_id IS NOT NULL
         """
     )
+
+    slack_workspace_columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(slack_workspaces)").fetchall()
+    }
+    if "needs_reauth" not in slack_workspace_columns:
+        connection.execute(
+            "ALTER TABLE slack_workspaces ADD COLUMN needs_reauth INTEGER NOT NULL DEFAULT 0"
+        )

@@ -72,6 +72,11 @@ struct ServeRuntime {
             "SANDWALK_SUPERVISED": "menubar",
             "SANDWALK_SETTINGS_PATH": AuthSettingsStore.settingsFileURL().path,
             "SANDWALK_DB_AUTO_HEAL": config.dbAutoHeal ? "1" : "0",
+            // Where the dashboard actually lives — bundled on the API port in
+            // production, or the separate Vite dev server otherwise. Lets the
+            // Slack App Home builder link to the right place (e.g. "Open
+            // Sandwalk", session links) instead of assuming the API port.
+            "SANDWALK_DASHBOARD_BASE_URL": config.dashboardURL.absoluteString,
         ])
         // Pin to Application Support; ignore stale shell overrides (e.g. /tmp).
         env.removeValue(forKey: "SANDWALK_HOME")
