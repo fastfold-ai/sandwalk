@@ -1018,7 +1018,7 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
 
 /* Shell nav strip: sidebar toggle + back/forward under traffic lights. */
 .sandwalk-shell-nav-strip {
-  height: 3.25rem; /* 52px — room above; centers with traffic_light_position y=20 */
+  height: 3.15rem; /* aligned with traffic_light_position y=24 in lib.rs */
   align-items: center;
   transition: padding-left 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1029,12 +1029,12 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
  * (see AppShellMainDragStrip).
  */
 .sandwalk-main-drag-strip {
-  height: 3.25rem; /* match shell nav strip */
+  height: 3.15rem; /* match shell nav strip */
 }
 
 html.sandwalk-mac-overlay .sandwalk-shell-nav-strip-mac {
   /*
-   * Traffic lights at (19, 20) in lib.rs; cluster ~58px wide → clear ~77px,
+   * Traffic lights at (19, 24) in lib.rs; cluster ~58px wide → clear ~77px,
    * then breathing room before the sidebar toggle.
    */
   padding-left: 6rem; /* 96px */

@@ -782,9 +782,11 @@ pub fn run() {
                     .transparent(true)
                     .title_bar_style(tauri::TitleBarStyle::Overlay)
                     .hidden_title(true)
-                    // Center traffic lights in the 52px shell nav strip
-                    // (~12px buttons → top at y=20 puts centers on the icon row).
-                    .traffic_light_position(tauri::LogicalPosition::new(19.0, 20.0));
+                    // Centers the traffic lights on the 44px (h-11) shell nav
+                    // strip's icon row — verified alignment, don't change
+                    // without testing against a real build (native macOS
+                    // buttons, not CSS — no dev hot-reload for this).
+                    .traffic_light_position(tauri::LogicalPosition::new(19.0, 24.0));
             }
 
             let window = win.build()?;
