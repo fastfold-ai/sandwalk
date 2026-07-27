@@ -12,14 +12,19 @@ const TABS = [
     body: 'Mention the bot in any channel it has been invited to. A new session opens here, and the answer goes back as a reply in that Slack thread.'
   },
   {
+    id: 'dm',
+    label: 'Direct messages',
+    body: 'Message Sandwalk in a DM — no @mention needed. Follow-ups in that thread stay on the same session.'
+  },
+  {
     id: 'threads',
     label: 'Threads stay connected',
-    body: 'Keep replying in the same Slack thread and it keeps talking to the same session, so the agent holds the context of the whole conversation.'
+    body: 'After the first @mention in a channel (or any message in a DM), keep replying in the same Slack thread without tagging the bot again. It stays on the same session.'
   },
   {
     id: 'teammates',
     label: 'Allow teammates',
-    body: 'Teammates are not trusted automatically. Their first mention waits for your OK, then they join the People list. Sessions they trigger run on this machine, with your models and keys.'
+    body: 'Teammates are not trusted automatically. Their first message to the agent waits for your OK, then they join the People list. Sessions they trigger run on this machine, with your models and keys.'
   }
 ] as const
 

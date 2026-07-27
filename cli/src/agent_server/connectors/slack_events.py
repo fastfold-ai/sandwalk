@@ -80,6 +80,8 @@ def event_to_inbound(
     if thread_ts == ts:
         thread_ts = None
 
+    channel_type = str(event.get("channel_type") or "").strip() or None
+
     return InboundMessage(
         team_id=str(team_id or "").strip(),
         channel_id=channel_id,
@@ -88,6 +90,7 @@ def event_to_inbound(
         ts=ts,
         thread_ts=thread_ts,
         channel_name=(channel_names or {}).get(channel_id),
+        channel_type=channel_type,
         user_name=(user_names or {}).get(user_id),
         user_avatar_url=(user_avatars or {}).get(user_id),
         mentions_me=mentions_me,

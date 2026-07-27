@@ -31,9 +31,15 @@ export function ConnectorMessageCard({
   createdAt: string
   className?: string
 }) {
-  const channel = source.channelName
-    ? `#${source.channelName}`
-    : source.channelId
+  // Channels: #name. DMs: @bot (or "DM" when the handle wasn't stored).
+  const isDm = source.channelId.startsWith('D')
+  const channel = isDm
+    ? source.channelName
+      ? `@${source.channelName}`
+      : 'DM'
+    : source.channelName
+      ? `#${source.channelName}`
+      : source.channelId
   const sender = source.senderName || source.senderId
   const when = relativeTime(createdAt)
   const initial = sender.trim().charAt(0).toUpperCase() || '?'

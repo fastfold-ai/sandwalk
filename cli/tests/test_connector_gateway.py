@@ -100,7 +100,88 @@ def test_second_mention_in_thread_reuses_session(
     decision = gateway.route(message(ts="1712000050.000900", thread_ts="1712000000.000100"))
     assert decision.action == "deliver"
     assert decision.session_ids == [session.id]
-    assert decision.reason == "mention thread"
+    assert decision.reason == "agent thread"
+
+
+def test_reply_in_mapped_thread_needs_no_mention(
+    store: AgentStore, gateway: SlackGateway
+) -> None:
+    store.allow_slack_user(team_id="T1", slack_user_id="U1")
+    session = store.create_session(title="Slack", workspace_path=None, source="slack")
+    store.set_slack_mention_session(
+        thread_target="slack:T1/C1:1712000000.000100",
+        session_id=session.id,
+        channel="slack:T1/C1",
+    )
+
+    decision = gateway.route(
+        message(
+            text="follow up without tagging",
+            mentions_me=False,
+            ts="1712000050.000900",
+            thread_ts="1712000000.000100",
+        )
+    )
+    assert decision.action == "deliver"
+    assert decision.session_ids == [session.id]
+    assert decision.reason == "agent thread"
+
+
+def test_unmapped_thread_reply_still_needs_mention(
+    store: AgentStore, gateway: SlackGateway
+) -> None:
+    store.allow_slack_user(team_id="T1", slack_user_id="U1")
+    decision = gateway.route(
+        message(
+            text="side conversation",
+            mentions_me=False,
+            ts="1712000050.000900",
+            thread_ts="1712000000.000100",
+        )
+    )
+    assert decision.action == "ignore"
+    assert decision.reason == "no subscription"
+
+
+def test_dm_without_mention_spawns(
+    store: AgentStore, gateway: SlackGateway
+) -> None:
+    store.allow_slack_user(team_id="T1", slack_user_id="U1")
+    decision = gateway.route(
+        message(
+            channel_id="D1",
+            channel_type="im",
+            text="hi",
+            mentions_me=False,
+        )
+    )
+    assert decision.action == "spawn"
+    assert decision.reason == "new dm"
+    assert decision.channel == "slack:T1/D1"
+
+
+def test_dm_from_unknown_sender_is_parked(gateway: SlackGateway) -> None:
+    decision = gateway.route(
+        message(
+            channel_id="D1",
+            channel_type="im",
+            text="hi",
+            mentions_me=False,
+        )
+    )
+    assert decision.action == "park"
+    assert decision.reason == "sender not allowed"
+
+
+def test_dm_id_prefix_counts_without_channel_type(
+    store: AgentStore, gateway: SlackGateway
+) -> None:
+    store.allow_slack_user(team_id="T1", slack_user_id="U1")
+    decision = gateway.route(
+        message(channel_id="D99ABC", text="hi", mentions_me=False)
+    )
+    assert decision.action == "spawn"
+    assert decision.reason == "new dm"
 
 
 def test_muted_session_stops_thread_delivery(
@@ -191,3 +272,7 @@ def test_source_label_uses_workspace_name(
     # Falls back to raw ids when names are unavailable.
     store.upsert_slack_workspace(team_id="T3", mode="socket")
     assert gateway.source_label(message(team_id="T3")) == "#C1 · T3"
+
+    assert gateway.source_label(
+        message(channel_id="D1", channel_type="im")
+    ) == "DM · Acme"

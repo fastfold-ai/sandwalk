@@ -143,8 +143,8 @@ export function SlackConnectorPanel({
               No workspace connected
             </p>
             <p className="mt-1 max-w-sm text-[13px]">
-              Connect a Slack workspace so mentions open a session here and the
-              answer goes back as a thread reply.
+              Connect a Slack workspace so DMs and channel mentions open a
+              session here and the answer goes back as a thread reply.
             </p>
           </div>
         </div>

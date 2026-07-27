@@ -49,6 +49,22 @@ def test_plain_message_is_not_a_mention() -> None:
     assert inbound.mentions_me is False
 
 
+def test_maps_dm_channel_type() -> None:
+    inbound = event_to_inbound(
+        event(
+            channel="D1",
+            channel_type="im",
+            text="hi",
+        ),
+        team_id="T1",
+        bot_user_id=BOT,
+    )
+    assert inbound is not None
+    assert inbound.channel_type == "im"
+    assert inbound.is_direct_message is True
+    assert inbound.mentions_me is False
+
+
 def test_bot_echo_is_dropped() -> None:
     assert event_to_inbound(event(bot_id="B999"), team_id="T1", bot_user_id=BOT) is None
     assert event_to_inbound(event(user=BOT), team_id="T1", bot_user_id=BOT) is None

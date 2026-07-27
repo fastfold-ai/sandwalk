@@ -700,6 +700,24 @@ class ConnectorService:
         self._deliver(session.id, message, first_message=True)
         return session.id
 
+    def _dm_channel_name(self, message: InboundMessage) -> str | None:
+        """Bot @handle for DM cards — resolved from the live adapter's auth."""
+        adapter = self._sockets.get(message.team_id)
+        if adapter is None:
+            return None
+        bot_name = getattr(adapter, "_bot_name", None)
+        if isinstance(bot_name, str) and bot_name.strip():
+            return bot_name.strip()
+        bot_id = getattr(adapter, "bot_user_id", None)
+        names = getattr(adapter, "user_names", None) or getattr(
+            adapter, "_user_names", None
+        )
+        if bot_id and isinstance(names, dict):
+            resolved = names.get(bot_id)
+            if isinstance(resolved, str) and resolved.strip():
+                return resolved.strip()
+        return None
+
     def _deliver(
         self, session_id: str, message: InboundMessage, *, first_message: bool
     ) -> None:
@@ -711,10 +729,15 @@ class ConnectorService:
             message, channel_label=label, first_message=first_message
         )
         # The model reads the framed content; the UI renders a card from this.
+        # DMs have no channel name in Slack's directory — use the bot handle so
+        # the card can show "@sandwalk" instead of a raw D… id.
+        channel_name = message.channel_name
+        if message.is_direct_message:
+            channel_name = self._dm_channel_name(message) or channel_name
         source = MessageSource(
             connector="slack",
             channel_id=message.channel_id,
-            channel_name=message.channel_name,
+            channel_name=channel_name,
             sender_id=message.user_id,
             sender_name=message.user_name,
             sender_avatar_url=message.user_avatar_url,

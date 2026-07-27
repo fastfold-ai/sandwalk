@@ -195,6 +195,32 @@ def test_message_carries_a_display_sidecar(
     assert "reply→" in stored.content
 
 
+def test_dm_sidecar_uses_bot_handle(
+    store: AgentStore, connectors: ConnectorService
+) -> None:
+    class _Adapter:
+        bot_user_id = "BBOT"
+        _bot_name = "sandwalk"
+        user_names = {"BBOT": "sandwalk"}
+
+    connectors._sockets["T1"] = _Adapter()
+    run(
+        connectors._on_inbound(
+            message(
+                channel_id="D1",
+                channel_type="im",
+                channel_name=None,
+                text="hi",
+                mentions_me=False,
+            )
+        )
+    )
+    stored = store.list_messages(store.list_sessions()[0].id)[0]
+    assert stored.source is not None
+    assert stored.source.channel_id == "D1"
+    assert stored.source.channel_name == "sandwalk"
+
+
 def test_locally_typed_messages_have_no_sidecar(
     store: AgentStore, agent: AgentService
 ) -> None:

@@ -33,6 +33,7 @@ class InboundMessage:
     ts: str
     thread_ts: str | None = None
     channel_name: str | None = None
+    channel_type: str | None = None
     user_name: str | None = None
     user_avatar_url: str | None = None
     mentions_me: bool = False
@@ -40,6 +41,14 @@ class InboundMessage:
     @property
     def channel(self) -> str:
         return format_channel(self.team_id, self.channel_id)
+
+    @property
+    def is_direct_message(self) -> bool:
+        """1:1 or group DM — no @mention required to address the bot."""
+        if self.channel_type in {"im", "mpim"}:
+            return True
+        # Socket Mode / older envelopes sometimes omit channel_type.
+        return self.channel_id[:1].upper() == "D"
 
     @property
     def thread_target(self) -> str:
@@ -76,11 +85,19 @@ class SlackGateway:
         channel = message.channel
         thread_target = message.thread_target
         listeners = self._listening_sessions(channel)
+        existing = self.store.get_slack_mention_session(thread_target)
 
-        if not message.mentions_me:
-            # Ambient channel traffic only reaches sessions that opted in. It is
-            # never parked — a non-mention from a stranger is not a request, and
-            # queuing all of it would bury the real approvals.
+        # Mentions, DMs, and replies in a thread we already opened are addressed
+        # to the agent. Random channel chatter still needs a subscription.
+        addressed = (
+            message.mentions_me
+            or message.is_direct_message
+            or existing is not None
+        )
+
+        if not addressed:
+            # Ambient traffic is never parked — queuing strangers' chatter would
+            # bury real approval requests.
             if not listeners:
                 return RouteDecision("ignore", "no subscription")
             if not self._is_allowed(message):
@@ -93,8 +110,7 @@ class SlackGateway:
                 channel=channel,
             )
 
-        # A mention is a direct request, so an unknown sender gets queued for
-        # approval rather than dropped.
+        # Addressed traffic from an unknown sender is queued for approval.
         if not self._is_allowed(message):
             return RouteDecision(
                 "park",
@@ -112,7 +128,6 @@ class SlackGateway:
                 channel=channel,
             )
 
-        existing = self.store.get_slack_mention_session(thread_target)
         if existing is not None:
             if self.store.is_session_connector_muted(
                 session_id=existing, connector=CONNECTOR
@@ -120,7 +135,7 @@ class SlackGateway:
                 return RouteDecision("ignore", "session muted")
             return RouteDecision(
                 "deliver",
-                "mention thread",
+                "agent thread",
                 session_ids=[existing],
                 thread_target=thread_target,
                 channel=channel,
@@ -128,7 +143,7 @@ class SlackGateway:
 
         return RouteDecision(
             "spawn",
-            "new mention",
+            "new dm" if message.is_direct_message else "new mention",
             thread_target=thread_target,
             channel=channel,
         )
@@ -151,6 +166,8 @@ class SlackGateway:
     def source_label(self, message: InboundMessage) -> str:
         """Human-readable origin for the session badge, e.g. ``#dev-ops · Acme``."""
         workspace = self.store.get_slack_workspace(message.team_id)
-        channel = message.channel_name or message.channel_id
         team = (workspace.team_name if workspace else None) or message.team_id
+        if message.is_direct_message:
+            return f"DM · {team}"
+        channel = message.channel_name or message.channel_id
         return f"#{channel} · {team}"
