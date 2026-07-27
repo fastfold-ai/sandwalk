@@ -6,8 +6,8 @@ import {
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
-/** Dock tile variant (macOS desktop only). "system" restores the bundle icon. */
-export type DockIconId = 'system' | 'golden' | 'dark'
+/** Dock tile variant (macOS desktop only). */
+export type DockIconId = 'dark' | 'light' | 'golden'
 
 /** Color palette layered on top of light/dark mode. */
 export type ThemePaletteId =
@@ -504,12 +504,21 @@ export function applyGlassTintStrength(percent: number) {
   )
 }
 
-/** Dock tile (macOS desktop) — defaults to the dark variant. */
+/** Dock tile (macOS desktop) — defaults to dark. */
 export function getStoredDockIcon(): DockIconId {
   try {
     const value = localStorage.getItem(DOCK_ICON_STORAGE_KEY)
-    if (value === 'system' || value === 'golden' || value === 'dark') {
+    if (value === 'dark' || value === 'light' || value === 'golden') {
       return value
+    }
+    // Older builds used "system" for the dark/default tile.
+    if (value === 'system') {
+      try {
+        localStorage.setItem(DOCK_ICON_STORAGE_KEY, 'dark')
+      } catch {
+        // ignore
+      }
+      return 'dark'
     }
   } catch {
     // ignore

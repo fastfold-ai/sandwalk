@@ -28,7 +28,7 @@ export function ComposerVoiceBar({
         disabled={transcribing}
         className={cn(
           'grid size-8 shrink-0 place-items-center rounded-full',
-          'bg-white/10 text-white/90 hover:bg-white/15',
+          'bg-muted text-foreground hover:bg-muted/80',
           'disabled:pointer-events-none disabled:opacity-40'
         )}
         aria-label="Cancel dictation"
@@ -40,13 +40,13 @@ export function ComposerVoiceBar({
       <div className="flex min-w-0 flex-1 items-center justify-center gap-2.5">
         {transcribing ? (
           <>
-            <Loader2 className="size-4 shrink-0 animate-spin text-white/45" />
-            <span className="text-[15px] text-white/55">Transcribing</span>
+            <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
+            <span className="text-muted-foreground text-[15px]">Transcribing</span>
           </>
         ) : (
           <>
-            <VoiceLevelBars levels={levels} className="text-white/45" />
-            <span className="text-[15px] text-white/55">Listening</span>
+            <VoiceLevelBars levels={levels} className="text-muted-foreground" />
+            <span className="text-muted-foreground text-[15px]">Listening</span>
           </>
         )}
       </div>
@@ -57,7 +57,7 @@ export function ComposerVoiceBar({
         disabled={transcribing || !recording}
         className={cn(
           'grid size-8 shrink-0 place-items-center rounded-full',
-          'bg-white text-black hover:bg-white/90',
+          'bg-foreground text-background hover:bg-foreground/90',
           'disabled:pointer-events-none disabled:opacity-40'
         )}
         aria-label={recording ? 'Stop and transcribe' : 'Transcribing'}

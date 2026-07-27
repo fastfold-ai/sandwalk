@@ -248,10 +248,10 @@ export function Composer({
             void addFiles(files)
           }}
           className={cn(
-            'relative rounded-3xl border p-2 shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',
+            'bg-card focus-within:border-muted-foreground/40 border-border relative rounded-3xl border p-2',
             voice.active
-              ? 'border-white/10 bg-[#212121] shadow-none focus-within:border-white/15'
-              : 'bg-card focus-within:border-muted-foreground/40 border-border',
+              ? 'shadow-none'
+              : 'shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',
             dragging &&
               !voice.active &&
               'border-sky-500/60 ring-2 ring-sky-500/20',

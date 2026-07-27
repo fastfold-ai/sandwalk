@@ -44,9 +44,9 @@ const DOCK_ICON_OPTIONS: {
   label: string
   src: string
 }[] = [
-  { id: 'system', label: 'Default', src: '/dock-icons/light.png' },
-  { id: 'golden', label: 'Golden', src: '/dock-icons/golden.png' },
-  { id: 'dark', label: 'Dark', src: '/dock-icons/dark.png' }
+  { id: 'dark', label: 'Dark', src: '/dock-icons/dark.png' },
+  { id: 'light', label: 'Light', src: '/dock-icons/light.png' },
+  { id: 'golden', label: 'Golden', src: '/dock-icons/golden.png' }
 ]
 
 function AppearanceDockIconSection({ dockIcon }: { dockIcon: DockIconId }) {

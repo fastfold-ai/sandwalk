@@ -203,8 +203,9 @@ export const setSidebarGlassOptions = (variant: string, tintStrength: number) =>
   })
 
 /**
- * Swap the Dock tile (macOS desktop only). `variant` is "light" | "dark";
- * anything else restores the bundle's default icon. No-op outside Tauri.
+ * Swap the Dock tile (macOS desktop only). `variant` is "dark" | "light" |
+ * "golden". Applied at runtime (and again on launch from the saved
+ * preference); the installed bundle icon stays dark. No-op outside Tauri.
  */
 export const setDockIcon = (variant: string) =>
   invoke<void>('set_dock_icon', { variant })

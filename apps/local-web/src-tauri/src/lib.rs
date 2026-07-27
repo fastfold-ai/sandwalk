@@ -152,9 +152,9 @@ static DOCK_VARIANT: std::sync::Mutex<String> = std::sync::Mutex::new(String::ne
 #[cfg(target_os = "macos")]
 static DOCK_BADGE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
-/// Custom dock icons bake in the standard macOS icon-grid margin
-/// (transparent rim around the squircle), so AppKit's `badgeLabel`
-/// overhangs the artwork corner like a normal Dock badge.
+/// Apply the live Dock tile + badge from the current variant/badge state.
+/// Bundle `icon.icns` stays dark (the install default); Light/Golden are
+/// runtime-only overrides restored on each launch from the saved preference.
 #[cfg(target_os = "macos")]
 fn refresh_dock_tile() -> Result<(), String> {
     use objc2::AnyThread as _;
@@ -180,28 +180,19 @@ fn refresh_dock_tile() -> Result<(), String> {
         .filter(|value| !value.is_empty())
         .map(str::to_string);
 
-    let bytes: Option<&[u8]> = match variant.as_str() {
-        "light" => Some(DOCK_ICON_LIGHT),
-        "dark" => Some(DOCK_ICON_DARK),
-        "golden" => Some(DOCK_ICON_GOLDEN),
-        _ => None,
+    let bytes: &[u8] = match variant.as_str() {
+        "light" => DOCK_ICON_LIGHT,
+        "golden" => DOCK_ICON_GOLDEN,
+        // "dark", legacy "system", unknown → dark (matches bundle icon.icns)
+        _ => DOCK_ICON_DARK,
     };
 
-    // Clear any previous custom content view so badgeLabel uses the app tile.
     tile.setContentView(None);
 
-    match bytes {
-        Some(bytes) => {
-            let data = NSData::with_bytes(bytes);
-            let image = NSImage::initWithData(NSImage::alloc(), &data)
-                .ok_or_else(|| "failed to decode dock icon".to_string())?;
-            unsafe { app.setApplicationIconImage(Some(&image)) };
-        }
-        None => {
-            // Restore the bundle's default icon.
-            unsafe { app.setApplicationIconImage(None) };
-        }
-    }
+    let data = NSData::with_bytes(bytes);
+    let image = NSImage::initWithData(NSImage::alloc(), &data)
+        .ok_or_else(|| "failed to decode dock icon".to_string())?;
+    unsafe { app.setApplicationIconImage(Some(&image)) };
 
     match badge.as_deref() {
         Some(value) => tile.setBadgeLabel(Some(&NSString::from_str(value))),
@@ -212,9 +203,8 @@ fn refresh_dock_tile() -> Result<(), String> {
 }
 
 /// Swap the Dock tile at runtime via `NSApplication.applicationIconImage`.
-/// There is no cross-platform Tauri API for this (window icons on macOS do
-/// not affect the Dock) — it is native AppKit, restored to the bundle icon
-/// when `variant` is anything other than "light"/"dark"/"golden".
+/// Preference is stored in the UI and re-applied on launch; the installed
+/// bundle icon remains dark for when the app is quit.
 #[tauri::command]
 fn set_dock_icon(variant: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
