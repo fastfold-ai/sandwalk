@@ -504,7 +504,7 @@ export function applyGlassTintStrength(percent: number) {
   )
 }
 
-/** Dock tile (macOS desktop) — defaults to the bundle's own icon. */
+/** Dock tile (macOS desktop) — defaults to the dark variant. */
 export function getStoredDockIcon(): DockIconId {
   try {
     const value = localStorage.getItem(DOCK_ICON_STORAGE_KEY)
@@ -514,7 +514,7 @@ export function getStoredDockIcon(): DockIconId {
   } catch {
     // ignore
   }
-  return 'system'
+  return 'dark'
 }
 
 export function applyDockIcon(id: DockIconId) {
@@ -731,7 +731,7 @@ export function resetAppearanceDefaults() {
   applyLiquidGlass(true)
   applyGlassMaterial('sidebar')
   applyGlassTintStrength(GLASS_TINT_STRENGTH_DEFAULT)
-  applyDockIcon('system')
+  applyDockIcon('dark')
   applyAppFont('default')
   applyUiFontSize(UI_FONT_SIZE_DEFAULT)
 }

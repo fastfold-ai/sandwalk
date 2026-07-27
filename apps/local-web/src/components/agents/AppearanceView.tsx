@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Monitor, Moon, Sun } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Monitor, Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import {
@@ -192,19 +192,41 @@ function AppearancePreferencesSection({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <input
-            type="number"
-            inputMode="numeric"
-            min={UI_FONT_SIZE_MIN}
-            max={UI_FONT_SIZE_MAX}
-            step={1}
-            value={fontSize}
-            onChange={event => {
-              const next = Number(event.target.value)
-              if (Number.isFinite(next)) applyUiFontSize(next)
-            }}
-            className="border-border bg-card text-foreground focus-visible:ring-ring h-8 w-14 rounded-md border px-2 text-center text-sm outline-none [appearance:textfield] focus-visible:ring-1 [&::-webkit-inner-spin-button]:opacity-100 [&::-webkit-outer-spin-button]:opacity-100"
-          />
+          {/* Native number spinners ignore the theme (invisible in dark mode),
+              so the stepper is custom-built with themed chevrons. */}
+          <div className="border-border bg-card focus-within:ring-ring flex h-8 items-stretch overflow-hidden rounded-md border focus-within:ring-1">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={UI_FONT_SIZE_MIN}
+              max={UI_FONT_SIZE_MAX}
+              step={1}
+              value={fontSize}
+              onChange={event => {
+                const next = Number(event.target.value)
+                if (Number.isFinite(next)) applyUiFontSize(next)
+              }}
+              className="text-foreground w-10 bg-transparent px-1 text-center text-sm outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            <div className="border-border flex flex-col border-l">
+              <button
+                type="button"
+                aria-label="Increase UI font size"
+                onClick={() => applyUiFontSize(Math.min(UI_FONT_SIZE_MAX, fontSize + 1))}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted/40 flex flex-1 items-center justify-center px-1.5"
+              >
+                <ChevronUp className="size-3" />
+              </button>
+              <button
+                type="button"
+                aria-label="Decrease UI font size"
+                onClick={() => applyUiFontSize(Math.max(UI_FONT_SIZE_MIN, fontSize - 1))}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted/40 border-border flex flex-1 items-center justify-center border-t px-1.5"
+              >
+                <ChevronDown className="size-3" />
+              </button>
+            </div>
+          </div>
           <span className="text-muted-foreground text-xs">px</span>
         </div>
       </div>
