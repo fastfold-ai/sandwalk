@@ -104,7 +104,7 @@ struct AppConfig: Equatable, Sendable {
     }
 
     var agentsHomeURL: URL {
-        dashboardURL.appendingPathComponent("agents/home")
+        dashboardURL.appendingPathComponent("agents/new")
     }
 
     var healthURL: URL {

@@ -86,7 +86,7 @@ final class AppConfigTests: XCTestCase {
             config.agentSessionURL("abc-123").absoluteString,
             "http://127.0.0.1:9002/agents/abc-123"
         )
-        XCTAssertEqual(config.agentsHomeURL.absoluteString, "http://127.0.0.1:9002/agents/home")
+        XCTAssertEqual(config.agentsHomeURL.absoluteString, "http://127.0.0.1:9002/agents/new")
     }
 
     func testProductionDashboardUsesAPIPort() {

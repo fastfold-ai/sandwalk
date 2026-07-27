@@ -40,7 +40,7 @@ export function AppShellMain(props: AppShellMainProps) {
     <ResizablePanel
       id="main"
       order={2}
-      defaultSize={82}
+      defaultSize={77}
       minSize={40}
       className="min-w-0"
     >

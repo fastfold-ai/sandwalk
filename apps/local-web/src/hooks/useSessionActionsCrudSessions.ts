@@ -24,7 +24,6 @@ type SessionCrudArgs = Pick<
   | 'tabsScopeKey'
   | 'sessionId'
   | 'sessionIdRef'
-  | 'session'
   | 'sessions'
   | 'setSessions'
   | 'setOpenTabsByProject'
@@ -63,7 +62,6 @@ export function useSessionActionsCrudSessions({
   tabsScopeKey,
   sessionId,
   sessionIdRef,
-  session,
   sessions,
   setSessions,
   setOpenTabsByProject,

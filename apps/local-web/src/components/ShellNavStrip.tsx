@@ -88,7 +88,7 @@ export function ShellNavControlsSlot({
       className={cn(
         'sandwalk-shell-nav-slot overflow-hidden',
         visible
-          ? 'mr-0.5 max-w-[7rem] opacity-100'
+          ? 'mr-0.5 max-w-[8rem] opacity-100'
           : 'pointer-events-none mr-0 max-w-0 opacity-0',
         className
       )}

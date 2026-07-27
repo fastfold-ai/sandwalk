@@ -214,7 +214,7 @@ const LIQUID_GLASS_OFF_CLASS = 'sandwalk-liquid-glass-off'
 
 export const UI_FONT_SIZE_MIN = 12
 export const UI_FONT_SIZE_MAX = 18
-export const UI_FONT_SIZE_DEFAULT = 14
+export const UI_FONT_SIZE_DEFAULT = 15
 
 /** Native glass tint alpha — how strongly the color wash reads through the blur. */
 export const GLASS_TINT_STRENGTH_MIN = 0

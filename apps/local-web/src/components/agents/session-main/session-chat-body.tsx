@@ -186,7 +186,7 @@ export function SessionChatBody({
         )}
       >
         <div
-          className="min-h-0 overflow-hidden transition-[flex-grow,opacity] duration-500 ease-out"
+          className="flex min-h-0 flex-col overflow-hidden transition-[flex-grow,opacity] duration-500 ease-out"
           style={{
             flexGrow: showTranscript ? 1 : 0,
             flexShrink: 1,

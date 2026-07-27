@@ -1036,8 +1036,9 @@ html.sandwalk-mac-overlay .sandwalk-shell-nav-strip-mac {
   /*
    * Traffic lights at (19, 24) in lib.rs; cluster ~58px wide → clear ~77px,
    * then breathing room before the sidebar toggle.
+   * Use px (not rem) so UI font-size changes do not eat into the nav buttons.
    */
-  padding-left: 6rem; /* 96px */
+  padding-left: 96px;
 }
 
 /*

@@ -130,13 +130,6 @@ export function useAppShellEffects(args: UseAppShellEffectsArgs) {
   useEffect(() => {
     if (args.routeProjectId) {
       args.setProjectScopeId(args.routeProjectId)
-      return
-    }
-    if (
-      args.locationPathname === '/' ||
-      args.locationPathname === '/agents/home'
-    ) {
-      args.setProjectScopeId(null)
     }
   }, [args.locationPathname, args.routeProjectId, args.setProjectScopeId])
 

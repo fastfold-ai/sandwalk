@@ -115,10 +115,10 @@ export function ChatTranscript({
   }, [activeRunTools, tools])
 
   return (
-    <div className="relative min-h-0 flex-1">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
       <ScrollArea
         ref={chatScrollRef}
-        className="chat-scrollbar h-full min-h-0"
+        className="chat-scrollbar min-h-0 flex-1"
       >
         <div className="mx-auto flex w-full max-w-[44rem] flex-col px-5 py-6">
           <div className="mb-4 flex min-w-0 flex-1 flex-col gap-y-2 empty:hidden">

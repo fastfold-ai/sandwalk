@@ -121,13 +121,15 @@ export function AppShellSidebar({
       ref={sidebarPanelRef}
       collapsible
       collapsedSize={0}
-      defaultSize={18}
+      defaultSize={23}
       // Open floor. Drag past ~halfway to collapsedSize → collapses (hide sidebar).
-      minSize={16}
+      // Pixel floor keeps traffic-light pad + toggle + back/forward visible.
+      minSize={23}
       maxSize={32}
       onCollapse={() => setSidebarCollapsed(true)}
       onExpand={() => setSidebarCollapsed(false)}
-      className="min-w-0"
+      // Floor only while open — a persistent min-width blocks collapse to 0.
+      className={cn(!sidebarCollapsed && 'min-w-[15rem]')}
     >
       <aside className="sandwalk-shell-sidebar bg-sidebar flex h-full flex-col overflow-hidden">
         <div
@@ -169,8 +171,7 @@ export function AppShellSidebar({
             backendUrl={backendUrl}
             navigate={navigate}
             onNavigateHome={() => {
-              setProjectScopeId(null)
-              navigate('/')
+              void createSession(activeProjectId)
             }}
             onSelectAllProjects={selectAllProjects}
             onSelectProject={selectProjectScope}

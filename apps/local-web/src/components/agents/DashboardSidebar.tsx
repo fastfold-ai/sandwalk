@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { DRAFT_AGENT_SESSION_ID } from '@/lib/draft-agent'
 import { cn } from '@/lib/utils'
 
 import { DASHBOARD_NAV_GROUPS } from './dashboard-nav'
@@ -39,7 +40,7 @@ export function DashboardSidebar({
             variant="ghost"
             size="sm"
             className="text-muted-foreground hover:text-foreground h-8 w-full justify-start gap-2 px-2 text-[13px] font-normal"
-            onClick={() => navigate('/')}
+            onClick={() => navigate(`/agents/${DRAFT_AGENT_SESSION_ID}`)}
           >
             <ArrowLeft className="size-3.5 shrink-0" />
             <span className="truncate">Back to Agents</span>

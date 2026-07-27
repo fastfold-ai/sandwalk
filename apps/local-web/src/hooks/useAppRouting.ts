@@ -113,17 +113,21 @@ export function useAppRouting(location: Location) {
   const isSandboxModalDetail = sandboxKind === 'modal'
   const isDashboardSpecialists = dashboardSection === 'specialists'
   const isDashboardOverview = isDashboard && dashboardSection === 'overview'
-  const isHome =
+  // `/` and `/agents/home` redirect to the draft chat; keep treating them as
+  // draft so the blank composer shows without a HomeView flash.
+  const isLegacyHomePath =
     location.pathname === '/' || location.pathname === '/agents/home'
+  const isHome = false
   const isLibrary =
     location.pathname === '/library' ||
     location.pathname.startsWith('/library/')
   const isProjectHome = Boolean(routeProjectId)
   const isDraftAgent =
+    isLegacyHomePath ||
     location.pathname === `/agents/${DRAFT_AGENT_SESSION_ID}`
   const isInspect = new URLSearchParams(location.search).get('inspect') === '1'
   const dashboardSkeletonKind: DashboardSkeletonKind = (() => {
-    if (isHome || isLibrary || isProjectHome) return 'home'
+    if (isLibrary || isProjectHome) return 'home'
     if (isDashboardOverview) return 'overview'
     if (isDashboardDoctor) return 'doctor'
     if (
@@ -155,16 +159,16 @@ export function useAppRouting(location: Location) {
   const routeSessionId = routes.sessionRoute?.params.sessionId ?? null
   // Draft uses the client sentinel "new" so composer/chat state have a key,
   // but API callers must skip reserved ids via isDraftAgentSessionId.
-  const sessionId =
-    !isDashboard &&
-    !isSkills &&
-    !isIntegrations &&
-    !isHome &&
-    !isLibrary &&
-    !isProjectHome &&
-    routeSessionId &&
-    (!isReservedAgentRouteId(routeSessionId) ||
-      isDraftAgentSessionId(routeSessionId))
+  const sessionId = isLegacyHomePath
+    ? DRAFT_AGENT_SESSION_ID
+    : !isDashboard &&
+        !isSkills &&
+        !isIntegrations &&
+        !isLibrary &&
+        !isProjectHome &&
+        routeSessionId &&
+        (!isReservedAgentRouteId(routeSessionId) ||
+          isDraftAgentSessionId(routeSessionId))
       ? routeSessionId
       : null
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
+import { DRAFT_AGENT_SESSION_ID } from '@/lib/draft-agent'
 import { onboardingPath } from '@/lib/onboarding'
 
 type LegacyRouteRedirectArgs = {
@@ -22,11 +23,15 @@ export function useAppLegacyRouteRedirects({
 }: LegacyRouteRedirectArgs) {
   useEffect(() => {
     if (locationPathname === '/login') {
-      navigate('/', { replace: true })
+      navigate(`/agents/${DRAFT_AGENT_SESSION_ID}`, { replace: true })
       return
     }
-    if (locationPathname === '/agents/home') {
-      navigate('/', { replace: true })
+    // Home is the blank draft chat — no separate landing page.
+    if (
+      locationPathname === '/' ||
+      locationPathname === '/agents/home'
+    ) {
+      navigate(`/agents/${DRAFT_AGENT_SESSION_ID}`, { replace: true })
       return
     }
     if (locationPathname === '/dashboard/settings') {
