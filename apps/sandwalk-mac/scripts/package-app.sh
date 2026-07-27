@@ -45,7 +45,7 @@ ICONSET="${BUILD_DIR}/AppIcon.iconset"
 rm -rf "${ICONSET}"
 mkdir -p "${ICONSET}" "${ROOT}/Resources" "$(dirname "${MODULE_ICON}")"
 
-# Bright white full-bleed master (system masks to squircle — like ChatGPT/Ollama).
+# Bright white full-bleed master (system masks it to the squircle shape).
 swift "${ROOT}/scripts/generate_app_icon.swift" "${MASTER}" 1024 >/dev/null
 cp "${MASTER}" "${MODULE_ICON}"
 

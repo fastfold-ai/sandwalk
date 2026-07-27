@@ -72,7 +72,7 @@ if squircle {
     ).addClip()
 }
 
-// Dark wash with a soft radial highlight behind the mark (Cursor-style depth).
+// Dark wash with a soft radial highlight behind the mark for depth.
 let gradient = NSGradient(colors: [
     NSColor(srgbRed: 0.11, green: 0.11, blue: 0.125, alpha: 1),
     NSColor(srgbRed: 0.055, green: 0.055, blue: 0.065, alpha: 1),
@@ -106,8 +106,8 @@ for (cx, top, body) in barGeometry {
 let contentW = contentMaxX - contentMinX
 let contentH = contentMaxY - contentMinY
 
-// ~26% glyph padding within the tile — Cursor/Ghostty-style breathing room.
-let pad = tile.width * 0.26
+// ~21% glyph padding within the tile.
+let pad = tile.width * 0.21
 let drawBox = tile.insetBy(dx: pad, dy: pad)
 let scale = min(drawBox.width / contentW, drawBox.height / contentH)
 let drawnW = contentW * scale
@@ -161,9 +161,9 @@ for geo in barGeometry {
     NSGraphicsContext.restoreGraphicsState()
 }
 
-// Glossy bezel — gradient ring hugging the squircle edge, lit from the top
-// (like Cursor's silver rim). Ring drawn via even-odd clip between two
-// squircle paths so the stroke itself carries the gradient.
+// Glossy bezel — gradient ring hugging the squircle edge, lit from the top.
+// Ring drawn via even-odd clip between two squircle paths so the stroke
+// itself carries the gradient.
 let rimRadius = tile.width * 0.2226
 let ringWidth = tile.width * 0.014
 let ring = NSBezierPath(

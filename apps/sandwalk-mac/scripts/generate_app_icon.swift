@@ -123,8 +123,8 @@ for (cx, top, body) in barGeometry {
 let contentW = contentMaxX - contentMinX
 let contentH = contentMaxY - contentMinY
 
-// ~26% glyph padding within the tile — Cursor/Ghostty-style breathing room.
-let pad = tile.width * 0.26
+// ~21% glyph padding within the tile.
+let pad = tile.width * 0.21
 let drawBox = tile.insetBy(dx: pad, dy: pad)
 let scale = min(drawBox.width / contentW, drawBox.height / contentH)
 let drawnW = contentW * scale
@@ -188,9 +188,9 @@ for geo in barGeometry {
     NSGraphicsContext.restoreGraphicsState()
 }
 
-// Glossy bezel — gradient ring hugging the squircle edge, lit from the top
-// (like Cursor's silver rim). Ring drawn via even-odd clip between two
-// squircle paths so the stroke itself carries the gradient.
+// Glossy bezel — gradient ring hugging the squircle edge, lit from the top.
+// Ring drawn via even-odd clip between two squircle paths so the stroke
+// itself carries the gradient.
 let rimRadius = tile.width * 0.2226
 let ringWidth = tile.width * 0.014
 let ring = NSBezierPath(
