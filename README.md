@@ -98,19 +98,17 @@ INSTALL=1 pnpm --filter @sandwalk/agent-local-web package:dmg && open ~/Applicat
 
 DMG also lands at `apps/packaging/dist/Sandwalk-<version>-macos-arm64.dmg`. Details: [`apps/packaging/README.md`](apps/packaging/README.md). Releases: [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases).
 
-**2. Tauri + agent server (hot reload)** — paste once; server in background, Tauri in the foreground. Quit with Ctrl+C (then stop the server if you want):
+**2. Tauri + agent server (hot reload)** — two terminals; Tauri does **not** start the API.
 
 ```bash
-osascript -e 'quit app "Sandwalk"' 2>/dev/null || true
-pkill -x sandwalk-desktop 2>/dev/null || true
-pkill -f 'sandwalk serve' 2>/dev/null || true
-(cd cli && uv sync && uv run sandwalk serve --host 127.0.0.1 --port 8787) &
+# Terminal 1 — agent API
+cd cli && uv sync && uv run sandwalk serve --host 127.0.0.1 --port 8787
+
+# Terminal 2 — Tauri desktop UI (hot reload) against that API
 pnpm --filter @sandwalk/agent-local-web tauri:dev
-# optional cleanup after Ctrl+C:
-# pkill -f 'sandwalk serve'
 ```
 
-Tauri does **not** start the API — `sandwalk serve` on `:8787` is required. Optional menubar helper only: `cd apps/sandwalk-mac && ./scripts/package-app.sh && open ~/Applications/Sandwalk\ Server.app`.
+Optional menubar helper only: `cd apps/sandwalk-mac && ./scripts/package-app.sh && open ~/Applications/Sandwalk\ Server.app`.
 
 #### CLI + Web UI
 
