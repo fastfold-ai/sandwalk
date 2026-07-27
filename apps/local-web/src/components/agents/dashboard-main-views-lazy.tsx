@@ -1,5 +1,18 @@
 import { lazy } from 'react'
 
+/*
+ * AgentSandboxView, DataView, McpView, and SpecialistsView are also imported
+ * statically elsewhere (Onboarding*Step components, SpecialistAvatar
+ * consumers) — Rolldown/Vite can't split them into separate chunks in that
+ * case (INEFFECTIVE_DYNAMIC_IMPORT), so they're re-exported eagerly here
+ * instead of wrapped in `lazy()`. They still render fine inside the
+ * Suspense boundaries below since those tolerate regular components too.
+ */
+export { AgentSandboxView } from '@/components/agents/AgentSandboxView'
+export { DataView } from '@/components/agents/DataView'
+export { McpView } from '@/components/agents/McpView'
+export { SpecialistsView } from '@/components/agents/SpecialistsView'
+
 export const AgentRuntimeView = lazy(() =>
   import('@/components/agents/AgentRuntimeView').then(m => ({
     default: m.AgentRuntimeView
@@ -8,11 +21,6 @@ export const AgentRuntimeView = lazy(() =>
 export const AgentPromptsView = lazy(() =>
   import('@/components/agents/AgentPromptsView').then(m => ({
     default: m.AgentPromptsView
-  }))
-)
-export const AgentSandboxView = lazy(() =>
-  import('@/components/agents/AgentSandboxView').then(m => ({
-    default: m.AgentSandboxView
   }))
 )
 export const AppearanceView = lazy(() =>
@@ -24,9 +32,6 @@ export const DashboardOverviewView = lazy(() =>
   import('@/components/agents/DashboardOverviewView').then(m => ({
     default: m.DashboardOverviewView
   }))
-)
-export const DataView = lazy(() =>
-  import('@/components/agents/DataView').then(m => ({ default: m.DataView }))
 )
 export const DoctorView = lazy(() =>
   import('@/components/agents/DoctorView').then(m => ({ default: m.DoctorView }))
@@ -48,9 +53,6 @@ export const IntegrationsView = lazy(() =>
   import('@/components/agents/IntegrationsView').then(m => ({
     default: m.IntegrationsView
   }))
-)
-export const McpView = lazy(() =>
-  import('@/components/agents/McpView').then(m => ({ default: m.McpView }))
 )
 export const McpDetailView = lazy(() =>
   import('@/components/agents/McpDetailView').then(m => ({
@@ -94,11 +96,6 @@ export const ServerLogsView = lazy(() =>
 )
 export const SkillsView = lazy(() =>
   import('@/components/agents/SkillsView').then(m => ({ default: m.SkillsView }))
-)
-export const SpecialistsView = lazy(() =>
-  import('@/components/agents/SpecialistsView').then(m => ({
-    default: m.SpecialistsView
-  }))
 )
 export const StorageView = lazy(() =>
   import('@/components/agents/StorageView').then(m => ({

@@ -155,9 +155,9 @@ static DOCK_ICON_GOLDEN: &[u8] = include_bytes!("../icons/dock/dock-golden.png")
 fn set_dock_icon(variant: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        use cocoa::appkit::{NSApp, NSApplication, NSImage};
-        use cocoa::base::{id, nil};
-        use cocoa::foundation::NSData;
+        use objc2::AnyThread as _;
+        use objc2_app_kit::{NSApplication, NSImage};
+        use objc2_foundation::{MainThreadMarker, NSData};
 
         let bytes: Option<&[u8]> = match variant.as_str() {
             "light" => Some(DOCK_ICON_LIGHT),
@@ -166,19 +166,20 @@ fn set_dock_icon(variant: String) -> Result<(), String> {
             _ => None,
         };
 
-        unsafe {
-            let app = NSApp();
-            match bytes {
-                Some(bytes) => {
-                    let data =
-                        NSData::dataWithBytes_length_(nil, bytes.as_ptr() as *const _, bytes.len() as u64);
-                    let image: id = NSImage::initWithData_(NSImage::alloc(nil), data);
-                    app.setApplicationIconImage_(image);
-                }
-                None => {
-                    // Restore the bundle's default icon.
-                    app.setApplicationIconImage_(nil);
-                }
+        // Tauri commands run on the main thread by default; this is required
+        // by NSApplication::sharedApplication.
+        let mtm = MainThreadMarker::new()
+            .ok_or_else(|| "set_dock_icon must run on the main thread".to_string())?;
+        let app = NSApplication::sharedApplication(mtm);
+        match bytes {
+            Some(bytes) => {
+                let data = NSData::with_bytes(bytes);
+                let image = NSImage::initWithData(NSImage::alloc(), &data);
+                unsafe { app.setApplicationIconImage(image.as_deref()) };
+            }
+            None => {
+                // Restore the bundle's default icon.
+                unsafe { app.setApplicationIconImage(None) };
             }
         }
     }
@@ -250,10 +251,6 @@ fn control_request(method: &str, path: &str, body: Option<Value>) -> Result<Valu
         return Ok(Value::Null);
     }
     serde_json::from_str(&text).map_err(|e| format!("bad JSON: {e} — {text}"))
-}
-
-fn inject_api_base() -> String {
-    inject_bootstrap_script(None)
 }
 
 fn inject_bootstrap_script(initial_route: Option<&str>) -> String {
