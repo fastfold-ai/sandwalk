@@ -4,7 +4,9 @@ import {
   type ComponentProps,
   type Dispatch,
   type RefObject,
-  type SetStateAction
+  type SetStateAction,
+  useCallback,
+  useEffect
 } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import type { NavigateFunction } from 'react-router-dom'
@@ -100,6 +102,8 @@ export type AgentSessionMainPanelProps = {
   canShowFilesPanel: boolean
   filesPanelRef: RefObject<ImperativePanelHandle | null>
   workspaceVersion: number
+  draftWorkspaceSessionId: string | null
+  setDraftWorkspaceSessionId: Dispatch<SetStateAction<string | null>>
   pendingOpenPath: string | null
   setPendingOpenPath: Dispatch<SetStateAction<string | null>>
   setComposer: (value: string | ((current: string) => string)) => void
@@ -167,6 +171,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     canShowFilesPanel,
     filesPanelRef,
     workspaceVersion,
+    draftWorkspaceSessionId,
+    setDraftWorkspaceSessionId,
     pendingOpenPath,
     setPendingOpenPath,
     setComposer,
@@ -174,8 +180,39 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   } = props
 
   const isDraft = isDraftAgentSessionId(sessionId)
-  // Draft has no artifacts pane — terminal alone takes the side column.
-  const showDraftTerminal = isDraft && terminalOpen
+  const inProject = Boolean(activeProjectId)
+
+  useEffect(() => {
+    // Reset when leaving the draft route or switching project scope.
+    setDraftWorkspaceSessionId(null)
+  }, [activeProjectId, isDraft, setDraftWorkspaceSessionId])
+
+  const ensureAgentSession = agentComposerSlotProps.ensureAgentSession
+  const prepareDraftWorkspace = useCallback(async () => {
+    if (!isDraft || !inProject) return draftWorkspaceSessionId
+    if (draftWorkspaceSessionId) return draftWorkspaceSessionId
+    const id = await ensureAgentSession(undefined, { navigate: false })
+    if (id) setDraftWorkspaceSessionId(id)
+    return id
+  }, [
+    draftWorkspaceSessionId,
+    ensureAgentSession,
+    inProject,
+    isDraft,
+    setDraftWorkspaceSessionId
+  ])
+
+  // Do not auto-materialize on draft mount / open files panel — that created
+  // empty "New research session" rows whenever New Agent ran inside a project.
+  // Materialize only when the user explicitly opens Files or Terminal.
+
+  const workspaceSessionId = isDraft ? draftWorkspaceSessionId : sessionId
+  // Host terminal only when draft is outside a project.
+  const showDraftTerminal = isDraft && !inProject && terminalOpen
+  const showWorkspaceFiles =
+    canShowFilesPanel &&
+    Boolean(workspaceSessionId) &&
+    (!isDraft || inProject)
 
   return (
     <ResizablePanelGroup
@@ -207,6 +244,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             exportTranscript={exportTranscript}
             setDeleteTarget={setDeleteTarget}
             projects={projects}
+            activeProjectId={activeProjectId}
             selectProjectScope={selectProjectScope}
             cliMenuOpen={cliMenuOpen}
             setCliMenuOpen={setCliMenuOpen}
@@ -216,6 +254,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             setTerminalOpen={setTerminalOpen}
             filesPanelCollapsed={filesPanelCollapsed}
             setFilesPanelCollapsed={setFilesPanelCollapsed}
+            onPrepareDraftWorkspace={prepareDraftWorkspace}
           />
           <SessionChatBody
             client={client}
@@ -279,15 +318,22 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             minSize={20}
             maxSize={55}
             onCollapse={() => setFilesPanelCollapsed(true)}
-            onExpand={() => setFilesPanelCollapsed(false)}
+            onExpand={() => {
+              setFilesPanelCollapsed(false)
+              if (isDraft && inProject) void prepareDraftWorkspace()
+            }}
             className="min-w-0"
           >
-            {sessionId && !isDraft ? (
+            {showWorkspaceFiles && workspaceSessionId ? (
               <WorkspacePanel
-                key={sessionId}
+                key={workspaceSessionId}
                 client={client}
-                sessionId={sessionId}
-                workspacePath={session?.workspacePath ?? null}
+                sessionId={workspaceSessionId}
+                workspacePath={
+                  isDraft
+                    ? null
+                    : (session?.workspacePath ?? null)
+                }
                 workspaceVersion={workspaceVersion}
                 runActive={runActive}
                 openPathRequest={pendingOpenPath}
@@ -297,9 +343,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                   setComposerFiles([])
                 }}
                 onBuildPlan={path => {
-                  if (!sessionId) return
                   void startPlanBuild({
-                    sessionId,
+                    sessionId: workspaceSessionId,
                     plan: planCardFromPath(path),
                     patchChat,
                     client,

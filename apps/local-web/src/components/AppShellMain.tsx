@@ -16,12 +16,16 @@ import {
 } from '@/components/ShellNavStrip'
 import { ResizablePanel } from '@/components/ui/resizable'
 import { useCrossfadeFlag } from '@/hooks/useDeferredTrue'
+import { isDraftAgentSessionId } from '@/lib/draft-agent'
 
 export type { AppShellMainProps } from '@/components/app/app-shell-main-props'
 
 export function AppShellMain(props: AppShellMainProps) {
+  // Draft New Agent already has SessionMainHeader (files/terminal chrome).
+  // Don't stack a redundant "New Chat" title row when no tabs are open.
   const showSimpleTitleBar =
     !props.showSessionTabs &&
+    !isDraftAgentSessionId(props.sessionId) &&
     !(
       props.isHome ||
       props.isLibrary ||
@@ -132,6 +136,8 @@ export function AppShellMain(props: AppShellMainProps) {
             canShowFilesPanel={props.canShowFilesPanel}
             filesPanelRef={props.filesPanelRef}
             workspaceVersion={props.workspaceVersion}
+            draftWorkspaceSessionId={props.draftWorkspaceSessionId}
+            setDraftWorkspaceSessionId={props.setDraftWorkspaceSessionId}
             pendingOpenPath={props.pendingOpenPath}
             setPendingOpenPath={props.setPendingOpenPath}
             setComposer={props.setComposer}

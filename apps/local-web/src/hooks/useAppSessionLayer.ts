@@ -71,6 +71,7 @@ type SessionLayerArgs = {
   setWorkspaceVersion: Dispatch<SetStateAction<number>>
   workspaceFiles: WorkspaceFile[]
   setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
+  setTerminalOpen: Dispatch<SetStateAction<boolean>>
   setPendingOpenPath: Dispatch<SetStateAction<string | null>>
   pendingAttachmentsRef: MutableRefObject<{
     sessionId: string
@@ -135,7 +136,9 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     loadSessions: args.loadSessions,
     loadProjects: args.loadProjects,
     setError: args.setError,
-    setCollapsedSidebarSections: args.setCollapsedSidebarSections
+    setCollapsedSidebarSections: args.setCollapsedSidebarSections,
+    setFilesPanelCollapsed: args.setFilesPanelCollapsed,
+    setTerminalOpen: args.setTerminalOpen
   })
 
   const send = useSessionChatSend({

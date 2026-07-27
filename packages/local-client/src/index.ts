@@ -721,6 +721,9 @@ export class LocalAgentClient
       name: string
       description?: string | null
       agentContext?: string | null
+      folderPath?: string | null
+      icon?: string | null
+      color?: string | null
       pinned?: boolean
     },
     signal?: AbortSignal,
@@ -730,7 +733,10 @@ export class LocalAgentClient
       body: JSON.stringify({
         name: input.name,
         description: input.description,
-        agent_context: input.agentContext,
+        agentContext: input.agentContext,
+        folderPath: input.folderPath,
+        icon: input.icon,
+        color: input.color,
         pinned: Boolean(input.pinned),
       }),
       headers: { 'content-type': 'application/json' },
@@ -744,20 +750,35 @@ export class LocalAgentClient
       name?: string
       description?: string | null
       agentContext?: string | null
+      folderPath?: string | null
+      icon?: string | null
+      color?: string | null
       pinned?: boolean
     },
     signal?: AbortSignal,
   ): Promise<AgentProject> {
+    const body: Record<string, unknown> = {
+      name: input.name,
+      description: input.description,
+      clearDescription: input.description === null,
+      agentContext: input.agentContext,
+      clearAgentContext: input.agentContext === null,
+      icon: input.icon,
+      color: input.color,
+      pinned: input.pinned,
+    }
+    // Only touch folder when the caller set folderPath. `null` clears; a string
+    // sets. Omitting the field (e.g. pin toggle) must not wipe a linked folder.
+    if (input.folderPath !== undefined) {
+      if (input.folderPath === null || input.folderPath === '') {
+        body.clearFolderPath = true
+      } else {
+        body.folderPath = input.folderPath
+      }
+    }
     return this.request<AgentProject>(`/projects/${encodeURIComponent(projectId)}`, {
       method: 'PATCH',
-      body: JSON.stringify({
-        name: input.name,
-        description: input.description,
-        clear_description: input.description === null,
-        agent_context: input.agentContext,
-        clear_agent_context: input.agentContext === null,
-        pinned: input.pinned,
-      }),
+      body: JSON.stringify(body),
       headers: { 'content-type': 'application/json' },
       signal,
     })

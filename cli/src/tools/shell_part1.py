@@ -98,23 +98,23 @@ def _session_workspace_root() -> Path | None:
 
 
 def _path_under_workspace(raw: str, *, workspace: Path) -> Path | None:
-    """Resolve ``raw`` and require it to live under the session workspace."""
+    """Resolve ``raw`` and require it to live under the session workspace.
+
+    Includes the intentional ``workspace/project`` symlink mount (external
+    project folder), so agents can redirect/rm there.
+    """
     text = (raw or "").strip()
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
         text = text[1:-1]
     text = _expand_env_refs(text).strip()
     if not text or text.startswith("(") or text in {"&1", "&2"}:
         return None
+    from agent_server.project_folder import path_under_workspace_or_project
+
     path = Path(text).expanduser()
     if not path.is_absolute():
         path = workspace / path
-    try:
-        root = workspace.resolve()
-        resolved = path.parent.resolve() / path.name
-        resolved.relative_to(root)
-    except (OSError, ValueError):
-        return None
-    return resolved
+    return path_under_workspace_or_project(path, workspace)
 
 
 def _strip_workspace_file_redirects(command: str) -> tuple[str | None, str]:

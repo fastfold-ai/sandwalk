@@ -1,4 +1,10 @@
-import { Download, FolderInput, Pencil, Trash2 } from 'lucide-react'
+import {
+  Download,
+  FolderInput,
+  MessageSquarePlus,
+  Pencil,
+  Trash2
+} from 'lucide-react'
 
 import {
   TabContextItem,
@@ -9,6 +15,7 @@ import {
 export function WorkspaceFileBrowserContextMenu({
   menu,
   onClose,
+  onAddToChat,
   onRename,
   onMove,
   onDownload,
@@ -21,6 +28,7 @@ export function WorkspaceFileBrowserContextMenu({
     type: 'file' | 'directory'
   } | null
   onClose: () => void
+  onAddToChat: (path: string) => void
   onRename: (path: string) => void
   onMove: (path: string) => void
   onDownload: (path: string) => void
@@ -30,6 +38,20 @@ export function WorkspaceFileBrowserContextMenu({
 
   return (
     <TabContextMenuShell x={menu.x} y={menu.y} onClose={onClose}>
+      {menu.type === 'file' ? (
+        <>
+          <TabContextItem
+            icon={<MessageSquarePlus className="size-3.5" />}
+            label="Add to chat"
+            onClick={() => {
+              const path = menu.path
+              onClose()
+              onAddToChat(path)
+            }}
+          />
+          <TabContextSeparator />
+        </>
+      ) : null}
       <TabContextItem
         icon={<Pencil className="size-3.5" />}
         label="Rename…"

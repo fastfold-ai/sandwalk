@@ -34,6 +34,8 @@ type UseAppSessionEffectsArgs = {
   projectScopeId: string | null
   client: LocalAgentClient
   workspaceVersion: number
+  /** When the route is a draft, list Files/@ mentions from this materialized session. */
+  draftWorkspaceSessionId: string | null
   setWorkspaceFiles: Dispatch<SetStateAction<WorkspaceFile[]>>
   skillRouteName: string | null | undefined
   setSkillDetail: Dispatch<SetStateAction<AgentSkillDetail | null>>
@@ -59,6 +61,7 @@ export function useAppSessionEffects({
   projectScopeId,
   client,
   workspaceVersion,
+  draftWorkspaceSessionId,
   setWorkspaceFiles,
   skillRouteName,
   setSkillDetail,
@@ -163,13 +166,17 @@ export function useAppSessionEffects({
   }, [sessions])
 
   useEffect(() => {
-    if (!sessionId || isDraftAgentSessionId(sessionId)) {
+    const listId =
+      sessionId && isDraftAgentSessionId(sessionId)
+        ? draftWorkspaceSessionId
+        : sessionId
+    if (!listId) {
       setWorkspaceFiles([])
       return
     }
     let cancelled = false
     void client
-      .listFiles(sessionId)
+      .listFiles(listId)
       .then(files => {
         if (!cancelled) setWorkspaceFiles(files)
       })
@@ -179,7 +186,7 @@ export function useAppSessionEffects({
     return () => {
       cancelled = true
     }
-  }, [client, sessionId, workspaceVersion])
+  }, [client, draftWorkspaceSessionId, sessionId, workspaceVersion])
 
   useEffect(() => {
     const name = skillRouteName

@@ -12,11 +12,18 @@ class _SessionCrudMixin:
     def ensure_workspace(self, session_id: str) -> AgentSession:
         """Ensure the session has a writable workspace directory on disk."""
         from agent_server import service
+        from agent_server.project_folder import sync_project_folder_link
 
         session = self.store.get_session(session_id)
         if session is None:
             raise KeyError(session_id)
         workspace = service.resolve_session_workspace(session_id, store=self.store, persist=True)
+        folder_path = None
+        if session.project_id:
+            project = self.store.get_project(session.project_id)
+            if project is not None:
+                folder_path = project.folder_path
+        sync_project_folder_link(workspace, folder_path)
         import_shared_fork_files(session_id, workspace)
         updated = self.store.get_session(session_id)
         if updated is None:

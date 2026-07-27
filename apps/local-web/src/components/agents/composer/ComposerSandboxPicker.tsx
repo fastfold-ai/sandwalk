@@ -141,18 +141,18 @@ export function ComposerSandboxPicker({
           {sandboxPhase !== 'idle' ||
           sandboxStatus?.status === 'starting' ||
           sandboxStatus?.status === 'stopping' ? (
-            <Loader className="size-3.5 animate-spin" />
+            <Loader className="size-4 animate-spin" />
           ) : sandboxStatus?.backend === 'modal' ? (
-            <ModalGlyph className="size-3.5" />
+            <ModalGlyph className="size-4" />
           ) : (
-            <Container className="size-3.5" />
+            <Container className="size-4" />
           )}
           {sandboxPhase === 'idle' &&
           sandboxStatus?.status !== 'starting' &&
           sandboxStatus?.status !== 'stopping' ? (
             <span
               className={cn(
-                'absolute right-0.5 bottom-0.5 size-1.5 rounded-full',
+                'pointer-events-none absolute right-1 bottom-1 size-1.5 rounded-full',
                 sandboxStatusDotClass(sandboxStatus, sandboxPhase)
               )}
             />

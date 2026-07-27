@@ -58,6 +58,38 @@ class TestShellRun:
         assert res.get("exit_code") == 0
         assert out.read_text().strip() == "downloaded"
 
+    def test_file_redirection_into_project_mount_allowed(self, tmp_path, monkeypatch):
+        import os
+
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        linked = tmp_path / "linked"
+        linked.mkdir()
+        (linked / "backlog.md").write_text("", encoding="utf-8")
+        os.symlink(linked, workspace / "project", target_is_directory=True)
+        monkeypatch.setenv("SANDWALK_SESSION_WORKSPACE", str(workspace))
+        out = workspace / "project" / "backlog.md"
+        res = shell_run(f'printf "task\\n" > "{out}" && echo ok')
+        assert res.get("error") != "blocked_command", res
+        assert res.get("exit_code") == 0
+        assert (linked / "backlog.md").read_text(encoding="utf-8") == "task\n"
+
+    def test_rm_under_project_mount_allowed(self, tmp_path, monkeypatch):
+        import os
+
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        linked = tmp_path / "linked"
+        linked.mkdir()
+        target = linked / "gone.md"
+        target.write_text("x\n", encoding="utf-8")
+        os.symlink(linked, workspace / "project", target_is_directory=True)
+        monkeypatch.setenv("SANDWALK_SESSION_WORKSPACE", str(workspace))
+        res = shell_run(f'rm "{workspace / "project" / "gone.md"}"')
+        assert res.get("error") != "blocked_command", res
+        assert res.get("exit_code") == 0
+        assert not target.exists()
+
     def test_semicolon_chain_in_workspace(self, tmp_path, monkeypatch):
         workspace = tmp_path / "ws"
         workspace.mkdir()

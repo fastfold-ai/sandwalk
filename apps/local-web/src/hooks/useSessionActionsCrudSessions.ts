@@ -36,6 +36,8 @@ type SessionCrudArgs = Pick<
   | 'loadSessions'
   | 'loadProjects'
   | 'setError'
+  | 'setFilesPanelCollapsed'
+  | 'setTerminalOpen'
 >
 
 function applyProjectScope(
@@ -73,7 +75,9 @@ export function useSessionActionsCrudSessions({
   composerLiveRef,
   loadSessions,
   loadProjects,
-  setError
+  setError,
+  setFilesPanelCollapsed,
+  setTerminalOpen
 }: SessionCrudArgs) {
   const createSessionInFlightRef = useRef(false)
   const ensureInFlightRef = useRef<Promise<string | null> | null>(null)
@@ -91,6 +95,9 @@ export function useSessionActionsCrudSessions({
       const id = projectId ?? activeProjectId ?? null
       applyProjectScope(id, setProjectScopeId, setRecentProjectIds)
       materializedDraftSessionRef.current = null
+      // Match All-scope New Agent: draft only, no side panels forcing a session.
+      setFilesPanelCollapsed(true)
+      setTerminalOpen(false)
       setChatBySessionId(current => ({
         ...current,
         [DRAFT_AGENT_SESSION_ID]: {
@@ -108,8 +115,10 @@ export function useSessionActionsCrudSessions({
       navigate,
       sessionIdRef,
       setChatBySessionId,
+      setFilesPanelCollapsed,
       setProjectScopeId,
-      setRecentProjectIds
+      setRecentProjectIds,
+      setTerminalOpen
     ]
   )
 

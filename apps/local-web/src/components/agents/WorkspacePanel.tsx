@@ -309,6 +309,7 @@ export function WorkspacePanel({
       <WorkspaceFileBrowserContextMenu
         menu={workspace.fileBrowserMenu}
         onClose={() => workspace.setFileBrowserMenu(null)}
+        onAddToChat={onAddToChat}
         onRename={workspace.openRenameDialog}
         onMove={workspace.openMoveDialog}
         onDownload={workspace.downloadFile}

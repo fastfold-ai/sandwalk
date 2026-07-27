@@ -105,7 +105,7 @@ export function ComposerToolbar({
 
   return (
     <div className="flex min-w-0 items-center justify-between gap-2 px-0.5">
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+      <div className="flex h-7 min-w-0 flex-1 items-center gap-1 overflow-hidden">
         <input
           ref={uploadRef}
           type="file"

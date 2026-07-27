@@ -2,6 +2,7 @@ import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import { MoreHorizontal, Pin, Plus, Trash2 } from 'lucide-react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
+import { ProjectMark } from '@/components/agents/ProjectMark'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -100,12 +101,20 @@ export function HomeProjectView({
     <ScrollArea className="flex-1">
       <div className="mx-auto w-full max-w-5xl px-6 pt-3 pb-8 md:px-10">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="truncate text-xl font-semibold">{project.name}</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {project.description ||
-                'Pick up where you left off or start something new.'}
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            <ProjectMark
+              icon={project.icon}
+              color={project.color}
+              className="mt-0.5 size-9"
+              iconClassName="size-4"
+            />
+            <div className="min-w-0">
+              <h2 className="truncate text-xl font-semibold">{project.name}</h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {project.description ||
+                  'Pick up where you left off or start something new.'}
+              </p>
+            </div>
           </div>
           {sessions.length > 0 ? (
             <Button
@@ -161,16 +170,26 @@ export function HomeProjectsList({
         >
           <button
             type="button"
-            className="min-w-0 flex-1 text-left"
+            className="flex min-w-0 flex-1 items-start gap-2.5 text-left"
             onClick={() => onOpenProject(project.id)}
           >
-            <div className="flex items-center gap-1.5">
-              <span className="truncate text-sm font-medium">{project.name}</span>
-              {project.pinned ? <Pin className="size-3 shrink-0" /> : null}
+            <ProjectMark
+              icon={project.icon}
+              color={project.color}
+              className="mt-0.5 size-7"
+            />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-sm font-medium">
+                  {project.name}
+                </span>
+                {project.pinned ? <Pin className="size-3 shrink-0" /> : null}
+              </div>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                {project.sessionCount} sessions ·{' '}
+                {relativeTime(project.updatedAt)}
+              </p>
             </div>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              {project.sessionCount} sessions · {relativeTime(project.updatedAt)}
-            </p>
           </button>
           <Popover>
             <PopoverTrigger asChild>

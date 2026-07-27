@@ -141,3 +141,17 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
         connection.execute(
             "ALTER TABLE slack_workspaces ADD COLUMN needs_reauth INTEGER NOT NULL DEFAULT 0"
         )
+
+    project_columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(projects)").fetchall()
+    }
+    if "folder_path" not in project_columns:
+        connection.execute("ALTER TABLE projects ADD COLUMN folder_path TEXT")
+    if "icon" not in project_columns:
+        connection.execute(
+            "ALTER TABLE projects ADD COLUMN icon TEXT NOT NULL DEFAULT 'folder'"
+        )
+    if "color" not in project_columns:
+        connection.execute(
+            "ALTER TABLE projects ADD COLUMN color TEXT NOT NULL DEFAULT 'neutral'"
+        )

@@ -70,6 +70,10 @@ export function useAppUiState() {
   >(() => readOpenTabsByProject())
   const [workspaceVersion, setWorkspaceVersion] = useState(0)
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([])
+  /** Materialized session used for Files/@ mentions while the route stays on /agents/new. */
+  const [draftWorkspaceSessionId, setDraftWorkspaceSessionId] = useState<
+    string | null
+  >(null)
   const [integrationValues, setIntegrationValues] = useState<
     Record<string, string>
   >({})
@@ -120,6 +124,8 @@ export function useAppUiState() {
     setWorkspaceVersion,
     workspaceFiles,
     setWorkspaceFiles,
+    draftWorkspaceSessionId,
+    setDraftWorkspaceSessionId,
     integrationValues,
     setIntegrationValues,
     sessionIdRef

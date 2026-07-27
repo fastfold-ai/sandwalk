@@ -226,6 +226,8 @@ export function AppShell(props: AppShellProps) {
           canShowFilesPanel={props.canShowFilesPanel}
           filesPanelRef={props.filesPanelRef}
           workspaceVersion={props.workspaceVersion}
+          draftWorkspaceSessionId={props.draftWorkspaceSessionId}
+          setDraftWorkspaceSessionId={props.setDraftWorkspaceSessionId}
           pendingOpenPath={props.pendingOpenPath}
           setPendingOpenPath={props.setPendingOpenPath}
           setComposer={props.setComposer}

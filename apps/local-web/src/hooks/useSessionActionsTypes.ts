@@ -43,4 +43,6 @@ export type UseSessionActionsArgs = {
   setCollapsedSidebarSections: Dispatch<
     SetStateAction<Record<string, boolean>>
   >
+  setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
+  setTerminalOpen: Dispatch<SetStateAction<boolean>>
 }

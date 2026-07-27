@@ -31,6 +31,9 @@ def register_project_routes(app: FastAPI, deps: AppDeps) -> None:
                 name=payload.name,
                 description=payload.description,
                 agent_context=payload.agent_context,
+                folder_path=payload.folder_path,
+                icon=payload.icon,
+                color=payload.color,
                 pinned=payload.pinned,
             )
         except ValueError as exc:
@@ -59,6 +62,11 @@ def register_project_routes(app: FastAPI, deps: AppDeps) -> None:
                 agent_context=payload.agent_context,
                 update_agent_context=payload.agent_context is not None
                 or payload.clear_agent_context,
+                folder_path=payload.folder_path,
+                update_folder_path=payload.folder_path is not None
+                or payload.clear_folder_path,
+                icon=payload.icon,
+                color=payload.color,
                 pinned=payload.pinned,
             )
         except ValueError as exc:

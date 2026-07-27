@@ -40,9 +40,19 @@ export function useSessionActionsCrudProjects({
     name: string
     description: string
     agentContext: string
+    folderPath?: string | null
+    icon?: string
+    color?: string
   }) => {
     try {
-      const project = await client.createProject(input)
+      const project = await client.createProject({
+        name: input.name,
+        description: input.description || null,
+        agentContext: input.agentContext || null,
+        folderPath: input.folderPath || null,
+        icon: input.icon,
+        color: input.color
+      })
       await loadProjects()
       setProjectScopeId(project.id)
       setRecentProjectIds(current => {
@@ -66,13 +76,25 @@ export function useSessionActionsCrudProjects({
     name: string
     description: string
     agentContext: string
+    folderPath?: string | null
+    icon?: string
+    color?: string
   }) => {
     if (!activeProject) return
     try {
+      const folderPath =
+        input.folderPath === undefined
+          ? undefined
+          : input.folderPath && input.folderPath.trim()
+            ? input.folderPath.trim()
+            : null
       await client.updateProject(activeProject.id, {
         name: input.name,
         description: input.description || null,
-        agentContext: input.agentContext || null
+        agentContext: input.agentContext || null,
+        ...(folderPath !== undefined ? { folderPath } : {}),
+        icon: input.icon,
+        color: input.color
       })
       await loadProjects()
     } catch (cause) {

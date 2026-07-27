@@ -12,6 +12,7 @@
     "core:window:allow-close",
     "core:window:allow-start-dragging",
     "liquid-glass:default",
-    "notification:default"
+    "notification:default",
+    "dialog:default"
   ]
 }

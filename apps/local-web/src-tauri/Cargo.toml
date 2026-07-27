@@ -25,6 +25,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 dirs = "5"
 base64 = "0.22"
 sandwalk-stt = { path = "../stt" }
+tauri-plugin-dialog = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Replaces the deprecated `cocoa`/`objc` crates for the Dock icon swap below.

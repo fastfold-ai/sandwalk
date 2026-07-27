@@ -6,6 +6,11 @@ import sqlite3
 import uuid
 
 from agent_server.models import AgentProject
+from agent_server.project_folder import (
+    normalize_project_color,
+    normalize_project_icon,
+    validate_project_folder_path,
+)
 from agent_server.store.rows import project_from_row
 from agent_server.store.util import utc_now
 
@@ -21,26 +26,36 @@ class ProjectMixin:
         name: str,
         description: str | None = None,
         agent_context: str | None = None,
+        folder_path: str | None = None,
+        icon: str | None = None,
+        color: str | None = None,
         pinned: bool = False,
     ) -> AgentProject:
         normalized = name.strip()
         if not normalized:
             raise ValueError("Project name cannot be empty.")
+        next_folder = validate_project_folder_path(folder_path)
+        next_icon = normalize_project_icon(icon)
+        next_color = normalize_project_color(color)
         now = utc_now()
         project_id = str(uuid.uuid4())
         with self._write_lock, self._connect() as connection:
             connection.execute(
                 """
                 INSERT INTO projects(
-                    id, name, description, agent_context, pinned, created_at, updated_at
+                    id, name, description, agent_context, folder_path, icon, color,
+                    pinned, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     project_id,
                     normalized,
                     (description or "").strip() or None,
                     (agent_context or "").strip() or None,
+                    next_folder,
+                    next_icon,
+                    next_color,
                     1 if pinned else 0,
                     now.isoformat(),
                     now.isoformat(),
@@ -100,6 +115,10 @@ class ProjectMixin:
         update_description: bool = False,
         agent_context: str | None = None,
         update_agent_context: bool = False,
+        folder_path: str | None = None,
+        update_folder_path: bool = False,
+        icon: str | None = None,
+        color: str | None = None,
         pinned: bool | None = None,
     ) -> AgentProject | None:
         current = self.get_project(project_id)
@@ -116,19 +135,32 @@ class ProjectMixin:
         next_context = current.agent_context
         if update_agent_context:
             next_context = (agent_context or "").strip() or None
+        next_folder = current.folder_path
+        if update_folder_path:
+            next_folder = validate_project_folder_path(folder_path)
+        next_icon = current.icon
+        if icon is not None:
+            next_icon = normalize_project_icon(icon)
+        next_color = current.color
+        if color is not None:
+            next_color = normalize_project_color(color)
         next_pinned = current.pinned if pinned is None else bool(pinned)
         now = utc_now()
         with self._write_lock, self._connect() as connection:
             connection.execute(
                 """
                 UPDATE projects
-                SET name = ?, description = ?, agent_context = ?, pinned = ?, updated_at = ?
+                SET name = ?, description = ?, agent_context = ?, folder_path = ?,
+                    icon = ?, color = ?, pinned = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
                     next_name,
                     next_description,
                     next_context,
+                    next_folder,
+                    next_icon,
+                    next_color,
                     1 if next_pinned else 0,
                     now.isoformat(),
                     project_id,

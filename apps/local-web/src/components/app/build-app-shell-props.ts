@@ -221,6 +221,8 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     error: input.bootstrap.error,
     filesPanelRef: input.ui.filesPanelRef,
     workspaceVersion: input.ui.workspaceVersion,
+    draftWorkspaceSessionId: input.ui.draftWorkspaceSessionId,
+    setDraftWorkspaceSessionId: input.ui.setDraftWorkspaceSessionId,
     pendingOpenPath: input.ui.pendingOpenPath,
     setPendingOpenPath: input.ui.setPendingOpenPath,
     setComposer: input.chat.setComposer,

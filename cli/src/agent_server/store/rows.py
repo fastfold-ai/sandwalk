@@ -89,11 +89,15 @@ def specialist_from_row(row: sqlite3.Row) -> Specialist:
 
 
 def project_from_row(row: sqlite3.Row, *, session_count: int = 0) -> AgentProject:
+    keys = set(row.keys())
     return AgentProject(
         id=row["id"],
         name=row["name"],
         description=row["description"],
         agent_context=row["agent_context"],
+        folder_path=row["folder_path"] if "folder_path" in keys else None,
+        icon=(row["icon"] if "icon" in keys and row["icon"] else "folder"),
+        color=(row["color"] if "color" in keys and row["color"] else "neutral"),
         pinned=bool(row["pinned"]),
         session_count=session_count,
         created_at=datetime.fromisoformat(row["created_at"]),

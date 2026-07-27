@@ -4,9 +4,8 @@ import {
   Check,
   Copy,
   Download,
+  Files,
   Folder,
-  PanelRight,
-  SquareTerminal,
   Terminal
 } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -50,6 +49,7 @@ export type SessionMainHeaderProps = {
   exportTranscript: (target: AgentSession) => void | Promise<void>
   setDeleteTarget: Dispatch<SetStateAction<AgentSession | null>>
   projects: AgentProject[]
+  activeProjectId: string | null
   selectProjectScope: (projectId: string) => void
   cliMenuOpen: boolean
   setCliMenuOpen: Dispatch<SetStateAction<boolean>>
@@ -59,6 +59,7 @@ export type SessionMainHeaderProps = {
   setTerminalOpen: Dispatch<SetStateAction<boolean>>
   filesPanelCollapsed: boolean
   setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
+  onPrepareDraftWorkspace?: () => void | Promise<void>
 }
 
 export function SessionMainHeader({
@@ -77,6 +78,7 @@ export function SessionMainHeader({
   exportTranscript,
   setDeleteTarget,
   projects,
+  activeProjectId,
   selectProjectScope,
   cliMenuOpen,
   setCliMenuOpen,
@@ -85,7 +87,8 @@ export function SessionMainHeader({
   terminalOpen,
   setTerminalOpen,
   filesPanelCollapsed,
-  setFilesPanelCollapsed
+  setFilesPanelCollapsed,
+  onPrepareDraftWorkspace
 }: SessionMainHeaderProps) {
   const overlay = useMacDesktopOverlay()
   // Collapse: reveal after panel closes. Expand: keep briefly so icons don't gap.
@@ -97,9 +100,42 @@ export function SessionMainHeader({
   // Collapsed: one chrome row — traffic lights → toggle/arrows → tabs → actions.
   const padForTrafficLights = showCollapsedNav && overlay
   const isDraft = isDraftAgentSessionId(sessionId)
-  // Draft has no session workspace — keep terminal (home cwd), hide CLI/files.
+  const activeProject =
+    projects.find(project => project.id === activeProjectId) || null
+  const inProject = Boolean(activeProjectId)
+  const hasProjectFolder = Boolean(activeProject?.folderPath)
+  // Draft: host terminal always; Files whenever a project is selected.
   const showTerminalAction = Boolean(sessionId)
-  const showCliAndFilesActions = Boolean(sessionId) && !isDraft
+  const showCliAction = Boolean(sessionId) && !isDraft
+  const showFilesAction = Boolean(sessionId) && (!isDraft || inProject)
+
+  const openTerminal = () => {
+    if (terminalOpen) {
+      setTerminalOpen(false)
+      return
+    }
+    if (isDraft && inProject) {
+      void (async () => {
+        await onPrepareDraftWorkspace?.()
+        setFilesPanelCollapsed(false)
+        setTerminalOpen(true)
+      })()
+      return
+    }
+    if (!isDraft) setFilesPanelCollapsed(false)
+    setTerminalOpen(true)
+  }
+
+  const toggleFiles = () => {
+    if (isDraft && inProject && filesPanelCollapsed) {
+      void (async () => {
+        await onPrepareDraftWorkspace?.()
+        setFilesPanelCollapsed(false)
+      })()
+      return
+    }
+    setFilesPanelCollapsed(current => !current)
+  }
 
   return (
     <DesktopDragRegion
@@ -143,9 +179,9 @@ export function SessionMainHeader({
         }
         onDelete={item => setDeleteTarget(item)}
       />
-      {showTerminalAction || showCliAndFilesActions ? (
-        <div className="flex h-8 shrink-0 items-center gap-0.5">
-          {showCliAndFilesActions && session?.projectId
+      {showTerminalAction || showCliAction || showFilesAction ? (
+        <div className="ml-auto flex h-8 shrink-0 items-center gap-0.5 self-center">
+          {showCliAction && session?.projectId
             ? (() => {
                 const projectName =
                   projects.find(p => p.id === session.projectId)
@@ -154,7 +190,7 @@ export function SessionMainHeader({
                 return (
                   <button
                     type="button"
-                    className="text-muted-foreground hover:text-foreground mr-1 inline-flex max-w-[12rem] items-center gap-1.5 rounded-md px-1.5 py-1 text-xs"
+                    className="text-muted-foreground hover:text-foreground mr-1 inline-flex h-8 max-w-[12rem] items-center gap-1.5 rounded-md px-1.5 text-xs"
                     title={projectName}
                     onClick={() =>
                       selectProjectScope(session.projectId!)
@@ -166,7 +202,7 @@ export function SessionMainHeader({
                 )
               })()
             : null}
-          {showCliAndFilesActions ? (
+          {showCliAction ? (
             <DropdownMenu
               open={cliMenuOpen}
               onOpenChange={open => {
@@ -179,7 +215,7 @@ export function SessionMainHeader({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-8"
+                  className="size-8 shrink-0"
                   aria-label="Resume in Agent CLI"
                   title="Resume in Agent CLI"
                 >
@@ -252,24 +288,18 @@ export function SessionMainHeader({
             </DropdownMenu>
           ) : null}
           {showTerminalAction ? (
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              onClick={() => {
-                if (terminalOpen) {
-                  setTerminalOpen(false)
-                  return
-                }
-                if (!isDraft) setFilesPanelCollapsed(false)
-                setTerminalOpen(true)
-              }}
+              className={cn(
+                'text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md',
+                terminalOpen && 'text-foreground'
+              )}
+              onClick={openTerminal}
               aria-label={
                 terminalOpen ? 'Hide terminal' : 'Show terminal'
               }
               title={
-                isDraft
+                isDraft && !inProject
                   ? terminalOpen
                     ? 'Hide terminal'
                     : 'Open terminal in home'
@@ -278,23 +308,30 @@ export function SessionMainHeader({
                     : 'Show terminal'
               }
             >
-              <SquareTerminal
-                className={cn(
-                  'size-4',
-                  terminalOpen && 'text-foreground'
-                )}
-              />
-            </Button>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-4"
+                aria-hidden
+              >
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+                <path d="m8 10 2 2-2 2" />
+                <path d="M12 14h4" />
+              </svg>
+            </button>
           ) : null}
-          {showCliAndFilesActions ? (
-            <Button
+          {showFilesAction ? (
+            <button
               type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              onClick={() =>
-                setFilesPanelCollapsed(current => !current)
-              }
+              className={cn(
+                'text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md',
+                !filesPanelCollapsed && 'text-foreground'
+              )}
+              onClick={toggleFiles}
               aria-label={
                 filesPanelCollapsed
                   ? 'Show files panel'
@@ -302,17 +339,14 @@ export function SessionMainHeader({
               }
               title={
                 filesPanelCollapsed
-                  ? 'Show files panel'
+                  ? hasProjectFolder
+                    ? 'Show project folder'
+                    : 'Show files panel'
                   : 'Hide files panel'
               }
             >
-              <PanelRight
-                className={cn(
-                  'size-4',
-                  !filesPanelCollapsed && 'text-foreground'
-                )}
-              />
-            </Button>
+              <Files className="size-4" />
+            </button>
           ) : null}
         </div>
       ) : null}

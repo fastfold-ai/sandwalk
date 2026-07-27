@@ -313,3 +313,20 @@ export async function listenDesktopNavigate(
     if (payload?.path) handler(payload.path)
   })
 }
+
+/** Native directory picker (desktop). Returns null when canceled or unavailable. */
+export async function pickDirectory(): Promise<string | null> {
+  if (!isTauri()) return null
+  try {
+    const dialog = await import('@tauri-apps/plugin-dialog')
+    const selected = await dialog.open({
+      directory: true,
+      multiple: false,
+      title: 'Choose project folder'
+    })
+    if (typeof selected === 'string' && selected.trim()) return selected
+    return null
+  } catch {
+    return null
+  }
+}

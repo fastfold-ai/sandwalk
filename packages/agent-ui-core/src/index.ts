@@ -222,6 +222,9 @@ export type AgentProject = {
   name: string
   description: string | null
   agentContext: string | null
+  folderPath: string | null
+  icon: string
+  color: string
   pinned: boolean
   sessionCount: number
   createdAt: string
@@ -1407,6 +1410,9 @@ export interface AgentClient {
       name: string
       description?: string | null
       agentContext?: string | null
+      folderPath?: string | null
+      icon?: string | null
+      color?: string | null
       pinned?: boolean
     },
     signal?: AbortSignal,
@@ -1417,6 +1423,9 @@ export interface AgentClient {
       name?: string
       description?: string | null
       agentContext?: string | null
+      folderPath?: string | null
+      icon?: string | null
+      color?: string | null
       pinned?: boolean
     },
     signal?: AbortSignal,

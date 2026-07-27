@@ -66,6 +66,9 @@ CREATE TABLE IF NOT EXISTS projects (
     name TEXT NOT NULL,
     description TEXT,
     agent_context TEXT,
+    folder_path TEXT,
+    icon TEXT NOT NULL DEFAULT 'folder',
+    color TEXT NOT NULL DEFAULT 'neutral',
     pinned INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL

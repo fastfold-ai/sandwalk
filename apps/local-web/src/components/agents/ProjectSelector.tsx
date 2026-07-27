@@ -12,6 +12,8 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 
+import { ProjectMark } from './ProjectMark'
+
 export function ProjectSelector({
   projects,
   value,
@@ -51,6 +53,14 @@ export function ProjectSelector({
           className="hover:bg-muted/50 inline-flex min-w-0 max-w-[11rem] items-center gap-1 rounded-md px-1.5 py-1 text-left text-sm font-medium"
           aria-label="Select project"
         >
+          {active ? (
+            <ProjectMark
+              icon={active.icon}
+              color={active.color}
+              className="size-5"
+              iconClassName="size-3"
+            />
+          ) : null}
           <span className="truncate">{label}</span>
           <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
         </button>
@@ -97,6 +107,12 @@ export function ProjectSelector({
                       onSelectProject(project.id)
                     }}
                   >
+                    <ProjectMark
+                      icon={project.icon}
+                      color={project.color}
+                      className="mt-0.5 size-6"
+                      iconClassName="size-3"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm">{project.name}</div>
                       {project.description ? (

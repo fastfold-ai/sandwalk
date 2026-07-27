@@ -189,6 +189,10 @@ export type AppShellMainProps = {
   canShowFilesPanel: boolean
   filesPanelRef: RefObject<ImperativePanelHandle | null>
   workspaceVersion: number
+  draftWorkspaceSessionId: string | null
+  setDraftWorkspaceSessionId: (
+    value: string | null | ((current: string | null) => string | null)
+  ) => void
   pendingOpenPath: string | null
   setPendingOpenPath: (value: string | null | ((current: string | null) => string | null)) => void
   setComposer: (value: string | ((current: string) => string)) => void

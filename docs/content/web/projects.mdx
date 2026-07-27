@@ -1,14 +1,32 @@
 ---
 title: Projects
-description: Scope sessions and give every agent shared context.
+description: Scope sessions, share a folder, and give every agent shared context.
 ---
 
-**Projects** scope sessions and files to a campaign. Each project can set **Agent Context** that every agent in that project inherits.
+**Projects** group agent chats for a campaign. Each project can set appearance, an optional **source folder**, and **Agent Context** that every agent in that project inherits.
 
-{/* TODO: expand with create-project flow */}
+## Create a project
 
-## Coming soon
+1. Open the project selector in the sidebar and choose **New project**.
+2. Pick an **icon and color** for the project mark.
+3. Enter a **name**.
+4. Optionally choose a **source folder** Sandwalk can read and edit.
+5. Expand **More** for an optional description (list-only) and Agent Context.
 
-- Creating a project
-- Agent Context
-- Switching projects from the sidebar
+## Source folder
+
+When a project has a source folder, Sandwalk mounts it into each chat workspace as `project/`. In the Files panel it appears as **Project folder**, alongside uploads and generated outputs.
+
+- One folder per project
+- Shared across every chat in the project
+- Clearable anytime from Project settings
+
+## Agent Context
+
+Text under **More → Agent Context** is injected into the system prompt for agents in that project. Use it for conventions, background, or standing instructions.
+
+Description is metadata for the project list only — it is not sent to the agent.
+
+## Switching projects
+
+Use the project selector in the sidebar to switch between **All** and a specific project. The active project's icon and color appear on the selector and in the home project list.

@@ -204,6 +204,8 @@ export type AppShellProps = {
   error: string | null
   filesPanelRef: RefObject<ImperativePanelHandle | null>
   workspaceVersion: number
+  draftWorkspaceSessionId: string | null
+  setDraftWorkspaceSessionId: Dispatch<SetStateAction<string | null>>
   pendingOpenPath: string | null
   setPendingOpenPath: Dispatch<SetStateAction<string | null>>
   setComposer: Dispatch<SetStateAction<string>>

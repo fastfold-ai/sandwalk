@@ -27,6 +27,26 @@ def test_workspace_relative_tool_path_variants(tmp_path: Path):
     assert workspace_relative_tool_path("/tmp/other.md", root) is None
 
 
+def test_workspace_relative_tool_path_project_symlink(tmp_path: Path):
+    import os
+
+    root = tmp_path / "ws"
+    root.mkdir()
+    linked = tmp_path / "linked"
+    linked.mkdir()
+    (linked / "backlog.md").write_text("", encoding="utf-8")
+    os.symlink(linked, root / "project", target_is_directory=True)
+
+    assert workspace_relative_tool_path(
+        str(root / "project" / "backlog.md"), root
+    ) == "project/backlog.md"
+    assert workspace_relative_tool_path("project/backlog.md", root) == (
+        "project/backlog.md"
+    )
+    # Bare absolute path into the linked folder (bypassing mount) stays rejected.
+    assert workspace_relative_tool_path(str(linked / "backlog.md"), root) is None
+
+
 def test_mirror_write_creates_host_file(tmp_path: Path):
     root = tmp_path / "ws"
     root.mkdir()
@@ -51,3 +71,25 @@ def test_wrap_is_idempotent(tmp_path: Path):
     first = wrap_backend_for_host_workspace(inner, tmp_path)
     second = wrap_backend_for_host_workspace(first, tmp_path)
     assert first is second
+
+
+def test_mirror_write_overwrites_existing_project_file(tmp_path: Path):
+    import os
+
+    root = tmp_path / "ws"
+    root.mkdir()
+    linked = tmp_path / "linked"
+    linked.mkdir()
+    (linked / "backlog.md").write_text("old\n", encoding="utf-8")
+    os.symlink(linked, root / "project", target_is_directory=True)
+
+    inner = MagicMock()
+    inner.upload_files = MagicMock()
+    backend = HostWorkspaceMirrorBackend(inner, root)
+    result = backend.write(str(root / "project" / "backlog.md"), "- task\n")
+
+    assert result.error is None
+    assert (linked / "backlog.md").read_text(encoding="utf-8") == "- task\n"
+    uploaded_path, uploaded_bytes = inner.upload_files.call_args[0][0][0]
+    assert uploaded_path == "/workspace/project/backlog.md"
+    assert uploaded_bytes == b"- task\n"

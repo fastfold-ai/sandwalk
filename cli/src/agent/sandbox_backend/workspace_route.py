@@ -28,7 +28,12 @@ logger = logging.getLogger(__name__)
 def workspace_relative_tool_path(
     path: str | None, workspace_root: str | Path
 ) -> str | None:
-    """Return a posix relative path when ``path`` targets the session workspace."""
+    """Return a posix relative path when ``path`` targets the session workspace.
+
+    Also maps absolute paths that resolve through ``workspace/project`` (symlink
+    to an external project folder) back to ``project/...`` so host mirroring and
+    overwrite writes work the same as other workspace files.
+    """
     raw = str(path or "").strip()
     if not raw:
         return None
@@ -46,15 +51,22 @@ def workspace_relative_tool_path(
             return None
         return cleaned
 
+    from agent_server.project_folder import (
+        path_under_workspace_or_project,
+        workspace_rel_via_project_mount,
+    )
+
     try:
-        resolved = Path(raw).expanduser().resolve()
+        candidate = Path(raw).expanduser()
+        allowed = path_under_workspace_or_project(candidate, root)
     except (OSError, RuntimeError, ValueError):
         return None
-    try:
-        rel = resolved.relative_to(root)
-    except ValueError:
+    if allowed is None:
         return None
-    return rel.as_posix()
+    try:
+        return allowed.relative_to(root).as_posix()
+    except ValueError:
+        return workspace_rel_via_project_mount(allowed, root)
 
 
 def _host_abs(root: Path, rel: str) -> str:

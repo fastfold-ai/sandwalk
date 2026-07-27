@@ -134,8 +134,17 @@ function artifactGroupKey(path: string): string {
   const top = parts[0]?.toLowerCase() || ''
   if (top === 'uploads') return 'Your uploads'
   if (top === 'outputs') return 'Generated outputs'
+  if (top === 'project') return 'Project folder'
   if (parts.length > 1) return parts[0]
   return 'Artifacts'
+}
+
+function topLevelGroupKey(top: string): string {
+  const key = top.toLowerCase()
+  if (key === 'uploads') return 'Your uploads'
+  if (key === 'outputs') return 'Generated outputs'
+  if (key === 'project') return 'Project folder'
+  return top
 }
 
 function ensureBucket(
@@ -159,6 +168,7 @@ export function parentDir(path: string): string {
 export function groupRootPath(groupId: string): string {
   if (groupId === 'Your uploads') return 'uploads'
   if (groupId === 'Generated outputs') return 'outputs'
+  if (groupId === 'Project folder') return 'project'
   if (groupId === 'Artifacts') return ''
   return groupId
 }
@@ -192,12 +202,7 @@ export function groupArtifacts(entries: WorkspaceFile[]): ArtifactGroup[] {
     if (entry.type === 'directory') {
       if (parts.length === 1) {
         const top = parts[0]
-        const key =
-          top.toLowerCase() === 'uploads'
-            ? 'Your uploads'
-            : top.toLowerCase() === 'outputs'
-              ? 'Generated outputs'
-              : top
+        const key = topLevelGroupKey(top)
         // Always-present scaffold folders stay hidden until they have items.
         if (!SYSTEM_TOP_LEVEL_DIRS.has(top.toLowerCase())) {
           ensureBucket(buckets, key)
@@ -211,7 +216,12 @@ export function groupArtifacts(entries: WorkspaceFile[]): ArtifactGroup[] {
     ensureBucket(buckets, artifactGroupKey(entry.path)).push(entry)
   }
 
-  const preferred = ['Your uploads', 'Generated outputs', 'Artifacts']
+  const preferred = [
+    'Project folder',
+    'Your uploads',
+    'Generated outputs',
+    'Artifacts'
+  ]
   const keys = [
     ...preferred.filter(key => buckets.has(key)),
     ...[...buckets.keys()].filter(key => !preferred.includes(key)).sort()

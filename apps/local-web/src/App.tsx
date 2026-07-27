@@ -113,6 +113,7 @@ export default function App() {
     setWorkspaceVersion: ui.setWorkspaceVersion,
     workspaceFiles: ui.workspaceFiles,
     setFilesPanelCollapsed: ui.setFilesPanelCollapsed,
+    setTerminalOpen: ui.setTerminalOpen,
     setPendingOpenPath: ui.setPendingOpenPath,
     pendingAttachmentsRef: ui.pendingAttachmentsRef,
     setChatBySessionIdRef
@@ -193,6 +194,7 @@ export default function App() {
     projectScopeId: ui.projectScopeId,
     client: bootstrap.client,
     workspaceVersion: ui.workspaceVersion,
+    draftWorkspaceSessionId: ui.draftWorkspaceSessionId,
     setWorkspaceFiles: ui.setWorkspaceFiles,
     skillRouteName: route.skillRouteName,
     setSkillDetail: ui.setSkillDetail,
@@ -245,8 +247,11 @@ export default function App() {
     isProjectHome: route.isProjectHome,
     sessionTitle: context.session?.title
   })
+  // Draft chats in a project get Files so shared project folder is reachable.
   const canShowFilesPanel = Boolean(
-    route.sessionId && !isDraftAgentSessionId(route.sessionId)
+    route.sessionId &&
+      (!isDraftAgentSessionId(route.sessionId) ||
+        Boolean(context.activeProjectId))
   )
 
   const gate = AppGates({

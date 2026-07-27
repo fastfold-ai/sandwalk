@@ -65,7 +65,7 @@ export function ComposerSpecialistPicker({
               />
             </span>
           ) : (
-            <GitBranch className="size-3.5" />
+            <GitBranch className="size-4" />
           )}
         </button>
       </PopoverTrigger>

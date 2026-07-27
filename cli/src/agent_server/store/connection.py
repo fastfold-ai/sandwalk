@@ -190,7 +190,17 @@ class ConnectionMixin:
             with self._write_lock:
                 logger.warning("Agent DB error on connect (%s); attempting heal", exc)
                 self._assert_healthy_database(allow_heal=True)
-                return self._open_connection()
+                # Heal may restore an older backup that predates newer columns
+                # (folder_path/icon/color, …). Re-apply schema + migrations before
+                # any INSERT/UPDATE against the recovered file.
+                connection = self._open_connection()
+                from agent_server.store.migrations import apply_migrations
+                from agent_server.store.schema import create_schema
+
+                create_schema(connection)
+                apply_migrations(connection)
+                connection.commit()
+                return connection
 
     def _open_connection(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30)

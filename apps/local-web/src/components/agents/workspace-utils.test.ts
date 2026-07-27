@@ -117,8 +117,33 @@ describe('folder browsing helpers', () => {
   it('groupRootPath maps labels to filesystem roots', () => {
     expect(groupRootPath('Your uploads')).toBe('uploads')
     expect(groupRootPath('Generated outputs')).toBe('outputs')
+    expect(groupRootPath('Project folder')).toBe('project')
     expect(groupRootPath('Artifacts')).toBe('')
     expect(groupRootPath('artifacts')).toBe('artifacts')
+  })
+
+  it('labels the project/ mount as Project folder', () => {
+    const groups = groupArtifacts([
+      {
+        path: 'project',
+        name: 'project',
+        type: 'directory',
+        size: null,
+        mtime: null
+      },
+      {
+        path: 'project/notes.md',
+        name: 'notes.md',
+        type: 'file',
+        size: 1,
+        mtime: null
+      }
+    ])
+    expect(groups).toHaveLength(1)
+    expect(groups[0].title).toBe('Project folder')
+    expect(groups[0].files.map(item => item.path)).toEqual([
+      'project/notes.md'
+    ])
   })
 
   it('childrenOf returns only immediate children sorted by mtime', () => {
