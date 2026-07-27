@@ -301,10 +301,18 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                   })
                 }}
                 onNewFiles={added => {
-                  // Generic listener: any new workspace file opens Files;
-                  // previewable artifacts auto-open in a tab.
+                  // Chat composer uploads land under uploads/ — keep those in
+                  // the composer preview only. Auto-open Files for other new
+                  // workspace files (agent artifacts, etc.).
+                  const noteworthy = added.filter(file => {
+                    const path = file.path.replace(/\\/g, '/')
+                    return (
+                      !path.startsWith('uploads/') && path !== 'uploads'
+                    )
+                  })
+                  if (noteworthy.length === 0) return
                   setFilesPanelCollapsed(false)
-                  const previewable = [...added]
+                  const previewable = [...noteworthy]
                     .reverse()
                     .find(file =>
                       /\.(svg|png|jpe?g|gif|webp|pdb|cif|mmcif|sdf|json|md|txt|csv|tsv)$/i.test(
@@ -315,7 +323,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                     setPendingOpenPath(previewable.path)
                     return
                   }
-                  const artifactDir = added.find(file =>
+                  const artifactDir = noteworthy.find(file =>
                     file.path.replace(/\\/g, '/').startsWith('artifacts/')
                   )
                   if (artifactDir) setPendingOpenPath('artifacts/')
