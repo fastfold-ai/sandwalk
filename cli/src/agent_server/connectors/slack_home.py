@@ -2,23 +2,23 @@
 
 Content is pushed with ``views.publish`` when the user opens the Home tab.
 Sessions and status come from the local desktop — nothing is fetched over
-HTTPS except the one static outbound link (the FastFold integration page).
+HTTPS except the one static outbound link (the Fastfold integration page).
 """
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 INTEGRATION_URL = "https://cloud.fastfold.ai/integrations/sandwalk"
 RECENT_LIMIT = 5
 
 _RELAY_LABEL = {
-    "live": (":white_check_mark:", "Connected to FastFold"),
+    "live": (":white_check_mark:", "Connected to Fastfold"),
     "reconnecting": (":large_yellow_circle:", "Reconnecting…"),
-    "signed_out": (":warning:", "FastFold account not linked"),
-    "auth_expired": (":warning:", "FastFold sign-in expired"),
+    "signed_out": (":warning:", "Fastfold account not linked"),
+    "auth_expired": (":warning:", "Fastfold sign-in expired"),
     "off": (":black_circle:", "Not connected"),
 }
 
@@ -35,7 +35,7 @@ class HomeSessionRow:
 
 @dataclass(frozen=True)
 class HomeStatus:
-    """Relay + FastFold account state, as :meth:`ConnectorService.status` sees it."""
+    """Relay + Fastfold account state, as :meth:`ConnectorService.status` sees it."""
 
     relay_state: str = "off"
     relay_detail: str | None = None
@@ -61,8 +61,8 @@ def user_ref(event: dict) -> str | None:
 def _relative(when: datetime | None) -> str:
     if when is None:
         return ""
-    stamp = when if when.tzinfo is not None else when.replace(tzinfo=timezone.utc)
-    seconds = max(0, int((datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds()))
+    stamp = when if when.tzinfo is not None else when.replace(tzinfo=UTC)
+    seconds = max(0, int((datetime.now(UTC) - stamp.astimezone(UTC)).total_seconds()))
     if seconds < 60:
         return "just now"
     minutes = seconds // 60
@@ -109,8 +109,12 @@ def _context(text: str) -> dict:
     return {"type": "context", "elements": [{"type": "mrkdwn", "text": text}]}
 
 
-def _status_lines(status: HomeStatus | None) -> list[str]:
-    """Sazabi-style status block: bold headline, then plain labeled rows."""
+def status_lines(status: HomeStatus | None) -> list[str]:
+    """Sazabi-style status block: bold headline, then plain labeled rows.
+
+    Public so `/sandwalk status` renders the exact same lines as the Home
+    tab's Integration status section.
+    """
     status = status or HomeStatus()
     icon, label = _RELAY_LABEL.get(status.relay_state, _RELAY_LABEL["off"])
     lines = [f"{icon} *{label}*"]
@@ -118,7 +122,7 @@ def _status_lines(status: HomeStatus | None) -> list[str]:
         lines.append(f"Slack workspace: `{status.team_name}`")
     account = status.account_email or status.account_user_id
     if account:
-        lines.append(f"FastFold account: `{account}`")
+        lines.append(f"Fastfold account: `{account}`")
     if status.relay_detail and status.relay_state != "live":
         lines.append(f"_{status.relay_detail}_")
     return lines
@@ -159,7 +163,7 @@ def build_home_blocks(
                     "type": "button",
                     "text": {
                         "type": "plain_text",
-                        "text": "FastFold Integration",
+                        "text": "Fastfold Integration",
                         "emoji": True,
                     },
                     "url": INTEGRATION_URL,
@@ -169,18 +173,14 @@ def build_home_blocks(
         },
         {"type": "divider"},
         _section("*Integration status*"),
-        _section("\n".join(_status_lines(status))),
+        _section("\n".join(status_lines(status))),
         {"type": "divider"},
         _section("*Recent threads*"),
     ]
 
     recent = sessions[:RECENT_LIMIT]
     if not recent:
-        blocks.append(
-            _context(
-                "No Slack sessions yet. Send a DM or mention the bot to start one."
-            )
-        )
+        blocks.append(_context("No Slack sessions yet. Send a DM or mention the bot to start one."))
         return blocks
 
     for item in recent:

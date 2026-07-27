@@ -11,6 +11,7 @@ import pytest
 
 from agent_server.connectors.gateway import InboundMessage
 from agent_server.connectors.service import ConnectorService
+from agent_server.connectors.slack_commands import SlashCommandRequest
 from agent_server.store import AgentStore
 
 T = TypeVar("T")
@@ -270,3 +271,161 @@ def test_import_without_reauth_still_skips_an_existing_token(
     assert called == ["https://api.test/v1/slack/connections"]
     bot, _app = store.get_slack_tokens("T1")
     assert bot == "xoxb-old"
+
+
+def slash_request(**overrides: object) -> SlashCommandRequest:
+    payload: dict[str, object] = {
+        "command": "/sandwalk",
+        "text": "status",
+        "team_id": "T1",
+        "user_id": "U1",
+        "channel_id": "C1",
+        "response_url": "https://hooks.slack.test/x",
+    }
+    payload.update(overrides)
+    return SlashCommandRequest(**payload)  # type: ignore[arg-type]
+
+
+def posted_texts(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "agent_server.connectors.slack_commands.post_response",
+        lambda url, text, **_kwargs: calls.append((url, text)),
+    )
+    return calls
+
+
+class TestHandleSlashCommand:
+    @pytest.fixture(autouse=True)
+    def _workspace(self, store: AgentStore) -> None:
+        # allow_slack_user has a foreign key on slack_workspaces — every test
+        # below either allows U1 or checks the "not allowed" rejection path,
+        # so the workspace row needs to exist first either way.
+        store.upsert_slack_workspace(team_id="T1", mode="relay")
+
+    def test_unauthorized_user_gets_rejected(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls = posted_texts(monkeypatch)
+        run(service.handle_slash_command(slash_request()))
+        assert len(calls) == 1
+        assert calls[0][0] == "https://hooks.slack.test/x"
+        assert "People list" in calls[0][1]
+
+    def test_status_reports_connection_state(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1")
+        store.upsert_slack_workspace(team_id="T1", mode="relay", team_name="Acme")
+        calls = posted_texts(monkeypatch)
+
+        run(service.handle_slash_command(slash_request(text="status")))
+
+        assert "Acme" in calls[0][1]
+
+    def test_sessions_lists_recent_slack_sessions(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1")
+        store.create_session(
+            title="hey you", workspace_path=None, source="slack", source_label="DM · Acme"
+        )
+        calls = posted_texts(monkeypatch)
+
+        run(service.handle_slash_command(slash_request(text="sessions")))
+
+        assert "hey you" in calls[0][1]
+        assert "DM · Acme" in calls[0][1]
+
+    def test_sessions_empty_says_so(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1")
+        calls = posted_texts(monkeypatch)
+        run(service.handle_slash_command(slash_request(text="sessions")))
+        assert "No Slack sessions yet" in calls[0][1]
+
+    def test_people_list(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1", display_name="Julio")
+        calls = posted_texts(monkeypatch)
+
+        run(service.handle_slash_command(slash_request(text="people list")))
+
+        assert "Julio" in calls[0][1]
+
+    def test_people_allow_approves_the_mentioned_user(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1")
+        calls = posted_texts(monkeypatch)
+
+        run(service.handle_slash_command(slash_request(text="people allow <@U9|jane>")))
+
+        assert store.is_slack_user_allowed(team_id="T1", slack_user_id="U9") is True
+        assert "<@U9>" in calls[0][1]
+
+    def test_people_allow_without_a_mention_shows_usage(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1")
+        calls = posted_texts(monkeypatch)
+
+        run(service.handle_slash_command(slash_request(text="people allow")))
+
+        assert "Usage" in calls[0][1]
+        # No target parsed out of the text, so nobody new got added.
+        assert [p.slack_user_id for p in store.list_slack_allowed_users("T1")] == ["U1"]
+
+    def test_people_unknown_subcommand_shows_usage(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1")
+        calls = posted_texts(monkeypatch)
+        run(service.handle_slash_command(slash_request(text="people frobnicate")))
+        assert "Usage" in calls[0][1]
+
+    def test_parked_lists_pending_requests(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1")
+        store.park_slack_message(
+            team_id="T1", channel="slack:T1/C1", slack_user_id="U2", text="what can you do?"
+        )
+        calls = posted_texts(monkeypatch)
+
+        run(service.handle_slash_command(slash_request(text="parked")))
+
+        assert "what can you do?" in calls[0][1]
+
+    def test_parked_empty_says_so(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1")
+        calls = posted_texts(monkeypatch)
+        run(service.handle_slash_command(slash_request(text="parked")))
+        assert "No pending approval requests" in calls[0][1]
+
+    def test_unknown_verb(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1")
+        calls = posted_texts(monkeypatch)
+        run(service.handle_slash_command(slash_request(text="nonsense")))
+        assert "`nonsense`" in calls[0][1]
+
+    def test_a_handler_exception_posts_a_generic_error(
+        self, store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store.allow_slack_user(team_id="T1", slack_user_id="U1")
+        calls = posted_texts(monkeypatch)
+
+        def boom(self, request):  # type: ignore[no-untyped-def]
+            raise RuntimeError("kaboom")
+
+        monkeypatch.setattr(ConnectorService, "_render_slash_command", boom)
+
+        run(service.handle_slash_command(slash_request(text="status")))
+
+        assert "went wrong" in calls[0][1]

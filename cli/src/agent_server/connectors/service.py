@@ -25,6 +25,7 @@ from agent_server.connectors.directory import (
 )
 from agent_server.connectors.framing import frame_inbound, spawn_title
 from agent_server.connectors.gateway import InboundMessage, RouteDecision, SlackGateway
+from agent_server.connectors.slack_commands import SlashCommandRequest
 from agent_server.connectors.slack_socket import SlackSocketAdapter
 from agent_server.models import MessageSource
 from agent_server.models.connectors import (
@@ -457,7 +458,7 @@ class ConnectorService:
             # Distinct from "off": the workspace is connected, but nothing can
             # be delivered until the user signs in to FastFold Cloud.
             self._relay_state = "signed_out"
-            self._relay_detail = "Connect FastFold Cloud to receive Slack messages."
+            self._relay_detail = "Connect Fastfold Cloud to receive Slack messages."
             logger.warning(
                 "Slack workspace %s needs a FastFold API key to relay", workspace.team_id
             )
@@ -482,6 +483,7 @@ class ConnectorService:
                     api_key=key,
                     on_message=self._on_inbound,
                     on_state=self._set_relay_state,
+                    on_slash_command=self.handle_slash_command,
                 )
             relay = self._relay
 
@@ -578,6 +580,62 @@ class ConnectorService:
             account_email=self._account_email,
             account_user_id=self._account_user_id,
         )
+
+    # --- slash commands ---------------------------------------------------
+
+    async def handle_slash_command(self, request: SlashCommandRequest) -> None:
+        """Dispatch a relayed ``/sandwalk`` subcommand and post the answer.
+
+        Runs entirely outside Slack's request/response cycle — the cloud
+        already sent the "Working on it..." ack; this posts the real answer to
+        ``response_url`` whenever it's ready. ``help`` never reaches here (the
+        cloud answers it directly), so every subcommand here needs the
+        invoking Slack user to already be on the allowlist — the same trust
+        boundary an unapproved mention already runs into.
+        """
+        from agent_server.connectors import slack_commands
+
+        if not self.store.is_slack_user_allowed(
+            team_id=request.team_id, slack_user_id=request.user_id
+        ):
+            text = slack_commands.render_unauthorized()
+        else:
+            try:
+                text = self._render_slash_command(request)
+            except Exception:
+                logger.exception("Slack slash command %s failed", request.verb)
+                text = slack_commands.render_error()
+
+        await asyncio.to_thread(slack_commands.post_response, request.response_url, text)
+
+    def _render_slash_command(self, request: SlashCommandRequest) -> str:
+        from agent_server.connectors import slack_commands
+
+        if request.verb == "status":
+            return slack_commands.render_status(self._slack_home_status(request.team_id))
+        if request.verb == "sessions":
+            return slack_commands.render_sessions(self._recent_slack_home_sessions())
+        if request.verb == "people":
+            return self._render_people_command(request)
+        if request.verb == "parked":
+            return slack_commands.render_parked(self.store.list_slack_parked_messages())
+        return slack_commands.render_unknown(request.verb or "(none)")
+
+    def _render_people_command(self, request: SlashCommandRequest) -> str:
+        from agent_server.connectors import slack_commands
+
+        sub = request.rest[0].lower() if request.rest else "list"
+        if sub == "list":
+            return slack_commands.render_people(
+                self.store.list_slack_allowed_users(request.team_id)
+            )
+        if sub == "allow":
+            target_id = slack_commands.first_mentioned_user_id(" ".join(request.rest[1:]))
+            if not target_id:
+                return slack_commands.render_allow_usage()
+            self.store.allow_slack_user(team_id=request.team_id, slack_user_id=target_id)
+            return slack_commands.render_allowed(target_id)
+        return slack_commands.render_people_usage()
 
     async def _stop_workspace(self, team_id: str) -> None:
         async with self._lock:

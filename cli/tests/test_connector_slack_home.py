@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from agent_server.connectors.slack_home import (
     HomeSessionRow,
@@ -35,7 +35,7 @@ def test_home_view_includes_welcome_and_empty_recent() -> None:
     assert "@sandwalk" in blob
     assert "No Slack sessions yet" in blob
     assert "Open Sandwalk" in blob
-    assert "FastFold Integration" in blob
+    assert "Fastfold Integration" in blob
     assert "cloud.fastfold.ai/integrations/sandwalk" in blob
 
 
@@ -46,7 +46,7 @@ def test_home_blocks_list_recent_sessions_as_links() -> None:
                 id="s1",
                 title="hey you",
                 source_label="DM · Acme",
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
             )
         ]
     )
@@ -102,11 +102,11 @@ def test_status_reflects_live_relay_and_workspace() -> None:
 def test_status_shows_detail_when_not_live() -> None:
     status = HomeStatus(
         relay_state="signed_out",
-        relay_detail="Connect FastFold Cloud to receive Slack messages.",
+        relay_detail="Connect Fastfold Cloud to receive Slack messages.",
     )
     blob = str(build_home_blocks([], status=status))
-    assert "FastFold account not linked" in blob
-    assert "Connect FastFold Cloud" in blob
+    assert "Fastfold account not linked" in blob
+    assert "Connect Fastfold Cloud" in blob
 
 
 def test_status_shows_account_email_when_known() -> None:

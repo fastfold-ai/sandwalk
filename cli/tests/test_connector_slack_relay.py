@@ -89,6 +89,84 @@ class TestTeamRouting:
         assert relay.get("T2").bot_user_id == "BTWO"
 
 
+class TestSlashCommandFrame:
+    """`slash_command` frames route to the callback, not the event pipeline."""
+
+    def slash_frame(self, **overrides):  # type: ignore[no-untyped-def]
+        base = {
+            "type": "slash_command",
+            "command": "/sandwalk",
+            "text": "status",
+            "team_id": "T1",
+            "user_id": "U1",
+            "channel_id": "C1",
+            "response_url": "https://hooks.slack.test/x",
+        }
+        base.update(overrides)
+        return base
+
+    def test_dispatches_to_the_slash_command_callback(self):
+        received: list = []
+        events_received: list = []
+
+        async def on_message(message):
+            events_received.append(message)
+
+        async def on_slash_command(request):
+            received.append(request)
+
+        relay = SlackRelayClient(
+            base_url="https://api.test",
+            api_key="sk-x",
+            on_message=on_message,
+            on_slash_command=on_slash_command,
+        )
+        relay.add_workspace(workspace())
+
+        run(relay._handle_frame(json.dumps(self.slash_frame())))
+
+        assert len(received) == 1
+        assert received[0].team_id == "T1"
+        assert received[0].verb == "status"
+        assert events_received == []  # never treated as an inbound message
+
+    def test_malformed_frame_is_dropped_quietly(self):
+        received: list = []
+
+        async def on_slash_command(request):
+            received.append(request)
+
+        relay = SlackRelayClient(
+            base_url="https://api.test",
+            api_key="sk-x",
+            on_message=lambda _m: None,  # type: ignore[arg-type,return-value]
+            on_slash_command=on_slash_command,
+        )
+        relay.add_workspace(workspace())
+
+        run(relay._handle_frame(json.dumps(self.slash_frame(team_id=""))))
+
+        assert received == []
+
+    def test_no_callback_registered_is_a_no_op(self):
+        relay = client_with(workspace(), [])  # no on_slash_command passed
+        run(relay._handle_frame(json.dumps(self.slash_frame())))  # must not raise
+
+    def test_a_handler_failure_does_not_escape(self):
+        async def boom(_request):
+            raise RuntimeError("handler exploded")
+
+        relay = SlackRelayClient(
+            base_url="https://api.test",
+            api_key="sk-x",
+            on_message=lambda _m: None,  # type: ignore[arg-type,return-value]
+            on_slash_command=boom,
+        )
+        relay.add_workspace(workspace())
+
+        run(relay._handle_frame(json.dumps(self.slash_frame())))  # must not raise
+
+
 class TestFrameHandling:
     def test_matches_what_socket_mode_would_produce(self):
         """The transport changes; the resulting message must not."""

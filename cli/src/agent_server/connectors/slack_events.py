@@ -24,9 +24,18 @@ def mentions_user(text: str, user_id: str | None) -> bool:
     """Whether the raw text @-mentions ``user_id``."""
     if not user_id:
         return False
-    return any(
-        match.group(1).upper() == user_id.upper() for match in _MENTION.finditer(text or "")
-    )
+    return any(match.group(1).upper() == user_id.upper() for match in _MENTION.finditer(text or ""))
+
+
+def first_mentioned_user_id(text: str) -> str | None:
+    """The first ``<@U0123>`` token's user id, or ``None`` if there is none.
+
+    Used to pull a target out of slash command text, e.g.
+    ``/sandwalk people allow @jane`` — Slack expands the picked mention to
+    ``<@U0123|jane>`` the same way it does inside an ordinary message.
+    """
+    match = _MENTION.search(text or "")
+    return match.group(1).upper() if match else None
 
 
 def rewrite_mentions(text: str, names: dict[str, str] | None = None) -> str:
@@ -71,9 +80,7 @@ def event_to_inbound(
         return None
 
     # Mention detection runs on the raw token form, before rewriting for display.
-    mentions_me = event.get("type") == "app_mention" or mentions_user(
-        raw_text, bot_user_id
-    )
+    mentions_me = event.get("type") == "app_mention" or mentions_user(raw_text, bot_user_id)
 
     thread_ts = str(event.get("thread_ts") or "").strip() or None
     # Slack sets thread_ts == ts on the parent; treat that as "not in a thread".

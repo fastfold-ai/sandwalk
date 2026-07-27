@@ -26,11 +26,13 @@ import os
 from collections.abc import Awaitable, Callable
 
 from agent_server.connectors.gateway import InboundMessage
+from agent_server.connectors.slack_commands import SlashCommandRequest, parse_slash_command
 from agent_server.connectors.slack_events import event_to_inbound
 
 logger = logging.getLogger("agent_server.connectors.slack")
 
 InboundHandler = Callable[[InboundMessage], Awaitable[None]]
+SlashCommandHandler = Callable[[SlashCommandRequest], Awaitable[None]]
 
 # Backoff between reconnect attempts, capped so a long outage keeps retrying
 # without hammering the cloud.
@@ -225,11 +227,13 @@ class SlackRelayClient:
         api_key: str,
         on_message: InboundHandler,
         on_state: Callable[[str, str | None], None] | None = None,
+        on_slash_command: SlashCommandHandler | None = None,
     ) -> None:
         self.base_url = base_url
         self.api_key = api_key
         self._on_message = on_message
         self._on_state = on_state
+        self._on_slash_command = on_slash_command
         self._workspaces: dict[str, SlackRelayWorkspace] = {}
         self._task: asyncio.Task | None = None
         self._closing = False
@@ -339,6 +343,19 @@ class SlackRelayClient:
         if not isinstance(payload, dict):
             return
         if payload.get("type") == "relay.ready":
+            return
+
+        if payload.get("type") == "slash_command":
+            # `help` never reaches here — the cloud answers it directly, no
+            # relay hop needed. Everything else needs the desktop's data.
+            request = parse_slash_command(payload)
+            if request is not None and self._on_slash_command is not None:
+                try:
+                    await self._on_slash_command(request)
+                except Exception:
+                    logger.exception(
+                        "Slack slash command handler failed for team %s", request.team_id
+                    )
             return
 
         team_id = _team_id_from_envelope(payload)
