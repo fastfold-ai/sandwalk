@@ -20,11 +20,6 @@ let size = CommandLine.arguments.count > 2
     : 1024
 let squircle = CommandLine.arguments.contains("--squircle")
 
-let barColors: [NSColor] = Array(
-    repeating: NSColor(srgbRed: 0.96, green: 0.96, blue: 0.97, alpha: 1),
-    count: 7
-)
-
 /// (centerX, topY, bodyHeight) in 847×847 Aura viewBox.
 let barGeometry: [(CGFloat, CGFloat, CGFloat)] = [
     (107, 458, 70),
@@ -62,22 +57,38 @@ NSGraphicsContext.current = ctx
 
 let bounds = NSRect(x: 0, y: 0, width: size, height: size)
 
+// In --squircle mode, follow the macOS icon grid: the squircle occupies
+// ~82.4% of the canvas with a transparent margin (like bundle .icns art).
+// Full-bleed squircles render noticeably larger than other Dock icons.
+let margin = squircle ? CGFloat(size) * 0.098 : 0
+let tile = bounds.insetBy(dx: margin, dy: margin)
 if squircle {
     // macOS Big Sur+ rounded-square icon shape — ~22.3% corner radius.
-    let squircleRadius = CGFloat(size) * 0.2226
+    let squircleRadius = tile.width * 0.2226
     NSBezierPath(
-        roundedRect: bounds,
+        roundedRect: tile,
         xRadius: squircleRadius,
         yRadius: squircleRadius
     ).addClip()
 }
 
-// Dark charcoal full-bleed wash (matches the app's dark-mode glass tint).
+// Dark wash with a soft radial highlight behind the mark (Cursor-style depth).
 let gradient = NSGradient(colors: [
-    NSColor(srgbRed: 0.145, green: 0.145, blue: 0.165, alpha: 1),
-    NSColor(srgbRed: 0.08, green: 0.08, blue: 0.09, alpha: 1),
+    NSColor(srgbRed: 0.11, green: 0.11, blue: 0.125, alpha: 1),
+    NSColor(srgbRed: 0.055, green: 0.055, blue: 0.065, alpha: 1),
 ])!
-gradient.draw(in: bounds, angle: -90)
+gradient.draw(in: tile, angle: -90)
+let halo = NSGradient(colors: [
+    NSColor(srgbRed: 0.30, green: 0.31, blue: 0.36, alpha: 0.35),
+    NSColor(srgbRed: 0.30, green: 0.31, blue: 0.36, alpha: 0.0),
+])!
+halo.draw(
+    fromCenter: NSPoint(x: tile.midX, y: tile.midY + tile.width * 0.06),
+    radius: 0,
+    toCenter: NSPoint(x: tile.midX, y: tile.midY + tile.width * 0.06),
+    radius: tile.width * 0.42,
+    options: []
+)
 
 let radius: CGFloat = 35
 // Tight content box of the Aura bars (ignore empty SVG margins).
@@ -95,18 +106,25 @@ for (cx, top, body) in barGeometry {
 let contentW = contentMaxX - contentMinX
 let contentH = contentMaxY - contentMinY
 
-// ~16% margin — mark sits smaller in the tile (Dock-friendly padding).
-let pad = CGFloat(size) * 0.16
-let drawBox = bounds.insetBy(dx: pad, dy: pad)
+// ~26% glyph padding within the tile — Cursor/Ghostty-style breathing room.
+let pad = tile.width * 0.26
+let drawBox = tile.insetBy(dx: pad, dy: pad)
 let scale = min(drawBox.width / contentW, drawBox.height / contentH)
 let drawnW = contentW * scale
 let drawnH = contentH * scale
 let originX = drawBox.midX - drawnW / 2
 let originY = drawBox.midY - drawnH / 2
 
-for (i, geo) in barGeometry.enumerated() {
+// Top-lit metallic shading — bright caps fading to cool gray (3D read).
+let barGrad = NSGradient(colorsAndLocations:
+    (NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1), 0.0),
+    (NSColor(srgbRed: 0.96, green: 0.96, blue: 0.98, alpha: 1), 0.30),
+    (NSColor(srgbRed: 0.84, green: 0.85, blue: 0.90, alpha: 1), 0.72),
+    (NSColor(srgbRed: 0.66, green: 0.67, blue: 0.74, alpha: 1), 1.0)
+)!
+
+for geo in barGeometry {
     let (cx, top, body) = geo
-    barColors[i].setFill()
     let width = radius * 2
     let height = body + radius * 2
     let x = originX + (cx - radius - contentMinX) * scale
@@ -115,12 +133,61 @@ for (i, geo) in barGeometry.enumerated() {
     let w = width * scale
     let h = height * scale
     let r = min(w, h) / 2
-    NSBezierPath(
+    let path = NSBezierPath(
         roundedRect: NSRect(x: x, y: y, width: w, height: h),
         xRadius: r,
         yRadius: r
-    ).fill()
+    )
+    // Tight glow via solid fill (NSGradient ignores NSShadow).
+    NSGraphicsContext.saveGraphicsState()
+    let shadow = NSShadow()
+    shadow.shadowColor = NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.30)
+    shadow.shadowBlurRadius = CGFloat(size) * 0.025
+    shadow.shadowOffset = NSSize(width: 0, height: 0)
+    shadow.set()
+    NSColor(srgbRed: 0.94, green: 0.94, blue: 0.96, alpha: 1).setFill()
+    path.fill()
+    NSGraphicsContext.restoreGraphicsState()
+    barGrad.draw(in: path, angle: -90)
+    // Specular glare on the top cap.
+    NSGraphicsContext.saveGraphicsState()
+    path.addClip()
+    let glare = NSGradient(colors: [
+        NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.85),
+        NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.0),
+    ])!
+    let capCenter = NSPoint(x: x + w / 2, y: y + h - r)
+    glare.draw(fromCenter: capCenter, radius: 0, toCenter: capCenter, radius: w * 1.1, options: [])
+    NSGraphicsContext.restoreGraphicsState()
 }
+
+// Glossy bezel — gradient ring hugging the squircle edge, lit from the top
+// (like Cursor's silver rim). Ring drawn via even-odd clip between two
+// squircle paths so the stroke itself carries the gradient.
+let rimRadius = tile.width * 0.2226
+let ringWidth = tile.width * 0.014
+let ring = NSBezierPath(
+    roundedRect: tile,
+    xRadius: rimRadius,
+    yRadius: rimRadius
+)
+let innerRect = tile.insetBy(dx: ringWidth, dy: ringWidth)
+ring.append(NSBezierPath(
+    roundedRect: innerRect,
+    xRadius: max(0, rimRadius - ringWidth),
+    yRadius: max(0, rimRadius - ringWidth)
+))
+ring.windingRule = .evenOdd
+NSGraphicsContext.saveGraphicsState()
+ring.addClip()
+let rimGrad = NSGradient(colorsAndLocations:
+    (NSColor(srgbRed: 0.78, green: 0.79, blue: 0.84, alpha: 0.90), 0.0),
+    (NSColor(srgbRed: 0.48, green: 0.49, blue: 0.54, alpha: 0.55), 0.35),
+    (NSColor(srgbRed: 0.30, green: 0.30, blue: 0.34, alpha: 0.40), 0.75),
+    (NSColor(srgbRed: 0.42, green: 0.42, blue: 0.47, alpha: 0.50), 1.0)
+)!
+rimGrad.draw(in: tile, angle: -90)
+NSGraphicsContext.restoreGraphicsState()
 
 NSGraphicsContext.restoreGraphicsState()
 

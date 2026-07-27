@@ -152,21 +152,14 @@ static DOCK_VARIANT: std::sync::Mutex<String> = std::sync::Mutex::new(String::ne
 #[cfg(target_os = "macos")]
 static DOCK_BADGE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
-/// Custom dock icons are pre-rounded squircles. Feeding them through
-/// `setApplicationIconImage` makes AppKit draw `badgeLabel` inset on top of
-/// the artwork (unlike Messages, where the badge overhangs the corner).
-///
-/// Fix: when a badge is present, draw the icon slightly inset into a larger
-/// transparent canvas so the system badge sits in the padding and visually
-/// hangs off the icon corner like a normal macOS Dock badge.
+/// Custom dock icons bake in the standard macOS icon-grid margin
+/// (transparent rim around the squircle), so AppKit's `badgeLabel`
+/// overhangs the artwork corner like a normal Dock badge.
 #[cfg(target_os = "macos")]
 fn refresh_dock_tile() -> Result<(), String> {
-    use block2::RcBlock;
     use objc2::AnyThread as _;
-    use objc2::runtime::Bool;
-    use objc2_app_kit::{NSApplication, NSCompositingOperation, NSImage};
-    use objc2_core_foundation::{CGPoint, CGRect, CGSize};
-    use objc2_foundation::{MainThreadMarker, NSData, NSInsetRect, NSRect, NSString};
+    use objc2_app_kit::{NSApplication, NSImage};
+    use objc2_foundation::{MainThreadMarker, NSData, NSString};
 
     let mtm = MainThreadMarker::new()
         .ok_or_else(|| "dock tile updates must run on the main thread".to_string())?;
@@ -200,32 +193,8 @@ fn refresh_dock_tile() -> Result<(), String> {
     match bytes {
         Some(bytes) => {
             let data = NSData::with_bytes(bytes);
-            let base = NSImage::initWithData(NSImage::alloc(), &data)
+            let image = NSImage::initWithData(NSImage::alloc(), &data)
                 .ok_or_else(|| "failed to decode dock icon".to_string())?;
-            let base_size = base.size();
-
-            let image = if badge.is_some() {
-                // ~10% padding each side → badge lands in the transparent rim.
-                let full = CGRect::new(CGPoint::new(0.0, 0.0), base_size);
-                let content = NSInsetRect(full, base_size.width * 0.10, base_size.height * 0.10);
-                let empty = CGRect::new(CGPoint::new(0.0, 0.0), CGSize::new(0.0, 0.0));
-                NSImage::imageWithSize_flipped_drawingHandler(
-                    base_size,
-                    false,
-                    &RcBlock::new(move |_rect: NSRect| {
-                        base.drawInRect_fromRect_operation_fraction(
-                            content,
-                            empty,
-                            NSCompositingOperation::SourceOver,
-                            1.0,
-                        );
-                        Bool::YES
-                    }),
-                )
-            } else {
-                base
-            };
-
             unsafe { app.setApplicationIconImage(Some(&image)) };
         }
         None => {
