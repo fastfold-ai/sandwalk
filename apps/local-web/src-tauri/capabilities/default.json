@@ -11,6 +11,7 @@
     "core:window:allow-unminimize",
     "core:window:allow-close",
     "core:window:allow-start-dragging",
-    "liquid-glass:default"
+    "liquid-glass:default",
+    "notification:default"
   ]
 }

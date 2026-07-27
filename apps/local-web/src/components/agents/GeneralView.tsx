@@ -16,6 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 
 import { GeneralViewAboutSection } from './general-view-about'
 import { GeneralViewAccountSection } from './general-view-account'
+import { GeneralViewNotificationsSection } from './general-view-notifications'
 import { GeneralViewServerSection } from './general-view-server'
 
 export function GeneralView({
@@ -138,6 +139,8 @@ export function GeneralView({
             </Button>
           </section>
         ) : null}
+
+        <GeneralViewNotificationsSection />
 
         <GeneralViewAboutSection
           backendVersion={backendVersion}

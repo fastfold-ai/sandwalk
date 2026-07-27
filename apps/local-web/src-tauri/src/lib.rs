@@ -720,6 +720,7 @@ pub fn run() {
 
     builder
         .plugin(tauri_plugin_liquid_glass::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             desktop_server_status,
             desktop_server_start,

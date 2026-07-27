@@ -7,7 +7,10 @@ import type {
 import { type Dispatch, type MutableRefObject, type SetStateAction,useEffect, useRef } from 'react'
 
 import { toolsFromEvents } from '@/components/agents/transcript'
-import { notifyApprovalRequired } from '@/lib/browser-notifications'
+import {
+  notifyApprovalRequired,
+  notifyRunCompleted
+} from '@/lib/browser-notifications'
 import { reduceChatOnAgentEvent } from '@/lib/chat-actions'
 import type { SessionChatState } from '@/lib/sessions'
 
@@ -296,11 +299,23 @@ export function useSessionChatStream({
                   : event.type === 'run.interrupted'
                   ? ('interrupted' as const)
                   : ('idle' as const)
-              setSessions(current =>
-                current.map(item =>
+              setSessions(current => {
+                const next = current.map(item =>
                   item.id === id ? { ...item, status: nextStatus } : item
                 )
-              )
+                if (
+                  event.type === 'run.completed' ||
+                  event.type === 'run.failed'
+                ) {
+                  const session = next.find(item => item.id === id)
+                  notifyRunCompleted({
+                    sessionId: id,
+                    sessionTitle: session?.title,
+                    ok: event.type === 'run.completed'
+                  })
+                }
+                return next
+              })
               if (event.type === 'run.completed') {
                 setWorkspaceVersion(current => current + 1)
                 void loadSkillsRef.current?.()

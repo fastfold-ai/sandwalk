@@ -1,15 +1,42 @@
-/** Best-effort browser notifications for agent HITL / background alerts. */
+/** Best-effort in-app + OS notifications for agent HITL / completion alerts. */
 
-let permissionRequested = false
+import { toast } from 'sonner'
 
-async function ensurePermission(): Promise<NotificationPermission | 'unsupported'> {
+import { isTauri } from '@/lib/desktop'
+import {
+  getStoredNotifyApproval,
+  getStoredNotifyCompletion,
+  type NotifyCompletionMode
+} from '@/lib/notification-settings'
+
+let webPermissionRequested = false
+
+function isWindowFocused(): boolean {
+  if (typeof document === 'undefined') return true
+  if (document.hidden) return false
+  try {
+    return document.hasFocus()
+  } catch {
+    return !document.hidden
+  }
+}
+
+function shouldNotifyCompletion(mode: NotifyCompletionMode): boolean {
+  if (mode === 'never') return false
+  if (mode === 'always') return true
+  return !isWindowFocused()
+}
+
+async function ensureWebPermission(): Promise<
+  NotificationPermission | 'unsupported'
+> {
   if (typeof window === 'undefined' || typeof Notification === 'undefined') {
     return 'unsupported'
   }
   if (Notification.permission === 'granted') return 'granted'
   if (Notification.permission === 'denied') return 'denied'
-  if (permissionRequested) return Notification.permission
-  permissionRequested = true
+  if (webPermissionRequested) return Notification.permission
+  webPermissionRequested = true
   try {
     return await Notification.requestPermission()
   } catch {
@@ -17,18 +44,42 @@ async function ensurePermission(): Promise<NotificationPermission | 'unsupported
   }
 }
 
-export async function notifyBrowser(input: {
+async function ensureNativePermission(): Promise<boolean> {
+  try {
+    const {
+      isPermissionGranted,
+      requestPermission
+    } = await import('@tauri-apps/plugin-notification')
+    if (await isPermissionGranted()) return true
+    return (await requestPermission()) === 'granted'
+  } catch {
+    return false
+  }
+}
+
+async function sendOsNotification(input: {
   title: string
   body?: string
   tag?: string
-  /** When true, only notify if the document is hidden (default). */
-  onlyWhenHidden?: boolean
 }): Promise<boolean> {
-  const onlyWhenHidden = input.onlyWhenHidden !== false
-  if (onlyWhenHidden && typeof document !== 'undefined' && !document.hidden) {
-    return false
+  if (isTauri()) {
+    try {
+      if (!(await ensureNativePermission())) return false
+      const { sendNotification } = await import(
+        '@tauri-apps/plugin-notification'
+      )
+      sendNotification({
+        title: input.title,
+        body: input.body,
+        // Some plugin versions accept `extra`; tag is best-effort via body only.
+      })
+      return true
+    } catch {
+      // Fall through to Web Notification API.
+    }
   }
-  const permission = await ensurePermission()
+
+  const permission = await ensureWebPermission()
   if (permission !== 'granted') return false
   try {
     const note = new Notification(input.title, {
@@ -45,24 +96,119 @@ export async function notifyBrowser(input: {
   }
 }
 
+/** Request native (or web) notification permission — used by settings UI. */
+export async function requestNotificationPermission(): Promise<
+  'granted' | 'denied' | 'default' | 'unsupported'
+> {
+  if (isTauri()) {
+    try {
+      const {
+        isPermissionGranted,
+        requestPermission
+      } = await import('@tauri-apps/plugin-notification')
+      if (await isPermissionGranted()) return 'granted'
+      const result = await requestPermission()
+      if (result === 'granted' || result === 'denied') return result
+      return 'default'
+    } catch {
+      return 'unsupported'
+    }
+  }
+  const permission = await ensureWebPermission()
+  if (permission === 'unsupported') return 'unsupported'
+  return permission
+}
+
+/** Current OS notification permission for settings UI. */
+export async function getNotificationPermission(): Promise<
+  'granted' | 'denied' | 'default' | 'unsupported'
+> {
+  if (isTauri()) {
+    try {
+      const { isPermissionGranted } = await import(
+        '@tauri-apps/plugin-notification'
+      )
+      if (await isPermissionGranted()) return 'granted'
+      if (typeof Notification !== 'undefined') {
+        if (Notification.permission === 'denied') return 'denied'
+        if (Notification.permission === 'granted') return 'granted'
+      }
+      return 'default'
+    } catch {
+      return 'unsupported'
+    }
+  }
+  if (typeof Notification === 'undefined') return 'unsupported'
+  return Notification.permission
+}
+
+export async function notifyBrowser(input: {
+  title: string
+  body?: string
+  tag?: string
+  /** When true, only notify if the document is hidden (default). */
+  onlyWhenHidden?: boolean
+}): Promise<boolean> {
+  const onlyWhenHidden = input.onlyWhenHidden !== false
+  if (onlyWhenHidden && typeof document !== 'undefined' && !document.hidden) {
+    return false
+  }
+  return sendOsNotification(input)
+}
+
 export function notifyApprovalRequired(input: {
   sessionTitle?: string | null
   toolName?: string | null
   sessionId?: string | null
 }): void {
+  if (!getStoredNotifyApproval()) return
+
   const tool = (input.toolName || 'a tool').trim() || 'a tool'
   const title = 'Approval required'
   const session = (input.sessionTitle || '').trim()
   const body = session
     ? `${session}: ${tool} is waiting for your approval.`
     : `${tool} is waiting for your approval.`
-  void notifyBrowser({
+
+  toast.message(title, { description: body })
+
+  void sendOsNotification({
     title,
     body,
     tag: input.sessionId
       ? `sandwalk-approval-${input.sessionId}`
-      : 'sandwalk-approval',
-    // Always notify for approvals — user may be looking at another chat tab.
-    onlyWhenHidden: false
+      : 'sandwalk-approval'
+  })
+}
+
+export function notifyRunCompleted(input: {
+  sessionTitle?: string | null
+  sessionId?: string | null
+  ok: boolean
+}): void {
+  if (!shouldNotifyCompletion(getStoredNotifyCompletion())) return
+
+  const session = (input.sessionTitle || '').trim()
+  const title = input.ok ? 'Agent finished' : 'Agent failed'
+  const body = session
+    ? input.ok
+      ? `${session} finished responding.`
+      : `${session} failed.`
+    : input.ok
+      ? 'Your agent finished responding.'
+      : 'Your agent run failed.'
+
+  if (input.ok) {
+    toast.success(title, { description: body })
+  } else {
+    toast.error(title, { description: body })
+  }
+
+  void sendOsNotification({
+    title,
+    body,
+    tag: input.sessionId
+      ? `sandwalk-complete-${input.sessionId}`
+      : 'sandwalk-complete'
   })
 }
