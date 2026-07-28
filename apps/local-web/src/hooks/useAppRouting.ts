@@ -122,13 +122,16 @@ export function useAppRouting(location: Location) {
   const isLibrary =
     location.pathname === '/library' ||
     location.pathname.startsWith('/library/')
+  const isSites =
+    location.pathname === '/sites' || location.pathname.startsWith('/sites/')
+  const siteId = decodeRouteParam(routes.siteRoute?.params.siteId)
   const isProjectHome = Boolean(routeProjectId)
   const isDraftAgent =
     isLegacyHomePath ||
     location.pathname === `/agents/${DRAFT_AGENT_SESSION_ID}`
   const isInspect = new URLSearchParams(location.search).get('inspect') === '1'
   const dashboardSkeletonKind: DashboardSkeletonKind = (() => {
-    if (isLibrary || isProjectHome) return 'home'
+    if (isLibrary || isSites || isProjectHome) return 'home'
     if (isDashboardOverview) return 'overview'
     if (isDashboardDoctor) return 'doctor'
     if (
@@ -167,6 +170,7 @@ export function useAppRouting(location: Location) {
         !isSkills &&
         !isIntegrations &&
         !isLibrary &&
+        !isSites &&
         !isProjectHome &&
         routeSessionId &&
         (!isReservedAgentRouteId(routeSessionId) ||
@@ -218,6 +222,8 @@ export function useAppRouting(location: Location) {
     isDashboardOverview,
     isHome,
     isLibrary,
+    isSites,
+    siteId,
     isProjectHome,
     isDraftAgent,
     isInspect,

@@ -32,6 +32,7 @@ from agent_server.sandbox_events import sandbox_event_bus
 from agent_server.sandbox_settings_service import SandboxSettingsService
 from agent_server.service import AgentService
 from agent_server.settings_service import SettingsService
+from agent_server.sites_service import SitesService
 from agent_server.skills_service import SkillsService
 from agent_server.specialists_service import SpecialistsService
 from agent_server.store import AgentStore
@@ -187,6 +188,7 @@ def create_app(
         specialists_service=SpecialistsService(store),
         integrations_service=integrations_service,
         settings_service=SettingsService(),
+        sites_service=SitesService(store, public_base_url=public_base),
         sandbox_settings_service=SandboxSettingsService(),
         account_service=AccountService(integrations=integrations_service),
         models_service=ModelsService(),

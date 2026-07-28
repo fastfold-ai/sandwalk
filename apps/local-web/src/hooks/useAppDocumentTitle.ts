@@ -30,6 +30,7 @@ type DocumentTitleArgs = {
   isDashboardAgentSecurity: boolean
   isDashboardMcp: boolean
   isLibrary: boolean
+  isSites: boolean
 }
 
 export function useAppDocumentTitle(args: DocumentTitleArgs) {
@@ -46,6 +47,10 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     }
     if (args.isLibrary) {
       document.title = `Library · ${base}`
+      return
+    }
+    if (args.isSites) {
+      document.title = `Sites · ${base}`
       return
     }
     if (args.isDashboardOverview) {
@@ -156,6 +161,7 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     args.isSandboxModalDetail,
     args.isDashboardMcp,
     args.isLibrary,
+    args.isSites,
     args.isDashboardOverview,
     args.isDashboardStatus,
     args.isDashboardGeneral,

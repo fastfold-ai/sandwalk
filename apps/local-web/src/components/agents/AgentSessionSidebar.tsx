@@ -4,14 +4,9 @@ import type {
   AgentSession,
   BackendHealth
 } from '@sandwalk/agent-ui-core'
-import {
-  LayoutDashboard,
-  LibraryBig,
-  Search,
-  Send
-} from 'lucide-react'
+import { Globe2, LayoutDashboard, LibraryBig, Search, Send } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
-import { type NavigateFunction,useLocation } from 'react-router-dom'
+import { type NavigateFunction, useLocation } from 'react-router-dom'
 
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
@@ -119,10 +114,14 @@ export function AgentSessionSidebar({
   onRefreshUser
 }: AgentSessionSidebarProps) {
   const location = useLocation()
-  const isLibrary = location.pathname === '/library' || location.pathname.startsWith('/library/')
+  const isLibrary =
+    location.pathname === '/library' ||
+    location.pathname.startsWith('/library/')
+  const isSites =
+    location.pathname === '/sites' || location.pathname.startsWith('/sites/')
   return (
     <>
-      <div className="sandwalk-sidebar-chrome shrink-0 px-3 pt-0.5 pb-2">
+      <div className="sandwalk-sidebar-chrome shrink-0 px-3 pb-2 pt-0.5">
         {/* Same px-2.5 as nav rows; mark is larger but left-aligned to the icon column. */}
         <div className="mb-2 flex items-center gap-1.5 px-2.5">
           <button
@@ -191,6 +190,19 @@ export function AgentSessionSidebar({
         >
           <LibraryBig className="size-3.5" />
           Library
+        </button>
+        <button
+          type="button"
+          className={cn(
+            'mt-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px]',
+            isSites
+              ? 'bg-sidebar-accent/55 text-foreground'
+              : 'text-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground'
+          )}
+          onClick={() => navigate('/sites')}
+        >
+          <Globe2 className="size-3.5" />
+          Sites
         </button>
       </div>
       <SidebarBatchBar

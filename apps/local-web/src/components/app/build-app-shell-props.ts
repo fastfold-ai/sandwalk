@@ -58,6 +58,8 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     sidebarPanelRef: input.ui.sidebarPanelRef,
     isDashboard: input.route.isDashboard,
     dashboardSection: input.route.dashboardSection,
+    isSites: input.route.isSites,
+    siteId: input.route.siteId,
     sidebarUserName: input.bootstrap.sidebarUserName,
     setSidebarCollapsed: input.ui.setSidebarCollapsed,
     logoutSession: input.bootstrap.logoutSession,

@@ -124,6 +124,26 @@ CREATE TABLE IF NOT EXISTS library_item_sessions (
     PRIMARY KEY (item_id, session_id)
 );
 
+CREATE TABLE IF NOT EXISTS sites (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    source_path TEXT NOT NULL,
+    origin_session_id TEXT,
+    origin_project_id TEXT,
+    storage_path TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    file_count INTEGER NOT NULL,
+    bytes INTEGER NOT NULL,
+    cloud_site_id TEXT,
+    cloud_url TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    published_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS sites_updated
+    ON sites(updated_at DESC, id DESC);
+
 CREATE TABLE IF NOT EXISTS slack_workspaces (
     team_id TEXT PRIMARY KEY,
     team_name TEXT,

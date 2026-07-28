@@ -12,6 +12,7 @@ from agent_server.store.projects import ProjectMixin
 from agent_server.store.session_queries import SessionQueryMixin
 from agent_server.store.session_updates import SessionUpdateMixin
 from agent_server.store.sessions import SessionCreateMixin
+from agent_server.store.sites import SiteMixin
 from agent_server.store.specialist_updates import SpecialistUpdateMixin
 from agent_server.store.specialists import SpecialistMixin
 
@@ -27,6 +28,7 @@ class AgentStore(
     EventMixin,
     McpServerMixin,
     LibraryMixin,
+    SiteMixin,
     ConnectorMixin,
     AgentStoreBase,
 ):

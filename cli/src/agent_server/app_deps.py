@@ -19,6 +19,7 @@ from agent_server.pty_manager import PtyManager
 from agent_server.sandbox_settings_service import SandboxSettingsService
 from agent_server.service import AgentService
 from agent_server.settings_service import SettingsService
+from agent_server.sites_service import SitesService
 from agent_server.skills_service import SkillsService
 from agent_server.specialists_service import SpecialistsService
 from agent_server.store import AgentStore
@@ -37,6 +38,7 @@ class AppDeps:
     specialists_service: SpecialistsService
     integrations_service: IntegrationsService
     settings_service: SettingsService
+    sites_service: SitesService
     sandbox_settings_service: SandboxSettingsService
     account_service: AccountService
     models_service: ModelsService

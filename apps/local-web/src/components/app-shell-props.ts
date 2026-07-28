@@ -86,6 +86,8 @@ export type AppShellProps = {
   showSessionTabs: boolean
   isHome: boolean
   isLibrary: boolean
+  isSites: boolean
+  siteId: string | null
   isProjectHome: boolean
   activeTitle: string
   isDashboardOverview: boolean

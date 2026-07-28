@@ -30,6 +30,7 @@ from agent_server.routes.sessions_sandbox_stream import register_session_sandbox
 from agent_server.routes.sessions_workspace import register_workspace_routes
 from agent_server.routes.sessions_workspace_mutate import register_workspace_mutate_routes
 from agent_server.routes.settings import register_settings_routes
+from agent_server.routes.sites import register_site_routes
 from agent_server.routes.skills import register_skill_routes
 from agent_server.routes.slack_oauth_return import register_slack_oauth_return_routes
 from agent_server.routes.specialists import register_specialist_routes
@@ -52,6 +53,7 @@ def register_all_routes(app: FastAPI, deps: AppDeps) -> None:
     register_model_profile_routes(app, deps)
     register_dataset_tool_routes(app, deps)
     register_skill_routes(app, deps)
+    register_site_routes(app, deps)
     register_project_routes(app, deps)
     register_library_routes(app, deps)
     register_connector_routes(app, deps)

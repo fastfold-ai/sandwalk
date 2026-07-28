@@ -56,6 +56,9 @@ import type {
   SandboxSettings,
   SessionConnectorMute,
   SessionSandboxStatus,
+  Site,
+  SitePreviewTicket,
+  SiteProvider,
   SettingsProvider,
   SlackAllowedUser,
   SlackConnectorStatus,
@@ -89,7 +92,8 @@ export class LocalAgentClient
     IntegrationProvider,
     SettingsProvider,
     ModelsProvider,
-    McpProvider
+    McpProvider,
+    SiteProvider
 {
   readonly baseUrl: string
   readonly apiKey?: string
@@ -348,6 +352,103 @@ export class LocalAgentClient
       signal
     })
     return result.data
+  }
+
+  async listSites(options?: {
+    q?: string | null
+    signal?: AbortSignal
+  }): Promise<Site[]> {
+    const params = new URLSearchParams()
+    if (options?.q) params.set('q', options.q)
+    const query = params.toString()
+    const result = await this.request<{ data: Site[] } | Site[]>(
+      `/sites${query ? `?${query}` : ''}`,
+      { signal: options?.signal }
+    )
+    return Array.isArray(result) ? result : result.data
+  }
+
+  createSite(
+    input: {
+      name: string
+      sourceSessionId?: string | null
+      sourceProjectId?: string | null
+      sourcePath?: string | null
+      slug?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<Site> {
+    return this.request<Site>('/sites', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: input.name,
+        session_id: input.sourceSessionId,
+        project_id: input.sourceProjectId,
+        path: input.sourcePath
+      }),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  getSite(siteId: string, signal?: AbortSignal): Promise<Site> {
+    return this.request<Site>(`/sites/${encodeURIComponent(siteId)}`, {
+      signal
+    })
+  }
+
+  updateSite(
+    siteId: string,
+    input: { name?: string; slug?: string | null },
+    signal?: AbortSignal
+  ): Promise<Site> {
+    return this.request<Site>(`/sites/${encodeURIComponent(siteId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  async deleteSite(siteId: string, signal?: AbortSignal): Promise<void> {
+    await this.request<unknown>(`/sites/${encodeURIComponent(siteId)}`, {
+      method: 'DELETE',
+      signal
+    })
+  }
+
+  refreshSite(siteId: string, signal?: AbortSignal): Promise<Site> {
+    return this.request<Site>(
+      `/sites/${encodeURIComponent(siteId)}/refresh`,
+      { method: 'POST', signal }
+    )
+  }
+
+  createSitePreviewTicket(
+    siteId: string,
+    signal?: AbortSignal
+  ): Promise<SitePreviewTicket> {
+    return this.request<SitePreviewTicket>(
+      `/sites/${encodeURIComponent(siteId)}/preview-ticket`,
+      { method: 'POST', signal }
+    )
+  }
+
+  async publishSite(
+    siteId: string,
+    input?: { slug?: string | null },
+    signal?: AbortSignal
+  ): Promise<Site> {
+    const result = await this.request<{ site: Site }>(
+      `/sites/${encodeURIComponent(siteId)}/publish`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ slug: input?.slug }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+    return result.site
   }
 
   async listLibrary(options?: {

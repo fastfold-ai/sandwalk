@@ -1,5 +1,9 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { AgentMessage, AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
+import type {
+  AgentMessage,
+  AgentProject,
+  AgentSession
+} from '@sandwalk/agent-ui-core'
 import {
   type ComponentProps,
   type Dispatch,
@@ -107,7 +111,9 @@ export type AgentSessionMainPanelProps = {
   pendingOpenPath: string | null
   setPendingOpenPath: Dispatch<SetStateAction<string | null>>
   setComposer: (value: string | ((current: string) => string)) => void
-  setComposerFiles: (value: string[] | ((current: string[]) => string[])) => void
+  setComposerFiles: (
+    value: string[] | ((current: string[]) => string[])
+  ) => void
 }
 
 export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
@@ -219,9 +225,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   // Host terminal only when draft is outside a project.
   const showDraftTerminal = isDraft && !inProject && terminalOpen
   const showWorkspaceFiles =
-    canShowFilesPanel &&
-    Boolean(workspaceSessionId) &&
-    (!isDraft || inProject)
+    canShowFilesPanel && Boolean(workspaceSessionId) && (!isDraft || inProject)
 
   return (
     <ResizablePanelGroup
@@ -263,7 +267,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             setTerminalOpen={setTerminalOpen}
             filesPanelCollapsed={filesPanelCollapsed}
             setFilesPanelCollapsed={setFilesPanelCollapsed}
-            onPrepareDraftWorkspace={prepareDraftWorkspace}
+            onPrepareDraftWorkspace={async () => {
+              await prepareDraftWorkspace()
+            }}
           />
           <SessionChatBody
             client={client}
@@ -341,11 +347,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 key={workspaceSessionId}
                 client={client}
                 sessionId={workspaceSessionId}
-                workspacePath={
-                  isDraft
-                    ? null
-                    : (session?.workspacePath ?? null)
-                }
+                workspacePath={isDraft ? null : session?.workspacePath ?? null}
                 workspaceVersion={workspaceVersion}
                 runActive={runActive}
                 openPathRequest={pendingOpenPath}
@@ -372,9 +374,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                   // workspace files (agent artifacts, etc.).
                   const noteworthy = added.filter(file => {
                     const path = file.path.replace(/\\/g, '/')
-                    return (
-                      !path.startsWith('uploads/') && path !== 'uploads'
-                    )
+                    return !path.startsWith('uploads/') && path !== 'uploads'
                   })
                   if (noteworthy.length === 0) return
                   setFilesPanelCollapsed(false)
@@ -414,7 +414,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             maxSize={70}
             className="min-w-0"
           >
-            <aside className="bg-card relative z-20 flex h-full w-full min-h-0 min-w-0 flex-col">
+            <aside className="bg-card relative z-20 flex h-full min-h-0 w-full min-w-0 flex-col">
               <TerminalPanel
                 client={client}
                 sessionId={HOST_TERMINAL_SESSION_ID}

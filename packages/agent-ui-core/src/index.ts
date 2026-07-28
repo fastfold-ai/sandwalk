@@ -263,6 +263,81 @@ export type UseLibraryInChatResult = {
   paths: string[]
 }
 
+export type SiteStatus =
+  | 'draft'
+  | 'ready'
+  | 'publishing'
+  | 'published'
+  | 'error'
+
+export type SiteDeployment = {
+  id: string
+  status: 'publishing' | 'published' | 'error'
+  slug: string
+  publicUrl: string | null
+  sizeBytes: number | null
+  createdAt: string
+  updatedAt: string
+  publishedAt: string | null
+}
+
+export type Site = {
+  id: string
+  name: string
+  slug: string | null
+  status: SiteStatus
+  sourceSessionId: string | null
+  sourceProjectId: string | null
+  sourcePath: string | null
+  sizeBytes: number | null
+  deployment: SiteDeployment | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type CreateSiteInput = {
+  name: string
+  sourceSessionId?: string | null
+  sourceProjectId?: string | null
+  sourcePath?: string | null
+  slug?: string | null
+}
+
+export type UpdateSiteInput = {
+  name?: string
+  slug?: string | null
+}
+
+export type SitePreviewTicket = {
+  url: string
+  expiresAt: string | null
+}
+
+export interface SiteProvider {
+  listSites(options?: {
+    q?: string | null
+    signal?: AbortSignal
+  }): Promise<Site[]>
+  createSite(input: CreateSiteInput, signal?: AbortSignal): Promise<Site>
+  getSite(siteId: string, signal?: AbortSignal): Promise<Site>
+  updateSite(
+    siteId: string,
+    input: UpdateSiteInput,
+    signal?: AbortSignal
+  ): Promise<Site>
+  deleteSite(siteId: string, signal?: AbortSignal): Promise<void>
+  refreshSite(siteId: string, signal?: AbortSignal): Promise<Site>
+  createSitePreviewTicket(
+    siteId: string,
+    signal?: AbortSignal
+  ): Promise<SitePreviewTicket>
+  publishSite(
+    siteId: string,
+    input?: { slug?: string | null },
+    signal?: AbortSignal
+  ): Promise<Site>
+}
+
 /** Where an inbound message came from. Display only — the model sees `content`. */
 export type MessageSource = {
   connector: 'slack'

@@ -48,9 +48,9 @@ type UseAppShellEffectsArgs = {
   isDashboardAgentPrompts: boolean
   isDashboardVoice: boolean
   isDashboardAgentRuntime: boolean
-  isDashboardAgentSecurity: boolean
   isDashboardMcp: boolean
   isLibrary: boolean
+  isSites: boolean
   sidebarCollapsed: boolean
   filesPanelCollapsed: boolean
   terminalOpen: boolean
@@ -106,9 +106,9 @@ export function useAppShellEffects(args: UseAppShellEffectsArgs) {
     isDashboardAgentPrompts: args.isDashboardAgentPrompts,
     isDashboardVoice: args.isDashboardVoice,
     isDashboardAgentRuntime: args.isDashboardAgentRuntime,
-    isDashboardAgentSecurity: args.isDashboardAgentSecurity,
     isDashboardMcp: args.isDashboardMcp,
-    isLibrary: args.isLibrary
+    isLibrary: args.isLibrary,
+    isSites: args.isSites
   })
 
   useAppPanelPersistence({

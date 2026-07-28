@@ -15,6 +15,7 @@ export type AppRouteMatches = {
   legacyIntegrationRoute: PathMatch<'integrationKey'> | null
   sessionRoute: PathMatch<'sessionId'> | null
   projectRoute: PathMatch<'projectId'> | null
+  siteRoute: PathMatch<'siteId'> | null
   specialistNewRoute: PathMatch<string> | null
   specialistEditRoute: PathMatch<'specialistId'> | null
 }
@@ -50,6 +51,7 @@ export function matchAppRoutes(pathname: string): AppRouteMatches {
     ),
     sessionRoute: matchPath('/agents/:sessionId', pathname),
     projectRoute: matchPath('/projects/:projectId', pathname),
+    siteRoute: matchPath('/sites/:siteId', pathname),
     specialistNewRoute: matchPath('/dashboard/specialists/new', pathname),
     specialistEditRoute: matchPath(
       '/dashboard/specialists/:specialistId',

@@ -55,6 +55,7 @@ _TOOL_MODULES = (
     "parity",
     "ops",
     "skills",
+    "sites",
     "dna",
     "omics",
     "shell",
