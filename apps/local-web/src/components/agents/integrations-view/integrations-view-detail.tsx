@@ -20,6 +20,7 @@ import {
   IntegrationsDetailFieldsTable,
   IntegrationsDetailVercelPanel
 } from './integrations-view-detail-panels'
+import { FastfoldAddControls } from './fastfold/FastfoldAddControls'
 import { SlackConnectorPanel } from './slack/SlackConnectorPanel'
 import { useIntegrationsDetailView } from './use-integrations-detail-view'
 import { VercelAddControls } from './vercel/VercelAddControls'
@@ -36,7 +37,8 @@ export function IntegrationsDetailView({
   onAutofill,
   onSetup,
   onOpenVercelTerminal,
-  onRemove
+  onRemove,
+  onReload
 }: {
   terminalClient: LocalAgentClient
   selected: IntegrationSummary
@@ -50,6 +52,7 @@ export function IntegrationsDetailView({
   onSetup: (key: string) => Promise<IntegrationSetupResult>
   onOpenVercelTerminal: () => Promise<string>
   onRemove: (key: string) => Promise<void>
+  onReload?: () => Promise<void>
 }) {
   const view = useIntegrationsDetailView({
     selectedKey: selected.key,
@@ -112,6 +115,16 @@ export function IntegrationsDetailView({
             <SlackConnectorPanel
               client={terminalClient}
               sessions={sessions}
+            />
+          ) : null}
+          {selected.key === 'fastfold-cloud' ? (
+            <FastfoldAddControls
+              client={terminalClient}
+              configured={selected.configured}
+              onImported={async () => {
+                if (onReload) await onReload()
+                await view.runValidate(selected.key)
+              }}
             />
           ) : null}
           {selected.key === 'skills-sh' ? (

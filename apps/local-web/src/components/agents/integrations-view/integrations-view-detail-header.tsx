@@ -9,6 +9,7 @@ import { openInSystemBrowser } from '@/lib/desktop'
 /** Stable mount points for Add split buttons (filled via portal). */
 export const SLACK_ADD_HEADER_SLOT_ID = 'sandwalk-slack-add-header-slot'
 export const VERCEL_ADD_HEADER_SLOT_ID = 'sandwalk-vercel-add-header-slot'
+export const FASTFOLD_ADD_HEADER_SLOT_ID = 'sandwalk-fastfold-add-header-slot'
 
 function setupHostLabel(url: string) {
   try {
@@ -76,6 +77,9 @@ export function IntegrationsDetailHeader({
           {selected.key === 'skills-sh' ? (
             <div id={VERCEL_ADD_HEADER_SLOT_ID} className="shrink-0" />
           ) : null}
+          {selected.key === 'fastfold-cloud' ? (
+            <div id={FASTFOLD_ADD_HEADER_SLOT_ID} className="shrink-0" />
+          ) : null}
         </div>
         {selected.key === 'skills-sh' ? (
           <p className="text-muted-foreground mt-1 text-sm">
@@ -91,6 +95,11 @@ export function IntegrationsDetailHeader({
             Use your agents from a Slack workspace — complete Relay Agent and
             Socket Mode support.
           </p>
+        ) : selected.key === 'fastfold-cloud' ? (
+          <p className="text-muted-foreground mt-1 text-sm">
+            Connect your Fastfold account to unlock Cloud skills and Slack
+            Relay.
+          </p>
         ) : (
           <p className="text-muted-foreground mt-1 text-sm">
             Preset provider env keys. Fill values and save.
@@ -98,7 +107,8 @@ export function IntegrationsDetailHeader({
         )}
         {selected.setupUrl &&
         selected.key !== 'skills-sh' &&
-        selected.key !== 'slack' ? (
+        selected.key !== 'slack' &&
+        selected.key !== 'fastfold-cloud' ? (
           <p className="text-muted-foreground mt-1 text-xs">
             No key yet?{' '}
             <button

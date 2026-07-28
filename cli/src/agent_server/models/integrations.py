@@ -67,6 +67,20 @@ class ValidateIntegrationResponse(ApiModel):
     message: str
 
 
+class FastfoldOneClickStart(ApiModel):
+    """Browser URL for the FastFold Cloud allow page."""
+
+    auth_url: str
+
+
+class FastfoldOneClickImport(ApiModel):
+    """Result of polling for a minted FastFold API key."""
+
+    ready: bool
+    provider: IntegrationProvider | None = None
+    team_id: str | None = None
+
+
 class IntegrationSetupStep(ApiModel):
     id: str
     label: str

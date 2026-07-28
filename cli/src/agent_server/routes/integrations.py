@@ -9,6 +9,8 @@ from fastapi import Body, FastAPI, HTTPException
 
 from agent_server.app_deps import AppDeps
 from agent_server.models import (
+    FastfoldOneClickImport,
+    FastfoldOneClickStart,
     IntegrationList,
     IntegrationProvider,
     IntegrationSetupRequest,
@@ -137,3 +139,43 @@ def register_integration_routes(app: FastAPI, deps: AppDeps) -> None:
             raise HTTPException(status_code=404, detail="Integration not found.") from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post(
+        "/v1/integrations/fastfold-cloud/one-click",
+        response_model=FastfoldOneClickStart,
+    )
+    async def start_fastfold_one_click() -> FastfoldOneClickStart:
+        from agent_server.integrations_service.fastfold_one_click import (
+            start_fastfold_one_click as _start,
+        )
+
+        try:
+            auth_url = await asyncio.to_thread(_start)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return FastfoldOneClickStart(auth_url=auth_url)
+
+    @app.post(
+        "/v1/integrations/fastfold-cloud/one-click/import",
+        response_model=FastfoldOneClickImport,
+    )
+    async def import_fastfold_one_click() -> FastfoldOneClickImport:
+        from agent_server.integrations_service.fastfold_one_click import (
+            import_fastfold_one_click as _import,
+        )
+
+        try:
+            result = await asyncio.to_thread(_import, integrations_service)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if result.get("ready"):
+            await _sync_slack_relay_after_fastfold("fastfold-cloud")
+        return FastfoldOneClickImport(
+            ready=bool(result.get("ready")),
+            provider=result.get("provider"),
+            team_id=(
+                str(result["team_id"])
+                if result.get("team_id") is not None
+                else None
+            ),
+        )

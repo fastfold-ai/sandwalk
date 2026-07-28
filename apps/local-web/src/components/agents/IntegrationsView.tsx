@@ -34,6 +34,7 @@ export function IntegrationsView({
   onSetup,
   onOpenVercelTerminal,
   onRemove,
+  onReload,
   embedded = false
 }: {
   terminalClient: LocalAgentClient
@@ -52,6 +53,7 @@ export function IntegrationsView({
   onSetup: (key: string) => Promise<IntegrationSetupResult>
   onOpenVercelTerminal: () => Promise<string>
   onRemove: (key: string) => Promise<void>
+  onReload?: () => Promise<void>
   embedded?: boolean
 }) {
   const navigate = useNavigate()
@@ -83,6 +85,7 @@ export function IntegrationsView({
         onSetup={onSetup}
         onOpenVercelTerminal={onOpenVercelTerminal}
         onRemove={onRemove}
+        onReload={onReload}
       />
     )
   }

@@ -82,6 +82,7 @@ export function DashboardMainIntegrationsPanel({
         }
         await loadIntegrations()
       }}
+      onReload={loadIntegrations}
     />
   )
 }

@@ -1648,6 +1648,31 @@ export class LocalAgentClient
     )
   }
 
+  /** Open Cloud allow page; poll importFastfoldOneClick until ready. */
+  startFastfoldOneClick(
+    signal?: AbortSignal
+  ): Promise<{ authUrl: string }> {
+    return this.request<{ authUrl: string }>(
+      '/integrations/fastfold-cloud/one-click',
+      { method: 'POST', signal }
+    )
+  }
+
+  importFastfoldOneClick(signal?: AbortSignal): Promise<{
+    ready: boolean
+    provider?: IntegrationSummary | null
+    teamId?: string | null
+  }> {
+    return this.request<{
+      ready: boolean
+      provider?: IntegrationSummary | null
+      teamId?: string | null
+    }>('/integrations/fastfold-cloud/one-click/import', {
+      method: 'POST',
+      signal
+    })
+  }
+
   removeIntegration(
     key: string,
     signal?: AbortSignal

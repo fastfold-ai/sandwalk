@@ -18,7 +18,29 @@ from agent_server.routes.oauth_return_page import connector_icon_data_uri, rende
 
 def register_slack_oauth_return_routes(app: FastAPI, deps: AppDeps) -> None:
     @app.get("/oauth/callback")
-    async def slack_oauth_return(slack: str | None = None, reason: str | None = None) -> Response:
+    async def oauth_return(
+        slack: str | None = None,
+        fastfold: str | None = None,
+        reason: str | None = None,
+    ) -> Response:
+        if fastfold == "connected":
+            html = render_oauth_return_page(
+                ok=True,
+                title="Fastfold connected",
+                detail="You can close this tab and return to Sandwalk — it's already saving your API key.",
+                tag_label="Fastfold AI Cloud",
+            )
+            return Response(content=html, media_type="text/html")
+        if fastfold == "error":
+            html = render_oauth_return_page(
+                ok=False,
+                title="Could not connect Fastfold",
+                detail=reason
+                or "Something went wrong. Close this tab and try again from Sandwalk.",
+                tag_label="Fastfold AI Cloud",
+            )
+            return Response(content=html, media_type="text/html", status_code=400)
+
         if slack == "connected":
             html = render_oauth_return_page(
                 ok=True,
