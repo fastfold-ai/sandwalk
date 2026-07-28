@@ -19,12 +19,17 @@ def frame_inbound(
     channel_label: str,
     first_message: bool = False,
 ) -> str:
-    """Wrap the raw Slack text with its origin and reply handle."""
+    """Wrap the raw Slack text with its origin and reply handle.
+
+    Every Slack-sourced turn (mentions, DMs, thread follow-ups, and Listening
+    subscriptions) must reply through ``slack.send_message``. ``first_message``
+    is kept for callers/tests but no longer changes the instruction — Listening
+    deliveries used to omit it and agents answered only in Sandwalk.
+    """
+    del first_message  # Reserved for callers; framing is consistent for all paths.
     who = message.user_name or message.user_id
     header = f"[Slack · {channel_label} | from {who} | reply→{message.thread_target}]"
     body = message.text.strip()
-    if not first_message:
-        return f"{header}\n{body}"
     return (
         f"{header}\n{body}\n\n"
         "You are answering in Slack. When you have the answer, call "

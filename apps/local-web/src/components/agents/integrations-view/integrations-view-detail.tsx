@@ -5,11 +5,13 @@ import type {
   IntegrationSummary
 } from '@sandwalk/agent-ui-core'
 import { CircleCheck, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { BusyConfirmOverlay } from '@/components/BusyConfirmOverlay'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
+import { IntegrationUnlocksSection } from './integration-unlocks-section'
 import {
   IntegrationsDetailHeader,
   IntegrationsDetailNav
@@ -68,7 +70,7 @@ export function IntegrationsDetailView({
       })
       .then(result => {
         view.setSetupResult(result)
-        view.setValidationMessage(
+        toast.success(
           `${result.summary} Use the terminal below to run the listed commands.`
         )
         view.setAutoFetchPending(true)
@@ -76,8 +78,10 @@ export function IntegrationsDetailView({
       .catch(error => {
         view.setSetupResult(null)
         view.setAutoFetchPending(false)
-        view.setValidationMessage(
-          error instanceof Error ? error.message : 'Unable to open Vercel setup.'
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Unable to open Vercel setup.'
         )
       })
       .finally(() => {
@@ -102,19 +106,18 @@ export function IntegrationsDetailView({
         onLinkProject={handleLinkProject}
       />
       <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pb-6 pt-6 md:px-6 md:pb-8 md:pt-8">
           <IntegrationsDetailHeader selected={selected} />
+          <IntegrationUnlocksSection
+            client={terminalClient}
+            integrationKey={selected.key}
+            unlocks={selected.unlocks || []}
+          />
           {selected.key === 'slack' ? (
-            <>
-              <SlackConnectorPanel client={terminalClient} sessions={sessions} />
-              <div className="border-border/70 mt-2 border-t pt-4">
-                <h3 className="text-[13px] font-medium">Report notifications</h3>
-                <p className="text-muted-foreground mt-0.5 text-[12px]">
-                  Separate from the connector above — this token is what the
-                  agent uses to post reports to a channel.
-                </p>
-              </div>
-            </>
+            <SlackConnectorPanel
+              client={terminalClient}
+              sessions={sessions}
+            />
           ) : null}
           {selected.key === 'skills-sh' ? (
             <IntegrationsDetailVercelPanel
@@ -126,37 +129,36 @@ export function IntegrationsDetailView({
               onCloseTerminal={() => view.setTerminalOpen(false)}
             />
           ) : null}
-          <IntegrationsDetailFieldsTable
-            selected={selected}
-            values={values}
-            onValueChange={onValueChange}
-            onRemove={onRemove}
-          />
-          {view.validationMessage ? (
-            <p className="text-muted-foreground text-sm">
-              {view.validationMessage}
-            </p>
+          {selected.key !== 'slack' ? (
+            <>
+              <IntegrationsDetailFieldsTable
+                selected={selected}
+                values={values}
+                onValueChange={onValueChange}
+                onRemove={onRemove}
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="secondary"
+                  disabled={view.validationBusy}
+                  onClick={() => void view.runValidate(selected.key)}
+                >
+                  {view.validationBusy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <CircleCheck className="size-4" />
+                  )}
+                  Test
+                </Button>
+                <Button
+                  disabled={!Object.values(values).some(value => value.trim())}
+                  onClick={() => void onSave()}
+                >
+                  Save
+                </Button>
+              </div>
+            </>
           ) : null}
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              disabled={view.validationBusy}
-              onClick={() => void view.runValidate(selected.key)}
-            >
-              {view.validationBusy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <CircleCheck className="size-4" />
-              )}
-              Test API Key
-            </Button>
-            <Button
-              disabled={!Object.values(values).some(value => value.trim())}
-              onClick={() => void onSave()}
-            >
-              Save Overrides
-            </Button>
-          </div>
         </div>
       </ScrollArea>
     </div>

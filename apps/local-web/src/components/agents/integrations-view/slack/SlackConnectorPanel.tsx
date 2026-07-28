@@ -4,17 +4,26 @@ import type {
   SlackSubscription,
   SlackWorkspace
 } from '@sandwalk/agent-ui-core'
-import { Loader2, Plus } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
-import { Button } from '@/components/ui/button'
+import { openInSystemBrowser } from '@/lib/desktop'
 
+import { SLACK_ADD_HEADER_SLOT_ID } from '../integrations-view-detail-header'
+import {
+  SlackAddSplitButton,
+  SlackOneClickDialog
+} from './SlackAddSplitButton'
 import { SlackAddWorkspaceModal } from './SlackAddWorkspaceModal'
 import { SlackHowItWorks } from './SlackHowItWorks'
 import { SlackParkedQueue } from './SlackParkedQueue'
 import { SlackWorkspaceCard } from './SlackWorkspaceCard'
 import { useSlackConnector } from './use-slack-connector'
+
+const ONE_CLICK_TIMEOUT_MS = 5 * 60 * 1000
+const ONE_CLICK_POLL_MS = 2000
 
 export function SlackConnectorPanel({
   client,
@@ -24,9 +33,14 @@ export function SlackConnectorPanel({
   sessions: AgentSession[]
 }) {
   const slack = useSlackConnector(client)
-  const [addOpen, setAddOpen] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
   const [updating, setUpdating] = useState<SlackWorkspace | null>(null)
   const [subscriptions, setSubscriptions] = useState<SlackSubscription[]>([])
+  const [oneClickOpen, setOneClickOpen] = useState(false)
+  const [oneClickWaiting, setOneClickWaiting] = useState(false)
+  const [oneClickError, setOneClickError] = useState<string | null>(null)
+  const [headerSlot, setHeaderSlot] = useState<Element | null>(null)
+  const oneClickCancelledRef = useRef(false)
 
   const loadSubscriptions = useCallback(async () => {
     try {
@@ -41,6 +55,17 @@ export function SlackConnectorPanel({
     void loadSubscriptions()
   }, [loadSubscriptions, slack.status])
 
+  useEffect(() => {
+    oneClickCancelledRef.current = !oneClickOpen
+    if (oneClickOpen) return
+    setOneClickWaiting(false)
+    setOneClickError(null)
+  }, [oneClickOpen])
+
+  useEffect(() => {
+    setHeaderSlot(document.getElementById(SLACK_ADD_HEADER_SLOT_ID))
+  }, [])
+
   const workspaces = slack.status?.workspaces ?? []
   const connected = workspaces.length > 0
   // One shared relay connection serves every relay-mode workspace, so this
@@ -54,36 +79,84 @@ export function SlackConnectorPanel({
     return ok
   }
 
+  const openManual = () => {
+    setUpdating(null)
+    setManualOpen(true)
+  }
+
+  const startOneClick = async () => {
+    setOneClickError(null)
+    setOneClickOpen(true)
+    setOneClickWaiting(true)
+    let authUrl: string
+    try {
+      authUrl = (await client.startSlackOneClick()).authUrl
+    } catch (cause) {
+      setOneClickWaiting(false)
+      setOneClickError(
+        cause instanceof Error
+          ? cause.message
+          : 'Could not start the Slack install.'
+      )
+      return
+    }
+
+    openInSystemBrowser(authUrl)
+    const deadline = Date.now() + ONE_CLICK_TIMEOUT_MS
+    while (Date.now() < deadline) {
+      await new Promise(resolve => window.setTimeout(resolve, ONE_CLICK_POLL_MS))
+      if (oneClickCancelledRef.current) return
+      try {
+        const result = await client.importSlackOneClick()
+        if (result.data.length > 0) {
+          setOneClickWaiting(false)
+          await run(async () => undefined)
+          setOneClickOpen(false)
+          return
+        }
+      } catch {
+        // Transient while the user is still in the browser; keep polling.
+      }
+    }
+    setOneClickWaiting(false)
+    setOneClickError(
+      'No workspace arrived. Finish the approval in Slack and try again.'
+    )
+  }
+
+  const addPortal =
+    headerSlot != null
+      ? createPortal(
+          <SlackAddSplitButton
+            busy={slack.busy}
+            waiting={oneClickWaiting}
+            onAddToSlack={() => void startOneClick()}
+            onOpenManual={openManual}
+          />,
+          headerSlot
+        )
+      : null
+
   if (slack.loading) {
     return (
-      <div className="text-muted-foreground flex items-center gap-2 py-10 text-[13px]">
-        <Loader2 className="size-4 animate-spin" />
-        Loading Slack…
-      </div>
+      <>
+        {addPortal}
+        <div className="text-muted-foreground flex items-center gap-2 py-10 text-[13px]">
+          <Loader2 className="size-4 animate-spin" />
+          Loading Slack…
+        </div>
+      </>
     )
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <Button
-          size="sm"
-          className="h-8 gap-1.5"
-          onClick={() => {
-            setUpdating(null)
-            setAddOpen(true)
-          }}
-        >
-          <Plus className="size-3.5" />
-          Add workspace
-        </Button>
-      </div>
+      {addPortal}
+      <SlackHowItWorks />
 
       {slack.error ? (
         <p className="text-destructive text-[13px]">{slack.error}</p>
       ) : null}
-
-      <SlackHowItWorks />
 
       <SlackParkedQueue
         parked={slack.parked}
@@ -120,13 +193,16 @@ export function SlackConnectorPanel({
             }
             onUpdateTokens={target => {
               setUpdating(target)
-              setAddOpen(true)
+              setManualOpen(true)
             }}
             onDisconnect={teamId =>
               void run(() => client.disconnectSlackWorkspace(teamId))
             }
             onSetEnabled={(teamId, enabled) =>
               void run(() => client.setSlackWorkspaceEnabled(teamId, enabled))
+            }
+            onRefreshChannels={teamId =>
+              void slack.refreshDirectory(teamId)
             }
             relayState={relayState}
           />
@@ -143,20 +219,30 @@ export function SlackConnectorPanel({
               No workspace connected
             </p>
             <p className="mt-1 max-w-sm text-[13px]">
-              Connect a Slack workspace so DMs and channel mentions open a
-              session here and the answer goes back as a thread reply.
+              Use your agents from a Slack workspace — complete Relay Agent and
+              Socket Mode support.
             </p>
           </div>
         </div>
       )}
 
+      <SlackOneClickDialog
+        open={oneClickOpen}
+        busy={slack.busy}
+        waiting={oneClickWaiting}
+        error={oneClickError}
+        onOpenChange={setOneClickOpen}
+        onRetry={() => void startOneClick()}
+        onOpenManual={openManual}
+      />
+
       <SlackAddWorkspaceModal
-        open={addOpen}
+        open={manualOpen}
         client={client}
         busy={slack.busy}
         updatingWorkspace={updating}
         onOpenChange={next => {
-          setAddOpen(next)
+          setManualOpen(next)
           if (!next) setUpdating(null)
         }}
         onImported={() => void run(async () => undefined)}

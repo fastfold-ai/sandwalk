@@ -135,7 +135,7 @@ export function IntegrationsMainListView({
             <div className="mb-3 shrink-0">
               <h2 className="text-2xl font-semibold">Integrations</h2>
               <p className="text-muted-foreground mt-1 text-sm">
-                Connect API keys and services the agent uses for models, search,
+                Connect services the agent uses for search, communication,
                 compute, and cloud workflows.
               </p>
             </div>

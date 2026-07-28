@@ -12,6 +12,7 @@ from agent_server.integrations_service import (
     IntegrationsService,
     category_for,
 )
+from agent_server.integrations_service.capabilities import install_boltz_cli
 
 
 def test_category_for_prefixes():
@@ -47,6 +48,99 @@ def test_list_and_get_providers():
     assert svc.get("does-not-exist") is None
 
 
+def test_integration_unlocks_match_wired_tools_and_skills():
+    svc = IntegrationsService()
+
+    ibm = svc.get("ibm-rxn")
+    assert ibm is not None
+    assert [unlock.id for unlock in ibm.unlocks] == ["chemistry.retrosynthesis"]
+
+    fastfold = svc.get("fastfold-cloud")
+    assert fastfold is not None
+    assert {unlock.id for unlock in fastfold.unlocks} == {
+        "fold",
+        "protein_design_boltzgen",
+        "md_openmm_calvados",
+        "md_openmmdl",
+        "slack_report",
+        "slack-relay-agent",
+    }
+    assert all(
+        unlock.source for unlock in fastfold.unlocks if unlock.kind == "skill"
+    )
+    relay = next(
+        unlock for unlock in fastfold.unlocks if unlock.id == "slack-relay-agent"
+    )
+    assert relay.kind == "capability"
+    assert relay.requirement == "ambient"
+
+    slack = svc.get("slack")
+    assert slack is not None
+    assert [unlock.id for unlock in slack.unlocks] == ["slack.send_message"]
+    assert slack.unlocks[0].requirement == "connector"
+
+    tavily = svc.get("tavily")
+    assert tavily is not None
+    assert tavily.category == "MCP"
+
+
+def test_install_boltz_cli_capability_reports_verified_status(
+    monkeypatch,
+):
+    installed = Path("/tmp/boltz-api")
+    monkeypatch.setattr(
+        "agent_server.integrations_service.capabilities.install_boltz_cli",
+        lambda: installed,
+    )
+    monkeypatch.setattr(
+        "agent_server.integrations_service.provider.find_boltz_cli",
+        lambda: installed,
+    )
+
+    provider = IntegrationsService().install_capability("boltz", "boltz-api-cli")
+
+    capability = next(
+        unlock for unlock in provider.unlocks if unlock.id == "boltz-api-cli"
+    )
+    assert capability.installable is True
+    assert capability.installed is True
+    assert capability.status_detail == str(installed)
+
+
+def test_boltz_cli_installer_downloads_runs_and_verifies(monkeypatch):
+    installed = Path("/tmp/boltz-api")
+    state = {"installed": False}
+    response = MagicMock()
+    response.text = "#!/bin/sh\ninstall boltz-api"
+    response.raise_for_status.return_value = None
+    monkeypatch.setattr(
+        "agent_server.integrations_service.capabilities.find_boltz_cli",
+        lambda: installed if state["installed"] else None,
+    )
+    monkeypatch.setattr(
+        "agent_server.integrations_service.capabilities.shutil.which",
+        lambda name: "/bin/sh" if name == "sh" else None,
+    )
+    monkeypatch.setattr(
+        "agent_server.integrations_service.capabilities.httpx.get",
+        lambda *_args, **_kwargs: response,
+    )
+
+    def fake_run(*args, **kwargs):
+        state["installed"] = True
+        assert args[0] == ["/bin/sh"]
+        assert kwargs["input"] == response.text
+        return MagicMock(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        "agent_server.integrations_service.capabilities.subprocess.run",
+        fake_run,
+    )
+
+    assert install_boltz_cli() == installed
+    response.raise_for_status.assert_called_once()
+
+
 def test_update_and_remove_integration(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
     monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
@@ -57,11 +151,14 @@ def test_update_and_remove_integration(tmp_path: Path, monkeypatch):
     updated = svc.update("anthropic", {"ANTHROPIC_API_KEY": "sk-ant-api03-testkey"})
     assert updated.configured is True
     assert updated.source in {"config", "environment"}
+    assert updated.fields[0].updated_at is not None
     assert Config.load().get("llm.anthropic_api_key") == "sk-ant-api03-testkey"
+    assert "llm.anthropic_api_key" in Config.load().get("integrations.updated_at")
 
     cleared = svc.remove("anthropic")
     assert cleared.configured is False
     assert Config.load().get("llm.anthropic_api_key") is None
+    assert Config.load().get("integrations.updated_at") == {}
 
 
 def test_update_requires_value():
@@ -80,6 +177,80 @@ def test_validate_integration():
 
     with pytest.raises(KeyError):
         svc.validate("missing-provider")
+
+
+@pytest.mark.parametrize(
+    ("status_code", "ok", "message"),
+    [
+        (200, True, "Boltz API key works."),
+        (401, False, "Invalid API key."),
+    ],
+)
+def test_validate_boltz_calls_auth_endpoint(
+    monkeypatch, status_code: int, ok: bool, message: str
+):
+    monkeypatch.setenv("BOLTZ_API_KEY", "sk_bc_test")
+    response = MagicMock(status_code=status_code)
+    request = MagicMock(return_value=response)
+    monkeypatch.setattr(
+        "agent_server.integrations_service.mutate.httpx.get",
+        request,
+    )
+
+    result = IntegrationsService().validate("boltz")
+
+    assert result.ok is ok
+    assert result.message == message
+    request.assert_called_once_with(
+        "https://api.boltz.bio/compute/v1/auth/me",
+        headers={
+            "Accept": "application/json",
+            "x-api-key": "sk_bc_test",
+            "User-Agent": (
+                "Mozilla/5.0 (compatible; Sandwalk/1.0; "
+                "+https://github.com/fastfold-ai/sandwalk)"
+            ),
+        },
+        timeout=15.0,
+        follow_redirects=True,
+    )
+
+
+@pytest.mark.parametrize(
+    ("status_code", "ok", "message"),
+    [
+        (200, True, "Fastfold Cloud API key works."),
+        (401, False, "Invalid API key."),
+    ],
+)
+def test_validate_fastfold_cloud_calls_users_me(
+    monkeypatch, status_code: int, ok: bool, message: str
+):
+    monkeypatch.setenv("FASTFOLD_API_KEY", "sk-ff-test")
+    response = MagicMock(status_code=status_code)
+    request = MagicMock(return_value=response)
+    monkeypatch.setattr(
+        "agent_server.integrations_service.mutate.httpx.get",
+        request,
+    )
+
+    result = IntegrationsService().validate("fastfold-cloud")
+
+    assert result.ok is ok
+    assert result.message == message
+    request.assert_called_once_with(
+        "https://api.fastfold.ai/v1/users/me",
+        headers={
+            "Accept": "application/json",
+            "Authorization": "Bearer sk-ff-test",
+            "User-Agent": (
+                "Mozilla/5.0 (compatible; Sandwalk/1.0; "
+                "+https://github.com/fastfold-ai/sandwalk)"
+            ),
+        },
+        timeout=15.0,
+        follow_redirects=True,
+    )
 
 
 def test_extract_env_value():

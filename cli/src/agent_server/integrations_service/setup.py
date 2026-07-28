@@ -127,6 +127,7 @@ class SetupMixin:
         with self._lock:
             config = Config.load()
             config.set("api.vercel_oidc_token", token)
+            self._mark_updated(config, ["api.vercel_oidc_token"])
             config.save()
             os.environ["VERCEL_OIDC_TOKEN"] = token
             sync_process_env_from_config(config)

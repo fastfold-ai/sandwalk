@@ -84,6 +84,29 @@ export function useSlackConnector(client: LocalAgentClient) {
     [reload]
   )
 
+  /** Re-fetch people/channels for one workspace from Slack. */
+  const refreshDirectory = useCallback(
+    async (teamId: string) => {
+      setBusy(true)
+      setError(null)
+      try {
+        const result = await client.getSlackDirectory(teamId)
+        setDirectories(current => ({ ...current, [teamId]: result }))
+        return true
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'Unable to refresh Slack channels'
+        )
+        return false
+      } finally {
+        setBusy(false)
+      }
+    },
+    [client]
+  )
+
   return {
     status,
     parked,
@@ -94,6 +117,7 @@ export function useSlackConnector(client: LocalAgentClient) {
     error,
     setError,
     reload,
+    refreshDirectory,
     act
   }
 }

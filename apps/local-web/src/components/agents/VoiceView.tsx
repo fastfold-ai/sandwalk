@@ -382,7 +382,7 @@ export function VoiceView() {
             </section>
 
             <section className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-base font-semibold">Mic check</h3>
                 {ready ? <StatusBadge tone="ok" label="Enabled" /> : null}
               </div>

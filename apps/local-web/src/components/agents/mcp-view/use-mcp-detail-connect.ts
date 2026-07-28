@@ -5,6 +5,7 @@ import type {
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 
+import { openMcpOAuthBrowser } from './mcp-oauth-browser'
 import { formatConnectError } from './mcp-view-shared'
 
 type McpDetailConnectInput = {
@@ -47,12 +48,11 @@ export function useMcpDetailConnect({
     try {
       const connectResult = await onConnectCatalog({ method: 'oauth' })
       if (connectResult.authorizeUrl) {
-        window.open(
-          connectResult.authorizeUrl,
-          'fastfold-mcp-oauth',
-          'width=560,height=720'
-        )
-        toast.message('Complete sign-in in the browser window…', {
+        await openMcpOAuthBrowser(connectResult.authorizeUrl, async () => {
+          await onRefreshMeta?.()
+          await loadTools(true)
+        })
+        toast.message('Complete sign-in in your browser…', {
           description: catalogEntry.name
         })
       } else if (!connectResult.ok) {

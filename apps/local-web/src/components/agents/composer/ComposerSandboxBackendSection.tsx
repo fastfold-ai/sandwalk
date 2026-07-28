@@ -102,7 +102,7 @@ export function ComposerSandboxBackendToggle({
         <p className="text-muted-foreground px-0.5 text-[10px] leading-snug">
           Modal not set up.{' '}
           <Link
-            to="/dashboard/integrations/modal"
+            to="/dashboard/agent/sandbox/modal"
             className="text-foreground font-medium underline underline-offset-2"
             onClick={onClose}
           >

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import Field
@@ -14,6 +15,25 @@ class IntegrationField(ApiModel):
     configured: bool
     source: Literal["environment", "config", "none"]
     masked_preview: str | None = None
+    updated_at: datetime | None = None
+
+
+class IntegrationUnlock(ApiModel):
+    kind: Literal["tool", "skill", "capability", "notice"]
+    id: str
+    label: str
+    description: str
+    source: str | None = None
+    requirement: Literal[
+        "built_in",
+        "install",
+        "connector",
+        "ambient",
+        "not_wired",
+    ] = "built_in"
+    installable: bool = False
+    installed: bool | None = None
+    status_detail: str | None = None
 
 
 class IntegrationProvider(ApiModel):
@@ -28,6 +48,7 @@ class IntegrationProvider(ApiModel):
     setup_url: str | None = None
     free: bool = False
     fields: list[IntegrationField] = Field(default_factory=list)
+    unlocks: list[IntegrationUnlock] = Field(default_factory=list)
 
 
 class IntegrationList(ApiModel):

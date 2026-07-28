@@ -16,6 +16,91 @@ KEY_ALIASES = {
     "compute.runpod_api_key": "runpod",
 }
 
+
+def _tool(
+    tool_id: str,
+    label: str,
+    description: str,
+    *,
+    requirement: str = "built_in",
+) -> dict[str, str]:
+    return {
+        "kind": "tool",
+        "id": tool_id,
+        "label": label,
+        "description": description,
+        "requirement": requirement,
+    }
+
+
+def _skill(name: str, label: str, description: str) -> dict[str, str]:
+    return {
+        "kind": "skill",
+        "id": name,
+        "label": label,
+        "description": description,
+        "source": f"fastfold-ai/skills@skills/{name}",
+        "requirement": "install",
+    }
+
+
+def _capability(
+    capability_id: str,
+    label: str,
+    description: str,
+    *,
+    requirement: str = "built_in",
+    installable: bool = False,
+) -> dict[str, str | bool]:
+    return {
+        "kind": "capability",
+        "id": capability_id,
+        "label": label,
+        "description": description,
+        "requirement": requirement,
+        "installable": installable,
+    }
+
+
+def _notice(notice_id: str, label: str, description: str) -> dict[str, str]:
+    return {
+        "kind": "notice",
+        "id": notice_id,
+        "label": label,
+        "description": description,
+        "requirement": "not_wired",
+    }
+
+
+_GPU_COMPUTE_UNLOCKS = [
+    _tool(
+        "compute.submit_job",
+        "Submit GPU jobs",
+        "Submit real cloud GPU jobs after the tool's default dry-run preview.",
+    ),
+    _tool(
+        "compute.job_status",
+        "Check GPU job status",
+        "Check a previously submitted provider job.",
+    ),
+    _tool(
+        "structure.dock",
+        "Molecular docking",
+        "Run docking workloads on the configured GPU provider.",
+    ),
+    _tool(
+        "structure.md_simulate",
+        "Molecular dynamics",
+        "Run OpenMM or GROMACS molecular dynamics workloads.",
+    ),
+    _tool(
+        "structure.fep",
+        "Free energy perturbation",
+        "Run relative binding free-energy calculations.",
+    ),
+]
+
+
 PROVIDER_METADATA = {
     "modal": {
         "name": "Modal",
@@ -26,6 +111,14 @@ PROVIDER_METADATA = {
         "name": "LangSmith",
         "category": "Observability",
         "description": "LangChain tracing API keys and project overrides.",
+        "unlocks": [
+            _notice(
+                "langsmith-not-wired",
+                "No direct Sandwalk integration",
+                "The credentials are exported for compatible libraries, but no "
+                "Sandwalk tool currently enables LangSmith tracing explicitly.",
+            )
+        ],
     },
     "nvidia": {
         "name": "NVIDIA",
@@ -71,18 +164,34 @@ PROVIDER_METADATA = {
     },
     "tavily": {
         "name": "Tavily",
-        "category": "Search",
-        "description": "Tavily search API key used by research tools.",
+        "category": "MCP",
+        "description": "Tavily MCP credentials for real-time web search and extraction.",
     },
     "slack": {
         "name": "Slack",
         "category": "Communication",
-        "description": "Slack reports and agent notifications.",
+        "description": "Use your agents from a Slack workspace — complete Relay Agent and Socket Mode support.",
+        "unlocks": [
+            _tool(
+                "slack.send_message",
+                "Send Slack messages",
+                "Reply in a Slack channel or thread through a connected workspace.",
+                requirement="connector",
+            ),
+        ],
     },
     "skills-sh": {
         "name": "Vercel",
         "category": "Skills",
         "description": "Vercel OIDC token for skills.sh catalog search.",
+        "unlocks": [
+            _capability(
+                "skills-sh-catalog",
+                "skills.sh catalog",
+                "Search, inspect, and audit skills from the authenticated desktop catalog.",
+                requirement="ambient",
+            )
+        ],
     },
     "tamarind": {
         "name": "Tamarind Bio",
@@ -110,6 +219,98 @@ PROVIDER_METADATA = {
         "description": (
             "Hugging Face Hub MCP — models, datasets, Spaces, papers, and docs."
         ),
+    },
+    "ibm-rxn": {
+        "unlocks": [
+            _tool(
+                "chemistry.retrosynthesis",
+                "IBM RXN retrosynthesis",
+                "Use IBM RXN for retrosynthetic route planning before the built-in "
+                "heuristic fallback.",
+            )
+        ],
+    },
+    "lens": {
+        "unlocks": [
+            _tool(
+                "literature.patent_search",
+                "Lens patent search",
+                "Use Lens.org as the preferred patent source before EPO and PubMed "
+                "fallbacks.",
+            )
+        ],
+    },
+    "fastfold-cloud": {
+        "unlocks": [
+            _skill(
+                "fold",
+                "Protein folding",
+                "Submit and retrieve FastFold structure predictions.",
+            ),
+            _skill(
+                "protein_design_boltzgen",
+                "BoltzGen protein design",
+                "Run FastFold BoltzGen design workflows.",
+            ),
+            _skill(
+                "md_openmm_calvados",
+                "CALVADOS + OpenMM",
+                "Run coarse-grained molecular dynamics workflows.",
+            ),
+            _skill(
+                "md_openmmdl",
+                "OpenMMDL",
+                "Run atomistic molecular dynamics workflows.",
+            ),
+            _skill(
+                "slack_report",
+                "Slack reports",
+                "Publish research reports through FastFold Cloud.",
+            ),
+            _capability(
+                "slack-relay-agent",
+                "Slack Relay Agent",
+                "Connect paid Slack workspaces through FastFold Cloud’s Agent "
+                "relay — no Socket Mode tokens needed.",
+                requirement="ambient",
+            ),
+        ],
+    },
+    "boltz": {
+        "unlocks": [
+            _skill(
+                "boltz",
+                "Boltz API workflows",
+                "Run structure, binding, design, screening, and ADME workflows.",
+            ),
+            _capability(
+                "boltz-api-cli",
+                "boltz-api CLI",
+                "The Boltz skill invokes the official CLI, which must also be installed.",
+                requirement="install",
+                installable=True,
+            ),
+        ],
+    },
+    "sendgrid": {
+        "unlocks": [
+            _tool(
+                "notification.send_email",
+                "Send email",
+                "Send non-dry-run email notifications through SendGrid.",
+            ),
+            _tool(
+                "cro.send_inquiry",
+                "Send CRO inquiries",
+                "Deliver drafted CRO inquiry emails through notification.send_email.",
+            ),
+        ],
+    },
+    "lambda-labs": {
+        "unlocks": _GPU_COMPUTE_UNLOCKS,
+    },
+    "runpod": {
+        "unlocks": _GPU_COMPUTE_UNLOCKS,
     },
 }
 VERCEL_INTEGRATION_DIR = (CONFIG_DIR / "vercel-integration").expanduser()

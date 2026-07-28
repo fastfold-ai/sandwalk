@@ -154,9 +154,10 @@ export function formatConnectError(err: unknown): string {
 }
 
 export function authMeta(entry: McpCatalogEntry) {
-  const keysHref = entry.integrationKey
-    ? `/dashboard/integrations/${entry.integrationKey}`
-    : null
+  const keysHref =
+    entry.integrationKey && entry.id
+      ? `/dashboard/mcp/catalog/${encodeURIComponent(entry.id)}`
+      : null
   const apiKeyLabel = keysHref ? (
     <a
       href={keysHref}

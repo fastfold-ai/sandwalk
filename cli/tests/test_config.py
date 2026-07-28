@@ -246,14 +246,23 @@ def test_keys_table_includes_llm_provider_keys():
 
 
 def test_keys_table_includes_boltz_provider():
-    cfg = Config(data={"api.boltz_api_key": "sk_bc_test_1234567890"})
+    cfg = Config(
+        data={
+            "api.boltz_api_key": "sk_bc_test_1234567890",
+            "integrations.updated_at": {
+                "api.boltz_api_key": "2026-07-27T12:00:00",
+            },
+        }
+    )
     table = cfg.keys_table()
     services = list(getattr(table.columns[0], "_cells", []))
     previews = list(getattr(table.columns[2], "_cells", []))
+    updated = list(getattr(table.columns[-1], "_cells", []))
     assert "Boltz" in services
     boltz_idx = services.index("Boltz")
     assert previews[boltz_idx].startswith("sk_bc_te")
     assert "..." in previews[boltz_idx]
+    assert updated[boltz_idx] == "2026-07-27"
 
 
 def test_keys_table_includes_preview_column_and_masked_openai_value():
@@ -717,6 +726,25 @@ class TestValidateConfig:
     def test_unknown_key_warns(self):
         issues = _validate_config({"agent.typo_key": True})
         assert any("Unknown config key" in i and "typo_key" in i for i in issues)
+
+    def test_integration_update_timestamps_are_known(self):
+        issues = _validate_config({
+            "integrations.updated_at": {
+                "api.boltz_api_key": "2026-07-28T02:31:24+00:00",
+            }
+        })
+        assert not any("Unknown config key" in issue for issue in issues)
+
+    def test_tavily_mcp_oauth_keys_are_known(self):
+        issues = _validate_config({
+            "mcp.tavily_access_token": "tok",
+            "mcp.tavily_refresh_token": "ref",
+            "mcp.tavily_token_expires_at": "2026-07-28T00:00:00+00:00",
+            "mcp.tavily_client_id": "cid",
+            "mcp.tavily_tool_count": 4,
+            "mcp.tavily_status_message": "ok",
+        })
+        assert not any("Unknown config key" in issue for issue in issues)
 
     def test_custom_mcp_oauth_keys_are_known(self):
         """Dynamic mcp.custom_<uuid>_* keys written by OAuth must not warn.

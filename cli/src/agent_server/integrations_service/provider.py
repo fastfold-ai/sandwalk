@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import os
 import threading
+from datetime import UTC, datetime
 
 from agent.config import API_KEYS, Config
+from agent_server.integrations_service.capabilities import find_boltz_cli
 from agent_server.integrations_service.metadata import (
     KEY_ALIASES,
     PROVIDER_METADATA,
     category_for,
 )
-from agent_server.models import IntegrationField, IntegrationProvider
+from agent_server.models import IntegrationField, IntegrationProvider, IntegrationUnlock
 
 
 class ProviderMixin:
@@ -42,8 +44,38 @@ class ProviderMixin:
             return "••••••••"
         return f"{normalized[:4]}…{normalized[-4:]}"
 
+    @staticmethod
+    def _updated_at(config: Config) -> dict[str, str]:
+        value = config.get("integrations.updated_at")
+        if not isinstance(value, dict):
+            return {}
+        return {
+            str(config_key): str(timestamp)
+            for config_key, timestamp in value.items()
+            if str(timestamp).strip()
+        }
+
+    @classmethod
+    def _mark_updated(cls, config: Config, config_keys: list[str]) -> None:
+        timestamps = cls._updated_at(config)
+        timestamp = datetime.now(UTC).isoformat()
+        for config_key in config_keys:
+            timestamps[config_key] = timestamp
+        config.set("integrations.updated_at", timestamps)
+
+    @classmethod
+    def _clear_updated(cls, config: Config, config_keys: list[str]) -> None:
+        timestamps = cls._updated_at(config)
+        for config_key in config_keys:
+            timestamps.pop(config_key, None)
+        if timestamps:
+            config.set("integrations.updated_at", timestamps)
+            return
+        config.unset("integrations.updated_at")
+
     def _provider(self, key: str, entries: list[tuple[str, dict]]) -> IntegrationProvider:
         config = Config.load()
+        timestamps = self._updated_at(config)
         fields: list[IntegrationField] = []
         for config_key, info in entries:
             env_value = str(os.environ.get(info["env_var"]) or "").strip()
@@ -61,11 +93,29 @@ class ProviderMixin:
                         value,
                         is_secret=bool(info.get("secret", True)),
                     ),
+                    updated_at=timestamps.get(config_key),
                 )
             )
 
         first_config_key, first_info = entries[0]
         metadata = PROVIDER_METADATA.get(key, {})
+        unlocks = [
+            IntegrationUnlock.model_validate(unlock)
+            for unlock in list(metadata.get("unlocks") or [])
+        ]
+        if key == "boltz":
+            cli_path = find_boltz_cli()
+            unlocks = [
+                unlock.model_copy(
+                    update={
+                        "installed": cli_path is not None,
+                        "status_detail": str(cli_path) if cli_path else None,
+                    }
+                )
+                if unlock.id == "boltz-api-cli"
+                else unlock
+                for unlock in unlocks
+            ]
         configured_fields = [field for field in fields if field.configured]
         primary = configured_fields[0] if configured_fields else fields[0]
         return IntegrationProvider(
@@ -80,6 +130,7 @@ class ProviderMixin:
             setup_url=str(first_info.get("url") or "") or None,
             free=all(bool(info.get("free")) for _, info in entries),
             fields=fields,
+            unlocks=unlocks,
         )
 
     def list(self) -> list[IntegrationProvider]:

@@ -4,9 +4,62 @@ from __future__ import annotations
 
 import os
 
+import httpx
+
 from agent.config import Config, sync_process_env_from_config, unset_process_env_for_config_keys
 from agent.doctor.model_provider_http import probe_llm_api_key, supports_llm_key_probe
 from agent_server.models import IntegrationProvider, ValidateIntegrationResponse
+
+_PROBE_USER_AGENT = (
+    "Mozilla/5.0 (compatible; Sandwalk/1.0; "
+    "+https://github.com/fastfold-ai/sandwalk)"
+)
+
+
+def _probe_boltz_api_key(api_key: str) -> tuple[bool, str]:
+    """Validate a Boltz key using its non-billable auth context endpoint."""
+    try:
+        response = httpx.get(
+            "https://api.boltz.bio/compute/v1/auth/me",
+            headers={
+                "Accept": "application/json",
+                "x-api-key": api_key,
+                "User-Agent": _PROBE_USER_AGENT,
+            },
+            timeout=15.0,
+            follow_redirects=True,
+        )
+    except Exception as exc:
+        return False, f"Couldn't reach Boltz ({exc.__class__.__name__})."
+
+    if response.status_code < 300:
+        return True, "Boltz API key works."
+    if response.status_code in (401, 403):
+        return False, "Invalid API key."
+    return False, f"Boltz returned HTTP {response.status_code}."
+
+
+def _probe_fastfold_api_key(api_key: str) -> tuple[bool, str]:
+    """Validate a Fastfold Cloud key via the dual-auth /users/me endpoint."""
+    try:
+        response = httpx.get(
+            "https://api.fastfold.ai/v1/users/me",
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {api_key}",
+                "User-Agent": _PROBE_USER_AGENT,
+            },
+            timeout=15.0,
+            follow_redirects=True,
+        )
+    except Exception as exc:
+        return False, f"Couldn't reach Fastfold Cloud ({exc.__class__.__name__})."
+
+    if response.status_code < 300:
+        return True, "Fastfold Cloud API key works."
+    if response.status_code in (401, 403):
+        return False, "Invalid API key."
+    return False, f"Fastfold Cloud returned HTTP {response.status_code}."
 
 
 class MutateMixin:
@@ -28,6 +81,10 @@ class MutateMixin:
                 config.set(by_env[env_name], value)
                 # Force into process env so web runs/PTY match CLI immediately.
                 os.environ[env_name] = value
+            self._mark_updated(
+                config,
+                [by_env[env_name] for env_name in normalized],
+            )
             config.save()
             sync_process_env_from_config(config)
         return self._provider(key, entries)
@@ -41,6 +98,7 @@ class MutateMixin:
             removed_keys = [config_key for config_key, _ in entries]
             for config_key, _ in entries:
                 config.unset(config_key)
+            self._clear_updated(config, removed_keys)
             # Not set up ⇒ that provider's models must be off in the list.
             from agent_server.models_service.mutate import disable_models_for_provider
 
@@ -91,6 +149,24 @@ class MutateMixin:
                 configured=True,
                 source=provider.source,
                 message=result.message,
+            )
+
+        if key == "boltz":
+            ok, message = _probe_boltz_api_key(self._secret_value(key))
+            return ValidateIntegrationResponse(
+                ok=ok,
+                configured=True,
+                source=provider.source,
+                message=message,
+            )
+
+        if key == "fastfold-cloud":
+            ok, message = _probe_fastfold_api_key(self._secret_value(key))
+            return ValidateIntegrationResponse(
+                ok=ok,
+                configured=True,
+                source=provider.source,
+                message=message,
             )
 
         return ValidateIntegrationResponse(

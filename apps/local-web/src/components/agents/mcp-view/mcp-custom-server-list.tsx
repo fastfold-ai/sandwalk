@@ -19,6 +19,7 @@ import {
   isAuthReconnectMessage,
   serverNeedsAuth
 } from './mcp-custom-server-helpers'
+import { openMcpOAuthBrowser } from './mcp-oauth-browser'
 import { formatConnectError, McpToggle } from './mcp-view-shared'
 
 export { customServerNeedsAuth }
@@ -104,14 +105,10 @@ export function McpCustomServerList({
           : null
       if (!result) return
       if (result.authorizeUrl) {
-        window.open(
-          result.authorizeUrl,
-          'fastfold-mcp-oauth',
-          'width=560,height=720'
-        )
+        await openMcpOAuthBrowser(result.authorizeUrl)
         setWaitingId(server.id)
         setWaitingCatalogId(server.catalogId || null)
-        toast.message('Complete sign-in in the browser window…', {
+        toast.message('Complete sign-in in your browser…', {
           description: server.name
         })
       } else if (!result.ok) {

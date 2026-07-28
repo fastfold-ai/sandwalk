@@ -4,12 +4,18 @@ import type {
   IntegrationSetupResult,
   IntegrationSummary
 } from '@sandwalk/agent-ui-core'
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { IntegrationsDetailView } from './integrations-view/integrations-view-detail'
 import {
   IntegrationsFeaturedOverview,
   IntegrationsMainListView
 } from './integrations-view/integrations-view-list'
+import {
+  integrationManagementPath,
+  integrationsOwnedByIntegrations
+} from './integrations-view/integrations-view-ownership'
 
 export function IntegrationsView({
   terminalClient,
@@ -48,7 +54,19 @@ export function IntegrationsView({
   onRemove: (key: string) => Promise<void>
   embedded?: boolean
 }) {
-  const selected = integrations.find(item => item.key === selectedKey)
+  const navigate = useNavigate()
+  const ownedIntegrations = integrationsOwnedByIntegrations(integrations)
+  const requested = integrations.find(item => item.key === selectedKey)
+  const managementPath = requested
+    ? integrationManagementPath(requested)
+    : null
+  const selected = ownedIntegrations.find(item => item.key === selectedKey)
+
+  useEffect(() => {
+    if (managementPath) navigate(managementPath, { replace: true })
+  }, [managementPath, navigate])
+
+  if (managementPath) return null
 
   if (selected) {
     return (
@@ -72,7 +90,7 @@ export function IntegrationsView({
   if (featuredOnly) {
     return (
       <IntegrationsFeaturedOverview
-        integrations={integrations}
+        integrations={ownedIntegrations}
         loading={loading}
         onShowAll={onShowAll}
         onSelect={onSelect}
@@ -82,7 +100,7 @@ export function IntegrationsView({
 
   return (
     <IntegrationsMainListView
-      integrations={integrations}
+      integrations={ownedIntegrations}
       loading={loading}
       embedded={embedded}
       onSelect={onSelect}

@@ -1,5 +1,6 @@
 import type { IntegrationSetupResult } from '@sandwalk/agent-ui-core'
 import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 export function useIntegrationsDetailView({
   selectedKey,
@@ -10,9 +11,6 @@ export function useIntegrationsDetailView({
   onValidate: (key: string) => Promise<{ ok: boolean; message: string }>
   onAutofill: (key: string) => Promise<void>
 }) {
-  const [validationMessage, setValidationMessage] = useState<string | null>(
-    null
-  )
   const [validationBusy, setValidationBusy] = useState(false)
   const [overlay, setOverlay] = useState<{
     phase: 'working' | 'done'
@@ -34,7 +32,6 @@ export function useIntegrationsDetailView({
     setSetupResult(null)
     setAutoFetchPending(false)
     autoFetchAttemptsRef.current = 0
-    setValidationMessage(null)
     setValidationBusy(false)
     setOverlay(null)
     setTerminalOpen(false)
@@ -49,7 +46,6 @@ export function useIntegrationsDetailView({
   async function runValidate(key: string) {
     const isModalProbe = key === 'modal'
     setValidationBusy(true)
-    setValidationMessage(null)
     if (isModalProbe) {
       setOverlay({
         phase: 'working',
@@ -60,7 +56,8 @@ export function useIntegrationsDetailView({
     }
     try {
       const result = await onValidate(key)
-      setValidationMessage(result.message)
+      if (result.ok) toast.success(result.message)
+      else toast.error(result.message)
       if (isModalProbe) {
         if (result.ok) {
           await showDoneOverlay(
@@ -73,7 +70,7 @@ export function useIntegrationsDetailView({
       }
     } catch (error) {
       setOverlay(null)
-      setValidationMessage(
+      toast.error(
         error instanceof Error
           ? error.message
           : 'Unable to test integration.'
@@ -93,7 +90,7 @@ export function useIntegrationsDetailView({
         await onAutofill(selectedKey)
         if (cancelled) return
         setAutoFetchPending(false)
-        setValidationMessage(
+        toast.success(
           'Imported Vercel OIDC token into /keys config. Skills.sh search is now enabled.'
         )
       } catch {
@@ -101,7 +98,7 @@ export function useIntegrationsDetailView({
         autoFetchAttemptsRef.current += 1
         if (autoFetchAttemptsRef.current >= 40) {
           setAutoFetchPending(false)
-          setValidationMessage(
+          toast.error(
             'Still waiting for Vercel token. Finish terminal prompts, then click Re-link Project again.'
           )
           return
@@ -121,8 +118,6 @@ export function useIntegrationsDetailView({
   }, [autoFetchPending, onAutofill, selectedKey])
 
   return {
-    validationMessage,
-    setValidationMessage,
     validationBusy,
     overlay,
     setupResult,

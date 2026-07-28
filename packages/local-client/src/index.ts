@@ -73,7 +73,7 @@ import type {
   PromptBudgetResponse,
   WorkspaceFile,
   WorkspaceFileContent,
-  PtySessionInfo,
+  PtySessionInfo
 } from '@sandwalk/agent-ui-core'
 
 export type LocalAgentClientOptions = {
@@ -111,12 +111,14 @@ export class LocalAgentClient
     const response = await fetch(url, {
       ...init,
       credentials: 'include',
-      headers: this.headers(init.headers),
+      headers: this.headers(init.headers)
     })
     if (!response.ok) {
       const detail = await response.text()
       throw new Error(
-        `FastFold Agent API ${response.status}: ${detail || response.statusText} [${init.method || 'GET'} ${url}]`,
+        `FastFold Agent API ${response.status}: ${
+          detail || response.statusText
+        } [${init.method || 'GET'} ${url}]`
       )
     }
     if (response.status === 204) {
@@ -127,7 +129,9 @@ export class LocalAgentClient
     return JSON.parse(text) as T
   }
 
-  private normalizeValidateMcp(raw: Record<string, unknown>): ValidateMcpResult {
+  private normalizeValidateMcp(
+    raw: Record<string, unknown>
+  ): ValidateMcpResult {
     const toolsRaw = raw.tools
     const tools = Array.isArray(toolsRaw)
       ? toolsRaw.map(item => String(item))
@@ -154,7 +158,7 @@ export class LocalAgentClient
           inputSchema:
             schema && typeof schema === 'object' && !Array.isArray(schema)
               ? (schema as Record<string, unknown>)
-              : null,
+              : null
         })
       }
     }
@@ -163,7 +167,7 @@ export class LocalAgentClient
       toolCount: Number(raw.toolCount ?? raw.tool_count ?? tools.length) || 0,
       message: String(raw.message || ''),
       tools,
-      toolDetails,
+      toolDetails
     }
   }
 
@@ -177,16 +181,16 @@ export class LocalAgentClient
 
   async login(
     apiKey: string,
-    options?: { remember?: boolean; signal?: AbortSignal },
+    options?: { remember?: boolean; signal?: AbortSignal }
   ): Promise<{ ok: boolean; authEnabled?: boolean }> {
     return this.request('/auth/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         apiKey,
-        remember: Boolean(options?.remember),
+        remember: Boolean(options?.remember)
       }),
-      signal: options?.signal,
+      signal: options?.signal
     })
   }
 
@@ -205,27 +209,29 @@ export class LocalAgentClient
   stopServer(signal?: AbortSignal): Promise<ServerLifecycleResult> {
     return this.request<ServerLifecycleResult>('/server/stop', {
       method: 'POST',
-      signal,
+      signal
     })
   }
 
   restartServer(signal?: AbortSignal): Promise<ServerLifecycleResult> {
     return this.request<ServerLifecycleResult>('/server/restart', {
       method: 'POST',
-      signal,
+      signal
     })
   }
 
   clearRuntimeCache(signal?: AbortSignal): Promise<ServerCacheInfo> {
     return this.request<ServerCacheInfo>('/storage/cache/clear', {
       method: 'POST',
-      signal,
+      signal
     })
   }
 
   runDoctor(
-    signalOrOptions?: AbortSignal | { scope?: 'full' | 'core'; signal?: AbortSignal },
-    maybeSignal?: AbortSignal,
+    signalOrOptions?:
+      | AbortSignal
+      | { scope?: 'full' | 'core'; signal?: AbortSignal },
+    maybeSignal?: AbortSignal
   ): Promise<DoctorReport> {
     let scope: 'full' | 'core' = 'full'
     let signal: AbortSignal | undefined
@@ -253,7 +259,7 @@ export class LocalAgentClient
 
   installEnvironmentPackage(
     name: string,
-    options?: { allowUnlisted?: boolean; signal?: AbortSignal },
+    options?: { allowUnlisted?: boolean; signal?: AbortSignal }
   ): Promise<EnvironmentPackageMutationResult> {
     return this.request<EnvironmentPackageMutationResult>(
       '/environment/packages/install',
@@ -262,16 +268,16 @@ export class LocalAgentClient
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           name,
-          allowUnlisted: Boolean(options?.allowUnlisted),
+          allowUnlisted: Boolean(options?.allowUnlisted)
         }),
-        signal: options?.signal,
-      },
+        signal: options?.signal
+      }
     )
   }
 
   uninstallEnvironmentPackage(
     name: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<EnvironmentPackageMutationResult> {
     return this.request<EnvironmentPackageMutationResult>(
       '/environment/packages/uninstall',
@@ -279,58 +285,68 @@ export class LocalAgentClient
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ name }),
-        signal,
-      },
+        signal
+      }
     )
   }
 
   async downloadDiagnostics(
     uiDiagnostics?: Record<string, unknown> | null,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`${this.baseUrl}/v1/doctor/diagnostics`, {
       method: 'POST',
       credentials: 'include',
       headers: this.headers({ 'content-type': 'application/json' }),
       body: JSON.stringify({ uiDiagnostics: uiDiagnostics ?? null }),
-      signal,
+      signal
     })
     if (!response.ok) {
       const detail = await response.text()
       throw new Error(
-        `FastFold Agent API ${response.status}: ${detail || response.statusText}`,
+        `FastFold Agent API ${response.status}: ${
+          detail || response.statusText
+        }`
       )
     }
     const disposition = response.headers.get('content-disposition') || ''
     const match = disposition.match(/filename="?([^"]+)"?/i)
     const filename =
       match?.[1] ||
-      `fastfold-diagnostics-${new Date().toISOString().replace(/[:.]/g, '')}.zip`
+      `fastfold-diagnostics-${new Date()
+        .toISOString()
+        .replace(/[:.]/g, '')}.zip`
     return { blob: await response.blob(), filename }
   }
 
-  async listSessions(
-    options?: { projectId?: string | null; signal?: AbortSignal },
-  ): Promise<AgentSession[]> {
+  async listSessions(options?: {
+    projectId?: string | null
+    signal?: AbortSignal
+  }): Promise<AgentSession[]> {
     const params = new URLSearchParams()
     if (options?.projectId) params.set('projectId', options.projectId)
     const query = params.toString()
     const result = await this.request<{ data: AgentSession[] }>(
       `/sessions${query ? `?${query}` : ''}`,
-      { signal: options?.signal },
+      { signal: options?.signal }
     )
     return result.data
   }
 
   async getSessionsRevision(signal?: AbortSignal): Promise<string> {
-    const result = await this.request<{ revision: string }>('/sessions/revision', {
-      signal,
-    })
+    const result = await this.request<{ revision: string }>(
+      '/sessions/revision',
+      {
+        signal
+      }
+    )
     return result.revision
   }
 
   async listProjects(signal?: AbortSignal): Promise<AgentProject[]> {
-    const result = await this.request<{ data: AgentProject[] }>('/projects', { signal })
+    const result = await this.request<{ data: AgentProject[] }>('/projects', {
+      signal
+    })
     return result.data
   }
 
@@ -345,15 +361,19 @@ export class LocalAgentClient
     if (options?.kind) params.set('kind', options.kind)
     if (options?.q) params.set('q', options.q)
     if (options?.page != null) params.set('page', String(options.page))
-    if (options?.perPage != null) params.set('per_page', String(options.perPage))
+    if (options?.perPage != null)
+      params.set('per_page', String(options.perPage))
     const query = params.toString()
     return this.request<LibraryItemList>(
       `/library${query ? `?${query}` : ''}`,
-      { signal: options?.signal },
+      { signal: options?.signal }
     )
   }
 
-  async uploadLibraryFile(file: File, signal?: AbortSignal): Promise<LibraryItem> {
+  async uploadLibraryFile(
+    file: File,
+    signal?: AbortSignal
+  ): Promise<LibraryItem> {
     const form = new FormData()
     form.append('file', file)
     const response = await fetch(`${this.baseUrl}/v1/library/upload`, {
@@ -361,10 +381,12 @@ export class LocalAgentClient
       credentials: 'include',
       body: form,
       headers: this.headers(),
-      signal,
+      signal
     })
     if (!response.ok) {
-      throw new Error(`FastFold Agent API ${response.status}: ${await response.text()}`)
+      throw new Error(
+        `FastFold Agent API ${response.status}: ${await response.text()}`
+      )
     }
     return (await response.json()) as LibraryItem
   }
@@ -372,20 +394,20 @@ export class LocalAgentClient
   updateLibraryItem(
     itemId: string,
     input: { displayName: string },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<LibraryItem> {
     return this.request<LibraryItem>(`/library/${encodeURIComponent(itemId)}`, {
       method: 'PATCH',
       body: JSON.stringify({ display_name: input.displayName }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   async deleteLibraryItem(itemId: string, signal?: AbortSignal): Promise<void> {
     await this.request<{ deleted: boolean }>(
       `/library/${encodeURIComponent(itemId)}`,
-      { method: 'DELETE', signal },
+      { method: 'DELETE', signal }
     )
   }
 
@@ -395,17 +417,17 @@ export class LocalAgentClient
       projectId?: string | null
       title?: string | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<UseLibraryInChatResult> {
     return this.request<UseLibraryInChatResult>('/library/use-in-chat', {
       method: 'POST',
       body: JSON.stringify({
         item_ids: input.itemIds,
         project_id: input.projectId,
-        title: input.title,
+        title: input.title
       }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
@@ -415,34 +437,36 @@ export class LocalAgentClient
 
   async fetchLibraryContent(
     itemId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<Blob> {
     const response = await fetch(this.getLibraryContentUrl(itemId), {
       method: 'GET',
       credentials: 'include',
       headers: this.headers(),
-      signal,
+      signal
     })
     if (!response.ok) {
-      throw new Error(`FastFold Agent API ${response.status}: ${await response.text()}`)
+      throw new Error(
+        `FastFold Agent API ${response.status}: ${await response.text()}`
+      )
     }
     return response.blob()
   }
 
   readLibraryFile(
     itemId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<WorkspaceFileContent> {
     return this.request<WorkspaceFileContent>(
       `/library/${encodeURIComponent(itemId)}/file`,
-      { signal },
+      { signal }
     )
   }
 
   writeLibraryFile(
     itemId: string,
     input: { content: string; encoding?: 'text' | 'base64' },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<WorkspaceFileContent> {
     return this.request<WorkspaceFileContent>(
       `/library/${encodeURIComponent(itemId)}/content`,
@@ -450,11 +474,11 @@ export class LocalAgentClient
         method: 'PUT',
         body: JSON.stringify({
           content: input.content,
-          encoding: input.encoding || 'text',
+          encoding: input.encoding || 'text'
         }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
@@ -462,31 +486,33 @@ export class LocalAgentClient
 
   getSlackStatus(signal?: AbortSignal): Promise<SlackConnectorStatus> {
     return this.request<SlackConnectorStatus>('/connectors/slack/status', {
-      signal,
+      signal
     })
   }
 
   getSlackManifest(
     appName?: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SlackManifest> {
     const query = appName ? `?app_name=${encodeURIComponent(appName)}` : ''
     return this.request<SlackManifest>(`/connectors/slack/manifest${query}`, {
-      signal,
+      signal
     })
   }
 
-  listSlackWorkspaces(signal?: AbortSignal): Promise<{ data: SlackWorkspace[] }> {
+  listSlackWorkspaces(
+    signal?: AbortSignal
+  ): Promise<{ data: SlackWorkspace[] }> {
     return this.request<{ data: SlackWorkspace[] }>(
       '/connectors/slack/workspaces',
-      { signal },
+      { signal }
     )
   }
 
   /** Ask FastFold Cloud for the Slack install URL to open in the browser. */
   startSlackOneClick(
     input?: { returnTo?: string },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ authUrl: string }> {
     return this.request<{ authUrl: string }>(
       '/connectors/slack/connect/one-click',
@@ -494,8 +520,8 @@ export class LocalAgentClient
         method: 'POST',
         body: JSON.stringify({ return_to: input?.returnTo ?? null }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
@@ -509,39 +535,39 @@ export class LocalAgentClient
    */
   importSlackOneClick(
     reauthTeamId?: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ data: SlackWorkspace[] }> {
     const query = reauthTeamId
       ? `?reauth_team_id=${encodeURIComponent(reauthTeamId)}`
       : ''
     return this.request<{ data: SlackWorkspace[] }>(
       `/connectors/slack/connect/one-click/import${query}`,
-      { method: 'POST', signal },
+      { method: 'POST', signal }
     )
   }
 
   connectSlackManual(
     input: { botToken: string; appToken: string },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SlackWorkspace> {
     return this.request<SlackWorkspace>('/connectors/slack/connect', {
       method: 'POST',
       body: JSON.stringify({
         bot_token: input.botToken,
-        app_token: input.appToken,
+        app_token: input.appToken
       }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   async disconnectSlackWorkspace(
     teamId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
     await this.request<{ ok: boolean }>(
       `/connectors/slack/workspaces/${encodeURIComponent(teamId)}`,
-      { method: 'DELETE', signal },
+      { method: 'DELETE', signal }
     )
   }
 
@@ -549,7 +575,7 @@ export class LocalAgentClient
   setSlackWorkspaceEnabled(
     teamId: string,
     enabled: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SlackWorkspace> {
     return this.request<SlackWorkspace>(
       `/connectors/slack/workspaces/${encodeURIComponent(teamId)}/enabled`,
@@ -557,35 +583,37 @@ export class LocalAgentClient
         method: 'PATCH',
         body: JSON.stringify({ enabled }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   getSlackDirectory(
     teamId: string,
-    options?: { refresh?: boolean; signal?: AbortSignal },
+    options?: { refresh?: boolean; signal?: AbortSignal }
   ): Promise<SlackDirectory> {
     const query = options?.refresh ? '?refresh=true' : ''
     return this.request<SlackDirectory>(
-      `/connectors/slack/workspaces/${encodeURIComponent(teamId)}/directory${query}`,
-      { signal: options?.signal },
+      `/connectors/slack/workspaces/${encodeURIComponent(
+        teamId
+      )}/directory${query}`,
+      { signal: options?.signal }
     )
   }
 
   listSlackPeople(
     teamId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ data: SlackAllowedUser[] }> {
     return this.request<{ data: SlackAllowedUser[] }>(
       `/connectors/slack/workspaces/${encodeURIComponent(teamId)}/people`,
-      { signal },
+      { signal }
     )
   }
 
   allowSlackPerson(
     input: { teamId: string; slackUserId: string; displayName?: string | null },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ data: SlackAllowedUser[] }> {
     return this.request<{ data: SlackAllowedUser[] }>(
       '/connectors/slack/people',
@@ -594,42 +622,42 @@ export class LocalAgentClient
         body: JSON.stringify({
           team_id: input.teamId,
           slack_user_id: input.slackUserId,
-          display_name: input.displayName,
+          display_name: input.displayName
         }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   async disallowSlackPerson(
     teamId: string,
     slackUserId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
     await this.request<{ ok: boolean }>(
       `/connectors/slack/workspaces/${encodeURIComponent(teamId)}` +
         `/people/${encodeURIComponent(slackUserId)}`,
-      { method: 'DELETE', signal },
+      { method: 'DELETE', signal }
     )
   }
 
   listSlackSubscriptions(
     sessionId?: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ data: SlackSubscription[] }> {
     const query = sessionId
       ? `?session_id=${encodeURIComponent(sessionId)}`
       : ''
     return this.request<{ data: SlackSubscription[] }>(
       `/connectors/slack/subscriptions${query}`,
-      { signal },
+      { signal }
     )
   }
 
   addSlackSubscription(
     input: { sessionId: string; channel: string },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ data: SlackSubscription[] }> {
     return this.request<{ data: SlackSubscription[] }>(
       '/connectors/slack/subscriptions',
@@ -637,67 +665,72 @@ export class LocalAgentClient
         method: 'POST',
         body: JSON.stringify({
           session_id: input.sessionId,
-          channel: input.channel,
+          channel: input.channel
         }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   async removeSlackSubscription(
     sessionId: string,
     channel: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
     const params = new URLSearchParams({
       session_id: sessionId,
-      channel,
+      channel
     })
     await this.request<{ ok: boolean }>(
       `/connectors/slack/subscriptions?${params}`,
-      { method: 'DELETE', signal },
+      { method: 'DELETE', signal }
     )
   }
 
-  listSlackParked(signal?: AbortSignal): Promise<{ data: SlackParkedMessage[] }> {
+  listSlackParked(
+    signal?: AbortSignal
+  ): Promise<{ data: SlackParkedMessage[] }> {
     return this.request<{ data: SlackParkedMessage[] }>(
       '/connectors/slack/parked',
-      { signal },
+      { signal }
     )
   }
 
-  async allowSlackParked(messageId: string, signal?: AbortSignal): Promise<void> {
+  async allowSlackParked(
+    messageId: string,
+    signal?: AbortSignal
+  ): Promise<void> {
     await this.request<{ ok: boolean }>(
       `/connectors/slack/parked/${encodeURIComponent(messageId)}/allow`,
-      { method: 'POST', signal },
+      { method: 'POST', signal }
     )
   }
 
   async dismissSlackParked(
     messageId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
     await this.request<{ ok: boolean }>(
       `/connectors/slack/parked/${encodeURIComponent(messageId)}`,
-      { method: 'DELETE', signal },
+      { method: 'DELETE', signal }
     )
   }
 
   getSessionSlackMute(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionConnectorMute> {
     return this.request<SessionConnectorMute>(
       `/sessions/${encodeURIComponent(sessionId)}/connectors/slack`,
-      { signal },
+      { signal }
     )
   }
 
   setSessionSlackMute(
     sessionId: string,
     muted: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionConnectorMute> {
     return this.request<SessionConnectorMute>(
       `/sessions/${encodeURIComponent(sessionId)}/connectors/slack`,
@@ -705,15 +738,18 @@ export class LocalAgentClient
         method: 'PUT',
         body: JSON.stringify({ muted }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   getProject(projectId: string, signal?: AbortSignal): Promise<AgentProject> {
-    return this.request<AgentProject>(`/projects/${encodeURIComponent(projectId)}`, {
-      signal,
-    })
+    return this.request<AgentProject>(
+      `/projects/${encodeURIComponent(projectId)}`,
+      {
+        signal
+      }
+    )
   }
 
   createProject(
@@ -726,7 +762,7 @@ export class LocalAgentClient
       color?: string | null
       pinned?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentProject> {
     return this.request<AgentProject>('/projects', {
       method: 'POST',
@@ -737,10 +773,10 @@ export class LocalAgentClient
         folderPath: input.folderPath,
         icon: input.icon,
         color: input.color,
-        pinned: Boolean(input.pinned),
+        pinned: Boolean(input.pinned)
       }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
@@ -755,7 +791,7 @@ export class LocalAgentClient
       color?: string | null
       pinned?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentProject> {
     const body: Record<string, unknown> = {
       name: input.name,
@@ -765,7 +801,7 @@ export class LocalAgentClient
       clearAgentContext: input.agentContext === null,
       icon: input.icon,
       color: input.color,
-      pinned: input.pinned,
+      pinned: input.pinned
     }
     // Only touch folder when the caller set folderPath. `null` clears; a string
     // sets. Omitting the field (e.g. pin toggle) must not wipe a linked folder.
@@ -776,30 +812,41 @@ export class LocalAgentClient
         body.folderPath = input.folderPath
       }
     }
-    return this.request<AgentProject>(`/projects/${encodeURIComponent(projectId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-      headers: { 'content-type': 'application/json' },
-      signal,
-    })
+    return this.request<AgentProject>(
+      `/projects/${encodeURIComponent(projectId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
   }
 
   async deleteProject(projectId: string, signal?: AbortSignal): Promise<void> {
     await this.request<{ deleted: boolean }>(
       `/projects/${encodeURIComponent(projectId)}`,
-      { method: 'DELETE', signal },
+      { method: 'DELETE', signal }
     )
   }
 
   async listSpecialists(signal?: AbortSignal): Promise<Specialist[]> {
-    const result = await this.request<{ data: Specialist[] }>('/specialists', { signal })
+    const result = await this.request<{ data: Specialist[] }>('/specialists', {
+      signal
+    })
     return result.data
   }
 
-  getSpecialist(specialistId: string, signal?: AbortSignal): Promise<Specialist> {
-    return this.request<Specialist>(`/specialists/${encodeURIComponent(specialistId)}`, {
-      signal,
-    })
+  getSpecialist(
+    specialistId: string,
+    signal?: AbortSignal
+  ): Promise<Specialist> {
+    return this.request<Specialist>(
+      `/specialists/${encodeURIComponent(specialistId)}`,
+      {
+        signal
+      }
+    )
   }
 
   createSpecialist(
@@ -816,7 +863,7 @@ export class LocalAgentClient
       mcpCatalogIds?: string[]
       enabled?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<Specialist> {
     return this.request<Specialist>('/specialists', {
       method: 'POST',
@@ -831,10 +878,10 @@ export class LocalAgentClient
         tool_names: input.toolNames ?? [],
         mcp_server_ids: input.mcpServerIds ?? [],
         mcp_catalog_ids: input.mcpCatalogIds ?? [],
-        enabled: input.enabled ?? true,
+        enabled: input.enabled ?? true
       }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
@@ -853,28 +900,31 @@ export class LocalAgentClient
       mcpCatalogIds?: string[]
       enabled?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<Specialist> {
-    return this.request<Specialist>(`/specialists/${encodeURIComponent(specialistId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        name: input.name,
-        slug: input.slug,
-        description: input.description,
-        clear_description: input.description === null,
-        instructions: input.instructions,
-        clear_instructions: input.instructions === null,
-        color: input.color,
-        icon: input.icon,
-        skill_names: input.skillNames,
-        tool_names: input.toolNames,
-        mcp_server_ids: input.mcpServerIds,
-        mcp_catalog_ids: input.mcpCatalogIds,
-        enabled: input.enabled,
-      }),
-      headers: { 'content-type': 'application/json' },
-      signal,
-    })
+    return this.request<Specialist>(
+      `/specialists/${encodeURIComponent(specialistId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: input.name,
+          slug: input.slug,
+          description: input.description,
+          clear_description: input.description === null,
+          instructions: input.instructions,
+          clear_instructions: input.instructions === null,
+          color: input.color,
+          icon: input.icon,
+          skill_names: input.skillNames,
+          tool_names: input.toolNames,
+          mcp_server_ids: input.mcpServerIds,
+          mcp_catalog_ids: input.mcpCatalogIds,
+          enabled: input.enabled
+        }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
   }
 
   getPromptBudget(
@@ -884,7 +934,7 @@ export class LocalAgentClient
       sampleQuery?: string | null
       tokenCountMethod?: 'tiktoken' | 'provider' | string | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<PromptBudgetResponse> {
     const params = new URLSearchParams()
     if (options?.specialistId) params.set('specialistId', options.specialistId)
@@ -898,22 +948,31 @@ export class LocalAgentClient
     const query = params.toString()
     return this.request<PromptBudgetResponse>(
       `/settings/prompt-budget${query ? `?${query}` : ''}`,
-      { signal },
+      { signal }
     )
   }
 
-  async deleteSpecialist(specialistId: string, signal?: AbortSignal): Promise<void> {
+  async deleteSpecialist(
+    specialistId: string,
+    signal?: AbortSignal
+  ): Promise<void> {
     await this.request<{ deleted: boolean }>(
       `/specialists/${encodeURIComponent(specialistId)}`,
-      { method: 'DELETE', signal },
+      { method: 'DELETE', signal }
     )
   }
 
-  async searchSessions(query: string, signal?: AbortSignal): Promise<AgentSession[]> {
+  async searchSessions(
+    query: string,
+    signal?: AbortSignal
+  ): Promise<AgentSession[]> {
     const params = new URLSearchParams({ q: query })
-    const result = await this.request<{ data: AgentSession[] }>(`/sessions/search?${params}`, {
-      signal,
-    })
+    const result = await this.request<{ data: AgentSession[] }>(
+      `/sessions/search?${params}`,
+      {
+        signal
+      }
+    )
     return result.data
   }
 
@@ -925,7 +984,7 @@ export class LocalAgentClient
       specialistId?: string | null
       sandboxBackend?: 'builtin' | 'modal' | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSession> {
     return this.request<AgentSession>('/sessions', {
       method: 'POST',
@@ -934,10 +993,10 @@ export class LocalAgentClient
         workspace_path: input.workspacePath,
         project_id: input.projectId,
         specialist_id: input.specialistId,
-        sandbox_backend: input.sandboxBackend,
+        sandbox_backend: input.sandboxBackend
       }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
@@ -950,40 +1009,43 @@ export class LocalAgentClient
       specialistId?: string | null
       sandboxBackend?: 'builtin' | 'modal' | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSession> {
-    return this.request<AgentSession>(`/sessions/${encodeURIComponent(sessionId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        title: input.title,
-        organize_label: input.organizeLabel ?? undefined,
-        clear_organize_label: input.organizeLabel === null,
-        project_id: input.projectId ?? undefined,
-        clear_project_id: input.projectId === null,
-        specialist_id: input.specialistId ?? undefined,
-        clear_specialist_id: input.specialistId === null,
-        sandbox_backend: input.sandboxBackend ?? undefined,
-        clear_sandbox_backend: input.sandboxBackend === null,
-      }),
-      headers: { 'content-type': 'application/json' },
-      signal,
-    })
+    return this.request<AgentSession>(
+      `/sessions/${encodeURIComponent(sessionId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title: input.title,
+          organize_label: input.organizeLabel ?? undefined,
+          clear_organize_label: input.organizeLabel === null,
+          project_id: input.projectId ?? undefined,
+          clear_project_id: input.projectId === null,
+          specialist_id: input.specialistId ?? undefined,
+          clear_specialist_id: input.specialistId === null,
+          sandbox_backend: input.sandboxBackend ?? undefined,
+          clear_sandbox_backend: input.sandboxBackend === null
+        }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
   }
 
   getSessionSandbox(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus> {
     return this.request<SessionSandboxStatus>(
       `/sessions/${encodeURIComponent(sessionId)}/sandbox`,
-      { signal },
+      { signal }
     )
   }
 
   sandboxStreamUrl(sessionId: string): string {
     const base = this.baseUrl.replace(/^http/, 'ws')
     const url = new URL(
-      `${base}/v1/sessions/${encodeURIComponent(sessionId)}/sandbox/stream`,
+      `${base}/v1/sessions/${encodeURIComponent(sessionId)}/sandbox/stream`
     )
     if (this.apiKey) url.searchParams.set('token', this.apiKey)
     return url.toString()
@@ -991,38 +1053,38 @@ export class LocalAgentClient
 
   startSessionSandbox(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus> {
     return this.request<SessionSandboxStatus>(
       `/sessions/${encodeURIComponent(sessionId)}/sandbox/start`,
-      { method: 'POST', signal },
+      { method: 'POST', signal }
     )
   }
 
   stopSessionSandbox(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus> {
     return this.request<SessionSandboxStatus>(
       `/sessions/${encodeURIComponent(sessionId)}/sandbox/stop`,
-      { method: 'POST', signal },
+      { method: 'POST', signal }
     )
   }
 
   restartSessionSandbox(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus> {
     return this.request<SessionSandboxStatus>(
       `/sessions/${encodeURIComponent(sessionId)}/sandbox/restart`,
-      { method: 'POST', signal },
+      { method: 'POST', signal }
     )
   }
 
   autoTitleSession(
     sessionId: string,
     input: { force?: boolean } = {},
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSession> {
     return this.request<AgentSession>(
       `/sessions/${encodeURIComponent(sessionId)}/title/auto`,
@@ -1030,19 +1092,25 @@ export class LocalAgentClient
         method: 'POST',
         body: JSON.stringify({ force: Boolean(input.force) }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   async deleteSession(sessionId: string, signal?: AbortSignal): Promise<void> {
-    await this.request<{ deleted: boolean }>(`/sessions/${encodeURIComponent(sessionId)}`, {
-      method: 'DELETE',
-      signal,
-    })
+    await this.request<{ deleted: boolean }>(
+      `/sessions/${encodeURIComponent(sessionId)}`,
+      {
+        method: 'DELETE',
+        signal
+      }
+    )
   }
 
-  async listMessages(sessionId: string, signal?: AbortSignal): Promise<AgentMessage[]> {
+  async listMessages(
+    sessionId: string,
+    signal?: AbortSignal
+  ): Promise<AgentMessage[]> {
     const result = await this.request<{
       data: AgentMessage[]
       feedback?: Record<string, 'up' | 'down'>
@@ -1050,17 +1118,20 @@ export class LocalAgentClient
     return result.data
   }
 
-  async listEventHistory(sessionId: string, signal?: AbortSignal): Promise<AgentEvent[]> {
+  async listEventHistory(
+    sessionId: string,
+    signal?: AbortSignal
+  ): Promise<AgentEvent[]> {
     const result = await this.request<{ data: AgentEvent[] }>(
       `/sessions/${encodeURIComponent(sessionId)}/events/history`,
-      { signal },
+      { signal }
     )
     return result.data
   }
 
   async getMessageFeedback(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<Record<string, 'up' | 'down'>> {
     const result = await this.request<{
       data: AgentMessage[]
@@ -1073,35 +1144,41 @@ export class LocalAgentClient
     sessionId: string,
     messageId: string,
     reaction: 'up' | 'down' | null,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
     await this.request(
-      `/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(messageId)}/feedback`,
+      `/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(
+        messageId
+      )}/feedback`,
       {
         method: 'POST',
         body: JSON.stringify({ reaction }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
-  sendMessage(sessionId: string, content: string, signal?: AbortSignal): Promise<{ runId: string }> {
+  sendMessage(
+    sessionId: string,
+    content: string,
+    signal?: AbortSignal
+  ): Promise<{ runId: string }> {
     return this.request<{ runId: string }>(
       `/sessions/${encodeURIComponent(sessionId)}/messages`,
       {
         method: 'POST',
         body: JSON.stringify({ content }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   async interrupt(sessionId: string, signal?: AbortSignal): Promise<boolean> {
     const result = await this.request<{ interrupted: boolean }>(
       `/sessions/${encodeURIComponent(sessionId)}/interrupt`,
-      { method: 'POST', signal },
+      { method: 'POST', signal }
     )
     return result.interrupted
   }
@@ -1109,7 +1186,7 @@ export class LocalAgentClient
   submitApprovals(
     sessionId: string,
     decisions: HitlDecision[],
-    options?: { interruptId?: string | null; signal?: AbortSignal },
+    options?: { interruptId?: string | null; signal?: AbortSignal }
   ): Promise<{ accepted: boolean; interruptId?: string | null }> {
     return this.request<{ accepted: boolean; interruptId?: string | null }>(
       `/sessions/${encodeURIComponent(sessionId)}/approvals`,
@@ -1117,11 +1194,11 @@ export class LocalAgentClient
         method: 'POST',
         body: JSON.stringify({
           decisions,
-          interruptId: options?.interruptId ?? null,
+          interruptId: options?.interruptId ?? null
         }),
         headers: { 'content-type': 'application/json' },
-        signal: options?.signal,
-      },
+        signal: options?.signal
+      }
     )
   }
 
@@ -1131,10 +1208,11 @@ export class LocalAgentClient
       afterSequence?: number
       signal?: AbortSignal
       onEvent: (event: AgentEvent) => void
-    },
+    }
   ): Promise<void> {
     const query = new URLSearchParams()
-    if (options.afterSequence) query.set('after_sequence', String(options.afterSequence))
+    if (options.afterSequence)
+      query.set('after_sequence', String(options.afterSequence))
     // Prefer native EventSource: WKWebView (Tauri) buffers fetch ReadableStream
     // chunks, delivering trailing frames (run.completed) seconds late. The
     // native SSE parser flushes per event and auto-reconnects with
@@ -1144,15 +1222,19 @@ export class LocalAgentClient
     }
     const suffix = query.size ? `?${query}` : ''
     const response = await fetch(
-      `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/events${suffix}`,
+      `${this.baseUrl}/v1/sessions/${encodeURIComponent(
+        sessionId
+      )}/events${suffix}`,
       {
         credentials: 'include',
         headers: this.headers({ accept: 'text/event-stream' }),
-        signal: options.signal,
-      },
+        signal: options.signal
+      }
     )
     if (!response.ok || !response.body) {
-      throw new Error(`FastFold Agent event stream failed with status ${response.status}`)
+      throw new Error(
+        `FastFold Agent event stream failed with status ${response.status}`
+      )
     }
 
     const reader = response.body.getReader()
@@ -1169,8 +1251,8 @@ export class LocalAgentClient
       for (const frame of frames) {
         const data = frame
           .split('\n')
-          .filter((line) => line.startsWith('data:'))
-          .map((line) => line.slice(5).trim())
+          .filter(line => line.startsWith('data:'))
+          .map(line => line.slice(5).trim())
           .join('')
         if (data) options.onEvent(JSON.parse(data) as AgentEvent)
       }
@@ -1183,13 +1265,15 @@ export class LocalAgentClient
     options: {
       signal?: AbortSignal
       onEvent: (event: AgentEvent) => void
-    },
+    }
   ): Promise<void> {
     // EventSource cannot set headers; authenticate via query token
     // (same pattern as the sandbox/PTY WebSockets) plus cookies.
     if (this.apiKey) query.set('token', this.apiKey)
     const suffix = query.size ? `?${query}` : ''
-    const url = `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/events${suffix}`
+    const url = `${this.baseUrl}/v1/sessions/${encodeURIComponent(
+      sessionId
+    )}/events${suffix}`
     return new Promise<void>((resolve, reject) => {
       const source = new EventSource(url, { withCredentials: true })
       let opened = false
@@ -1209,7 +1293,7 @@ export class LocalAgentClient
       source.onopen = () => {
         opened = true
       }
-      source.onmessage = (message) => {
+      source.onmessage = message => {
         try {
           options.onEvent(JSON.parse(message.data) as AgentEvent)
         } catch {
@@ -1222,16 +1306,20 @@ export class LocalAgentClient
         if (source.readyState === EventSource.CLOSED) {
           cleanup()
           if (opened) resolve()
-          else reject(new Error('FastFold Agent event stream failed to connect'))
+          else
+            reject(new Error('FastFold Agent event stream failed to connect'))
         }
       }
     })
   }
 
-  async listFiles(sessionId: string, signal?: AbortSignal): Promise<WorkspaceFile[]> {
+  async listFiles(
+    sessionId: string,
+    signal?: AbortSignal
+  ): Promise<WorkspaceFile[]> {
     const result = await this.request<{ data: WorkspaceFile[] }>(
       `/sessions/${encodeURIComponent(sessionId)}/files`,
-      { signal },
+      { signal }
     )
     return result.data
   }
@@ -1239,12 +1327,12 @@ export class LocalAgentClient
   readFile(
     sessionId: string,
     path: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<WorkspaceFileContent> {
     const query = new URLSearchParams({ path })
     return this.request<WorkspaceFileContent>(
       `/sessions/${encodeURIComponent(sessionId)}/files/content?${query}`,
-      { signal },
+      { signal }
     )
   }
 
@@ -1256,10 +1344,12 @@ export class LocalAgentClient
       encoding?: 'text' | 'base64'
       baseVersion?: string | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<FileWriteResult> {
     const response = await fetch(
-      `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/files/content`,
+      `${this.baseUrl}/v1/sessions/${encodeURIComponent(
+        sessionId
+      )}/files/content`,
       {
         method: 'PUT',
         credentials: 'include',
@@ -1267,43 +1357,52 @@ export class LocalAgentClient
           path: input.path,
           content: input.content,
           encoding: input.encoding || 'text',
-          base_version: input.baseVersion,
+          base_version: input.baseVersion
         }),
         headers: this.headers({ 'content-type': 'application/json' }),
-        signal,
-      },
+        signal
+      }
     )
     if (response.status === 409) {
       const body = (await response.json()) as { current: WorkspaceFileContent }
       return { ok: false, conflict: true, current: body.current }
     }
     if (!response.ok) {
-      throw new Error(`FastFold Agent API ${response.status}: ${await response.text()}`)
+      throw new Error(
+        `FastFold Agent API ${response.status}: ${await response.text()}`
+      )
     }
-    return { ok: true, content: (await response.json()) as WorkspaceFileContent }
+    return {
+      ok: true,
+      content: (await response.json()) as WorkspaceFileContent
+    }
   }
 
   async uploadFile(
     sessionId: string,
     file: File,
     relativeDirectory = 'uploads',
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<WorkspaceFileContent> {
     const form = new FormData()
     form.append('file', file)
     if (relativeDirectory) form.append('relative_dir', relativeDirectory)
     const response = await fetch(
-      `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/files/upload`,
+      `${this.baseUrl}/v1/sessions/${encodeURIComponent(
+        sessionId
+      )}/files/upload`,
       {
         method: 'POST',
         credentials: 'include',
         body: form,
         headers: this.headers(),
-        signal,
-      },
+        signal
+      }
     )
     if (!response.ok) {
-      throw new Error(`FastFold Agent API ${response.status}: ${await response.text()}`)
+      throw new Error(
+        `FastFold Agent API ${response.status}: ${await response.text()}`
+      )
     }
     return (await response.json()) as WorkspaceFileContent
   }
@@ -1311,70 +1410,89 @@ export class LocalAgentClient
   async createFolder(
     sessionId: string,
     path: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
-    await this.request(`/sessions/${encodeURIComponent(sessionId)}/files/folders`, {
-      method: 'POST',
-      body: JSON.stringify({ path }),
-      headers: { 'content-type': 'application/json' },
-      signal,
-    })
+    await this.request(
+      `/sessions/${encodeURIComponent(sessionId)}/files/folders`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ path }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
   }
 
   async moveFile(
     sessionId: string,
     sourcePath: string,
     targetPath: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
-    await this.request(`/sessions/${encodeURIComponent(sessionId)}/files/move`, {
-      method: 'POST',
-      body: JSON.stringify({ source_path: sourcePath, target_path: targetPath }),
-      headers: { 'content-type': 'application/json' },
-      signal,
-    })
+    await this.request(
+      `/sessions/${encodeURIComponent(sessionId)}/files/move`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          source_path: sourcePath,
+          target_path: targetPath
+        }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
   }
 
   async deleteFile(
     sessionId: string,
     path: string,
     recursive = false,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
     const query = new URLSearchParams({ path, recursive: String(recursive) })
-    await this.request(`/sessions/${encodeURIComponent(sessionId)}/files?${query}`, {
-      method: 'DELETE',
-      signal,
-    })
+    await this.request(
+      `/sessions/${encodeURIComponent(sessionId)}/files?${query}`,
+      {
+        method: 'DELETE',
+        signal
+      }
+    )
   }
 
   downloadUrl(sessionId: string, path: string): string {
     const query = new URLSearchParams({ path })
-    return `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/files/download?${query}`
+    return `${this.baseUrl}/v1/sessions/${encodeURIComponent(
+      sessionId
+    )}/files/download?${query}`
   }
 
   async listSkills(signal?: AbortSignal): Promise<AgentSkill[]> {
-    const result = await this.request<{ data: AgentSkill[] }>('/skills', { signal })
+    const result = await this.request<{ data: AgentSkill[] }>('/skills', {
+      signal
+    })
     return result.data
   }
 
   async listSkillSources(signal?: AbortSignal): Promise<AgentSkillSource[]> {
-    const result = await this.request<{ data: AgentSkillSource[] }>('/skills/sources', { signal })
+    const result = await this.request<{ data: AgentSkillSource[] }>(
+      '/skills/sources',
+      { signal }
+    )
     return result.data
   }
 
   async searchSkillCatalog(
     query: string,
     limit = 12,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentCatalogSkill[]> {
     const params = new URLSearchParams({
       q: query,
-      limit: String(limit),
+      limit: String(limit)
     })
     const result = await this.request<{ data: AgentCatalogSkill[] }>(
       `/skills/catalog/search?${params.toString()}`,
-      { signal },
+      { signal }
     )
     return result.data
   }
@@ -1385,71 +1503,77 @@ export class LocalAgentClient
       page?: number
       perPage?: number
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentCatalogLeaderboard> {
     const params = new URLSearchParams({
       view: options?.view || 'all-time',
       page: String(options?.page ?? 0),
-      per_page: String(options?.perPage ?? 50),
+      per_page: String(options?.perPage ?? 50)
     })
     return this.request<AgentCatalogLeaderboard>(
       `/skills/catalog/leaderboard?${params.toString()}`,
-      { signal },
+      { signal }
     )
   }
 
   getCatalogSkillDetail(
     source: string,
     skill: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentCatalogSkillDetail> {
     const params = new URLSearchParams({ source, skill })
     return this.request<AgentCatalogSkillDetail>(
       `/skills/catalog/detail?${params.toString()}`,
-      { signal },
+      { signal }
     )
   }
 
   getCatalogSkillAudit(
     source: string,
     skill: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentCatalogSkillAudit> {
     const params = new URLSearchParams({ source, skill })
     return this.request<AgentCatalogSkillAudit>(
       `/skills/catalog/audit?${params.toString()}`,
-      { signal },
+      { signal }
     )
   }
 
   bulkSkillAction(
     action: AgentSkillBatchAction,
     names: string[],
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSkillBatchResult> {
     return this.request<AgentSkillBatchResult>('/skills/batch', {
       method: 'POST',
       body: JSON.stringify({ action, names }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   getSkill(name: string, signal?: AbortSignal): Promise<AgentSkillDetail> {
-    return this.request<AgentSkillDetail>(`/skills/${encodeURIComponent(name)}`, { signal })
+    return this.request<AgentSkillDetail>(
+      `/skills/${encodeURIComponent(name)}`,
+      { signal }
+    )
   }
 
   setSkillEnabled(
     name: string,
     enabled: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSkillDetail> {
-    return this.request<AgentSkillDetail>(`/skills/${encodeURIComponent(name)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ enabled }),
-      headers: { 'content-type': 'application/json' },
-      signal,
-    })
+    return this.request<AgentSkillDetail>(
+      `/skills/${encodeURIComponent(name)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
   }
 
   async installSkill(source: string, signal?: AbortSignal): Promise<string[]> {
@@ -1457,7 +1581,7 @@ export class LocalAgentClient
       method: 'POST',
       body: JSON.stringify({ source }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
     return result.installed
   }
@@ -1470,10 +1594,12 @@ export class LocalAgentClient
       credentials: 'include',
       body: form,
       headers: this.headers(),
-      signal,
+      signal
     })
     if (!response.ok) {
-      throw new Error(`FastFold Agent API ${response.status}: ${await response.text()}`)
+      throw new Error(
+        `FastFold Agent API ${response.status}: ${await response.text()}`
+      )
     }
     const result = (await response.json()) as { installed: string[] }
     return result.installed
@@ -1482,20 +1608,26 @@ export class LocalAgentClient
   async removeSkill(name: string, signal?: AbortSignal): Promise<void> {
     await this.request(`/skills/${encodeURIComponent(name)}`, {
       method: 'DELETE',
-      signal,
+      signal
     })
   }
 
   async upgradeSkills(signal?: AbortSignal): Promise<string[]> {
-    const result = await this.request<{ installed: string[] }>('/skills/upgrade', {
-      method: 'POST',
-      signal,
-    })
+    const result = await this.request<{ installed: string[] }>(
+      '/skills/upgrade',
+      {
+        method: 'POST',
+        signal
+      }
+    )
     return result.installed
   }
 
   async listIntegrations(signal?: AbortSignal): Promise<IntegrationSummary[]> {
-    const result = await this.request<{ data: IntegrationSummary[] }>('/integrations', { signal })
+    const result = await this.request<{ data: IntegrationSummary[] }>(
+      '/integrations',
+      { signal }
+    )
     // Legacy global OpenAI-compatible key is redundant with per–Local LLM profile keys.
     return result.data.filter(item => item.key !== 'openai-compatible')
   }
@@ -1503,37 +1635,65 @@ export class LocalAgentClient
   updateIntegration(
     key: string,
     values: Record<string, string>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<IntegrationSummary> {
-    return this.request<IntegrationSummary>(`/integrations/${encodeURIComponent(key)}`, {
-      method: 'PUT',
-      body: JSON.stringify({ values }),
-      headers: { 'content-type': 'application/json' },
-      signal,
-    })
+    return this.request<IntegrationSummary>(
+      `/integrations/${encodeURIComponent(key)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ values }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
   }
 
-  removeIntegration(key: string, signal?: AbortSignal): Promise<IntegrationSummary> {
-    return this.request<IntegrationSummary>(`/integrations/${encodeURIComponent(key)}`, {
-      method: 'DELETE',
-      signal,
-    })
+  removeIntegration(
+    key: string,
+    signal?: AbortSignal
+  ): Promise<IntegrationSummary> {
+    return this.request<IntegrationSummary>(
+      `/integrations/${encodeURIComponent(key)}`,
+      {
+        method: 'DELETE',
+        signal
+      }
+    )
   }
 
-  autofillIntegration(key: string, signal?: AbortSignal): Promise<IntegrationSummary> {
+  autofillIntegration(
+    key: string,
+    signal?: AbortSignal
+  ): Promise<IntegrationSummary> {
     return this.request<IntegrationSummary>(
       `/integrations/${encodeURIComponent(key)}/autofill`,
       {
         method: 'POST',
-        signal,
-      },
+        signal
+      }
+    )
+  }
+
+  installIntegrationCapability(
+    key: string,
+    capabilityId: string,
+    signal?: AbortSignal
+  ): Promise<IntegrationSummary> {
+    return this.request<IntegrationSummary>(
+      `/integrations/${encodeURIComponent(
+        key
+      )}/capabilities/${encodeURIComponent(capabilityId)}/install`,
+      {
+        method: 'POST',
+        signal
+      }
     )
   }
 
   setupIntegration(
     key: string,
     workingDirectory?: string | null,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<IntegrationSetupResult> {
     const body =
       workingDirectory && workingDirectory.trim()
@@ -1545,18 +1705,18 @@ export class LocalAgentClient
         method: 'POST',
         body,
         headers: body ? { 'content-type': 'application/json' } : undefined,
-        signal,
-      },
+        signal
+      }
     )
   }
 
   async validateIntegration(
     key: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ ok: boolean; message: string }> {
     return this.request<{ ok: boolean; message: string }>(
       `/integrations/${encodeURIComponent(key)}/validate`,
-      { method: 'POST', signal },
+      { method: 'POST', signal }
     )
   }
 
@@ -1566,7 +1726,7 @@ export class LocalAgentClient
 
   updateRuntimeSettings(
     changes: Partial<RuntimeSettings>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<RuntimeSettings> {
     return this.request<RuntimeSettings>('/settings/runtime', {
       method: 'PATCH',
@@ -1590,10 +1750,10 @@ export class LocalAgentClient
         tool_health_fail_threshold: changes.toolHealthFailThreshold,
         tool_health_suppress_seconds: changes.toolHealthSuppressSeconds,
         plan_mode: changes.planMode,
-        file_access: changes.fileAccess,
+        file_access: changes.fileAccess
       }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
@@ -1603,16 +1763,16 @@ export class LocalAgentClient
 
   updateOnboardingSettings(
     changes: Partial<OnboardingSettings>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<OnboardingSettings> {
     return this.request<OnboardingSettings>('/settings/onboarding', {
       method: 'PATCH',
       body: JSON.stringify({
         completed: changes.completed,
-        step: changes.step,
+        step: changes.step
       }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
@@ -1622,7 +1782,7 @@ export class LocalAgentClient
 
   updateSandboxSettings(
     changes: Partial<SandboxSettings>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SandboxSettings> {
     return this.request<SandboxSettings>('/settings/sandbox', {
       method: 'PATCH',
@@ -1636,17 +1796,17 @@ export class LocalAgentClient
         gpu_class: changes.gpuClass,
         cpu_cores: changes.cpuCores,
         ram_gb: changes.ramGb,
-        idle_ttl_seconds: changes.idleTtlSeconds,
+        idle_ttl_seconds: changes.idleTtlSeconds
       }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   probeSandboxSettings(signal?: AbortSignal): Promise<SandboxProbeReport> {
     return this.request<SandboxProbeReport>('/settings/sandbox/probe', {
       method: 'POST',
-      signal,
+      signal
     })
   }
 
@@ -1658,14 +1818,14 @@ export class LocalAgentClient
     if (options?.checkUpdates) params.set('check_updates', 'true')
     const query = params.toString()
     return this.request<AccountSummary>(`/account${query ? `?${query}` : ''}`, {
-      signal: options?.signal,
+      signal: options?.signal
     })
   }
 
   logoutAccount(signal?: AbortSignal): Promise<AccountSummary> {
     return this.request<AccountSummary>('/account/logout', {
       method: 'POST',
-      signal,
+      signal
     })
   }
 
@@ -1680,7 +1840,7 @@ export class LocalAgentClient
     const query = params.toString()
     const result = await this.request<{ data: AgentModel[] }>(
       `/models${query ? `?${query}` : ''}`,
-      { signal: options?.signal },
+      { signal: options?.signal }
     )
     return result.data
   }
@@ -1688,39 +1848,39 @@ export class LocalAgentClient
   updateModelEnabled(
     modelId: string,
     enabled: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentModel> {
     return this.request<AgentModel>(`/models/${encodeURIComponent(modelId)}`, {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   createCustomModel(
     input: CreateAgentModelInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentModel> {
     return this.request<AgentModel>('/models', {
       method: 'POST',
       body: JSON.stringify({
         id: input.id,
         provider: input.provider || 'openai',
-        label: input.label,
+        label: input.label
       }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   async deleteCustomModel(
     modelId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
     await this.request(`/models/${encodeURIComponent(modelId)}`, {
       method: 'DELETE',
-      signal,
+      signal
     })
   }
 
@@ -1733,14 +1893,14 @@ export class LocalAgentClient
     const query = params.toString()
     const result = await this.request<{ data: ModelProfile[] }>(
       `/model-profiles${query ? `?${query}` : ''}`,
-      { signal: options?.signal },
+      { signal: options?.signal }
     )
     return result.data
   }
 
   createModelProfile(
     input: UpsertModelProfileInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfile> {
     return this.request<ModelProfile>('/model-profiles', {
       method: 'POST',
@@ -1753,17 +1913,17 @@ export class LocalAgentClient
         default_model: input.defaultModel,
         discovery: input.discovery,
         set_active: input.setActive,
-        set_default: input.setDefault,
+        set_default: input.setDefault
       }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   updateModelProfile(
     profileId: string,
     input: UpsertModelProfileInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfile> {
     return this.request<ModelProfile>(
       `/model-profiles/${encodeURIComponent(profileId)}`,
@@ -1778,37 +1938,37 @@ export class LocalAgentClient
           default_model: input.defaultModel,
           discovery: input.discovery,
           set_active: input.setActive,
-          set_default: input.setDefault,
+          set_default: input.setDefault
         }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   async deleteModelProfile(
     profileId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
     await this.request(`/model-profiles/${encodeURIComponent(profileId)}`, {
       method: 'DELETE',
-      signal,
+      signal
     })
   }
 
   probeModelProfile(
     profileId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfileProbeResult> {
     return this.request<ModelProfileProbeResult>(
       `/model-profiles/${encodeURIComponent(profileId)}/probe`,
-      { method: 'POST', signal },
+      { method: 'POST', signal }
     )
   }
 
   discoverModelEndpoint(
     input: DiscoverModelEndpointInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfileProbeResult> {
     return this.request<ModelProfileProbeResult>('/model-profiles/discover', {
       method: 'POST',
@@ -1816,36 +1976,36 @@ export class LocalAgentClient
       body: JSON.stringify({
         backend: input.backend ?? undefined,
         baseUrl: input.baseUrl,
-        apiKey: input.apiKey ?? undefined,
+        apiKey: input.apiKey ?? undefined
       }),
-      signal,
+      signal
     })
   }
 
   async listDatasets(signal?: AbortSignal): Promise<DatasetSummary[]> {
     const result = await this.request<{ data: DatasetSummary[] }>('/datasets', {
-      signal,
+      signal
     })
     return result.data
   }
 
   installDataset(
     datasetId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<DatasetInstallResult> {
     return this.request<DatasetInstallResult>(
       `/datasets/${encodeURIComponent(datasetId)}/install`,
-      { method: 'POST', signal },
+      { method: 'POST', signal }
     )
   }
 
   removeDataset(
     datasetId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<DatasetInstallResult> {
     return this.request<DatasetInstallResult>(
       `/datasets/${encodeURIComponent(datasetId)}`,
-      { method: 'DELETE', signal },
+      { method: 'DELETE', signal }
     )
   }
 
@@ -1857,38 +2017,40 @@ export class LocalAgentClient
     if (options?.enabledOnly) params.set('enabled_only', 'true')
     const query = params.toString()
     return this.request<ToolCatalog>(`/tools${query ? `?${query}` : ''}`, {
-      signal: options?.signal,
+      signal: options?.signal
     })
   }
 
   updateToolEnabled(
     toolId: string,
     enabled: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ToolSummary> {
     return this.request<ToolSummary>(`/tools/${encodeURIComponent(toolId)}`, {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   batchUpdateTools(
     action: ToolBatchAction,
     ids: string[],
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ToolBatchResult> {
     return this.request<ToolBatchResult>('/tools/batch', {
       method: 'POST',
       body: JSON.stringify({ action, ids }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   async listMcpServers(signal?: AbortSignal): Promise<McpServer[]> {
-    const result = await this.request<{ data: McpServer[] }>('/mcp-servers', { signal })
+    const result = await this.request<{ data: McpServer[] }>('/mcp-servers', {
+      signal
+    })
     return result.data
   }
 
@@ -1898,41 +2060,41 @@ export class LocalAgentClient
 
   putMcpJsonConfig(
     document: McpJsonDocument,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<McpJsonConfig> {
     return this.request<McpJsonConfig>('/mcp-servers/config', {
       method: 'PUT',
       body: JSON.stringify({ document }),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   async listMcpCatalog(signal?: AbortSignal): Promise<McpCatalogEntry[]> {
     const result = await this.request<{ data: McpCatalogEntry[] }>(
       '/mcp-servers/catalog',
-      { signal },
+      { signal }
     )
     return result.data
   }
 
   installMcpCatalog(
     catalogId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<McpServer> {
     return this.request<McpServer>(
       `/mcp-servers/catalog/${encodeURIComponent(catalogId)}/install`,
       {
         method: 'POST',
-        signal,
-      },
+        signal
+      }
     )
   }
 
   connectMcpCatalog(
     catalogId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ConnectMcpResult> {
     return this.request<ConnectMcpResult>(
       `/mcp-servers/catalog/${encodeURIComponent(catalogId)}/connect`,
@@ -1940,15 +2102,15 @@ export class LocalAgentClient
         method: 'POST',
         body: JSON.stringify(input),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   connectMcpServer(
     serverId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ConnectMcpResult> {
     return this.request<ConnectMcpResult>(
       `/mcp-servers/${encodeURIComponent(serverId)}/connect`,
@@ -1956,28 +2118,28 @@ export class LocalAgentClient
         method: 'POST',
         body: JSON.stringify(input),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   disconnectMcpCatalog(
     catalogId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ConnectMcpResult> {
     return this.request<ConnectMcpResult>(
       `/mcp-servers/catalog/${encodeURIComponent(catalogId)}/connect`,
       {
         method: 'DELETE',
-        signal,
-      },
+        signal
+      }
     )
   }
 
   setMcpCatalogEnabled(
     catalogId: string,
     enabled: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ConnectMcpResult> {
     return this.request<ConnectMcpResult>(
       `/mcp-servers/catalog/${encodeURIComponent(catalogId)}`,
@@ -1985,78 +2147,80 @@ export class LocalAgentClient
         method: 'PATCH',
         body: JSON.stringify({ enabled }),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   async validateMcpCatalog(
     catalogId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ValidateMcpResult> {
     const raw = await this.request<Record<string, unknown>>(
       `/mcp-servers/catalog/${encodeURIComponent(catalogId)}/validate`,
       {
         method: 'POST',
-        signal,
-      },
+        signal
+      }
     )
     return this.normalizeValidateMcp(raw || {})
   }
 
   async validateMcpServer(
     serverId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ValidateMcpResult> {
     const raw = await this.request<Record<string, unknown>>(
       `/mcp-servers/${encodeURIComponent(serverId)}/validate`,
       {
         method: 'POST',
-        signal,
-      },
+        signal
+      }
     )
     return this.normalizeValidateMcp(raw || {})
   }
 
   createMcpServer(
     input: Omit<McpServer, 'id' | 'createdAt' | 'updatedAt'>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<McpServer> {
     return this.request<McpServer>('/mcp-servers', {
       method: 'POST',
       body: JSON.stringify(input),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   updateMcpServer(
     id: string,
-    changes: Partial<Omit<McpServer, 'id' | 'transport' | 'createdAt' | 'updatedAt'>>,
-    signal?: AbortSignal,
+    changes: Partial<
+      Omit<McpServer, 'id' | 'transport' | 'createdAt' | 'updatedAt'>
+    >,
+    signal?: AbortSignal
   ): Promise<McpServer> {
     return this.request<McpServer>(`/mcp-servers/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(changes),
       headers: { 'content-type': 'application/json' },
-      signal,
+      signal
     })
   }
 
   async deleteMcpServer(id: string, signal?: AbortSignal): Promise<void> {
     await this.request(`/mcp-servers/${encodeURIComponent(id)}`, {
       method: 'DELETE',
-      signal,
+      signal
     })
   }
 
   async listPtySessions(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<PtySessionInfo[]> {
     const result = await this.request<{ data: PtySessionInfo[] }>(
       `/sessions/${encodeURIComponent(sessionId)}/pty`,
-      { signal },
+      { signal }
     )
     return result.data
   }
@@ -2064,7 +2228,7 @@ export class LocalAgentClient
   createPtySession(
     sessionId: string,
     input?: { title?: string; cols?: number; rows?: number },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<PtySessionInfo> {
     return this.request<PtySessionInfo>(
       `/sessions/${encodeURIComponent(sessionId)}/pty`,
@@ -2072,8 +2236,8 @@ export class LocalAgentClient
         method: 'POST',
         body: JSON.stringify(input || {}),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
@@ -2081,34 +2245,40 @@ export class LocalAgentClient
     sessionId: string,
     ptyId: string,
     input: { title?: string; cols?: number; rows?: number },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<PtySessionInfo> {
     return this.request<PtySessionInfo>(
-      `/sessions/${encodeURIComponent(sessionId)}/pty/${encodeURIComponent(ptyId)}`,
+      `/sessions/${encodeURIComponent(sessionId)}/pty/${encodeURIComponent(
+        ptyId
+      )}`,
       {
         method: 'PUT',
         body: JSON.stringify(input),
         headers: { 'content-type': 'application/json' },
-        signal,
-      },
+        signal
+      }
     )
   }
 
   async deletePtySession(
     sessionId: string,
     ptyId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void> {
     await this.request(
-      `/sessions/${encodeURIComponent(sessionId)}/pty/${encodeURIComponent(ptyId)}`,
-      { method: 'DELETE', signal },
+      `/sessions/${encodeURIComponent(sessionId)}/pty/${encodeURIComponent(
+        ptyId
+      )}`,
+      { method: 'DELETE', signal }
     )
   }
 
   ptyConnectUrl(sessionId: string, ptyId: string): string {
     const base = this.baseUrl.replace(/^http/, 'ws')
     const url = new URL(
-      `${base}/v1/sessions/${encodeURIComponent(sessionId)}/pty/${encodeURIComponent(ptyId)}/connect`,
+      `${base}/v1/sessions/${encodeURIComponent(
+        sessionId
+      )}/pty/${encodeURIComponent(ptyId)}/connect`
     )
     if (this.apiKey) url.searchParams.set('token', this.apiKey)
     return url.toString()

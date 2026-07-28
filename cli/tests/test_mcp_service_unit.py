@@ -38,6 +38,7 @@ def test_paperclip_catalog_entry_featured_over_linear():
     paperclip = get_catalog_entry("paperclip")
     linear = get_catalog_entry("linear")
     huggingface = get_catalog_entry("huggingface")
+    tavily = get_catalog_entry("tavily")
     assert paperclip is not None
     assert linear is not None
     assert huggingface is not None
@@ -53,12 +54,20 @@ def test_paperclip_catalog_entry_featured_over_linear():
     assert huggingface.auth_mode == "api_key"
     assert huggingface.api_key_env_var == "HF_TOKEN"
     assert huggingface.api_key_header_prefix == "Bearer "
+    assert tavily is not None
+    assert tavily.featured is True
+    assert tavily.auth_mode == "api_key_or_oauth"
+    assert tavily.preferred_auth == "oauth"
+    assert tavily.api_key_config_key == "api.tavily_api_key"
+    assert tavily.api_key_header == "Authorization"
+    assert tavily.api_key_header_prefix == "Bearer "
     assert {e.id for e in MCP_CATALOG} >= {
         "tamarind",
         "latch",
         "neurosnap",
         "paperclip",
         "huggingface",
+        "tavily",
         "linear",
     }
     assert "betterstack" not in {e.id for e in MCP_CATALOG}
@@ -258,6 +267,7 @@ def test_resolve_auth_headers_api_key(tmp_path: Path, monkeypatch):
     (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
     cfg = Config({})
     cfg.set("mcp.tamarind_api_key", "tam-key")
+    cfg.set("api.tavily_api_key", "tvly-key")
     cfg.save()
 
     entry = get_catalog_entry("tamarind")
@@ -268,6 +278,12 @@ def test_resolve_auth_headers_api_key(tmp_path: Path, monkeypatch):
     assert "Sandwalk" in (headers.get("User-Agent") or "")
     assert credentials_configured(entry, Config.load()) is True
     assert auth_method_in_use(entry, Config.load()) == "api_key"
+
+    tavily = get_catalog_entry("tavily")
+    assert tavily is not None
+    tavily_headers = resolve_auth_headers(tavily, Config.load())
+    assert tavily_headers is not None
+    assert tavily_headers.get("Authorization") == "Bearer tvly-key"
 
 
 def test_resolve_auth_headers_oauth_token(tmp_path: Path, monkeypatch):

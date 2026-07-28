@@ -26,12 +26,39 @@ def test_integrations_http_crud(tmp_path: Path, monkeypatch):
         detail = client.get("/v1/integrations/anthropic")
         assert detail.status_code == 200
 
+        ibm = client.get("/v1/integrations/ibm-rxn")
+        assert ibm.status_code == 200
+        assert ibm.json()["unlocks"][0]["id"] == "chemistry.retrosynthesis"
+        assert ibm.json()["unlocks"][0]["requirement"] == "built_in"
+
+        installed_cli = tmp_path / "bin" / "boltz-api"
+        monkeypatch.setattr(
+            "agent_server.integrations_service.capabilities.install_boltz_cli",
+            lambda: installed_cli,
+        )
+        monkeypatch.setattr(
+            "agent_server.integrations_service.provider.find_boltz_cli",
+            lambda: installed_cli,
+        )
+        installed = client.post(
+            "/v1/integrations/boltz/capabilities/boltz-api-cli/install"
+        )
+        assert installed.status_code == 200, installed.text
+        boltz_cli = next(
+            unlock
+            for unlock in installed.json()["unlocks"]
+            if unlock["id"] == "boltz-api-cli"
+        )
+        assert boltz_cli["installed"] is True
+        assert boltz_cli["statusDetail"] == str(installed_cli)
+
         updated = client.put(
             "/v1/integrations/anthropic",
             json={"value": "sk-ant-api03-validkey"},
         )
         assert updated.status_code == 200, updated.text
         assert updated.json()["configured"] is True
+        assert updated.json()["fields"][0]["updatedAt"] is not None
 
         from agent.doctor.model_provider_http import ModelsProbeResult
 

@@ -73,6 +73,28 @@ def register_integration_routes(app: FastAPI, deps: AppDeps) -> None:
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Integration not found.") from exc
 
+    @app.post(
+        "/v1/integrations/{integration_key}/capabilities/{capability_id}/install",
+        response_model=IntegrationProvider,
+    )
+    async def install_integration_capability(
+        integration_key: str,
+        capability_id: str,
+    ) -> IntegrationProvider:
+        try:
+            return await asyncio.to_thread(
+                integrations_service.install_capability,
+                integration_key,
+                capability_id,
+            )
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=404,
+                detail="Installable integration capability not found.",
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.post("/v1/integrations/{integration_key}/autofill", response_model=IntegrationProvider)
     async def autofill_integration(integration_key: str) -> IntegrationProvider:
         try:

@@ -9,6 +9,9 @@ import { openInSystemBrowser } from '@/lib/desktop'
 
 import { VERCEL_SETUP_COMMANDS } from './integrations-view-shared'
 
+/** Stable mount point for the Slack Add split button (filled via portal). */
+export const SLACK_ADD_HEADER_SLOT_ID = 'sandwalk-slack-add-header-slot'
+
 function setupHostLabel(url: string) {
   try {
     return new URL(url).hostname
@@ -90,8 +93,13 @@ export function IntegrationsDetailHeader({
   return (
     <div className="flex items-start gap-3">
       <IntegrationIcon integration={selected} size="lg" />
-      <div>
-        <h2 className="text-xl font-semibold">{selected.name}</h2>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold">{selected.name}</h2>
+          {selected.key === 'slack' ? (
+            <div id={SLACK_ADD_HEADER_SLOT_ID} className="shrink-0" />
+          ) : null}
+        </div>
         {selected.key === 'skills-sh' ? (
           <div className="text-muted-foreground mt-1 space-y-1 text-sm">
             <p>Use this for Skills.sh catalog search authentication.</p>
@@ -121,7 +129,7 @@ export function IntegrationsDetailHeader({
                 </strong>{' '}
                 - it opens the setup terminal and runs these commands for you.
               </li>
-              <li>Follow the terminal prompts, then click Test API Key.</li>
+              <li>Follow the terminal prompts, then click Test.</li>
             </ol>
             <pre className="bg-muted/40 mt-2 rounded border p-2 font-mono text-[11px]">
               <code>{VERCEL_SETUP_COMMANDS.join('\n')}</code>
@@ -134,15 +142,17 @@ export function IntegrationsDetailHeader({
           </p>
         ) : selected.key === 'slack' ? (
           <p className="text-muted-foreground mt-1 text-sm">
-            Connect a workspace so mentions open a session here and the answer
-            goes back as a thread reply.
+            Use your agents from a Slack workspace — complete Relay Agent and
+            Socket Mode support.
           </p>
         ) : (
           <p className="text-muted-foreground mt-1 text-sm">
             Preset provider env keys. Fill values and save.
           </p>
         )}
-        {selected.setupUrl && selected.key !== 'skills-sh' ? (
+        {selected.setupUrl &&
+        selected.key !== 'skills-sh' &&
+        selected.key !== 'slack' ? (
           <p className="text-muted-foreground mt-1 text-xs">
             No key yet?{' '}
             <button

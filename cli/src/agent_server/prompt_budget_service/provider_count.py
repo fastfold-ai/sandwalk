@@ -44,6 +44,19 @@ def _system_text(system_parts: list[str]) -> str:
     return "\n\n".join(part.strip() for part in system_parts if (part or "").strip())
 
 
+def _sanitize_google_schema(value: Any) -> Any:
+    """Remove JSON Schema metadata unsupported by google.genai ``Schema``."""
+    if isinstance(value, list):
+        return [_sanitize_google_schema(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    return {
+        key: _sanitize_google_schema(item)
+        for key, item in value.items()
+        if not str(key).startswith("$")
+    }
+
+
 def count_anthropic_input_tokens(
     *,
     model: str,
@@ -173,21 +186,21 @@ def count_google_input_tokens(
         logger.debug("google.genai import failed: %s", exc)
         return None
 
-    declarations = []
-    for tool in _parse_tools(tool_texts):
-        params = tool.get("input_schema") or tool.get("parameters") or {
-            "type": "object",
-            "properties": {},
-        }
-        declarations.append(
-            types.FunctionDeclaration(
-                name=str(tool.get("name") or "tool"),
-                description=str(tool.get("description") or "") or None,
-                parameters=params,
-            )
-        )
     system = _system_text(system_parts)
     try:
+        declarations = []
+        for tool in _parse_tools(tool_texts):
+            params = tool.get("input_schema") or tool.get("parameters") or {
+                "type": "object",
+                "properties": {},
+            }
+            declarations.append(
+                types.FunctionDeclaration(
+                    name=str(tool.get("name") or "tool"),
+                    description=str(tool.get("description") or "") or None,
+                    parameters=_sanitize_google_schema(params),
+                )
+            )
         client = genai.Client(api_key=key)
         config_kwargs: dict[str, Any] = {}
         if system:

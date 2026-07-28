@@ -1,5 +1,4 @@
 import { CircleCheck, Loader2 } from 'lucide-react'
-import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -50,31 +49,17 @@ export function SandboxModalSection({
 }) {
   return (
     <section className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold">Modal credentials</h3>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Required before chats can start Modal Sandbox.
-          </p>
-        </div>
-        <Link
-          to="/dashboard/integrations/modal"
-          className="text-muted-foreground hover:text-foreground shrink-0 text-xs underline underline-offset-4"
-        >
-          Open Integrations
-        </Link>
+      <div>
+        <h3 className="text-base font-semibold">Modal credentials</h3>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Required before chats can start Modal Sandbox.
+        </p>
       </div>
 
       {!modalReady ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-900 dark:text-amber-200">
-          Modal is not set up.{' '}
-          <Link
-            to="/dashboard/integrations/modal"
-            className="font-medium underline underline-offset-2"
-          >
-            Set up Modal
-          </Link>{' '}
-          to enable Modal Sandbox in chats.
+          Modal is not set up. Enter and save your credentials below to enable
+          Modal Sandbox in chats.
         </div>
       ) : null}
 
@@ -149,7 +134,7 @@ export function SandboxModalSection({
           ) : (
             <CircleCheck className="size-4" />
           )}
-          Test API Key
+          Test
         </Button>
         <Button
           disabled={
@@ -158,7 +143,7 @@ export function SandboxModalSection({
           onClick={() => onSaveModalTokens()}
         >
           {savingTokens ? <Loader2 className="animate-spin" /> : null}
-          Save Overrides
+          Save
         </Button>
       </div>
     </section>

@@ -6,6 +6,7 @@ import type { Dispatch, SetStateAction } from 'react'
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 
+import { openMcpOAuthBrowser } from './mcp-oauth-browser'
 import { type CatalogStatusPatch, formatConnectError } from './mcp-view-shared'
 
 type McpConnectState = {
@@ -37,12 +38,8 @@ export function useMcpConnect({
       try {
         const result = await onConnectCatalog(entry.id, { method: 'oauth' })
         if (result.authorizeUrl) {
-          window.open(
-            result.authorizeUrl,
-            'fastfold-mcp-oauth',
-            'width=560,height=720'
-          )
-          toast.message('Complete sign-in in the browser window…', {
+          await openMcpOAuthBrowser(result.authorizeUrl, onRefresh)
+          toast.message('Complete sign-in in your browser…', {
             description: entry.name
           })
         } else if (!result.ok) {

@@ -6,7 +6,7 @@ import type {
   SlackSubscription,
   SlackWorkspace
 } from '@sandwalk/agent-ui-core'
-import { X } from 'lucide-react'
+import { RefreshCw, X } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 
 import { McpToggle } from '@/components/agents/mcp-view/mcp-view-shared'
@@ -81,6 +81,7 @@ export function SlackWorkspaceCard({
   onUpdateTokens,
   onDisconnect,
   onSetEnabled,
+  onRefreshChannels,
   relayState
 }: {
   workspace: SlackWorkspace
@@ -103,6 +104,7 @@ export function SlackWorkspaceCard({
   onDisconnect: (teamId: string) => void
   /** Pause/resume - keeps tokens and settings, unlike disconnect. */
   onSetEnabled: (teamId: string, enabled: boolean) => void
+  onRefreshChannels: (teamId: string) => void
 }) {
   const allowed = new Set(people.map(person => person.slackUserId))
   const knownPeople = directory?.people ?? []
@@ -128,7 +130,9 @@ export function SlackWorkspaceCard({
         !listeningKeys.has(`slack:${workspace.teamId}/${channel.id}`)
     )
     .map(channel => ({
-      id: channel.id,
+      // Full slack:TEAM/CHANNEL — bare C… ids only resolve when exactly one
+      // workspace is connected; with multiple, the API rejects them.
+      id: `slack:${workspace.teamId}/${channel.id}`,
       label: `#${channel.name}`,
       hint: channel.isPrivate ? 'private' : null
     }))
@@ -288,7 +292,13 @@ export function SlackWorkspaceCard({
             sessions={sessions}
             channelOptions={channelOptions}
             onAdd={onAddSubscription}
+            onRefresh={() => onRefreshChannels(workspace.teamId)}
           />
+          <p className="text-muted-foreground text-[11px] leading-relaxed">
+            Private channels only show up after you invite{' '}
+            <span className="text-foreground font-medium">@Sandwalk</span> to
+            them. Then refresh the channel list.
+          </p>
         </div>
       </Row>
 
@@ -331,12 +341,14 @@ function SlackChannelAdder({
   busy,
   sessions,
   channelOptions,
-  onAdd
+  onAdd,
+  onRefresh
 }: {
   busy: boolean
   sessions: AgentSession[]
   channelOptions: PickerOption[]
   onAdd: (sessionId: string, channel: string) => void
+  onRefresh: () => void
 }) {
   // A channel only listens on behalf of a session, so pick that first.
   const [sessionId, setSessionId] = useState('')
@@ -358,11 +370,22 @@ function SlackChannelAdder({
       <SlackPickerPopover
         label="Add channel"
         placeholder="Search channels…"
-        emptyHint="No channels found. Invite the bot to a channel first."
+        emptyHint="No channels found. Invite @Sandwalk to the channel, then refresh."
         options={channelOptions}
         disabled={busy || !sessionId}
         onPick={option => onAdd(sessionId, option.id)}
       />
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="h-7 gap-1.5 text-[12px]"
+        disabled={busy}
+        onClick={onRefresh}
+      >
+        <RefreshCw className={cn('size-3.5', busy && 'animate-spin')} />
+        Refresh
+      </Button>
     </div>
   )
 }

@@ -1,11 +1,24 @@
 """Rich table rendering for API keys and full config dumps."""
 
 import os
+from datetime import datetime
 
 from rich.table import Table
 
 from .api_keys import API_KEYS
 from .defaults import DEFAULTS
+
+
+def _format_updated_date(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "[dim]unknown[/dim]"
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone().strftime(
+            "%Y-%m-%d"
+        )
+    except ValueError:
+        return "[dim]unknown[/dim]"
 
 
 class TablesMixin:
@@ -20,8 +33,12 @@ class TablesMixin:
         table.add_column("Unlocks", style="dim")
         table.add_column("Config Key", style="cyan dim")
         table.add_column("Sign Up", style="dim")
+        table.add_column("Updated", style="dim", no_wrap=True)
 
         profiles = self.openai_profiles(include_cloud=True)
+        timestamps = self.get("integrations.updated_at")
+        if not isinstance(timestamps, dict):
+            timestamps = {}
         active_profile = self.get_openai_profile()
         active_profile_id = str((active_profile or {}).get("id") or "").strip()
         active_profile_label = str((active_profile or {}).get("label") or "").strip()
@@ -64,6 +81,7 @@ class TablesMixin:
                 info["description"],
                 config_key,
                 info["url"] + free_tag,
+                _format_updated_date(timestamps.get(config_key)) if val else "—",
             )
 
             if config_key == "llm.openai_api_key":
@@ -90,6 +108,13 @@ class TablesMixin:
                         f"{profile_backend} endpoint ({profile_endpoint})",
                         "llm.openai_profiles.<id>.api_key",
                         (profile_install_url + " (free)") if profile_install_url else "—",
+                        (
+                            _format_updated_date(
+                                timestamps.get(f"llm.openai_profiles.{profile_id}.api_key")
+                            )
+                            if profile_key
+                            else "—"
+                        ),
                     )
 
         return table

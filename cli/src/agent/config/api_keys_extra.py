@@ -22,7 +22,7 @@ API_KEYS_EXTRA = {
         "name": "Slack",
         "provider_key": "slack",
         "env_var": "SLACK_BOT_TOKEN",
-        "description": "Slack reports and agent notifications",
+        "description": "Use your agents from a Slack workspace — complete Relay Agent and Socket Mode support",
         "url": "https://api.slack.com/apps",
         "free": True,
     },

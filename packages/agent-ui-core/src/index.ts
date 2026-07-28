@@ -477,11 +477,17 @@ type EventEnvelope<TType extends string, TPayload> = {
 }
 
 export type AgentEvent =
-  | EventEnvelope<'session.created' | 'session.updated', { session: AgentSession }>
+  | EventEnvelope<
+      'session.created' | 'session.updated',
+      { session: AgentSession }
+    >
   | EventEnvelope<'run.started', { messageId: string }>
   | EventEnvelope<'assistant.delta', { delta: string }>
   | EventEnvelope<'assistant.message', { message: AgentMessage }>
-  | EventEnvelope<'tool.started', { name: string; arguments: unknown; toolCallId: string }>
+  | EventEnvelope<
+      'tool.started',
+      { name: string; arguments: unknown; toolCallId: string }
+    >
   | EventEnvelope<
       'tool.completed',
       {
@@ -527,6 +533,18 @@ export type AgentEvent =
       }
     >
 
+export type IntegrationUnlock = {
+  kind: 'tool' | 'skill' | 'capability' | 'notice'
+  id: string
+  label: string
+  description: string
+  source: string | null
+  requirement: 'built_in' | 'install' | 'connector' | 'ambient' | 'not_wired'
+  installable: boolean
+  installed: boolean | null
+  statusDetail: string | null
+}
+
 export type IntegrationSummary = {
   key: string
   name: string
@@ -545,7 +563,9 @@ export type IntegrationSummary = {
     configured: boolean
     source: 'environment' | 'config' | 'none'
     maskedPreview: string | null
+    updatedAt: string | null
   }>
+  unlocks: IntegrationUnlock[]
 }
 
 export type IntegrationSetupStep = {
@@ -567,10 +587,21 @@ export interface IntegrationProvider {
   updateIntegration(
     key: string,
     values: Record<string, string>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<IntegrationSummary>
-  removeIntegration(key: string, signal?: AbortSignal): Promise<IntegrationSummary>
-  autofillIntegration(key: string, signal?: AbortSignal): Promise<IntegrationSummary>
+  removeIntegration(
+    key: string,
+    signal?: AbortSignal
+  ): Promise<IntegrationSummary>
+  autofillIntegration(
+    key: string,
+    signal?: AbortSignal
+  ): Promise<IntegrationSummary>
+  installIntegrationCapability(
+    key: string,
+    capabilityId: string,
+    signal?: AbortSignal
+  ): Promise<IntegrationSummary>
   setupIntegration(
     key: string,
     workingDirectory?: string | null,
@@ -578,7 +609,7 @@ export interface IntegrationProvider {
   ): Promise<IntegrationSetupResult>
   validateIntegration(
     key: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ ok: boolean; message: string }>
 }
 
@@ -658,7 +689,14 @@ export type SessionSandboxStatus = {
   backend: 'builtin' | 'modal' | string
   sessionBackend: 'builtin' | 'modal' | null
   globalBackend: 'builtin' | 'modal' | string
-  status: 'ready' | 'running' | 'stopped' | 'unavailable' | 'starting' | 'stopping' | string
+  status:
+    | 'ready'
+    | 'running'
+    | 'stopped'
+    | 'unavailable'
+    | 'starting'
+    | 'stopping'
+    | string
   providerSandboxName: string | null
   modalConfigured: boolean
   computeType: string
@@ -782,22 +820,23 @@ export interface SettingsProvider {
   getRuntimeSettings(signal?: AbortSignal): Promise<RuntimeSettings>
   updateRuntimeSettings(
     changes: Partial<RuntimeSettings>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<RuntimeSettings>
   getOnboardingSettings?(signal?: AbortSignal): Promise<OnboardingSettings>
   updateOnboardingSettings?(
     changes: Partial<OnboardingSettings>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<OnboardingSettings>
   getSandboxSettings?(signal?: AbortSignal): Promise<SandboxSettings>
   updateSandboxSettings?(
     changes: Partial<SandboxSettings>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SandboxSettings>
   probeSandboxSettings?(signal?: AbortSignal): Promise<SandboxProbeReport>
-  getAccount?(
-    options?: { checkUpdates?: boolean; signal?: AbortSignal },
-  ): Promise<AccountSummary>
+  getAccount?(options?: {
+    checkUpdates?: boolean
+    signal?: AbortSignal
+  }): Promise<AccountSummary>
   logoutAccount?(signal?: AbortSignal): Promise<AccountSummary>
 }
 
@@ -883,11 +922,11 @@ export interface DatasetsProvider {
   listDatasets(signal?: AbortSignal): Promise<DatasetSummary[]>
   installDataset(
     datasetId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<DatasetInstallResult>
   removeDataset(
     datasetId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<DatasetInstallResult>
 }
 
@@ -910,12 +949,12 @@ export interface ToolsProvider {
   updateToolEnabled(
     toolId: string,
     enabled: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ToolSummary>
   batchUpdateTools(
     action: ToolBatchAction,
     ids: string[],
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ToolBatchResult>
 }
 
@@ -927,13 +966,13 @@ export interface ModelsProvider {
   }): Promise<AgentModel[]>
   createCustomModel?(
     input: CreateAgentModelInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentModel>
   deleteCustomModel?(modelId: string, signal?: AbortSignal): Promise<void>
   updateModelEnabled(
     modelId: string,
     enabled: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentModel>
   listModelProfiles(options?: {
     includeCloud?: boolean
@@ -941,21 +980,21 @@ export interface ModelsProvider {
   }): Promise<ModelProfile[]>
   createModelProfile(
     input: UpsertModelProfileInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfile>
   updateModelProfile(
     profileId: string,
     input: UpsertModelProfileInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfile>
   deleteModelProfile(profileId: string, signal?: AbortSignal): Promise<void>
   probeModelProfile(
     profileId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfileProbeResult>
   discoverModelEndpoint?(
     input: DiscoverModelEndpointInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfileProbeResult>
 }
 
@@ -1060,38 +1099,52 @@ export interface McpProvider {
   listMcpServers(signal?: AbortSignal): Promise<McpServer[]>
   listMcpCatalog(signal?: AbortSignal): Promise<McpCatalogEntry[]>
   /** Re-add a removed catalog template to the installed list. */
-  installMcpCatalog?(catalogId: string, signal?: AbortSignal): Promise<McpServer>
+  installMcpCatalog?(
+    catalogId: string,
+    signal?: AbortSignal
+  ): Promise<McpServer>
   connectMcpCatalog(
     catalogId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ConnectMcpResult>
   connectMcpServer?(
     serverId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ConnectMcpResult>
-  disconnectMcpCatalog(catalogId: string, signal?: AbortSignal): Promise<ConnectMcpResult>
+  disconnectMcpCatalog(
+    catalogId: string,
+    signal?: AbortSignal
+  ): Promise<ConnectMcpResult>
   setMcpCatalogEnabled(
     catalogId: string,
     enabled: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ConnectMcpResult>
-  validateMcpCatalog(catalogId: string, signal?: AbortSignal): Promise<ValidateMcpResult>
-  validateMcpServer(serverId: string, signal?: AbortSignal): Promise<ValidateMcpResult>
+  validateMcpCatalog(
+    catalogId: string,
+    signal?: AbortSignal
+  ): Promise<ValidateMcpResult>
+  validateMcpServer(
+    serverId: string,
+    signal?: AbortSignal
+  ): Promise<ValidateMcpResult>
   getMcpJsonConfig?(signal?: AbortSignal): Promise<McpJsonConfig>
   putMcpJsonConfig?(
     document: McpJsonDocument,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<McpJsonConfig>
   createMcpServer(
     input: Omit<McpServer, 'id' | 'createdAt' | 'updatedAt'>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<McpServer>
   updateMcpServer(
     id: string,
-    changes: Partial<Omit<McpServer, 'id' | 'transport' | 'createdAt' | 'updatedAt'>>,
-    signal?: AbortSignal,
+    changes: Partial<
+      Omit<McpServer, 'id' | 'transport' | 'createdAt' | 'updatedAt'>
+    >,
+    signal?: AbortSignal
   ): Promise<McpServer>
   deleteMcpServer(id: string, signal?: AbortSignal): Promise<void>
 }
@@ -1268,7 +1321,11 @@ export interface SkillProvider {
 
 export interface FileProvider {
   listFiles(sessionId: string, signal?: AbortSignal): Promise<WorkspaceFile[]>
-  readFile(sessionId: string, path: string, signal?: AbortSignal): Promise<WorkspaceFileContent>
+  readFile(
+    sessionId: string,
+    path: string,
+    signal?: AbortSignal
+  ): Promise<WorkspaceFileContent>
   writeFile(
     sessionId: string,
     input: {
@@ -1277,26 +1334,30 @@ export interface FileProvider {
       encoding?: 'text' | 'base64'
       baseVersion?: string | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<FileWriteResult>
   uploadFile(
     sessionId: string,
     file: File,
     relativeDirectory?: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<WorkspaceFileContent>
-  createFolder(sessionId: string, path: string, signal?: AbortSignal): Promise<void>
+  createFolder(
+    sessionId: string,
+    path: string,
+    signal?: AbortSignal
+  ): Promise<void>
   moveFile(
     sessionId: string,
     sourcePath: string,
     targetPath: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void>
   deleteFile(
     sessionId: string,
     path: string,
     recursive?: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void>
   downloadUrl(sessionId: string, path: string): string
 }
@@ -1310,41 +1371,40 @@ export interface AgentClient {
   runDoctor?(
     signalOrOptions?:
       | AbortSignal
-      | { scope?: 'full' | 'core'; signal?: AbortSignal },
+      | { scope?: 'full' | 'core'; signal?: AbortSignal }
   ): Promise<DoctorReport>
   getStorage?(signal?: AbortSignal): Promise<StorageReport>
   getEnvironment?(signal?: AbortSignal): Promise<EnvironmentReport>
   installEnvironmentPackage?(
     name: string,
-    options?: { allowUnlisted?: boolean; signal?: AbortSignal },
+    options?: { allowUnlisted?: boolean; signal?: AbortSignal }
   ): Promise<EnvironmentPackageMutationResult>
   uninstallEnvironmentPackage?(
     name: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<EnvironmentPackageMutationResult>
   downloadDiagnostics?(
     uiDiagnostics?: Record<string, unknown> | null,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ blob: Blob; filename: string }>
-  listSessions(
-    options?: { projectId?: string | null; signal?: AbortSignal },
-  ): Promise<AgentSession[]>
+  listSessions(options?: {
+    projectId?: string | null
+    signal?: AbortSignal
+  }): Promise<AgentSession[]>
   getSessionsRevision?(signal?: AbortSignal): Promise<string>
   listProjects?(signal?: AbortSignal): Promise<AgentProject[]>
-  listLibrary?(
-    options?: {
-      kind?: LibraryKind | null
-      q?: string | null
-      page?: number
-      perPage?: number
-      signal?: AbortSignal
-    },
-  ): Promise<LibraryItemList>
+  listLibrary?(options?: {
+    kind?: LibraryKind | null
+    q?: string | null
+    page?: number
+    perPage?: number
+    signal?: AbortSignal
+  }): Promise<LibraryItemList>
   uploadLibraryFile?(file: File, signal?: AbortSignal): Promise<LibraryItem>
   updateLibraryItem?(
     itemId: string,
     input: { displayName: string },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<LibraryItem>
   deleteLibraryItem?(itemId: string, signal?: AbortSignal): Promise<void>
   useLibraryInChat?(
@@ -1353,21 +1413,24 @@ export interface AgentClient {
       projectId?: string | null
       title?: string | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<UseLibraryInChatResult>
   getLibraryContentUrl?(itemId: string): string
   fetchLibraryContent?(itemId: string, signal?: AbortSignal): Promise<Blob>
   readLibraryFile?(
     itemId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<WorkspaceFileContent>
   writeLibraryFile?(
     itemId: string,
     input: { content: string; encoding?: 'text' | 'base64' },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<WorkspaceFileContent>
   listSpecialists?(signal?: AbortSignal): Promise<Specialist[]>
-  getSpecialist?(specialistId: string, signal?: AbortSignal): Promise<Specialist>
+  getSpecialist?(
+    specialistId: string,
+    signal?: AbortSignal
+  ): Promise<Specialist>
   createSpecialist?(
     input: {
       name: string
@@ -1382,7 +1445,7 @@ export interface AgentClient {
       mcpCatalogIds?: string[]
       enabled?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<Specialist>
   updateSpecialist?(
     specialistId: string,
@@ -1399,7 +1462,7 @@ export interface AgentClient {
       mcpCatalogIds?: string[]
       enabled?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<Specialist>
   getPromptBudget?(
     options?: {
@@ -1408,7 +1471,7 @@ export interface AgentClient {
       sampleQuery?: string | null
       tokenCountMethod?: PromptBudgetTokenCountMethod | string | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<PromptBudgetResponse>
   deleteSpecialist?(specialistId: string, signal?: AbortSignal): Promise<void>
   createProject?(
@@ -1421,7 +1484,7 @@ export interface AgentClient {
       color?: string | null
       pinned?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentProject>
   updateProject?(
     projectId: string,
@@ -1434,7 +1497,7 @@ export interface AgentClient {
       color?: string | null
       pinned?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentProject>
   deleteProject?(projectId: string, signal?: AbortSignal): Promise<void>
   searchSessions(query: string, signal?: AbortSignal): Promise<AgentSession[]>
@@ -1446,7 +1509,7 @@ export interface AgentClient {
       specialistId?: string | null
       sandboxBackend?: 'builtin' | 'modal' | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSession>
   updateSession(
     sessionId: string,
@@ -1457,45 +1520,52 @@ export interface AgentClient {
       specialistId?: string | null
       sandboxBackend?: 'builtin' | 'modal' | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSession>
   getSessionSandbox?(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus>
   sandboxStreamUrl?(sessionId: string): string
   startSessionSandbox?(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus>
   stopSessionSandbox?(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus>
   restartSessionSandbox?(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus>
   autoTitleSession(
     sessionId: string,
     input?: { force?: boolean },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSession>
   deleteSession(sessionId: string, signal?: AbortSignal): Promise<void>
   listMessages(sessionId: string, signal?: AbortSignal): Promise<AgentMessage[]>
-  listEventHistory(sessionId: string, signal?: AbortSignal): Promise<AgentEvent[]>
+  listEventHistory(
+    sessionId: string,
+    signal?: AbortSignal
+  ): Promise<AgentEvent[]>
   setMessageFeedback(
     sessionId: string,
     messageId: string,
     reaction: 'up' | 'down' | null,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void>
-  sendMessage(sessionId: string, content: string, signal?: AbortSignal): Promise<{ runId: string }>
+  sendMessage(
+    sessionId: string,
+    content: string,
+    signal?: AbortSignal
+  ): Promise<{ runId: string }>
   interrupt(sessionId: string, signal?: AbortSignal): Promise<boolean>
   submitApprovals?(
     sessionId: string,
     decisions: HitlDecision[],
-    options?: { interruptId?: string | null; signal?: AbortSignal },
+    options?: { interruptId?: string | null; signal?: AbortSignal }
   ): Promise<{ accepted: boolean; interruptId?: string | null }>
   streamEvents(
     sessionId: string,
@@ -1503,6 +1573,6 @@ export interface AgentClient {
       afterSequence?: number
       signal?: AbortSignal
       onEvent: (event: AgentEvent) => void
-    },
+    }
   ): Promise<void>
 }

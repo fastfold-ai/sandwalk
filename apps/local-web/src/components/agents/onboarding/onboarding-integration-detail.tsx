@@ -91,7 +91,7 @@ export function OnboardingIntegrationDetail({
                     </strong>{' '}
                     to open the setup terminal and run the commands.
                   </li>
-                  <li>Follow the terminal prompts, then click Test API Key.</li>
+                  <li>Follow the terminal prompts, then click Test.</li>
                 </ol>
                 <pre className="bg-muted/40 mt-2 overflow-x-auto rounded border p-2 font-mono text-[11px]">
                   <code>{VERCEL_SETUP_COMMANDS.join('\n')}</code>
@@ -242,7 +242,7 @@ export function OnboardingIntegrationDetail({
             onClick={() => onTestKey()}
           >
             <CircleCheck className="size-4" />
-            Test API Key
+            Test
           </Button>
         ) : null}
         <Button

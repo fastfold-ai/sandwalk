@@ -178,9 +178,9 @@ def test_second_mention_reuses_the_same_session(
     assert len(store.list_sessions()) == 1
     messages = store.list_messages(session_id)
     assert len(messages) == 2
-    # Only the opening message carries the tool instruction.
+    # Mentions, follow-ups, and Listening all carry the reply instruction.
     assert "slack.send_message" in messages[0].content
-    assert "slack.send_message" not in messages[1].content
+    assert "slack.send_message" in messages[1].content
 
 
 def test_busy_session_drops_rather_than_crashing(
@@ -339,7 +339,8 @@ async def _drain(agent: AgentService, session_id: str) -> None:
 def test_framing_shows_origin_and_handle() -> None:
     framed = frame_inbound(message(), channel_label="#dev-ops · Acme")
     assert framed.startswith("[Slack · #dev-ops · Acme | from Julio | reply→")
-    assert "slack.send_message" not in framed
+    assert "slack.send_message" in framed
+    assert "reply→slack:T1/C1:1712000000.000100" in framed
 
 
 def test_framing_falls_back_to_the_user_id() -> None:

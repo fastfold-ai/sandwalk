@@ -61,7 +61,7 @@ createRoot(document.getElementById('root')!).render(
       <AppErrorBoundary>
         <App />
       </AppErrorBoundary>
-      <Toaster richColors closeButton position="top-center" />
+      <Toaster closeButton position="top-center" />
     </BrowserRouter>
   </StrictMode>
 )

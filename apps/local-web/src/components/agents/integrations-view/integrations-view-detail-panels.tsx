@@ -8,6 +8,13 @@ import { cn } from '@/lib/utils'
 
 import { VERCEL_SETUP_RUN_COMMAND } from './integrations-view-shared'
 
+function formatUpdatedAt(value: string | null) {
+  if (!value) return 'Unknown'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Unknown'
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date)
+}
+
 export function IntegrationsDetailVercelPanel({
   terminalClient,
   setupResult,
@@ -84,7 +91,9 @@ export function IntegrationsDetailFieldsTable({
   onRemove: (key: string) => Promise<void>
 }) {
   return (
-    <div className="mt-5 overflow-hidden rounded-md border">
+    <section className="mt-5 space-y-2">
+      <h3 className="text-sm font-medium">Keys</h3>
+      <div className="overflow-hidden rounded-md border">
       <div className="bg-muted/20 text-muted-foreground grid grid-cols-[minmax(9.5rem,0.9fr)_minmax(0,1.4fr)_minmax(7.5rem,0.85fr)_4.5rem] items-center gap-3 border-b px-3 py-2 text-xs">
         <span>Key</span>
         <span>Value</span>
@@ -109,11 +118,18 @@ export function IntegrationsDetailFieldsTable({
             onChange={event => onValueChange(field.envVar, event.target.value)}
             placeholder={`Enter ${field.envVar}`}
           />
-          <span className="text-muted-foreground min-w-0 truncate text-xs">
-            {field.configured
-              ? `Configured · ${field.maskedPreview || field.source}`
-              : 'Not configured'}
-          </span>
+          <div className="text-muted-foreground min-w-0 text-xs">
+            <span className="block truncate">
+              {field.configured
+                ? `Configured · ${field.maskedPreview || field.source}`
+                : 'Not configured'}
+            </span>
+            {field.configured ? (
+              <span className="mt-0.5 block truncate">
+                Last updated {formatUpdatedAt(field.updatedAt)}
+              </span>
+            ) : null}
+          </div>
           {field.configured ? (
             <Button
               variant="ghost"
@@ -128,6 +144,7 @@ export function IntegrationsDetailFieldsTable({
           )}
         </div>
       ))}
-    </div>
+      </div>
+    </section>
   )
 }
