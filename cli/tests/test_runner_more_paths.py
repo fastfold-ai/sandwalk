@@ -122,3 +122,18 @@ class TestNotificationAndUsageFormatting:
         assert result.summary == "Agent SDK error: boom"
         assert result.raw_results["error"] == "boom"
         assert result.duration_s == 3.5
+
+    def test_make_error_result_links_file_access_settings(self):
+        error = (
+            "Path:/Users/example/private.txt outside root directory: "
+            "/tmp/sandwalk-skills-route"
+        )
+        result = AgentRunner._make_error_result("read file", error, 0.2)
+
+        assert "Agent SDK error" not in result.summary
+        assert "couldn't access that file" in result.summary
+        assert (
+            "[Configure agent access in Agent → Security]"
+            "(/dashboard/agent/security)"
+        ) in result.summary
+        assert result.raw_results["error"] == error

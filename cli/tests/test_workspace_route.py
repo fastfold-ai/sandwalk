@@ -138,3 +138,33 @@ def test_mirror_awrite_overwrites_existing_project_file(tmp_path: Path):
 
     assert result.error is None
     assert (linked / "backlog.md").read_text(encoding="utf-8") == "- task\n"
+
+
+def test_mirror_allows_sandwalk_base_files(tmp_path: Path, monkeypatch):
+    """Default policy can read/write/edit anywhere under SANDWALK_CONFIG_DIR."""
+    from deepagents.backends import FilesystemBackend
+
+    config = tmp_path / "sandwalk"
+    skills = config / "skills" / "boltz" / "references"
+    skills.mkdir(parents=True)
+    example = skills / "examples.md"
+    example.write_text("old\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("SANDWALK_CONFIG_DIR", str(config))
+
+    inner = FilesystemBackend(root_dir=str(workspace), virtual_mode=False)
+    backend = HostWorkspaceMirrorBackend(inner, workspace)
+
+    read = backend.read(str(example))
+    assert read.error is None
+    assert read.file_data["content"] == "old\n"
+
+    edit = backend.edit(str(example), "old", "new")
+    assert edit.error is None
+    assert example.read_text(encoding="utf-8") == "new\n"
+
+    created = config / "artifacts" / "result.txt"
+    write = backend.write(str(created), "result\n")
+    assert write.error is None
+    assert created.read_text(encoding="utf-8") == "result\n"

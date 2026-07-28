@@ -88,6 +88,9 @@ type AgentComposerSlotProps = {
   startSessionSandbox: () => Promise<void>
   stopSessionSandbox: () => Promise<void>
   restartSessionSandbox: () => Promise<void>
+  refreshSessionSandbox: (
+    targetSessionId?: string | null
+  ) => Promise<SessionSandboxStatus | null>
   setRuntimeSettings: Dispatch<SetStateAction<RuntimeSettings | null>>
   loadModelOptions: () => Promise<void>
 }
@@ -135,6 +138,7 @@ export function AgentComposerSlot({
   startSessionSandbox,
   stopSessionSandbox,
   restartSessionSandbox,
+  refreshSessionSandbox,
   setRuntimeSettings,
   loadModelOptions
 }: AgentComposerSlotProps) {
@@ -255,6 +259,7 @@ export function AgentComposerSlot({
         onSandboxStart={() => void startSessionSandbox()}
         onSandboxStop={() => void stopSessionSandbox()}
         onSandboxRestart={() => void restartSessionSandbox()}
+        onRefreshSandbox={() => void refreshSessionSandbox()}
         onLoadLocalSystem={async () => {
           const report = await client.getServerStatus()
           return report.system

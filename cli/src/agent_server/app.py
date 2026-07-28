@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import os
 import secrets
+import threading
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -117,6 +118,7 @@ def create_app(
     ).rstrip("/")
     mcp_service = McpService(store, public_base_url=public_base)
     backend_id = str(uuid.uuid5(uuid.NAMESPACE_URL, str(store.path.resolve())))
+    shutdown_event = threading.Event()
 
     # Persisted auth settings; CLI/env --api-key overrides the effective key.
     auth_settings = load_settings(create_if_missing=False)
@@ -134,6 +136,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        shutdown_event.clear()
         # Re-sync on startup in case config changed while the process was idle,
         # or tests construct the app without going through run_server().
         try:
@@ -153,6 +156,10 @@ def create_app(
             logging.getLogger("agent_server").exception("Connector startup failed")
         backup_task = asyncio.create_task(_keep_backup_fresh(store))
         yield
+        shutdown_event.set()
+        from agent_server.store.event_notifier import EVENT_NOTIFIER
+
+        EVENT_NOTIFIER.wake_all()
         backup_task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await backup_task
@@ -170,6 +177,7 @@ def create_app(
     app.state.agent_service = service
     app.state.auth_settings = auth_settings
     app.state.runtime_api_key = runtime_api_key
+    app.state.shutdown_event = shutdown_event
 
     deps = AppDeps(
         app=app,
@@ -220,6 +228,7 @@ def create_app(
     from agent_server.static_ui import mount_static_ui, resolve_ui_dist
 
     ui_dist = resolve_ui_dist()
+    app.state.ui_dist = ui_dist
     if ui_dist is not None:
         mount_static_ui(app, ui_dist)
 

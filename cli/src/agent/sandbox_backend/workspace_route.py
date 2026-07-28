@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,25 @@ from deepagents.backends.protocol import EditResult, ReadResult, WriteResult
 from agent.sandbox_sync.paths import WORKSPACE_REMOTE_ROOT
 
 logger = logging.getLogger(__name__)
+
+
+def _sandwalk_host_path(path: str | None) -> Path | None:
+    """Return an absolute host path when it is under Sandwalk's dynamic base."""
+    raw = str(path or "").strip()
+    base = str(os.environ.get("SANDWALK_CONFIG_DIR") or "").strip()
+    if not raw or not base:
+        return None
+    candidate = Path(raw).expanduser()
+    if not candidate.is_absolute():
+        return None
+    try:
+        root = Path(base).expanduser().resolve()
+        resolved = candidate.parent.resolve() / candidate.name
+        if resolved == root or resolved.is_relative_to(root):
+            return resolved
+    except (OSError, ValueError):
+        return None
+    return None
 
 
 def _read_host_file(path: Path, offset: int, limit: int) -> ReadResult:
@@ -165,6 +185,16 @@ class HostWorkspaceMirrorBackend:
     def write(self, file_path: str, content: str) -> WriteResult:
         rel = workspace_relative_tool_path(file_path, self._root)
         if rel is None:
+            host_path = _sandwalk_host_path(file_path)
+            if host_path is not None:
+                try:
+                    host_path.parent.mkdir(parents=True, exist_ok=True)
+                    host_path.write_text(content, encoding="utf-8")
+                    return WriteResult(path=str(host_path))
+                except OSError as exc:
+                    return WriteResult(
+                        error=f"Error writing host file '{file_path}': {exc}"
+                    )
             return self._inner.write(file_path, content)
         try:
             _mirror_host_text(self._root, rel, content)
@@ -182,6 +212,39 @@ class HostWorkspaceMirrorBackend:
     ) -> EditResult:
         rel = workspace_relative_tool_path(file_path, self._root)
         if rel is None:
+            host_path = _sandwalk_host_path(file_path)
+            if host_path is not None and host_path.is_file():
+                try:
+                    text = host_path.read_text(encoding="utf-8")
+                except OSError as exc:
+                    return EditResult(
+                        error=f"Error reading host file '{file_path}': {exc}"
+                    )
+                count = text.count(old_string)
+                if count == 0:
+                    return EditResult(error=f"String not found in {file_path}")
+                if not replace_all and count > 1:
+                    return EditResult(
+                        error=(
+                            f"Multiple matches for edit in {file_path} "
+                            f"({count}); set replace_all=True to replace all."
+                        )
+                    )
+                updated = (
+                    text.replace(old_string, new_string)
+                    if replace_all
+                    else text.replace(old_string, new_string, 1)
+                )
+                try:
+                    host_path.write_text(updated, encoding="utf-8")
+                except OSError as exc:
+                    return EditResult(
+                        error=f"Error writing host file '{file_path}': {exc}"
+                    )
+                return EditResult(
+                    path=str(host_path),
+                    occurrences=count if replace_all else 1,
+                )
             return self._inner.edit(
                 file_path, old_string, new_string, replace_all=replace_all
             )
@@ -229,6 +292,9 @@ class HostWorkspaceMirrorBackend:
     def read(self, file_path: str, offset: int = 0, limit: int = 2000) -> Any:
         rel = workspace_relative_tool_path(file_path, self._root)
         if rel is None:
+            host_path = _sandwalk_host_path(file_path)
+            if host_path is not None and host_path.is_file():
+                return _read_host_file(host_path, offset, limit)
             return self._inner.read(file_path, offset=offset, limit=limit)
         host_path = self._root / rel if rel else self._root
         if host_path.is_file():

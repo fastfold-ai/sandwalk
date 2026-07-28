@@ -73,6 +73,7 @@ export function Composer({
   onSandboxStop,
   onSandboxRestart,
   onLoadLocalSystem,
+  onRefreshSandbox,
   onPlanModeChange,
   editingQueued = false,
   onCancelEditQueued
@@ -341,6 +342,7 @@ export function Composer({
                 onSandboxStop={onSandboxStop}
                 onSandboxRestart={onSandboxRestart}
                 onLoadLocalSystem={onLoadLocalSystem}
+                onRefreshSandbox={onRefreshSandbox}
                 onPlanModeChange={onPlanModeChange}
                 onStop={onStop}
               />

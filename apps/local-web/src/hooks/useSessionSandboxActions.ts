@@ -54,7 +54,11 @@ export function createSessionSandboxActions({
   const selectSessionSandboxBackend = async (
     backend: 'builtin' | 'modal'
   ) => {
-    const ensuredId = session?.id ?? (await ensureAgentSession())
+    // Match upload behavior on /agents/new: materialize a real session without
+    // navigating, apply the sandbox choice, then reuse that session on send.
+    const ensuredId =
+      session?.id ??
+      (await ensureAgentSession(undefined, { navigate: false }))
     if (!ensuredId || isDraftAgentSessionId(ensuredId)) return
     if (
       backend === 'modal' &&

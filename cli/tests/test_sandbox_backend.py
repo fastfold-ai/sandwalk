@@ -312,6 +312,37 @@ def test_modal_skills_execute_runs_on_host(tmp_path: Path):
     fake_backend.execute.assert_not_called()
 
 
+def test_modal_skills_read_follows_staged_source_symlink(tmp_path: Path):
+    clear_active_handles()
+    bundled = tmp_path / "bundled"
+    installed = tmp_path / "installed"
+    (bundled / "other").mkdir(parents=True)
+    references = installed / "boltz" / "references"
+    references.mkdir(parents=True)
+    example = references / "examples.md"
+    example.write_text("# Boltz examples\n", encoding="utf-8")
+
+    fake_backend = MagicMock()
+    cfg = SimpleNamespace(
+        get=lambda key, default=None: {"sandbox.backend": "modal"}.get(key, default)
+    )
+    with patch(
+        "agent.sandbox_backend._create_or_reuse_modal_sandbox",
+        return_value=(fake_backend, MagicMock(), "sandwalk-read", True),
+    ):
+        handle = resolve_deepagents_backend(
+            cfg,
+            session_id="read-skills",
+            workspace_root=str(tmp_path / "workspace"),
+            skill_source_dirs=[str(bundled), str(installed)],
+            sync_workspace=False,
+        )
+
+    result = handle.backend.read("/skills/boltz/references/examples.md")
+    assert result.error is None
+    assert result.file_data["content"] == "# Boltz examples\n"
+
+
 def test_modal_workspace_execute_uses_modal(tmp_path: Path):
     clear_active_handles()
     fake_backend = MagicMock()

@@ -250,6 +250,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     startSessionSandbox: sandbox.startSessionSandbox,
     stopSessionSandbox: sandbox.stopSessionSandbox,
     restartSessionSandbox: sandbox.restartSessionSandbox,
+    refreshSessionSandbox: sandbox.refreshSessionSandbox,
     setRuntimeSettings: args.setRuntimeSettings,
     loadModelOptions: args.loadModelOptions
   })

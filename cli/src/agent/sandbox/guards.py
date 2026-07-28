@@ -48,19 +48,31 @@ def _is_within(path: Path, root: Path) -> bool:
 
 
 def _session_workspace_roots() -> list[Path]:
-    """Session workspace + project mount (symlink target) when set."""
+    """Default writable roots: Sandwalk base, workspace, and project mount."""
     import os
+
+    config_raw = str(
+        os.environ.get("SANDWALK_CONFIG_DIR") or CONFIG_DIR
+    ).strip()
+    roots: list[Path] = []
+    if config_raw:
+        try:
+            config_root = Path(config_raw).expanduser().resolve()
+            if config_root.is_dir():
+                roots.append(config_root)
+        except OSError:
+            pass
 
     raw = str(os.environ.get("SANDWALK_SESSION_WORKSPACE") or "").strip()
     if not raw:
-        return []
+        return roots
     try:
         root = Path(raw).expanduser().resolve()
     except OSError:
-        return []
+        return roots
     if not root.is_dir():
-        return []
-    roots = [root]
+        return roots
+    roots.append(root)
     try:
         from agent_server.project_folder import project_mount_target
 

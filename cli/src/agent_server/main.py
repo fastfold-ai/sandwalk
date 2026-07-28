@@ -10,6 +10,26 @@ from pathlib import Path
 SHUTDOWN_GRACE_SECONDS = 5
 
 
+def _signal_shutdown(app) -> None:
+    """Ask long-lived streams to close before Uvicorn starts draining tasks."""
+    app.state.shutdown_event.set()
+    from agent_server.store.event_notifier import EVENT_NOTIFIER
+
+    EVENT_NOTIFIER.wake_all()
+
+
+def _serve(app, **kwargs) -> None:
+    """Run Uvicorn with an early cooperative-shutdown hook."""
+    import uvicorn
+
+    class ShutdownAwareServer(uvicorn.Server):
+        def handle_exit(self, sig, frame) -> None:
+            _signal_shutdown(app)
+            super().handle_exit(sig, frame)
+
+    ShutdownAwareServer(uvicorn.Config(app, **kwargs)).run()
+
+
 def run_server(
     *,
     host: str = "127.0.0.1",
@@ -20,8 +40,6 @@ def run_server(
     allowed_hosts: list[str] | None = None,
     uds: Path | None = None,
 ) -> None:
-    import uvicorn
-
     log_config = None
     try:
         from agent.diagnostics import ensure_logging_configured, uvicorn_log_config
@@ -114,6 +132,17 @@ def run_server(
     except AgentStoreCorruptedError as exc:
         raise SystemExit(f"Error: {exc}") from exc
 
+    from agent_server.banner import print_server_banner
+
+    print_server_banner(
+        host=host,
+        port=port,
+        public=public,
+        auth_enabled=bool(app.state.runtime_api_key),
+        uds=uds,
+        ui_available=bool(getattr(app.state, "ui_dist", None)),
+    )
+
     run_kwargs = {
         "log_level": "info",
         # The desktop UI holds event streams open for as long as it is running,
@@ -132,10 +161,10 @@ def run_server(
         socket_path.unlink(missing_ok=True)
         previous_umask = os.umask(0o077)
         try:
-            uvicorn.run(app, uds=str(socket_path), **run_kwargs)
+            _serve(app, uds=str(socket_path), **run_kwargs)
         finally:
             os.umask(previous_umask)
             socket_path.unlink(missing_ok=True)
         return
 
-    uvicorn.run(app, host=host, port=port, **run_kwargs)
+    _serve(app, host=host, port=port, **run_kwargs)

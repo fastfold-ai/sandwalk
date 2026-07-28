@@ -11,6 +11,7 @@ import {
 } from '@/components/agents/DashboardSidebar'
 import { ShellNavStrip } from '@/components/ShellNavStrip'
 import { ResizablePanel } from '@/components/ui/resizable'
+import { useSidebarPixelWidth } from '@/hooks/useSidebarPixelWidth'
 import { groupSessions, type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
@@ -114,6 +115,11 @@ export function AppShellSidebar({
   exportTranscript,
   setDeleteTarget
 }: AppShellSidebarProps) {
+  const { onSidebarResize } = useSidebarPixelWidth(
+    sidebarPanelRef,
+    sidebarCollapsed
+  )
+
   return (
     <ResizablePanel
       id="sidebar"
@@ -122,14 +128,15 @@ export function AppShellSidebar({
       collapsible
       collapsedSize={0}
       defaultSize={23}
-      // Open floor. Drag past ~halfway to collapsedSize → collapses (hide sidebar).
-      // Pixel floor keeps traffic-light pad + toggle + back/forward visible.
-      minSize={23}
+      // Soft % floor; CSS pixel floor + pixel-width hook are the real constraints.
+      // Drag past minSize → collapses (hide sidebar).
+      minSize={5}
       maxSize={32}
       onCollapse={() => setSidebarCollapsed(true)}
       onExpand={() => setSidebarCollapsed(false)}
+      onResize={onSidebarResize}
       // Floor only while open — a persistent min-width blocks collapse to 0.
-      className={cn(!sidebarCollapsed && 'min-w-[15rem]')}
+      className={cn(!sidebarCollapsed && 'min-w-[243px]')}
     >
       <aside className="sandwalk-shell-sidebar bg-sidebar flex h-full flex-col overflow-hidden">
         <div

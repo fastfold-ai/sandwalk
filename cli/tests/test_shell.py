@@ -42,7 +42,10 @@ class TestIsBlocked:
     def test_workspace_mode_is_freer(self, tmp_path, monkeypatch):
         workspace = tmp_path / "ws"
         (workspace / "artifacts").mkdir(parents=True)
+        config = tmp_path / "sandwalk"
+        (config / "skills").mkdir(parents=True)
         monkeypatch.setenv("SANDWALK_SESSION_WORKSPACE", str(workspace))
+        monkeypatch.setenv("SANDWALK_CONFIG_DIR", str(config))
         assert _is_blocked(
             f'echo hi > "{workspace / "artifacts" / "out.txt"}"'
         ) is None
@@ -54,6 +57,10 @@ class TestIsBlocked:
         assert _is_blocked("rm -rf artifacts/tmp") is None
         assert _is_blocked("chmod 644 artifacts/out.txt") is None
         assert _is_blocked('python3 -c "print(1)"') is None
+        assert _is_blocked(
+            f'echo hi > "{config / "skills" / "notes.md"}"'
+        ) is None
+        assert _is_blocked(f'rm "{config / "skills" / "notes.md"}"') is None
         # Still blocked outside the session workspace / dangerous ops.
         assert _is_blocked("echo hi > /tmp/out.txt") is not None
         assert _is_blocked("rm -rf /tmp/out") is not None

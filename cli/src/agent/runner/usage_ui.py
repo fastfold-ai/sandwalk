@@ -11,6 +11,21 @@ import random
 
 from agent.types import ExecutionResult, Plan
 
+_FILE_ACCESS_ERROR_MARKERS = (
+    "outside root directory",
+    "sandbox file reads are restricted",
+    "sandbox file writes are restricted",
+    "file redirection is only allowed under",
+    "is only allowed on paths under",
+)
+_FILE_ACCESS_MESSAGE = (
+    "Sandwalk couldn't access that file because it is outside the folders "
+    "currently allowed for this agent. "
+    "[Configure agent access in Agent → Security]"
+    "(/dashboard/agent/security), select **Full filesystem access**, save, "
+    "and try again."
+)
+
 
 class UsageUIMixin:
     """Console-facing usage summary and error rendering helpers."""
@@ -122,9 +137,15 @@ class UsageUIMixin:
     def _make_error_result(query: str, error: str, duration: float) -> ExecutionResult:
         """Build an ExecutionResult representing a failed query."""
         plan = Plan(query=query, steps=[])
+        normalized = str(error).lower()
+        summary = (
+            _FILE_ACCESS_MESSAGE
+            if any(marker in normalized for marker in _FILE_ACCESS_ERROR_MARKERS)
+            else f"Agent SDK error: {error}"
+        )
         return ExecutionResult(
             plan=plan,
-            summary=f"Agent SDK error: {error}",
+            summary=summary,
             raw_results={"error": error},
             duration_s=duration,
             iterations=1,

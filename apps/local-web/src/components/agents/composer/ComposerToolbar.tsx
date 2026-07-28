@@ -54,6 +54,7 @@ export function ComposerToolbar({
   onSandboxStop,
   onSandboxRestart,
   onLoadLocalSystem,
+  onRefreshSandbox,
   onPlanModeChange,
   onStop
 }: {
@@ -97,6 +98,7 @@ export function ComposerToolbar({
   onSandboxStop?: () => void | Promise<void>
   onSandboxRestart?: () => void | Promise<void>
   onLoadLocalSystem?: () => Promise<ServerSystemInfo | null>
+  onRefreshSandbox?: () => void | Promise<void>
   onPlanModeChange?: (planMode: boolean) => Promise<void>
   onStop: () => void
 }) {
@@ -157,6 +159,7 @@ export function ComposerToolbar({
             onSandboxStop={onSandboxStop}
             onSandboxRestart={onSandboxRestart}
             onLoadLocalSystem={onLoadLocalSystem}
+            onRefreshSandbox={onRefreshSandbox}
           />
         ) : null}
       </div>

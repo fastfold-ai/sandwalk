@@ -1,5 +1,6 @@
 """shell — part 1 of split module. See tools/shell.py."""
-from tools.shell_base import Path, _ENV_VAR_PATTERN, os, re, shlex
+from tools.shell_base import _ENV_VAR_PATTERN, Path, os, re, shlex
+
 
 def _expand_env_refs(token: str) -> str:
     """Replace ``$VAR`` / ``${VAR}`` with values from ``os.environ`` (empty if unset)."""
@@ -113,6 +114,18 @@ def _path_under_workspace(raw: str, *, workspace: Path) -> Path | None:
     path = Path(text).expanduser()
     if not path.is_absolute():
         path = workspace / path
+
+    # Sandwalk owns this tree (skills, downloads, config, session workspaces).
+    # The safe default permits all file operations under its dynamic base path.
+    config_raw = str(os.environ.get("SANDWALK_CONFIG_DIR") or "").strip()
+    if config_raw:
+        try:
+            config_root = Path(config_raw).expanduser().resolve()
+            resolved = path.parent.resolve() / path.name
+            if resolved == config_root or resolved.is_relative_to(config_root):
+                return resolved
+        except (OSError, ValueError):
+            pass
 
     # Full file-access policy: allow redirects / rm anywhere (user opt-in).
     try:

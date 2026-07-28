@@ -69,9 +69,40 @@ export function useSessionSandbox({
   const refreshSessionSandbox = useCallback(
     async (targetSessionId?: string | null) => {
       const id = targetSessionId ?? sessionId
-      if (!id || isDraftAgentSessionId(id)) {
+      if (!id) {
         setSessionSandboxStatus(null)
         return null
+      }
+      if (isDraftAgentSessionId(id)) {
+        try {
+          const settings = await client.getSandboxSettings()
+          setSandboxSettings(settings)
+          const status: SessionSandboxStatus = {
+            sessionId: id,
+            backend: 'builtin',
+            sessionBackend: null,
+            globalBackend: settings.backend,
+            status: 'ready',
+            providerSandboxName: null,
+            modalConfigured: settings.modalConfigured,
+            computeType: settings.computeType,
+            gpuClass: settings.gpuClass,
+            cpuCores: settings.cpuCores,
+            ramGb: settings.ramGb,
+            cpuImage: settings.cpuImage,
+            gpuImage: settings.gpuImage,
+            baseImage:
+              settings.computeType === 'gpu'
+                ? settings.gpuImage
+                : settings.cpuImage,
+            detail: null
+          }
+          setSessionSandboxStatus(status)
+          return status
+        } catch {
+          setSessionSandboxStatus(null)
+          return null
+        }
       }
       try {
         const status = await client.getSessionSandbox(id)
@@ -92,7 +123,7 @@ export function useSessionSandbox({
         return null
       }
     },
-    [client, sessionId, sessionIdRef]
+    [client, sessionId, sessionIdRef, setSandboxSettings]
   )
 
   useEffect(() => {

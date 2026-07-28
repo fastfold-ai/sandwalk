@@ -3,7 +3,7 @@ import type {
   SessionSandboxStatus
 } from '@sandwalk/agent-ui-core'
 import { Container, Loader } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ComposerSandboxPopoverContent } from '@/components/agents/composer/ComposerSandboxPopoverContent'
 import { ModalGlyph } from '@/components/agents/composer/ModalGlyph'
@@ -33,7 +33,8 @@ export function ComposerSandboxPicker({
   onSandboxStart,
   onSandboxStop,
   onSandboxRestart,
-  onLoadLocalSystem
+  onLoadLocalSystem,
+  onRefreshSandbox
 }: {
   sandboxStatus?: SessionSandboxStatus | null
   sandboxPhase?: SandboxActionPhase
@@ -47,6 +48,8 @@ export function ComposerSandboxPicker({
   onSandboxStop?: () => void | Promise<void>
   onSandboxRestart?: () => void | Promise<void>
   onLoadLocalSystem?: () => Promise<ServerSystemInfo | null>
+  /** Re-fetch sandbox status when the picker opens (picks up Modal setup done elsewhere). */
+  onRefreshSandbox?: () => void | Promise<void>
 }) {
   const [sandboxPickerOpen, setSandboxPickerOpen] = useState(false)
   const [sandboxDraft, setSandboxDraft] = useState(() =>
@@ -55,9 +58,19 @@ export function ComposerSandboxPicker({
   const [sandboxConfirming, setSandboxConfirming] = useState(false)
   const [localSystem, setLocalSystem] = useState<ServerSystemInfo | null>(null)
   const [localSystemLoading, setLocalSystemLoading] = useState(false)
+  const refreshedOpenRef = useRef(false)
 
   useEffect(() => {
-    if (!sandboxPickerOpen) return
+    if (!sandboxPickerOpen) {
+      refreshedOpenRef.current = false
+      return
+    }
+    // Modal may have been configured on the Sandbox/Integrations page while
+    // this chat stayed open — refresh so "not set up" clears without reload.
+    if (!refreshedOpenRef.current) {
+      refreshedOpenRef.current = true
+      void onRefreshSandbox?.()
+    }
     setSandboxDraft(draftFromSandboxStatus(sandboxStatus))
     if (!onLoadLocalSystem) {
       setLocalSystem(null)
@@ -78,7 +91,7 @@ export function ComposerSandboxPicker({
     return () => {
       cancelled = true
     }
-  }, [sandboxPickerOpen, onLoadLocalSystem, sandboxStatus])
+  }, [sandboxPickerOpen, onLoadLocalSystem, onRefreshSandbox, sandboxStatus])
 
   const appliedSandboxBackend =
     sandboxStatus?.backend === 'modal' ? 'modal' : 'builtin'

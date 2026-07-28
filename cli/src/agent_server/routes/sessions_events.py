@@ -43,7 +43,11 @@ def register_session_event_routes(app: FastAPI, deps: AppDeps) -> None:
             nonlocal cursor
             heartbeat_ticks = 0
             flush_after_batch = False
-            while not await request.is_disconnected():
+            shutdown_event = request.app.state.shutdown_event
+            while (
+                not shutdown_event.is_set()
+                and not await request.is_disconnected()
+            ):
                 # Capture the generation before querying so an event appended
                 # between the query and the wait wakes us instantly.
                 generation = EVENT_NOTIFIER.generation(session_id)

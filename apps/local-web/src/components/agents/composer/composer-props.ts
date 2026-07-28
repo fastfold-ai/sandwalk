@@ -86,6 +86,7 @@ export type ComposerProps = {
   onSandboxStop?: () => void | Promise<void>
   onSandboxRestart?: () => void | Promise<void>
   onLoadLocalSystem?: () => Promise<ServerSystemInfo | null>
+  onRefreshSandbox?: () => void | Promise<void>
   onPlanModeChange?: (planMode: boolean) => Promise<void>
   editingQueued?: boolean
   onCancelEditQueued?: () => void

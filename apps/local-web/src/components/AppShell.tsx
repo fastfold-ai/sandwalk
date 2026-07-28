@@ -6,6 +6,7 @@ import {
   ResizableHandle,
   ResizablePanelGroup
 } from '@/components/ui/resizable'
+import { SHELL_PANEL_GROUP_ID } from '@/hooks/useSidebarPixelWidth'
 import { SHELL_PANELS_AUTO_SAVE_ID } from '@/lib/app-storage'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +22,7 @@ export function AppShell(props: AppShellProps) {
       */}
       <div className="sandwalk-shell bg-background flex h-full w-full flex-col overflow-hidden">
         <ResizablePanelGroup
+          id={SHELL_PANEL_GROUP_ID}
           direction="horizontal"
           autoSaveId={SHELL_PANELS_AUTO_SAVE_ID}
           className="sandwalk-shell-panels min-h-0 w-full flex-1 overflow-hidden"

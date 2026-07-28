@@ -29,6 +29,40 @@ _SKILLS_EXECUTE_HINT = (
 )
 
 
+class SkillsFilesystemBackend(FilesystemBackend):
+    """Filesystem backend that safely follows staged skill-directory symlinks.
+
+    Deepagents' stock virtual backend rejects a staged ``skill -> source``
+    symlink because its resolved target is outside the staging root. Installed
+    skills are intentionally host-backed, so allow targets under the known
+    source roots while still rejecting traversal and unrelated paths.
+    """
+
+    def __init__(self, root: Path, sources: list[Path]) -> None:
+        super().__init__(root_dir=str(root), virtual_mode=True)
+        self._skill_roots = [source.resolve() for source in sources]
+
+    def _resolve_path(self, key: str) -> Path:
+        vpath = key if key.startswith("/") else f"/{key}"
+        if ".." in Path(vpath).parts or vpath.startswith("~"):
+            raise ValueError("Path traversal not allowed")
+        lexical = self.cwd / vpath.lstrip("/")
+        try:
+            lexical.relative_to(self.cwd)
+        except ValueError:
+            raise ValueError("Path traversal not allowed") from None
+        resolved = lexical.resolve()
+        allowed = [self.cwd, *self._skill_roots]
+        if not any(
+            resolved == root or resolved.is_relative_to(root)
+            for root in allowed
+        ):
+            raise ValueError(
+                f"Path:{resolved} outside Sandwalk skill directories"
+            )
+        return resolved
+
+
 def _skills_filesystem_root(sources: list[str]) -> Path | None:
     """Build a single host root for CompositeBackend ``/skills/`` routing.
 
@@ -134,7 +168,12 @@ def _compose_modal_with_local_skills(
     if skills_root is None:
         return modal_backend, [], None
 
-    skills_fs = FilesystemBackend(root_dir=str(skills_root), virtual_mode=True)
+    source_roots = [
+        Path(str(raw)).expanduser().resolve()
+        for raw in skill_source_dirs
+        if Path(str(raw)).expanduser().is_dir()
+    ]
+    skills_fs = SkillsFilesystemBackend(skills_root, source_roots)
     composite = CompositeBackend(
         default=modal_backend,
         routes={f"{SKILLS_REMOTE_ROOT}/": skills_fs},

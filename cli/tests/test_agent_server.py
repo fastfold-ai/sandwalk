@@ -256,7 +256,7 @@ def test_agent_server_workspace_file_contract(tmp_path: Path, monkeypatch):
 
 
 def test_public_server_requires_security_configuration(monkeypatch):
-    monkeypatch.setattr("uvicorn.run", lambda *args, **kwargs: None)
+    monkeypatch.setattr("agent_server.main._serve", lambda *args, **kwargs: None)
 
     with pytest.raises(ValueError, match="api-key"):
         run_server(host="0.0.0.0", public=True)

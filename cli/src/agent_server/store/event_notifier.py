@@ -29,6 +29,13 @@ class EventNotifier:
             self._generations[session_id] += 1
             self._cond.notify_all()
 
+    def wake_all(self) -> None:
+        """Wake every active event stream, including during server shutdown."""
+        with self._cond:
+            for session_id in self._generations:
+                self._generations[session_id] += 1
+            self._cond.notify_all()
+
     def wait_for_change(
         self, session_id: str, seen_generation: int, timeout: float
     ) -> int:
