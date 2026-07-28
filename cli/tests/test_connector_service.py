@@ -185,18 +185,66 @@ def test_disconnect_clears_the_allowlist(store: AgentStore) -> None:
     assert store.list_slack_allowed_users("T1") == []
 
 
-def test_status_reports_mode_and_workspaces(store: AgentStore, service: ConnectorService) -> None:
+def test_status_reports_mode_and_workspaces(
+    store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+) -> None:
     assert service.status().mode is None
 
     store.upsert_slack_workspace(team_id="T1", mode="relay", team_name="Acme")
+    # No FastFold key ⇒ enabled relay cannot be live.
+    monkeypatch.setattr(
+        "agent_server.account_service.helpers.api_key", lambda cfg=None: ""
+    )
     status = service.status()
     assert status.mode == "relay"
     assert [item.team_id for item in status.workspaces] == ["T1"]
-    assert status.relay_state == "off"
+    assert status.relay_state == "signed_out"
+    assert status.workspaces[0].live is False
 
     # Socket Mode takes precedence — connecting one pauses relay delivery.
     store.upsert_slack_workspace(team_id="T2", mode="socket")
     assert service.status().mode == "socket"
+
+
+def test_status_marks_relay_not_live_without_fastfold_key(
+    store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store.upsert_slack_workspace(team_id="T1", mode="relay", team_name="Acme")
+    service._sockets["T1"] = type("Adapter", (), {"connected": True})()
+    service._relay_state = "live"
+    monkeypatch.setattr(
+        "agent_server.account_service.helpers.api_key", lambda cfg=None: ""
+    )
+
+    status = service.status()
+
+    assert status.relay_state == "signed_out"
+    assert status.workspaces[0].live is False
+
+
+def test_reconcile_fastfold_auth_stops_relay_without_key(
+    store: AgentStore, service: ConnectorService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store.upsert_slack_workspace(team_id="T1", mode="relay", team_name="Acme")
+    stopped: list[str] = []
+
+    class FakeRelay:
+        async def stop(self) -> None:
+            stopped.append("stopped")
+
+    service._sockets["T1"] = type("Adapter", (), {"connected": True})()
+    service._relay = FakeRelay()
+    service._relay_state = "live"
+    monkeypatch.setattr(
+        "agent_server.account_service.helpers.api_key", lambda cfg=None: ""
+    )
+
+    run(service.reconcile_fastfold_auth())
+
+    assert stopped == ["stopped"]
+    assert service._relay is None
+    assert "T1" not in service._sockets
+    assert service._relay_state == "signed_out"
 
 
 def test_disconnect_removes_the_workspace(store: AgentStore, service: ConnectorService) -> None:

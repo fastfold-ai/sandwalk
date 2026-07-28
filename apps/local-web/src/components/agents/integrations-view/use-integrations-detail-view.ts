@@ -68,6 +68,7 @@ export function useIntegrationsDetailView({
           setOverlay(null)
         }
       }
+      return result
     } catch (error) {
       setOverlay(null)
       toast.error(
@@ -75,9 +76,28 @@ export function useIntegrationsDetailView({
           ? error.message
           : 'Unable to test integration.'
       )
+      return null
     } finally {
       setValidationBusy(false)
     }
+  }
+
+  async function runSaveAndValidate(
+    key: string,
+    save: () => Promise<void>
+  ) {
+    setValidationBusy(true)
+    try {
+      await save()
+    } catch (error) {
+      setValidationBusy(false)
+      toast.error(
+        error instanceof Error ? error.message : 'Unable to save integration.'
+      )
+      return
+    }
+    // Validate with the freshly saved credentials (same live probe as Test).
+    await runValidate(key)
   }
 
   useEffect(() => {
@@ -99,7 +119,7 @@ export function useIntegrationsDetailView({
         if (autoFetchAttemptsRef.current >= 40) {
           setAutoFetchPending(false)
           toast.error(
-            'Still waiting for Vercel token. Finish terminal prompts, then click Re-link Project again.'
+            'Still waiting for Vercel token. Finish terminal prompts, then open Add again or paste the token.'
           )
           return
         }
@@ -135,6 +155,7 @@ export function useIntegrationsDetailView({
     setOpeningTerminal,
     terminalStartupNonce,
     setTerminalStartupNonce,
-    runValidate
+    runValidate,
+    runSaveAndValidate
   }
 }

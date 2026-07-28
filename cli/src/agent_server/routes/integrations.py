@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
 from fastapi import Body, FastAPI, HTTPException
 
@@ -19,6 +20,12 @@ from agent_server.models import (
 
 def register_integration_routes(app: FastAPI, deps: AppDeps) -> None:
     integrations_service = deps.integrations_service
+
+    async def _sync_slack_relay_after_fastfold(integration_key: str) -> None:
+        if integration_key != "fastfold-cloud":
+            return
+        with contextlib.suppress(Exception):
+            await deps.connector_service.reconcile_fastfold_auth()
 
     @app.get("/v1/integrations", response_model=IntegrationList)
     async def list_integrations() -> IntegrationList:
@@ -46,11 +53,13 @@ def register_integration_routes(app: FastAPI, deps: AppDeps) -> None:
                 if provider is None:
                     raise KeyError(integration_key)
                 values[provider.env_var] = payload.value
-            return await asyncio.to_thread(
+            provider = await asyncio.to_thread(
                 integrations_service.update,
                 integration_key,
                 values,
             )
+            await _sync_slack_relay_after_fastfold(integration_key)
+            return provider
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Integration not found.") from exc
         except ValueError as exc:
@@ -59,7 +68,11 @@ def register_integration_routes(app: FastAPI, deps: AppDeps) -> None:
     @app.delete("/v1/integrations/{integration_key}", response_model=IntegrationProvider)
     async def remove_integration(integration_key: str) -> IntegrationProvider:
         try:
-            return await asyncio.to_thread(integrations_service.remove, integration_key)
+            provider = await asyncio.to_thread(
+                integrations_service.remove, integration_key
+            )
+            await _sync_slack_relay_after_fastfold(integration_key)
+            return provider
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Integration not found.") from exc
 

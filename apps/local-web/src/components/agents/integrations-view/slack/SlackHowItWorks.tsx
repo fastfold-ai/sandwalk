@@ -47,14 +47,14 @@ const ROWS: {
         For paid Slack accounts with the Agent capability — you’ll need a{' '}
         <Link
           to={FASTFOLD_CLOUD_PATH}
-          className="text-foreground hover:text-foreground/80 inline-flex items-center gap-1 font-medium underline underline-offset-2"
+          className="text-foreground hover:text-foreground/80 inline-flex items-center gap-1 font-medium"
         >
           <img
             src={FASTFOLD_ICON.src}
             alt=""
             className="size-3.5 object-contain"
           />
-          FastFold account
+          Fastfold account
         </Link>
         .
       </>

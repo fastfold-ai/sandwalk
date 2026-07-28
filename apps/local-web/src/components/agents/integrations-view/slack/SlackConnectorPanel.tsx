@@ -165,66 +165,81 @@ export function SlackConnectorPanel({
         onDismiss={id => void run(() => client.dismissSlackParked(id))}
       />
 
-      {connected ? (
-        workspaces.map(workspace => (
-          <SlackWorkspaceCard
-            key={workspace.teamId}
-            workspace={workspace}
-            people={slack.people[workspace.teamId] ?? []}
-            directory={slack.directories[workspace.teamId] ?? null}
-            subscriptions={subscriptions}
-            sessions={sessions}
-            busy={slack.busy}
-            onAllowPerson={(teamId, slackUserId, displayName) =>
-              void run(() =>
-                client.allowSlackPerson({ teamId, slackUserId, displayName })
-              )
-            }
-            onDisallowPerson={(teamId, slackUserId) =>
-              void run(() => client.disallowSlackPerson(teamId, slackUserId))
-            }
-            onAddSubscription={(sessionId, channel) =>
-              void run(() =>
-                client.addSlackSubscription({ sessionId, channel })
-              )
-            }
-            onRemoveSubscription={(sessionId, channel) =>
-              void run(() => client.removeSlackSubscription(sessionId, channel))
-            }
-            onUpdateTokens={target => {
-              setUpdating(target)
-              setManualOpen(true)
-            }}
-            onDisconnect={teamId =>
-              void run(() => client.disconnectSlackWorkspace(teamId))
-            }
-            onSetEnabled={(teamId, enabled) =>
-              void run(() => client.setSlackWorkspaceEnabled(teamId, enabled))
-            }
-            onRefreshChannels={teamId =>
-              void slack.refreshDirectory(teamId)
-            }
-            relayState={relayState}
-          />
-        ))
-      ) : (
-        <div className="border-border/70 text-muted-foreground flex flex-col items-center gap-3 rounded-xl border border-dashed py-12 text-center">
-          <img
-            src={INTEGRATION_ICONS.slack.src}
-            alt=""
-            className="size-8 object-contain opacity-60"
-          />
-          <div>
-            <p className="text-foreground text-[14px] font-medium">
-              No workspace connected
-            </p>
-            <p className="mt-1 max-w-sm text-[13px]">
-              Use your agents from a Slack workspace — complete Relay Agent and
-              Socket Mode support.
-            </p>
+      <section className="space-y-2">
+        <h3 className="text-sm font-medium">Connections</h3>
+        {connected ? (
+          <div className="space-y-4">
+            {workspaces.map(workspace => (
+              <SlackWorkspaceCard
+                key={workspace.teamId}
+                workspace={workspace}
+                people={slack.people[workspace.teamId] ?? []}
+                directory={slack.directories[workspace.teamId] ?? null}
+                subscriptions={subscriptions}
+                sessions={sessions}
+                busy={slack.busy}
+                onAllowPerson={(teamId, slackUserId, displayName) =>
+                  void run(() =>
+                    client.allowSlackPerson({
+                      teamId,
+                      slackUserId,
+                      displayName
+                    })
+                  )
+                }
+                onDisallowPerson={(teamId, slackUserId) =>
+                  void run(() =>
+                    client.disallowSlackPerson(teamId, slackUserId)
+                  )
+                }
+                onAddSubscription={(sessionId, channel) =>
+                  void run(() =>
+                    client.addSlackSubscription({ sessionId, channel })
+                  )
+                }
+                onRemoveSubscription={(sessionId, channel) =>
+                  void run(() =>
+                    client.removeSlackSubscription(sessionId, channel)
+                  )
+                }
+                onUpdateTokens={target => {
+                  setUpdating(target)
+                  setManualOpen(true)
+                }}
+                onDisconnect={teamId =>
+                  void run(() => client.disconnectSlackWorkspace(teamId))
+                }
+                onSetEnabled={(teamId, enabled) =>
+                  void run(() =>
+                    client.setSlackWorkspaceEnabled(teamId, enabled)
+                  )
+                }
+                onRefreshChannels={teamId =>
+                  void slack.refreshDirectory(teamId)
+                }
+                relayState={relayState}
+              />
+            ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="border-border/70 text-muted-foreground flex flex-col items-center gap-3 rounded-xl border border-dashed py-12 text-center">
+            <img
+              src={INTEGRATION_ICONS.slack.src}
+              alt=""
+              className="size-8 object-contain opacity-60"
+            />
+            <div>
+              <p className="text-foreground text-[14px] font-medium">
+                No workspace connected
+              </p>
+              <p className="mt-1 max-w-sm text-[13px]">
+                Use your agents from a Slack workspace — complete Relay Agent
+                and Socket Mode support.
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
 
       <SlackOneClickDialog
         open={oneClickOpen}

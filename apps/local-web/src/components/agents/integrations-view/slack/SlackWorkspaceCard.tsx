@@ -8,7 +8,9 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import { RefreshCw, X } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
+import { Link } from 'react-router-dom'
 
+import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import { McpToggle } from '@/components/agents/mcp-view/mcp-view-shared'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -19,11 +21,8 @@ import {
   SlackPickerPopover
 } from './SlackPickerPopover'
 
-const RELAY_ISSUE_LABEL: Partial<Record<SlackRelayState, string>> = {
-  signed_out: 'Sign in to Fastfold Cloud to receive mentions',
-  auth_expired: 'Fastfold Cloud sign-in expired — reconnect to receive mentions',
-  reconnecting: 'Reconnecting…'
-}
+const FASTFOLD_CLOUD_PATH = '/dashboard/integrations/fastfold-cloud'
+const FASTFOLD_ICON = INTEGRATION_ICONS['fastfold-cloud']
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -143,43 +142,50 @@ export function SlackWorkspaceCard({
     return known ? `#${known.name}` : id
   }
 
-  const relayIssue =
-    workspace.enabled && workspace.mode === 'relay'
-      ? RELAY_ISSUE_LABEL[relayState]
-      : null
-
   const isReconnecting =
     workspace.mode === 'relay' && relayState === 'reconnecting'
+  const relayBlocked =
+    workspace.enabled &&
+    workspace.mode === 'relay' &&
+    (relayState === 'signed_out' || relayState === 'auth_expired')
   // A rotated/invalid bot token is a distinct, more actionable state than a
   // dropped connection — it needs a click, not a wait, so it takes priority
-  // over every other status.
+  // over every other status. Missing Fastfold key also outranks a stale Live.
   const statusDotClass = workspace.needsReauth
     ? 'bg-red-500'
     : !workspace.enabled
       ? 'bg-muted-foreground/50'
-      : workspace.live
-        ? 'bg-emerald-500'
-        : isReconnecting
-          ? 'bg-amber-500'
-          : 'bg-red-500'
+      : relayBlocked
+        ? 'bg-amber-500'
+        : workspace.live
+          ? 'bg-emerald-500'
+          : isReconnecting
+            ? 'bg-amber-500'
+            : 'bg-red-500'
   const statusLabel = workspace.needsReauth
     ? 'Reconnect needed'
     : !workspace.enabled
       ? 'Paused'
-      : workspace.live
-        ? 'Live'
-        : isReconnecting
-          ? 'Reconnecting…'
-          : 'Error'
+      : relayBlocked
+        ? relayState === 'auth_expired'
+          ? 'Key rejected'
+          : 'Needs Fastfold key'
+        : workspace.live
+          ? 'Live'
+          : isReconnecting
+            ? 'Reconnecting…'
+            : 'Error'
   const statusTextClass = workspace.needsReauth
     ? 'text-red-500'
     : !workspace.enabled
       ? 'text-muted-foreground'
-      : workspace.live
-        ? 'text-emerald-500'
-        : isReconnecting
-          ? 'text-amber-500'
-          : 'text-red-500'
+      : relayBlocked
+        ? 'text-amber-500'
+        : workspace.live
+          ? 'text-emerald-500'
+          : isReconnecting
+            ? 'text-amber-500'
+            : 'text-red-500'
 
   return (
     <section
@@ -205,9 +211,23 @@ export function SlackWorkspaceCard({
             <p className="mt-0.5 truncate text-[11px] text-red-500">
               Slack rejected the last message — the bot token needs refreshing.
             </p>
-          ) : relayIssue ? (
-            <p className="mt-0.5 truncate text-[11px] text-amber-500">
-              {relayIssue}
+          ) : relayBlocked ? (
+            <p className="text-muted-foreground mt-0.5 text-[11px]">
+              Add your{' '}
+              <Link
+                to={FASTFOLD_CLOUD_PATH}
+                className="text-foreground hover:text-foreground/80 inline-flex items-center gap-1 font-medium"
+              >
+                <img
+                  src={FASTFOLD_ICON.src}
+                  alt=""
+                  className="size-3.5 object-contain"
+                />
+                Fastfold account
+              </Link>{' '}
+              {relayState === 'auth_expired'
+                ? 'to resume relay.'
+                : 'to enable relay.'}
             </p>
           ) : null}
         </div>
@@ -302,7 +322,7 @@ export function SlackWorkspaceCard({
         </div>
       </Row>
 
-      <div className="border-border/70 flex items-center justify-between border-t px-4 py-2.5">
+      <div className="border-border/70 flex items-center justify-end gap-1 border-t px-4 py-2.5">
         {/* Socket Mode always offers "Update" (re-pasting tokens). Relay has
             no tokens of its own to paste, so it only gets a button once a
             failure actually calls for a reconnect — the same one-click flow
@@ -320,9 +340,7 @@ export function SlackWorkspaceCard({
           >
             {workspace.needsReauth ? 'Reconnect' : 'Update'}
           </Button>
-        ) : (
-          <span />
-        )}
+        ) : null}
         <Button
           size="sm"
           variant="ghost"

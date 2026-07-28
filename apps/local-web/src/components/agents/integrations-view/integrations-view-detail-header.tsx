@@ -1,16 +1,14 @@
 import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
-import { Button } from '@/components/ui/button'
 import { openInSystemBrowser } from '@/lib/desktop'
 
-import { VERCEL_SETUP_COMMANDS } from './integrations-view-shared'
-
-/** Stable mount point for the Slack Add split button (filled via portal). */
+/** Stable mount points for Add split buttons (filled via portal). */
 export const SLACK_ADD_HEADER_SLOT_ID = 'sandwalk-slack-add-header-slot'
+export const VERCEL_ADD_HEADER_SLOT_ID = 'sandwalk-vercel-add-header-slot'
 
 function setupHostLabel(url: string) {
   try {
@@ -22,16 +20,10 @@ function setupHostLabel(url: string) {
 
 export function IntegrationsDetailNav({
   selected,
-  setupRunning,
-  openingTerminal,
-  onBack,
-  onLinkProject
+  onBack
 }: {
   selected: IntegrationSummary
-  setupRunning: boolean
-  openingTerminal: boolean
   onBack: () => void
-  onLinkProject: () => void
 }) {
   return (
     <DetailStickyNav>
@@ -62,24 +54,6 @@ export function IntegrationsDetailNav({
             Modal Settings
           </Link>
         ) : null}
-        {selected.key === 'skills-sh' ? (
-          <Button
-            variant="secondary"
-            disabled={setupRunning || openingTerminal}
-            onClick={onLinkProject}
-          >
-            {setupRunning || openingTerminal ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <img
-                src="/integrations/vercel.png"
-                alt=""
-                className="size-4 rounded object-contain dark:invert"
-              />
-            )}
-            {selected.configured ? 'Re-link Project' : 'Link Project'}
-          </Button>
-        ) : null}
       </div>
     </DetailStickyNav>
   )
@@ -99,42 +73,14 @@ export function IntegrationsDetailHeader({
           {selected.key === 'slack' ? (
             <div id={SLACK_ADD_HEADER_SLOT_ID} className="shrink-0" />
           ) : null}
+          {selected.key === 'skills-sh' ? (
+            <div id={VERCEL_ADD_HEADER_SLOT_ID} className="shrink-0" />
+          ) : null}
         </div>
         {selected.key === 'skills-sh' ? (
-          <div className="text-muted-foreground mt-1 space-y-1 text-sm">
-            <p>Use this for Skills.sh catalog search authentication.</p>
-            <ol className="list-inside list-decimal space-y-0.5 text-xs">
-              <li>
-                In{' '}
-                {selected.setupUrl ? (
-                  <button
-                    type="button"
-                    className="underline underline-offset-2"
-                    onClick={() =>
-                      void openInSystemBrowser(selected.setupUrl!)
-                    }
-                  >
-                    Vercel Dashboard ↗
-                  </button>
-                ) : (
-                  'Vercel Dashboard'
-                )}
-                , open the target project, then go to `Settings {'->'}{' '}
-                Security {'->'} OIDC Federation` and enable it.
-              </li>
-              <li>
-                Click{' '}
-                <strong>
-                  {selected.configured ? 'Re-link Project' : 'Link Project'}
-                </strong>{' '}
-                - it opens the setup terminal and runs these commands for you.
-              </li>
-              <li>Follow the terminal prompts, then click Test.</li>
-            </ol>
-            <pre className="bg-muted/40 mt-2 rounded border p-2 font-mono text-[11px]">
-              <code>{VERCEL_SETUP_COMMANDS.join('\n')}</code>
-            </pre>
-          </div>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Skills.sh catalog search authentication via Vercel OIDC.
+          </p>
         ) : selected.key === 'modal' ? (
           <p className="text-muted-foreground mt-1 text-sm">
             Modal tokens for sandbox chats. App defaults and images live under

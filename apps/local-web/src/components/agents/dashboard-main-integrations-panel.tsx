@@ -48,11 +48,11 @@ export function DashboardMainIntegrationsPanel({
         }))
       }
       onSelect={key => navigateToIntegration(navigate, integrations, key)}
-      onSave={async () => {
+      onSave={async override => {
         if (!selectedIntegrationKey) return
         await client.updateIntegration(
           selectedIntegrationKey,
-          integrationValues
+          override ?? integrationValues
         )
         setIntegrationValues({})
         await loadIntegrations()

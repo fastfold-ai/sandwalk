@@ -1,5 +1,7 @@
-import { ChevronDown, ExternalLink, Loader2, Plus } from 'lucide-react'
+import { Cable, ChevronDown, ExternalLink, Loader2, Plus } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
+import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -14,6 +16,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+
+const FASTFOLD_CLOUD_PATH = '/dashboard/integrations/fastfold-cloud'
+const FASTFOLD_ICON = INTEGRATION_ICONS['fastfold-cloud']
+
+function needsFastfoldAccount(error: string | null) {
+  if (!error) return false
+  const text = error.toLowerCase()
+  return (
+    text.includes('fastfold') ||
+    text.includes('api key') ||
+    text.includes('one-click')
+  )
+}
 
 export function SlackAddSplitButton({
   busy,
@@ -79,18 +94,63 @@ export function SlackOneClickDialog({
   onRetry: () => void
   onOpenManual: () => void
 }) {
+  const missingAccount = needsFastfoldAccount(error)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="text-left">
           <DialogTitle className="text-base">Add to Slack</DialogTitle>
           <DialogDescription className="text-[12px]">
-            Approve Sandwalk for your workspace in the browser — no tokens to
-            copy.
+            {missingAccount
+              ? 'One-click relay needs a Fastfold account. Or connect with Socket Mode instead.'
+              : 'Approve Sandwalk for your workspace in the browser — no tokens to copy.'}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          {error ? (
+          {missingAccount ? (
+            <div className="space-y-2">
+              <Link
+                to={FASTFOLD_CLOUD_PATH}
+                onClick={() => onOpenChange(false)}
+                className="border-border/70 hover:bg-muted/40 flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors"
+              >
+                <img
+                  src={FASTFOLD_ICON.src}
+                  alt=""
+                  className="size-5 object-contain"
+                />
+                <div className="min-w-0 text-left">
+                  <p className="text-foreground text-[13px] font-medium">
+                    Add Fastfold account
+                  </p>
+                  <p className="text-muted-foreground text-[11px]">
+                    Save your Fastfold API key, then try Add again.
+                  </p>
+                </div>
+              </Link>
+              <button
+                type="button"
+                className="border-border/70 hover:bg-muted/40 flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors"
+                onClick={() => {
+                  onOpenChange(false)
+                  onOpenManual()
+                }}
+              >
+                <Cable className="text-muted-foreground size-5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-foreground text-[13px] font-medium">
+                    Manual Socket
+                  </p>
+                  <p className="text-muted-foreground text-[11px]">
+                    Connect with app tokens — no Fastfold account needed.
+                  </p>
+                </div>
+              </button>
+            </div>
+          ) : null}
+
+          {error && !missingAccount ? (
             <div className="border-destructive/40 bg-destructive/5 rounded-lg border p-3">
               <p className="text-[12px] leading-relaxed">{error}</p>
               <Button
@@ -102,10 +162,11 @@ export function SlackOneClickDialog({
                   onOpenManual()
                 }}
               >
-                Add via Socket (manual)
+                Manual Socket
               </Button>
             </div>
           ) : null}
+
           {waiting ? (
             <div className="border-border/70 bg-muted/30 flex items-center gap-2 rounded-lg border p-3">
               <Loader2 className="size-3.5 shrink-0 animate-spin" />
@@ -114,6 +175,7 @@ export function SlackOneClickDialog({
               </p>
             </div>
           ) : null}
+
           {!waiting && !error ? (
             <Button
               size="sm"
@@ -125,6 +187,7 @@ export function SlackOneClickDialog({
               <ExternalLink className="ml-1.5 size-3.5" />
             </Button>
           ) : null}
+
           {waiting || error ? (
             <Button
               size="sm"

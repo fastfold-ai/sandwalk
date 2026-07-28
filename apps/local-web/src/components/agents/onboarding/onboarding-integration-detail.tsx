@@ -256,7 +256,7 @@ export function OnboardingIntegrationDetail({
           ) : (
             <Check className="size-4" />
           )}
-          Save & use
+          Save &amp; Test
         </Button>
       </div>
     </section>

@@ -97,7 +97,7 @@ def test_import_one_click_accepts_a_reauth_team_id(client: TestClient) -> None:
         params={"reauth_team_id": "T1"},
     )
     assert response.status_code == 400
-    assert "Connect FastFold Cloud" in response.json()["detail"]
+    assert "Connect Fastfold Cloud" in response.json()["detail"]
 
 
 def test_people_allowlist_round_trip(client: TestClient) -> None:

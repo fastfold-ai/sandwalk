@@ -52,6 +52,27 @@ def test_integrations_http_crud(tmp_path: Path, monkeypatch):
         assert boltz_cli["installed"] is True
         assert boltz_cli["statusDetail"] == str(installed_cli)
 
+        installed_npx = tmp_path / "bin" / "npx"
+        monkeypatch.setattr(
+            "agent_server.integrations_service.capabilities.install_npx_skills_cli",
+            lambda: installed_npx,
+        )
+        monkeypatch.setattr(
+            "agent_server.integrations_service.provider.find_npx_skills_cli",
+            lambda: installed_npx,
+        )
+        skills_cli = client.post(
+            "/v1/integrations/skills-sh/capabilities/npx-skills-cli/install"
+        )
+        assert skills_cli.status_code == 200, skills_cli.text
+        npx_unlock = next(
+            unlock
+            for unlock in skills_cli.json()["unlocks"]
+            if unlock["id"] == "npx-skills-cli"
+        )
+        assert npx_unlock["installed"] is True
+        assert npx_unlock["statusDetail"] == str(installed_npx)
+
         updated = client.put(
             "/v1/integrations/anthropic",
             json={"value": "sk-ant-api03-validkey"},

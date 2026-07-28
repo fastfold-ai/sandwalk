@@ -77,7 +77,7 @@ export function useOnboardingIntegrations(client: LocalAgentClient) {
         if (autoFetchAttemptsRef.current >= 40) {
           setAutoFetchPending(false)
           setNotice(
-            'Still waiting for Vercel token. Finish terminal prompts, then click Re-link Project again.'
+            'Still waiting for Vercel token. Finish terminal prompts, then open Add again or paste the token.'
           )
           return
         }
@@ -187,8 +187,14 @@ export function useOnboardingIntegrations(client: LocalAgentClient) {
     try {
       await client.updateIntegration(selected.key, payload)
       setValues({})
-      setNotice(`${selected.name} connected.`)
       await refresh()
+      const result = await client.validateIntegration(selected.key)
+      setNotice(
+        result.ok
+          ? `${selected.name} connected. ${result.message}`
+          : result.message
+      )
+      if (!result.ok) setError(result.message)
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not save integration.'

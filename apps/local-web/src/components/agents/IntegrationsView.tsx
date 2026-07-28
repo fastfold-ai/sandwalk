@@ -46,7 +46,7 @@ export function IntegrationsView({
   onShowAll?: () => void
   onSelect: (key: string | null) => void
   onValueChange: (envName: string, value: string) => void
-  onSave: () => Promise<void>
+  onSave: (values?: Record<string, string>) => Promise<void>
   onValidate: (key: string) => Promise<{ ok: boolean; message: string }>
   onAutofill: (key: string) => Promise<void>
   onSetup: (key: string) => Promise<IntegrationSetupResult>

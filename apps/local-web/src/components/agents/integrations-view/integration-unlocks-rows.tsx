@@ -22,6 +22,22 @@ function capabilityIcon(unlock: IntegrationUnlock): ReactNode {
       />
     )
   }
+  if (
+    unlock.id === 'npx-skills-cli' ||
+    unlock.id === 'skills-sh-catalog' ||
+    unlock.id.startsWith('skills-sh')
+  ) {
+    return (
+      <img
+        src={INTEGRATION_ICONS['skills-sh'].src}
+        alt=""
+        className={cn(
+          'size-5 shrink-0 object-contain',
+          INTEGRATION_ICONS['skills-sh'].invertInDark && 'dark:invert'
+        )}
+      />
+    )
+  }
   if (unlock.kind === 'notice') {
     return <CircleAlert className="text-muted-foreground size-5 shrink-0" />
   }

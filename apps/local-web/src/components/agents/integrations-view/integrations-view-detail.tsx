@@ -22,6 +22,7 @@ import {
 } from './integrations-view-detail-panels'
 import { SlackConnectorPanel } from './slack/SlackConnectorPanel'
 import { useIntegrationsDetailView } from './use-integrations-detail-view'
+import { VercelAddControls } from './vercel/VercelAddControls'
 
 export function IntegrationsDetailView({
   terminalClient,
@@ -43,7 +44,7 @@ export function IntegrationsDetailView({
   sessions?: AgentSession[]
   onBack: () => void
   onValueChange: (envName: string, value: string) => void
-  onSave: () => Promise<void>
+  onSave: (values?: Record<string, string>) => Promise<void>
   onValidate: (key: string) => Promise<{ ok: boolean; message: string }>
   onAutofill: (key: string) => Promise<void>
   onSetup: (key: string) => Promise<IntegrationSetupResult>
@@ -98,13 +99,7 @@ export function IntegrationsDetailView({
         message={view.overlay?.message || ''}
         description={view.overlay?.description}
       />
-      <IntegrationsDetailNav
-        selected={selected}
-        setupRunning={view.setupRunning}
-        openingTerminal={view.openingTerminal}
-        onBack={onBack}
-        onLinkProject={handleLinkProject}
-      />
+      <IntegrationsDetailNav selected={selected} onBack={onBack} />
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pb-6 pt-6 md:px-6 md:pb-8 md:pt-8">
           <IntegrationsDetailHeader selected={selected} />
@@ -120,14 +115,31 @@ export function IntegrationsDetailView({
             />
           ) : null}
           {selected.key === 'skills-sh' ? (
-            <IntegrationsDetailVercelPanel
-              terminalClient={terminalClient}
-              setupResult={view.setupResult}
-              terminalOpen={view.terminalOpen}
-              terminalSessionId={view.terminalSessionId}
-              terminalStartupNonce={view.terminalStartupNonce}
-              onCloseTerminal={() => view.setTerminalOpen(false)}
-            />
+            <>
+              <VercelAddControls
+                busy={
+                  view.setupRunning ||
+                  view.openingTerminal ||
+                  view.validationBusy
+                }
+                configured={selected.configured}
+                setupUrl={selected.setupUrl}
+                onRunTerminal={handleLinkProject}
+                onSaveToken={async token => {
+                  await view.runSaveAndValidate(selected.key, () =>
+                    onSave({ VERCEL_OIDC_TOKEN: token })
+                  )
+                }}
+              />
+              <IntegrationsDetailVercelPanel
+                terminalClient={terminalClient}
+                setupResult={view.setupResult}
+                terminalOpen={view.terminalOpen}
+                terminalSessionId={view.terminalSessionId}
+                terminalStartupNonce={view.terminalStartupNonce}
+                onCloseTerminal={() => view.setTerminalOpen(false)}
+              />
+            </>
           ) : null}
           {selected.key !== 'slack' ? (
             <>
@@ -151,10 +163,18 @@ export function IntegrationsDetailView({
                   Test
                 </Button>
                 <Button
-                  disabled={!Object.values(values).some(value => value.trim())}
-                  onClick={() => void onSave()}
+                  disabled={
+                    view.validationBusy ||
+                    !Object.values(values).some(value => value.trim())
+                  }
+                  onClick={() =>
+                    void view.runSaveAndValidate(selected.key, onSave)
+                  }
                 >
-                  Save
+                  {view.validationBusy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : null}
+                  Save &amp; Test
                 </Button>
               </div>
             </>

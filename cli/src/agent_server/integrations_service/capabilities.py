@@ -66,15 +66,65 @@ def install_boltz_cli() -> Path:
     return installed
 
 
+def find_npx_skills_cli() -> Path | None:
+    """Resolve a usable `skills` CLI or `npx` (for `npx skills …`)."""
+    candidates = [
+        shutil.which("skills"),
+        shutil.which("npx"),
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        path = Path(candidate).expanduser()
+        if path.is_file() and os.access(path, os.X_OK):
+            return path
+    return None
+
+
+def install_npx_skills_cli() -> Path:
+    existing = find_npx_skills_cli()
+    if existing:
+        return existing
+    npm = shutil.which("npm")
+    if not npm:
+        raise ValueError(
+            "Node.js / npm is required for `npx skills`. "
+            "Install Node.js from https://nodejs.org, then retry."
+        )
+    result = subprocess.run(
+        [npm, "install", "-g", "skills"],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        if detail:
+            detail = detail.splitlines()[-1]
+        raise ValueError(
+            f"`npm install -g skills` failed: {detail or 'installer exited with an error'}"
+        )
+    installed = find_npx_skills_cli()
+    if installed is None:
+        raise ValueError(
+            "The skills CLI installer finished, but `skills` / `npx` was not found on PATH."
+        )
+    return installed
+
+
 class CapabilityMixin:
     def install_capability(
         self,
         integration_key: str,
         capability_id: str,
     ) -> IntegrationProvider:
-        if integration_key != "boltz" or capability_id != "boltz-api-cli":
+        if integration_key == "boltz" and capability_id == "boltz-api-cli":
+            install_boltz_cli()
+        elif integration_key == "skills-sh" and capability_id == "npx-skills-cli":
+            install_npx_skills_cli()
+        else:
             raise KeyError((integration_key, capability_id))
-        install_boltz_cli()
         provider = self.get(integration_key)
         if provider is None:
             raise KeyError(integration_key)

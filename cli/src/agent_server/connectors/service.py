@@ -250,7 +250,7 @@ class ConnectorService:
         key = api_key()
         if not key:
             raise ValueError(
-                "Connect FastFold Cloud first — one-click Slack needs an API key "
+                "Connect Fastfold Cloud first — one-click Slack needs an API key "
                 "so the relay knows which desktop to deliver to."
             )
 
@@ -291,7 +291,7 @@ class ConnectorService:
 
         key = api_key()
         if not key:
-            raise ValueError("Connect FastFold Cloud first.")
+            raise ValueError("Connect Fastfold Cloud first.")
 
         base = cloud_base_url()
         listing, error = await asyncio.to_thread(
@@ -901,26 +901,96 @@ class ConnectorService:
 
     # --- status ---------------------------------------------------------
 
+    async def reconcile_fastfold_auth(self) -> None:
+        """Start or stop the shared relay when the FastFold Cloud key changes.
+
+        Relay inbound requires ``FASTFOLD_API_KEY`` / ``api.fastfold_cloud_key``.
+        Removing the key used to leave a live socket and a green UI until restart;
+        this tears it down (or brings it back) immediately.
+        """
+        from agent_server.account_service.helpers import api_key
+
+        key = api_key()
+        relay_workspaces = [
+            workspace
+            for workspace in self.store.list_slack_workspaces()
+            if workspace.mode == "relay" and workspace.enabled
+        ]
+        if not relay_workspaces:
+            return
+
+        if not key:
+            await self._stop_relay_for_missing_key()
+            return
+
+        # Key is present again — restart any relay workspace that is not live.
+        for workspace in relay_workspaces:
+            if self.socket_connected(workspace.team_id) and self._relay_state == "live":
+                continue
+            try:
+                await self._start_relay_workspace(workspace)
+            except Exception:
+                logger.exception(
+                    "Failed to restart Slack relay workspace %s after FastFold key change",
+                    workspace.team_id,
+                )
+
+    async def _stop_relay_for_missing_key(self) -> None:
+        relay_ids = {
+            workspace.team_id
+            for workspace in self.store.list_slack_workspaces()
+            if workspace.mode == "relay"
+        }
+        async with self._lock:
+            relay = self._relay
+            self._relay = None
+            for team_id in list(self._sockets):
+                if team_id in relay_ids:
+                    self._sockets.pop(team_id, None)
+        if relay is not None:
+            with contextlib.suppress(Exception):
+                await relay.stop()
+        self._relay_state = "signed_out"
+        self._relay_detail = "Connect Fastfold Cloud to receive Slack messages."
+        logger.info("Stopped Slack relay — FastFold API key is not configured")
+
     def status(self) -> SlackConnectorStatus:
+        from agent_server.account_service.helpers import api_key
+
         workspaces = self.store.list_slack_workspaces()
         mode = None
         if any(item.mode == "socket" for item in workspaces):
             mode = "socket"
         elif any(item.mode == "relay" for item in workspaces):
             mode = "relay"
+        # Relay inbound needs a FastFold key. Even if a socket is still up after
+        # the key was cleared, report signed_out / not live so the UI matches.
+        key = api_key()
+        has_enabled_relay = any(
+            item.mode == "relay" and item.enabled for item in workspaces
+        )
+        relay_state = self._relay_state
+        relay_detail = self._relay_detail
+        if has_enabled_relay and not key:
+            relay_state = "signed_out"
+            relay_detail = "Connect Fastfold Cloud to receive Slack messages."
         # A paused workspace is never live regardless of what its (possibly
         # stale) adapter thinks; socket_connected covers both socket and relay
         # adapters since SlackRelayWorkspace exposes the same `.connected`.
         live_workspaces = [
             workspace.model_copy(
-                update={"live": workspace.enabled and self.socket_connected(workspace.team_id)}
+                update={
+                    "live": workspace.enabled
+                    and self.socket_connected(workspace.team_id)
+                    and not (workspace.mode == "relay" and not key)
+                }
             )
             for workspace in workspaces
         ]
         return SlackConnectorStatus(
             mode=mode,  # type: ignore[arg-type]
-            relay_state=self._relay_state,  # type: ignore[arg-type]
-            relay_detail=self._relay_detail,
+            relay_state=relay_state,  # type: ignore[arg-type]
+            relay_detail=relay_detail,
             workspaces=live_workspaces,
         )
 

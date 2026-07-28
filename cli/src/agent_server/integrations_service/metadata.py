@@ -190,7 +190,14 @@ PROVIDER_METADATA = {
                 "skills.sh catalog",
                 "Search, inspect, and audit skills from the authenticated desktop catalog.",
                 requirement="ambient",
-            )
+            ),
+            _capability(
+                "npx-skills-cli",
+                "npx skills CLI",
+                "Required for Skills.sh-compatible installs (`npx skills add` / find).",
+                requirement="install",
+                installable=True,
+            ),
         ],
     },
     "tamarind": {

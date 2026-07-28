@@ -7,7 +7,10 @@ import threading
 from datetime import UTC, datetime
 
 from agent.config import API_KEYS, Config
-from agent_server.integrations_service.capabilities import find_boltz_cli
+from agent_server.integrations_service.capabilities import (
+    find_boltz_cli,
+    find_npx_skills_cli,
+)
 from agent_server.integrations_service.metadata import (
     KEY_ALIASES,
     PROVIDER_METADATA,
@@ -116,7 +119,38 @@ class ProviderMixin:
                 else unlock
                 for unlock in unlocks
             ]
+        if key == "skills-sh":
+            cli_path = find_npx_skills_cli()
+            unlocks = [
+                unlock.model_copy(
+                    update={
+                        "installed": cli_path is not None,
+                        "status_detail": str(cli_path) if cli_path else None,
+                    }
+                )
+                if unlock.id == "npx-skills-cli"
+                else unlock
+                for unlock in unlocks
+            ]
         configured_fields = [field for field in fields if field.configured]
+        if key == "fastfold-cloud":
+            # Slack Relay Agent needs the FastFold key — surface that on the unlock.
+            key_ready = bool(configured_fields)
+            unlocks = [
+                unlock.model_copy(
+                    update={
+                        "installed": key_ready,
+                        "status_detail": (
+                            None
+                            if key_ready
+                            else "Save a FastFold API key to enable Slack relay."
+                        ),
+                    }
+                )
+                if unlock.id == "slack-relay-agent"
+                else unlock
+                for unlock in unlocks
+            ]
         primary = configured_fields[0] if configured_fields else fields[0]
         return IntegrationProvider(
             key=key,

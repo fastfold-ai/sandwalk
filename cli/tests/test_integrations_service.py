@@ -12,7 +12,10 @@ from agent_server.integrations_service import (
     IntegrationsService,
     category_for,
 )
-from agent_server.integrations_service.capabilities import install_boltz_cli
+from agent_server.integrations_service.capabilities import (
+    install_boltz_cli,
+    install_npx_skills_cli,
+)
 
 
 def test_category_for_prefixes():
@@ -105,6 +108,70 @@ def test_install_boltz_cli_capability_reports_verified_status(
     assert capability.installable is True
     assert capability.installed is True
     assert capability.status_detail == str(installed)
+
+
+def test_skills_sh_unlocks_include_installable_npx_skills_cli(monkeypatch):
+    monkeypatch.setattr(
+        "agent_server.integrations_service.provider.find_npx_skills_cli",
+        lambda: None,
+    )
+    vercel = IntegrationsService().get("skills-sh")
+    assert vercel is not None
+    assert [unlock.id for unlock in vercel.unlocks] == [
+        "skills-sh-catalog",
+        "npx-skills-cli",
+    ]
+    cli = next(unlock for unlock in vercel.unlocks if unlock.id == "npx-skills-cli")
+    assert cli.installable is True
+    assert cli.installed is False
+
+
+def test_install_npx_skills_cli_capability_reports_verified_status(monkeypatch):
+    installed = Path("/tmp/npx")
+    monkeypatch.setattr(
+        "agent_server.integrations_service.capabilities.install_npx_skills_cli",
+        lambda: installed,
+    )
+    monkeypatch.setattr(
+        "agent_server.integrations_service.provider.find_npx_skills_cli",
+        lambda: installed,
+    )
+
+    provider = IntegrationsService().install_capability(
+        "skills-sh", "npx-skills-cli"
+    )
+
+    capability = next(
+        unlock for unlock in provider.unlocks if unlock.id == "npx-skills-cli"
+    )
+    assert capability.installable is True
+    assert capability.installed is True
+    assert capability.status_detail == str(installed)
+
+
+def test_npx_skills_cli_installer_uses_npm_global_install(monkeypatch):
+    installed = Path("/tmp/skills")
+    state = {"installed": False}
+    monkeypatch.setattr(
+        "agent_server.integrations_service.capabilities.find_npx_skills_cli",
+        lambda: installed if state["installed"] else None,
+    )
+    monkeypatch.setattr(
+        "agent_server.integrations_service.capabilities.shutil.which",
+        lambda name: "/usr/bin/npm" if name == "npm" else None,
+    )
+
+    def fake_run(cmd, **kwargs):
+        state["installed"] = True
+        assert cmd == ["/usr/bin/npm", "install", "-g", "skills"]
+        return MagicMock(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        "agent_server.integrations_service.capabilities.subprocess.run",
+        fake_run,
+    )
+
+    assert install_npx_skills_cli() == installed
 
 
 def test_boltz_cli_installer_downloads_runs_and_verifies(monkeypatch):
@@ -243,6 +310,44 @@ def test_validate_fastfold_cloud_calls_users_me(
         headers={
             "Accept": "application/json",
             "Authorization": "Bearer sk-ff-test",
+            "User-Agent": (
+                "Mozilla/5.0 (compatible; Sandwalk/1.0; "
+                "+https://github.com/fastfold-ai/sandwalk)"
+            ),
+        },
+        timeout=15.0,
+        follow_redirects=True,
+    )
+
+
+@pytest.mark.parametrize(
+    ("status_code", "ok", "message"),
+    [
+        (200, True, "Vercel OIDC token works with skills.sh."),
+        (401, False, "Invalid or expired Vercel OIDC token."),
+    ],
+)
+def test_validate_skills_sh_calls_search_api(
+    monkeypatch, status_code: int, ok: bool, message: str
+):
+    monkeypatch.setenv("VERCEL_OIDC_TOKEN", "eyJ.test.token")
+    response = MagicMock(status_code=status_code)
+    request = MagicMock(return_value=response)
+    monkeypatch.setattr(
+        "agent_server.integrations_service.mutate.httpx.get",
+        request,
+    )
+
+    result = IntegrationsService().validate("skills-sh")
+
+    assert result.ok is ok
+    assert result.message == message
+    request.assert_called_once_with(
+        "https://skills.sh/api/v1/skills/search",
+        params={"q": "fold", "limit": 1},
+        headers={
+            "Accept": "application/json",
+            "Authorization": "Bearer eyJ.test.token",
             "User-Agent": (
                 "Mozilla/5.0 (compatible; Sandwalk/1.0; "
                 "+https://github.com/fastfold-ai/sandwalk)"

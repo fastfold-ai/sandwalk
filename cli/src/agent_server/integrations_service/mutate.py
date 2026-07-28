@@ -62,6 +62,30 @@ def _probe_fastfold_api_key(api_key: str) -> tuple[bool, str]:
     return False, f"Fastfold Cloud returned HTTP {response.status_code}."
 
 
+def _probe_vercel_skills_token(token: str) -> tuple[bool, str]:
+    """Validate a Vercel OIDC token against the skills.sh search API."""
+    try:
+        response = httpx.get(
+            "https://skills.sh/api/v1/skills/search",
+            params={"q": "fold", "limit": 1},
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {token}",
+                "User-Agent": _PROBE_USER_AGENT,
+            },
+            timeout=15.0,
+            follow_redirects=True,
+        )
+    except Exception as exc:
+        return False, f"Couldn't reach skills.sh ({exc.__class__.__name__})."
+
+    if response.status_code < 300:
+        return True, "Vercel OIDC token works with skills.sh."
+    if response.status_code in (401, 403):
+        return False, "Invalid or expired Vercel OIDC token."
+    return False, f"skills.sh returned HTTP {response.status_code}."
+
+
 class MutateMixin:
     def update(self, key: str, values: dict[str, str]) -> IntegrationProvider:
         entries = self._providers.get(key)
@@ -162,6 +186,15 @@ class MutateMixin:
 
         if key == "fastfold-cloud":
             ok, message = _probe_fastfold_api_key(self._secret_value(key))
+            return ValidateIntegrationResponse(
+                ok=ok,
+                configured=True,
+                source=provider.source,
+                message=message,
+            )
+
+        if key == "skills-sh":
+            ok, message = _probe_vercel_skills_token(self._secret_value(key))
             return ValidateIntegrationResponse(
                 ok=ok,
                 configured=True,
