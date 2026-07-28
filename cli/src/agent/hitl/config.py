@@ -28,7 +28,7 @@ def skills_manage_needs_approval(args: dict[str, Any] | None) -> bool:
     if action in _SENSITIVE_ACTIONS:
         return True
     if action == "create":
-        return _truthy(payload.get("install"), default=True)
+        return _truthy(payload.get("install"), default=False)
     return False
 
 

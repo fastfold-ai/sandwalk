@@ -99,15 +99,20 @@ def _create_skill(
         "path": str(skill_dir),
         "author": author,
         "category": "Created by Me",
-        "mention": mention,
         "summary": (
-            f"Created skill scaffold at {skill_dir}. "
-            f"Include {mention} in your reply so the user can open skill details."
+            f"Created skill draft at {skill_dir}. "
+            "This draft is not installed or available yet."
         ),
         "skills_updated": False,
+        "installed": False,
+        "installation_verified": False,
+        "available": False,
     }
     if not install:
-        result["summary"] += " Not installed yet — call install with this path when ready."
+        result["summary"] += (
+            " Finish authoring it, then call skills.manage(action='install', "
+            "source=<this path>) and verify with action='info'."
+        )
         return result
 
     if not _install_allowed(_session):
@@ -125,8 +130,21 @@ def _create_skill(
     result["install"] = installed
     result["ok"] = bool(installed.get("ok"))
     if result["ok"]:
+        verified = skills_mod.skill_info(skill_name)
+        if verified is None:
+            result["ok"] = False
+            result["summary"] = (
+                f"Created scaffold at {skill_dir}, and the installer reported "
+                "success, but the installed registry could not verify it. "
+                "Do not claim this skill is available."
+            )
+            return result
         result["skills_updated"] = True
+        result["mention"] = mention
         result["installed_path"] = str(skills_mod.GLOBAL_SKILLS_DIR / skill_name)
+        result["installed"] = True
+        result["installation_verified"] = True
+        result["available"] = bool(verified.enabled)
         result["summary"] = (
             f"Created and installed {mention} (author: {author}, category: Created by Me) "
             f"to {skills_mod.GLOBAL_SKILLS_DIR}. "
@@ -160,7 +178,7 @@ def _create_skill(
         "query": "For find: search query",
         "path": "For create: output directory (default: ~/.sandwalk/skill-drafts)",
         "author": "For create: author label (default: local user name)",
-        "install": "For create: also install after scaffold (default true)",
+        "install": "For create: also install immediately (default false; author the draft first)",
         "with_scripts": "For create: also create a scripts/ folder (default false)",
     },
     usage_guide=(
@@ -168,6 +186,9 @@ def _create_skill(
         "install/remove (and create with install=true) pause for human approval in the "
         "desktop UI or interactive CLI before running — do not ask the user to confirm in chat "
         "as a substitute for that gate. "
+        "For authored skills: create with install=false, finish the draft, then install its "
+        "returned path and verify with info. Never call a draft available unless the install "
+        "result has installation_verified=true and info succeeds. "
         "Newly installed/enabled skills are usable on the next user message and in the CLI. "
         "After create/install/enable/disable/remove, always include the skill slash mention "
         "(e.g. /lab-notes) in your user-facing reply so the UI can link to skill details. "
@@ -181,7 +202,7 @@ def manage(
     query: str = "",
     path: str = "",
     author: str = "",
-    install: Any = True,
+    install: Any = False,
     with_scripts: Any = False,
     _session: Any = None,
     _prior_results: Any = None,
@@ -290,6 +311,9 @@ def manage(
             "author": skills_mod.display_author(info),
             "enabled": info.enabled,
             "path": str(info.path) if info.path else None,
+            "installed": True,
+            "installation_verified": True,
+            "available": bool(info.enabled),
         }
 
     if act == "create":
@@ -297,7 +321,7 @@ def manage(
             name=(name or source).strip(),
             path=path.strip(),
             author=(author or _author_for_create(_session)).strip(),
-            install=_truthy(install, default=True),
+            install=_truthy(install, default=False),
             with_scripts=_truthy(with_scripts, default=False),
             _session=_session,
         )
@@ -330,8 +354,32 @@ def manage(
         if isinstance(result, dict) and result.get("ok"):
             installed_names = result.get("installed") or []
             label = installed_names[0] if installed_names else Path(src).name
+            verified = [
+                skills_mod.skill_info(str(installed_name))
+                for installed_name in installed_names
+            ]
+            if not installed_names or any(info is None for info in verified):
+                return {
+                    **result,
+                    "ok": False,
+                    "skills_updated": False,
+                    "installed": False,
+                    "installation_verified": False,
+                    "available": False,
+                    "summary": (
+                        f"{result.get('summary', 'Installer completed.')} "
+                        "Sandwalk could not verify the skill in the installed "
+                        "registry. Do not claim it is available."
+                    ),
+                }
             result = _with_mention(
-                {**result, "skills_updated": True},
+                {
+                    **result,
+                    "skills_updated": True,
+                    "installed": True,
+                    "installation_verified": True,
+                    "available": all(bool(info and info.enabled) for info in verified),
+                },
                 str(label),
             )
             result["summary"] = (

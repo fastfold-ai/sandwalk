@@ -380,12 +380,43 @@ def test_skills_manage_install_allowed_calls_install(monkeypatch):
         return {"ok": True, "installed": ["foo"], "summary": "ok"}
 
     monkeypatch.setattr(skills_mod, "install_skill", fake_install)
+    monkeypatch.setattr(
+        skills_mod,
+        "skill_info",
+        lambda name: MagicMock(name=name, enabled=True),
+    )
     session = MagicMock()
     session.config.get.return_value = True
     result = manage(action="install", source="owner/repo@skills/foo", _session=session)
     assert result["ok"] is True
     assert result.get("skills_updated") is True
+    assert result["installation_verified"] is True
+    assert result["installed"] is True
+    assert result["available"] is True
     assert called["source"] == "owner/repo@skills/foo"
+
+
+def test_skills_manage_install_does_not_claim_unverified_skill(monkeypatch):
+    from tools.skills import manage
+
+    monkeypatch.setattr(
+        skills_mod,
+        "install_skill",
+        lambda source, **kwargs: {
+            "ok": True,
+            "installed": ["missing"],
+            "summary": "copied",
+        },
+    )
+    monkeypatch.setattr(skills_mod, "skill_info", lambda name: None)
+
+    result = manage(action="install", source="/tmp/missing")
+
+    assert result["ok"] is False
+    assert result["installation_verified"] is False
+    assert result["installed"] is False
+    assert result["available"] is False
+    assert "Do not claim it is available" in result["summary"]
 
 
 def test_skills_manage_enable_disable(monkeypatch):
@@ -439,6 +470,9 @@ def test_skills_manage_create_scaffolds_and_installs(tmp_path, monkeypatch):
     )
     assert result["ok"] is True
     assert result["skills_updated"] is True
+    assert result["installation_verified"] is True
+    assert result["installed"] is True
+    assert result["available"] is True
     assert result["mention"] == "/my-custom-skill"
     assert "/my-custom-skill" in result["summary"]
     skill_md = (tmp_path / "drafts" / "my-custom-skill" / "SKILL.md").read_text(encoding="utf-8")
@@ -457,12 +491,15 @@ def test_skills_manage_create_defaults_to_skill_drafts(tmp_path, monkeypatch):
     result = manage(
         action="create",
         name="draft-only",
-        install=False,
         _session=None,
     )
     assert result["ok"] is True
     assert str(tmp_path / "cfg" / "skill-drafts" / "draft-only") in result["path"]
-    assert result["mention"] == "/draft-only"
+    assert result["installed"] is False
+    assert result["installation_verified"] is False
+    assert result["available"] is False
+    assert "not installed" in result["summary"]
+    assert "mention" not in result
 
 
 def test_install_local_zip_archive(tmp_path, monkeypatch):

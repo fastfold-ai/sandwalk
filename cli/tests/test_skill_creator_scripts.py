@@ -79,7 +79,7 @@ def test_quick_validate_missing_and_strict_paths(tmp_path):
     assert quick_validate.main([str(skill)]) == 1
 
 
-def test_quick_validate_success_and_strict_warning(tmp_path):
+def test_quick_validate_success_and_strict_warning(tmp_path, capsys):
     skill = tmp_path / "skill-b"
     skill.mkdir()
     (skill / "SKILL.md").write_text(
@@ -87,6 +87,10 @@ def test_quick_validate_success_and_strict_warning(tmp_path):
         encoding="utf-8",
     )
     assert quick_validate.main([str(skill)]) == 0
+    validation = capsys.readouterr()
+    assert "valid as a draft" in validation.err
+    assert "Validation does not install it" in validation.err
+    assert "skills.manage(action='info'" in validation.err
 
     warn_skill = tmp_path / "skill-c"
     warn_skill.mkdir()

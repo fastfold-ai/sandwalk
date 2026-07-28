@@ -96,7 +96,13 @@ def main(argv: list[str] | None = None) -> int:
         print("Validation failed.", file=sys.stderr)
         return 1
 
-    print(f"OK: {skill_md} is valid.", file=sys.stderr)
+    print(
+        f"OK: {skill_md} is valid as a draft. Validation does not install it. "
+        "Use skills.manage(action='install', source=<skill-path>), then verify "
+        "with skills.manage(action='info', name=<skill-name>) before claiming "
+        "the skill is available.",
+        file=sys.stderr,
+    )
     print(name)
     return 0
 

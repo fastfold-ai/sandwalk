@@ -2,6 +2,20 @@
 
 from __future__ import annotations
 
+_SKILL_LIFECYCLE_POLICY = """
+
+## Skill creation and installation truth
+When creating a user skill, use `skills.manage(action="create", install=false)`
+for the draft, author and validate it, then call
+`skills.manage(action="install", source="<draft-path>")`. The install call is
+the required user approval gate; do not substitute a chat confirmation.
+Never say a skill is installed, available, usable, or present in the `/` menu
+because files were written or validation passed. Make those claims only after
+an install result has `installation_verified=true` and a subsequent
+`skills.manage(action="info", name="<name>")` succeeds. Otherwise say clearly:
+"Draft created, but it is not installed."
+"""
+
 
 def _load_installed_skills(session=None, user_request: str | None = None) -> str:
     """Build installed-skills context with an adaptive size budget.
@@ -48,10 +62,11 @@ def build_skills_section(
         from agent import system_prompt as _pkg
 
         skills_context = _pkg._load_installed_skills(session=session, user_request=user_request)
-        return ("\n" + skills_context) if skills_context else ""
+        catalog = ("\n" + skills_context) if skills_context else ""
+        return catalog + _SKILL_LIFECYCLE_POLICY
 
     if runtime != "deepagents":
-        return ""
+        return _SKILL_LIFECYCLE_POLICY
 
     if compact:
         return (
@@ -60,6 +75,7 @@ def build_skills_section(
             "``SKILL.md`` with ``read_file`` before following it. Run skill scripts "
             "with ``shell_run`` on the **host** skill path "
             "(``$SANDWALK_SKILLS_DIR/<skill>/scripts/...``).\n"
+            + _SKILL_LIFECYCLE_POLICY
         )
 
     modal_on = str(sandbox_backend or "").strip().lower() == "modal"
@@ -91,4 +107,5 @@ def build_skills_section(
         "the whole machine (`/`, `$HOME`, `/tmp`, unrelated repos) looking for "
         "artifacts or API keys — downloads belong in the session workspace; "
         "credentials come from Integrations / host env (see Credentials section).\n"
+        + _SKILL_LIFECYCLE_POLICY
     )

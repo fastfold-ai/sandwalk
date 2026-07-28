@@ -22,18 +22,16 @@ User-authored skills set `author` to the local user name and
 
 1. **Clarify.** Ask what the skill should do, its trigger phrases, and whether it needs scripts.
 
-2. **Scaffold (prefer the tool).** Create + optionally install in one step:
+2. **Scaffold a draft with the tool (required).** Do not create the skill
+   directory with `mkdir`, `write_file`, or `scripts/init_skill.py`; those paths
+   are drafts and do not register a skill with Sandwalk. Call:
 
    ```
-   skills.manage(action="create", name="<skill-name>", install=true)
-   skills.manage(action="create", name="<skill-name>", path="./skills", install=false)
+   skills.manage(action="create", name="<skill-name>", install=false, with_scripts=true)
    ```
 
-   Or via the script (same scaffolder the tool wraps):
-
-   ```bash
-   python scripts/init_skill.py <skill-name> --path <output-dir> [--author "Your Name"] [--with-scripts]
-   ```
+   Use the returned `path` for all authoring. A successful create result with
+   `install=false` means **draft created, not installed, not available**.
 
 3. **Author.** Edit the generated `SKILL.md`:
    - Keep it under ~500 lines; move long docs to `references/`.
@@ -53,30 +51,38 @@ User-authored skills set `author` to the local user name and
    python scripts/package_skill.py <path/to/skill> [output-dir]
    ```
 
-6. **Install** (if create used `install=false`, or after packaging):
+6. **Install (required unless the user declines).** After authoring and
+   validation, call the approval-gated installer with the exact draft path:
 
    ```
    skills.manage(action="install", source="<path/to/skill>")
-   skills.manage(action="install", source="<path/to/skill.skill>")  # zip / .skill
    ```
 
-   Also valid: GitHub URL or `owner/repo@subpath`.
-   Create-with-install and install/remove pause for desktop UI or interactive CLI
-   approval — do not rely on chat confirmation as the primary gate.
+   This displays the desktop/CLI approval prompt. Do not replace it with a chat
+   question. If the user rejects or the installer fails, say **created as a
+   draft but not installed** and provide the draft path.
 
-7. **Verify.** `skills.manage(action="list")` — the skill should show your user name as author and category Created by Me.
-   Tell the user it appears in the composer `/` menu and is usable on the **next
-   user message** (not mid-same-turn), including the CLI (`sandwalk` / terminal agent).
+7. **Verify (hard completion gate).** Require the install result to contain
+   `installation_verified=true`, then call:
 
-8. **Always mention the skill in your reply** as a slash chip so the UI can link
-   to skill details (same format as composer `/` inserts), e.g.:
+   ```
+   skills.manage(action="info", name="<skill-name>")
+   ```
+
+   Only say “installed”, “available”, “ready to use”, or that it appears in the
+   composer when both calls succeed and `info` confirms the skill is installed
+   and enabled. Validation alone never proves installation. The skill becomes
+   usable on the **next user message** (not mid-same-turn), including the CLI.
+
+8. **Mention the slash skill only after verified installation** so the UI can
+   link to its installed details, e.g.:
 
    ```
    Installed /lab-notes — open it from Skills or type /lab-notes in the composer.
    ```
 
-   Prefer the plain `/skill-name` form (not a markdown URL). Do this for create,
-   install, enable, disable, and remove confirmations.
+   Prefer the plain `/skill-name` form (not a markdown URL). Do not present a
+   draft-only skill as an active slash command.
 
 ## Enable / disable / remove
 ```

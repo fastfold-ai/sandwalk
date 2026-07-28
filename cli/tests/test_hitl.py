@@ -30,7 +30,7 @@ def test_skills_manage_predicate_gates_sensitive_actions():
     assert skills_manage_needs_approval({"action": "remove", "name": "y"})
     assert skills_manage_needs_approval({"action": "uninstall"})
     assert skills_manage_needs_approval({"action": "create", "install": True})
-    assert skills_manage_needs_approval({"action": "create"})  # default install=true
+    assert not skills_manage_needs_approval({"action": "create"})  # draft only
     assert not skills_manage_needs_approval({"action": "create", "install": False})
     assert not skills_manage_needs_approval({"action": "find", "query": "fold"})
     assert not skills_manage_needs_approval({"action": "list"})

@@ -53,6 +53,9 @@ class TestSystemPrompt:
             exclude_categories={"unsafe"},
         )
         assert isinstance(prompt, str) and prompt
+        assert "Skill creation and installation truth" in prompt
+        assert "installation_verified=true" in prompt
+        assert 'Draft created, but it is not installed.' in prompt
         mock_catalog.assert_called_once_with(
             exclude_categories={"unsafe"},
             exclude_tools=set(),
