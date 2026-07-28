@@ -84,6 +84,16 @@ def make_safe_open(output_dir: Path, extra_read_dirs: list[Path] = None):
             # Allow file descriptors (stdout/stderr) used by internal libs.
             return real_open(file, mode, *args, **kwargs)
 
+        # Full file-access policy: no path restrictions (user opt-in; the
+        # Security page warns this lets the agent touch the whole OS).
+        try:
+            from agent_server.file_access import full_file_access_enabled
+
+            if full_file_access_enabled():
+                return real_open(file, mode, *args, **kwargs)
+        except Exception:  # noqa: BLE001
+            pass
+
         path = Path(file).expanduser()
         resolved = path.resolve() if path.is_absolute() else (cwd_root / path).resolve()
 

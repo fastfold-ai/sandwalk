@@ -26,6 +26,9 @@ class RuntimeSettings(ApiModel):
     tool_health_fail_threshold: int = 2
     tool_health_suppress_seconds: int = 900
     plan_mode: bool = False
+    # File access policy: "project" (workspace + linked project folder only)
+    # or "full" (anywhere on the host filesystem).
+    file_access: str = "project"
 
 
 class UpdateRuntimeSettingsRequest(ApiModel):
@@ -48,6 +51,7 @@ class UpdateRuntimeSettingsRequest(ApiModel):
     tool_health_fail_threshold: int | None = None
     tool_health_suppress_seconds: int | None = None
     plan_mode: bool | None = None
+    file_access: str | None = None
 
 
 class OnboardingSettings(ApiModel):

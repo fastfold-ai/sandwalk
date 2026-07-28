@@ -12,6 +12,7 @@ import {
   Plug,
   ScrollText,
   Settings2,
+  ShieldCheck,
   Sparkles,
   Stethoscope,
   Wrench
@@ -72,6 +73,12 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
         label: 'Sandbox',
         path: '/dashboard/agent/sandbox',
         icon: Container
+      },
+      {
+        id: 'agent_security',
+        label: 'Security',
+        path: '/dashboard/agent/security',
+        icon: ShieldCheck
       },
       {
         id: 'context',

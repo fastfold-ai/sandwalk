@@ -50,6 +50,7 @@ export type AppShellMainProps = {
   isDashboardAppearance: boolean
   isDashboardAgentRuntime: boolean
   isDashboardAgentSandbox: boolean
+  isDashboardAgentSecurity: boolean
   isDashboardAgentPrompts: boolean
   isDashboardVoice: boolean
   isDashboardModels: boolean
@@ -206,6 +207,7 @@ export function isDashboardMainView(props: AppShellMainProps) {
     props.isDashboardAppearance ||
     props.isDashboardAgentRuntime ||
     props.isDashboardAgentSandbox ||
+    props.isDashboardAgentSecurity ||
     props.isDashboardAgentPrompts ||
     props.isDashboardVoice ||
     props.isDashboardModels ||

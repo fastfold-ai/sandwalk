@@ -188,6 +188,22 @@ class DeepAgentsBuildMixin:
                     ctx = {**ctx, "workspace_path": workspace_path}
                 except Exception:
                     workspace_path = ""
+        # Mirror the agent file-access policy so shell/sandbox guards can gate
+        # writes without a config load in hot paths.
+        try:
+            from agent_server.file_access import (
+                FILE_ACCESS_ENV,
+                normalize_file_access,
+            )
+
+            session_config = getattr(self.session, "config", None)
+            os.environ[FILE_ACCESS_ENV] = normalize_file_access(
+                session_config.get("agent.file_access")
+                if session_config is not None
+                else None
+            )
+        except Exception:
+            pass
         if workspace_path:
             # Align shell/skill subprocesses with the UI file tree.
             os.environ["SANDWALK_SESSION_WORKSPACE"] = workspace_path

@@ -88,6 +88,7 @@ export function useAppRouting(location: Location) {
   const isDashboardAppearance = dashboardSection === 'appearance'
   const isDashboardAgentRuntime = dashboardSection === 'agent_runtime'
   const isDashboardAgentSandbox = dashboardSection === 'agent_sandbox'
+  const isDashboardAgentSecurity = dashboardSection === 'agent_security'
   const isDashboardAgentPrompts = dashboardSection === 'context'
   const isDashboardVoice = dashboardSection === 'voice'
   const isDashboardModels = dashboardSection === 'models'
@@ -136,6 +137,7 @@ export function useAppRouting(location: Location) {
       isDashboardAppearance ||
       isDashboardAgentRuntime ||
       isDashboardAgentPrompts ||
+      isDashboardAgentSecurity ||
       isDashboardVoice ||
       isDashboardStorage ||
       isDashboardEnvironment
@@ -196,6 +198,7 @@ export function useAppRouting(location: Location) {
     isDashboardAppearance,
     isDashboardAgentRuntime,
     isDashboardAgentSandbox,
+    isDashboardAgentSecurity,
     isDashboardAgentPrompts,
     isDashboardVoice,
     isDashboardModels,

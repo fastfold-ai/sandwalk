@@ -94,6 +94,7 @@ export type AppShellProps = {
   isDashboardAppearance: boolean
   isDashboardAgentRuntime: boolean
   isDashboardAgentSandbox: boolean
+  isDashboardAgentSecurity: boolean
   isDashboardAgentPrompts: boolean
   isDashboardVoice: boolean
   isDashboardModels: boolean

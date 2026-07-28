@@ -4,6 +4,7 @@ import {
   AgentPromptsView,
   AgentRuntimeView,
   AgentSandboxView,
+  AgentSecurityView,
   AppearanceView,
   DataView,
   DoctorView,
@@ -32,6 +33,7 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     isDashboardAgentPrompts,
     isDashboardVoice,
     isDashboardAgentSandbox,
+    isDashboardAgentSecurity,
     isSandboxLocalDetail,
     isSandboxModalDetail,
     isDashboardModels,
@@ -99,6 +101,20 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         onGetRuntimeSettings={signal => client.getRuntimeSettings(signal)}
         onUpdateRuntimeSettings={async (changes, signal) => {
           const next = await client.updateRuntimeSettings(changes, signal)
+          setRuntimeSettings(next)
+          return next
+        }}
+      />
+    )
+  }
+
+  if (isDashboardAgentSecurity) {
+    return (
+      <AgentSecurityView
+        connected={Boolean(health)}
+        runtimeSettings={runtimeSettings}
+        onUpdateRuntimeSettings={async changes => {
+          const next = await client.updateRuntimeSettings(changes)
           setRuntimeSettings(next)
           return next
         }}

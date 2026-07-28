@@ -109,11 +109,22 @@ def _path_under_workspace(raw: str, *, workspace: Path) -> Path | None:
     text = _expand_env_refs(text).strip()
     if not text or text.startswith("(") or text in {"&1", "&2"}:
         return None
-    from agent_server.project_folder import path_under_workspace_or_project
 
     path = Path(text).expanduser()
     if not path.is_absolute():
         path = workspace / path
+
+    # Full file-access policy: allow redirects / rm anywhere (user opt-in).
+    try:
+        from agent_server.file_access import full_file_access_enabled
+
+        if full_file_access_enabled():
+            return path.parent.resolve() / path.name
+    except Exception:  # noqa: BLE001
+        pass
+
+    from agent_server.project_folder import path_under_workspace_or_project
+
     return path_under_workspace_or_project(path, workspace)
 
 

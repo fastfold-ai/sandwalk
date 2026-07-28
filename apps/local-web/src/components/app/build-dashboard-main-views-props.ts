@@ -48,6 +48,7 @@ export function buildDashboardMainViewsProps(
     isDashboardAgentPrompts: props.isDashboardAgentPrompts,
     isDashboardVoice: props.isDashboardVoice,
     isDashboardAgentSandbox: props.isDashboardAgentSandbox,
+    isDashboardAgentSecurity: props.isDashboardAgentSecurity,
     isDashboardModels: props.isDashboardModels,
     isDashboardData: props.isDashboardData,
     isDashboardTools: props.isDashboardTools,

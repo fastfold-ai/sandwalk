@@ -1590,6 +1590,7 @@ export class LocalAgentClient
         tool_health_fail_threshold: changes.toolHealthFailThreshold,
         tool_health_suppress_seconds: changes.toolHealthSuppressSeconds,
         plan_mode: changes.planMode,
+        file_access: changes.fileAccess,
       }),
       headers: { 'content-type': 'application/json' },
       signal,

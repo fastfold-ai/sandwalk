@@ -29,6 +29,26 @@ def test_settings_service_get_defaults(tmp_path: Path, monkeypatch):
     assert settings.interrupt_drain_timeout_s >= 1
     assert settings.parallel_max_threads >= 1
     assert isinstance(settings.tool_health_enabled, bool)
+    assert settings.file_access == "project"
+
+
+def test_settings_service_file_access_roundtrip(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
+    (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
+    Config({}).save()
+
+    updated = SettingsService.update(
+        UpdateRuntimeSettingsRequest(file_access="full")
+    )
+    assert updated.file_access == "full"
+    assert Config.load().get("agent.file_access") == "full"
+
+    # Unknown values normalize back to the safe default.
+    reset = SettingsService.update(
+        UpdateRuntimeSettingsRequest(file_access="bogus")
+    )
+    assert reset.file_access == "project"
 
 
 def test_settings_service_update_runtime_knobs(tmp_path: Path, monkeypatch):

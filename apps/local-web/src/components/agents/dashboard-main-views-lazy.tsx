@@ -23,6 +23,11 @@ export const AgentPromptsView = lazy(() =>
     default: m.AgentPromptsView
   }))
 )
+export const AgentSecurityView = lazy(() =>
+  import('@/components/agents/AgentSecurityView').then(m => ({
+    default: m.AgentSecurityView
+  }))
+)
 export const AppearanceView = lazy(() =>
   import('@/components/agents/AppearanceView').then(m => ({
     default: m.AppearanceView

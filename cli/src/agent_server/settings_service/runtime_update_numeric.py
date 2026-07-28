@@ -79,3 +79,7 @@ def apply_numeric_updates(config: Config, payload: UpdateRuntimeSettingsRequest)
         )
     if payload.plan_mode is not None:
         config.set("agent.plan_preview", bool(payload.plan_mode))
+    if payload.file_access is not None:
+        from agent_server.file_access import normalize_file_access
+
+        config.set("agent.file_access", normalize_file_access(payload.file_access))

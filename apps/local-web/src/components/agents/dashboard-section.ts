@@ -4,6 +4,7 @@ export type DashboardSection =
   | 'appearance'
   | 'agent_runtime'
   | 'agent_sandbox'
+  | 'agent_security'
   | 'context'
   | 'voice'
   | 'models'

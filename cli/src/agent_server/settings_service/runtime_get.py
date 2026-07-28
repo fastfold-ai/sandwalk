@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from agent.config import Config
 from agent.model_catalog import get_model_reasoning
+from agent_server.file_access import normalize_file_access
 from agent_server.models import RuntimeSettings
 from agent_server.settings_service.limits import (
     bool_from_config,
@@ -80,4 +81,5 @@ def get_runtime_settings(config: Config) -> RuntimeSettings:
             default=900,
         ),
         plan_mode=bool_from_config(config, "agent.plan_preview", False),
+        file_access=normalize_file_access(config.get("agent.file_access")),
     )

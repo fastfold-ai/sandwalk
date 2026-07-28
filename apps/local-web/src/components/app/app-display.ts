@@ -51,6 +51,7 @@ export function resolveActiveTitle(input: {
   isDashboardGeneral: boolean
   isDashboardAppearance: boolean
   isDashboardAgentRuntime: boolean
+  isDashboardAgentSecurity: boolean
   isDashboardAgentPrompts: boolean
   isDashboardVoice: boolean
   isDashboardModels: boolean
@@ -74,6 +75,7 @@ export function resolveActiveTitle(input: {
   if (input.isDashboardGeneral) return 'General'
   if (input.isDashboardAppearance) return 'Appearance'
   if (input.isDashboardAgentRuntime) return 'Runtime'
+  if (input.isDashboardAgentSecurity) return 'Security'
   if (input.isDashboardAgentPrompts) return 'Context'
   if (input.isDashboardVoice) return 'Voice'
   if (input.isDashboardModels) return 'Models'

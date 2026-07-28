@@ -608,6 +608,12 @@ export type RuntimeSettings = {
   toolHealthSuppressSeconds: number
   /** True = Plan mode (author plans/*.md); false = Agent mode. */
   planMode?: boolean
+  /**
+   * Agent file-access policy:
+   * - "project": workspace + linked project folder only (default, safe).
+   * - "full": anywhere on the host filesystem (opt-in, higher risk).
+   */
+  fileAccess?: 'project' | 'full'
 }
 
 export type AgentPlanCard = {
