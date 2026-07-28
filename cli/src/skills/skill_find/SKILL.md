@@ -1,6 +1,9 @@
 ---
 name: skill-find
 description: Discover, try without installing, and install agent skills — first from the official Fastfold catalog (github.com/fastfold-ai/skills), then from the open skills.sh ecosystem (npx skills find / use). Use when the user wants to find, search, browse, list, try/use without installing, add, enable, disable, or remove skills/capabilities (e.g. fold, MD, protein design, Google Calendar).
+author: sandwalk
+category: Built-in
+version: 1.0.0
 ---
 
 # Skill Find

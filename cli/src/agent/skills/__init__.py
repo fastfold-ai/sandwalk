@@ -62,6 +62,11 @@ NPX_SKILLS_DIR = CONFIG_DIR / ".claude" / "skills"
 # Default discovery catalog (GitHub ``owner/repo``); skills live under ``skills/``.
 DEFAULT_CATALOG = "fastfold-ai/skills"
 
+# Built-in skills ship inside this package; GitHub path metadata uses this repo
+# once it is public (private repos 404 and fall back to local SKILL.md mtime).
+BUNDLED_SKILLS_GITHUB_REPO = "fastfold-ai/sandwalk"
+BUNDLED_SKILLS_REPO_PATH = "cli/src/skills"
+
 # Curated skill collections, grouped by provider. Each ``source`` is a
 # GitHub shorthand installable via ``install_skill`` (native git or npx). Installing
 # a whole-repo source batch-installs all skills it contains.
@@ -184,10 +189,14 @@ from .releases import (  # noqa: E402
     _tag_tuple,
     _write_update_cache,
     check_github_skill_update,
+    enrich_bundled_skill,
     fetch_latest_release,
+    fetch_path_latest_commit,
     fetch_repo_head_sha,
     get_cached_skills_update,
+    package_version,
     refresh_skills_update_cache,
+    resolve_bundled_path_commit,
     resolve_repo_remote_state,
 )
 from .upgrade import (  # noqa: E402
@@ -256,8 +265,14 @@ __all__ = [
     "MANIFEST_FILENAME",
     "SKILL_STATE_FILENAME",
     "DEFAULT_CATALOG",
+    "BUNDLED_SKILLS_GITHUB_REPO",
+    "BUNDLED_SKILLS_REPO_PATH",
     "SUGGESTED_SKILL_SOURCES",
     "GITHUB_API",
     "SKILLS_UPDATE_CACHE",
     "SKILLS_PROMPT_INDEX_CACHE",
+    "enrich_bundled_skill",
+    "fetch_path_latest_commit",
+    "package_version",
+    "resolve_bundled_path_commit",
 ]

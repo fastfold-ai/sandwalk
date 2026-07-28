@@ -134,6 +134,176 @@ def fetch_repo_head_sha(owner_repo: str, *, timeout_s: float = 2.5) -> dict | No
 
 
 _REPO_CHECK_INTERVAL_S = 3600  # 1h — fresher than catalog banner (24h)
+_BUNDLED_PATH_CHECK_INTERVAL_S = 24 * 3600
+
+
+def fetch_path_latest_commit(
+    owner_repo: str,
+    path: str,
+    *,
+    timeout_s: float = 1.5,
+) -> dict | None:
+    """Return ``{"sha", "committed_at"}`` for the latest commit touching ``path``.
+
+    Best-effort: returns None when the repo is private/missing (404), the path
+    has no history, or the network call fails. Used for built-in skill
+    ``updated_at`` once ``fastfold-ai/sandwalk`` is public.
+    """
+    import httpx
+
+    owner_repo = str(owner_repo or "").strip().strip("/")
+    path = str(path or "").strip().strip("/")
+    if not owner_repo or not path:
+        return None
+    url = f"{_skills.GITHUB_API}/repos/{owner_repo}/commits"
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "fastfold-agent-cli"}
+    try:
+        with httpx.Client(timeout=timeout_s, follow_redirects=True) as client:
+            resp = client.get(
+                url,
+                headers=headers,
+                params={"path": path, "per_page": 1},
+            )
+            if resp.status_code in {401, 403, 404}:
+                return None
+            resp.raise_for_status()
+            data = resp.json()
+    except (httpx.HTTPError, TimeoutError, ValueError):
+        return None
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(data, list) or not data:
+        return None
+    item = data[0]
+    if not isinstance(item, dict):
+        return None
+    sha = str(item.get("sha") or "").strip().lower()
+    commit = item.get("commit") if isinstance(item.get("commit"), dict) else {}
+    author = commit.get("author") if isinstance(commit.get("author"), dict) else {}
+    committed_at = str(author.get("date") or "").strip()
+    if not committed_at:
+        committer = commit.get("committer") if isinstance(commit.get("committer"), dict) else {}
+        committed_at = str(committer.get("date") or "").strip()
+    if not committed_at:
+        return None
+    return {"sha": sha, "committed_at": committed_at}
+
+
+def resolve_bundled_path_commit(
+    skill_dir_name: str,
+    *,
+    force: bool = False,
+    timeout_s: float = 1.5,
+) -> dict | None:
+    """Cached GitHub commit metadata for a bundled skill directory.
+
+    Returns ``{"sha", "committed_at"}`` or None. Negative results (private repo)
+    are cached so skills list stays snappy until the repo is public.
+    """
+    dir_name = str(skill_dir_name or "").strip().strip("/")
+    if not dir_name:
+        return None
+    path = f"{_skills.BUNDLED_SKILLS_REPO_PATH}/{dir_name}"
+    cache = _read_update_cache()
+    paths = cache.get("bundled_paths") if isinstance(cache.get("bundled_paths"), dict) else {}
+    entry = paths.get(path) if isinstance(paths.get(path), dict) else {}
+    if entry and not force:
+        checked = entry.get("checked_at")
+        if checked:
+            try:
+                last = datetime.fromisoformat(str(checked))
+                if (datetime.now(UTC) - last).total_seconds() < _BUNDLED_PATH_CHECK_INTERVAL_S:
+                    if entry.get("unavailable"):
+                        return None
+                    committed_at = str(entry.get("committed_at") or "").strip()
+                    if committed_at:
+                        return {
+                            "sha": str(entry.get("sha") or ""),
+                            "committed_at": committed_at,
+                        }
+                    return None
+            except Exception:  # noqa: BLE001
+                pass
+
+    remote = fetch_path_latest_commit(
+        _skills.BUNDLED_SKILLS_GITHUB_REPO,
+        path,
+        timeout_s=timeout_s,
+    )
+    paths = dict(paths)
+    if remote and remote.get("committed_at"):
+        paths[path] = {
+            "checked_at": datetime.now(UTC).isoformat(),
+            "sha": str(remote.get("sha") or ""),
+            "committed_at": str(remote["committed_at"]),
+            "unavailable": False,
+        }
+        result = {
+            "sha": str(remote.get("sha") or ""),
+            "committed_at": str(remote["committed_at"]),
+        }
+    else:
+        paths[path] = {
+            "checked_at": datetime.now(UTC).isoformat(),
+            "sha": "",
+            "committed_at": "",
+            "unavailable": True,
+        }
+        result = None
+    cache = dict(cache)
+    cache["bundled_paths"] = paths
+    _write_update_cache(cache)
+    return result
+
+
+def package_version() -> str:
+    """Installed sandwalk package version (fallback for built-in skill tags)."""
+    try:
+        from _version import __version__
+
+        return str(__version__ or "").strip() or "0.0.1"
+    except Exception:  # noqa: BLE001
+        return "0.0.1"
+
+
+def file_mtime_iso(path: Path) -> str:
+    """UTC ISO timestamp from a local file mtime."""
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).isoformat()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def enrich_bundled_skill(info: _skills.SkillInfo) -> None:
+    """Fill version / updated_at for built-in skills.
+
+    Priority:
+    - version: SKILL.md ``version:`` → sandwalk package version
+    - updated_at: SKILL.md ``updated:`` → GitHub path commit (when public) →
+      local SKILL.md mtime
+    """
+    if str(getattr(info, "source", "") or "") != "bundled":
+        return
+    if not getattr(info, "version", None):
+        info.version = package_version()
+    if getattr(info, "updated_at", None):
+        return
+    skill_md = getattr(info, "path", None)
+    dir_name = ""
+    if skill_md is not None:
+        try:
+            dir_name = Path(skill_md).parent.name
+        except Exception:  # noqa: BLE001
+            dir_name = ""
+    remote = resolve_bundled_path_commit(dir_name) if dir_name else None
+    if remote and remote.get("committed_at"):
+        info.updated_at = str(remote["committed_at"])
+        sha = str(remote.get("sha") or "").strip()
+        if sha and not getattr(info, "commit", None):
+            info.commit = sha
+        return
+    if skill_md is not None:
+        info.updated_at = file_mtime_iso(Path(skill_md))
 
 
 def resolve_repo_remote_state(

@@ -131,7 +131,7 @@ def test_display_version_with_release_tag():
 
 def test_display_author_and_updated_fallbacks():
     bundled = skills_mod.SkillInfo(name="x", source="bundled")
-    assert skills_mod.display_author(bundled) == "fastfold-ai"
+    assert skills_mod.display_author(bundled) == "sandwalk"
     npx = skills_mod.SkillInfo(name="y", source="npx")
     assert skills_mod.display_author(npx) == "-"
     assert skills_mod.display_updated(npx) == "-"
@@ -555,8 +555,93 @@ def test_discover_ecosystem_skills_parses_npx_output(monkeypatch):
 def test_bundled_skill_find_exists():
     skill_find = skills_mod.BUNDLED_SKILLS_DIR / "skill_find" / "SKILL.md"
     assert skill_find.exists()
-    assert "name: skill-find" in skill_find.read_text(encoding="utf-8")
+    text = skill_find.read_text(encoding="utf-8")
+    assert "name: skill-find" in text
+    assert "author: sandwalk" in text
+    assert "category: Built-in" in text
+    assert "version: 1.0.0" in text
     assert not (skills_mod.BUNDLED_SKILLS_DIR / "find_skills").exists()
+
+
+def test_bundled_skill_creator_is_sandwalk_builtin():
+    skill_creator = skills_mod.BUNDLED_SKILLS_DIR / "skill_creator" / "SKILL.md"
+    assert skill_creator.exists()
+    text = skill_creator.read_text(encoding="utf-8")
+    assert "name: skill-creator" in text
+    assert "author: sandwalk" in text
+    assert "category: Built-in" in text
+    assert "version: 1.0.0" in text
+    info = skills_mod.parse_skill_md(skill_creator)
+    info.source = "bundled"
+    assert skills_mod.display_author(info) == "sandwalk"
+    assert info.version == "1.0.0"
+
+
+def test_enrich_bundled_skill_uses_manual_version_and_mtime(tmp_path, monkeypatch):
+    skill_md = tmp_path / "skill_find" / "SKILL.md"
+    skill_md.parent.mkdir()
+    skill_md.write_text(
+        "---\nname: skill-find\ndescription: d\nauthor: sandwalk\n"
+        "category: Built-in\nversion: 2.1.0\n---\n",
+        encoding="utf-8",
+    )
+    info = skills_mod.parse_skill_md(skill_md)
+    info.source = "bundled"
+    monkeypatch.setattr(
+        "agent.skills.releases.resolve_bundled_path_commit",
+        lambda *_a, **_k: None,
+    )
+    skills_mod.enrich_bundled_skill(info)
+    assert info.version == "2.1.0"
+    assert info.updated_at  # local SKILL.md mtime fallback
+
+
+def test_enrich_bundled_skill_prefers_github_commit_date(tmp_path, monkeypatch):
+    skill_md = tmp_path / "skill_creator" / "SKILL.md"
+    skill_md.parent.mkdir()
+    skill_md.write_text(
+        "---\nname: skill-creator\ndescription: d\nauthor: sandwalk\n"
+        "category: Built-in\n---\n",
+        encoding="utf-8",
+    )
+    info = skills_mod.parse_skill_md(skill_md)
+    info.source = "bundled"
+    monkeypatch.setattr(
+        "agent.skills.releases.package_version",
+        lambda: "9.9.9",
+    )
+    monkeypatch.setattr(
+        "agent.skills.releases.resolve_bundled_path_commit",
+        lambda *_a, **_k: {
+            "sha": "abcdef1234567890",
+            "committed_at": "2026-07-01T12:00:00Z",
+        },
+    )
+    skills_mod.enrich_bundled_skill(info)
+    assert info.version == "9.9.9"
+    assert info.updated_at == "2026-07-01T12:00:00Z"
+    assert info.commit == "abcdef1234567890"
+
+
+def test_enrich_bundled_skill_keeps_manual_updated_tag(tmp_path, monkeypatch):
+    skill_md = tmp_path / "skill_find" / "SKILL.md"
+    skill_md.parent.mkdir()
+    skill_md.write_text(
+        "---\nname: skill-find\ndescription: d\nupdated: 2026-01-15\n---\n",
+        encoding="utf-8",
+    )
+    info = skills_mod.parse_skill_md(skill_md)
+    info.source = "bundled"
+    called = {"github": False}
+
+    def _remote(*_a, **_k):
+        called["github"] = True
+        return {"sha": "abc", "committed_at": "2026-07-01T12:00:00Z"}
+
+    monkeypatch.setattr("agent.skills.releases.resolve_bundled_path_commit", _remote)
+    skills_mod.enrich_bundled_skill(info)
+    assert info.updated_at == "2026-01-15"
+    assert called["github"] is False
 
 
 # ─── CLI ───────────────────────────────────────────────────────────────────

@@ -60,9 +60,10 @@ export function useSkillsViewListActions({
     setCopiedInstall(false)
   }, [detail?.name])
 
-  const detailInstallCommand = detail
-    ? `sandwalk skills add ${skillInstallSource(detail.name, detail.source)} --skill ${detail.name}`
-    : ''
+  const detailInstallCommand =
+    detail && detail.source !== 'bundled'
+      ? `sandwalk skills add ${skillInstallSource(detail.name, detail.source)} --skill ${detail.name}`
+      : ''
 
   const detailPresentation = detail
     ? resolveInstalledDetailPresentation(detail)

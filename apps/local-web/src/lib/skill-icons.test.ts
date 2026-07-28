@@ -10,12 +10,15 @@ import {
 } from './skill-icons'
 
 describe('isFeaturedSkill', () => {
-  it('detects fastfold author, bundled source, and fastfold-ai source', () => {
+  it('detects fastfold author, sandwalk/bundled, and fastfold-ai source', () => {
     expect(
       isFeaturedSkill({ name: 'x', author: 'FastFold Team', source: 'user' })
     ).toBe(true)
     expect(
       isFeaturedSkill({ name: 'x', author: '', source: 'bundled' })
+    ).toBe(true)
+    expect(
+      isFeaturedSkill({ name: 'skill-find', author: 'sandwalk', source: 'bundled' })
     ).toBe(true)
     expect(
       isFeaturedSkill({
@@ -58,6 +61,33 @@ describe('skillIcon helpers', () => {
     expect(featuredSkillIcon({ name: 'other', iconSrc: null })).toBe(
       '/ff_simbol_color.svg'
     )
+    expect(
+      featuredSkillIcon({
+        name: 'skill-creator',
+        iconSrc: null,
+        author: 'sandwalk',
+        source: 'bundled'
+      })
+    ).toBe('/sandwalk-mark.svg')
+    expect(
+      featuredSkillIcon({
+        name: 'skill-find',
+        iconSrc: null,
+        author: 'sandwalk',
+        source: 'bundled'
+      })
+    ).toBe('/sandwalk-mark.svg')
+  })
+
+  it('inverts sandwalk built-in marks in dark mode', () => {
+    expect(
+      skillIconInvertInDark({
+        name: 'skill-creator',
+        iconSrc: null,
+        author: 'sandwalk',
+        source: 'bundled'
+      })
+    ).toBe(true)
   })
 
   it('composerSkillIcon uses featured fallback only for featured skills', () => {

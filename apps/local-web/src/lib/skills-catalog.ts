@@ -22,6 +22,8 @@ export {
   parseCatalogSkillId
 } from './skills-catalog-install'
 export {
+  BUNDLED_SKILLS_GITHUB_REPO,
+  BUNDLED_SKILLS_GITHUB_TREE,
   catalogCoordsFromInstalledSkill,
   catalogSkillDetailPath,
   catalogSkillPreferredName,

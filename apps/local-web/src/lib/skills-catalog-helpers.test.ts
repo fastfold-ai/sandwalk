@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   categorizeSkill,
   isUserCreatedSkill,
+  skillMetaText,
   suggestionSourceIcon,
   suggestionSourceLabel
 } from '@/lib/skills-catalog-helpers'
@@ -46,9 +47,32 @@ describe('user-created skill labels', () => {
     ).toBe(true)
   })
 
+  it('labels bundled package skills as Built-in', () => {
+    expect(
+      categorizeSkill(
+        skill({ name: 'skill-creator', source: 'bundled', author: 'sandwalk' })
+      )
+    ).toBe('Built-in')
+    expect(
+      categorizeSkill(
+        skill({ name: 'skill-find', category: 'Built-in', author: 'sandwalk' })
+      )
+    ).toBe('Built-in')
+    expect(
+      skillMetaText(
+        skill({
+          name: 'skill-creator',
+          source: 'bundled',
+          author: 'sandwalk',
+          version: '1.0.0'
+        })
+      )
+    ).toBe('sandwalk · v1.0.0 · Built-in')
+  })
+
   it('keeps heuristic categories for non-user skills', () => {
     expect(
-      categorizeSkill(skill({ name: 'slack_report', source: 'bundled' }))
+      categorizeSkill(skill({ name: 'slack_report', source: 'global' }))
     ).toBe('Integrations')
   })
 })

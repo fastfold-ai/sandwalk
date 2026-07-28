@@ -233,6 +233,7 @@ export function SkillRemoveButton({
   pending: boolean
   onRemove: (name: string) => void
 }) {
+  if (skill.source === 'bundled') return null
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

@@ -1,6 +1,9 @@
 ---
 name: skill-creator
 description: Create new agent skills and iteratively improve them. Use when the user wants to build, scaffold, author, validate, package, enable, or install a new user-created skill for the Sandwalk / Fastfold agent CLI.
+author: sandwalk
+category: Built-in
+version: 1.0.0
 ---
 
 # Skill Creator

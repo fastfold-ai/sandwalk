@@ -109,52 +109,58 @@ export function SkillsInstalledDetailView({
     !localCatalogLoading && localCatalogSource
       ? skillsShSkillUrl(localCatalogSource, detail.name)
       : null
+  const isBuiltIn = detail.source === 'bundled'
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
       <DetailStickyNav>
         <SkillsBreadcrumb onBack={onBack} />
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant={updateAvailable ? 'default' : 'ghost'}
-            size="sm"
-            className={cn(
-              'h-7 px-2 text-xs',
-              updateAvailable && 'bg-foreground text-background hover:bg-foreground/90'
-            )}
-            disabled={pendingUpgrade || batchBusy}
-            title={
-              updateAvailable
-                ? latestVersionLabel
-                  ? `Upgrade to ${latestVersionLabel}`
-                  : 'A newer version is available — run upgrade'
-                : 'Sync installed skills to the latest release (sandwalk skills upgrade)'
-            }
-            onClick={onUpgrade}
-          >
-            {pendingUpgrade ? (
-              <Loader2 className="mr-1 size-3.5 animate-spin" />
-            ) : (
-              <ArrowUp className="mr-1 size-3.5" />
-            )}
-            {updateAvailable
-              ? latestVersionLabel
-                ? `Upgrade to ${latestVersionLabel}`
-                : 'Upgrade available'
-              : 'Upgrade'}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs text-red-600 hover:text-red-700"
-            disabled={Boolean(pendingRemove[detail.name]) || batchBusy}
-            onClick={() => onRemove(detail.name)}
-          >
-            <Trash2 className="mr-1 size-3.5" />
-            Remove
-          </Button>
+          {!isBuiltIn ? (
+            <>
+              <Button
+                type="button"
+                variant={updateAvailable ? 'default' : 'ghost'}
+                size="sm"
+                className={cn(
+                  'h-7 px-2 text-xs',
+                  updateAvailable &&
+                    'bg-foreground text-background hover:bg-foreground/90'
+                )}
+                disabled={pendingUpgrade || batchBusy}
+                title={
+                  updateAvailable
+                    ? latestVersionLabel
+                      ? `Upgrade to ${latestVersionLabel}`
+                      : 'A newer version is available — run upgrade'
+                    : 'Sync installed skills to the latest release (sandwalk skills upgrade)'
+                }
+                onClick={onUpgrade}
+              >
+                {pendingUpgrade ? (
+                  <Loader2 className="mr-1 size-3.5 animate-spin" />
+                ) : (
+                  <ArrowUp className="mr-1 size-3.5" />
+                )}
+                {updateAvailable
+                  ? latestVersionLabel
+                    ? `Upgrade to ${latestVersionLabel}`
+                    : 'Upgrade available'
+                  : 'Upgrade'}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-red-600 hover:text-red-700"
+                disabled={Boolean(pendingRemove[detail.name]) || batchBusy}
+                onClick={() => onRemove(detail.name)}
+              >
+                <Trash2 className="mr-1 size-3.5" />
+                Remove
+              </Button>
+            </>
+          ) : null}
           {localSkillsShUrl ? (
             <Button
               type="button"
@@ -260,7 +266,8 @@ export function SkillsInstalledDetailView({
                           className="truncate underline-offset-2 hover:underline"
                           onClick={() => void openInSystemBrowser(detailAuthorUrl)}
                         >
-                          {detail.author || 'fastfold-ai'}
+                          {detail.author ||
+                            (detail.source === 'bundled' ? 'sandwalk' : 'unknown')}
                         </button>
                       ) : (
                         <span className="truncate">{detail.author || 'unknown'}</span>
@@ -272,16 +279,27 @@ export function SkillsInstalledDetailView({
             </aside>
 
             <section className="min-w-0 overflow-x-hidden p-1">
-              <div className="mb-4 space-y-1.5">
-                <p className="text-muted-foreground text-sm font-medium">
-                  Install this skill
-                </p>
-                <InstallCommandBlock
-                  command={detailInstallCommand}
-                  copied={copiedInstall}
-                  onCopy={onCopyInstall}
-                />
-              </div>
+              {isBuiltIn ? (
+                <div className="mb-4 space-y-1.5">
+                  <p className="text-muted-foreground text-sm font-medium">
+                    Built into Sandwalk
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Ships with the app — no install command needed.
+                  </p>
+                </div>
+              ) : detailInstallCommand ? (
+                <div className="mb-4 space-y-1.5">
+                  <p className="text-muted-foreground text-sm font-medium">
+                    Install this skill
+                  </p>
+                  <InstallCommandBlock
+                    command={detailInstallCommand}
+                    copied={copiedInstall}
+                    onCopy={onCopyInstall}
+                  />
+                </div>
+              ) : null}
 
               <MarkdownContent
                 content={stripFrontmatter(detail.content)}

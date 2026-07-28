@@ -5,6 +5,11 @@ import {
   OWNER_REPO_RE
 } from './skills-catalog-install'
 
+/** Built-in skills ship in the Sandwalk package (`cli/src/skills`). */
+export const BUNDLED_SKILLS_GITHUB_TREE =
+  'https://github.com/fastfold-ai/sandwalk/tree/main/cli/src/skills'
+export const BUNDLED_SKILLS_GITHUB_REPO = 'https://github.com/fastfold-ai/sandwalk'
+
 export function splitSkillSourceSpec(
   rawSource: string | null | undefined
 ): { ownerRepo: string; skillsPath: string } | null {
@@ -77,6 +82,8 @@ export function skillGithubUrl(
   name: string,
   rawSource: string | null | undefined
 ): string | null {
+  const source = String(rawSource || '').trim()
+  if (source === 'bundled') return BUNDLED_SKILLS_GITHUB_TREE
   const spec = splitSkillSourceSpec(rawSource)
   if (!spec) return null
   const ownerRepo = spec.ownerRepo
@@ -91,6 +98,9 @@ export function catalogCoordsFromInstalledSkill(
 ): { source: string; skill: string } | null {
   const name = String(skill.name || '').trim()
   if (!name) return null
+  const source = String(skill.source || '').trim()
+  // Built-in package skills are not skills.sh catalog entries.
+  if (source === 'bundled') return null
   const spec = splitSkillSourceSpec(skill.source)
   if (!spec?.ownerRepo) return null
   return { source: spec.ownerRepo, skill: name }
@@ -138,6 +148,8 @@ export function catalogSkillDetailPath(skill: {
 }
 
 export function skillAuthorUrl(rawSource: string | null | undefined): string | null {
+  const source = String(rawSource || '').trim()
+  if (source === 'bundled') return BUNDLED_SKILLS_GITHUB_REPO
   const spec = splitSkillSourceSpec(rawSource)
   if (!spec) return null
   return `https://github.com/${spec.ownerRepo}`

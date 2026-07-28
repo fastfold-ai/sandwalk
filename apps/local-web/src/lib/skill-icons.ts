@@ -1,5 +1,7 @@
 import type { AgentSkill } from '@sandwalk/agent-ui-core'
 
+const SANDWALK_MARK = '/sandwalk-mark.svg'
+
 const SKILL_ICON_BY_NAME: Record<
   string,
   { src: string; invertInDark?: boolean }
@@ -8,7 +10,17 @@ const SKILL_ICON_BY_NAME: Record<
   diagrams_mermaid: { src: '/mermaid-logo.png' },
   slack_report: { src: '/integrations/slack.png' },
   md_openmm_calvados: { src: '/models/openmm-seeklogo.svg' },
-  md_openmmdl: { src: '/models/openmmdl.png' }
+  md_openmmdl: { src: '/models/openmmdl.png' },
+  'skill-creator': { src: SANDWALK_MARK, invertInDark: true },
+  'skill-find': { src: SANDWALK_MARK, invertInDark: true }
+}
+
+function isBundledSkill(
+  skill: Partial<Pick<AgentSkill, 'author' | 'source'>>
+): boolean {
+  const author = String(skill.author || '').toLowerCase()
+  const source = String(skill.source || '').toLowerCase()
+  return source === 'bundled' || author === 'sandwalk'
 }
 
 export function isFeaturedSkill(
@@ -18,6 +30,7 @@ export function isFeaturedSkill(
   const source = String(skill.source || '').toLowerCase()
   return (
     author.includes('fastfold') ||
+    author === 'sandwalk' ||
     source === 'bundled' ||
     source.includes('fastfold-ai')
   )
@@ -39,6 +52,7 @@ function inferredSkillIcon(
   ) {
     return '/integrations/huggingface.png'
   }
+  if (isBundledSkill(skill)) return SANDWALK_MARK
   return null
 }
 
@@ -53,10 +67,12 @@ export function skillIcon(
 
 /** Match Integrations: invert dark logos (e.g. Boltz) in dark mode. */
 export function skillIconInvertInDark(
-  skill: Pick<AgentSkill, 'name' | 'iconSrc'>
+  skill: Pick<AgentSkill, 'name' | 'iconSrc'> &
+    Partial<Pick<AgentSkill, 'author' | 'source'>>
 ): boolean {
   if (String(skill.iconSrc || '').trim()) return false
-  return Boolean(SKILL_ICON_BY_NAME[skill.name]?.invertInDark)
+  if (SKILL_ICON_BY_NAME[skill.name]?.invertInDark) return true
+  return isBundledSkill(skill)
 }
 
 export function featuredSkillIcon(

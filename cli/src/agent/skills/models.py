@@ -94,6 +94,8 @@ def parse_skill_md(skill_md: Path) -> SkillInfo:
     icon = ""
     author = ""
     category = ""
+    version: str | None = None
+    updated_at = ""
 
     try:
         # Frontmatter lives at the top; avoid loading large SKILL.md bodies just
@@ -129,6 +131,14 @@ def parse_skill_md(skill_md: Path) -> SkillInfo:
             author = line.split(":", 1)[1].strip().strip('"').strip("'")
         elif line.startswith("category:") or line.startswith("origin:"):
             category = line.split(":", 1)[1].strip().strip('"').strip("'")
+        elif line.startswith("version:"):
+            value = line.split(":", 1)[1].strip().strip('"').strip("'")
+            if value:
+                version = value
+        elif line.startswith("updated:") or line.startswith("updated_at:"):
+            value = line.split(":", 1)[1].strip().strip('"').strip("'")
+            if value:
+                updated_at = value
 
     if category.lower() in {"custom", "user"}:
         category = USER_CREATED_CATEGORY
@@ -143,6 +153,8 @@ def parse_skill_md(skill_md: Path) -> SkillInfo:
         icon=icon,
         author=author,
         category=category,
+        version=version,
+        updated_at=updated_at,
     )
 
 
@@ -228,7 +240,7 @@ def display_author(info: SkillInfo) -> str:
         return author
     source = str(getattr(info, "source", "") or "")
     if source == "bundled":
-        return "fastfold-ai"
+        return "sandwalk"
     return "-"
 
 

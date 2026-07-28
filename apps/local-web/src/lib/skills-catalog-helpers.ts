@@ -29,6 +29,9 @@ export function isUserCreatedSkill(skill: AgentSkill): boolean {
 
 export function categorizeSkill(skill: AgentSkill) {
   if (isUserCreatedSkill(skill)) return 'Created by Me'
+  const source = String(skill.source || '').trim().toLowerCase()
+  const category = String(skill.category || '').trim().toLowerCase()
+  if (source === 'bundled' || category === 'built-in') return 'Built-in'
   const name = skill.name.toLowerCase()
   if (name === 'fold' || name === 'boltz-structure-and-binding')
     return 'Structure Prediction'
@@ -98,6 +101,11 @@ export function skillMetaText(skill: AgentSkill): string | null {
   const author = skill.author.trim()
   if (author) parts.push(author)
   if (skill.version) parts.push(`v${skill.version.replace(/^v/i, '')}`)
+  const source = String(skill.source || '').trim().toLowerCase()
+  if (source === 'bundled') {
+    parts.push('Built-in')
+    return parts.join(' · ')
+  }
   if (skill.updateAvailable && skill.latestVersion) {
     const latest = String(skill.latestVersion)
     const label =

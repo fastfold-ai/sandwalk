@@ -75,10 +75,12 @@ class CatalogListMixin:
 
         author = display_author(info)
         if author in {"-", ""}:
-            author = info.author or ("fastfold-ai" if info.source == "bundled" else "")
+            author = info.author or ("sandwalk" if info.source == "bundled" else "")
         category = str(getattr(info, "category", "") or "").strip()
         if is_user_created_skill(info):
             category = USER_CREATED_CATEGORY
+        elif (info.source or "") == "bundled" and not category:
+            category = "Built-in"
         update = update or {}
         return SkillSummary(
             name=info.name,

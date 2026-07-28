@@ -21,6 +21,11 @@ export function skillMetaText(skill: AgentSkill): string | null {
   const author = String(skill.author || '').trim()
   if (author) parts.push(author)
   if (skill.version) parts.push(`v${String(skill.version).replace(/^v/i, '')}`)
+  const source = String(skill.source || '').trim().toLowerCase()
+  if (source === 'bundled') {
+    parts.push('Built-in')
+    return parts.join(' · ')
+  }
   return parts.length > 0 ? parts.join(' · ') : null
 }
 

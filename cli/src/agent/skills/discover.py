@@ -33,9 +33,11 @@ def _scan_dir(base: Path, source: str) -> dict[str, _skills.SkillInfo]:
         if child.is_dir() and skill_md.exists():
             info = _skills.parse_skill_md(skill_md)
             frontmatter_author = (info.author or "").strip()
+            frontmatter_version = getattr(info, "version", None)
+            frontmatter_updated = str(getattr(info, "updated_at", "") or "").strip()
             info.source = source
             meta = skills_meta.get(child.name) or {}
-            if isinstance(meta, dict):
+            if isinstance(meta, dict) and meta:
                 install_source = str(meta.get("source") or "").strip()
                 if install_source:
                     # Prefer the real source spec (owner/repo@path or URL) so
@@ -43,11 +45,20 @@ def _scan_dir(base: Path, source: str) -> dict[str, _skills.SkillInfo]:
                     info.source = install_source
                 derived = _skills._derive_author(install_source) if install_source else ""
                 info.author = frontmatter_author or derived
-                info.updated_at = str(meta.get("installed_at") or "")
+                installed_at = str(meta.get("installed_at") or "").strip()
+                if installed_at:
+                    info.updated_at = installed_at
                 release = meta.get("release")
-                info.version = str(release) if release else None
+                if release:
+                    info.version = str(release)
+                elif frontmatter_version:
+                    info.version = frontmatter_version
                 commit = str(meta.get("commit") or "").strip()
                 info.commit = commit or None
+            else:
+                info.author = frontmatter_author or info.author
+                info.version = frontmatter_version
+                info.updated_at = frontmatter_updated
             if source == "npx" and info.source == "npx":
                 lock_source = npx_sources.get(child.name) or npx_sources.get(info.name)
                 if lock_source:
@@ -58,6 +69,10 @@ def _scan_dir(base: Path, source: str) -> dict[str, _skills.SkillInfo]:
                     info.category = _skills.USER_CREATED_CATEGORY
                 if not info.author or info.author.strip().lower() in {"custom", "user"}:
                     info.author = _skills.local_skill_author_name()
+            if source == "bundled":
+                from agent.skills.releases import enrich_bundled_skill
+
+                enrich_bundled_skill(info)
             # Key by directory name (canonical identifier everywhere else).
             out[child.name] = info
     return out
