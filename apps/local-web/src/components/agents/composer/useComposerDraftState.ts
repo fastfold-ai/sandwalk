@@ -14,7 +14,8 @@ export function useComposerDraftState({
   onLiveDraftChange,
   autoFocus,
   focusKey,
-  workspaceFiles = []
+  workspaceFiles = [],
+  onEnsureWorkspaceFiles
 }: {
   value: string
   onChange: (value: string) => void
@@ -22,6 +23,7 @@ export function useComposerDraftState({
   autoFocus?: boolean
   focusKey?: string | null
   workspaceFiles?: WorkspaceFile[]
+  onEnsureWorkspaceFiles?: () => void | Promise<void>
 }) {
   const textInputRefs = useRef<
     Map<number, HTMLInputElement | HTMLTextAreaElement>
@@ -124,6 +126,15 @@ export function useComposerDraftState({
   useEffect(() => {
     setAtDismissed(false)
   }, [atMention?.start])
+
+  // Load @ file index when the menu opens — do not wait for the Files panel.
+  const ensuredAtStartRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!atOpen || !atMention) return
+    if (ensuredAtStartRef.current === atMention.start) return
+    ensuredAtStartRef.current = atMention.start
+    void onEnsureWorkspaceFiles?.()
+  }, [atMention, atOpen, onEnsureWorkspaceFiles])
 
   const chipInserters = useMemo(
     () =>

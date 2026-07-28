@@ -116,12 +116,20 @@ def test_builtin_handle_noop_sync(tmp_path: Path):
 
 
 def test_resolve_builtin(tmp_path: Path):
+    import os
+
+    from agent.sandbox_backend.workspace_route import HostWorkspaceMirrorBackend
+
     clear_active_handles()
     cfg = SimpleNamespace(
         get=lambda key, default=None: {
             "sandbox.backend": "builtin",
         }.get(key, default)
     )
+    linked = tmp_path / "linked"
+    linked.mkdir()
+    (linked / "backlog.md").write_text("old\n", encoding="utf-8")
+    os.symlink(linked, tmp_path / "project", target_is_directory=True)
     handle = resolve_deepagents_backend(
         cfg,
         session_id="s1",
@@ -129,7 +137,14 @@ def test_resolve_builtin(tmp_path: Path):
         skill_source_dirs=[str(tmp_path)],
     )
     assert handle.kind == "builtin"
-    assert isinstance(handle.backend, FilesystemBackend)
+    assert isinstance(handle.backend, HostWorkspaceMirrorBackend)
+    assert isinstance(handle.backend._inner, FilesystemBackend)
+    # Existing project files must upsert via write_file (no "already exists").
+    result = handle.backend.write(
+        str(tmp_path / "project" / "backlog.md"), "- task\n"
+    )
+    assert result.error is None
+    assert (linked / "backlog.md").read_text(encoding="utf-8") == "- task\n"
     assert handle.skills_sources == [str(tmp_path)]
     assert push_paths_for_session("s1", tmp_path, ["x"]) == 0
 

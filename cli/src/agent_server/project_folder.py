@@ -113,6 +113,30 @@ def project_mount_target(workspace: Path) -> Path | None:
     return target if target.is_dir() else None
 
 
+def _macos_private_var_alias(path: Path) -> Path:
+    """Map ``/var/...`` ↔ ``/private/var/...`` so lexical compares match ``resolve()``."""
+    text = os.path.normpath(str(path))
+    if text.startswith("/var/"):
+        return Path("/private" + text)
+    if text.startswith("/private/var/"):
+        return Path(text[len("/private") :])
+    return Path(text)
+
+
+def _lexical_relative_to_root(candidate: Path, root: Path) -> Path | None:
+    """Return candidate relative to root without following ``project/`` symlinks."""
+    lexical = Path(os.path.normpath(str(candidate)))
+    bases = {root, Path(os.path.normpath(str(root))), _macos_private_var_alias(root)}
+    aliases = {lexical, _macos_private_var_alias(lexical)}
+    for base in bases:
+        for item in aliases:
+            try:
+                return item.relative_to(base)
+            except ValueError:
+                continue
+    return None
+
+
 def path_under_workspace_or_project(
     path: Path, workspace: Path
 ) -> Path | None:
@@ -141,12 +165,8 @@ def path_under_workspace_or_project(
 
     # Lexical path must still be under workspace/project/... (not a bare
     # absolute path into the linked folder, which would bypass the mount).
-    try:
-        lexical = Path(os.path.normpath(str(candidate)))
-        rel = lexical.relative_to(root)
-    except (OSError, ValueError):
-        return None
-    if not rel.parts or rel.parts[0] != PROJECT_FOLDER_LINK_NAME:
+    rel = _lexical_relative_to_root(candidate, root)
+    if rel is None or not rel.parts or rel.parts[0] != PROJECT_FOLDER_LINK_NAME:
         return None
 
     target = project_mount_target(root)

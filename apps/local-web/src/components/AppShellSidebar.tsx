@@ -171,7 +171,8 @@ export function AppShellSidebar({
             backendUrl={backendUrl}
             navigate={navigate}
             onNavigateHome={() => {
-              void createSession(activeProjectId)
+              // Home: blank draft composer with All projects selected.
+              void createSession(null)
             }}
             onSelectAllProjects={selectAllProjects}
             onSelectProject={selectProjectScope}

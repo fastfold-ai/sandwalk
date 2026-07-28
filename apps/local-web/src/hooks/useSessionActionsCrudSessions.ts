@@ -89,11 +89,17 @@ export function useSessionActionsCrudSessions({
   const [renameValue, setRenameValue] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<AgentSession | null>(null)
 
-  /** Open the local draft composer — no API session until first real action. */
+  /** Open the local draft composer — no API session until first real action.
+   * Pass `null` for All projects; omit to keep the current project scope.
+   */
   const createSession = useCallback(
     async (projectId?: string | null) => {
-      const id = projectId ?? activeProjectId ?? null
-      applyProjectScope(id, setProjectScopeId, setRecentProjectIds)
+      const id = projectId === undefined ? (activeProjectId ?? null) : projectId
+      if (id) {
+        applyProjectScope(id, setProjectScopeId, setRecentProjectIds)
+      } else {
+        setProjectScopeId(null)
+      }
       materializedDraftSessionRef.current = null
       // Match All-scope New Agent: draft only, no side panels forcing a session.
       setFilesPanelCollapsed(true)

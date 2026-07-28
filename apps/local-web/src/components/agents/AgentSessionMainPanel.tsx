@@ -188,8 +188,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   }, [activeProjectId, isDraft, setDraftWorkspaceSessionId])
 
   const ensureAgentSession = agentComposerSlotProps.ensureAgentSession
+  const setWorkspaceVersion = agentComposerSlotProps.setWorkspaceVersion
   const prepareDraftWorkspace = useCallback(async () => {
-    if (!isDraft || !inProject) return draftWorkspaceSessionId
+    if (!isDraft) return draftWorkspaceSessionId
     if (draftWorkspaceSessionId) return draftWorkspaceSessionId
     const id = await ensureAgentSession(undefined, { navigate: false })
     if (id) setDraftWorkspaceSessionId(id)
@@ -197,14 +198,22 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   }, [
     draftWorkspaceSessionId,
     ensureAgentSession,
-    inProject,
     isDraft,
     setDraftWorkspaceSessionId
   ])
 
-  // Do not auto-materialize on draft mount / open files panel — that created
-  // empty "New research session" rows whenever New Agent ran inside a project.
-  // Materialize only when the user explicitly opens Files or Terminal.
+  // Materialize / refresh workspace index for @ mentions without opening Files.
+  const ensureWorkspaceForMentions = useCallback(async () => {
+    if (isDraft) {
+      const id = await prepareDraftWorkspace()
+      if (id) setWorkspaceVersion(current => current + 1)
+      return
+    }
+    setWorkspaceVersion(current => current + 1)
+  }, [isDraft, prepareDraftWorkspace, setWorkspaceVersion])
+
+  // Do not auto-materialize on draft mount — that created empty
+  // "New research session" rows. Files / Terminal / @ mentions opt in.
 
   const workspaceSessionId = isDraft ? draftWorkspaceSessionId : sessionId
   // Host terminal only when draft is outside a project.
@@ -267,7 +276,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             messagesLoaded={messagesLoaded}
             runActive={runActive}
             showChatSkeleton={showChatSkeleton}
-            agentComposerSlotProps={agentComposerSlotProps}
+            agentComposerSlotProps={{
+              ...agentComposerSlotProps,
+              onEnsureWorkspaceFiles: ensureWorkspaceForMentions
+            }}
             projects={projects}
             recentProjectIds={recentProjectIds}
             activeProjectId={activeProjectId}

@@ -72,7 +72,12 @@ def resolve_deepagents_backend(
     workspace_root = str(Path(workspace_root).expanduser().resolve())
 
     if kind != "modal":
-        backend = FilesystemBackend(root_dir=workspace_root, virtual_mode=False)
+        # Mirror wrapper upserts host files (incl. workspace/project symlink) so
+        # deepagents write_file does not fail with "already exists" on edits.
+        backend = wrap_backend_for_host_workspace(
+            FilesystemBackend(root_dir=workspace_root, virtual_mode=False),
+            workspace_root,
+        )
         handle = SandboxHandle(
             kind="builtin",
             backend=backend,

@@ -14,15 +14,55 @@ This wrapper:
 
 from __future__ import annotations
 
+import base64
 import logging
 from pathlib import Path
 from typing import Any
 
-from deepagents.backends.protocol import EditResult, WriteResult
+from deepagents.backends.protocol import EditResult, ReadResult, WriteResult
 
 from agent.sandbox_sync.paths import WORKSPACE_REMOTE_ROOT
 
 logger = logging.getLogger(__name__)
+
+
+def _read_host_file(path: Path, offset: int, limit: int) -> ReadResult:
+    """Read a host file directly, bypassing symlink-root checks in FS backends.
+
+    Mirrors deepagents' text/binary + offset/limit + empty-content behavior so
+    files under the ``project/`` symlink (which resolves outside the workspace
+    root) can still be read by the model.
+    """
+    from deepagents.backends.filesystem import check_empty_content
+    from deepagents.backends.protocol import FileData
+
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        return ReadResult(error=f"Error reading file '{path}': {exc}")
+
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        encoded = base64.standard_b64encode(raw).decode("ascii")
+        return ReadResult(
+            file_data=FileData(content=encoded, encoding="base64")
+        )
+
+    empty = check_empty_content(content)
+    if empty:
+        return ReadResult(file_data=FileData(content=empty, encoding="utf-8"))
+
+    lines = content.splitlines(keepends=True)
+    start = offset
+    end = min(start + limit, len(lines))
+    if start >= len(lines):
+        return ReadResult(
+            error=f"Line offset {offset} exceeds file length ({len(lines)} lines)"
+        )
+    return ReadResult(
+        file_data=FileData(content="".join(lines[start:end]), encoding="utf-8")
+    )
 
 
 def workspace_relative_tool_path(
@@ -95,6 +135,15 @@ def _mirror_modal_text(inner: Any, rel: str, content: str) -> None:
             return
         except Exception as exc:  # noqa: BLE001
             logger.debug("Modal upload mirror for %s failed: %s", path, exc)
+    # FilesystemBackend.write refuses overwrites — skip when the path already
+    # exists on an inner FS backend; host bytes were already written.
+    try:
+        from deepagents.backends import FilesystemBackend
+
+        if isinstance(inner, FilesystemBackend):
+            return
+    except Exception:  # noqa: BLE001
+        pass
     try:
         result = inner.write(path, content)
         if getattr(result, "error", None):
@@ -183,14 +232,38 @@ class HostWorkspaceMirrorBackend:
             return self._inner.read(file_path, offset=offset, limit=limit)
         host_path = self._root / rel if rel else self._root
         if host_path.is_file():
-            from deepagents.backends import FilesystemBackend
-
-            host_fs = FilesystemBackend(
-                root_dir=str(self._root), virtual_mode=True
-            )
-            virtual = f"/{rel}" if rel else "/"
-            return host_fs.read(virtual, offset=offset, limit=limit)
+            # Read directly: FilesystemBackend resolves the project/ symlink and
+            # rejects it as "outside root directory".
+            return _read_host_file(host_path, offset, limit)
         return self._inner.read(_modal_path(rel), offset=offset, limit=limit)
+
+    # deepagents tool nodes call the async variants — route them through the
+    # same host-mirror logic so workspace/project writes upsert instead of
+    # falling through to the inner backend's create-only "already exists" path.
+    async def awrite(self, file_path: str, content: str) -> WriteResult:
+        import asyncio
+
+        return await asyncio.to_thread(self.write, file_path, content)
+
+    async def aedit(
+        self,
+        file_path: str,
+        old_string: str,
+        new_string: str,
+        replace_all: bool = False,  # noqa: FBT001, FBT002
+    ) -> EditResult:
+        import asyncio
+
+        return await asyncio.to_thread(
+            self.edit, file_path, old_string, new_string, replace_all
+        )
+
+    async def aread(
+        self, file_path: str, offset: int = 0, limit: int = 2000
+    ) -> Any:
+        import asyncio
+
+        return await asyncio.to_thread(self.read, file_path, offset, limit)
 
 
 def wrap_backend_for_host_workspace(backend: Any, workspace_root: str | Path) -> Any:

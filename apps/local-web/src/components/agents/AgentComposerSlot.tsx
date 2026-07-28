@@ -75,6 +75,7 @@ type AgentComposerSlotProps = {
   handleStop: () => void | Promise<void>
   loadSkillDetail: (name: string) => Promise<AgentSkillDetail>
   setWorkspaceVersion: Dispatch<SetStateAction<number>>
+  onEnsureWorkspaceFiles?: () => void | Promise<void>
   runtimeSettings: RuntimeSettings | null
   tokenUsage: { inputTokens: number; outputTokens: number }
   selectSessionSpecialist: (specialistId: string | null) => Promise<void>
@@ -125,6 +126,7 @@ export function AgentComposerSlot({
   handleStop,
   loadSkillDetail,
   setWorkspaceVersion,
+  onEnsureWorkspaceFiles,
   runtimeSettings,
   tokenUsage,
   selectSessionSpecialist,
@@ -207,6 +209,7 @@ export function AgentComposerSlot({
           setFilesPanelCollapsed(false)
           setPendingOpenPath(path)
         }}
+        onEnsureWorkspaceFiles={onEnsureWorkspaceFiles}
         onSend={handleComposerSend}
         onStop={() => void handleStop()}
         onLoadSkill={loadSkillDetail}

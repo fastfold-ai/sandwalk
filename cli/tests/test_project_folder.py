@@ -40,6 +40,35 @@ def test_path_under_workspace_or_project_allows_mount(tmp_path: Path):
     assert path_under_workspace_or_project(linked / "backlog.md", workspace) is None
 
 
+def test_path_under_workspace_or_project_var_private_alias(tmp_path: Path):
+    """Lexical checks must tolerate macOS /var vs /private/var."""
+    import os
+
+    from agent_server.project_folder import path_under_workspace_or_project
+
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    linked = tmp_path / "linked"
+    linked.mkdir()
+    (linked / "backlog.md").write_text("x\n", encoding="utf-8")
+    os.symlink(linked, workspace / "project", target_is_directory=True)
+
+    resolved_ws = workspace.resolve()
+    # Build a /var/... form when resolve() produced /private/var/...
+    text = str(resolved_ws / "project" / "backlog.md")
+    if text.startswith("/private/var/"):
+        aliased = Path(text[len("/private") :])
+        assert path_under_workspace_or_project(aliased, workspace) is not None
+    else:
+        # Non-macOS / non-/var temp dirs: still accept the normal path.
+        assert (
+            path_under_workspace_or_project(
+                workspace / "project" / "backlog.md", workspace
+            )
+            is not None
+        )
+
+
 def test_validate_project_folder_path_requires_existing_directory(tmp_path: Path):
     folder = tmp_path / "data"
     folder.mkdir()

@@ -47,6 +47,31 @@ def _is_within(path: Path, root: Path) -> bool:
         return False
 
 
+def _session_workspace_roots() -> list[Path]:
+    """Session workspace + project mount (symlink target) when set."""
+    import os
+
+    raw = str(os.environ.get("SANDWALK_SESSION_WORKSPACE") or "").strip()
+    if not raw:
+        return []
+    try:
+        root = Path(raw).expanduser().resolve()
+    except OSError:
+        return []
+    if not root.is_dir():
+        return []
+    roots = [root]
+    try:
+        from agent_server.project_folder import project_mount_target
+
+        target = project_mount_target(root)
+        if target is not None:
+            roots.append(target)
+    except Exception:  # noqa: BLE001
+        pass
+    return roots
+
+
 def make_safe_open(output_dir: Path, extra_read_dirs: list[Path] = None):
     """Restrict sandbox file I/O to safe paths."""
     real_open = open
@@ -64,11 +89,16 @@ def make_safe_open(output_dir: Path, extra_read_dirs: list[Path] = None):
 
         downloads_root = (CONFIG_DIR / "downloads").resolve()
         tmp_root = Path("/tmp").resolve()
+        # Read env live: the session workspace may be set after the sandbox is
+        # constructed (agent-server sets it per turn).
+        workspace_roots = _session_workspace_roots()
+        in_workspace = any(_is_within(resolved, root) for root in workspace_roots)
         can_read = (
             _is_within(resolved, cwd_root)
             or _is_within(resolved, output_root)
             or _is_within(resolved, downloads_root)
             or _is_within(resolved, tmp_root)
+            or in_workspace
             or any(_is_within(resolved, d) for d in extra_roots)
         )
         if not can_read:
@@ -81,9 +111,11 @@ def make_safe_open(output_dir: Path, extra_read_dirs: list[Path] = None):
         if writes and not (
             _is_within(resolved, output_root)
             or _is_within(resolved, tmp_root)
+            or in_workspace
         ):
             raise PermissionError(
-                f"Sandbox file writes are restricted to {output_root} and /tmp"
+                f"Sandbox file writes are restricted to {output_root}, /tmp, "
+                "and the session workspace"
             )
 
         if writes:

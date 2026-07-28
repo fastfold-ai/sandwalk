@@ -93,3 +93,48 @@ def test_mirror_write_overwrites_existing_project_file(tmp_path: Path):
     uploaded_path, uploaded_bytes = inner.upload_files.call_args[0][0][0]
     assert uploaded_path == "/workspace/project/backlog.md"
     assert uploaded_bytes == b"- task\n"
+
+
+def test_mirror_read_project_symlink_file(tmp_path: Path):
+    """Reading through the project/ symlink must not hit the root-escape check."""
+    import os
+
+    from deepagents.backends import FilesystemBackend
+
+    root = tmp_path / "ws"
+    root.mkdir()
+    linked = tmp_path / "linked"
+    linked.mkdir()
+    (linked / "backlog.md").write_text("- one\n- two\n", encoding="utf-8")
+    os.symlink(linked, root / "project", target_is_directory=True)
+
+    inner = FilesystemBackend(root_dir=str(root), virtual_mode=False)
+    backend = HostWorkspaceMirrorBackend(inner, root)
+    result = backend.read(str(root / "project" / "backlog.md"))
+
+    assert result.error is None
+    assert result.file_data["content"] == "- one\n- two\n"
+
+
+def test_mirror_awrite_overwrites_existing_project_file(tmp_path: Path):
+    """deepagents calls the async variant; it must upsert like sync write."""
+    import asyncio
+    import os
+
+    from deepagents.backends import FilesystemBackend
+
+    root = tmp_path / "ws"
+    root.mkdir()
+    linked = tmp_path / "linked"
+    linked.mkdir()
+    (linked / "backlog.md").write_text("old\n", encoding="utf-8")
+    os.symlink(linked, root / "project", target_is_directory=True)
+
+    inner = FilesystemBackend(root_dir=str(root), virtual_mode=False)
+    backend = HostWorkspaceMirrorBackend(inner, root)
+    result = asyncio.run(
+        backend.awrite(str(root / "project" / "backlog.md"), "- task\n")
+    )
+
+    assert result.error is None
+    assert (linked / "backlog.md").read_text(encoding="utf-8") == "- task\n"

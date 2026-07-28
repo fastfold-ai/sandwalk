@@ -58,6 +58,7 @@ export function Composer({
   onUpload,
   onLoadSkill,
   onOpenFile,
+  onEnsureWorkspaceFiles,
   runtimeSettings,
   tokenUsage,
   onModelSelect,
@@ -86,7 +87,8 @@ export function Composer({
     onLiveDraftChange,
     autoFocus,
     focusKey,
-    workspaceFiles
+    workspaceFiles,
+    onEnsureWorkspaceFiles
   })
 
   const {

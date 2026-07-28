@@ -57,6 +57,8 @@ export type ComposerProps = {
   ) => Promise<Array<{ path: string; name: string; mimeType?: string }>>
   onLoadSkill: (name: string) => Promise<AgentSkillDetail>
   onOpenFile?: (path: string) => void
+  /** Ensure workspace file index is ready for @ mentions (no Files panel required). */
+  onEnsureWorkspaceFiles?: () => void | Promise<void>
   runtimeSettings: RuntimeSettings | null
   tokenUsage: { inputTokens: number; outputTokens: number }
   onModelSelect: (
