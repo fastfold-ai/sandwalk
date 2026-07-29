@@ -5,16 +5,15 @@ publishing tool is introduced independently of this skill.
 
 ## State Handling
 
-1. Submit one publish request and retain every returned site, operation, or
-   deployment identifier.
-2. If the response is accepted, queued, uploading, building, processing, or any
-   other nonterminal state, tell the user it was accepted and begin status polling.
-3. Poll the matching status action. Follow tool-provided retry timing; otherwise
-   use a modest delay and a bounded wait.
-4. Report success only when the status response is the documented ready/success
-   terminal state. Use its final URL verbatim.
-5. Treat documented failed or cancelled states as terminal. For an unknown state
-   or local timeout, preserve the identifier and say readiness is unconfirmed.
+1. Submit one publish request and retain the local site identifier.
+2. The publish action uploads and waits for remote processing. Keep progress
+   factual while that single call is running.
+3. Report success only when publish returns `status="published"`. Use its final URL
+   verbatim.
+4. Treat a returned failure as terminal. For an unknown result or local timeout,
+   preserve the local site identifier and say readiness is unconfirmed.
+5. The status action only reads the last confirmed local state. Do not use it as a
+   remote deployment poll or claim that it resumes a timed-out publish.
 
 Do not turn a status timeout into another publish request. A retry can create a
 duplicate deployment unless the tool explicitly documents idempotency.

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+# LangChain's openai default is 120s between parsed stream chunks. Reasoning
+# models (Grok, etc.) often pause longer mid-response while TCP stayalives
+# still look healthy — 300s keeps the stall guard without failing healthy runs.
+STREAM_CHUNK_TIMEOUT_S = 300.0
+
 
 def _active_compatible_backend(config) -> str | None:
     """Return the active OpenAI-compatible profile backend, if any."""
@@ -52,6 +57,7 @@ def build_openai_chat_model(config, *, temperature: float):
     # Ask OpenAI-compatible servers (oMLX, Ollama, Unsloth, …) to include
     # usage on the final stream chunk so local models don't report 0 tokens.
     kwargs["stream_usage"] = True
+    kwargs["stream_chunk_timeout"] = STREAM_CHUNK_TIMEOUT_S
     if is_openai_cloud and model_supports_reasoning_effort("openai", model):
         effort, fast = get_model_reasoning(
             config.get("llm.model_reasoning"),

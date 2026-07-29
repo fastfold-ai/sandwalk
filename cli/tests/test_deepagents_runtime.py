@@ -164,6 +164,7 @@ class TestBuildChatModel:
         assert captured["kwargs"]["api_key"] == "k"
         assert captured["kwargs"]["base_url"] == "http://localhost:11434/v1"
         assert captured["kwargs"]["use_responses_api"] is False
+        assert captured["kwargs"]["stream_chunk_timeout"] == 300.0
 
     def test_openai_gpt5_omits_temperature(self, monkeypatch):
         captured = self._patch_init(monkeypatch)

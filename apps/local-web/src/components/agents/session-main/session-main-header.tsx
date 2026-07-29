@@ -6,13 +6,14 @@ import {
   Download,
   Files,
   Folder,
+  Globe2,
   Terminal
 } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
-import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import { SessionTabs } from '@/components/agents/SessionTabs'
+import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import {
   SHELL_SIDEBAR_MOTION_MS,
   ShellNavControlsSlot
@@ -59,6 +60,8 @@ export type SessionMainHeaderProps = {
   setTerminalOpen: Dispatch<SetStateAction<boolean>>
   filesPanelCollapsed: boolean
   setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
+  panelView: 'files' | 'preview'
+  setPanelView: Dispatch<SetStateAction<'files' | 'preview'>>
   onPrepareDraftWorkspace?: () => void | Promise<void>
 }
 
@@ -88,6 +91,8 @@ export function SessionMainHeader({
   setTerminalOpen,
   filesPanelCollapsed,
   setFilesPanelCollapsed,
+  panelView,
+  setPanelView,
   onPrepareDraftWorkspace
 }: SessionMainHeaderProps) {
   const overlay = useMacDesktopOverlay()
@@ -108,6 +113,7 @@ export function SessionMainHeader({
   const showTerminalAction = Boolean(sessionId)
   const showCliAction = Boolean(sessionId) && !isDraft
   const showFilesAction = Boolean(sessionId) && (!isDraft || inProject)
+  const showPreviewAction = Boolean(sessionId) && !isDraft
 
   const openTerminal = () => {
     if (terminalOpen) {
@@ -127,6 +133,11 @@ export function SessionMainHeader({
   }
 
   const toggleFiles = () => {
+    if (panelView === 'preview') {
+      setPanelView('files')
+      setFilesPanelCollapsed(false)
+      return
+    }
     if (isDraft && inProject && filesPanelCollapsed) {
       void (async () => {
         await onPrepareDraftWorkspace?.()
@@ -135,6 +146,15 @@ export function SessionMainHeader({
       return
     }
     setFilesPanelCollapsed(current => !current)
+  }
+
+  const togglePreview = () => {
+    if (panelView === 'preview' && !filesPanelCollapsed) {
+      setFilesPanelCollapsed(true)
+      return
+    }
+    setPanelView('preview')
+    setFilesPanelCollapsed(false)
   }
 
   return (
@@ -179,7 +199,10 @@ export function SessionMainHeader({
         }
         onDelete={item => setDeleteTarget(item)}
       />
-      {showTerminalAction || showCliAction || showFilesAction ? (
+      {showTerminalAction ||
+      showCliAction ||
+      showFilesAction ||
+      showPreviewAction ? (
         <div className="ml-auto flex h-8 shrink-0 items-center gap-0.5 self-center">
           {showCliAction && session?.projectId
             ? (() => {
@@ -329,7 +352,9 @@ export function SessionMainHeader({
               type="button"
               className={cn(
                 'text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md',
-                !filesPanelCollapsed && 'text-foreground'
+                !filesPanelCollapsed &&
+                  panelView === 'files' &&
+                  'text-foreground'
               )}
               onClick={toggleFiles}
               aria-label={
@@ -346,6 +371,30 @@ export function SessionMainHeader({
               }
             >
               <Files className="size-4" />
+            </button>
+          ) : null}
+          {showPreviewAction ? (
+            <button
+              type="button"
+              className={cn(
+                'text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md',
+                !filesPanelCollapsed &&
+                  panelView === 'preview' &&
+                  'text-foreground'
+              )}
+              onClick={togglePreview}
+              aria-label={
+                panelView === 'preview' && !filesPanelCollapsed
+                  ? 'Hide site preview'
+                  : 'Show site preview'
+              }
+              title={
+                panelView === 'preview' && !filesPanelCollapsed
+                  ? 'Hide site preview'
+                  : 'Show site preview'
+              }
+            >
+              <Globe2 className="size-4" />
             </button>
           ) : null}
         </div>

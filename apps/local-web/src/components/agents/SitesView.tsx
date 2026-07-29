@@ -3,16 +3,21 @@ import type { AgentProject, AgentSession, Site } from '@sandwalk/agent-ui-core'
 import {
   ExternalLink,
   Globe2,
+  LayoutGrid,
+  List,
   Loader2,
   Pencil,
-  RefreshCw,
+  Plus,
   Rocket,
-  Search,
   Trash2
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
+import {
+  SitesViewGrid,
+  SitesViewList
+} from '@/components/agents/sites-view-list'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -28,10 +33,13 @@ import {
   filterSites,
   formatSiteBytes,
   isPublishedSite,
+  siteChatPath,
   sitePublicUrl,
   siteSourceLabel
 } from '@/lib/sites'
 import { cn } from '@/lib/utils'
+
+const LAYOUT_KEY = 'sandwalk.sites.layout'
 
 function formatUpdated(value: string) {
   const date = new Date(value)
@@ -42,6 +50,10 @@ function formatUpdated(value: string) {
     year:
       date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric'
   }).format(date)
+}
+
+function formatSiteCount(total: number) {
+  return `${total.toLocaleString()} ${total === 1 ? 'site' : 'sites'}`
 }
 
 function statusLabel(site: Site) {
@@ -114,18 +126,27 @@ export function SitesView({
   navigate,
   siteId,
   sessions,
-  projects
+  projects,
+  onAddSite
 }: {
   client: LocalAgentClient
   navigate: NavigateFunction
   siteId: string | null
   sessions: AgentSession[]
   projects: AgentProject[]
+  onAddSite: () => void
 }) {
   const [sites, setSites] = useState<Site[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [layout, setLayout] = useState<'grid' | 'list'>(() => {
+    try {
+      return localStorage.getItem(LAYOUT_KEY) === 'list' ? 'list' : 'grid'
+    } catch {
+      return 'grid'
+    }
+  })
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState<{ site: Site; url: string } | null>(
     null
@@ -150,10 +171,23 @@ export function SitesView({
     void load()
   }, [load])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAYOUT_KEY, layout)
+    } catch {
+      // Sandboxed or privacy-restricted views may not expose storage.
+    }
+  }, [layout])
+
   const filtered = useMemo(() => filterSites(sites, query), [query, sites])
   const selected = siteId
     ? sites.find(site => site.id === siteId) ?? null
     : null
+
+  useEffect(() => {
+    if (!siteId || !selected) return
+    navigate(siteChatPath(selected) ?? '/sites', { replace: true })
+  }, [navigate, selected, siteId])
 
   const replaceSite = (site: Site) => {
     setSites(current =>
@@ -261,20 +295,47 @@ export function SitesView({
       onDelete={() => void deleteSite(site)}
     />
   )
+  const viewProps = {
+    client,
+    sites: filtered,
+    sessions,
+    projects,
+    busyId,
+    onSelect: (site: Site) => {
+      const path = siteChatPath(site)
+      if (!path) {
+        void showPreview(site)
+        return
+      }
+      navigate(path)
+    },
+    onPreview: (site: Site) => void showPreview(site),
+    onOpen: (site: Site) => void openPublished(site),
+    onPublish: (site: Site) =>
+      void run(site, () =>
+        client.publishSite(site.id, { slug: site.slug })
+      ),
+    onRename: (site: Site) => {
+      setRename(site)
+      setRenameValue(site.name)
+    },
+    onDelete: (site: Site) => void deleteSite(site)
+  }
 
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <header className="border-border/70 flex shrink-0 items-center justify-between border-b px-6 py-4">
-          <div>
-            <h1 className="text-lg font-semibold">
+        <header className="mx-auto flex w-full max-w-6xl shrink-0 items-center justify-between gap-3 px-6 pb-6 pt-3 md:px-10">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Globe2 className="text-muted-foreground size-5 shrink-0" />
+            <h1 className="text-lg font-semibold tracking-tight">
               {selected ? selected.name : 'Sites'}
             </h1>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              {selected
-                ? 'Preview your local draft and manage its hosted deployment.'
-                : 'Local drafts and published sites created by your agents.'}
-            </p>
+            {!selected ? (
+              <span className="text-muted-foreground text-sm leading-none tabular-nums">
+                {formatSiteCount(sites.length)}
+              </span>
+            ) : null}
           </div>
           {selected ? (
             <div className="flex items-center gap-2">
@@ -288,21 +349,48 @@ export function SitesView({
               {actions(selected)}
             </div>
           ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void load()}
-              disabled={loading}
-            >
-              <RefreshCw className="mr-1.5 size-3.5" />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-1">
+              <Input
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+                placeholder="Search sites"
+                className="h-8 w-44 md:w-56"
+              />
+              <Button size="sm" className="h-8" onClick={onAddSite}>
+                <Plus className="mr-1.5 size-3.5" />
+                Add
+              </Button>
+              <div className="flex items-center">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className={cn('size-8', layout === 'grid' && 'bg-muted')}
+                  onClick={() => setLayout('grid')}
+                  aria-label="Gallery view"
+                >
+                  <LayoutGrid className="size-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className={cn('size-8', layout === 'list' && 'bg-muted')}
+                  onClick={() => setLayout('list')}
+                  aria-label="List view"
+                >
+                  <List className="size-3.5" />
+                </Button>
+              </div>
+            </div>
           )}
         </header>
 
         {error ? (
-          <div className="border-destructive/30 bg-destructive/5 text-destructive mx-6 mt-4 rounded-md border px-3 py-2 text-xs">
-            {error}
+          <div className="mx-auto w-full max-w-6xl px-6 pb-4 md:px-10">
+            <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
+              {error}
+            </div>
           </div>
         ) : null}
 
@@ -372,71 +460,14 @@ export function SitesView({
             </div>
           </main>
         ) : (
-          <main className="min-h-0 flex-1 overflow-auto p-6">
-            <div className="mx-auto max-w-6xl">
-              <div className="relative mb-5 max-w-md">
-                <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-                <Input
-                  value={query}
-                  onChange={event => setQuery(event.target.value)}
-                  placeholder="Search sites"
-                  className="pl-9"
-                />
-              </div>
+          <main className="min-h-0 flex-1 overflow-auto">
+            <div className="mx-auto w-full max-w-6xl px-6 pb-10 md:px-10">
               {filtered.length ? (
-                <div className="border-border overflow-hidden rounded-xl border">
-                  <div className="text-muted-foreground grid grid-cols-[minmax(13rem,1.5fr)_minmax(8rem,1fr)_7rem_6rem_7rem_auto] gap-4 border-b px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide">
-                    <span>Site</span>
-                    <span>Source</span>
-                    <span>Status</span>
-                    <span>Size</span>
-                    <span>Updated</span>
-                    <span />
-                  </div>
-                  {filtered.map(site => (
-                    <div
-                      key={site.id}
-                      className="border-border/70 hover:bg-muted/30 grid grid-cols-[minmax(13rem,1.5fr)_minmax(8rem,1fr)_7rem_6rem_7rem_auto] items-center gap-4 border-b px-4 py-3 last:border-b-0"
-                    >
-                      <button
-                        type="button"
-                        className="min-w-0 text-left"
-                        onClick={() => navigate(`/sites/${site.id}`)}
-                      >
-                        <span className="block truncate text-sm font-medium">
-                          {site.name}
-                        </span>
-                        <span className="text-muted-foreground mt-0.5 block truncate text-xs">
-                          {sitePublicUrl(site) || site.slug || 'Local draft'}
-                        </span>
-                      </button>
-                      <span className="text-muted-foreground truncate text-xs">
-                        {siteSourceLabel(site, sessions, projects)}
-                      </span>
-                      <span
-                        className={cn(
-                          'w-fit rounded-full px-2 py-0.5 text-[11px] font-medium',
-                          site.status === 'error'
-                            ? 'bg-destructive/10 text-destructive'
-                            : site.status === 'published'
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-muted text-muted-foreground'
-                        )}
-                      >
-                        {statusLabel(site)}
-                      </span>
-                      <span className="text-muted-foreground text-xs">
-                        {formatSiteBytes(
-                          site.deployment?.sizeBytes ?? site.sizeBytes
-                        )}
-                      </span>
-                      <span className="text-muted-foreground text-xs">
-                        {formatUpdated(site.updatedAt)}
-                      </span>
-                      {actions(site)}
-                    </div>
-                  ))}
-                </div>
+                layout === 'grid' ? (
+                  <SitesViewGrid {...viewProps} />
+                ) : (
+                  <SitesViewList {...viewProps} />
+                )
               ) : (
                 <div className="border-border flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed">
                   <Globe2 className="text-muted-foreground size-8" />
@@ -446,6 +477,12 @@ export function SitesView({
                   <p className="text-muted-foreground mt-1 text-xs">
                     Sites built by agents will appear here.
                   </p>
+                  {!query ? (
+                    <Button size="sm" className="mt-4" onClick={onAddSite}>
+                      <Plus className="mr-1.5 size-3.5" />
+                      Add site
+                    </Button>
+                  ) : null}
                 </div>
               )}
             </div>

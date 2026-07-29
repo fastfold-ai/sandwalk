@@ -10,13 +10,16 @@ import {
   type RefObject,
   type SetStateAction,
   useCallback,
-  useEffect
+  useEffect,
+  useLayoutEffect,
+  useState
 } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
-import type { NavigateFunction } from 'react-router-dom'
+import { type NavigateFunction,useLocation } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { fileChipToken } from '@/components/agents/composer-parts'
+import { useSessionSiteAutoPreview } from '@/components/agents/sites/use-session-site-auto-preview'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
@@ -117,6 +120,7 @@ export type AgentSessionMainPanelProps = {
 }
 
 export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
+  const location = useLocation()
   const {
     client,
     navigate,
@@ -187,11 +191,31 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
 
   const isDraft = isDraftAgentSessionId(sessionId)
   const inProject = Boolean(activeProjectId)
+  const requestedSiteId = new URLSearchParams(location.search).get('site')
+  const [panelView, setPanelView] = useState<'files' | 'preview'>(() =>
+    requestedSiteId ? 'preview' : 'files'
+  )
+  const showSitePreview = useCallback(() => {
+    setPanelView('preview')
+    setFilesPanelCollapsed(false)
+  }, [setFilesPanelCollapsed])
+
+  useSessionSiteAutoPreview({
+    client,
+    sessionId: isDraft ? null : sessionId,
+    workspaceVersion,
+    onSiteReady: showSitePreview
+  })
 
   useEffect(() => {
     // Reset when leaving the draft route or switching project scope.
     setDraftWorkspaceSessionId(null)
   }, [activeProjectId, isDraft, setDraftWorkspaceSessionId])
+
+  useLayoutEffect(() => {
+    setPanelView(requestedSiteId ? 'preview' : 'files')
+    if (requestedSiteId) setFilesPanelCollapsed(false)
+  }, [requestedSiteId, sessionId, setFilesPanelCollapsed])
 
   const ensureAgentSession = agentComposerSlotProps.ensureAgentSession
   const setWorkspaceVersion = agentComposerSlotProps.setWorkspaceVersion
@@ -267,6 +291,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             setTerminalOpen={setTerminalOpen}
             filesPanelCollapsed={filesPanelCollapsed}
             setFilesPanelCollapsed={setFilesPanelCollapsed}
+            panelView={panelView}
+            setPanelView={setPanelView}
             onPrepareDraftWorkspace={async () => {
               await prepareDraftWorkspace()
             }}
@@ -395,6 +421,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                   if (artifactDir) setPendingOpenPath('artifacts/')
                 }}
                 onTogglePanel={() => setFilesPanelCollapsed(true)}
+                panelView={panelView}
+                siteId={requestedSiteId}
                 terminalOpen={terminalOpen}
                 onCloseTerminal={() => setTerminalOpen(false)}
                 onOpenTerminal={() => setTerminalOpen(true)}

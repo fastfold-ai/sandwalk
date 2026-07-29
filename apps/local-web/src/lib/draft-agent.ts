@@ -1,6 +1,16 @@
 /** Client-only sentinel for /agents/new before a real session exists. */
 export const DRAFT_AGENT_SESSION_ID = 'new'
 
+export type DraftSessionSeed = {
+  composer?: string
+  composerSkills?: string[]
+}
+
+export type CreateDraftSession = (
+  projectId?: string | null,
+  seed?: DraftSessionSeed
+) => Promise<void>
+
 /**
  * PTY scope for terminals opened outside an agent session (cwd = $HOME).
  * Not a chat route — only used with the sessions PTY API.

@@ -5,6 +5,7 @@ import {
   filterSites,
   formatSiteBytes,
   isPublishedSite,
+  siteChatPath,
   sitePublicUrl,
   siteSourceLabel
 } from '@/lib/sites'
@@ -56,5 +57,10 @@ describe('site view helpers', () => {
     ).toBe('Build report')
     expect(sitePublicUrl(site)).toBe('https://results.example.test')
     expect(isPublishedSite(site)).toBe(true)
+  })
+
+  it('links a site back to its source chat and preview panel', () => {
+    expect(siteChatPath(site)).toBe('/agents/session-1?site=site-1')
+    expect(siteChatPath({ ...site, sourceSessionId: null })).toBeNull()
   })
 })

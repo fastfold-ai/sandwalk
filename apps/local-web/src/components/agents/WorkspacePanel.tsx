@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils'
 
 import { ArtifactsBrowser } from './ArtifactsBrowser'
+import { SitePreviewPanel } from './SitePreviewPanel'
 import { TerminalPanel } from './TerminalPanel'
 import { useWorkspacePanel } from './workspace/use-workspace-panel'
 import { WorkspaceFileBrowserContextMenu } from './workspace/workspace-file-browser-context-menu'
@@ -36,6 +37,8 @@ export function WorkspacePanel({
   onFilesChange,
   onNewFiles,
   onTogglePanel,
+  panelView = 'files',
+  siteId = null,
   terminalOpen = false,
   onCloseTerminal,
   onOpenTerminal
@@ -55,6 +58,8 @@ export function WorkspacePanel({
     files: import('@sandwalk/agent-ui-core').WorkspaceFile[]
   ) => void
   onTogglePanel?: () => void
+  panelView?: 'files' | 'preview'
+  siteId?: string | null
   terminalOpen?: boolean
   onCloseTerminal?: () => void
   onOpenTerminal?: () => void
@@ -177,6 +182,20 @@ export function WorkspacePanel({
     />
   )
 
+  const main =
+    panelView === 'preview' ? (
+      <SitePreviewPanel
+        client={client}
+        sessionId={sessionId}
+        workspaceVersion={workspaceVersion}
+        runActive={runActive}
+        siteId={siteId}
+        onClose={onTogglePanel}
+      />
+    ) : (
+      filesColumn
+    )
+
   return (
     <>
       <aside className="bg-card relative z-20 flex h-full w-full min-w-0 flex-col">
@@ -194,7 +213,7 @@ export function WorkspacePanel({
               className="min-h-0"
             >
               <div className="flex h-full min-h-0 flex-col overflow-hidden">
-                {filesColumn}
+                {main}
               </div>
             </ResizablePanel>
             <ResizableHandle
@@ -224,7 +243,7 @@ export function WorkspacePanel({
             </ResizablePanel>
           </ResizablePanelGroup>
         ) : (
-          filesColumn
+          main
         )}
       </aside>
 

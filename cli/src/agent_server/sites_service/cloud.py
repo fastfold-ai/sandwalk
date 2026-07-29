@@ -46,6 +46,7 @@ class FastFoldSitesClient:
         timeout: float | None = None,
         request_timeout: float = 30,
         wait_timeout: float = 120,
+        ready_timeout: float = 120,
     ) -> None:
         self.api_key = (api_key or os.environ.get("FASTFOLD_API_KEY") or "").strip()
         self.endpoint = (
@@ -59,6 +60,8 @@ class FastFoldSitesClient:
             1.0,
             float(wait_timeout if timeout is None else timeout),
         )
+        # CloudFront KeyValueStore can lag a bit after deploy succeeds.
+        self.ready_timeout = max(1.0, float(ready_timeout))
 
     def _json(
         self,
@@ -123,6 +126,43 @@ class FastFoldSitesClient:
             detail = exc.read().decode(errors="replace").strip()
             raise RuntimeError(f"Site upload failed with HTTP {exc.code}: {detail[:300]}") from exc
 
+    def _public_url_ready(self, url: str) -> bool:
+        """Return True when the public site URL serves a successful HTML response."""
+        request = urllib.request.Request(
+            url,
+            method="GET",
+            headers={
+                "Accept": "text/html,*/*",
+                "User-Agent": "sandwalk-sites-ready-check/1.0",
+                "Cache-Control": "no-cache",
+            },
+        )
+        try:
+            with urllib.request.urlopen(
+                request, timeout=min(15.0, self.request_timeout)
+            ) as response:
+                return 200 <= int(response.status) < 400
+        except urllib.error.HTTPError as exc:
+            # 404 is the CloudFront Function "slug not in KVS yet" response.
+            if exc.code in {404, 403, 502, 503, 504}:
+                return False
+            raise RuntimeError(
+                f"Published site returned unexpected HTTP {exc.code} at {url}"
+            ) from exc
+        except urllib.error.URLError:
+            return False
+
+    def _wait_until_reachable(self, url: str) -> None:
+        deadline = time.monotonic() + self.ready_timeout
+        while time.monotonic() < deadline:
+            if self._public_url_ready(url):
+                return
+            time.sleep(2)
+        raise TimeoutError(
+            f"Site deployed, but {url} was not reachable within "
+            f"{int(self.ready_timeout)}s (CloudFront routing may still be propagating)."
+        )
+
     def publish(
         self,
         *,
@@ -181,6 +221,7 @@ class FastFoldSitesClient:
                 url = str(status.get("publicUrl") or site.get("url") or "").strip()
                 if not url:
                     raise RuntimeError("Published site response did not include a URL.")
+                self._wait_until_reachable(url)
                 return PublishedSite(url=url, site_id=site_id)
             if last_state == "failed":
                 detail = str(status.get("errorMessage") or "Site deployment failed")

@@ -17,6 +17,7 @@ import type { Location, NavigateFunction } from 'react-router-dom'
 
 import type { DashboardSection } from '@/components/agents/DashboardSidebar'
 import type { DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
+import type { CreateDraftSession } from '@/lib/draft-agent'
 import type { SkillsViewMode } from '@/lib/skills-catalog'
 
 export type DashboardMainViewsProps = {
@@ -114,7 +115,7 @@ export type DashboardMainViewsProps = {
     targetSessionId?: string | null
   ) => Promise<import('@sandwalk/agent-ui-core').SessionSandboxStatus | null>
   onCreateProject: () => void
-  createSession: (projectId?: string | null) => Promise<void>
+  createSession: CreateDraftSession
   onOpenProject: (projectId: string) => void
   togglePinProject: (project: AgentProject) => void | Promise<void>
   deleteProject: (project: AgentProject) => void | Promise<void>

@@ -53,12 +53,33 @@ class TestClassifyLlmError:
     def test_connection(self):
         title, body = _classify_llm_error(ConnectionError("connection error"))
         assert title == "Connection problem"
+        assert body.splitlines()[0] == "connection error"
         assert "network" in body.lower()
 
     def test_connection_refused_text(self):
         title, body = _classify_llm_error(_Err("dial tcp: connection refused"))
         assert title == "Connection problem"
+        assert "connection refused" in body.splitlines()[0].lower()
         assert "could not reach" in body.lower()
+
+    def test_stream_chunk_timeout_keeps_provider_detail(self):
+        class StreamChunkTimeoutError(Exception):
+            pass
+
+        StreamChunkTimeoutError.__module__ = "langchain_openai.chat_models._client_utils"
+        err = StreamChunkTimeoutError(
+            "No streaming chunk received for 120.0s (model=grok-4.5, "
+            "chunks_received=50). The connection may be alive at the TCP layer "
+            "but is not producing content. Tune or disable via the "
+            "`stream_chunk_timeout` constructor kwarg."
+        )
+        title, body = _classify_llm_error(err)
+        assert title == "Model stream stalled"
+        first = body.splitlines()[0]
+        assert "No streaming chunk received for 120.0s" in first
+        assert "grok-4.5" in first
+        assert "chunks_received=50" in first
+        assert "Tune or disable" not in first
 
     def test_model_or_endpoint_not_found(self):
         title, body = _classify_llm_error(

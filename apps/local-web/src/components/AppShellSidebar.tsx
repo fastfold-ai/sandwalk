@@ -16,6 +16,7 @@ import {
 import { ShellNavStrip } from '@/components/ShellNavStrip'
 import { ResizablePanel } from '@/components/ui/resizable'
 import { useSidebarPixelWidth } from '@/hooks/useSidebarPixelWidth'
+import type { CreateDraftSession } from '@/lib/draft-agent'
 import { groupSessions, type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
@@ -55,7 +56,7 @@ export type AppShellSidebarProps = {
   setGlobalSearchOpen: (
     value: boolean | ((current: boolean) => boolean)
   ) => void
-  createSession: (projectId?: string | null) => Promise<void>
+  createSession: CreateDraftSession
   clearSessionSelection: () => void
   batchArchiveSelected: () => void | Promise<void>
   batchMoveSelected: (projectId: string | null) => void | Promise<void>

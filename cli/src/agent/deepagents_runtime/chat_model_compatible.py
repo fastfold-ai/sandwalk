@@ -59,6 +59,8 @@ def build_compatible_chat_model(config, provider: str, *, temperature: float):
             )
         return init_chat_model(f"anthropic:{model}", **kwargs)
 
+    from agent.deepagents_runtime.chat_model_openai import STREAM_CHUNK_TIMEOUT_S
+
     kwargs = {}
     if not (
         provider == "opencode" and str(model).strip().lower().startswith("gpt-")
@@ -70,6 +72,7 @@ def build_compatible_chat_model(config, provider: str, *, temperature: float):
     kwargs["use_responses_api"] = bool(
         provider == "opencode" and opencode_model_uses_responses_api(model)
     )
+    kwargs["stream_chunk_timeout"] = STREAM_CHUNK_TIMEOUT_S
     if model_supports_reasoning_effort(provider, model):
         effort, fast = get_model_reasoning(
             config.get("llm.model_reasoning"),

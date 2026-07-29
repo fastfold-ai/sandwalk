@@ -26,12 +26,28 @@ from agent_server.models import (
 )
 
 
+def _is_site_preview_path(path: str) -> bool:
+    parts = path.split("/")
+    return (
+        len(parts) >= 7
+        and parts[1:3] == ["v1", "sites"]
+        and bool(parts[3])
+        and parts[4] == "preview"
+        and bool(parts[5])
+    )
+
+
 def register_auth_middleware(app: FastAPI, deps: AppDeps) -> None:
     @app.middleware("http")
     async def require_api_key(request: Request, call_next):
         path = request.url.path
         key = deps.current_api_key()
-        if key and path.startswith("/v1/") and path not in AUTH_EXEMPT_PATHS:
+        if (
+            key
+            and path.startswith("/v1/")
+            and path not in AUTH_EXEMPT_PATHS
+            and not _is_site_preview_path(path)
+        ):
             ok = request_is_authenticated(
                 headers=request.headers,
                 cookies=request.cookies,

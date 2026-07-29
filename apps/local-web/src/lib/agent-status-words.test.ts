@@ -3,8 +3,12 @@ import { describe, expect, it } from 'vitest'
 import {
   agentStatusKey,
   DEFAULT_AGENT_STATUS,
+  MODEL_SLOW_AFTER_MS,
+  MODEL_SLOW_STATUS,
   resolveAgentStatus,
-  statusLabelForTool
+  statusLabelForTool,
+  WAITING_ON_MODEL_AFTER_MS,
+  WAITING_ON_MODEL_STATUS
 } from './agent-status-words'
 
 describe('agent-status-words', () => {
@@ -37,7 +41,7 @@ describe('agent-status-words', () => {
     ).toBe('Running Python')
   })
 
-  it('mirrors the latest tool card when nothing is pending', () => {
+  it('returns planning when nothing is pending', () => {
     expect(
       resolveAgentStatus([
         {
@@ -46,6 +50,28 @@ describe('agent-status-words', () => {
           startedAt: '2026-01-01T00:00:00Z'
         }
       ])
+    ).toBe(DEFAULT_AGENT_STATUS)
+  })
+
+  it('escalates to waiting / slow when the model is quiet', () => {
+    expect(
+      resolveAgentStatus([], { quietMs: WAITING_ON_MODEL_AFTER_MS })
+    ).toBe(WAITING_ON_MODEL_STATUS)
+    expect(resolveAgentStatus([], { quietMs: MODEL_SLOW_AFTER_MS })).toBe(
+      MODEL_SLOW_STATUS
+    )
+    expect(
+      resolveAgentStatus(
+        [
+          {
+            id: '1',
+            name: 'run_python',
+            status: 'pending',
+            startedAt: 't1'
+          }
+        ],
+        { quietMs: MODEL_SLOW_AFTER_MS }
+      )
     ).toBe('Running Python')
   })
 
@@ -60,9 +86,17 @@ describe('agent-status-words', () => {
     expect(first).not.toBe(second)
     expect(second).toContain('2')
     expect(second).toContain('pending')
+    expect(
+      agentStatusKey([
+        { id: '1', name: 'search_tools', status: 'completed', startedAt: 't1' }
+      ])
+    ).toBe('planning')
+    expect(
+      agentStatusKey([], { quietMs: WAITING_ON_MODEL_AFTER_MS })
+    ).toBe('waiting-on-model')
   })
 
-  it('updates status as each new tool card appears', () => {
+  it('updates status as each new pending tool appears', () => {
     expect(
       resolveAgentStatus([
         {
@@ -72,7 +106,7 @@ describe('agent-status-words', () => {
           startedAt: 't1'
         }
       ])
-    ).toBe('Searching tools')
+    ).toBe(DEFAULT_AGENT_STATUS)
     expect(
       resolveAgentStatus([
         {

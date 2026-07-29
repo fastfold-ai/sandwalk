@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from agent.hitl.context import get_hitl_context
 from agent_server.sites_service import SitesService
 from agent_server.store import AgentStore
 from tools import registry
@@ -12,6 +13,27 @@ from tools import registry
 
 def _dump(site: Any) -> dict[str, Any]:
     return site.model_dump(mode="json", by_alias=True)
+
+
+def _origins(
+    store: AgentStore,
+    *,
+    session_id: str,
+    project_id: str,
+    fallback_session_id: str | None = None,
+    fallback_project_id: str | None = None,
+) -> tuple[str | None, str | None]:
+    context = get_hitl_context()
+    resolved_session = (
+        session_id.strip()
+        or fallback_session_id
+        or (context.session_id if context else None)
+    )
+    resolved_project = project_id.strip() or fallback_project_id
+    if resolved_project is None and resolved_session:
+        session = store.get_session(resolved_session)
+        resolved_project = session.project_id if session else None
+    return resolved_session, resolved_project
 
 
 @registry.register(
@@ -32,8 +54,8 @@ def _dump(site: Any) -> dict[str, Any]:
     },
     usage_guide=(
         "Use after sites-building has produced a static output directory. Preview before publish. "
-        "Publishing is a public external side effect: confirm the final name and requested slug "
-        "with the user before action=publish."
+        "Publishing and deleting a published site are public external side effects. Confirm the "
+        "final name and requested slug before action=publish, and confirm before action=delete."
     ),
 )
 def manage(
@@ -64,11 +86,16 @@ def manage(
                 return {"ok": False, "summary": "Site not found."}
             return {"ok": True, "summary": f"Site '{site.name}' is {site.status}.", "site": _dump(site)}
         if current == "create":
+            origin_session_id, origin_project_id = _origins(
+                store,
+                session_id=session_id,
+                project_id=project_id,
+            )
             site = service.register(
                 name=name,
                 source=path,
-                session_id=session_id or None,
-                project_id=project_id or None,
+                session_id=origin_session_id,
+                project_id=origin_project_id,
                 workspace_root=Path.cwd(),
             )
             return {
@@ -80,12 +107,19 @@ def manage(
             existing = store.get_site(site_id)
             if existing is None:
                 return {"ok": False, "summary": "Site not found."}
+            origin_session_id, origin_project_id = _origins(
+                store,
+                session_id=session_id,
+                project_id=project_id,
+                fallback_session_id=existing.origin_session_id,
+                fallback_project_id=existing.origin_project_id,
+            )
             site = service.register(
                 site_id=site_id,
                 name=name or existing.name,
                 source=path,
-                session_id=session_id or existing.origin_session_id,
-                project_id=project_id or existing.origin_project_id,
+                session_id=origin_session_id,
+                project_id=origin_project_id,
                 workspace_root=Path.cwd(),
             )
             return {

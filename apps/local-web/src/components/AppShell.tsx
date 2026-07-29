@@ -91,6 +91,8 @@ export function AppShell(props: AppShellProps) {
           showSessionTabs={props.showSessionTabs}
           isHome={props.isHome}
           isLibrary={props.isLibrary}
+          isSites={props.isSites}
+          siteId={props.siteId}
           isProjectHome={props.isProjectHome}
           isDashboard={props.isDashboard}
           activeTitle={props.activeTitle}

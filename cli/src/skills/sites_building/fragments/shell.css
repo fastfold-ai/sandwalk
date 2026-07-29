@@ -1,0 +1,143 @@
+/* Locked report shell — restored on every build_site.py run. Do not edit. */
+
+.report-actions {
+  position: fixed;
+  z-index: 20;
+  top: 1rem;
+  right: 1.25rem;
+  display: flex;
+  gap: 0.45rem;
+}
+
+.report-actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.2rem;
+  border: 0;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.7rem;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+
+.report-actions .button:hover {
+  background: var(--surface-subtle);
+}
+
+.report-layout {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  width: min(72rem, calc(100% - 3rem));
+  margin-inline: auto;
+  padding-block: clamp(3.5rem, 8vw, 5.5rem);
+}
+
+.toc {
+  position: sticky;
+  top: 3rem;
+  align-self: start;
+  font-size: 0.84rem;
+}
+
+.toc-title {
+  margin: 0 0 0.55rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.toc a {
+  display: block;
+  padding: 0.2rem 0;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.toc a:hover,
+.toc a.active {
+  color: var(--text);
+}
+
+.toc a.active {
+  font-weight: 600;
+}
+
+.report-layout > main {
+  min-width: 0;
+}
+
+.report-layout > main > footer {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 5rem;
+  border-top: 1px solid var(--border);
+  padding-block: 1.5rem 2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sandwalk-brand {
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.sandwalk-brand:hover,
+.sandwalk-brand:focus-visible {
+  color: var(--text);
+}
+
+.sandwalk-logo {
+  width: 7.5rem;
+  height: auto;
+  display: block;
+  fill: currentColor;
+}
+
+@media (max-width: 760px) {
+  .report-actions {
+    position: absolute;
+  }
+
+  .report-layout {
+    display: block;
+    width: min(100% - 2rem, 46rem);
+    padding-top: 5rem;
+  }
+
+  .toc {
+    position: static;
+    margin-bottom: 2.5rem;
+    columns: 2;
+  }
+
+  .toc-title {
+    column-span: all;
+  }
+}
+
+@media (max-width: 430px) {
+  .toc {
+    columns: 1;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .report-layout {
+    display: block;
+    width: 100%;
+    padding: 0;
+  }
+}

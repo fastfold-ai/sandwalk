@@ -17,9 +17,19 @@ from pathlib import Path
 from agent import runner as _runner
 
 
-def _provider_error_detail(exc: Exception, *, limit: int = 240) -> str:
+def _provider_error_detail(exc: Exception, *, limit: int = 360) -> str:
     """Return a single-line, truncated provider error for UI/logs."""
     text = " ".join(str(exc).split())
+    # Drop long "how to tune" tails; keep the actionable diagnosis.
+    for marker in (
+        " Tune or disable via",
+        " See also `http_socket_options`",
+        " See also http_socket_options",
+    ):
+        idx = text.find(marker)
+        if idx > 40:
+            text = text[:idx].rstrip(" .") + "."
+            break
     if len(text) > limit:
         return text[: limit - 1] + "…"
     return text
@@ -31,10 +41,13 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
     Returns ``None`` for unrecognized errors so the caller can fall back to the
     generic error path (full traceback in logs). Recognized errors get a short,
     actionable message instead of a multi-frame traceback dumped to the console.
+    The first body line is what the chat UI surfaces, so put the provider detail
+    there whenever it helps debugging.
     """
     text = str(exc)
     low = text.lower()
     status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    exc_name = str(getattr(exc.__class__, "__name__", "") or "")
     exc_mod = str(getattr(exc.__class__, "__module__", "") or "").lower()
     detail = _provider_error_detail(exc)
 
@@ -49,6 +62,7 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
     if is_auth:
         return (
             "Authentication failed",
+            f"{detail}\n"
             "Your model provider rejected the API key (401 — invalid or missing).\n"
             "Set a valid key, then re-run your query:\n"
             "  • sandwalk config set llm.anthropic_api_key sk-ant-...\n"
@@ -65,6 +79,7 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
     if is_rate:
         return (
             "Rate limited",
+            f"{detail}\n"
             "The model provider is rate-limiting or overloaded (429).\n"
             "Wait a few seconds and try again.",
         )
@@ -77,6 +92,7 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
     if is_not_found:
         return (
             "Model or endpoint not found",
+            f"{detail}\n"
             "The configured provider returned 404 (model or endpoint not found).\n"
             "Verify `llm.model` and `llm.openai_base_url` for your selected profile,\n"
             "then retry (you can update via `/model` or `sandwalk setup`).",
@@ -92,9 +108,26 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
     if is_context:
         return (
             "Context length exceeded",
+            f"{detail}\n"
             "The request exceeded the model's context window.\n"
-            f"Provider detail: {detail}\n"
             "Try a shorter prompt, fewer skills/tools, or a larger-context model.",
+        )
+
+    # Stream stall: TCP may still be open while the provider stops sending tokens.
+    # Must be checked before the generic timeout/connection bucket.
+    is_stream_stall = (
+        exc_name == "StreamChunkTimeoutError"
+        or "streamchunktimeouterror" in low
+        or "no streaming chunk received" in low
+        or "stream_chunk_timeout" in low
+    )
+    if is_stream_stall:
+        return (
+            "Model stream stalled",
+            f"{detail}\n"
+            "The provider stopped sending tokens mid-response. Retry, switch models, "
+            "or raise/disable `stream_chunk_timeout` / "
+            "`LANGCHAIN_OPENAI_STREAM_CHUNK_TIMEOUT_S`.",
         )
 
     is_conn = (
@@ -111,14 +144,15 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
     if is_conn:
         return (
             "Connection problem",
-            "Could not reach the model provider.\n"
-            "Check your network connection and try again.",
+            f"{detail}\n"
+            "Could not reach the model provider. Check your network and retry.",
         )
 
     is_server_unavailable = status in {500, 502, 503, 504} or "service unavailable" in low
     if is_server_unavailable:
         return (
             "Provider unavailable",
+            f"{detail}\n"
             "The model provider is temporarily unavailable.\n"
             "Try again shortly, or switch models/providers with `/model`.",
         )

@@ -41,3 +41,9 @@ export function sitePublicUrl(site: Site) {
 export function isPublishedSite(site: Site) {
   return Boolean(sitePublicUrl(site))
 }
+
+export function siteChatPath(site: Site) {
+  if (!site.sourceSessionId) return null
+  const query = new URLSearchParams({ site: site.id })
+  return `/agents/${encodeURIComponent(site.sourceSessionId)}?${query}`
+}

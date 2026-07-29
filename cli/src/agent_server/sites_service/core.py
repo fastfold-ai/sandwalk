@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import secrets
 import shutil
 import tempfile
@@ -12,6 +13,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import ClassVar
 
 from agent.config import CONFIG_DIR
 from agent_server.models.sites import Site
@@ -31,6 +33,11 @@ SECRET_PARTS = {
     "id_rsa",
     "id_ed25519",
 }
+SECRET_SUFFIXES = {".jks", ".key", ".p12", ".pem", ".pfx"}
+SECRET_PATTERN = re.compile(
+    r"(^|[._-])(api[_-]?key|credential|credentials|private[_-]?key|secret|secrets)([._-]|$)",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -42,6 +49,9 @@ class SiteContent:
 
 
 class SitesService:
+    _tokens: ClassVar[dict[str, tuple[str, datetime]]] = {}
+    _token_lock: ClassVar[threading.Lock] = threading.Lock()
+
     def __init__(
         self,
         store: AgentStore,
@@ -57,8 +67,6 @@ class SitesService:
         self.public_base_url = public_base_url.rstrip("/")
         self.publisher = publisher
         self.preview_ttl = preview_ttl
-        self._tokens: dict[str, tuple[str, datetime]] = {}
-        self._token_lock = threading.Lock()
 
     @staticmethod
     def _name(name: str) -> str:
@@ -138,7 +146,12 @@ class SitesService:
                 continue
             relative = path.relative_to(root).as_posix()
             parts = Path(relative).parts
-            if any(part.startswith(".") or part.lower() in SECRET_PARTS for part in parts):
+            name = path.name.lower()
+            if (
+                any(part.startswith(".") or part.lower() in SECRET_PARTS for part in parts)
+                or Path(name).suffix in SECRET_SUFFIXES
+                or SECRET_PATTERN.search(name)
+            ):
                 raise ValueError(f"Site output cannot contain hidden or secret files: {relative}")
             data = path.read_bytes()
             digest.update(relative.encode())
@@ -219,6 +232,7 @@ class SitesService:
                     bytes_count=content.bytes,
                     origin_session_id=session_id,
                     origin_project_id=project_id,
+                    reset_publication=content.sha256 != current.content_sha256,
                 )
                 if result is None:
                     raise RuntimeError("Failed to update site.")
@@ -241,6 +255,9 @@ class SitesService:
         site = self.store.get_site(site_id)
         if site is None:
             raise KeyError("Site not found.")
+        if site.cloud_site_id:
+            publisher = self.publisher or FastFoldSitesClient()
+            publisher.delete(site.cloud_site_id)
         target = Path(site.storage_path)
         trash = self.root / f".deleting-{site_id}-{secrets.token_hex(6)}"
         if target.exists():
@@ -251,8 +268,10 @@ class SitesService:
             raise KeyError("Site not found.")
         shutil.rmtree(trash, ignore_errors=True)
         with self._token_lock:
-            self._tokens = {
-                token: value for token, value in self._tokens.items() if value[0] != site_id
+            SitesService._tokens = {
+                token: value
+                for token, value in SitesService._tokens.items()
+                if value[0] != site_id
             }
 
     def create_preview(self, site_id: str) -> tuple[str, datetime]:
@@ -261,7 +280,7 @@ class SitesService:
         token = secrets.token_urlsafe(24)
         expires = datetime.now(UTC) + timedelta(seconds=self.preview_ttl)
         with self._token_lock:
-            self._tokens[token] = (site_id, expires)
+            SitesService._tokens[token] = (site_id, expires)
         return (
             f"{self.public_base_url}/v1/sites/{site_id}/preview/{token}/",
             expires,
@@ -270,10 +289,10 @@ class SitesService:
     def preview_site(self, site_id: str, token: str) -> Site | None:
         now = datetime.now(UTC)
         with self._token_lock:
-            self._tokens = {
-                key: value for key, value in self._tokens.items() if value[1] > now
+            SitesService._tokens = {
+                key: value for key, value in SitesService._tokens.items() if value[1] > now
             }
-            value = self._tokens.get(token)
+            value = SitesService._tokens.get(token)
         if value is None or value[0] != site_id:
             return None
         return self.store.get_site(site_id)

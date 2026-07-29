@@ -34,6 +34,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import type { CreateDraftSession } from '@/lib/draft-agent'
 
 type AppDialogsProps = {
   client: LocalAgentClient
@@ -52,7 +53,7 @@ type AppDialogsProps = {
   pendingMentionRef: MutableRefObject<string | string[] | null>
   setComposer: Dispatch<SetStateAction<string>>
   setComposerFiles: Dispatch<SetStateAction<string[]>>
-  createSession: (projectId?: string | null) => Promise<void>
+  createSession: CreateDraftSession
   newProjectOpen: boolean
   setNewProjectOpen: Dispatch<SetStateAction<boolean>>
   createProject: (input: {

@@ -1,5 +1,7 @@
 import { AgentSessionMainPanel } from '@/components/agents/AgentSessionMainPanel'
+import { skillChipToken } from '@/components/agents/composer-parts'
 import { DashboardMainViews } from '@/components/agents/DashboardMainViews'
+import { SitesView } from '@/components/agents/SitesView'
 import {
   AppShellMainDragStrip,
   AppShellTitleBar,
@@ -29,6 +31,7 @@ export function AppShellMain(props: AppShellMainProps) {
     !(
       props.isHome ||
       props.isLibrary ||
+      props.isSites ||
       props.isProjectHome ||
       props.isDashboard
     )
@@ -39,6 +42,11 @@ export function AppShellMain(props: AppShellMainProps) {
     SHELL_SIDEBAR_MOTION_MS,
     100
   )
+  const addSite = async () => {
+    await props.createSession(undefined, {
+      composer: `${skillChipToken('sites-building')} Create a site for …`
+    })
+  }
 
   return (
     <ResizablePanel
@@ -73,7 +81,16 @@ export function AppShellMain(props: AppShellMainProps) {
         ) : null}
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {isDashboardMainView(props) ? (
+        {props.isSites ? (
+          <SitesView
+            client={props.client}
+            navigate={props.navigate}
+            siteId={props.siteId}
+            sessions={props.sessions}
+            projects={props.projects}
+            onAddSite={() => void addSite()}
+          />
+        ) : isDashboardMainView(props) ? (
           <DashboardMainViews {...buildDashboardMainViewsProps(props)} />
         ) : (
           <AgentSessionMainPanel

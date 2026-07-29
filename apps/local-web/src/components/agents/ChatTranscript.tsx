@@ -181,14 +181,17 @@ export function ChatTranscript({
                 />
               </div>
             ) : null}
-            {runActive && !deferredDelta ? (
+            {runActive ? (
               <div className="mx-auto flex w-full max-w-[44rem] items-center px-2 py-2 text-sm">
                 {pendingApproval ? (
                   <span className="animate-text-shimmer font-light">
                     Pending approval
                   </span>
                 ) : (
-                  <AgentStatusText tools={statusTools} />
+                  <AgentStatusText
+                    tools={statusTools}
+                    liveDelta={liveDelta}
+                  />
                 )}
               </div>
             ) : null}

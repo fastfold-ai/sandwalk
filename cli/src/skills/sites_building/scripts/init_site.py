@@ -31,6 +31,14 @@ def initialize(target: Path, template: str) -> list[str]:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(item, destination)
         created.append(relative.as_posix())
+    if template == "static":
+        shell = Path(__file__).resolve().parent.parent / "fragments" / "shell.css"
+        destination = target / "src" / "shell.css"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(shell, destination)
+        path = "src/shell.css"
+        if path not in created:
+            created.append(path)
     return created
 
 

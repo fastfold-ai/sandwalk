@@ -27,6 +27,7 @@ import { type DashboardSection } from '@/components/agents/DashboardSidebar'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
+import type { CreateDraftSession } from '@/lib/draft-agent'
 import { type SessionChatState } from '@/lib/sessions'
 import {
   parseCatalogSkillId,
@@ -41,6 +42,8 @@ export type AppShellMainProps = {
   showSessionTabs: boolean
   isHome: boolean
   isLibrary: boolean
+  isSites: boolean
+  siteId: string | null
   isProjectHome: boolean
   isDashboard: boolean
   activeTitle: string
@@ -124,7 +127,7 @@ export type AppShellMainProps = {
   deleteProject: DashboardMainViewsProps['deleteProject']
   setNewProjectOpen: (value: boolean | ((current: boolean) => boolean)) => void
   setProjectScopeId: (value: string | null | ((current: string | null) => string | null)) => void
-  createSession: (projectId?: string | null) => Promise<void>
+  createSession: CreateDraftSession
   openTabs: AgentSession[]
   sessionId: string | null
   session: AgentSession | null

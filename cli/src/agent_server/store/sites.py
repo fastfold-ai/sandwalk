@@ -120,6 +120,7 @@ class SiteMixin:
         bytes_count: int,
         origin_session_id: str | None,
         origin_project_id: str | None,
+        reset_publication: bool,
     ) -> Site | None:
         with self._write_lock, self._connect() as connection:
             cursor = connection.execute(
@@ -127,7 +128,10 @@ class SiteMixin:
                 UPDATE sites
                 SET source_path = ?, storage_path = ?, content_sha256 = ?,
                     file_count = ?, bytes = ?, origin_session_id = ?,
-                    origin_project_id = ?, updated_at = ?
+                    origin_project_id = ?,
+                    cloud_url = CASE WHEN ? THEN NULL ELSE cloud_url END,
+                    published_at = CASE WHEN ? THEN NULL ELSE published_at END,
+                    updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -138,6 +142,8 @@ class SiteMixin:
                     bytes_count,
                     origin_session_id,
                     origin_project_id,
+                    reset_publication,
+                    reset_publication,
                     utc_now().isoformat(),
                     site_id,
                 ),

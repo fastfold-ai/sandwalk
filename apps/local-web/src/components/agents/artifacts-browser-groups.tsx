@@ -40,6 +40,13 @@ function newestMtime(files: WorkspaceFile[]): string | null {
   return best
 }
 
+function entryLabel(file: WorkspaceFile, root: string, showPath: boolean) {
+  if (!showPath) return file.name
+  if (!root) return file.path
+  const prefix = `${root}/`
+  return file.path.startsWith(prefix) ? file.path.slice(prefix.length) : file.path
+}
+
 function GroupFolderTrail({
   root,
   cwd,
@@ -95,12 +102,14 @@ function GroupFolderTrail({
 
 function ArtifactEntryRow({
   file,
+  label,
   activePath,
   onOpen,
   onDownloadFile,
   onFileContextMenu
 }: {
   file: WorkspaceFile
+  label: string
   activePath: string | null
   onOpen: (file: WorkspaceFile) => void
   onDownloadFile: (path: string) => void
@@ -132,7 +141,7 @@ function ArtifactEntryRow({
         <Icon icon={getFileIcon(file.name)} className="size-3.5 shrink-0" />
       )}
       <span className="min-w-0 flex-1 truncate text-left text-[11px]">
-        {file.name}
+        {label}
       </span>
       <div className="relative h-6 w-11 shrink-0">
         <span className="text-muted-foreground pointer-events-none absolute inset-0 flex items-center justify-end pr-0.5 text-[10px] transition-opacity group-hover/file:opacity-0">
@@ -160,6 +169,7 @@ function ArtifactEntryCard({
   client,
   sessionId,
   file,
+  label,
   activePath,
   onOpen,
   onFileContextMenu
@@ -167,6 +177,7 @@ function ArtifactEntryCard({
   client: LocalAgentClient
   sessionId: string
   file: WorkspaceFile
+  label: string
   activePath: string | null
   onOpen: (file: WorkspaceFile) => void
   onFileContextMenu: (file: WorkspaceFile, x: number, y: number) => void
@@ -202,7 +213,7 @@ function ArtifactEntryCard({
         />
       )}
       <span className="line-clamp-2 w-full px-0.5 text-[11px] leading-tight">
-        {file.name}
+        {label}
       </span>
       <span className="text-muted-foreground px-0.5 text-[10px]">
         {file.type === 'directory'
@@ -333,6 +344,7 @@ export function ArtifactsBrowserGroups({
                           client={client}
                           sessionId={sessionId}
                           file={file}
+                          label={entryLabel(file, root, searchActive)}
                           activePath={activePath}
                           onOpen={entry => {
                             if (entry.type === 'directory' && !searchActive) {
@@ -354,6 +366,7 @@ export function ArtifactsBrowserGroups({
                         <ArtifactEntryRow
                           key={file.path}
                           file={file}
+                          label={entryLabel(file, root, searchActive)}
                           activePath={activePath}
                           onOpen={entry => {
                             if (entry.type === 'directory' && !searchActive) {

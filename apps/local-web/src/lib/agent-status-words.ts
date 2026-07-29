@@ -1,6 +1,13 @@
 /** Realistic agent status copy driven by the active tool (not random fluff). */
 
 export const DEFAULT_AGENT_STATUS = 'Planning next moves'
+export const WAITING_ON_MODEL_STATUS = 'Waiting on the model provider'
+export const MODEL_SLOW_STATUS = 'Model provider is taking longer than usual'
+
+/** Quiet gap before we hint the model is still thinking. */
+export const WAITING_ON_MODEL_AFTER_MS = 15_000
+/** Longer quiet gap for a stronger “still waiting” hint. */
+export const MODEL_SLOW_AFTER_MS = 45_000
 
 type StatusRule = {
   /** Match tool name (exact or prefix/includes). */
@@ -83,37 +90,34 @@ export function latestPendingTool(
   return best
 }
 
-/** Most recently started tool in the list (any status), or null. */
-export function latestTool(
-  tools: StatusToolLike[] | null | undefined
-): StatusToolLike | null {
-  const list = tools || []
-  let best: StatusToolLike | null = null
-  for (const tool of list) {
-    if (!best || isNewerTool(tool, best)) best = tool
-  }
-  return best
-}
-
 /**
- * Pick status from the current run's tools.
- * Prefer the in-flight tool; otherwise mirror the newest tool card so the
- * label updates as soon as a card appears (even if it completes quickly).
+ * Pick status from the current run's tools and quiet-time gap.
+ * Prefer the in-flight tool; otherwise escalate from planning → waiting → slow
+ * when the model has been silent for a while.
  */
 export function resolveAgentStatus(
-  tools: StatusToolLike[] | null | undefined
+  tools: StatusToolLike[] | null | undefined,
+  options?: { quietMs?: number }
 ): string {
   const pending = latestPendingTool(tools)
   if (pending) return statusLabelForTool(pending.name)
-  const latest = latestTool(tools)
-  if (latest) return statusLabelForTool(latest.name)
+  const quietMs = Math.max(0, options?.quietMs ?? 0)
+  if (quietMs >= MODEL_SLOW_AFTER_MS) return MODEL_SLOW_STATUS
+  if (quietMs >= WAITING_ON_MODEL_AFTER_MS) return WAITING_ON_MODEL_STATUS
   return DEFAULT_AGENT_STATUS
 }
 
-/** Stable key so the status line remounts when the active tool changes. */
-export function agentStatusKey(tools: StatusToolLike[] | null | undefined): string {
+/** Stable key so the status line remounts when the active tool / wait phase changes. */
+export function agentStatusKey(
+  tools: StatusToolLike[] | null | undefined,
+  options?: { quietMs?: number }
+): string {
   const pending = latestPendingTool(tools)
-  const active = pending || latestTool(tools)
-  if (!active) return 'planning'
-  return `${active.status}:${active.id || active.name}:${active.startedAt || ''}`
+  if (pending) {
+    return `${pending.status}:${pending.id || pending.name}:${pending.startedAt || ''}`
+  }
+  const label = resolveAgentStatus(tools, options)
+  if (label === MODEL_SLOW_STATUS) return 'model-slow'
+  if (label === WAITING_ON_MODEL_STATUS) return 'waiting-on-model'
+  return 'planning'
 }

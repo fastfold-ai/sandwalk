@@ -10,6 +10,7 @@ import {
 } from '@/lib/app-storage'
 import {
   DRAFT_AGENT_SESSION_ID,
+  type DraftSessionSeed,
   isDraftAgentSessionId
 } from '@/lib/draft-agent'
 import { downloadMarkdown, emptySessionChatState } from '@/lib/sessions'
@@ -93,8 +94,9 @@ export function useSessionActionsCrudSessions({
    * Pass `null` for All projects; omit to keep the current project scope.
    */
   const createSession = useCallback(
-    async (projectId?: string | null) => {
+    async (projectId?: string | null, seed?: DraftSessionSeed) => {
       const id = projectId === undefined ? (activeProjectId ?? null) : projectId
+      const composer = seed?.composer ?? ''
       if (id) {
         applyProjectScope(id, setProjectScopeId, setRecentProjectIds)
       } else {
@@ -108,10 +110,12 @@ export function useSessionActionsCrudSessions({
         ...current,
         [DRAFT_AGENT_SESSION_ID]: {
           ...emptySessionChatState(),
+          composer,
+          composerSkills: seed?.composerSkills ?? [],
           messagesLoaded: true
         }
       }))
-      composerLiveRef.current = ''
+      composerLiveRef.current = composer
       sessionIdRef.current = DRAFT_AGENT_SESSION_ID
       navigate(`/agents/${DRAFT_AGENT_SESSION_ID}`)
     },

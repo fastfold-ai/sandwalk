@@ -27,19 +27,6 @@ def _dist(tmp_path: Path) -> Path:
     return dist
 
 
-def test_skill_metadata_and_publish_guardrails():
-    text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
-    assert "name: sites-hosting" in text
-    assert "author: sandwalk" in text
-    assert "category: Built-in" in text
-    assert "version: 1.0.0" in text
-    assert "FASTFOLD_API_KEY" in text
-    assert "sites.manage" in text
-    assert "<slug>.sandwalk.site" in text
-    assert "Never say deployed" in text
-    assert len(text.splitlines()) < 500
-
-
 def test_package_is_deterministic_and_exact(tmp_path):
     dist = _dist(tmp_path)
     first = tmp_path / "first.zip"

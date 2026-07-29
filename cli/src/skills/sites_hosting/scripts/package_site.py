@@ -15,7 +15,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 MAX_BYTES = 100 * 1024 * 1024
-MAX_FILES = 10_000
+MAX_FILES = 5_000
 _TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 _SECRET_NAMES = {
     "credentials",

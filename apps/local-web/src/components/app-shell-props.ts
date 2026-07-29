@@ -26,6 +26,7 @@ import { type DashboardSection } from '@/components/agents/DashboardSidebar'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
+import type { CreateDraftSession } from '@/lib/draft-agent'
 import { groupSessions,type SessionChatState } from '@/lib/sessions'
 import { type parseCatalogSkillId,type SkillsViewMode } from '@/lib/skills-catalog'
 
@@ -58,7 +59,7 @@ export type AppShellProps = {
   setProjectSettingsOpen: Dispatch<SetStateAction<boolean>>
   setNewProjectOpen: Dispatch<SetStateAction<boolean>>
   setGlobalSearchOpen: Dispatch<SetStateAction<boolean>>
-  createSession: (projectId?: string | null) => Promise<void>
+  createSession: CreateDraftSession
   setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
   clearSessionSelection: () => void
   batchArchiveSelected: () => void | Promise<void>

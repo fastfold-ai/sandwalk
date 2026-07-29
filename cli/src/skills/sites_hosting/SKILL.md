@@ -49,16 +49,13 @@ the user asks to host, deploy, publish, or update a Sandwalk Site.
 5. **Publish.** After confirming this public side effect with the user, call
    `sites.manage(action="publish", site_id="<id>")`. Pass `slug` only when the
    user requested one. The tool packages, uploads, and waits for the deployment.
-6. **Confirm status.** If publication returns without a terminal state, call
-   `sites.manage(action="status", site_id="<id>")` until terminal:
-   - `published` (or an equivalent success state): publication is durable; report the final URL.
-   - `failed`, `cancelled`, or equivalent: report the failure and useful detail.
-   - timeout or unknown state: report that publication is still unconfirmed and
-     provide the operation/site identifier for follow-up.
-
-   Use reasonable intervals and honor retry hints. Do not republish merely because
-   processing is asynchronous. Read [Publishing lifecycle](references/publishing-lifecycle.md)
-   for status and communication rules.
+6. **Confirm the result.** `sites.manage(action="publish")` waits for the remote
+   deployment to reach a terminal result. Report success only when that call returns
+   a site with `status="published"` and the service-provided URL. The `status` action
+   reads the last confirmed local state; it does not resume a timed-out remote poll.
+   On timeout or an unknown result, report that publication is unconfirmed, include
+   the local site identifier, and do not republish automatically. Read
+   [Publishing lifecycle](references/publishing-lifecycle.md) for communication rules.
 
 ## Completion Rules
 
