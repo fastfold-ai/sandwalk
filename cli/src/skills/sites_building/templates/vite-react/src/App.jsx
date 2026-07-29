@@ -11,11 +11,11 @@ function SandwalkLogo() {
     >
       <svg
         className="sandwalk-logo"
-        viewBox="0 0 280 62"
+        viewBox="0 0 300 62"
         role="img"
         aria-hidden="true"
       >
-        <g transform="translate(2 10) scale(0.085) translate(-72 -177)">
+        <g transform="translate(2 12) scale(0.072) translate(-72 -177)">
           <path d="M107 458c-19 0-35 16-35 35v70c0 19 16 35 35 35s35-16 35-35v-70c0-19-16-35-35-35z" />
           <path d="M213 283c-19 0-35 16-35 35v176c0 19 16 35 35 35s35-16 35-35V318c0-19-16-35-35-35z" />
           <path d="M318 177c-19 0-35 16-35 35v246c0 19 16 35 35 35s35-16 35-35V212c0-19-16-35-35-35z" />
@@ -25,11 +25,11 @@ function SandwalkLogo() {
           <path d="M739 248c-19 0-35 16-35 35v70c0 19 16 35 35 35s35-16 35-35v-70c0-19-16-35-35-35z" />
         </g>
         <text
-          x="72"
-          y="48"
+          x="68"
+          y="44"
           fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
-          fontSize="52"
-          letterSpacing="-2"
+          fontSize="42"
+          letterSpacing="-1.5"
         >
           sandwalk
         </text>

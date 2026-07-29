@@ -122,8 +122,34 @@ def apply_report_shell(dist: Path) -> list[str]:
             + ". Keep the starter markers; only edit main content and TOC links."
         )
 
+    html = ensure_favicon(dist, html)
     index.write_text(html, encoding="utf-8")
     return applied
+
+
+def ensure_favicon(dist: Path, html: str | None = None) -> str:
+    """Ensure dist has favicon.svg and index.html links it."""
+    index = dist / "index.html"
+    if html is None:
+        html = index.read_text(encoding="utf-8") if index.is_file() else ""
+    favicon = _FRAGMENTS / "favicon.svg"
+    if favicon.is_file() and not (dist / "favicon.svg").is_file():
+        shutil.copyfile(favicon, dist / "favicon.svg")
+    if html and 'rel="icon"' not in html and "rel='icon'" not in html:
+        html = html.replace(
+            "<title>",
+            '<link rel="icon" href="favicon.svg" type="image/svg+xml" />\n    <title>',
+            1,
+        )
+        if 'rel="icon"' not in html:
+            html = html.replace(
+                "</head>",
+                '    <link rel="icon" href="favicon.svg" type="image/svg+xml" />\n  </head>',
+                1,
+            )
+        if index.is_file():
+            index.write_text(html, encoding="utf-8")
+    return html
 
 
 def build(project: Path) -> tuple[str, Path, str]:
@@ -153,6 +179,7 @@ def build(project: Path) -> tuple[str, Path, str]:
     if not (dist / "index.html").is_file():
         raise ValueError(f"build did not create {dist / 'index.html'}")
     apply_report_shell(dist)
+    ensure_favicon(dist)
     stamped = stamp_report_date(dist)
     return kind, dist, stamped
 

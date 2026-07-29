@@ -13,8 +13,14 @@ from skills.sites_building.scripts import (
 def test_initialize_static_and_vite_templates(tmp_path):
     static = tmp_path / "static"
     created = init_site.initialize(static, "static")
-    assert sorted(created) == ["src/index.html", "src/shell.css", "src/styles.css"]
+    assert sorted(created) == [
+        "src/favicon.svg",
+        "src/index.html",
+        "src/shell.css",
+        "src/styles.css",
+    ]
     assert (static / "src" / "shell.css").is_file()
+    assert (static / "src" / "favicon.svg").is_file()
 
     vite = tmp_path / "vite"
     created = init_site.initialize(vite, "vite-react")
@@ -73,6 +79,8 @@ def test_build_static_site_and_validate_local_references(tmp_path, monkeypatch):
     assert 'id="theme-toggle"' in html
     assert "sandwalk-logo" in html
     assert (dist / "shell.css").is_file()
+    assert (dist / "favicon.svg").is_file()
+    assert 'rel="icon"' in html
     assert validate_site.validate(dist) == []
 
 

@@ -212,17 +212,21 @@ summary {
 footer {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
   margin-top: 5rem;
   border-top: 1px solid var(--border);
   padding-block: 1.5rem 2rem;
   color: var(--muted);
   font-size: 0.78rem;
+  text-align: center;
 }
 
 .sandwalk-brand {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   color: inherit;
   text-decoration: none;
 }
@@ -233,9 +237,10 @@ footer {
 }
 
 .sandwalk-logo {
-  width: 7.5rem;
+  width: 5.25rem;
   height: auto;
   display: block;
+  overflow: visible;
   fill: currentColor;
 }
 
