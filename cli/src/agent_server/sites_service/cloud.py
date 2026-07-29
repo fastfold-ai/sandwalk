@@ -32,6 +32,8 @@ class SitesPublisher(Protocol):
         cloud_site_id: str | None = None,
     ) -> PublishedSite: ...
 
+    def delete(self, site_id: str) -> None: ...
+
 
 class FastFoldSitesClient:
     """Publish a ZIP through the FastFold Sites control-plane workflow."""
@@ -41,7 +43,9 @@ class FastFoldSitesClient:
         *,
         api_key: str | None = None,
         endpoint: str | None = None,
-        timeout: float = 300,
+        timeout: float | None = None,
+        request_timeout: float = 30,
+        wait_timeout: float = 120,
     ) -> None:
         self.api_key = (api_key or os.environ.get("FASTFOLD_API_KEY") or "").strip()
         self.endpoint = (
@@ -49,7 +53,12 @@ class FastFoldSitesClient:
             or os.environ.get("FASTFOLD_SITES_API_URL")
             or "https://api.fastfold.ai/v1"
         ).rstrip("/")
-        self.timeout = timeout
+        # ``timeout`` remains as a legacy alias for the deployment wait budget.
+        self.request_timeout = max(5.0, float(request_timeout))
+        self.wait_timeout = max(
+            1.0,
+            float(wait_timeout if timeout is None else timeout),
+        )
 
     def _json(
         self,
@@ -68,7 +77,9 @@ class FastFoldSitesClient:
         if data is not None:
             request.add_header("Content-Type", "application/json")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with urllib.request.urlopen(
+                request, timeout=self.request_timeout
+            ) as response:
                 result = json.loads(response.read() or b"{}")
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode(errors="replace").strip()
@@ -103,7 +114,9 @@ class FastFoldSitesClient:
         request = urllib.request.Request(url, data=bytes(body), method="POST")
         request.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with urllib.request.urlopen(
+                request, timeout=self.request_timeout
+            ) as response:
                 if response.status not in {200, 201, 204}:
                     raise RuntimeError(f"Site upload failed with HTTP {response.status}")
         except urllib.error.HTTPError as exc:
@@ -156,20 +169,29 @@ class FastFoldSitesClient:
             },
         )
 
-        deadline = time.monotonic() + self.timeout
+        deadline = time.monotonic() + self.wait_timeout
+        last_state = "queued"
         while time.monotonic() < deadline:
             status = self._json(
                 "GET",
                 f"/sites/{site_id}/deployments/{deployment_id}",
             )
-            state = str(status.get("status") or "").lower()
-            if state == "succeeded":
+            last_state = str(status.get("status") or "").lower() or last_state
+            if last_state == "succeeded":
                 url = str(status.get("publicUrl") or site.get("url") or "").strip()
                 if not url:
                     raise RuntimeError("Published site response did not include a URL.")
                 return PublishedSite(url=url, site_id=site_id)
-            if state == "failed":
+            if last_state == "failed":
                 detail = str(status.get("errorMessage") or "Site deployment failed")
                 raise RuntimeError(detail)
             time.sleep(2)
-        raise TimeoutError("Timed out waiting for the site deployment to finish.")
+        raise TimeoutError(
+            f"Timed out after {int(self.wait_timeout)}s waiting for site deployment "
+            f"{deployment_id} (last status: {last_state})."
+        )
+
+    def delete(self, site_id: str) -> None:
+        if not self.api_key:
+            raise ValueError("FASTFOLD_API_KEY is required to delete a published site.")
+        self._json("DELETE", f"/sites/{site_id}")
