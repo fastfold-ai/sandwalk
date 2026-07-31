@@ -18,6 +18,9 @@ export type ThemePaletteId =
   | 'darwin'
   | 'ember'
   | 'verdant'
+  | 'fabienk'
+  | 'dune'
+  | 'neonnoir'
   | 'tritanopia'
   | 'protanopia'
   | 'custom'
@@ -256,6 +259,33 @@ export const THEME_PALETTES: ThemePaletteMeta[] = [
     accentSwatch: '#71D18F'
   },
   {
+    id: 'fabienk',
+    name: 'Fabienk',
+    description:
+      'Angine de Poitrine — black void, gold triangle, alien dot pattern on the sidebar.',
+    // radial: gold → white → black
+    swatches: ['#F8B144', '#FFFFFF', '#000000'],
+    accentSwatch: '#F8B144'
+  },
+  {
+    id: 'dune',
+    name: 'Dune',
+    description:
+      'Arrakis — teal haze, burnt umber, and a single natural dune on the sidebar.',
+    // radial: sun amber → copper sand → deep umber (matches sidebar art)
+    swatches: ['#F0B85A', '#C87828', '#1A0E0A'],
+    accentSwatch: '#E8A040'
+  },
+  {
+    id: 'neonnoir',
+    name: 'Neon Noir',
+    description:
+      'Magenta neon, deep violet, holographic rain, and a city skyline on the sidebar.',
+    // radial: neon pink → violet → near-black
+    swatches: ['#E83A8A', '#5C2A8A', '#0A0614'],
+    accentSwatch: '#E83A8A'
+  },
+  {
     id: 'mirage',
     name: 'Mirage',
     description: 'Coral red primary with sand gold accents from the Mirage plate.',
@@ -348,6 +378,8 @@ export function getStoredTheme(): ThemeMode {
 export function getStoredPalette(): ThemePaletteId {
   try {
     const value = localStorage.getItem(PALETTE_STORAGE_KEY)
+    // Brief preview id — renamed to Neon Noir for trademark safety.
+    if (value === 'bladerunner') return 'neonnoir'
     if (
       value === 'custom' ||
       THEME_PALETTES.some(item => item.id === value)

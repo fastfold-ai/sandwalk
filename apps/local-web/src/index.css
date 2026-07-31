@@ -753,6 +753,436 @@ html.sandwalk-mac-glass .sandwalk-shell-main {
   --sidebar-gradient-end: 251 40% 6%;
 }
 
+
+/* Fabienk — Angine de Poitrine (black / gold / white + alien dot pattern). */
+:root[data-palette='fabienk'] {
+  --background: 40 30% 98%;
+  --foreground: 0 0% 6%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 6%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 6%;
+  --primary: 36 85% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 40 20% 94%;
+  --secondary-foreground: 0 0% 12%;
+  --muted: 40 16% 94%;
+  --muted-foreground: 0 0% 38%;
+  --accent: 36 70% 94%;
+  --accent-foreground: 36 80% 28%;
+  --border: 40 12% 88%;
+  --input: 40 12% 88%;
+  --ring: 36 93% 50%;
+  /* Sidebar stays true-black in both modes — the art is the void. */
+  --sidebar-background: 0 0% 0%;
+  --sidebar-foreground: 40 20% 96%;
+  --sidebar-primary: 36 93% 62%;
+  --sidebar-primary-foreground: 0 0% 0%;
+  --sidebar-accent: 36 93% 62%;
+  --sidebar-accent-foreground: 0 0% 0%;
+  --sidebar-border: 0 0% 12%;
+  --sidebar-ring: 36 93% 62%;
+}
+
+.dark[data-palette='fabienk'] {
+  --background: 0 0% 2%;
+  --foreground: 40 20% 96%;
+  --card: 0 0% 5%;
+  --card-foreground: 40 20% 96%;
+  --popover: 0 0% 5%;
+  --popover-foreground: 40 20% 96%;
+  --primary: 36 93% 62%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 10%;
+  --secondary-foreground: 40 15% 92%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 40 10% 62%;
+  --accent: 36 40% 12%;
+  --accent-foreground: 36 93% 70%;
+  --border: 0 0% 14%;
+  --input: 0 0% 14%;
+  --ring: 36 93% 62%;
+  --sidebar-background: 0 0% 0%;
+  --sidebar-foreground: 40 20% 96%;
+  --sidebar-primary: 36 93% 62%;
+  --sidebar-primary-foreground: 0 0% 0%;
+  --sidebar-accent: 36 93% 62%;
+  --sidebar-accent-foreground: 0 0% 0%;
+  --sidebar-border: 0 0% 12%;
+  --sidebar-ring: 36 93% 62%;
+}
+
+/*
+ * Fabienk sidebar — pure black void + alien gold dots + soft triangle.
+ * Always black (even in light mode / liquid glass) so the art reads.
+ */
+html[data-palette='fabienk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='fabienk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='fabienk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off[data-palette='fabienk'] .sandwalk-shell-sidebar {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #000 !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Light glass normally forces charcoal labels — keep Fabienk ink white/gold. */
+html[data-palette='fabienk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='fabienk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass:not(.dark)[data-palette='fabienk'] .sandwalk-shell-sidebar {
+  --sidebar-foreground: 40 20% 96%;
+  --foreground: 40 20% 96%;
+  --muted-foreground: 36 35% 68%;
+  color: hsl(40 20% 96%);
+}
+
+html[data-palette='fabienk'] .sandwalk-shell-sidebar > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Alien dot field + centered stippled triangle (Angine de Poitrine). */
+html[data-palette='fabienk'] .sandwalk-shell-sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.72;
+  background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22220%22%20viewBox%3D%220%200%20200%20220%22%3E%3Cdefs%3E%3Cpattern%20id%3D%22d%22%20width%3D%225%22%20height%3D%225%22%20patternUnits%3D%22userSpaceOnUse%22%3E%3Ccircle%20cx%3D%221.2%22%20cy%3D%221.4%22%20r%3D%220.7%22%20fill%3D%22%23F8B144%22%2F%3E%3Ccircle%20cx%3D%223.8%22%20cy%3D%223.6%22%20r%3D%220.55%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.75%22%2F%3E%3Ccircle%20cx%3D%222.5%22%20cy%3D%224.2%22%20r%3D%220.4%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.55%22%2F%3E%3C%2Fpattern%3E%3ClinearGradient%20id%3D%22sh%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23F8B144%22%20stop-opacity%3D%220%22%2F%3E%3Cstop%20offset%3D%22.45%22%20stop-color%3D%22%23F8B144%22%20stop-opacity%3D%220%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23000%22%20stop-opacity%3D%22.55%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpolygon%20points%3D%22100%2C8%2018%2C212%20182%2C212%22%20fill%3D%22url%28%23d%29%22%20fill-opacity%3D%22.95%22%2F%3E%3Cpolygon%20points%3D%22100%2C8%20182%2C212%20100%2C212%22%20fill%3D%22url%28%23sh%29%22%2F%3E%3C%2Fsvg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2272%22%20height%3D%2296%22%20viewBox%3D%220%200%2072%2096%22%3E%3Ccircle%20cx%3D%228%22%20cy%3D%227%22%20r%3D%220.7%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.7%22%2F%3E%3Ccircle%20cx%3D%2222%22%20cy%3D%2214%22%20r%3D%220.55%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.45%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%226%22%20r%3D%220.8%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.85%22%2F%3E%3Ccircle%20cx%3D%2258%22%20cy%3D%2218%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.55%22%2F%3E%3Ccircle%20cx%3D%2267%22%20cy%3D%229%22%20r%3D%220.65%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.4%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2228%22%20r%3D%220.6%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.75%22%2F%3E%3Ccircle%20cx%3D%2233%22%20cy%3D%2224%22%20r%3D%220.75%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.5%22%2F%3E%3Ccircle%20cx%3D%2249%22%20cy%3D%2232%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.9%22%2F%3E%3Ccircle%20cx%3D%2263%22%20cy%3D%2227%22%20r%3D%220.7%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.6%22%2F%3E%3Ccircle%20cx%3D%225%22%20cy%3D%2242%22%20r%3D%220.55%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.65%22%2F%3E%3Ccircle%20cx%3D%2219%22%20cy%3D%2248%22%20r%3D%220.8%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.4%22%2F%3E%3Ccircle%20cx%3D%2237%22%20cy%3D%2240%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.8%22%2F%3E%3Ccircle%20cx%3D%2254%22%20cy%3D%2246%22%20r%3D%220.65%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.55%22%2F%3E%3Ccircle%20cx%3D%2268%22%20cy%3D%2251%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.7%22%2F%3E%3Ccircle%20cx%3D%2210%22%20cy%3D%2262%22%20r%3D%220.7%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.5%22%2F%3E%3Ccircle%20cx%3D%2227%22%20cy%3D%2258%22%20r%3D%220.55%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.85%22%2F%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2266%22%20r%3D%220.75%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.45%22%2F%3E%3Ccircle%20cx%3D%2259%22%20cy%3D%2260%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.75%22%2F%3E%3Ccircle%20cx%3D%2215%22%20cy%3D%2278%22%20r%3D%220.6%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.6%22%2F%3E%3Ccircle%20cx%3D%2231%22%20cy%3D%2284%22%20r%3D%220.7%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.4%22%2F%3E%3Ccircle%20cx%3D%2248%22%20cy%3D%2276%22%20r%3D%220.55%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.9%22%2F%3E%3Ccircle%20cx%3D%2264%22%20cy%3D%2282%22%20r%3D%220.8%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.5%22%2F%3E%3Ccircle%20cx%3D%226%22%20cy%3D%2290%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.7%22%2F%3E%3Ccircle%20cx%3D%2239%22%20cy%3D%2292%22%20r%3D%220.65%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.55%22%2F%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%2288%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.8%22%2F%3E%3Ccircle%20cx%3D%2225%22%20cy%3D%2235%22%20r%3D%220.45%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.6%22%2F%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2212%22%20r%3D%220.45%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.5%22%2F%3E%3Ccircle%20cx%3D%2217%22%20cy%3D%2270%22%20r%3D%220.45%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.75%22%2F%3E%3Ccircle%20cx%3D%2261%22%20cy%3D%2238%22%20r%3D%220.45%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.65%22%2F%3E%3Ccircle%20cx%3D%2235%22%20cy%3D%2252%22%20r%3D%220.45%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.55%22%2F%3E%3C%2Fsvg%3E");
+  background-size:
+    min(220px, 92%) min(260px, 58%),
+    72px 96px;
+  background-position:
+    50% 42%,
+    0 0;
+  background-repeat:
+    no-repeat,
+    repeat;
+  animation: fabienk-dots-breathe 8s ease-in-out infinite;
+}
+
+@keyframes fabienk-dots-breathe {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+  50% {
+    opacity: 0.82;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-palette='fabienk'] .sandwalk-shell-sidebar::before {
+    animation: none;
+    opacity: 0.72;
+  }
+}
+
+/* Keep glass edge fade off — dots are the edge treatment. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='fabienk'] .sandwalk-shell-sidebar::after {
+  content: none;
+}
+
+/* Dune — Arrakis (teal haze / burnt umber / rose-gold + dune silhouette). */
+:root[data-palette='dune'] {
+  --background: 180 22% 94%;
+  --foreground: 18 35% 14%;
+  --card: 180 18% 97%;
+  --card-foreground: 18 35% 14%;
+  --popover: 180 18% 97%;
+  --popover-foreground: 18 35% 14%;
+  --primary: 28 45% 42%;
+  --primary-foreground: 40 50% 96%;
+  --secondary: 180 14% 90%;
+  --secondary-foreground: 18 30% 20%;
+  --muted: 180 12% 90%;
+  --muted-foreground: 18 12% 40%;
+  --accent: 28 35% 90%;
+  --accent-foreground: 28 40% 28%;
+  --border: 180 12% 84%;
+  --input: 180 12% 84%;
+  --ring: 28 42% 55%;
+  /* Sidebar stays deep umber — the dune face. */
+  --sidebar-background: 18 45% 10%;
+  --sidebar-foreground: 35 30% 92%;
+  --sidebar-primary: 28 45% 64%;
+  --sidebar-primary-foreground: 18 40% 10%;
+  --sidebar-accent: 28 42% 55%;
+  --sidebar-accent-foreground: 18 40% 10%;
+  --sidebar-border: 18 30% 16%;
+  --sidebar-ring: 28 42% 55%;
+}
+
+.dark[data-palette='dune'] {
+  --background: 18 40% 6%;
+  --foreground: 35 30% 92%;
+  --card: 18 35% 9%;
+  --card-foreground: 35 30% 92%;
+  --popover: 18 35% 9%;
+  --popover-foreground: 35 30% 92%;
+  --primary: 32 75% 55%;
+  --primary-foreground: 18 40% 8%;
+  --secondary: 18 25% 14%;
+  --secondary-foreground: 35 25% 88%;
+  --muted: 18 22% 13%;
+  --muted-foreground: 30 15% 60%;
+  --accent: 28 30% 16%;
+  --accent-foreground: 32 70% 68%;
+  --border: 18 22% 16%;
+  --input: 18 22% 16%;
+  --ring: 32 75% 55%;
+  --sidebar-background: 18 50% 7%;
+  --sidebar-foreground: 35 30% 92%;
+  --sidebar-primary: 32 75% 55%;
+  --sidebar-primary-foreground: 18 40% 8%;
+  --sidebar-accent: 32 65% 42%;
+  --sidebar-accent-foreground: 35 40% 96%;
+  --sidebar-border: 18 30% 12%;
+  --sidebar-ring: 32 75% 55%;
+}
+
+/*
+ * Dune sidebar — deep umber face + a single natural dune silhouette.
+ * Always umber (even in light mode / liquid glass) so the art reads.
+ */
+html[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off[data-palette='dune'] .sandwalk-shell-sidebar {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #1f120e !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.dark[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.dark[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark[data-palette='dune'] .sandwalk-shell-sidebar {
+  background-color: #140a07 !important;
+}
+
+/* Light glass normally forces charcoal labels — keep Dune ink sand-light. */
+html[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass:not(.dark)[data-palette='dune'] .sandwalk-shell-sidebar {
+  --sidebar-foreground: 35 30% 92%;
+  --foreground: 35 30% 92%;
+  --muted-foreground: 30 20% 68%;
+  color: hsl(35 30% 92%);
+}
+
+html[data-palette='dune'] .sandwalk-shell-sidebar > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Single natural dune + sun above the crest (cool Arrakis plate). */
+html[data-palette='dune'] .sandwalk-shell-sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.9;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22280%22%20height%3D%22320%22%20viewBox%3D%220%200%20280%20320%22%20preserveAspectRatio%3D%22xMidYMax%20meet%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22haze%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%238BB6B6%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%238BB6B6%22%20stop-opacity%3D%22.07%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%235A3228%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22body%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%236B4030%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%231A0E0A%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22lit%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%233D2118%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.48%22%20stop-color%3D%22%238B5A3C%22%20stop-opacity%3D%22.15%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23D4A373%22%20stop-opacity%3D%22.55%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23E8C49A%22%20stop-opacity%3D%22.7%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22sun%22%20cx%3D%2250%25%22%20cy%3D%2250%25%22%20r%3D%2250%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23F0D080%22%20stop-opacity%3D%22.55%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23E8C49A%22%20stop-opacity%3D%22.22%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23E8C49A%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%3C%2FradialGradient%3E%0A%20%20%20%20%3Cpattern%20id%3D%22rip%22%20width%3D%2248%22%20height%3D%2210%22%20patternUnits%3D%22userSpaceOnUse%22%3E%0A%20%20%20%20%20%20%3Cpath%20d%3D%22M0%205%20Q12%202.5%2024%205%20T48%205%22%20fill%3D%22none%22%20stroke%3D%22%23D4A373%22%20stroke-opacity%3D%22.14%22%20stroke-width%3D%22.7%22%2F%3E%0A%20%20%20%20%20%20%3Cpath%20d%3D%22M0%208%20Q14%205.5%2028%208%20T48%208%22%20fill%3D%22none%22%20stroke%3D%22%238BB6B6%22%20stroke-opacity%3D%22.07%22%20stroke-width%3D%22.5%22%2F%3E%0A%20%20%20%20%3C%2Fpattern%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22280%22%20height%3D%22320%22%20fill%3D%22url%28%23haze%29%22%2F%3E%0A%20%20%3C%21--%20sun%20centered%20above%20the%20dune%20crest%20%28~x%3D208%29%20--%3E%0A%20%20%3Ccircle%20cx%3D%22208%22%20cy%3D%22118%22%20r%3D%2252%22%20fill%3D%22url%28%23sun%29%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22208%22%20cy%3D%22118%22%20r%3D%2214%22%20fill%3D%22%23F0D080%22%20fill-opacity%3D%22.35%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20252%20C32%20230%2058%20222%2096%20234%20C138%20248%20168%20216%20208%20204%20C238%20194%20260%20198%20280%20206%20L280%20320%20Z%22%20fill%3D%22url%28%23body%29%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20252%20C32%20230%2058%20222%2096%20234%20C138%20248%20168%20216%20208%20204%20C238%20194%20260%20198%20280%20206%20L280%20320%20Z%22%20fill%3D%22url%28%23lit%29%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20252%20C32%20230%2058%20222%2096%20234%20C138%20248%20168%20216%20208%20204%20C238%20194%20260%20198%20280%20206%22%20fill%3D%22none%22%20stroke%3D%22%23E8C49A%22%20stroke-opacity%3D%22.45%22%20stroke-width%3D%221.5%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20252%20C32%20230%2058%20222%2096%20234%20C138%20248%20168%20216%20208%20204%20C238%20194%20260%20198%20280%20206%20L280%20320%20Z%22%20fill%3D%22url%28%23rip%29%22%2F%3E%0A%3C%2Fsvg%3E");
+  background-size: 100% 100%;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  animation: dune-haze-breathe 12s ease-in-out infinite;
+}
+
+/* Single warm dune + sun above the crest for dark mode. */
+.dark[data-palette='dune'] .sandwalk-shell-sidebar::before {
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22280%22%20height%3D%22320%22%20viewBox%3D%220%200%20280%20320%22%20preserveAspectRatio%3D%22xMidYMax%20meet%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22body%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220.2%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%231A0A06%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.46%22%20stop-color%3D%22%233D1810%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.52%22%20stop-color%3D%22%23C87828%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23E8A040%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22depth%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23000%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23000%22%20stop-opacity%3D%22.45%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22sun%22%20cx%3D%2250%25%22%20cy%3D%2250%25%22%20r%3D%2250%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23F8D080%22%20stop-opacity%3D%22.7%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.45%22%20stop-color%3D%22%23F0B85A%22%20stop-opacity%3D%22.28%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23F0B85A%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%3C%2FradialGradient%3E%0A%20%20%20%20%3Cpattern%20id%3D%22rip%22%20width%3D%2248%22%20height%3D%2210%22%20patternUnits%3D%22userSpaceOnUse%22%3E%0A%20%20%20%20%20%20%3Cpath%20d%3D%22M0%205%20Q12%202.5%2024%205%20T48%205%22%20fill%3D%22none%22%20stroke%3D%22%23F0B85A%22%20stroke-opacity%3D%22.16%22%20stroke-width%3D%22.7%22%2F%3E%0A%20%20%20%20%20%20%3Cpath%20d%3D%22M0%208%20Q14%205.5%2028%208%20T48%208%22%20fill%3D%22none%22%20stroke%3D%22%23C46A28%22%20stroke-opacity%3D%22.1%22%20stroke-width%3D%22.5%22%2F%3E%0A%20%20%20%20%3C%2Fpattern%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3C%21--%20sun%20centered%20above%20the%20dune%20crest%20%28~x%3D216%29%20--%3E%0A%20%20%3Ccircle%20cx%3D%22216%22%20cy%3D%22112%22%20r%3D%2256%22%20fill%3D%22url%28%23sun%29%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22216%22%20cy%3D%22112%22%20r%3D%2215%22%20fill%3D%22%23F8D080%22%20fill-opacity%3D%22.4%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20248%20C36%20222%2062%20214%20102%20228%20C146%20244%20176%20208%20216%20196%20C246%20186%20266%20190%20280%20198%20L280%20320%20Z%22%20fill%3D%22url%28%23body%29%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20248%20C36%20222%2062%20214%20102%20228%20C146%20244%20176%20208%20216%20196%20C246%20186%20266%20190%20280%20198%20L280%20320%20Z%22%20fill%3D%22url%28%23depth%29%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20248%20C36%20222%2062%20214%20102%20228%20C146%20244%20176%20208%20216%20196%20C246%20186%20266%20190%20280%20198%22%20fill%3D%22none%22%20stroke%3D%22%23F0B85A%22%20stroke-opacity%3D%22.5%22%20stroke-width%3D%221.6%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20248%20C36%20222%2062%20214%20102%20228%20C146%20244%20176%20208%20216%20196%20C246%20186%20266%20190%20280%20198%20L280%20320%20Z%22%20fill%3D%22url%28%23rip%29%22%2F%3E%0A%3C%2Fsvg%3E");
+  opacity: 0.85;
+}
+
+@keyframes dune-haze-breathe {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-palette='dune'] .sandwalk-shell-sidebar::before {
+    animation: none;
+    opacity: 0.9;
+  }
+  .dark[data-palette='dune'] .sandwalk-shell-sidebar::before {
+    opacity: 0.85;
+  }
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='dune'] .sandwalk-shell-sidebar::after {
+  content: none;
+}
+
+/* Neon Noir — magenta / violet / deep navy + holo rain & skyline. */
+:root[data-palette='neonnoir'] {
+  --background: 260 30% 97%;
+  --foreground: 270 35% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 270 35% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 270 35% 12%;
+  --primary: 330 75% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 260 20% 94%;
+  --secondary-foreground: 270 30% 20%;
+  --muted: 260 16% 94%;
+  --muted-foreground: 270 12% 40%;
+  --accent: 330 55% 94%;
+  --accent-foreground: 330 65% 32%;
+  --border: 260 14% 88%;
+  --input: 260 14% 88%;
+  --ring: 330 75% 48%;
+  --sidebar-background: 270 40% 6%;
+  --sidebar-foreground: 300 20% 94%;
+  --sidebar-primary: 330 80% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 330 75% 48%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 270 30% 14%;
+  --sidebar-ring: 330 80% 58%;
+}
+
+.dark[data-palette='neonnoir'] {
+  --background: 270 45% 5%;
+  --foreground: 300 20% 94%;
+  --card: 270 35% 8%;
+  --card-foreground: 300 20% 94%;
+  --popover: 270 35% 8%;
+  --popover-foreground: 300 20% 94%;
+  --primary: 330 80% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 270 25% 12%;
+  --secondary-foreground: 300 15% 90%;
+  --muted: 270 22% 12%;
+  --muted-foreground: 280 12% 62%;
+  --accent: 330 35% 16%;
+  --accent-foreground: 330 85% 72%;
+  --border: 270 22% 16%;
+  --input: 270 22% 16%;
+  --ring: 330 80% 58%;
+  --sidebar-background: 270 50% 4%;
+  --sidebar-foreground: 300 20% 94%;
+  --sidebar-primary: 330 80% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 330 70% 38%;
+  --sidebar-accent-foreground: 300 30% 98%;
+  --sidebar-border: 270 30% 12%;
+  --sidebar-ring: 330 80% 58%;
+}
+
+/*
+ * Neon Noir sidebar — deep noir + holographic bloom, skyline,
+ * and falling rain.
+ */
+html[data-palette='neonnoir'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='neonnoir'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='neonnoir'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off[data-palette='neonnoir'] .sandwalk-shell-sidebar {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #0A0614 !important;
+  border-color: transparent;
+  box-shadow: inset -1px 0 12px -2px hsl(330 80% 58% / 0.35) !important;
+}
+
+html[data-palette='neonnoir'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='neonnoir'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass:not(.dark)[data-palette='neonnoir'] .sandwalk-shell-sidebar {
+  --sidebar-foreground: 300 20% 94%;
+  --foreground: 300 20% 94%;
+  --muted-foreground: 300 18% 70%;
+  color: hsl(300 20% 94%);
+}
+
+html[data-palette='neonnoir'] .sandwalk-shell-sidebar > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Holographic bloom + skyline */
+html[data-palette='neonnoir'] .sandwalk-shell-sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.95;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22280%22%20height%3D%22360%22%20viewBox%3D%220%200%20280%20360%22%20preserveAspectRatio%3D%22xMidYMax%20meet%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22holo%22%20cx%3D%2228%25%22%20cy%3D%2242%25%22%20r%3D%2255%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23FF4DA6%22%20stop-opacity%3D%22.38%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.4%22%20stop-color%3D%22%23E83A8A%22%20stop-opacity%3D%22.18%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230A0614%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%3C%2FradialGradient%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22fog%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%231A0A2E%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.6%22%20stop-color%3D%22%232A1450%22%20stop-opacity%3D%22.14%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230A0614%22%20stop-opacity%3D%22.5%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22neon%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23E83A8A%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23E83A8A%22%20stop-opacity%3D%22.45%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%235C2A8A%22%20stop-opacity%3D%22.12%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22280%22%20height%3D%22360%22%20fill%3D%22url%28%23holo%29%22%2F%3E%0A%20%20%3Crect%20width%3D%22280%22%20height%3D%22360%22%20fill%3D%22url%28%23fog%29%22%2F%3E%0A%20%20%3Cg%20fill%3D%22%2305030A%22%20fill-opacity%3D%22.9%22%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%22286%22%20width%3D%2216%22%20height%3D%2274%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2214%22%20y%3D%22262%22%20width%3D%2220%22%20height%3D%2298%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2232%22%20y%3D%22274%22%20width%3D%2212%22%20height%3D%2286%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2242%22%20y%3D%22248%22%20width%3D%2226%22%20height%3D%22112%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2266%22%20y%3D%22268%22%20width%3D%2214%22%20height%3D%2292%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2278%22%20y%3D%22254%22%20width%3D%2222%22%20height%3D%22106%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2298%22%20y%3D%22270%22%20width%3D%2212%22%20height%3D%2290%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22108%22%20y%3D%22240%22%20width%3D%2228%22%20height%3D%22120%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22134%22%20y%3D%22262%22%20width%3D%2216%22%20height%3D%2298%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22148%22%20y%3D%22250%22%20width%3D%2224%22%20height%3D%22110%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22170%22%20y%3D%22276%22%20width%3D%2212%22%20height%3D%2284%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22180%22%20y%3D%22256%22%20width%3D%2228%22%20height%3D%22104%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22206%22%20y%3D%22268%22%20width%3D%2214%22%20height%3D%2292%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22218%22%20y%3D%22244%22%20width%3D%2234%22%20height%3D%22116%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22250%22%20y%3D%22260%22%20width%3D%2230%22%20height%3D%22100%22%2F%3E%0A%20%20%3C%2Fg%3E%0A%20%20%3Cg%3E%0A%20%20%20%20%3Crect%20x%3D%2220%22%20y%3D%22278%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23E83A8A%22%20fill-opacity%3D%22.65%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2250%22%20y%3D%22262%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23A8D8FF%22%20fill-opacity%3D%22.5%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2290%22%20y%3D%22272%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23E83A8A%22%20fill-opacity%3D%22.7%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22120%22%20y%3D%22255%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23E83A8A%22%20fill-opacity%3D%22.6%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22188%22%20y%3D%22270%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23A8D8FF%22%20fill-opacity%3D%22.45%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22230%22%20y%3D%22258%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23E83A8A%22%20fill-opacity%3D%22.65%22%2F%3E%0A%20%20%3C%2Fg%3E%0A%20%20%3Crect%20x%3D%220%22%20y%3D%22322%22%20width%3D%22280%22%20height%3D%2238%22%20fill%3D%22url%28%23neon%29%22%20fill-opacity%3D%22.3%22%2F%3E%0A%3C%2Fsvg%3E");
+  background-size: 100% 100%;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+}
+
+/* Falling rain */
+html[data-palette='neonnoir'] .sandwalk-shell-sidebar::after,
+html.sandwalk-mac-glass[data-palette='neonnoir'] .sandwalk-shell-sidebar::after,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='neonnoir'] .sandwalk-shell-sidebar::after,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off[data-palette='neonnoir'] .sandwalk-shell-sidebar::after,
+html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active)[data-palette='neonnoir'] .sandwalk-shell-sidebar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  width: auto;
+  opacity: 0.35;
+  background: none;
+  background-image:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 10px,
+      hsl(330 80% 70% / 0) 10px,
+      hsl(330 80% 70% / 0.18) 11px,
+      transparent 12px,
+      transparent 28px
+    ),
+    repeating-linear-gradient(
+      185deg,
+      transparent 0,
+      transparent 18px,
+      hsl(220 60% 70% / 0) 18px,
+      hsl(220 60% 70% / 0.12) 19px,
+      transparent 20px,
+      transparent 40px
+    );
+  background-size: 14px 120px, 22px 160px;
+  animation: neonnoir-rain 2.8s linear infinite;
+}
+
+@keyframes neonnoir-rain {
+  from {
+    background-position: 0 0, 8px 0;
+  }
+  to {
+    background-position: 0 120px, 8px 160px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-palette='neonnoir'] .sandwalk-shell-sidebar::after {
+    animation: none;
+    opacity: 0.22;
+  }
+}
+
+
 /*
  * Gradient sidebars (Sandwalk Dorado, Ember, Verdant) — blend the sidebar
  * background into `--sidebar-gradient-end` top-to-bottom. Wins over the
