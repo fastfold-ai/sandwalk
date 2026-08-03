@@ -143,6 +143,7 @@ export function useComposerDraftState({
         slash,
         atMention,
         setLocalDraft,
+        commitDraft,
         emittedDraftRef,
         pendingCaretRef,
         applyComposerCaret
@@ -150,6 +151,7 @@ export function useComposerDraftState({
     [
       applyComposerCaret,
       atMention,
+      commitDraft,
       draft,
       pendingCaretRef,
       setLocalDraft,
@@ -161,13 +163,18 @@ export function useComposerDraftState({
     if (!atMention) return []
     const query = atMention.query.toLowerCase()
     return workspaceFiles
-      .filter(file => file.type === 'file')
       .filter(file => {
         if (!query) return true
         return (
           file.name.toLowerCase().includes(query) ||
           file.path.toLowerCase().includes(query)
         )
+      })
+      .sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type === 'directory' ? -1 : 1
+        }
+        return a.path.localeCompare(b.path)
       })
       .slice(0, 40)
   }, [atMention, workspaceFiles])

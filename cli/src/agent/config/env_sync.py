@@ -175,6 +175,7 @@ def env_var_mappings(api_keys: dict) -> dict[str, str]:
             "XAI_API_KEY": "llm.xai_api_key",
             "GEMINI_API_KEY": "llm.google_api_key",
             "MOONSHOT_API_KEY": "llm.moonshot_api_key",
+            "OPENROUTER_API_KEY": "llm.openrouter_api_key",
             "OPENCODE_API_KEY": "llm.opencode_api_key",
             "OPENAI_BASE_URL": "llm.openai_base_url",
             "CT_DATA_DIR": "data.base",

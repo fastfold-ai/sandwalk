@@ -1,5 +1,6 @@
 import { Icon } from '@iconify/react'
 import type { WorkspaceFile } from '@sandwalk/agent-ui-core'
+import { Folder } from 'lucide-react'
 import {
   forwardRef,
   type KeyboardEvent,
@@ -7,7 +8,8 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState} from 'react'
+  useState
+} from 'react'
 
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { getFileIcon } from '@/lib/file-icons'
@@ -131,10 +133,15 @@ export const ComposerAtMenu = forwardRef<
     <div className="bg-popover border-border/70 absolute bottom-full left-0 right-0 z-40 mb-2 overflow-hidden rounded-lg border shadow-lg">
       <div ref={listRootRef} className="min-h-0">
         <ScrollArea className="h-64">
-          <div className="p-1" role="listbox" aria-label="Workspace files">
+          <div
+            className="p-1"
+            role="listbox"
+            aria-label="Workspace files and folders"
+          >
             {results.length > 0 ? (
               results.map(file => {
                 const selected = selectedFile?.path === file.path
+                const isFolder = file.type === 'directory'
                 return (
                   <button
                     key={file.path}
@@ -156,16 +163,22 @@ export const ComposerAtMenu = forwardRef<
                       selected && 'bg-muted'
                     )}
                   >
-                    <Icon
-                      icon={getFileIcon(file.name)}
-                      className="mt-0.5 size-4 shrink-0"
-                    />
+                    {isFolder ? (
+                      <Folder className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+                    ) : (
+                      <Icon
+                        icon={getFileIcon(file.name)}
+                        className="mt-0.5 size-4 shrink-0"
+                      />
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">
                         @{file.name}
+                        {isFolder ? '/' : ''}
                       </span>
                       <span className="text-muted-foreground block truncate text-[11px]">
                         workspace/{file.path}
+                        {isFolder ? '/' : ''}
                       </span>
                     </span>
                   </button>
@@ -175,7 +188,7 @@ export const ComposerAtMenu = forwardRef<
               <div className="text-muted-foreground px-2 py-1.5 text-xs">
                 {workspaceFileCount === 0
                   ? 'No workspace files yet'
-                  : 'No matching files'}
+                  : 'No matching files or folders'}
               </div>
             )}
           </div>

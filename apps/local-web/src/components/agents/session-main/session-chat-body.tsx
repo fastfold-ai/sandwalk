@@ -226,6 +226,7 @@ export function SessionChatBody({
               onScrollToBottom={scrollChatToBottom}
               skills={agentComposerSlotProps.skills}
               mcpServers={agentComposerSlotProps.mcpServers}
+              workspaceFiles={agentComposerSlotProps.workspaceFiles}
             />
           ) : null}
         </div>

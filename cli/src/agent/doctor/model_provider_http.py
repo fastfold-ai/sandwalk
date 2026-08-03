@@ -49,6 +49,8 @@ _PROBE_MODELS = {
     # Curated serverless id from the Together catalog (non-serverless
     # Meta-Llama Turbo returns HTTP 400 "Unable to access non-serverless model").
     "together": "zai-org/GLM-5.2",
+    # OpenRouter free-tier ping; curated catalog default is Claude Sonnet.
+    "openrouter": "openai/gpt-4o-mini",
 }
 
 
@@ -320,9 +322,16 @@ def probe_llm_api_key(
     meta = OPENAI_COMPATIBLE_PROVIDERS[provider_key]
     resolved = str(meta.get("label") or provider_key)
     base = str(meta["base_url"]).rstrip("/")
+    headers = {"Authorization": f"Bearer {key}"}
+    if provider_key == "openrouter":
+        from agent.deepagents_runtime.openrouter_attribution import (
+            openrouter_attribution_headers,
+        )
+
+        headers.update(openrouter_attribution_headers())
     return probe_chat_completions(
         f"{base}/chat/completions",
-        {"Authorization": f"Bearer {key}"},
+        headers,
         label=label or resolved,
         model=model,
         timeout=wait,
@@ -344,6 +353,7 @@ CHAT_PROBE_PROVIDERS = frozenset(
         "mistral",
         "qwen",
         "together",
+        "openrouter",
     }
 )
 

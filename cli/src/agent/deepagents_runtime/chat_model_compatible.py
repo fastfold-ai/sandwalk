@@ -28,7 +28,8 @@ def build_compatible_chat_model(config, provider: str, *, temperature: float):
         raise ValueError(
             f"deepagents runtime does not support llm.provider '{provider}'. "
             "Use 'anthropic', 'openai', 'xai', 'google', 'moonshot', 'nvidia', "
-            "'opencode', 'deepseek', 'minimax', 'mistral', 'qwen', or 'together'."
+            "'opencode', 'deepseek', 'minimax', 'mistral', 'qwen', 'together', "
+            "or 'openrouter'."
         )
 
     meta = OPENAI_COMPATIBLE_PROVIDERS.get(provider, {})

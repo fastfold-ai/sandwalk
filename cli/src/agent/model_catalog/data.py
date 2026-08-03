@@ -34,6 +34,7 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
     "openai": [
         ("gpt-5.6-sol", "GPT-5.6 Sol", "High-speed frontier model for coding"),
         ("gpt-5.6-terra", "GPT-5.6 Terra", "Balanced GPT-5.6 for general professional work"),
+        ("gpt-5.6-luna", "GPT-5.6 Luna", "GPT-5.6 variant for broader agent workloads"),
         ("gpt-5.5", "GPT-5.5", "Frontier model for coding and professional work"),
         ("gpt-5.3-codex", "Codex 5.3", "Specialized OpenAI coding model (Responses API)"),
         # Legacy (disabled by default)
@@ -135,36 +136,206 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
     "together": [
         (
             "thinkingmachines/Inkling",
-            "Inkling · via Together",
+            "Inkling",
             "Thinking Machines Inkling — multimodal (image + audio) via Together AI",
         ),
         (
             "zai-org/GLM-5.2",
-            "GLM-5.2 · via Together",
+            "GLM-5.2",
             "Z AI GLM-5.2 via Together AI",
         ),
         (
             "moonshotai/Kimi-K2.7-Code",
-            "Kimi K2.7 Code · via Together",
+            "Kimi K2.7 Code",
             "Moonshot Kimi K2.7 Code via Together AI",
         ),
         (
             "moonshotai/Kimi-K2.6",
-            "Kimi K2.6 · via Together",
+            "Kimi K2.6",
             "Moonshot Kimi K2.6 via Together AI",
         ),
         (
             "deepseek-ai/DeepSeek-V4-Pro",
-            "DeepSeek V4 Pro · via Together",
+            "DeepSeek V4 Pro",
             "DeepSeek V4 Pro via Together AI",
         ),
         # Llama 4 (Maverick/Scout) is dedicated-endpoint-only on Together now
         # (HTTP 400 model_not_available on serverless) — not curated.
     ],
+    # Curated defaults + a few opt-in highlights. Full tool-capable catalog is
+    # also discovered live (discover_models=true); new discoveries start disabled.
+    "openrouter": [
+        (
+            "anthropic/claude-opus-5",
+            "Claude Opus 5",
+            "Anthropic flagship via OpenRouter",
+        ),
+        (
+            "anthropic/claude-sonnet-5",
+            "Claude Sonnet 5",
+            "Anthropic — default OpenRouter pick for agents",
+        ),
+        (
+            "anthropic/claude-haiku-4.5",
+            "Claude Haiku 4.5",
+            "Anthropic — fast / cheap Claude via OpenRouter",
+        ),
+        (
+            "openai/gpt-5.6-terra",
+            "GPT-5.6 Terra",
+            "OpenAI GPT-5.6 Terra via OpenRouter",
+        ),
+        (
+            "openai/gpt-5.6-luna",
+            "GPT-5.6 Luna",
+            "OpenAI GPT-5.6 Luna via OpenRouter",
+        ),
+        (
+            "google/gemini-3.5-flash",
+            "Gemini 3.5 Flash",
+            "Google — fast Gemini 3.5 via OpenRouter",
+        ),
+        (
+            "google/gemini-2.5-pro",
+            "Gemini 2.5 Pro",
+            "Google flagship via OpenRouter",
+        ),
+        (
+            "x-ai/grok-4.5",
+            "Grok 4.5",
+            "xAI flagship via OpenRouter",
+        ),
+        (
+            "deepseek/deepseek-v4-pro",
+            "DeepSeek V4 Pro",
+            "DeepSeek flagship via OpenRouter",
+        ),
+        (
+            "thinkingmachines/inkling",
+            "Inkling",
+            "Thinking Machines Inkling via OpenRouter",
+        ),
+        (
+            "qwen/qwen3.7-flash",
+            "Qwen3.7 Flash",
+            "Alibaba Qwen3.7 Flash via OpenRouter",
+        ),
+        (
+            "moonshotai/kimi-k2.6",
+            "Kimi K2.6",
+            "Moonshot Kimi via OpenRouter",
+        ),
+        (
+            "mistralai/mistral-large-2512",
+            "Mistral Large",
+            "Mistral flagship via OpenRouter",
+        ),
+        (
+            "z-ai/glm-5.2",
+            "GLM 5.2",
+            "Z.ai GLM 5.2 via OpenRouter",
+        ),
+        (
+            "xiaomi/mimo-v2.5",
+            "MiMo V2.5",
+            "Xiaomi MiMo V2.5 via OpenRouter",
+        ),
+        # Optional / previous gen (disabled by default)
+        (
+            "anthropic/claude-opus-5-fast",
+            "Claude Opus 5 Fast",
+            "Anthropic Opus 5 fast variant via OpenRouter",
+        ),
+        (
+            "anthropic/claude-sonnet-4.6",
+            "Claude Sonnet 4.6",
+            "Previous Sonnet via OpenRouter",
+        ),
+        (
+            "anthropic/claude-sonnet-4.5",
+            "Claude Sonnet 4.5",
+            "Previous Sonnet via OpenRouter",
+        ),
+        (
+            "anthropic/claude-opus-4.6",
+            "Claude Opus 4.6",
+            "Previous Opus via OpenRouter",
+        ),
+        (
+            "openai/gpt-5.6-sol",
+            "GPT-5.6 Sol",
+            "OpenAI GPT-5.6 Sol via OpenRouter",
+        ),
+        (
+            "openai/gpt-5.2",
+            "GPT-5.2",
+            "Previous OpenAI flagship via OpenRouter",
+        ),
+        (
+            "openai/gpt-4o-mini",
+            "GPT-4o Mini",
+            "OpenAI — fast / cheap via OpenRouter",
+        ),
+        (
+            "google/gemini-2.5-flash",
+            "Gemini 2.5 Flash",
+            "Previous Gemini Flash via OpenRouter",
+        ),
+        (
+            "deepseek/deepseek-v4-flash",
+            "DeepSeek V4 Flash",
+            "DeepSeek V4 Flash via OpenRouter",
+        ),
+        (
+            "deepseek/deepseek-chat-v3.1",
+            "DeepSeek Chat V3.1",
+            "Previous DeepSeek via OpenRouter",
+        ),
+        (
+            "thinkingmachines/inkling-small",
+            "Inkling Small",
+            "Thinking Machines Inkling Small via OpenRouter",
+        ),
+        (
+            "meta/muse-spark-1.1",
+            "Muse Spark 1.1",
+            "Meta Muse Spark via OpenRouter",
+        ),
+        (
+            "qwen/qwen3.7-plus",
+            "Qwen3.7 Plus",
+            "Alibaba Qwen3.7 Plus via OpenRouter",
+        ),
+        (
+            "qwen/qwen3.7-max",
+            "Qwen3.7 Max",
+            "Alibaba Qwen3.7 Max via OpenRouter",
+        ),
+        (
+            "qwen/qwen3-max",
+            "Qwen3 Max",
+            "Previous Qwen flagship via OpenRouter",
+        ),
+        (
+            "moonshotai/kimi-k2.7-code",
+            "Kimi K2.7 Code",
+            "Moonshot Kimi K2.7 Code via OpenRouter",
+        ),
+        (
+            "moonshotai/kimi-k2",
+            "Kimi K2",
+            "Previous Kimi via OpenRouter",
+        ),
+        (
+            "nvidia/nemotron-3-ultra-550b-a55b:free",
+            "Nemotron 3 Ultra Free",
+            "NVIDIA Nemotron 3 Ultra free tier via OpenRouter",
+        ),
+    ],
 }
 
 # Bump when the default-enabled set changes so existing configs get migrated once.
-CATALOG_DEFAULTS_VERSION = 4
+CATALOG_DEFAULTS_VERSION = 6
 
 # Models present in the catalog but hidden by default. Users can re-enable them
 # from Dashboard → Models; toggling simply removes them from the hidden list.
@@ -182,6 +353,25 @@ DEFAULT_DISABLED_MODELS: frozenset[str] = frozenset(
         "gpt-5-mini",
         "gpt-5-nano",
         "kimi-k2.5",
+        # OpenRouter optional / previous-gen (full vendor/model ids)
+        "anthropic/claude-opus-5-fast",
+        "anthropic/claude-sonnet-4.6",
+        "anthropic/claude-sonnet-4.5",
+        "anthropic/claude-opus-4.6",
+        "openai/gpt-5.6-sol",
+        "openai/gpt-5.2",
+        "openai/gpt-4o-mini",
+        "google/gemini-2.5-flash",
+        "deepseek/deepseek-v4-flash",
+        "deepseek/deepseek-chat-v3.1",
+        "thinkingmachines/inkling-small",
+        "meta/muse-spark-1.1",
+        "qwen/qwen3.7-plus",
+        "qwen/qwen3.7-max",
+        "qwen/qwen3-max",
+        "moonshotai/kimi-k2.7-code",
+        "moonshotai/kimi-k2",
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
     }
 )
 

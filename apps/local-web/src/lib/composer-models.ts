@@ -53,7 +53,15 @@ const CLOUD_PROVIDER_LABELS: Record<string, string> = {
   minimax: 'MiniMax',
   mistral: 'Mistral',
   qwen: 'Qwen',
-  together: 'Together AI'
+  together: 'Together AI',
+  openrouter: 'OpenRouter'
+}
+
+/** Drop redundant “· via Provider” suffixes — provider shows under the name. */
+export function formatComposerModelLabel(label: string): string {
+  return String(label || '')
+    .replace(/\s*·\s*via\s+.+$/i, '')
+    .trim()
 }
 
 const LOCAL_BACKEND_LABELS: Record<string, string> = {
@@ -66,7 +74,7 @@ const LOCAL_BACKEND_LABELS: Record<string, string> = {
   other: 'Local'
 }
 
-/** Right-side badge in the composer model picker (provider / local backend). */
+/** Provider / local-backend label shown under the model name in the picker. */
 export function modelOptionBadge(model: {
   source: string
   provider: string
@@ -127,7 +135,7 @@ export function toComposerModelOptions(
     .map(model => ({
       provider: model.provider,
       model: model.id,
-      label: model.label,
+      label: formatComposerModelLabel(model.label),
       speed: modelOptionBadge(model),
       profileId: model.profileId,
       source: model.source,

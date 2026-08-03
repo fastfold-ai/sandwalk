@@ -73,12 +73,13 @@ class DeepAgentsRunMixin:
             "mistral",
             "qwen",
             "together",
+            "openrouter",
         ):
             return self._make_error_result(
                 query,
                 f"Unsupported llm.provider '{provider}'. Use 'anthropic', 'openai', "
                 "'xai', 'google', 'moonshot', 'nvidia', 'opencode', 'deepseek', "
-                "'minimax', 'mistral', 'qwen', or 'together' "
+                "'minimax', 'mistral', 'qwen', 'together', or 'openrouter' "
                 "(OpenAI-compatible endpoints via llm.openai_base_url).",
                 0.0,
             )

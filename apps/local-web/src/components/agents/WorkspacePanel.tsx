@@ -51,7 +51,7 @@ export function WorkspacePanel({
   /** When set, open this workspace path in a preview tab. */
   openPathRequest?: string | null
   onOpenPathRequestHandled?: () => void
-  onAddToChat: (path: string) => void
+  onAddToChat: (path: string, kind?: 'file' | 'directory') => void
   onBuildPlan?: (path: string) => void
   onFilesChange?: (count: number) => void
   onNewFiles?: (
@@ -101,8 +101,8 @@ export function WorkspacePanel({
       totalCount={workspace.filteredFiles.length}
       query={workspace.query}
       viewMode={workspace.viewMode}
-      flatMode={workspace.flatMode}
       expandedGroups={workspace.expandedGroups}
+      expandedDirs={workspace.expandedDirs}
       activePath={workspace.activePath}
       workspacePath={workspacePath}
       empty={
@@ -110,15 +110,20 @@ export function WorkspacePanel({
       }
       onQueryChange={workspace.setQuery}
       onViewModeChange={workspace.setViewMode}
-      onFlatModeChange={workspace.setFlatMode}
       onToggleGroup={id =>
         workspace.setExpandedGroups(current => ({
           ...current,
           [id]: !(current[id] ?? true)
         }))
       }
+      onToggleDir={path =>
+        workspace.setExpandedDirs(current => ({
+          ...current,
+          [path]: !current[path]
+        }))
+      }
+      onExpandedDirsChange={workspace.setExpandedDirs}
       onOpenFile={file => void workspace.openFile(file)}
-      onDownloadFile={workspace.downloadFile}
       onDownloadAll={workspace.downloadAll}
       onUpload={() => workspace.uploadRef.current?.click()}
       onNewFile={() => workspace.openPathDialog('file')}

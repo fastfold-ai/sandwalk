@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  formatComposerModelLabel,
   formatContextWindow,
   formatPickerContextBadge,
   isComposerModelSelected,
@@ -58,7 +59,23 @@ describe('modelOptionBadge', () => {
     expect(modelOptionBadge({ source: 'cloud', provider: 'google' })).toBe(
       'Gemini'
     )
+    expect(modelOptionBadge({ source: 'cloud', provider: 'openrouter' })).toBe(
+      'OpenRouter'
+    )
+    expect(modelOptionBadge({ source: 'cloud', provider: 'together' })).toBe(
+      'Together AI'
+    )
   })
+
+describe('formatComposerModelLabel', () => {
+  it('strips via-provider suffixes', () => {
+    expect(formatComposerModelLabel('DeepSeek V4 Pro · via Together')).toBe(
+      'DeepSeek V4 Pro'
+    )
+    expect(formatComposerModelLabel('Inkling · via Together')).toBe('Inkling')
+    expect(formatComposerModelLabel('Claude Opus 4.6')).toBe('Claude Opus 4.6')
+  })
+})
 
   it('prefers provider over generic Custom for custom cloud models', () => {
     expect(modelOptionBadge({ source: 'custom', provider: 'openai' })).toBe(
@@ -74,6 +91,15 @@ describe('toComposerModelOptions', () => {
         id: 'claude-sonnet',
         label: 'Sonnet',
         provider: 'anthropic',
+        source: 'cloud',
+        profileId: null,
+        backend: null,
+        enabled: true
+      },
+      {
+        id: 'deepseek-ai/DeepSeek-V4-Pro',
+        label: 'DeepSeek V4 Pro · via Together',
+        provider: 'together',
         source: 'cloud',
         profileId: null,
         backend: null,
@@ -103,6 +129,24 @@ describe('toComposerModelOptions', () => {
         model: 'claude-sonnet',
         label: 'Sonnet',
         speed: 'Anthropic',
+        profileId: null,
+        source: 'cloud',
+        backend: null,
+        supportsReasoningEffort: false,
+        reasoningEffortOptions: [],
+        reasoningEffort: 'medium',
+        reasoningFast: false,
+        contextWindow: null,
+        supportsImageInputs: false,
+        supportsPdfInputs: false,
+        supportsAudioInputs: false,
+        supportsVideoInputs: false
+      },
+      {
+        provider: 'together',
+        model: 'deepseek-ai/DeepSeek-V4-Pro',
+        label: 'DeepSeek V4 Pro',
+        speed: 'Together AI',
         profileId: null,
         source: 'cloud',
         backend: null,

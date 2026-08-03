@@ -133,7 +133,7 @@ export function ComposerModelPicker({
       <PopoverTrigger asChild>
         <button
           type="button"
-          title={`${selectedModel.label}${contextBadge ? ` ${contextBadge}` : ''}${selectedModel.speed ? ` · ${selectedModel.speed}` : ''}${reasoningBadge ? ` · ${reasoningBadge}` : ''}`}
+          title={`${selectedModel.label}${selectedModel.speed ? ` · ${selectedModel.speed}` : ''}${contextBadge ? ` ${contextBadge}` : ''}${reasoningBadge ? ` · ${reasoningBadge}` : ''}`}
           className="text-muted-foreground hover:text-foreground inline-flex min-w-0 max-w-[min(100%,20rem)] items-center gap-1 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
         >
           <span className="min-w-0 truncate font-medium">
@@ -147,10 +147,6 @@ export function ComposerModelPicker({
           {reasoningBadge ? (
             <span className="text-muted-foreground shrink-0 text-[11px]">
               {reasoningBadge}
-            </span>
-          ) : selectedModel.speed ? (
-            <span className="text-muted-foreground shrink-0 text-[11px]">
-              {selectedModel.speed}
             </span>
           ) : null}
           <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />

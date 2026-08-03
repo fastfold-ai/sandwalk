@@ -60,10 +60,128 @@ def model_supports_reasoning_effort(
     # Moonshot Kimi — only models with a real thinking toggle.
     if provider_norm == "moonshot":
         return moonshot_model_supports_thinking_toggle(value)
+    # OpenRouter — unified ``reasoning.effort`` for models that advertise it.
+    if provider_norm == "openrouter":
+        return openrouter_model_supports_reasoning(value)
     # Local / compatible profiles: Unsloth via ``compatible_backend``.
     if provider_norm in {"local", "compatible", "openai-compatible"}:
         return compatible_profile_supports_thinking(compatible_backend)
     return False
+
+
+def _openrouter_slug(model_id: str | None) -> tuple[str, str]:
+    """Return ``(vendor, slug)`` for an OpenRouter-style ``vendor/model`` id."""
+    value = str(model_id or "").strip().lower()
+    if "/" in value:
+        vendor, slug = value.split("/", 1)
+        return vendor, slug
+    return "", value
+
+
+def openrouter_model_supports_reasoning(model_id: str | None) -> bool:
+    """Return True when OpenRouter accepts a ``reasoning`` / effort control.
+
+    Based on OpenRouter ``supported_parameters`` / ``reasoning`` metadata for
+    Sandwalk's curated catalog (and close relatives). Models without a
+    reasoning control (GPT-4o Mini, Kimi K2, Qwen3 Max, Mistral Large) stay
+    out so Effort/Fast is not shown.
+    """
+    vendor, slug = _openrouter_slug(model_id)
+    if not slug:
+        return False
+
+    # OpenAI GPT-5 / o-series (not chat-only variants).
+    if vendor == "openai" or slug.startswith(("gpt-", "o1", "o3", "o4")):
+        if slug.startswith(("o1", "o3", "o4")):
+            return True
+        if slug.startswith("gpt-5"):
+            if "chat" in slug and "latest" in slug:
+                return False
+            return True
+        return False
+
+    # Anthropic — Sonnet/Haiku 4.5+, Opus 4.5+/5+, plus native effort models.
+    if vendor == "anthropic" or slug.startswith("claude-"):
+        import re
+
+        if re.search(r"haiku-4[.-]5", slug):
+            return True
+        if re.search(r"sonnet-4[.-][56]", slug):
+            return True
+        if re.search(r"opus-4[.-][5678]", slug):
+            return True
+        return anthropic_model_supports_effort(slug)
+
+    # Google — Gemini 2.5+ / 3+ expose OpenRouter reasoning (native Google
+    # only wires Gemini 3+ thinking_level).
+    if vendor == "google" or slug.startswith("gemini-"):
+        return slug.startswith("gemini-2.5") or slug.startswith("gemini-3")
+
+    # xAI Grok 4.x
+    if vendor in {"x-ai", "xai"} or slug.startswith("grok-"):
+        return xai_model_supports_reasoning_effort(slug)
+
+    # DeepSeek V3.1+ / V4 / R1 / reasoner variants.
+    if "deepseek" in vendor or "deepseek" in slug:
+        return any(
+            token in slug
+            for token in ("v3.1", "v3-1", "v3.2", "v4", "r1", "reasoner", "thinking")
+        )
+
+    # Qwen3.7 reasoning models on OpenRouter.
+    if vendor == "qwen" or slug.startswith("qwen"):
+        return "qwen3.7" in slug or "qwen3-7" in slug
+
+    # Thinking Machines Inkling.
+    if "thinkingmachines" in vendor or "inkling" in slug:
+        return "inkling" in slug
+
+    # Meta Muse Spark.
+    if vendor == "meta" or "muse" in slug:
+        return "muse" in slug
+
+    # Newer Kimi on OpenRouter (k2.5+ / k3 advertise reasoning).
+    if "moonshot" in vendor or slug.startswith("kimi-"):
+        return any(
+            token in slug
+            for token in ("kimi-k2.5", "kimi-k2.6", "kimi-k2.7", "kimi-k3")
+        )
+
+    # NVIDIA Nemotron (incl. :free) on OpenRouter.
+    if vendor == "nvidia" or "nemotron" in slug:
+        return "nemotron" in slug
+
+    # Z.ai GLM on OpenRouter.
+    if vendor in {"z-ai", "zai"} or slug.startswith("glm-"):
+        return slug.startswith("glm-")
+
+    # Xiaomi MiMo on OpenRouter.
+    if vendor == "xiaomi" or slug.startswith("mimo-"):
+        return "mimo-" in slug
+
+    return False
+
+
+def openrouter_model_reasoning_mandatory(model_id: str | None) -> bool:
+    """Return True when OpenRouter rejects ``reasoning.effort: none``.
+
+    Matches curated models whose OpenRouter ``reasoning.mandatory`` is true
+    (e.g. Gemini 2.5 Pro, Grok 4.5).
+    """
+    _, slug = _openrouter_slug(model_id)
+    if not slug:
+        return False
+    if "gemini-2.5-pro" in slug or "gemini-2-5-pro" in slug:
+        return True
+    if "grok-4.5" in slug or "grok-4-5" in slug:
+        return True
+    return False
+
+
+def openrouter_model_omits_temperature(model_id: str | None) -> bool:
+    """GPT-5 via OpenRouter omits temperature from supported_parameters."""
+    _, slug = _openrouter_slug(model_id)
+    return slug.startswith("gpt-5")
 
 
 def xai_model_supports_reasoning_effort(model_id: str | None) -> bool:

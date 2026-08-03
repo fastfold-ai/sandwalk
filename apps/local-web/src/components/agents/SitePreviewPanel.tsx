@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { openInSystemBrowser } from '@/lib/desktop'
+import { SITE_PREVIEW_SANDBOX } from '@/lib/sites'
 
 export function SitePreviewPanel({
   client,
@@ -271,7 +272,7 @@ export function SitePreviewPanel({
           key={`${selected.id}-${selected.updatedAt}-${preview.url}`}
           title={`${selected.name} preview`}
           src={preview.url}
-          sandbox="allow-forms allow-modals allow-popups allow-scripts"
+          sandbox={SITE_PREVIEW_SANDBOX}
           referrerPolicy="no-referrer"
           className="min-h-0 flex-1 bg-white"
         />

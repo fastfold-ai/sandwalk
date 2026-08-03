@@ -1,34 +1,47 @@
 import { Icon } from '@iconify/react'
-import { Plug, Sparkles, X } from 'lucide-react'
+import { Folder, Plug, Sparkles, X } from 'lucide-react'
 
 import { mcpIconForChip } from '@/components/agents/composer/composer-mention-utils'
+import {
+  mentionDisplayName,
+  mentionPathIsDirectory
+} from '@/components/agents/composer-parts'
 import { getFileIcon } from '@/lib/file-icons'
 import { skillIconForName, skillIconInvertInDark } from '@/lib/skill-icons'
 import { cn } from '@/lib/utils'
 
 export function ComposerFileChip({
   path,
+  kind = 'file',
   onOpenFile,
   onRemove
 }: {
   path: string
+  kind?: 'file' | 'directory'
   onOpenFile?: (path: string) => void
   onRemove: () => void
 }) {
-  const name = path.split('/').at(-1) || path
+  const isFolder = kind === 'directory' || mentionPathIsDirectory(path)
+  const name = mentionDisplayName(path)
+  const openPath = path.replace(/\/+$/u, '') || path
   return (
     <span className="bg-muted/50 border-border/70 inline-flex max-w-full select-none items-center gap-0.5 rounded-full border px-1.5 py-0 align-middle text-xs leading-5">
-      <Icon
-        icon={getFileIcon(name)}
-        className="text-muted-foreground size-3.5 shrink-0"
-      />
+      {isFolder ? (
+        <Folder className="text-muted-foreground size-3.5 shrink-0" />
+      ) : (
+        <Icon
+          icon={getFileIcon(name)}
+          className="text-muted-foreground size-3.5 shrink-0"
+        />
+      )}
       <button
         type="button"
         className="text-foreground max-w-[180px] truncate hover:underline"
-        title={`Open @${path}`}
-        onClick={() => onOpenFile?.(path)}
+        title={`Open @${openPath}`}
+        onClick={() => onOpenFile?.(openPath)}
       >
         @{name}
+        {isFolder ? '/' : ''}
       </button>
       <button
         type="button"

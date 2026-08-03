@@ -214,7 +214,9 @@ export function useAppSessionEffects({
     pendingMentionRef.current = null
     const paths = Array.isArray(pending) ? pending : [pending]
     if (!paths.length) return
-    setComposer(current => `${current}${paths.map(fileChipToken).join('')}`)
+    setComposer(
+      current => `${current}${paths.map(path => fileChipToken(path)).join('')}`
+    )
     setComposerFiles(paths)
   }, [sessionId, setComposer, setComposerFiles, pendingMentionRef])
 }

@@ -87,6 +87,14 @@ API_KEYS_LLM = {
         "url": "https://api.together.xyz/settings/api-keys",
         "free": False,
     },
+    "llm.openrouter_api_key": {
+        "name": "OpenRouter",
+        "provider_key": "openrouter",
+        "env_var": "OPENROUTER_API_KEY",
+        "description": "OpenRouter gateway for multi-provider models (Sandwalk-attributed)",
+        "url": "https://openrouter.ai/keys",
+        "free": False,
+    },
     "api.ibm_rxn_key": {
         "name": "IBM RXN",
         "env_var": "IBM_RXN_API_KEY",

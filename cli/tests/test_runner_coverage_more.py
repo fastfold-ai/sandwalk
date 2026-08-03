@@ -50,6 +50,37 @@ class TestClassifyLlmError:
         assert title == "Rate limited"
         assert "429" in body
 
+    def test_openrouter_rate_limit_surfaces_upstream_raw(self):
+        class RateLimitError(Exception):
+            def __init__(self, message: str, *, body=None, status_code=429):
+                super().__init__(message)
+                self.body = body
+                self.status_code = status_code
+
+        RateLimitError.__module__ = "openai"
+        err = RateLimitError(
+            "Error code: 429 - {'error': {'message': 'Provider returned error'}}",
+            body={
+                "error": {
+                    "message": "Provider returned error",
+                    "code": 429,
+                    "metadata": {
+                        "raw": (
+                            "together.ai: model is currently rate limited, "
+                            "please try again later"
+                        ),
+                        "provider_name": "Together",
+                    },
+                }
+            },
+        )
+        title, body = _classify_llm_error(err)
+        assert title == "Rate limited"
+        first = body.splitlines()[0]
+        assert "together.ai" in first.lower()
+        assert "rate limited" in first.lower()
+        assert "Provider returned error" not in first
+
     def test_connection(self):
         title, body = _classify_llm_error(ConnectionError("connection error"))
         assert title == "Connection problem"

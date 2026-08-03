@@ -1,5 +1,13 @@
 import type { AgentProject, AgentSession, Site } from '@sandwalk/agent-ui-core'
 
+/**
+ * Interactive site preview sandbox. Includes `allow-same-origin` so Chart.js,
+ * canvas heatmaps, and relative asset fetches work in the panel iframe.
+ * Thumbnails intentionally use a stricter empty sandbox (no scripts).
+ */
+export const SITE_PREVIEW_SANDBOX =
+  'allow-forms allow-modals allow-popups allow-same-origin allow-scripts'
+
 export function filterSites(sites: Site[], query: string) {
   const needle = query.trim().toLowerCase()
   if (!needle) return sites

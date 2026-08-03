@@ -86,6 +86,17 @@ OPENAI_COMPATIBLE_PROVIDERS: dict[str, dict[str, str]] = {
         "signup_url": "https://api.together.xyz/settings/api-keys",
         "default_model": "zai-org/GLM-5.2",
     },
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "config_key": "llm.openrouter_api_key",
+        "env_var": "OPENROUTER_API_KEY",
+        "label": "OpenRouter",
+        "signup_url": "https://openrouter.ai/keys",
+        "default_model": "anthropic/claude-sonnet-5",
+        # Discover live tool-capable models; new discoveries start disabled
+        # (see catalog_discovery._seed_openrouter_discovered_hidden).
+        "discover_models": "true",
+    },
 }
 
 OPENAI_PROFILE_DEFAULTS = {

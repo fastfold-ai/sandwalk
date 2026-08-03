@@ -15,6 +15,7 @@ import {
 describe('chip tokens', () => {
   it('builds file, skill, and mcp chip tokens', () => {
     expect(fileChipToken('src/a.ts')).toBe('⟦@:src/a.ts⟧')
+    expect(fileChipToken('evals', 'directory')).toBe('⟦@:evals/⟧')
     expect(skillChipToken('fold')).toBe('⟦/:fold⟧')
     expect(mcpChipToken('linear', 'Linear')).toBe(
       '⟦mcp:linear:Linear⟧'

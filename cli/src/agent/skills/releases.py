@@ -133,7 +133,10 @@ def fetch_repo_head_sha(owner_repo: str, *, timeout_s: float = 2.5) -> dict | No
     return {"sha": sha, "default_branch": branch}
 
 
-_REPO_CHECK_INTERVAL_S = 3600  # 1h — fresher than catalog banner (24h)
+# Short enough that a new GitHub Release surfaces in the Skills UI soon after
+# publish; still caches within a session so list/detail do not hit GitHub every
+# render. Catalog boot banner stays on the longer 24h interval.
+_REPO_CHECK_INTERVAL_S = 5 * 60
 _BUNDLED_PATH_CHECK_INTERVAL_S = 24 * 3600
 
 

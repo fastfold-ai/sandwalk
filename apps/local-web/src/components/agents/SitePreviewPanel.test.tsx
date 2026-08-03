@@ -3,6 +3,8 @@ import type { Site } from '@sandwalk/agent-ui-core'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { SITE_PREVIEW_SANDBOX } from '@/lib/sites'
+
 import { SitePreviewPanel } from './SitePreviewPanel'
 
 afterEach(() => {
@@ -47,9 +49,9 @@ describe('SitePreviewPanel', () => {
     )
 
     await waitFor(() => {
-      expect(
-        screen.getByTitle('Research report preview').getAttribute('src')
-      ).toBe('http://local/preview/one/')
+      const frame = screen.getByTitle('Research report preview')
+      expect(frame.getAttribute('src')).toBe('http://local/preview/one/')
+      expect(frame.getAttribute('sandbox')).toBe(SITE_PREVIEW_SANDBOX)
     })
 
     view.rerender(

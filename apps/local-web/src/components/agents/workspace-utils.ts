@@ -14,14 +14,29 @@ export type ArtifactGroup = {
   files: WorkspaceFile[]
 }
 
-type PersistedFileTabs = {
+export type PersistedFileTabs = {
   paths: string[]
   activePath: string | null
   filesTabActive: boolean
   viewMode?: ViewMode
+  /** Top-level artifact group expand/collapse (per session). */
+  expandedGroups?: Record<string, boolean>
+  /** Nested folder expand/collapse paths (per session). */
+  expandedDirs?: Record<string, boolean>
 }
 
 const OPEN_FILE_TABS_STORAGE_KEY = 'fastfold.open-file-tabs'
+
+function readBoolMap(value: unknown): Record<string, boolean> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const out: Record<string, boolean> = {}
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof key === 'string' && key.length > 0 && typeof entry === 'boolean') {
+      out[key] = entry
+    }
+  }
+  return out
+}
 
 export function readOpenFileTabs(sessionId: string): PersistedFileTabs {
   try {
@@ -42,7 +57,9 @@ export function readOpenFileTabs(sessionId: string): PersistedFileTabs {
       viewMode:
         entry.viewMode === 'grid' || entry.viewMode === 'list'
           ? entry.viewMode
-          : undefined
+          : undefined,
+      expandedGroups: readBoolMap(entry.expandedGroups),
+      expandedDirs: readBoolMap(entry.expandedDirs)
     }
   } catch {
     return { paths: [], activePath: null, filesTabActive: true }

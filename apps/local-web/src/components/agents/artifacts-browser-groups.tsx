@@ -1,9 +1,10 @@
 import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { WorkspaceFile } from '@sandwalk/agent-ui-core'
-import { ChevronDown, ChevronLeft, Download, Folder } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, Folder } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { setWorkspacePathDragData } from '@/components/agents/composer/workspace-path-drag'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { getFileIcon } from '@/lib/file-icons'
 import { cn, relativeTime } from '@/lib/utils'
@@ -40,90 +41,66 @@ function newestMtime(files: WorkspaceFile[]): string | null {
   return best
 }
 
-function entryLabel(file: WorkspaceFile, root: string, showPath: boolean) {
-  if (!showPath) return file.name
-  if (!root) return file.path
-  const prefix = `${root}/`
-  return file.path.startsWith(prefix) ? file.path.slice(prefix.length) : file.path
-}
-
-function GroupFolderTrail({
-  root,
-  cwd,
-  onNavigate
-}: {
-  root: string
-  cwd: string
-  onNavigate: (path: string) => void
-}) {
-  if (cwd === root) return null
-  const relative = root
-    ? cwd.slice(root.length).replace(/^\//, '')
-    : cwd
-  const segments = relative.split('/').filter(Boolean)
-  return (
-    <div className="text-muted-foreground flex min-w-0 items-center gap-0.5 px-1 pb-1 text-[11px]">
-      <button
-        type="button"
-        className="hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded"
-        title="Go up"
-        aria-label="Go up"
-        onClick={() => onNavigate(parentDir(cwd) || root)}
-      >
-        <ChevronLeft className="size-3.5" />
-      </button>
-      <button
-        type="button"
-        className="hover:text-foreground shrink-0 rounded px-0.5"
-        onClick={() => onNavigate(root)}
-      >
-        {root || 'Root'}
-      </button>
-      {segments.map((segment, index) => {
-        const path = [root, ...segments.slice(0, index + 1)]
-          .filter(Boolean)
-          .join('/')
-        return (
-          <span key={path} className="inline-flex min-w-0 items-center gap-0.5">
-            <span className="opacity-50">/</span>
-            <button
-              type="button"
-              className="hover:text-foreground truncate rounded px-0.5"
-              onClick={() => onNavigate(path)}
-            >
-              {segment}
-            </button>
-          </span>
-        )
-      })}
-    </div>
-  )
+function ancestorPaths(path: string): string[] {
+  const parts = path.split('/').filter(Boolean)
+  const out: string[] = []
+  for (let i = 1; i < parts.length; i += 1) {
+    out.push(parts.slice(0, i).join('/'))
+  }
+  return out
 }
 
 function ArtifactEntryRow({
   file,
   label,
+  depth,
+  expanded,
   activePath,
+  onToggleExpand,
   onOpen,
-  onDownloadFile,
   onFileContextMenu
 }: {
   file: WorkspaceFile
   label: string
+  depth: number
+  expanded: boolean
   activePath: string | null
+  onToggleExpand?: () => void
   onOpen: (file: WorkspaceFile) => void
-  onDownloadFile: (path: string) => void
   onFileContextMenu: (file: WorkspaceFile, x: number, y: number) => void
 }) {
+  const draggedRef = useRef(false)
+  const isFolder = file.type === 'directory'
   return (
     <div
       role="button"
       tabIndex={0}
+      draggable
       className={cn(
-        'hover:bg-muted group/file flex w-full cursor-pointer items-center gap-1.5 rounded px-1.5 py-1.5',
+        'hover:bg-muted group/file flex w-full cursor-pointer items-center gap-1 rounded py-1 pr-1.5',
         activePath === file.path && 'bg-muted'
       )}
-      onClick={() => onOpen(file)}
+      style={{ paddingLeft: 4 + depth * 12 }}
+      onDragStart={event => {
+        draggedRef.current = true
+        setWorkspacePathDragData(event.dataTransfer, {
+          path: file.path,
+          type: file.type
+        })
+      }}
+      onDragEnd={() => {
+        window.setTimeout(() => {
+          draggedRef.current = false
+        }, 0)
+      }}
+      onClick={() => {
+        if (draggedRef.current) return
+        if (isFolder) {
+          onToggleExpand?.()
+          return
+        }
+        onOpen(file)
+      }}
       onContextMenu={event => {
         event.preventDefault()
         onFileContextMenu(file, event.clientX, event.clientY)
@@ -131,11 +108,34 @@ function ArtifactEntryRow({
       onKeyDown={event => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
+          if (isFolder) {
+            onToggleExpand?.()
+            return
+          }
           onOpen(file)
         }
       }}
     >
-      {file.type === 'directory' ? (
+      {isFolder ? (
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded"
+          aria-label={expanded ? 'Collapse folder' : 'Expand folder'}
+          onClick={event => {
+            event.stopPropagation()
+            onToggleExpand?.()
+          }}
+        >
+          {expanded ? (
+            <ChevronDown className="size-3.5" />
+          ) : (
+            <ChevronRight className="size-3.5" />
+          )}
+        </button>
+      ) : (
+        <span className="inline-flex size-4 shrink-0" aria-hidden />
+      )}
+      {isFolder ? (
         <Folder className="text-muted-foreground size-3.5 shrink-0" />
       ) : (
         <Icon icon={getFileIcon(file.name)} className="size-3.5 shrink-0" />
@@ -143,25 +143,69 @@ function ArtifactEntryRow({
       <span className="min-w-0 flex-1 truncate text-left text-[11px]">
         {label}
       </span>
-      <div className="relative h-6 w-11 shrink-0">
-        <span className="text-muted-foreground pointer-events-none absolute inset-0 flex items-center justify-end pr-0.5 text-[10px] transition-opacity group-hover/file:opacity-0">
-          {relativeTime(file.mtime)}
-        </span>
-        {file.type === 'file' ? (
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 inline-flex size-6 items-center justify-center rounded opacity-0 transition-opacity group-hover/file:opacity-100"
-            title="Download"
-            onClick={event => {
-              event.stopPropagation()
-              onDownloadFile(file.path)
-            }}
-          >
-            <Download className="size-3.5" />
-          </button>
-        ) : null}
-      </div>
+      <span className="text-muted-foreground w-14 shrink-0 text-right text-[10px] tabular-nums whitespace-nowrap">
+        {relativeTime(file.mtime)}
+      </span>
     </div>
+  )
+}
+
+function ArtifactTreeNodes({
+  entries,
+  parentPath,
+  depth,
+  expandedDirs,
+  activePath,
+  onToggleDir,
+  onOpenFile,
+  onFileContextMenu
+}: {
+  entries: WorkspaceFile[]
+  parentPath: string
+  depth: number
+  expandedDirs: Record<string, boolean>
+  activePath: string | null
+  onToggleDir: (path: string) => void
+  onOpenFile: (file: WorkspaceFile) => void
+  onFileContextMenu: (file: WorkspaceFile, x: number, y: number) => void
+}) {
+  const children = childrenOf(entries, parentPath)
+  return (
+    <>
+      {children.map(file => {
+        const open = Boolean(expandedDirs[file.path])
+        return (
+          <div key={file.path}>
+            <ArtifactEntryRow
+              file={file}
+              label={file.name}
+              depth={depth}
+              expanded={open}
+              activePath={activePath}
+              onToggleExpand={
+                file.type === 'directory'
+                  ? () => onToggleDir(file.path)
+                  : undefined
+              }
+              onOpen={onOpenFile}
+              onFileContextMenu={onFileContextMenu}
+            />
+            {file.type === 'directory' && open ? (
+              <ArtifactTreeNodes
+                entries={entries}
+                parentPath={file.path}
+                depth={depth + 1}
+                expandedDirs={expandedDirs}
+                activePath={activePath}
+                onToggleDir={onToggleDir}
+                onOpenFile={onOpenFile}
+                onFileContextMenu={onFileContextMenu}
+              />
+            ) : null}
+          </div>
+        )
+      })}
+    </>
   )
 }
 
@@ -182,16 +226,33 @@ function ArtifactEntryCard({
   onOpen: (file: WorkspaceFile) => void
   onFileContextMenu: (file: WorkspaceFile, x: number, y: number) => void
 }) {
+  const draggedRef = useRef(false)
   return (
     // div (not button): structure thumbs embed control stubs; nested <button> is invalid HTML.
     <div
       role="button"
       tabIndex={0}
+      draggable
       className={cn(
         'hover:bg-muted/60 group/file flex cursor-pointer flex-col items-stretch gap-1.5 rounded-md border border-transparent p-1.5 text-left transition-colors',
         activePath === file.path && 'bg-muted border-border'
       )}
-      onClick={() => onOpen(file)}
+      onDragStart={event => {
+        draggedRef.current = true
+        setWorkspacePathDragData(event.dataTransfer, {
+          path: file.path,
+          type: file.type
+        })
+      }}
+      onDragEnd={() => {
+        window.setTimeout(() => {
+          draggedRef.current = false
+        }, 0)
+      }}
+      onClick={() => {
+        if (draggedRef.current) return
+        onOpen(file)
+      }}
       onKeyDown={event => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
@@ -230,12 +291,14 @@ export function ArtifactsBrowserGroups({
   visibleGroups,
   viewMode,
   expandedGroups,
+  expandedDirs,
   activePath,
   empty,
   searchActive = false,
   onToggleGroup,
+  onToggleDir,
+  onExpandedDirsChange,
   onOpenFile,
-  onDownloadFile,
   onFileContextMenu
 }: {
   client: LocalAgentClient
@@ -243,35 +306,56 @@ export function ArtifactsBrowserGroups({
   visibleGroups: ArtifactGroup[]
   viewMode: ViewMode
   expandedGroups: Record<string, boolean>
+  expandedDirs: Record<string, boolean>
   activePath: string | null
   empty: boolean
-  /** When true, show all matches flat instead of folder drill-down. */
+  /** When true, show filtered matches flat (search). */
   searchActive?: boolean
   onToggleGroup: (id: string) => void
+  onToggleDir: (path: string) => void
+  onExpandedDirsChange: (
+    value:
+      | Record<string, boolean>
+      | ((current: Record<string, boolean>) => Record<string, boolean>)
+  ) => void
   onOpenFile: (file: WorkspaceFile) => void
-  onDownloadFile: (path: string) => void
   onFileContextMenu: (
     file: WorkspaceFile,
     x: number,
     y: number
   ) => void
 }) {
-  const [cwdByGroup, setCwdByGroup] = useState<Record<string, string>>({})
+  const [gridCwdByGroup, setGridCwdByGroup] = useState<Record<string, string>>(
+    {}
+  )
 
-  const groupViews = useMemo(() => {
-    return visibleGroups.map(group => {
-      const root = groupRootPath(group.id)
-      const cwd = searchActive ? root : (cwdByGroup[group.id] ?? root)
-      // Flatten mode / search: show every file under the group so previews
-      // appear without drilling into folders.
-      const items = searchActive
-        ? [...group.files]
-            .filter(file => file.type === 'file')
-            .sort(compareArtifacts)
-        : childrenOf(group.files, cwd)
-      return { group, root, cwd, items }
+  // Keep the open file visible by expanding its ancestor folders.
+  useEffect(() => {
+    if (!activePath) return
+    const parents = ancestorPaths(activePath)
+    if (parents.length === 0) return
+    onExpandedDirsChange(current => {
+      let changed = false
+      const next = { ...current }
+      for (const path of parents) {
+        if (!next[path]) {
+          next[path] = true
+          changed = true
+        }
+      }
+      return changed ? next : current
     })
-  }, [cwdByGroup, searchActive, visibleGroups])
+  }, [activePath, onExpandedDirsChange])
+
+  const searchItemsByGroup = useMemo(() => {
+    if (!searchActive) return null
+    return visibleGroups.map(group => ({
+      group,
+      items: [...group.files]
+        .filter(file => file.type === 'file')
+        .sort(compareArtifacts)
+    }))
+  }, [searchActive, visibleGroups])
 
   if (empty) {
     return (
@@ -293,67 +377,57 @@ export function ArtifactsBrowserGroups({
 
   return (
     <ScrollArea className="min-h-0 flex-1">
-      <div className="space-y-2 p-2">
-        {groupViews.map(({ group, root, cwd, items }) => {
+      <div className="space-y-1 p-2">
+        {visibleGroups.map(group => {
           const open = expandedGroups[group.id] ?? true
           const stamp = newestMtime(group.files)
+          const root = groupRootPath(group.id)
+          const searchItems =
+            searchItemsByGroup?.find(item => item.group.id === group.id)
+              ?.items || []
+
           return (
-            <div key={group.id} className="space-y-1">
+            <div key={group.id}>
               <button
                 type="button"
-                className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between rounded px-1 py-1 text-left text-[11px]"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted flex w-full items-center gap-1 rounded px-1 py-1 text-left text-[11px]"
                 onClick={() => onToggleGroup(group.id)}
               >
-                <span className="inline-flex min-w-0 items-center gap-1 font-medium">
-                  <ChevronDown
-                    className={cn(
-                      'size-3.5 shrink-0 transition-transform',
-                      !open && '-rotate-90'
-                    )}
-                  />
-                  <span className="truncate">{group.title}</span>
+                {open ? (
+                  <ChevronDown className="size-3.5 shrink-0" />
+                ) : (
+                  <ChevronRight className="size-3.5 shrink-0" />
+                )}
+                <Folder className="size-3.5 shrink-0 opacity-80" />
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {group.title}
                 </span>
-                <span>
+                <span className="shrink-0 whitespace-nowrap">
                   {group.files.length}
                   {stamp ? ` · ${relativeTime(stamp)}` : ''}
                 </span>
               </button>
               {open ? (
-                <>
-                  {!searchActive ? (
-                    <GroupFolderTrail
-                      root={root}
-                      cwd={cwd}
-                      onNavigate={path =>
-                        setCwdByGroup(current => ({
-                          ...current,
-                          [group.id]: path
-                        }))
-                      }
-                    />
-                  ) : null}
-                  {items.length === 0 ? (
+                searchActive ? (
+                  searchItems.length === 0 ? (
                     <p className="text-muted-foreground px-1.5 py-1 text-[11px]">
-                      Empty folder
+                      No matches
                     </p>
                   ) : viewMode === 'grid' ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      {items.map(file => (
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      {searchItems.map(file => (
                         <ArtifactEntryCard
                           key={file.path}
                           client={client}
                           sessionId={sessionId}
                           file={file}
-                          label={entryLabel(file, root, searchActive)}
+                          label={
+                            root && file.path.startsWith(`${root}/`)
+                              ? file.path.slice(root.length + 1)
+                              : file.path
+                          }
                           activePath={activePath}
                           onOpen={entry => {
-                            if (entry.type === 'directory' && !searchActive) {
-                              setCwdByGroup(current => ({
-                                ...current,
-                                [group.id]: entry.path
-                              }))
-                              return
-                            }
                             if (entry.type === 'file') onOpenFile(entry)
                           }}
                           onFileContextMenu={onFileContextMenu}
@@ -362,34 +436,159 @@ export function ArtifactsBrowserGroups({
                     </div>
                   ) : (
                     <div className="space-y-0.5">
-                      {items.map(file => (
+                      {searchItems.map(file => (
                         <ArtifactEntryRow
                           key={file.path}
                           file={file}
-                          label={entryLabel(file, root, searchActive)}
+                          label={
+                            root && file.path.startsWith(`${root}/`)
+                              ? file.path.slice(root.length + 1)
+                              : file.path
+                          }
+                          depth={1}
+                          expanded={false}
                           activePath={activePath}
-                          onOpen={entry => {
-                            if (entry.type === 'directory' && !searchActive) {
-                              setCwdByGroup(current => ({
-                                ...current,
-                                [group.id]: entry.path
-                              }))
-                              return
-                            }
-                            if (entry.type === 'file') onOpenFile(entry)
-                          }}
-                          onDownloadFile={onDownloadFile}
+                          onOpen={onOpenFile}
                           onFileContextMenu={onFileContextMenu}
                         />
                       ))}
                     </div>
-                  )}
-                </>
+                  )
+                ) : viewMode === 'grid' ? (
+                  <GridFolderView
+                    client={client}
+                    sessionId={sessionId}
+                    group={group}
+                    root={root}
+                    cwd={gridCwdByGroup[group.id] ?? root}
+                    activePath={activePath}
+                    onNavigate={path =>
+                      setGridCwdByGroup(current => ({
+                        ...current,
+                        [group.id]: path
+                      }))
+                    }
+                    onOpenFile={onOpenFile}
+                    onFileContextMenu={onFileContextMenu}
+                  />
+                ) : childrenOf(group.files, root).length === 0 ? (
+                  <p className="text-muted-foreground px-1.5 py-1 text-[11px]">
+                    Empty folder
+                  </p>
+                ) : (
+                  <ArtifactTreeNodes
+                    entries={group.files}
+                    parentPath={root}
+                    depth={1}
+                    expandedDirs={expandedDirs}
+                    activePath={activePath}
+                    onToggleDir={onToggleDir}
+                    onOpenFile={onOpenFile}
+                    onFileContextMenu={onFileContextMenu}
+                  />
+                )
               ) : null}
             </div>
           )
         })}
       </div>
     </ScrollArea>
+  )
+}
+
+function GridFolderView({
+  client,
+  sessionId,
+  group,
+  root,
+  cwd,
+  activePath,
+  onNavigate,
+  onOpenFile,
+  onFileContextMenu
+}: {
+  client: LocalAgentClient
+  sessionId: string
+  group: ArtifactGroup
+  root: string
+  cwd: string
+  activePath: string | null
+  onNavigate: (path: string) => void
+  onOpenFile: (file: WorkspaceFile) => void
+  onFileContextMenu: (file: WorkspaceFile, x: number, y: number) => void
+}) {
+  const items = childrenOf(group.files, cwd)
+  const relative = root ? cwd.slice(root.length).replace(/^\//, '') : cwd
+  const segments = relative.split('/').filter(Boolean)
+
+  return (
+    <div className="space-y-1 pt-1">
+      {cwd !== root ? (
+        <div className="text-muted-foreground flex min-w-0 items-center gap-0.5 px-1 pb-1 text-[11px]">
+          <button
+            type="button"
+            className="hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded"
+            title="Go up"
+            aria-label="Go up"
+            onClick={() => onNavigate(parentDir(cwd) || root)}
+          >
+            <ChevronRight className="size-3.5 rotate-180" />
+          </button>
+          <button
+            type="button"
+            className="hover:text-foreground shrink-0 rounded px-0.5"
+            onClick={() => onNavigate(root)}
+          >
+            {root || 'Root'}
+          </button>
+          {segments.map((segment, index) => {
+            const path = [root, ...segments.slice(0, index + 1)]
+              .filter(Boolean)
+              .join('/')
+            return (
+              <span
+                key={path}
+                className="inline-flex min-w-0 items-center gap-0.5"
+              >
+                <span className="opacity-50">/</span>
+                <button
+                  type="button"
+                  className="hover:text-foreground truncate rounded px-0.5"
+                  onClick={() => onNavigate(path)}
+                >
+                  {segment}
+                </button>
+              </span>
+            )
+          })}
+        </div>
+      ) : null}
+      {items.length === 0 ? (
+        <p className="text-muted-foreground px-1.5 py-1 text-[11px]">
+          Empty folder
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          {items.map(file => (
+            <ArtifactEntryCard
+              key={file.path}
+              client={client}
+              sessionId={sessionId}
+              file={file}
+              label={file.name}
+              activePath={activePath}
+              onOpen={entry => {
+                if (entry.type === 'directory') {
+                  onNavigate(entry.path)
+                  return
+                }
+                onOpenFile(entry)
+              }}
+              onFileContextMenu={onFileContextMenu}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

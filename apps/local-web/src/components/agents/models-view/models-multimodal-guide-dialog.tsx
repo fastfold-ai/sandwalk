@@ -25,6 +25,7 @@ const PROVIDER_ORDER = [
   'mistral',
   'qwen',
   'together',
+  'openrouter',
   'local'
 ] as const
 
@@ -41,6 +42,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   mistral: 'Mistral',
   qwen: 'Qwen',
   together: 'Together AI',
+  openrouter: 'OpenRouter',
   local: 'Local'
 }
 

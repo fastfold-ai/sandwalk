@@ -162,6 +162,13 @@ PROVIDER_METADATA = {
             "Together AI OpenAI-compatible API — curated open models behind one key."
         ),
     },
+    "openrouter": {
+        "name": "OpenRouter",
+        "category": "AI Models",
+        "description": (
+            "OpenRouter multi-provider gateway — attributed to sandwalk.sh rankings."
+        ),
+    },
     "tavily": {
         "name": "Tavily",
         "category": "MCP",

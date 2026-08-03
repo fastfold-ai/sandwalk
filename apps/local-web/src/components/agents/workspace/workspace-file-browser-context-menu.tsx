@@ -28,7 +28,7 @@ export function WorkspaceFileBrowserContextMenu({
     type: 'file' | 'directory'
   } | null
   onClose: () => void
-  onAddToChat: (path: string) => void
+  onAddToChat: (path: string, kind?: 'file' | 'directory') => void
   onRename: (path: string) => void
   onMove: (path: string) => void
   onDownload: (path: string) => void
@@ -38,20 +38,17 @@ export function WorkspaceFileBrowserContextMenu({
 
   return (
     <TabContextMenuShell x={menu.x} y={menu.y} onClose={onClose}>
-      {menu.type === 'file' ? (
-        <>
-          <TabContextItem
-            icon={<MessageSquarePlus className="size-3.5" />}
-            label="Add to chat"
-            onClick={() => {
-              const path = menu.path
-              onClose()
-              onAddToChat(path)
-            }}
-          />
-          <TabContextSeparator />
-        </>
-      ) : null}
+      <TabContextItem
+        icon={<MessageSquarePlus className="size-3.5" />}
+        label="Add to chat"
+        onClick={() => {
+          const path = menu.path
+          const kind = menu.type
+          onClose()
+          onAddToChat(path, kind)
+        }}
+      />
+      <TabContextSeparator />
       <TabContextItem
         icon={<Pencil className="size-3.5" />}
         label="Rename…"

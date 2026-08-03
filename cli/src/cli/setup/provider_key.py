@@ -67,6 +67,7 @@ def _resolve_provider_key(
         "mistral",
         "qwen",
         "together",
+        "openrouter",
     ):
         from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 

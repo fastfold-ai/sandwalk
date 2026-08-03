@@ -378,8 +378,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 runActive={runActive}
                 openPathRequest={pendingOpenPath}
                 onOpenPathRequestHandled={() => setPendingOpenPath(null)}
-                onAddToChat={path => {
-                  setComposer(current => `${current}${fileChipToken(path)}`)
+                onAddToChat={(path, kind) => {
+                  setComposer(
+                    current => `${current}${fileChipToken(path, kind)}`
+                  )
                   setComposerFiles([])
                 }}
                 onBuildPlan={path => {

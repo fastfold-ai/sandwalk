@@ -21,6 +21,7 @@ DEFAULTS_LLM = {
     "llm.mistral_api_key": None,
     "llm.qwen_api_key": None,
     "llm.together_api_key": None,
+    "llm.openrouter_api_key": None,
     "llm.openai_compatible_api_key": None,  # legacy; migrated into profiles then cleared
     "llm.openai_base_url": None,
     "llm.openai_compatible_backend": None,
@@ -28,6 +29,8 @@ DEFAULTS_LLM = {
     "llm.openai_active_profile": None,
     "llm.openai_default_profile": None,
     "llm.hidden_models": [],
+    # OpenRouter ids already default-disabled on first discovery (opt-in).
+    "llm.openrouter_seen_models": [],
     "llm.custom_models": [],
     "llm.catalog_defaults_version": 0,
     "llm.temperature": 0.1,

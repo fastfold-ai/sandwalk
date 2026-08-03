@@ -25,6 +25,7 @@ VALID_LLM_PROVIDERS = frozenset(
         "mistral",
         "qwen",
         "together",
+        "openrouter",
     }
 )
 

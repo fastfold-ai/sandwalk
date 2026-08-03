@@ -354,6 +354,80 @@ def test_model_supports_reasoning_effort():
     )
     assert model_supports_reasoning_effort("nvidia", "nvidia/nemotron-3-ultra-550b-a55b") is False
     assert model_supports_reasoning_effort("openai", "gpt-5-chat-latest") is False
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "anthropic/claude-sonnet-5"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "anthropic/claude-haiku-4.5"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "openai/gpt-5.6-terra"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "openai/gpt-5.6-luna"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "qwen/qwen3.7-flash"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "thinkingmachines/inkling"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "google/gemini-2.5-pro"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "google/gemini-2.5-flash"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort("openrouter", "x-ai/grok-4.5") is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "deepseek/deepseek-chat-v3.1"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort("openrouter", "openai/gpt-4o-mini")
+        is False
+    )
+    assert (
+        model_supports_reasoning_effort("openrouter", "moonshotai/kimi-k2")
+        is False
+    )
+    assert (
+        model_supports_reasoning_effort("openrouter", "qwen/qwen3-max") is False
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "mistralai/mistral-large-2512"
+        )
+        is False
+    )
     assert reasoning_effort_options("openai", "gpt-5.6-sol") == [
         "low",
         "medium",
@@ -384,6 +458,7 @@ def test_model_supports_reasoning_effort():
     from agent.model_catalog import (
         effective_anthropic_effort,
         effective_gemini_thinking_level,
+        effective_openrouter_reasoning,
         effective_xai_reasoning_effort,
     )
 
@@ -402,6 +477,27 @@ def test_model_supports_reasoning_effort():
         effective_xai_reasoning_effort(effort="high", fast=True, model_id="grok-4.3")
         == "none"
     )
+    assert effective_openrouter_reasoning(
+        effort="high", fast=False, model_id="anthropic/claude-sonnet-5"
+    ) == {"effort": "high"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="anthropic/claude-sonnet-5"
+    ) == {"effort": "none"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="openai/gpt-5.6-terra"
+    ) == {"effort": "none"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="x-ai/grok-4.5"
+    ) == {"effort": "low"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="google/gemini-2.5-pro"
+    ) == {"effort": "low"}
+    assert effective_openrouter_reasoning(
+        effort="medium", fast=False, model_id="google/gemini-2.5-flash"
+    ) == {"effort": "medium"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="deepseek/deepseek-chat-v3.1"
+    ) == {"effort": "none"}
 
 
 def test_anthropic_model_omits_temperature():

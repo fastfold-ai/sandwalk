@@ -7,7 +7,8 @@ import type {
   AgentTodo,
   HitlDecision,
   McpServer,
-  PendingHitlApproval
+  PendingHitlApproval,
+  WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import { ArrowDown } from 'lucide-react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
@@ -56,6 +57,7 @@ type ChatTranscriptProps = {
   onScrollToBottom: () => void
   skills?: AgentSkill[]
   mcpServers?: McpServer[]
+  workspaceFiles?: WorkspaceFile[]
 }
 
 export function ChatTranscript({
@@ -88,7 +90,8 @@ export function ChatTranscript({
   showScrollToBottom,
   onScrollToBottom,
   skills = [],
-  mcpServers = []
+  mcpServers = [],
+  workspaceFiles = []
 }: ChatTranscriptProps) {
   const timelineItems = useMemo(
     () => buildChatTimelineItems(conversationTimeline),
@@ -144,6 +147,7 @@ export function ChatTranscript({
                 hiddenPlanPaths={hiddenPlanPaths}
                 skills={skills}
                 mcpServers={mcpServers}
+                workspaceFiles={workspaceFiles}
               />
             ))}
             {runActive && activeBuildPlan ? (

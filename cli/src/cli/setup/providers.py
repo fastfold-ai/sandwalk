@@ -35,6 +35,8 @@ def _parse_provider_list(raw: str) -> list[str]:
         "together": "together",
         "together-ai": "together",
         "together_ai": "together",
+        "openrouter": "openrouter",
+        "open-router": "openrouter",
         "openai_compatible": "openai_compatible",
         "openai-compatible": "openai_compatible",
         "compatible": "openai_compatible",
@@ -69,6 +71,7 @@ def _prompt_setup_providers(default_provider: str) -> list[str]:
         "mistral": "Mistral",
         "qwen": "Qwen (Alibaba)",
         "together": "Together AI",
+        "openrouter": "OpenRouter",
         "openai_compatible": "OpenAI-compatible custom endpoint",
     }
     _ = default_provider

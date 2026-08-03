@@ -1,4 +1,8 @@
-import type { AgentSkill, McpServer } from '@sandwalk/agent-ui-core'
+import type {
+  AgentSkill,
+  McpServer,
+  WorkspaceFile
+} from '@sandwalk/agent-ui-core'
 import {
   type MutableRefObject,
   useMemo
@@ -27,6 +31,7 @@ export function ComposerDraftEditor({
   composerParts,
   skills = [],
   mcpServers = [],
+  workspaceFiles = [],
   textInputRefs,
   pendingCaretRef,
   autoFocusedKeyRef,
@@ -52,6 +57,7 @@ export function ComposerDraftEditor({
   composerParts: ComposerPart[]
   skills?: AgentSkill[]
   mcpServers?: McpServer[]
+  workspaceFiles?: WorkspaceFile[]
   textInputRefs: MutableRefObject<
     Map<number, HTMLInputElement | HTMLTextAreaElement>
   >
@@ -120,10 +126,19 @@ export function ComposerDraftEditor({
         if (part.type === 'file') {
           chipRenderIndex += 1
           const chipIndex = chipRenderIndex
+          const trimmed = part.path.replace(/\/+$/u, '')
+          const entry = workspaceFiles.find(
+            file => file.path === part.path || file.path === trimmed
+          )
+          const kind =
+            entry?.type === 'directory' || part.path.endsWith('/')
+              ? 'directory'
+              : 'file'
           return (
             <ComposerFileChip
               key={`file-${partIndex}-${part.path}`}
               path={part.path}
+              kind={kind}
               onOpenFile={onOpenFile}
               onRemove={() => {
                 commitDraft(removeComposerChipAt(draft, chipIndex))

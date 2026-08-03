@@ -1,14 +1,18 @@
 import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { McpServer } from '@sandwalk/agent-ui-core'
-import { Plug } from 'lucide-react'
+import type { McpServer, WorkspaceFile } from '@sandwalk/agent-ui-core'
+import { Folder, Plug } from 'lucide-react'
 import { Fragment, type ReactNode } from 'react'
 
 import {
   mcpIconForChip,
   mcpIconForServer
 } from '@/components/agents/composer/composer-mention-utils'
-import { parseMessageParts } from '@/components/agents/composer-parts'
+import {
+  mentionDisplayName,
+  mentionPathIsDirectory,
+  parseMessageParts
+} from '@/components/agents/composer-parts'
 import { ExternalUrlLink } from '@/components/agents/ExternalUrlLink'
 import {
   MessageFilePreview,
@@ -47,6 +51,7 @@ export function UserMessageContent({
   client,
   sessionId,
   workspacePath,
+  workspaceFiles = [],
   skills,
   mcpServers
 }: {
@@ -56,6 +61,7 @@ export function UserMessageContent({
   client?: LocalAgentClient | null
   sessionId?: string | null
   workspacePath?: string | null
+  workspaceFiles?: WorkspaceFile[]
   skills?: SkillIconSkill[]
   mcpServers?: McpServer[]
 }) {
@@ -124,6 +130,11 @@ export function UserMessageContent({
             <WorkspaceFileChip
               key={`${key}-ws-${segmentIndex}`}
               path={segment.relative}
+              kind={
+                mentionPathIsDirectory(segment.relative, workspaceFiles)
+                  ? 'directory'
+                  : 'file'
+              }
               onOpenFile={onOpenFile}
             />
           )
@@ -139,13 +150,22 @@ export function UserMessageContent({
     }
     if (part.type === 'file') {
       if (previewPathSet.has(part.path)) return null
-      const name = part.path.split('/').at(-1) || part.path
+      const isFolder = mentionPathIsDirectory(part.path, workspaceFiles)
+      const name = mentionDisplayName(part.path)
+      const openPath = part.path.replace(/\/+$/u, '') || part.path
       const chipClass =
         'bg-card border-border/70 inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 align-middle text-xs'
       const chipBody = (
         <>
-          <Icon icon={getFileIcon(name)} className="size-3.5 shrink-0" />
-          <span className="max-w-[220px] truncate">@{name}</span>
+          {isFolder ? (
+            <Folder className="text-muted-foreground size-3.5 shrink-0" />
+          ) : (
+            <Icon icon={getFileIcon(name)} className="size-3.5 shrink-0" />
+          )}
+          <span className="max-w-[220px] truncate">
+            @{name}
+            {isFolder ? '/' : ''}
+          </span>
         </>
       )
       if (onOpenFile) {
@@ -154,8 +174,8 @@ export function UserMessageContent({
             key={`file-${index}-${part.path}`}
             type="button"
             className={cn(chipClass, 'hover:bg-muted/40 cursor-pointer')}
-            title={`Open @${part.path}`}
-            onClick={() => onOpenFile(part.path)}
+            title={`Open @${openPath}`}
+            onClick={() => onOpenFile(openPath)}
           >
             {chipBody}
           </button>
@@ -165,7 +185,7 @@ export function UserMessageContent({
         <span
           key={`file-${index}-${part.path}`}
           className={chipClass}
-          title={`@${part.path}`}
+          title={`@${openPath}`}
         >
           {chipBody}
         </span>

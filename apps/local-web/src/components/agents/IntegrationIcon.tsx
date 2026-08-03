@@ -22,6 +22,7 @@ export const INTEGRATION_ICONS: Record<
   mistral: { src: '/mistral.svg' },
   qwen: { src: '/qwen.svg' },
   together: { src: '/together.svg' },
+  openrouter: { src: '/models/openrouter-color.svg' },
   'ibm-rxn': { src: '/ibm.png' },
   lens: { src: '/lens.png' },
   sendgrid: { src: '/sendgrid.png' },

@@ -456,15 +456,17 @@ html.sandwalk-mac-glass .sandwalk-shell-main {
   --border: 30 18% 20%;
   --input: 30 18% 20%;
   --ring: 40 71% 59%;
-  --sidebar-background: 30 35% 14%;
-  --sidebar-foreground: 40 55% 90%;
+  /* Olive-khaki top → deep charcoal bottom (soft vertical wash). */
+  --sidebar-background: 42 18% 32%;
+  --sidebar-foreground: 40 55% 92%;
   --sidebar-primary: 40 71% 59%;
   --sidebar-primary-foreground: 25 40% 12%;
-  --sidebar-accent: 40 45% 28%;
-  --sidebar-accent-foreground: 40 70% 92%;
-  --sidebar-border: 30 22% 18%;
+  --sidebar-accent: 42 20% 40%;
+  --sidebar-accent-foreground: 40 70% 96%;
+  --sidebar-border: 30 12% 18%;
   --sidebar-ring: 40 71% 59%;
-  --sidebar-gradient-end: 40 55% 22%;
+  --sidebar-gradient-mid: 34 14% 18%;
+  --sidebar-gradient-end: 28 12% 10%;
 }
 
 :root[data-palette='darwin'] {
@@ -1210,6 +1212,30 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='verdant'] .sandw
     165deg,
     hsl(var(--sidebar-background) / 0.62) 0%,
     hsl(var(--sidebar-gradient-end) / 0.62) 140%
+  ) !important;
+}
+
+/*
+ * Sandwalk dark — stronger vertical olive→charcoal wash (reads through liquid
+ * glass). Overrides the shared 165deg/140% blend above.
+ */
+html.sandwalk-mac-glass.dark[data-palette='sandwalk'] .sandwalk-shell-sidebar,
+html.dark[data-palette='sandwalk']:not(.sandwalk-mac-glass) .sandwalk-shell-sidebar {
+  background: linear-gradient(
+    180deg,
+    hsl(var(--sidebar-background)) 0%,
+    hsl(var(--sidebar-gradient-mid)) 52%,
+    hsl(var(--sidebar-gradient-end)) 100%
+  ) !important;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark[data-palette='sandwalk']
+  .sandwalk-shell-sidebar {
+  background: linear-gradient(
+    180deg,
+    hsl(var(--sidebar-background) / 0.78) 0%,
+    hsl(var(--sidebar-gradient-mid) / 0.72) 52%,
+    hsl(var(--sidebar-gradient-end) / 0.8) 100%
   ) !important;
 }
 

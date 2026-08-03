@@ -87,7 +87,10 @@ export function useWorkspacePanelState({
     () => readOpenFileTabs(sessionId).viewMode ?? 'list'
   )
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
-    {}
+    () => readOpenFileTabs(sessionId).expandedGroups || {}
+  )
+  const [expandedDirs, setExpandedDirs] = useState<Record<string, boolean>>(
+    () => readOpenFileTabs(sessionId).expandedDirs || {}
   )
   const [modalOpen, setModalOpen] = useState(false)
   const [filesTabActive, setFilesTabActive] = useState(true)
@@ -99,7 +102,8 @@ export function useWorkspacePanelState({
   )
   const uploadRef = useRef<HTMLInputElement | null>(null)
   const seenFilePathsRef = useRef<Set<string> | null>(null)
-  const [flatMode, setFlatMode] = useState(true)
+  /** Skip one tree persist after hydrating from storage for a session. */
+  const skipTreePersistRef = useRef(true)
   const activeTab = tabs.find(tab => tab.path === activePath) || null
   const active = !filesTabActive ? activeTab : null
   const openingPath =
@@ -111,7 +115,11 @@ export function useWorkspacePanelState({
 
   useEffect(() => {
     seenFilePathsRef.current = null
-    setFlatMode(true)
+    skipTreePersistRef.current = true
+    const persisted = readOpenFileTabs(sessionId)
+    setViewMode(persisted.viewMode ?? 'list')
+    setExpandedGroups(persisted.expandedGroups || {})
+    setExpandedDirs(persisted.expandedDirs || {})
   }, [sessionId])
 
   useEffect(() => {
@@ -255,18 +263,41 @@ export function useWorkspacePanelState({
 
   useEffect(() => {
     if (!tabsReady) return
+    const current = readOpenFileTabs(sessionId)
     writeOpenFileTabs(sessionId, {
+      ...current,
       paths: tabs.map(tab => tab.path),
       activePath,
       filesTabActive,
-      viewMode
+      viewMode,
+      expandedGroups,
+      expandedDirs
     })
-  }, [activePath, filesTabActive, sessionId, tabs, tabsReady, viewMode])
+  }, [
+    activePath,
+    expandedDirs,
+    expandedGroups,
+    filesTabActive,
+    sessionId,
+    tabs,
+    tabsReady,
+    viewMode
+  ])
 
+  // Persist tree expand state even while file tabs are still restoring.
   useEffect(() => {
+    if (skipTreePersistRef.current) {
+      skipTreePersistRef.current = false
+      return
+    }
     const current = readOpenFileTabs(sessionId)
-    writeOpenFileTabs(sessionId, { ...current, viewMode })
-  }, [sessionId, viewMode])
+    writeOpenFileTabs(sessionId, {
+      ...current,
+      viewMode,
+      expandedGroups,
+      expandedDirs
+    })
+  }, [expandedDirs, expandedGroups, sessionId, viewMode])
 
   const artifactFiles = useMemo(
     () => files.filter(file => file.type === 'file'),
@@ -382,10 +413,10 @@ export function useWorkspacePanelState({
     setQuery,
     viewMode,
     setViewMode,
-    flatMode,
-    setFlatMode,
     expandedGroups,
     setExpandedGroups,
+    expandedDirs,
+    setExpandedDirs,
     modalOpen,
     setModalOpen,
     filesTabActive,

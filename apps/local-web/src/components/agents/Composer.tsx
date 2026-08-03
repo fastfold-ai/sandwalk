@@ -136,8 +136,13 @@ export function Composer({
     }
   }, [focusKey, onResolveAttachment, pendingAttachmentsRef, seedReadyAttachments])
 
-  const { dragging, dropHandlers } = useComposerFileDrop(files => {
-    void addFiles(files)
+  const { dragging, dropHandlers } = useComposerFileDrop({
+    onFiles: files => {
+      void addFiles(files)
+    },
+    onWorkspacePath: payload => {
+      draftState.chipInserters.appendFileChips([payload])
+    }
   })
 
   useComposerMentionFocus(
@@ -255,7 +260,7 @@ export function Composer({
             voice.active
               ? 'shadow-none'
               : 'shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',
-            dragging &&
+            Boolean(dragging) &&
               !voice.active &&
               'border-sky-500/60 ring-2 ring-sky-500/20',
             editingQueued &&
@@ -270,7 +275,9 @@ export function Composer({
             >
               <Upload className="size-6 text-sky-700 dark:text-sky-300" />
               <p className="text-sm font-medium text-sky-800 dark:text-sky-200">
-                Drop to upload
+                {dragging === 'reference'
+                  ? 'Drop to reference'
+                  : 'Drop to upload'}
               </p>
             </div>
           ) : null}
@@ -296,6 +303,7 @@ export function Composer({
                 composerParts={composerParts}
                 skills={skills}
                 mcpServers={mcpServers}
+                workspaceFiles={workspaceFiles}
                 textInputRefs={draftState.textInputRefs}
                 pendingCaretRef={draftState.pendingCaretRef}
                 autoFocusedKeyRef={draftState.autoFocusedKeyRef}

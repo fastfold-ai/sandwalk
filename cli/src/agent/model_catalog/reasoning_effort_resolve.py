@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from agent.model_catalog.reasoning_support import normalize_reasoning_effort
+from typing import Any
+
+from agent.model_catalog.reasoning_support import (
+    normalize_reasoning_effort,
+    openrouter_model_reasoning_mandatory,
+)
 
 
 def openai_reasoning_effort_floor(model_id: str | None) -> str:
@@ -135,3 +140,42 @@ def effective_unsloth_enable_thinking(
         return False
     raw = normalize_reasoning_effort(effort)
     return raw != "none"
+
+
+def effective_openrouter_reasoning(
+    *,
+    effort: str | None,
+    fast: bool = False,
+    model_id: str | None = None,
+) -> dict[str, Any]:
+    """Map UI effort/Fast onto OpenRouter ``reasoning`` (``effort`` key).
+
+    Uses the unified OpenRouter shape:
+    ``{"effort": "none"|"low"|"medium"|"high"|...}``.
+
+    OpenAI / xAI ids reuse their native floor rules; mandatory models
+    (Gemini 2.5 Pro, Grok 4.5) never send ``none``.
+    """
+    value = str(model_id or "").strip().lower()
+    slug = value.split("/", 1)[-1] if value else ""
+    vendor = value.split("/", 1)[0] if "/" in value else ""
+
+    if vendor == "openai" or slug.startswith(("gpt-5", "o1", "o3", "o4")):
+        level = effective_reasoning_effort(
+            effort=effort, fast=fast, model_id=slug
+        )
+        return {"effort": level}
+
+    if vendor in {"x-ai", "xai"} or slug.startswith("grok-"):
+        level = effective_xai_reasoning_effort(
+            effort=effort, fast=fast, model_id=slug
+        )
+        return {"effort": level}
+
+    mandatory = openrouter_model_reasoning_mandatory(model_id)
+    if fast:
+        return {"effort": "low" if mandatory else "none"}
+    raw = normalize_reasoning_effort(effort)
+    if raw == "none" and mandatory:
+        return {"effort": "low"}
+    return {"effort": raw}

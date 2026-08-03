@@ -49,6 +49,7 @@ def _resolve_all_provider_keys(
             "mistral",
             "qwen",
             "together",
+            "openrouter",
         ):
             cli_key_for_provider = None
         elif prov == "openai_compatible":

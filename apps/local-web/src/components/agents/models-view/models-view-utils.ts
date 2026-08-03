@@ -12,7 +12,8 @@ export const CLOUD_PROVIDERS = [
   { value: 'minimax', label: 'MiniMax' },
   { value: 'mistral', label: 'Mistral' },
   { value: 'qwen', label: 'Qwen' },
-  { value: 'together', label: 'Together AI' }
+  { value: 'together', label: 'Together AI' },
+  { value: 'openrouter', label: 'OpenRouter' }
 ] as const
 
 export const MODEL_LIST_PREVIEW_LIMIT = 10
@@ -141,7 +142,8 @@ export const LLM_API_KEY_ORDER = [
   'minimax',
   'mistral',
   'qwen',
-  'together'
+  'together',
+  'openrouter'
 ] as const
 
 export const LLM_API_KEY_COPY: Record<
@@ -243,6 +245,14 @@ export const LLM_API_KEY_COPY: Record<
       "Uses Together AI's OpenAI-compatible API — the endpoint is prefilled, just add your key.",
     hostLabel: 'together.xyz',
     placeholderUnset: 'Enter your Together AI API Key'
+  },
+  openrouter: {
+    cardTitle: 'OpenRouter',
+    title: 'OpenRouter API Key',
+    description:
+      'Route many providers through OpenRouter. Sandwalk attributes usage to sandwalk.sh.',
+    hostLabel: 'openrouter.ai',
+    placeholderUnset: 'Enter your OpenRouter API Key'
   }
 }
 

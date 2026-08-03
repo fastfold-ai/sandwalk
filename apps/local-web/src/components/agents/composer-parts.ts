@@ -19,8 +19,50 @@ const SKILL_SLASH_RE =
 const MCP_MENTION_RE =
   /(?:^|[\s(\["'])(mcp:[^\s]+)(?=[\s.,;:!?)\]"'`]|$)/g
 
-export function fileChipToken(path: string) {
-  return `⟦@:${path}⟧`
+/** Normalize a workspace mention path; directories keep a trailing `/`. */
+export function normalizeMentionPath(
+  path: string,
+  kind?: 'file' | 'directory'
+): string {
+  const trimmed = String(path || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+$/u, '')
+  if (!trimmed) return kind === 'directory' ? '/' : ''
+  if (kind === 'directory') return `${trimmed}/`
+  return trimmed
+}
+
+export function fileChipToken(
+  path: string,
+  kind?: 'file' | 'directory'
+) {
+  return `⟦@:${normalizeMentionPath(path, kind)}⟧`
+}
+
+export function mentionPathIsDirectory(
+  path: string,
+  workspaceFiles?: Array<{ path: string; type: 'file' | 'directory' }>
+): boolean {
+  const raw = String(path || '').trim().replace(/\\/g, '/')
+  if (!raw) return false
+  if (raw.endsWith('/')) return true
+  if (!workspaceFiles?.length) return false
+  const trimmed = raw.replace(/\/+$/u, '')
+  const exact = workspaceFiles.find(
+    file => file.path === trimmed || file.path === raw
+  )
+  if (exact?.type === 'directory') return true
+  const prefix = `${trimmed}/`
+  return workspaceFiles.some(file => file.path.startsWith(prefix))
+}
+
+export function mentionDisplayName(path: string): string {
+  const trimmed = String(path || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+$/u, '')
+  return trimmed.split('/').at(-1) || trimmed || path
 }
 
 export function skillChipToken(name: string) {

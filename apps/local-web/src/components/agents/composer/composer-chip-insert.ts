@@ -29,6 +29,7 @@ export function createChipInserters({
   slash,
   atMention,
   setLocalDraft,
+  commitDraft,
   emittedDraftRef,
   pendingCaretRef,
   applyComposerCaret
@@ -37,6 +38,7 @@ export function createChipInserters({
   slash: { start: number; end: number } | null
   atMention: { start: number; end: number } | null
   setLocalDraft: (value: string) => void
+  commitDraft: (value: string) => void
   emittedDraftRef: MutableRefObject<string>
   pendingCaretRef: MutableRefObject<number | null>
   applyComposerCaret: (caret: number) => boolean
@@ -90,7 +92,7 @@ export function createChipInserters({
     if (!atMention) return
     const before = draft.slice(0, atMention.start)
     const after = draft.slice(atMention.end).replace(/^\s+/u, '')
-    const token = fileChipToken(file.path)
+    const token = fileChipToken(file.path, file.type)
     const nextValue = spaceAroundChips(
       after ? `${before}${token} ${after}` : `${before}${token}`
     )
@@ -99,6 +101,37 @@ export function createChipInserters({
     flushSync(() => {
       emittedDraftRef.current = nextValue
       setLocalDraft(nextValue)
+    })
+    focusAfterChipInsert(caret)
+  }
+
+  /** Append workspace path chips (drag from Artifacts into composer). */
+  const appendFileChips = (
+    paths: Array<string | { path: string; type?: 'file' | 'directory' }>
+  ) => {
+    const tokens = paths
+      .map(item => {
+        if (typeof item === 'string') {
+          const trimmed = item.trim()
+          if (!trimmed) return null
+          const kind = trimmed.endsWith('/') ? 'directory' : undefined
+          return fileChipToken(trimmed, kind)
+        }
+        const trimmed = item.path.trim()
+        if (!trimmed) return null
+        return fileChipToken(trimmed, item.type)
+      })
+      .filter((token): token is string => Boolean(token))
+    if (tokens.length === 0) return
+    const joined = tokens.join(' ')
+    const nextValue = spaceAroundChips(
+      draft.trim() ? `${draft} ${joined}` : joined
+    )
+    const lastToken = tokens[tokens.length - 1]!
+    const caret = caretAfterInsertedToken(nextValue, lastToken)
+    pendingCaretRef.current = caret
+    flushSync(() => {
+      commitDraft(nextValue)
     })
     focusAfterChipInsert(caret)
   }
@@ -122,5 +155,11 @@ export function createChipInserters({
     focusAfterChipInsert(caret)
   }
 
-  return { insertSkillChip, insertMcpChip, insertFileChip, insertExample }
+  return {
+    insertSkillChip,
+    insertMcpChip,
+    insertFileChip,
+    appendFileChips,
+    insertExample
+  }
 }

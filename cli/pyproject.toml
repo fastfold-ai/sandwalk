@@ -50,6 +50,7 @@ dependencies = [
     # installs work without a separate ``pip install -e '.[modal]'`` step.
     "langchain-modal>=0.0.1",
     "modal>=0.73",
+    "langchain-openrouter>=0.2.7",
 ]
 
 [project.optional-dependencies]

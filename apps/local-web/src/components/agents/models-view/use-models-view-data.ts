@@ -114,6 +114,7 @@ export function useModelsViewData({
       mistral: 'Mistral',
       qwen: 'Qwen',
       together: 'Together AI',
+      openrouter: 'OpenRouter',
       local: 'Local'
     }
     return Array.from(counts.entries())

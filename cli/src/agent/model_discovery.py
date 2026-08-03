@@ -146,6 +146,22 @@ def fetch_openai_models(
     return names, err
 
 
+def _is_openrouter_models_url(url: str) -> bool:
+    return "openrouter.ai" in str(url or "").lower()
+
+
+def openrouter_model_supports_tools(item: dict[str, Any]) -> bool:
+    """True when OpenRouter reports ``tools`` in ``supported_parameters``.
+
+    Sandwalk agents always send tools, so models without tool support fail at
+    runtime with "No endpoints found that support tool use".
+    """
+    params = item.get("supported_parameters")
+    if not isinstance(params, list):
+        return False
+    return any(str(p).strip().lower() == "tools" for p in params)
+
+
 def fetch_openai_models_with_context(
     base_url: str, api_key: str | None = None
 ) -> tuple[list[str], dict[str, int], str | None]:
@@ -156,6 +172,7 @@ def fetch_openai_models_with_context(
     data = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(data, list):
         return [], {}, f"Unexpected /v1/models payload ({url})"
+    openrouter = _is_openrouter_models_url(url)
     names: list[str] = []
     windows: dict[str, int] = {}
     for item in data:
@@ -163,6 +180,9 @@ def fetch_openai_models_with_context(
             continue
         model_id = str(item.get("id") or "").strip()
         if not model_id:
+            continue
+        # Agents require tool-calling; hide OpenRouter models that cannot.
+        if openrouter and not openrouter_model_supports_tools(item):
             continue
         names.append(model_id)
         context_window = _context_window_from_model_item(item)

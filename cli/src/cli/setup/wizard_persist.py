@@ -70,6 +70,7 @@ def _setup_persist_provider_choice(cfg, selection: dict, args: dict) -> None:
             "mistral",
             "qwen",
             "together",
+            "openrouter",
         ):
             from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
@@ -115,6 +116,7 @@ def _apply_default_model(cfg, active_setup_provider, selected_providers, resolve
             "mistral": "mistral",
             "qwen": "qwen",
             "together": "",
+            "openrouter": "",
         }
         prefix = prefixes.get(active_setup_provider, "")
         if default_model and (not prefix or not current_model.startswith(prefix)):
@@ -158,6 +160,8 @@ def _setup_print_provider_summary(selected_providers: list[str], cloud_key: str 
             if p == "qwen"
             else "Together AI"
             if p == "together"
+            else "OpenRouter"
+            if p == "openrouter"
             else "Anthropic"
         )
         for p in selected_providers

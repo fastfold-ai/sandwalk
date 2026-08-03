@@ -15,7 +15,8 @@ export const LLM_API_KEY_ORDER = [
   'minimax',
   'mistral',
   'qwen',
-  'together'
+  'together',
+  'openrouter'
 ] as const
 
 /** Same backends as ModelsView local modal / CLI setup. */

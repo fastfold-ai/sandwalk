@@ -21,6 +21,7 @@ SETUP_PROVIDER_ORDER = (
     "mistral",
     "qwen",
     "together",
+    "openrouter",
     "openai_compatible",
 )
 UV_INSTALL_FLAVORS = frozenset({"all", "win_build"})

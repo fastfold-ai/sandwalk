@@ -42,6 +42,9 @@ def _prompt_setup_providers_text(options: list[str]) -> list[str]:
         "dashscope": "qwen",
         "tg": "together",
         "together": "together",
+        "or": "openrouter",
+        "openrouter": "openrouter",
+        "open-router": "openrouter",
         "k": "openai_compatible",
         "compatible": "openai_compatible",
         "openai-compatible": "openai_compatible",
@@ -56,7 +59,7 @@ def _prompt_setup_providers_text(options: list[str]) -> list[str]:
             "  [dim]Options:[/dim] anthropic (a), openai (o), xai (x), google (g), "
             "kimi/moonshot (m), nvidia (n), opencode (oc), deepseek (ds), "
             "minimax (mm), mistral (mi), qwen (qw), together (tg), "
-            "openai_compatible (k), all"
+            "openrouter (or), openai_compatible (k), all"
         )
         try:
             raw = input("  Providers: ").strip().lower()

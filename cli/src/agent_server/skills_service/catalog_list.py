@@ -100,7 +100,7 @@ class CatalogListMixin:
         )
 
     @staticmethod
-    def _updates_by_source(infos: list) -> dict[str, dict]:
+    def _updates_by_source(infos: list, *, force: bool = False) -> dict[str, dict]:
         """Map ``owner/repo`` → update info (one GitHub lookup per unique repo)."""
         from agent.skills.releases import (
             _owner_repo_from_source,
@@ -120,6 +120,7 @@ class CatalogListMixin:
                     source,
                     installed_release=getattr(info, "version", None),
                     installed_commit=getattr(info, "commit", None),
+                    force=force,
                 )
             except Exception:  # noqa: BLE001
                 update = None
@@ -171,7 +172,9 @@ class CatalogListMixin:
             content = info.path.read_text(encoding="utf-8")
         except OSError:
             content = ""
-        updates = self._updates_by_source([info])
+        # Force a fresh GitHub release check on the detail page so a just-published
+        # tag is not hidden behind the short-lived local update cache.
+        updates = self._updates_by_source([info], force=True)
         summary = self._summary(info, update=self._update_for_info(info, updates))
         return SkillDetail(
             **summary.model_dump(),

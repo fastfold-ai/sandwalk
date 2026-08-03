@@ -33,6 +33,7 @@ import {
   filterSites,
   formatSiteBytes,
   isPublishedSite,
+  SITE_PREVIEW_SANDBOX,
   siteChatPath,
   sitePublicUrl,
   siteSourceLabel
@@ -408,7 +409,7 @@ export function SitesView({
                     Preview local site
                   </span>
                   <span className="text-muted-foreground text-xs">
-                    Opens in an isolated sandbox
+                    Charts and interactive pages render in preview
                   </span>
                 </div>
               </button>
@@ -505,7 +506,7 @@ export function SitesView({
             <iframe
               title={`${preview.site.name} preview`}
               src={preview.url}
-              sandbox="allow-forms allow-modals allow-popups allow-scripts"
+              sandbox={SITE_PREVIEW_SANDBOX}
               referrerPolicy="no-referrer"
               className="h-full min-h-0 w-full bg-white"
             />

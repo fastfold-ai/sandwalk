@@ -3,7 +3,8 @@ import type {
   AgentMessage,
   AgentSession,
   AgentSkill,
-  McpServer
+  McpServer,
+  WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import {
   Check,
@@ -54,7 +55,8 @@ export function ChatTranscriptMessageEntry({
   client,
   sessionId,
   skills = [],
-  mcpServers = []
+  mcpServers = [],
+  workspaceFiles = []
 }: {
   entry: Extract<TranscriptEntry, { kind: 'message' }>
   runActive: boolean
@@ -69,6 +71,7 @@ export function ChatTranscriptMessageEntry({
   sessionId?: string | null
   skills?: AgentSkill[]
   mcpServers?: McpServer[]
+  workspaceFiles?: WorkspaceFile[]
 }) {
   const message = entry.message
   const isUser = message.role === 'user'
@@ -102,6 +105,7 @@ export function ChatTranscriptMessageEntry({
               client={client}
               sessionId={sessionId}
               workspacePath={session?.workspacePath}
+              workspaceFiles={workspaceFiles}
               skills={skills}
               mcpServers={mcpServers}
             />

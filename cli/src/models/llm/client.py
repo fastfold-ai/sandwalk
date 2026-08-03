@@ -28,6 +28,7 @@ class LLMClient:
         "mistral": "mistral-large-latest",
         "qwen": "qwen3-max",
         "together": "zai-org/GLM-5.2",
+        "openrouter": "anthropic/claude-sonnet-5",
     }
 
     # First-party OpenAI-compatible providers: fixed base URL + env fallback.
@@ -48,6 +49,7 @@ class LLMClient:
             "DASHSCOPE_API_KEY",
         ),
         "together": ("https://api.together.xyz/v1", "TOGETHER_API_KEY"),
+        "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
     }
 
     def __init__(self, provider: str = "openai", model: str = None,
@@ -85,10 +87,17 @@ class LLMClient:
         elif self.provider in self.OPENAI_COMPATIBLE_BASE_URLS:
             import openai
             default_base_url, env_var = self.OPENAI_COMPATIBLE_BASE_URLS[self.provider]
-            self._client = openai.OpenAI(
-                api_key=self.api_key or os.environ.get(env_var),
-                base_url=self.base_url or default_base_url,
-            )
+            client_kwargs = {
+                "api_key": self.api_key or os.environ.get(env_var),
+                "base_url": self.base_url or default_base_url,
+            }
+            if self.provider == "openrouter":
+                from agent.deepagents_runtime.openrouter_attribution import (
+                    openrouter_attribution_headers,
+                )
+
+                client_kwargs["default_headers"] = openrouter_attribution_headers()
+            self._client = openai.OpenAI(**client_kwargs)
 
         else:
             raise ValueError(f"Unknown provider: {self.provider}")

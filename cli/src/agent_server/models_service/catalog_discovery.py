@@ -16,6 +16,48 @@ def _discover_models_enabled(meta: dict) -> bool:
     return str(meta.get("discover_models") or "").strip().lower() in {"1", "true", "yes"}
 
 
+def _openrouter_seen_models(cfg: Config) -> set[str]:
+    raw = cfg.get("llm.openrouter_seen_models", [])
+    if not isinstance(raw, list):
+        return set()
+    return {
+        str(item).strip()
+        for item in raw
+        if str(item or "").strip()
+    }
+
+
+def _seed_openrouter_discovered_hidden(
+    cfg: Config, discovered: list[str], known_ids: set[str]
+) -> set[str]:
+    """Default-disable newly discovered OpenRouter models (opt-in).
+
+    Curated catalog ids are already in ``known_ids`` and keep their own
+    DEFAULT_DISABLED / hidden migration. Only brand-new live ids are seeded
+    into ``llm.hidden_models`` the first time we see them; later user enables
+    stick because we never re-hide a previously seen id.
+    """
+    seen = _openrouter_seen_models(cfg)
+    fresh = [
+        model_id
+        for model_id in discovered
+        if model_id not in known_ids and model_id not in seen
+    ]
+    if not fresh:
+        return set(cfg.hidden_models())
+
+    hidden = set(cfg.hidden_models())
+    hidden.update(fresh)
+    seen.update(fresh)
+    cfg.set("llm.hidden_models", sorted(hidden))
+    cfg.set("llm.openrouter_seen_models", sorted(seen))
+    try:
+        cfg.save()
+    except Exception:  # noqa: BLE001 — listing must still return models
+        pass
+    return hidden
+
+
 def _provider_discovered_items(
     cfg: Config, hidden: set[str], known_ids: set[str], *, enabled_only: bool
 ) -> list[AgentModel]:
@@ -26,7 +68,8 @@ def _provider_discovered_items(
     items: list[AgentModel] = []
     # First-party proxy providers (e.g. OpenCode Go) that advertise
     # discover_models=true: fetch live catalog from /v1/models when a key
-    # is configured. Discovered models are enabled by default.
+    # is configured. Discovered models are enabled by default — except
+    # OpenRouter, where new discoveries start disabled (opt-in).
     for provider, meta in OPENAI_COMPATIBLE_PROVIDERS.items():
         if not _discover_models_enabled(meta):
             continue
@@ -49,13 +92,20 @@ def _provider_discovered_items(
             fallback = str(meta.get("default_model") or "").strip()
             if fallback:
                 discovered = [fallback]
+        active_hidden = hidden
+        if provider == "openrouter":
+            active_hidden = _seed_openrouter_discovered_hidden(
+                cfg, discovered, known_ids
+            )
+            hidden.clear()
+            hidden.update(active_hidden)
         for model_id in discovered:
             if model_id in known_ids:
                 continue
             if provider == "opencode" and not opencode_model_is_supported(model_id):
                 continue
             known_ids.add(model_id)
-            enabled = model_id not in hidden
+            enabled = model_id not in active_hidden
             if enabled_only and not enabled:
                 continue
             context_window = context_windows.get(model_id)

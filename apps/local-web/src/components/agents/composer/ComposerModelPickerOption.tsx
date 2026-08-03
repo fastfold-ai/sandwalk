@@ -82,13 +82,13 @@ export function ComposerModelPickerOption({
       <button
         type="button"
         title={`${option.label}${
+          option.speed ? ` · ${option.speed}` : ''
+        }${
           contextBadge ? ` ${contextBadge}` : ''
         }${
           optionSupportsEffort
-            ? ` ${optionEffortLabel}`
-            : option.speed
-              ? ` · ${option.speed}`
-              : ''
+            ? ` · ${optionEffortLabel}`
+            : ''
         }${
           formatContextWindow(option.contextWindow) &&
           !contextBadge
@@ -99,22 +99,24 @@ export function ComposerModelPickerOption({
         aria-label={`Select ${option.label}`}
         onClick={selectModel}
       />
-      <span className="pointer-events-none flex min-w-0 flex-1 items-baseline gap-1.5 truncate text-left">
-        <span className="text-foreground truncate">{option.label}</span>
-        {contextBadge ? (
-          <span className="text-muted-foreground shrink-0 text-[11px]">
-            {contextBadge}
-          </span>
-        ) : null}
-        {optionSupportsEffort ? (
-          <span className="text-muted-foreground shrink-0 text-[11px]">
-            {optionEffortLabel}
+      <span className="pointer-events-none flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+        <span className="flex min-w-0 items-baseline gap-1.5 truncate">
+          <span className="text-foreground truncate">{option.label}</span>
+          {contextBadge ? (
+            <span className="text-muted-foreground shrink-0 text-[11px]">
+              {contextBadge}
+            </span>
+          ) : null}
+        </span>
+        {option.speed ? (
+          <span className="text-muted-foreground truncate text-[11px] leading-none">
+            {option.speed}
           </span>
         ) : null}
       </span>
       <div className="relative z-10 flex shrink-0 items-center gap-2">
-        {optionSupportsEffort && onReasoningSettingsChange ? (
-          isSelected ? (
+        {optionSupportsEffort ? (
+          isSelected && onReasoningSettingsChange ? (
             <ComposerModelEffortMenu
               option={option}
               optionEffort={optionEffort}
@@ -125,31 +127,33 @@ export function ComposerModelPickerOption({
               onReasoningSettingsChange={onReasoningSettingsChange}
             />
           ) : (
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100"
-              onClick={event => {
-                event.preventDefault()
-                event.stopPropagation()
-                void (async () => {
-                  await onModelSelect(
-                    option.provider,
-                    option.model,
-                    option.profileId
-                  )
-                  onModelSearchClear()
-                  onEffortMenuOpenChange(true)
-                })()
-              }}
-            >
-              Edit
-            </button>
+            <>
+              <span className="text-muted-foreground pointer-events-none text-xs whitespace-nowrap group-hover:hidden">
+                {optionEffortLabel}
+              </span>
+              {onReasoningSettingsChange ? (
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground hidden text-xs font-medium group-hover:inline"
+                  onClick={event => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    void (async () => {
+                      await onModelSelect(
+                        option.provider,
+                        option.model,
+                        option.profileId
+                      )
+                      onModelSearchClear()
+                      onEffortMenuOpenChange(true)
+                    })()
+                  }}
+                >
+                  Edit
+                </button>
+              ) : null}
+            </>
           )
-        ) : null}
-        {option.speed && !isSelected && !optionSupportsEffort ? (
-          <span className="text-muted-foreground pointer-events-none text-xs whitespace-nowrap">
-            {option.speed}
-          </span>
         ) : null}
         {isSelected ? (
           <Check className="text-foreground pointer-events-none size-4 shrink-0" />

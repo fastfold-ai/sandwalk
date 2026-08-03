@@ -24,6 +24,7 @@ def _configured_llm_summary(cfg: Config) -> DoctorCheck:
         "mistral",
         "qwen",
         "together",
+        "openrouter",
     )
     for provider in cloud_order:
         if not cfg.llm_api_key(provider):

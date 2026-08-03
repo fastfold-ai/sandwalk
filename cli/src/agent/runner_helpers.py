@@ -17,9 +17,95 @@ from pathlib import Path
 from agent import runner as _runner
 
 
+def _extract_provider_error_payload(exc: Exception) -> dict | None:
+    """Pull a JSON error body from OpenAI / OpenRouter / httpx-style exceptions."""
+    for candidate in (
+        getattr(exc, "body", None),
+        getattr(exc, "response_json", None),
+    ):
+        if isinstance(candidate, dict):
+            return candidate
+        if isinstance(candidate, str) and candidate.strip().startswith("{"):
+            try:
+                parsed = json.loads(candidate)
+            except Exception:  # noqa: BLE001
+                parsed = None
+            if isinstance(parsed, dict):
+                return parsed
+
+    response = getattr(exc, "response", None)
+    if response is not None:
+        try:
+            parsed = response.json()
+        except Exception:  # noqa: BLE001
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+        try:
+            text = str(getattr(response, "text", "") or "").strip()
+        except Exception:  # noqa: BLE001
+            text = ""
+        if text.startswith("{"):
+            try:
+                parsed = json.loads(text)
+            except Exception:  # noqa: BLE001
+                parsed = None
+            if isinstance(parsed, dict):
+                return parsed
+    return None
+
+
+def _format_openrouter_provider_detail(payload: dict) -> str | None:
+    """Prefer OpenRouter ``error.metadata.raw`` over the opaque wrapper message."""
+    err = payload.get("error")
+    if not isinstance(err, dict):
+        err = payload if isinstance(payload.get("message"), str) else None
+    if not isinstance(err, dict):
+        return None
+
+    message = str(err.get("message") or "").strip()
+    metadata = err.get("metadata") if isinstance(err.get("metadata"), dict) else {}
+    raw = str(metadata.get("raw") or metadata.get("error") or "").strip()
+    provider = str(
+        metadata.get("provider_name")
+        or metadata.get("provider")
+        or ""
+    ).strip()
+
+    # Typical OpenRouter upstream failure: message="Provider returned error"
+    # with the real diagnosis in metadata.raw.
+    if raw:
+        if provider and provider.lower() not in raw.lower():
+            return f"{provider}: {raw}"
+        return raw
+    if message and message.lower() != "provider returned error":
+        if provider:
+            return f"{provider}: {message}"
+        return message
+    if provider and message:
+        return f"{provider}: {message}"
+    return message or None
+
+
 def _provider_error_detail(exc: Exception, *, limit: int = 360) -> str:
     """Return a single-line, truncated provider error for UI/logs."""
-    text = " ".join(str(exc).split())
+    # Prefer structured OpenRouter/OpenAI bodies so the chat UI shows the
+    # upstream diagnosis instead of the opaque "Provider returned error".
+    detail = None
+    payload = _extract_provider_error_payload(exc)
+    if payload is not None:
+        detail = _format_openrouter_provider_detail(payload)
+    if not detail:
+        # Walk causes — LangChain often wraps the OpenAI error.
+        cause = getattr(exc, "__cause__", None) or getattr(exc, "__context__", None)
+        if isinstance(cause, BaseException):
+            nested = _extract_provider_error_payload(cause)
+            if nested is not None:
+                detail = _format_openrouter_provider_detail(nested)
+            if not detail:
+                detail = " ".join(str(cause).split()) or None
+
+    text = detail or " ".join(str(exc).split())
     # Drop long "how to tune" tails; keep the actionable diagnosis.
     for marker in (
         " Tune or disable via",

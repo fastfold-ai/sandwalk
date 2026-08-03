@@ -126,7 +126,7 @@ export function AgentSessionSidebar({
         <div className="mb-2 flex items-center gap-1.5 px-2.5">
           <button
             type="button"
-            className="hover:bg-sidebar-accent/50 -ml-0.5 inline-flex h-8 w-5 shrink-0 items-center justify-start rounded-md"
+            className="hover:bg-sidebar-accent/50 -ml-2 inline-flex size-8 shrink-0 items-center justify-center rounded-md"
             onClick={onNavigateHome}
             aria-label="Home"
             title="Home"

@@ -4,7 +4,8 @@ import type {
   AgentPlanCard,
   AgentSession,
   AgentSkill,
-  McpServer
+  McpServer,
+  WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { type Dispatch, memo, type SetStateAction } from 'react'
@@ -41,6 +42,7 @@ type TimelineItemProps = {
   hiddenPlanPaths?: ReadonlySet<string> | string[]
   skills?: AgentSkill[]
   mcpServers?: McpServer[]
+  workspaceFiles?: WorkspaceFile[]
 }
 
 /** Memoized: history rows must not re-render on every streamed delta. */
@@ -63,7 +65,8 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
   onInterrupt,
   hiddenPlanPaths = [],
   skills = [],
-  mcpServers = []
+  mcpServers = [],
+  workspaceFiles = []
 }: TimelineItemProps) {
   const hiddenPlans =
     hiddenPlanPaths instanceof Set
@@ -200,6 +203,7 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
       sessionId={sessionId}
       skills={skills}
       mcpServers={mcpServers}
+      workspaceFiles={workspaceFiles}
     />
   )
 })
