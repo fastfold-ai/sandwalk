@@ -33,6 +33,14 @@ def print_banner(cfg=None):
         "gpt-4o-mini": "GPT-4o Mini",
     }
     model_name = model_names.get(model_raw, model_raw)
+    try:
+        from agent.model_catalog import config_selected_effort_label
+
+        effort_label = config_selected_effort_label(cfg)
+    except Exception:  # noqa: BLE001 — never break banner startup
+        effort_label = None
+    if model_name and effort_label:
+        model_name = f"{model_name} · {effort_label}"
 
     tier = _resolve_fastfold_subscription_tier_local(cfg)
     tier_display = _format_plan_label(tier)

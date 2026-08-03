@@ -110,6 +110,7 @@ def test_idle_toolbar_plan_modal_colors(terminal):
     }.get(key, default)
     terminal._cli_specialist_label = "Protein Designer"
     terminal._cli_sandbox_label = "Modal Sandbox"
+    terminal._toolbar_effort_label = MagicMock(return_value=None)
     text = str(terminal._bottom_toolbar())
     assert "plan mode" in text
     assert "#9a7429" in text
@@ -118,6 +119,15 @@ def test_idle_toolbar_plan_modal_colors(terminal):
     assert "verbose" not in text
     assert "? for commands" not in text
     assert "Ctrl+O" not in text
+
+
+def test_idle_toolbar_shows_effort_next_to_model(terminal):
+    terminal.session.current_model = "z-ai/glm-5.2"
+    terminal.session.current_provider = "openrouter"
+    terminal._model_display_name = MagicMock(return_value="z-ai/glm-5.2")
+    terminal._toolbar_effort_label = MagicMock(return_value="Medium · Fast")
+    text = str(terminal._bottom_toolbar())
+    assert "z-ai/glm-5.2 · Medium · Fast" in text
 
 
 def test_idle_toolbar_shows_folder_and_context(terminal, monkeypatch):

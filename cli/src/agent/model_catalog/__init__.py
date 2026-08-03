@@ -26,6 +26,11 @@ from agent.model_catalog.opencode import (
     opencode_model_uses_anthropic,
     opencode_model_uses_responses_api,
 )
+from agent.model_catalog.reasoning_display import (
+    config_selected_effort_label,
+    format_reasoning_effort_label,
+    selected_reasoning_effort_label,
+)
 from agent.model_catalog.reasoning_effort_resolve import (
     clamp_openai_reasoning_effort,
     effective_anthropic_effort,
@@ -96,6 +101,7 @@ __all__ = [
     "clamp_openai_reasoning_effort",
     "cloud_catalog_models",
     "compatible_profile_supports_thinking",
+    "config_selected_effort_label",
     "context_window_for_model",
     "effective_anthropic_effort",
     "effective_gemini_thinking_level",
@@ -105,6 +111,7 @@ __all__ = [
     "effective_unsloth_enable_thinking",
     "effective_xai_reasoning_effort",
     "format_discovered_model_label",
+    "format_reasoning_effort_label",
     "get_model_reasoning",
     "google_model_supports_thinking_level",
     "modality_capability_fields",
@@ -131,6 +138,7 @@ __all__ = [
     "reasoning_effort_options",
     "reasoning_settings_key",
     "resolve_catalog_model_id",
+    "selected_reasoning_effort_label",
     "terminal_available_models",
     "upsert_model_reasoning",
     "xai_model_supports_reasoning_effort",

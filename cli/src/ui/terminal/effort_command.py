@@ -42,6 +42,7 @@ class _EffortCommandMixin:
     ) -> None:
         """Prompt Low/Medium/High/Fast and persist to ``llm.model_reasoning``."""
         from agent.model_catalog import (
+            format_reasoning_effort_label,
             get_model_reasoning,
             normalize_reasoning_effort,
             upsert_model_reasoning,
@@ -65,7 +66,9 @@ class _EffortCommandMixin:
             default_fast=bool(cfg.get("llm.reasoning_fast", False)),
         )
         label = str(display or model_id or "model").strip()
-        current_label = "Fast" if current_fast else current_effort.capitalize()
+        current_label = format_reasoning_effort_label(
+            effort=current_effort, fast=current_fast
+        )
         self.console.print(
             f"  [cyan]Effort for {label}[/cyan] [dim](current: {current_label})[/dim]"
         )
@@ -106,7 +109,7 @@ class _EffortCommandMixin:
         cfg.set("llm.model_reasoning", next_store)
         cfg.save()
         self.session.config = cfg
-        shown = "Fast" if fast else effort.capitalize()
+        shown = format_reasoning_effort_label(effort=effort, fast=fast)
         self.console.print(f"  [green]Effort →[/green] {shown}")
 
     def _handle_effort_command(self, query: str = "") -> None:

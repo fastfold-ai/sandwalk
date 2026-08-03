@@ -88,6 +88,28 @@ class _BottomToolbarMixin:
         except Exception:  # noqa: BLE001 — never break the prompt toolbar
             return None
 
+    def _toolbar_effort_label(self) -> str | None:
+        """Current Effort/Fast for the active model, if the model supports it."""
+        try:
+            from agent.model_catalog import config_selected_effort_label
+
+            cfg = getattr(self.session, "config", None)
+            if cfg is None:
+                return None
+            provider = str(
+                getattr(self.session, "current_provider", None)
+                or cfg.get("llm.provider")
+                or "openai"
+            ).strip().lower()
+            model_id = str(
+                getattr(self.session, "current_model", None) or cfg.get("llm.model") or ""
+            ).strip()
+            return config_selected_effort_label(
+                cfg, provider=provider, model_id=model_id
+            )
+        except Exception:  # noqa: BLE001 — never break the prompt toolbar
+            return None
+
     def _bottom_toolbar(self):
         try:
             return self._render_bottom_toolbar()
@@ -114,6 +136,9 @@ class _BottomToolbarMixin:
             return HTML(f'{tab_bar}  <style fg="#555555" bg="default">·  ←/→ switch tab</style>')
 
         model = self._model_display_name()
+        effort_label = self._toolbar_effort_label()
+        if effort_label:
+            model = f"{model} · {effort_label}"
         compat_backend = self._current_compatible_backend_label()
         if compat_backend:
             model = f"{model} · {compat_backend}"
