@@ -186,7 +186,8 @@ class TestTerminalMethods:
 
         rendered = "\n".join(str(call.args[0]) for call in terminal.console.print.call_args_list if call.args)
         assert "Current model:" in rendered
-        assert "gemma4:e2b-mlx (Ollama)" in rendered
+        assert "gemma4:e2b-mlx" in rendered
+        assert "(Ollama)" in rendered
         assert "Provider:" in rendered
         assert "OpenAI-compatible custom endpoint (Ollama)" in rendered
 

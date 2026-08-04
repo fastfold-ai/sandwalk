@@ -120,6 +120,10 @@ DEFAULTS_LLM = {
     # by the legacy PromptSession path (non-transcript); leave false there so
     # Warp/iTerm host scrollback still works.
     "ui.mouse_support": False,
+    # Soft panel / compose box: auto follows terminal/OS dark mode.
+    "ui.theme": "auto",
+    # Named preset matching Sandwalk UI Theme → Presets (default, sandwalk, …).
+    "ui.palette": "default",
     "ui.mermaid.enabled": True,
     "ui.mermaid.ascii": False,
     "ui.mermaid.theme": "default",

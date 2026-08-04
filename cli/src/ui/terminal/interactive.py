@@ -53,6 +53,7 @@ from .settings_menu import _SettingsMenuMixin
 from .skills_commands import _SkillsCommandsMixin
 from .skills_upgrade_remove import _SkillsUpgradeRemoveMixin
 from .switch_model import _SwitchModelMixin
+from .theme_command import _ThemeCommandMixin
 from .trace_replay import _TraceReplayMixin
 from .usage_persistence import _UsagePersistenceMixin
 from .usage_tasks_display import _UsageTasksDisplayMixin
@@ -60,6 +61,7 @@ from .usage_tracking import _UsageTrackingMixin
 
 class InteractiveTerminal(
     _SwitchModelMixin,
+    _ThemeCommandMixin,
     _AgentBootstrapMixin,
     _AgentsAndCaseStudyMixin,
     _BoltzSetupMixin,
@@ -299,6 +301,9 @@ class InteractiveTerminal(
         Nested ``PromptSession.prompt()`` cannot run while the fullscreen
         transcript Application owns the input — selection appears broken and
         Rich colors are stripped into the transcript.
+
+        Host pickers (/model, /settings, …) keep the normal terminal look —
+        theme palettes apply only to the owned transcript TUI.
         """
         app = getattr(self, "_transcript_app", None)
 
@@ -545,6 +550,12 @@ class InteractiveTerminal(
             return True
         if cmd in ("settings", "/settings"):
             self._schedule_host_terminal(self._change_settings)
+            self._advance_suggestion()
+            return True
+        if cmd in ("theme", "/theme") or cmd.startswith("/theme"):
+            # Host TTY: questionary / PromptSession can't run inside the
+            # fullscreen transcript app (same as /model).
+            self._schedule_host_terminal(self._handle_theme_command, query)
             self._advance_suggestion()
             return True
         if (

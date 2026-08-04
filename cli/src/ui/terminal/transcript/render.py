@@ -19,7 +19,7 @@ from ui.traces.formatting import format_args, format_duration, truncate_output
 LEFT_PAD = "  "
 _PAD_FRAG: StyleAndTextTuples = [("", LEFT_PAD)]
 
-# User message soft panel — match compose box (outer margin + gold ┃ + #f5f5f5).
+# User message soft panel — match compose box (outer margin + gold ┃ + theme bg).
 _USER_OUTER = "  "
 _USER_ACCENT = "┃"
 _USER_INNER = "  "
@@ -206,6 +206,34 @@ def user_message_rows(
     return rows
 
 
+def usage_footer_rows(left: str, right: str, *, width: int) -> list[StyleAndTextTuples]:
+    """Duration left / tokens right, laid out for the live transcript width.
+
+    Pre-padding to ``console.width`` clips the trailing token digits when the
+    Window is even one column narrower — reflow here instead.
+    """
+    style = "class:transcript-system"
+    # Keep one column clear at the right edge so ↑/↓ counts never clip.
+    usable = max(8, int(width) - 1)
+    content_w = max(1, usable - len(LEFT_PAD))
+    left = str(left or "")
+    right = str(right or "")
+    if len(left) + (1 if right else 0) + len(right) > content_w:
+        line = f"{left} · {right}" if right else left
+        if len(line) > content_w:
+            line = line[:content_w]
+        body = _pad(line)
+    else:
+        spaces = max(1, content_w - len(left) - len(right)) if right else 0
+        body = LEFT_PAD + left + (" " * spaces) + right
+    if len(body) > usable:
+        body = body[:usable]
+    return [
+        [("", "")],
+        [(style, body)],
+    ]
+
+
 def entry_rows(
     entry: Entry,
     *,
@@ -224,6 +252,26 @@ def entry_rows(
                 entry.text, width=inner, config=config, colored=True
             )
             return [(entry, i, frags) for i, frags in enumerate(styled)]
+
+        if entry.kind == "usage":
+            left, sep, right = entry.text.partition("\t")
+            rows = usage_footer_rows(left, right if sep else "", width=width)
+            return [(entry, i, frags) for i, frags in enumerate(rows)]
+
+        if entry.kind == "resume":
+            # Wrap ourselves so every continuation line keeps LEFT_PAD.
+            from ui.terminal.attachments import (
+                chipify_uploads_for_display,
+                style_with_image_chips,
+            )
+
+            raw = chipify_uploads_for_display(entry.text)
+            style = "class:transcript-resume"
+            out: list[tuple[Entry, int, StyleAndTextTuples]] = []
+            for i, line in enumerate(_wrap(raw, inner)):
+                frags = style_with_image_chips(line, style)
+                out.append((entry, i, [("", LEFT_PAD), *frags]))
+            return out or [(entry, 0, _style_plain(style, LEFT_PAD.rstrip()))]
 
         # Startup mark + meta (Rich ANSI). Banner already has Rich Padding;
         # leave blank lines alone so the inset breathes.

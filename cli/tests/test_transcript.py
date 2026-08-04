@@ -316,6 +316,41 @@ def test_drag_selects_text_without_toggling_tool():
     assert "selectable" in selected
 
 
+def test_resume_line_keeps_left_pad_when_wrapped():
+    """Continuation lines must keep the transcript inset (Rich drops it)."""
+    from ui.terminal.transcript.render import LEFT_PAD, entry_lines
+
+    store = TranscriptStore()
+    store.append_text(
+        "Resumed session d50b3d49 — what's this ?@uploads/20260804-180631-clipboard.png (1 turns)",
+        kind="resume",
+    )
+    rows = entry_lines(store.entries[0], width=40)
+    plain = [line for _, _, line in rows]
+    assert len(plain) > 1
+    assert all(line.startswith(LEFT_PAD) for line in plain)
+    joined = "\n".join(plain)
+    assert "@uploads/" not in joined
+    assert "[Image 1]" in joined
+
+
+def test_usage_footer_keeps_token_counts_inside_width():
+    """Token arrows must stay fully visible (not clipped to ↓ 2 from ↓ 253)."""
+    from ui.terminal.transcript.render import entry_lines
+
+    store = TranscriptStore()
+    store.append_text("✻ Generated for 20s\t↑ 10,980 ↓ 253", kind="usage")
+    for width in (40, 60, 80, 100, 120):
+        rows = entry_lines(store.entries[0], width=width)
+        plain = [line for _, _, line in rows if line.strip()]
+        assert plain, width
+        assert all(len(line) <= width for _, _, line in rows), (width, rows)
+        joined = "\n".join(plain)
+        assert "↑ 10,980" in joined
+        assert "↓ 253" in joined
+        assert joined.rstrip().endswith("253")
+
+
 def test_markdown_assistant_hard_wraps_to_width():
     """Rich soft_wrap must be off — long assistant lines must not clip mid-word."""
     from ui.terminal.transcript.render import LEFT_PAD, entry_lines, markdown_to_plain

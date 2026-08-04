@@ -46,11 +46,36 @@ class _SessionLifecycleMixin:
             return healed
         return healed or title or "untitled"
 
+    def _print_resumed_session_line(
+        self,
+        session_id: str,
+        title: str,
+        n: int,
+        *,
+        label: str = "Resumed session",
+    ) -> None:
+        """Resume status with left pad on every wrapped line (+ image chips)."""
+        from rich.markup import escape
+
+        from ui.terminal.attachments import chipify_uploads_for_display
+
+        display = chipify_uploads_for_display(str(title or ""))
+        sid = str(session_id or "")
+        line = f"{label} {sid} — {display} ({n} turns)"
+        transcript = getattr(self, "transcript", None)
+        if transcript is not None:
+            # Own wrap so continuation lines keep LEFT_PAD (Rich drops it).
+            transcript.append_text(line, kind="resume")
+            return
+        self.console.print(
+            f"  [green]{escape(label)}[/green] [bold]{escape(sid)}[/bold] — "
+            f"{escape(display)} ({n} turns)"
+        )
+
     def _resume_session(self, identifier: str = None):
         """Resume a previous session and replay its history into the TUI."""
         from agent.loop import AgentLoop
         from agent.trajectory import Trajectory
-        from rich.markup import escape
 
         sessions = Trajectory.list_sessions()
         if not sessions:
@@ -82,10 +107,7 @@ class _SessionLifecycleMixin:
             title = self._session_display_title()
             # Clear the prior active session's scrollback, then show resumed turns.
             self._reset_transcript_canvas()
-            self.console.print(
-                f"  [green]Resumed[/green] [bold]{escape(session_id)}[/bold] — "
-                f"{escape(title)} ({n} turns)"
-            )
+            self._print_resumed_session_line(session_id, title, n, label="Resumed")
             self._render_resumed_history(
                 self.console.width, turns=self.agent.trajectory.turns
             )

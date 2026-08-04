@@ -110,10 +110,19 @@ class _BottomToolbarMixin:
         except Exception:  # noqa: BLE001 — never break the prompt toolbar
             return None
 
-    # Soft panel on white: #f5f5f5 over #ffffff (truecolor; sync app style).
-    _COMPOSE_BG = "#f5f5f5"
-    # Sandwalk gold (compose bar + Agent lead); related to plan mustard #9a7429.
-    _COMPOSE_ACCENT = "#c9a227"
+    def _compose_palette(self) -> dict[str, str]:
+        from ui.terminal.theme import panel_palette, resolve_ui_theme
+
+        cfg = getattr(getattr(self, "session", None), "config", None)
+        return panel_palette(resolve_ui_theme(cfg), config=cfg)
+
+    @property
+    def _COMPOSE_BG(self) -> str:
+        return self._compose_palette()["panel_bg"]
+
+    @property
+    def _COMPOSE_ACCENT(self) -> str:
+        return self._compose_palette()["accent"]
 
     def _bottom_toolbar(self):
         try:
@@ -223,8 +232,12 @@ class _BottomToolbarMixin:
     def _compose_meta_toolbar(self):
         """Model / sandbox (idle) or gold scanner + interrupt (busy) inside panel."""
         try:
-            bg = self._COMPOSE_BG
-            accent = self._COMPOSE_ACCENT
+            palette = self._compose_palette()
+            bg = palette["panel_bg"]
+            accent = palette["accent"]
+            muted = palette["muted_fg"]
+            sep = palette["sep_fg"]
+            model_fg = palette["model_fg"]
             # Exit / interrupt / mention still replace the in-panel line.
             special = self._toolbar_special_markup(bg=bg, include_busy=False)
             if special is not None:
@@ -237,16 +250,16 @@ class _BottomToolbarMixin:
                 with self._run_lock:
                     queued = len(self._queued_queries)
                 spinner = self._toolbar_spinner_markup(palette="gold")
-                # Force compose bg on scanner cells so they don't punch white holes.
+                # Force compose bg on scanner cells so they don't punch holes.
                 spinner = self._with_bg(spinner, bg)
                 queued_label = (
-                    f'<style fg="#8a8f98" bg="{bg}"> · queued {queued}</style>'
+                    f'<style fg="{muted}" bg="{bg}"> · queued {queued}</style>'
                     if queued
                     else ""
                 )
                 return self._toolbar_html(
                     f"{spinner}{queued_label}"
-                    f'<style fg="#8a8f98" bg="{bg}">  ctrl+c interrupt</style>'
+                    f'<style fg="{muted}" bg="{bg}">  ctrl+c interrupt</style>'
                 )
 
             # Idle: lead · model provider · sandbox
@@ -258,25 +271,25 @@ class _BottomToolbarMixin:
                 model = f"{model} · {_html_escape(effort)}"
             provider = self._compose_provider_label()
             provider_frag = (
-                f'<style fg="#8a8f98" bg="{bg}"> {_html_escape(provider)}</style>'
+                f'<style fg="{muted}" bg="{bg}"> {_html_escape(provider)}</style>'
                 if provider
                 else ""
             )
             sandbox_label = getattr(self, "_cli_sandbox_label", None) or "Local Sandbox"
             is_modal = "modal" in sandbox_label.lower()
-            sandbox_fg = "#5a9e4a" if is_modal else "#8a8f98"
+            sandbox_fg = "#5a9e4a" if is_modal else muted
             frag = (
                 f'<style fg="{accent}" bg="{bg}">{_html_escape(lead)}</style>'
-                f'<style fg="#aaaaaa" bg="{bg}"> · </style>'
-                f'<style fg="#333333" bg="{bg}">{model}</style>'
+                f'<style fg="{sep}" bg="{bg}"> · </style>'
+                f'<style fg="{model_fg}" bg="{bg}">{model}</style>'
                 f"{provider_frag}"
-                f'<style fg="#aaaaaa" bg="{bg}"> · </style>'
+                f'<style fg="{sep}" bg="{bg}"> · </style>'
                 f'<style fg="{sandbox_fg}" bg="{bg}">'
                 f"{_html_escape(sandbox_label)}</style>"
             )
             if self.session.config.get("agent.plan_preview", False) and lead != "Plan":
                 frag += (
-                    f'<style fg="#aaaaaa" bg="{bg}"> · </style>'
+                    f'<style fg="{sep}" bg="{bg}"> · </style>'
                     f'<style fg="#9a7429" bg="{bg}">plan</style>'
                 )
             return self._toolbar_html(frag)
@@ -290,22 +303,26 @@ class _BottomToolbarMixin:
         try:
             from html import escape as _html_escape
 
+            palette = self._compose_palette()
+            canvas = palette["canvas_bg"]
+            muted = palette["muted_fg"]
+
             # Exit/interrupt replace the path row.
             if self._show_exit_hint or self._show_interrupt_hint:
                 special = self._toolbar_special_markup(
-                    bg="default", include_busy=False
+                    bg=canvas, include_busy=False
                 )
                 return self._toolbar_html(special or "")
 
             left = (
-                f'<style fg="#8a8f98" bg="default">'
+                f'<style fg="{muted}" bg="{canvas}">'
                 f"{_html_escape(_short_cwd_label())}</style>"
             )
             context = self._toolbar_context_label()
             if not context:
                 return self._toolbar_html(left)
             right = (
-                f'<style fg="#7f8790" bg="default">'
+                f'<style fg="{muted}" bg="{canvas}">'
                 f"{_html_escape(context)}</style>"
             )
             # Outer margin (2+2) + gold bar (2) + inner pads for the transcript layout.

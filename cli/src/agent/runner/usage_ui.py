@@ -94,8 +94,14 @@ class UsageUIMixin:
         fresh_in = max(0, in_tokens - cache_read)
         left = f"✻ {verb} for {duration_text}"
         right = f"↑ {fresh_in:,} ↓ {out_tokens:,}"
+        transcript = getattr(self.session, "transcript", None)
+        if transcript is not None:
+            # Owned TUI: layout against the live Window width (not console.width).
+            transcript.append_text(f"{left}\t{right}", kind="usage")
+            return
         term_width = max(40, int(getattr(self.session.console, "width", 100) or 100))
-        inner_width = max(10, term_width - 2)
+        # Leave a right margin — full-width pad clips trailing token digits.
+        inner_width = max(10, term_width - 4)
         if len(left) + len(right) + 1 <= inner_width:
             spaces = max(1, inner_width - len(left) - len(right))
             self.session.console.print(

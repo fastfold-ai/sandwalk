@@ -136,9 +136,15 @@ class _TraceReplayMixin:
         out_tokens = self._coerce_int(output_tokens)
         right = f"↑ {in_tokens:,} ↓ {out_tokens:,}"
 
+        transcript = getattr(self, "transcript", None)
+        if transcript is not None:
+            # Reflow at paint time so tokens never clip at the Window edge.
+            transcript.append_text(f"{left}\t{right}", kind="usage")
+            return
+
+        # Legacy Rich path (no owned transcript): leave a right margin.
         width = max(40, int(term_width or self.console.width or 100))
-        inner_width = max(10, width - 2)
-        # Small top margin so the footer isn't flush against the answer body.
+        inner_width = max(10, width - 4)
         self.console.print()
         if len(left) + len(right) + 1 <= inner_width:
             spaces = max(1, inner_width - len(left) - len(right))

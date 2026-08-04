@@ -16,14 +16,9 @@ class _AgentBootstrapMixin:
                     self.agent = AgentLoop.resume(self.session, resume_id)
                 self._restore_usage_from_trajectory()
                 n = len(self.agent.trajectory.turns)
-                from rich.markup import escape
-
                 title = self._session_display_title()
                 sid = str(self.agent.trajectory.session_id or "")
-                self.console.print(
-                    f"  [green]Resumed session[/green] "
-                    f"[bold]{escape(sid)}[/bold] — {escape(title)} ({n} turns)"
-                )
+                self._print_resumed_session_line(sid, title, n)
                 self._render_resumed_history(
                     self.console.width, turns=self.agent.trajectory.turns
                 )

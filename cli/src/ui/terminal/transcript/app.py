@@ -27,34 +27,12 @@ from prompt_toolkit.styles import merge_styles
 
 from ui.terminal.attach_lexer import AttachChipLexer
 from ui.terminal.completion import PT_STYLE
+from ui.terminal.theme import (
+    resolve_ui_palette,
+    resolve_ui_theme,
+    transcript_style_dict,
+)
 from ui.terminal.transcript.control import TranscriptControl
-
-
-# Match the pre-transcript Rich look: muted user chrome, cyan tools (like the
-# old ▸ start indicator), soft green only on the checkmark via tool line text,
-# default fg for assistant body (Rich ANSI supplies emphasis/links).
-# Soft compose panel (pad + fill). Keep bg in sync with _COMPOSE_BG.
-_TRANSCRIPT_STYLE = {
-    "transcript-sep": "#d0d0d0",
-    "transcript-text": "",
-    # User turns share the compose soft panel (sync _COMPOSE_BG / accent).
-    "transcript-user": "bg:#f5f5f5 #222222",
-    "transcript-user-accent": "#c9a227",
-    "transcript-system": "#7f8790",
-    "transcript-tool": "#8be9fd",
-    "transcript-tool-ok": "#98c379",
-    "transcript-tool-error": "#ff5555",
-    "transcript-tool-detail": "#7f8790",
-    "transcript-selected": "reverse",
-    # Same orange chip as the compose AttachChipLexer / PT_STYLE.
-    "image-chip": "bold #111111 bg:#f0a030",
-    # Soft panel #f5f5f5 on white #ffffff (sync _COMPOSE_BG; needs truecolor).
-    "transcript-compose": "bg:#f5f5f5 #222222",
-    "transcript-compose.prompt": "bold #555555",
-    # Gold accent outside the soft panel (default/terminal bg behind it).
-    "transcript-compose-accent": "#c9a227",
-    "transcript-status": "bg:default #8a8f98",
-}
 
 # Cursor OSC color (Warp/VT100); matches sandwalk green accent.
 _COMPOSE_CURSOR = "#50fa7b"
@@ -63,10 +41,23 @@ _COMPOSE_CURSOR = "#50fa7b"
 _INVALIDATE_MIN_INTERVAL_S = 0.05
 
 
-def _merge_style():
+def _merge_style(config=None):
     from prompt_toolkit.styles import Style
 
-    return merge_styles([PT_STYLE, Style.from_dict(_TRANSCRIPT_STYLE)])
+    theme = resolve_ui_theme(config)
+    palette = resolve_ui_palette(config)
+    return merge_styles(
+        [
+            PT_STYLE,
+            Style.from_dict(
+                transcript_style_dict(theme, palette=palette, config=config)
+            ),
+        ]
+    )
+
+
+def _theme_fingerprint(config=None) -> tuple[str, str]:
+    return (resolve_ui_theme(config), resolve_ui_palette(config))
 
 
 def run_transcript_session(
@@ -104,6 +95,7 @@ def run_transcript_session(
         wrap_lines=False,
         dont_extend_height=False,
         allow_scroll_beyond_bottom=False,
+        style="class:transcript-root",
     )
     control.window = transcript_window
 
@@ -163,21 +155,22 @@ def run_transcript_session(
     status_bar = VSplit(
         [
             # Align under panel text (gold bar is outside the gray box).
-            Window(width=2, char=" "),
+            Window(width=2, char=" ", style="class:transcript-root"),
             Window(
                 FormattedTextControl(_status),
                 height=1,
                 dont_extend_height=True,
-                style="class:bottom-toolbar",
+                style="class:transcript-status",
             ),
-            Window(width=2, char=" "),
+            Window(width=2, char=" ", style="class:transcript-root"),
         ],
         padding=0,
+        style="class:transcript-root",
     )
 
     def _outer(width: int = 2) -> Window:
         # Margin outside the soft panel — keep off the terminal edge.
-        return Window(width=width, char=" ")
+        return Window(width=width, char=" ", style="class:transcript-root")
 
     # Gold bar sits left of the gray panel (outside the box), slightly heavier ┃.
     compose_block = VSplit(
@@ -192,25 +185,28 @@ def run_transcript_session(
             _outer(),
         ],
         padding=0,
+        style="class:transcript-root",
     )
     status_block = VSplit(
         [
             _outer(),
-            Window(width=1, char=" "),  # same column as gold bar
+            Window(width=1, char=" ", style="class:transcript-root"),
             status_bar,
             _outer(),
         ],
         padding=0,
+        style="class:transcript-root",
     )
 
     root = FloatContainer(
         content=HSplit(
             [
                 transcript_window,
-                Window(height=1),  # breath between history and composer
+                Window(height=1, style="class:transcript-root"),
                 compose_block,
                 status_block,
-            ]
+            ],
+            style="class:transcript-root",
         ),
         floats=[
             Float(
@@ -225,23 +221,61 @@ def run_transcript_session(
 
     from prompt_toolkit.output.color_depth import ColorDepth
 
+    theme_state = {"fp": _theme_fingerprint(config)}
+
     app = Application(
         layout=Layout(root, focused_element=buf),
         key_bindings=kb,
-        style=_merge_style(),
-        # Soft #f5f5f5 panel washes out to white without 24-bit color.
+        style=_merge_style(config),
+        # Soft panels need 24-bit color (light #f5f5f5 / dark #2a2a2e).
         color_depth=ColorDepth.TRUE_COLOR,
         full_screen=True,
         mouse_support=True,
         erase_when_done=False,
     )
+    terminal._transcript_app = app
 
     invalidate_lock = threading.Lock()
     invalidate_state = {"last": 0.0, "pending": False}
 
+    def _sync_theme_style(*, force: bool = False) -> None:
+        """Refresh panel colors when OS appearance or /theme selection changes."""
+        from ui.terminal.theme import clear_appearance_cache
+
+        # Avoid OSC 11 spam inside the fullscreen app; env + macOS are enough live.
+        if not force:
+            clear_appearance_cache()
+        # Reload config so /theme writes are visible without restart.
+        live_cfg = config
+        try:
+            sess = getattr(terminal, "session", None)
+            if sess is not None and getattr(sess, "config", None) is not None:
+                live_cfg = sess.config
+        except Exception:  # noqa: BLE001
+            pass
+        fp = _theme_fingerprint(live_cfg)
+        if not force and fp == theme_state["fp"]:
+            return
+        theme_state["fp"] = fp
+        try:
+            app.style = _merge_style(live_cfg)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _force_theme_refresh() -> None:
+        _sync_theme_style(force=True)
+        try:
+            if app.is_running:
+                app.invalidate()
+        except Exception:  # noqa: BLE001
+            pass
+
+    terminal._ui_theme_refresh = _force_theme_refresh
+
     def _invalidate_now() -> None:
         try:
             if app.is_running:
+                _sync_theme_style()
                 app.invalidate()
         except Exception:  # noqa: BLE001
             pass
