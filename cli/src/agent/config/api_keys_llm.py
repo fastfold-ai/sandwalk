@@ -88,6 +88,7 @@ API_KEYS_LLM = {
             "OpenAI-compatible base URL for Token Plan, Coding Plan, or "
             "pay-as-you-go (leave empty to auto-detect on Test)"
         ),
+        "url": "https://www.alibabacloud.com/help/en/model-studio/developer-reference/use-qwen-by-calling-api",
         "secret": False,
         "free": False,
     },

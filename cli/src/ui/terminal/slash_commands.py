@@ -16,7 +16,7 @@ SLASH_COMMANDS = {
     "/model": "Switch LLM model/provider interactively",
     "/effort": "Set Effort / Fast (thinking) for the active model",
     "/settings": "Configure UI and agent preferences",
-    "/theme": "Interactive theme picker (palettes + light|dark|auto)",
+    "/themes": "Interactive theme picker (palettes + light|dark|auto)",
     "/config": "Show active runtime configuration",
     "/keys": "Show API key status (/keys profile | set-compatible | set-moonshot | set-boltz)",
     "/mcp": "List and manage MCP servers (/mcp connect|enable|validate|add|remove)",

@@ -237,12 +237,27 @@ def test_llm_api_key_legacy_fallback_for_anthropic():
     assert cfg.llm_api_key("anthropic") == "legacy-anthropic-key"
 
 
+def test_api_keys_registry_has_required_fields_for_keys_table():
+    """Every API_KEYS entry must satisfy keys_table() — catches missing url/name."""
+    from agent.config.api_keys import API_KEYS
+
+    required = ("name", "description", "url", "free")
+    missing = []
+    for config_key, info in API_KEYS.items():
+        assert isinstance(info, dict), config_key
+        for field in required:
+            if field not in info:
+                missing.append(f"{config_key}.{field}")
+    assert missing == [], f"API_KEYS missing fields used by /keys: {missing}"
+
+
 def test_keys_table_includes_llm_provider_keys():
     cfg = Config(data={})
     table = cfg.keys_table()
     first_col = list(getattr(table.columns[0], "_cells", []))
     assert "Anthropic" in first_col
     assert "OpenAI" in first_col
+    assert "Qwen endpoint" in first_col
 
 
 def test_keys_table_includes_boltz_provider():

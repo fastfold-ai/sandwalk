@@ -307,12 +307,8 @@ class _BottomToolbarMixin:
             canvas = palette["canvas_bg"]
             muted = palette["muted_fg"]
 
-            # Exit/interrupt replace the path row.
-            if self._show_exit_hint or self._show_interrupt_hint:
-                special = self._toolbar_special_markup(
-                    bg=canvas, include_busy=False
-                )
-                return self._toolbar_html(special or "")
+            # Exit/interrupt hints live only on the compose meta line so they
+            # are not duplicated under the path/context row.
 
             left = (
                 f'<style fg="{muted}" bg="{canvas}">'

@@ -22,11 +22,10 @@ from prompt_toolkit.layout.containers import (
 )
 from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.layout.dimension import Dimension
-from prompt_toolkit.layout.menus import CompletionsMenu
 from prompt_toolkit.styles import merge_styles
 
 from ui.terminal.attach_lexer import AttachChipLexer
-from ui.terminal.completion import PT_STYLE
+from ui.terminal.completion import ComposeCompletionsMenu, PT_STYLE
 from ui.terminal.theme import (
     resolve_ui_palette,
     resolve_ui_theme,
@@ -36,6 +35,12 @@ from ui.terminal.transcript.control import TranscriptControl
 
 # Cursor OSC color (Warp/VT100); matches sandwalk green accent.
 _COMPOSE_CURSOR = "#50fa7b"
+
+# Match compose_block: [outer 2][accent ┃ 1][panel …][outer 2].
+# Menu float includes the accent column so the ┃ continues into the menu.
+_COMPOSE_OUTER = 2
+_COMPOSE_BOX_LEFT = _COMPOSE_OUTER  # 2 — accent ┃ is first column of the menu
+_COMPOSE_BOX_RIGHT = _COMPOSE_OUTER
 
 # Coalesce store/toolbar invalidates so Rich re-renders can't pin the UI.
 _INVALIDATE_MIN_INTERVAL_S = 0.05
@@ -210,9 +215,11 @@ def run_transcript_session(
         ),
         floats=[
             Float(
-                xcursor=True,
+                # Full compose-panel width, flush with accent ┃ borderline.
+                left=_COMPOSE_BOX_LEFT,
+                right=_COMPOSE_BOX_RIGHT,
                 ycursor=True,
-                content=CompletionsMenu(max_height=12, scroll_offset=1),
+                content=ComposeCompletionsMenu(max_height=12, scroll_offset=1, lift=1),
             )
         ],
     )
@@ -239,13 +246,13 @@ def run_transcript_session(
     invalidate_state = {"last": 0.0, "pending": False}
 
     def _sync_theme_style(*, force: bool = False) -> None:
-        """Refresh panel colors when OS appearance or /theme selection changes."""
+        """Refresh panel colors when OS appearance or /themes selection changes."""
         from ui.terminal.theme import clear_appearance_cache
 
         # Avoid OSC 11 spam inside the fullscreen app; env + macOS are enough live.
         if not force:
             clear_appearance_cache()
-        # Reload config so /theme writes are visible without restart.
+        # Reload config so /themes writes are visible without restart.
         live_cfg = config
         try:
             sess = getattr(terminal, "session", None)

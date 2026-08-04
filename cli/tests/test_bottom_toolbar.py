@@ -62,6 +62,16 @@ def test_exit_and_interrupt_hints(terminal):
     assert "Interrupt requested" in str(terminal._bottom_toolbar())
 
 
+def test_exit_hint_only_on_compose_meta_not_status(terminal):
+    """Transcript shows meta + status; hint must not appear twice."""
+    terminal._show_exit_hint = True
+    meta = str(terminal._compose_meta_toolbar())
+    status = str(terminal._compose_status_toolbar())
+    assert "Ctrl+C again to exit" in meta
+    assert "Ctrl+C again to exit" not in status
+    assert "Projects" in status or "context" in status or "~" in status
+
+
 def test_mention_tab_bar(terminal):
     terminal._mention_completing.return_value = True
     terminal._merged_completer = SimpleNamespace(

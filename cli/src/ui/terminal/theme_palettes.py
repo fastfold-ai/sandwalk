@@ -486,7 +486,7 @@ def palette_swatch_markup(pal: ThemePalette | dict) -> str:
     return f"[{top} on {bottom}]▄[/]"
 
 
-# Aliases users might type in /theme …
+# Aliases users might type in /themes …
 _PALETTE_ALIASES = {
     "neon-noir": "neonnoir",
     "neon_noir": "neonnoir",

@@ -552,9 +552,14 @@ class InteractiveTerminal(
             self._schedule_host_terminal(self._change_settings)
             self._advance_suggestion()
             return True
-        if cmd in ("theme", "/theme") or cmd.startswith("/theme"):
-            # Host TTY: questionary / PromptSession can't run inside the
-            # fullscreen transcript app (same as /model).
+        if (
+            cmd in ("themes", "/themes", "theme", "/theme")
+            or cmd.startswith("/themes")
+            or cmd.startswith("/theme ")
+            or cmd == "/theme"
+        ):
+            # Host TTY: PromptSession can't run inside the fullscreen
+            # transcript app (same as /model). /theme is a short alias.
             self._schedule_host_terminal(self._handle_theme_command, query)
             self._advance_suggestion()
             return True

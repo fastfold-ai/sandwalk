@@ -1,4 +1,4 @@
-"""Light/dark soft-panel theme detection, palettes, and /theme wiring."""
+"""Light/dark soft-panel theme detection, palettes, and /themes wiring."""
 
 from __future__ import annotations
 
@@ -82,6 +82,25 @@ def test_transcript_style_paints_full_tui_canvas():
     sand = transcript_style_dict("dark", palette="sandwalk")
     assert "bg:#3d2a18" in sand["transcript-root"]
     assert sand["transcript-root"] != noir["transcript-root"]
+
+
+def test_completion_menu_follows_theme_accent_and_panel():
+    """Slash menu matches compose panel; selection uses palette accent."""
+    from ui.terminal.theme import _contrast_on
+
+    sand = transcript_style_dict("dark", palette="sandwalk")
+    assert "bg:#2e2418" in sand["completion-menu"]  # sandwalk dark panel
+    assert "bg:#e1b34c" in sand["completion-menu.completion.current"]
+    assert _contrast_on("#e1b34c") == "#111111"
+    assert "#111111" in sand["completion-menu.completion.current"]
+    assert "bg:#2e2418" in sand["completion-menu-accent"]
+    assert "#e1b34c" in sand["completion-menu-accent"]
+
+    noir = transcript_style_dict("dark", palette="neonnoir")
+    assert "bg:#e83a8a" in noir["completion-menu.completion.current"]
+    assert sand["completion-menu.completion.current"] != noir[
+        "completion-menu.completion.current"
+    ]
 
 
 class _Cfg:
@@ -168,9 +187,9 @@ def test_theme_command_sets_palette(monkeypatch):
             pass
 
     monkeypatch.setattr("agent.config.Config.load", lambda: FakeCfg())
-    t._handle_theme_command("/theme sandwalk")
+    t._handle_theme_command("/themes sandwalk")
     assert saved.get("ui.palette") == "sandwalk"
-    t._handle_theme_command("/theme dark")
+    t._handle_theme_command("/themes dark")
     assert saved.get("ui.theme") == "dark"
     t._refresh_ui_theme.assert_called()
 
@@ -203,7 +222,7 @@ def test_theme_interactive_list_has_no_descriptions(monkeypatch):
             pass
 
     monkeypatch.setattr("agent.config.Config.load", lambda: FakeCfg())
-    t._handle_theme_command("/theme")
+    t._handle_theme_command("/themes")
     printed = " ".join(str(c) for c in t.console.print.call_args_list)
     assert "Palettes" in printed
     assert "Fabienk" in printed or "fabienk" in printed

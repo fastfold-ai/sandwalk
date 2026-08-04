@@ -73,14 +73,16 @@ class TablesMixin:
                 val = self._normalized_secret(self.get(config_key))
                 status = "[green]configured[/green]" if val else "[red]not set[/red]"
 
-            free_tag = " (free)" if info["free"] else ""
+            free_tag = " (free)" if info.get("free") else ""
+            signup = str(info.get("url") or "").strip()
+            signup_cell = (signup + free_tag) if signup else ("—" if not free_tag else free_tag.strip())
             table.add_row(
-                info["name"],
+                info.get("name") or config_key,
                 status,
                 self._secret_preview(val),
-                info["description"],
+                info.get("description") or "",
                 config_key,
-                info["url"] + free_tag,
+                signup_cell,
                 _format_updated_date(timestamps.get(config_key)) if val else "—",
             )
 

@@ -5,25 +5,134 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.filters import has_completions, is_done, to_filter
+from prompt_toolkit.layout.containers import (
+    ConditionalContainer,
+    HSplit,
+    VSplit,
+    Window,
+)
+from prompt_toolkit.layout.controls import UIContent
+from prompt_toolkit.layout.dimension import Dimension
+from prompt_toolkit.layout.margins import ScrollbarMargin
+from prompt_toolkit.layout.menus import CompletionsMenuControl, _get_menu_item_fragments
+from prompt_toolkit.layout.screen import Point
 from prompt_toolkit.styles import Style
 
 from ui.terminal.slash_commands import SLASH_COMMANDS
 
-# prompt_toolkit style — colored prompt, dark completion menu
+
+class _FullWidthCompletionsMenuControl(CompletionsMenuControl):
+    """Pad meta (or the command column) so the selection bar spans the float."""
+
+    def create_content(self, width: int, height: int) -> UIContent:
+        from prompt_toolkit.application.current import get_app
+
+        complete_state = get_app().current_buffer.complete_state
+        if not complete_state:
+            return UIContent()
+
+        completions = complete_state.completions
+        index = complete_state.complete_index
+        show_meta = self._show_meta(complete_state)
+        menu_width = self._get_menu_width(width, complete_state)
+        if show_meta:
+            # Stretch descriptions so highlight / panel fill the compose box.
+            menu_meta_width = max(0, width - menu_width)
+        else:
+            menu_width = max(menu_width, width)
+            menu_meta_width = 0
+
+        def get_line(i: int):
+            c = completions[i]
+            is_current = i == index
+            result = _get_menu_item_fragments(
+                c, is_current, menu_width, space_after=True
+            )
+            if show_meta and menu_meta_width > 0:
+                result += self._get_menu_item_meta_fragments(
+                    c, is_current, menu_meta_width
+                )
+            return result
+
+        return UIContent(
+            get_line=get_line,
+            cursor_position=Point(x=0, y=index or 0),
+            line_count=len(completions),
+        )
+
+
+class ComposeCompletionsMenu(ConditionalContainer):
+    """Slash/@ menu sized to the compose panel (full width, accent ┃ border)."""
+
+    def __init__(
+        self,
+        max_height: int = 12,
+        scroll_offset: int = 1,
+        *,
+        lift: int = 1,
+    ) -> None:
+        from prompt_toolkit.layout.containers import ScrollOffsets
+
+        menu = Window(
+            content=_FullWidthCompletionsMenuControl(),
+            width=Dimension(),
+            height=Dimension(min=1, max=max_height),
+            scroll_offsets=ScrollOffsets(top=scroll_offset, bottom=scroll_offset),
+            # Thin gray scrollbar (not theme accent).
+            right_margins=[ScrollbarMargin(display_arrows=False)],
+            dont_extend_width=False,
+            style="class:completion-menu",
+            z_index=10**8,
+        )
+        # Bottom pad stays inside the menu panel (same fill + accent ┃), so it
+        # reads as margin above the input — not a canvas hole between boxes.
+        panel = menu
+        if lift > 0:
+            panel = HSplit(
+                [
+                    menu,
+                    Window(
+                        height=Dimension.exact(lift),
+                        char=" ",
+                        style="class:completion-menu",
+                    ),
+                ],
+                padding=0,
+            )
+        body = VSplit(
+            [
+                Window(
+                    width=1,
+                    char="┃",
+                    style="class:transcript-compose-accent",
+                ),
+                panel,
+            ],
+            padding=0,
+        )
+        super().__init__(
+            content=body,
+            filter=to_filter(True) & has_completions & ~is_done,
+        )
+
+# Base prompt_toolkit style (host PromptSession). Transcript TUI overlays
+# theme-aware completion-menu colors via ``transcript_style_dict``.
 PT_STYLE = Style.from_dict({
     "prompt": "bold #50fa7b",
     # Force plain, non-reversed toolbar text so no default
     # prompt_toolkit badge/background styling bleeds through.
     "bottom-toolbar": "noinherit noreverse #8a8f98 bg:default",
     "bottom-toolbar.text": "noinherit noreverse #8a8f98 bg:default",
-    # Completion menu — dark background so mention colors stay readable
-    "completion-menu": "bg:#1a1a2e #cccccc",
-    "completion-menu.completion": "bg:#1a1a2e #cccccc",
-    "completion-menu.completion.current": "bg:#333355 #ffffff bold",
-    "completion-menu.meta.completion": "bg:#1a1a2e #888888",
-    "completion-menu.meta.completion.current": "bg:#333355 #aaaaaa",
-    "scrollbar.background": "bg:#1a1a2e",
-    "scrollbar.button": "bg:#333355",
+    # Neutral fallback when not inside the themed transcript app.
+    "completion-menu": "bg:#f5f5f5 #222222",
+    "completion-menu.completion": "bg:#f5f5f5 #222222",
+    "completion-menu.completion.current": "bg:#c9a227 #111111 bold",
+    "completion-menu.meta.completion": "bg:#f5f5f5 #8a8f98",
+    "completion-menu.meta.completion.current": "bg:#c9a227 #111111",
+    "scrollbar.background": "bg:#f5f5f5",
+    "scrollbar.button": "bg:#c8c8c8",
+    "scrollbar.arrow": "bg:#f5f5f5 #aaaaaa",
     # Mention kind colors
     "mention-tool": "#00d7ff",     # cyan for tool mentions
     "mention-dataset": "#50fa7b",  # green for dataset mentions

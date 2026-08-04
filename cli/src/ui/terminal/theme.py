@@ -197,6 +197,23 @@ def resolve_ui_theme(config: Any = None) -> ThemeName:
     return "dark" if terminal_prefers_dark() else "light"
 
 
+def _contrast_on(bg_hex: str) -> str:
+    """Readable ink for text on ``bg_hex`` (selected completion row, etc.)."""
+    token = str(bg_hex or "").strip().lstrip("#")
+    if len(token) != 6:
+        return "#ffffff"
+    try:
+        r = int(token[0:2], 16)
+        g = int(token[2:4], 16)
+        b = int(token[4:6], 16)
+    except ValueError:
+        return "#ffffff"
+    # Relative luminance — light accents (gold) need dark ink.
+    if (0.299 * r + 0.587 * g + 0.114 * b) > 160:
+        return "#111111"
+    return "#ffffff"
+
+
 def transcript_style_dict(
     theme: ThemeName | str | None = None,
     *,
@@ -206,14 +223,18 @@ def transcript_style_dict(
     """prompt_toolkit style entries for the owned transcript + compose panel."""
     p = panel_palette(theme, palette=palette, config=config)
     canvas = f"bg:{p['canvas_bg']} {p['canvas_fg']}"
+    panel = f"bg:{p['panel_bg']} {p['panel_fg']}"
+    accent = p["accent"]
+    on_accent = _contrast_on(accent)
+    muted = p["muted_fg"]
     return {
         # Full-TUI canvas (sidebar equivalent from Sandwalk UI presets).
         "": canvas,
         "transcript-root": canvas,
         "transcript-sep": p["sep_line"],
         "transcript-text": p["canvas_fg"],
-        "transcript-user": f"bg:{p['panel_bg']} {p['panel_fg']}",
-        "transcript-user-accent": p["accent"],
+        "transcript-user": panel,
+        "transcript-user-accent": accent,
         "transcript-system": p["system_fg"],
         "transcript-resume": p["resume_fg"],
         "transcript-tool": "#8be9fd",
@@ -222,10 +243,21 @@ def transcript_style_dict(
         "transcript-tool-detail": p["system_fg"],
         "transcript-selected": "reverse",
         "image-chip": "bold #111111 bg:#f0a030",
-        "transcript-compose": f"bg:{p['panel_bg']} {p['panel_fg']}",
+        "transcript-compose": panel,
         "transcript-compose.prompt": f"bold {p['prompt_fg']}",
-        "transcript-compose-accent": f"bg:{p['canvas_bg']} {p['accent']}",
-        "transcript-status": f"bg:{p['canvas_bg']} {p['muted_fg']}",
+        "transcript-compose-accent": f"bg:{p['canvas_bg']} {accent}",
+        "transcript-status": f"bg:{p['canvas_bg']} {muted}",
+        # Slash / @ menu — same panel as compose, accent selection (opencode-like).
+        "completion-menu": panel,
+        "completion-menu.completion": panel,
+        "completion-menu.completion.current": f"bg:{accent} {on_accent} bold",
+        "completion-menu.meta.completion": f"bg:{p['panel_bg']} {muted}",
+        "completion-menu.meta.completion.current": f"bg:{accent} {on_accent}",
+        "completion-menu-accent": f"bg:{p['panel_bg']} {accent}",
+        # Thin muted scrollbar (not accent — accent is the left ┃ only).
+        "scrollbar.background": f"bg:{p['panel_bg']}",
+        "scrollbar.button": f"bg:{p['sep_fg']}",
+        "scrollbar.arrow": f"bg:{p['panel_bg']} {muted}",
     }
 
 

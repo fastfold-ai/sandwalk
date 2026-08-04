@@ -1,7 +1,8 @@
-"""Mixin: /theme — pick Sandwalk UI palette + light/dark/auto for the transcript TUI.
+"""Mixin: /themes — pick Sandwalk UI palette + light/dark/auto for the transcript TUI.
 
 Host interactive UIs (/model, /settings, …) are intentionally unthemed —
 this only updates the owned fullscreen transcript canvas/compose panel.
+``/theme`` is accepted as a short alias.
 """
 
 from __future__ import annotations
@@ -133,7 +134,7 @@ class _ThemeCommandMixin:
         )
 
     def _handle_theme_command(self, query: str) -> None:
-        """Interactive picker, or direct ``/theme <palette|light|dark|auto>``."""
+        """Interactive picker, or direct ``/themes <palette|light|dark|auto>``."""
         from agent.config import Config
         from ui.terminal.theme import list_palettes, normalize_palette_id
 
@@ -165,7 +166,7 @@ class _ThemeCommandMixin:
         if chosen_id is None:
             self.console.print(
                 f"  [yellow]Unknown theme[/yellow] [bold]{arg}[/bold]. "
-                "Use /theme to pick a preset."
+                "Use /themes to pick a preset."
             )
             return
         self._apply_theme_palette(cfg, chosen_id)
