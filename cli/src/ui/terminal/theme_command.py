@@ -59,7 +59,21 @@ class _ThemeCommandMixin:
         self._refresh_ui_theme()
 
     def _prompt_theme_interactive(self, cfg) -> None:
-        """Numbered list + prompt — same shape as /model (no themed host chrome)."""
+        """OpenCode-style modal (search + live preview); numbered list fallback."""
+        # Prefer in-app overlay while the transcript Application owns the TTY.
+        host = getattr(self, "_themes_modal_host", None)
+        app = getattr(self, "_transcript_app", None)
+        if host is not None and getattr(app, "is_running", False):
+            host.open()
+            return
+        try:
+            from ui.terminal.themes_modal import run_themes_modal
+
+            if run_themes_modal(self):
+                return
+        except Exception:  # noqa: BLE001
+            pass
+
         from ui.terminal.theme import (
             list_palettes,
             resolve_ui_palette,
@@ -73,7 +87,7 @@ class _ThemeCommandMixin:
         active_mode = resolve_ui_theme(cfg)
 
         self.console.print()
-        self.console.print("  [cyan]Theme[/cyan]")
+        self.console.print("  [cyan]Themes[/cyan]")
         self.console.print(
             f"  [dim]Mode:[/dim] {mode} [dim](resolved {active_mode})[/dim]"
         )

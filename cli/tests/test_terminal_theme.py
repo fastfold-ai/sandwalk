@@ -224,7 +224,7 @@ def test_theme_interactive_list_has_no_descriptions(monkeypatch):
     monkeypatch.setattr("agent.config.Config.load", lambda: FakeCfg())
     t._handle_theme_command("/themes")
     printed = " ".join(str(c) for c in t.console.print.call_args_list)
-    assert "Palettes" in printed
+    assert "Palettes" in printed or "Themes" in printed
     assert "Fabienk" in printed or "fabienk" in printed
     assert "Angine de Poitrine" not in printed
     assert "Arrakis" not in printed

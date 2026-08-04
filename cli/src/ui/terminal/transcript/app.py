@@ -10,7 +10,7 @@ from prompt_toolkit.application import Application
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.history import History
-from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.key_binding import KeyBindings, merge_key_bindings
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import Layout
 from prompt_toolkit.layout.containers import (
@@ -279,6 +279,25 @@ def run_transcript_session(
 
     terminal._ui_theme_refresh = _force_theme_refresh
 
+    # In-app /themes overlay (centered dialog over live transcript).
+    from ui.terminal.themes_modal import ThemesModalHost
+
+    def _focus_compose() -> None:
+        try:
+            app.layout.focus(buf)
+        except Exception:  # noqa: BLE001
+            pass
+
+    themes_host = ThemesModalHost(
+        terminal,
+        app=app,
+        on_style_refresh=_force_theme_refresh,
+        focus_compose=_focus_compose,
+    )
+    terminal._themes_modal_host = themes_host
+    root.floats.extend(themes_host.floats)
+    app.key_bindings = merge_key_bindings([themes_host.key_bindings, kb])
+
     def _invalidate_now() -> None:
         try:
             if app.is_running:
@@ -360,6 +379,7 @@ def run_transcript_session(
         unsubscribe()
         terminal._transcript_app = None
         terminal._transcript_buffer = None
+        terminal._themes_modal_host = None
 
     if result is None:
         raise EOFError
@@ -391,7 +411,13 @@ def _build_transcript_bindings(
 
     kb = _build_key_bindings(terminal, include_mouse=False)
 
-    @kb.add("enter", eager=True)
+    def _themes_modal_closed() -> bool:
+        host = getattr(terminal, "_themes_modal_host", None)
+        return host is None or not getattr(host.state, "open", False)
+
+    modal_closed = Condition(_themes_modal_closed)
+
+    @kb.add("enter", filter=modal_closed, eager=True)
     def _enter(event):
         buffer = event.app.current_buffer
         cs = buffer.complete_state
@@ -417,11 +443,11 @@ def _build_transcript_bindings(
         else:
             event.app.invalidate()
 
-    @kb.add("escape", "enter", eager=True)
+    @kb.add("escape", "enter", filter=modal_closed, eager=True)
     def _alt_enter(event):
         event.app.current_buffer.insert_text("\n")
 
-    @kb.add("c-d", eager=True)
+    @kb.add("c-d", filter=modal_closed, eager=True)
     def _eof(event):
         if not event.app.current_buffer.text:
             event.app.exit(result=None)

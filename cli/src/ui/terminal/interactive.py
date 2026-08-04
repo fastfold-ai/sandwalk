@@ -558,9 +558,14 @@ class InteractiveTerminal(
             or cmd.startswith("/theme ")
             or cmd == "/theme"
         ):
-            # Host TTY: PromptSession can't run inside the fullscreen
-            # transcript app (same as /model). /theme is a short alias.
-            self._schedule_host_terminal(self._handle_theme_command, query)
+            # In-app overlay when the transcript app is live (session stays
+            # visible around the dialog). Host TTY only as fallback.
+            host = getattr(self, "_themes_modal_host", None)
+            app = getattr(self, "_transcript_app", None)
+            if host is not None and getattr(app, "is_running", False):
+                self._handle_theme_command(query)
+            else:
+                self._schedule_host_terminal(self._handle_theme_command, query)
             self._advance_suggestion()
             return True
         if (

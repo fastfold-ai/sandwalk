@@ -227,7 +227,9 @@ def transcript_style_dict(
     accent = p["accent"]
     on_accent = _contrast_on(accent)
     muted = p["muted_fg"]
-    return {
+    from ui.terminal.themes_modal import themes_modal_style_extras
+
+    out = {
         # Full-TUI canvas (sidebar equivalent from Sandwalk UI presets).
         "": canvas,
         "transcript-root": canvas,
@@ -259,6 +261,8 @@ def transcript_style_dict(
         "scrollbar.button": f"bg:{p['sep_fg']}",
         "scrollbar.arrow": f"bg:{p['panel_bg']} {muted}",
     }
+    out.update(themes_modal_style_extras(p))
+    return out
 
 
 def clear_theme_cache() -> None:
@@ -284,4 +288,5 @@ __all__ = [
     "resolve_ui_theme",
     "terminal_prefers_dark",
     "transcript_style_dict",
+    "_contrast_on",
 ]
