@@ -71,6 +71,31 @@ def test_expand_image_chips():
     assert expand_image_chips("[Image 1] what?", {1: "uploads/a.png"}) == "@uploads/a.png what?"
 
 
+def test_chipify_uploads_for_display():
+    from ui.terminal.attachments import chipify_uploads_for_display, style_with_image_chips
+
+    text = chipify_uploads_for_display(
+        "@uploads/20260804-clip.png what's this?"
+    )
+    assert text == "[Image 1] what's this?"
+    assert "@uploads/" not in text
+
+    frags = style_with_image_chips(text, "class:transcript-user")
+    chip = "".join(t for s, t in frags if "image-chip" in s)
+    assert chip == "[Image 1]"
+
+
+def test_chipify_keeps_existing_chip_numbers():
+    from ui.terminal.attachments import chipify_uploads_for_display
+
+    text = chipify_uploads_for_display(
+        "[Image 1] and @uploads/other.png"
+    )
+    assert "[Image 1]" in text
+    assert "[Image 2]" in text
+    assert "@uploads/" not in text
+
+
 def test_rewrite_loose_image_paths(tmp_path: Path):
     img = tmp_path / "loose.png"
     img.write_bytes(b"x")

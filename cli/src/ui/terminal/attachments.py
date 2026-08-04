@@ -32,6 +32,11 @@ _MIME_TO_EXT = {
 
 # Visible chip in the compose buffer; expanded to @uploads/… on submit.
 _CHIP_RE = re.compile(r"\[Image\s+(\d+)\]")
+_CHIP_LABEL_RE = re.compile(r"\[Image\s+\d+\]")
+_UPLOAD_AT_RE = re.compile(
+    r"@uploads/[^\s]+?\.(?:png|jpe?g|gif|webp|heic|heif)\b",
+    re.IGNORECASE,
+)
 
 # Absolute / home / file:// image path at the start of pasted text (optional rest).
 _LEADING_PATH_RE = re.compile(
@@ -167,6 +172,41 @@ def attach_from_pasted_text(workspace: Path, text: str) -> tuple[str, str] | Non
 
 def chip_label(n: int) -> str:
     return f"[Image {n}]"
+
+
+def chipify_uploads_for_display(text: str) -> str:
+    """Replace ``@uploads/…`` image tokens with ``[Image N]`` for UI display."""
+    if not text or not _UPLOAD_AT_RE.search(text):
+        return text
+    existing = [int(m.group(1)) for m in _CHIP_RE.finditer(text)]
+    n = max(existing, default=0)
+
+    def _repl(_match: re.Match[str]) -> str:
+        nonlocal n
+        n += 1
+        return chip_label(n)
+
+    return _UPLOAD_AT_RE.sub(_repl, text)
+
+
+def style_with_image_chips(
+    text: str, base_style: str
+) -> list[tuple[str, str]]:
+    """Split text into FormattedText fragments, highlighting ``[Image N]`` chips."""
+    if not text:
+        return [(base_style, "")]
+    if not _CHIP_LABEL_RE.search(text):
+        return [(base_style, text)]
+    out: list[tuple[str, str]] = []
+    pos = 0
+    for match in _CHIP_LABEL_RE.finditer(text):
+        if match.start() > pos:
+            out.append((base_style, text[pos : match.start()]))
+        out.append(("class:image-chip", match.group(0)))
+        pos = match.end()
+    if pos < len(text):
+        out.append((base_style, text[pos:]))
+    return out
 
 
 def expand_image_chips(text: str, attach_map: dict[int, str]) -> str:

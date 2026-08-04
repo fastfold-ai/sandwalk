@@ -223,6 +223,31 @@ class InteractiveTerminal(
                 buf.complete_state.go_to_index(0)
 
         self._prompt_session.default_buffer.on_completions_changed += _auto_highlight_first
+        # Nested pickers (/model, /sandbox, …) run above the transcript app;
+        # force in_thread so PromptSession does not asyncio.run() on that loop.
+        self._patch_nested_prompt_sessions()
+
+    def _patch_nested_prompt_sessions(self) -> None:
+        """Make nested PromptSession.prompt safe while the transcript app runs."""
+        for attr in (
+            "_prompt_session",
+            "_plain_prompt_session",
+            "_secret_prompt_session",
+        ):
+            session = getattr(self, attr, None)
+            if session is None:
+                continue
+            original = session.prompt
+
+            def _make(orig):
+                def _prompt(*args, **kwargs):
+                    if int(getattr(self, "_host_terminal_depth", 0) or 0) > 0:
+                        kwargs.setdefault("in_thread", True)
+                    return orig(*args, **kwargs)
+
+                return _prompt
+
+            session.prompt = _make(original)  # type: ignore[method-assign]
 
     def _install_console_flicker_guard(self) -> None:
         """Route Rich prints into the owned transcript; pause toolbar invalidate."""
@@ -231,11 +256,26 @@ class InteractiveTerminal(
         # Keep the real printer for post-exit messages (resume hint) that must
         # land on the host scrollback after the fullscreen app tears down.
         self._console_print_original = original
+        self._host_terminal_depth = 0
 
         def _print(*args, **kwargs):
             self._toolbar_refresh_suspend += 1
             try:
                 transcript = getattr(self, "transcript", None)
+                host = int(getattr(self, "_host_terminal_depth", 0) or 0) > 0
+                # Nested pickers need the real TTY; also tee into the transcript
+                # so tables remain after the fullscreen UI redraws.
+                if host:
+                    original(*args, **kwargs)
+                    if transcript is not None:
+                        from ui.terminal.transcript.sink import rich_print_to_text
+
+                        text = rich_print_to_text(
+                            *args, width=int(console.width or 100), **kwargs
+                        )
+                        if text.strip():
+                            transcript.append_text(text, kind="system")
+                    return None
                 if transcript is not None:
                     from ui.terminal.transcript.sink import rich_print_to_text
 
@@ -250,6 +290,49 @@ class InteractiveTerminal(
                 self._toolbar_refresh_suspend = max(0, self._toolbar_refresh_suspend - 1)
 
         console.print = _print  # type: ignore[method-assign]
+
+    def _schedule_host_terminal(self, fn, /, *args, **kwargs) -> None:
+        """Run an interactive CLI flow on the real TTY above the transcript app.
+
+        Nested ``PromptSession.prompt()`` cannot run while the fullscreen
+        transcript Application owns the input — selection appears broken and
+        Rich colors are stripped into the transcript.
+        """
+        app = getattr(self, "_transcript_app", None)
+
+        def _call():
+            return fn(*args, **kwargs)
+
+        if app is None or not getattr(app, "is_running", False):
+            _call()
+            return
+
+        def _wrapped():
+            self._host_terminal_depth = int(getattr(self, "_host_terminal_depth", 0) or 0) + 1
+            try:
+                _call()
+            finally:
+                self._host_terminal_depth = max(
+                    0, int(getattr(self, "_host_terminal_depth", 0) or 0) - 1
+                )
+                try:
+                    if app.is_running:
+                        app.invalidate()
+                except Exception:
+                    pass
+                try:
+                    self._invalidate_prompt_toolbar(retries=3)
+                except Exception:
+                    pass
+
+        async def _task():
+            from prompt_toolkit.application import run_in_terminal
+
+            # in_executor: nested PromptSession.prompt() uses asyncio.run();
+            # that cannot run on the transcript app's already-running loop.
+            await run_in_terminal(_wrapped, in_executor=True)
+
+        app.create_background_task(_task())
 
     def _expand_tool_card(self, card=None) -> None:
         """Toggle in-place expand for a tool entry in the owned transcript."""
@@ -346,6 +429,8 @@ class InteractiveTerminal(
             return True
 
         self.transcript.append_separator()
+        # Keep chip labels for transcript display; expand paths only for the agent.
+        display_query = query
         query = self._expand_attached_images(query)
 
         # Handle slash commands and plain commands
@@ -415,47 +500,50 @@ class InteractiveTerminal(
         cmd_head = cmd.split(maxsplit=1)[0]
         cmd_rest = query.split(maxsplit=1)[1] if len(query.split(maxsplit=1)) > 1 else ""
         if cmd_head in ("skills-add", "/skills-add", "skill-add", "/skill-add"):
-            self._add_skill(cmd_rest)
+            self._schedule_host_terminal(self._add_skill, cmd_rest)
             self._advance_suggestion()
             return True
         if cmd_head in ("skills-find", "/skills-find", "skill-find", "/skill-find"):
+            # Display-only — keep the table in the transcript (no host flash).
             self._find_skills(cmd_rest)
             self._advance_suggestion()
             return True
         if cmd_head in ("skills-upgrade", "/skills-upgrade", "skill-upgrade", "/skill-upgrade"):
-            self._upgrade_skills()
+            self._schedule_host_terminal(self._upgrade_skills)
             self._advance_suggestion()
             return True
         if cmd_head in ("skills-remove", "/skills-remove", "skill-remove", "/skill-remove"):
-            self._remove_skill(cmd_rest)
+            self._schedule_host_terminal(self._remove_skill, cmd_rest)
             self._advance_suggestion()
             return True
         if cmd in ("skill", "/skill", "skills", "/skills"):
+            # Display-only — keep the table in the transcript (no host flash).
             self._show_skills()
             self._advance_suggestion()
             return True
         if cmd_head in ("specialist", "/specialist"):
-            self._handle_specialist_command(query)
+            self._schedule_host_terminal(self._handle_specialist_command, query)
             self._advance_suggestion()
             return True
         if cmd_head in ("sandbox", "/sandbox"):
-            self._handle_sandbox_command(query)
+            self._schedule_host_terminal(self._handle_sandbox_command, query)
             self._advance_suggestion()
             return True
         if cmd_head in ("data", "/data"):
+            # Mostly display / status; keep output in the transcript.
             self._handle_data_command(query)
             self._advance_suggestion()
             return True
         if cmd in ("model", "/model"):
-            self._switch_model()
+            self._schedule_host_terminal(self._switch_model)
             self._advance_suggestion()
             return True
         if cmd in ("effort", "/effort") or cmd.startswith("/effort"):
-            self._handle_effort_command(query)
+            self._schedule_host_terminal(self._handle_effort_command, query)
             self._advance_suggestion()
             return True
         if cmd in ("settings", "/settings"):
-            self._change_settings()
+            self._schedule_host_terminal(self._change_settings)
             self._advance_suggestion()
             return True
         if (
@@ -466,7 +554,7 @@ class InteractiveTerminal(
             or cmd == "compatible"
             or cmd.startswith("/compatible")
         ):
-            self._handle_model_manager_command(query)
+            self._schedule_host_terminal(self._handle_model_manager_command, query)
             self._advance_suggestion()
             return True
         if cmd in ("plan", "/plan"):
@@ -489,15 +577,15 @@ class InteractiveTerminal(
             self._advance_suggestion()
             return True
         if cmd == "keys" or cmd.startswith("/keys"):
-            self._handle_keys_command(query)
+            self._schedule_host_terminal(self._handle_keys_command, query)
             self._advance_suggestion()
             return True
         if cmd == "mcp" or cmd.startswith("/mcp"):
-            self._handle_mcp_command(query)
+            self._schedule_host_terminal(self._handle_mcp_command, query)
             self._advance_suggestion()
             return True
         if cmd in ("upgrade", "/upgrade"):
-            self._run_upgrade()
+            self._schedule_host_terminal(self._run_upgrade)
             self._advance_suggestion()
             return True
         if cmd in ("doctor", "/doctor"):
@@ -548,7 +636,7 @@ class InteractiveTerminal(
             action = parts[1].strip().lower() if len(parts) > 1 else ""
             if action in {"delete", "del", "rm", "remove"}:
                 target = parts[2].strip() if len(parts) > 2 else None
-                self._delete_session(target)
+                self._schedule_host_terminal(self._delete_session, target)
             else:
                 self._list_sessions()
             return True
@@ -560,16 +648,16 @@ class InteractiveTerminal(
         if cmd.startswith("/resume"):
             parts = query.split(maxsplit=1)
             sid = parts[1].strip() if len(parts) > 1 else None
-            self._resume_session(sid)
+            self._schedule_host_terminal(self._resume_session, sid)
             return True
         if cmd.startswith("/agents"):
-            self._handle_agents_command(query, context)
+            self._schedule_host_terminal(self._handle_agents_command, query, context)
             return True
         if cmd.startswith("/case-study"):
-            self._handle_case_study_command(query, context)
+            self._schedule_host_terminal(self._handle_case_study_command, query, context)
             return True
 
-        # ! prefix — shell command
+        # ! prefix — shell command (keep output in the transcript)
         if query.startswith("!"):
             self._run_shell(query[1:].strip())
             return True
@@ -594,7 +682,7 @@ class InteractiveTerminal(
 
         # Keep prompt available while one generation runs; extra user messages
         # are queued and executed serially by the worker.
-        self.transcript.append_text(query, kind="user")
+        self.transcript.append_text(display_query, kind="user")
         self._submit_query(query, context)
         self._advance_suggestion()
         return True

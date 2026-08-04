@@ -38,6 +38,8 @@ _TRANSCRIPT_STYLE = {
     "transcript-tool-error": "#ff5555",
     "transcript-tool-detail": "#7f8790",
     "transcript-selected": "reverse",
+    # Same orange chip as the compose AttachChipLexer / PT_STYLE.
+    "image-chip": "bold #111111 bg:#f0a030",
 }
 
 # Coalesce store/toolbar invalidates so Rich re-renders can't pin the UI.

@@ -162,15 +162,36 @@ def entry_rows(
                 rows.append((entry, i, body))
             return rows or [(entry, 0, [("", "")])]
 
+        # Rich → transcript keeps ANSI; render it (model lists, tables, etc.).
+        if entry.kind in {"system", "text"} and "\x1b[" in entry.text:
+            rows: list[tuple[Entry, int, StyleAndTextTuples]] = []
+            for i, line in enumerate(entry.text.split("\n")):
+                body = list(to_formatted_text(ANSI(line))) if line else [("", "")]
+                rows.append((entry, i, body))
+            return rows or [(entry, 0, [("", "")])]
+
         prefix = "❯ " if entry.kind == "user" else ""
-        body = prefix + entry.text if prefix else entry.text
+        raw = entry.text
+        # Show the same orange [Image N] chips as the compose box (not @uploads/…).
+        if entry.kind == "user" or "@uploads/" in raw or "[Image " in raw:
+            from ui.terminal.attachments import chipify_uploads_for_display
+
+            raw = chipify_uploads_for_display(raw)
+        body = prefix + raw if prefix else raw
         style = {
             "user": "class:transcript-user",
             "system": "class:transcript-system",
         }.get(entry.kind, "class:transcript-text")
         out: list[tuple[Entry, int, StyleAndTextTuples]] = []
+        use_chips = "[Image " in body
         for i, line in enumerate(_wrap(body, inner)):
-            out.append((entry, i, _style_plain(style, _pad(line))))
+            if use_chips:
+                from ui.terminal.attachments import style_with_image_chips
+
+                frags = style_with_image_chips(line, style)
+                out.append((entry, i, [("", LEFT_PAD), *frags]))
+            else:
+                out.append((entry, i, _style_plain(style, _pad(line))))
         return out or [(entry, 0, _style_plain(style, LEFT_PAD.rstrip()))]
 
     if isinstance(entry, ToolEntry):

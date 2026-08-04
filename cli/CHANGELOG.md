@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flicker) or stacks invalidate listeners that froze the UI mid-response.
 - Exit goodbye / `sandwalk --resume …` hint prints to the real terminal again
   after the fullscreen transcript closes.
+- Interactive slash flows (`/model`, `/sandbox`, …) suspend the transcript TUI
+  so nested prompts and Rich colors work again; printed tables are teed into
+  the transcript so they do not vanish after the UI redraws. Display-only
+  commands (`/skills`, `/sessions`, …) stay in the transcript.
 - `sandwalk fork` / `sandwalk agent fork` now imports the forked chat into the
   shared SQLite store so it appears in the Web UI Agents list immediately
   (no separate `sandwalk sync` required).

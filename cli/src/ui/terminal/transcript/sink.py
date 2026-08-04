@@ -42,7 +42,7 @@ class TranscriptSink:
 
 
 def rich_print_to_text(*args: Any, width: int = 100, **kwargs: Any) -> str:
-    """Render Rich console.print args to a plain string for the transcript."""
+    """Render Rich console.print args to an ANSI string for the transcript."""
     from io import StringIO
 
     from rich.console import Console
@@ -51,8 +51,8 @@ def rich_print_to_text(*args: Any, width: int = 100, **kwargs: Any) -> str:
     console = Console(
         file=buf,
         width=max(40, width),
-        force_terminal=False,
-        color_system=None,
+        force_terminal=True,
+        color_system="256",
         highlight=False,
     )
     console.print(*args, **kwargs)

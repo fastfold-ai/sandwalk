@@ -177,6 +177,35 @@ def test_render_cache_skips_rerender_when_revision_unchanged():
     assert id(control._rows) != rows_id
 
 
+def test_system_ansi_from_rich_keeps_color_codes_out_of_plain_path():
+    from ui.terminal.transcript.render import entry_rows
+    from ui.terminal.transcript.sink import rich_print_to_text
+
+    colored = rich_print_to_text("[cyan]hello[/cyan] [dim]world[/dim]", width=40)
+    assert "\x1b[" in colored
+    store = TranscriptStore()
+    store.append_text(colored, kind="system")
+    rows = entry_rows(store.entries[0], width=80)
+    joined = "".join(t for _e, _i, frags in rows for _s, t in frags)
+    assert "hello" in joined
+    assert "world" in joined
+    assert "\x1b[" not in joined  # ANSI parsed into styles, not raw escapes
+
+
+def test_user_message_renders_upload_as_image_chip():
+    from ui.terminal.transcript.render import entry_rows
+
+    store = TranscriptStore()
+    store.append_text("@uploads/20260804-clip.png what's this?", kind="user")
+    rows = entry_rows(store.entries[0], width=80)
+    assert rows
+    frags = rows[0][2]
+    joined = "".join(t for _s, t in frags)
+    assert "[Image 1]" in joined
+    assert "@uploads/" not in joined
+    assert any("image-chip" in s for s, _t in frags)
+
+
 def test_banner_kind_preserves_mark_without_left_pad():
     from ui.terminal.transcript.render import LEFT_PAD, entry_lines
 
