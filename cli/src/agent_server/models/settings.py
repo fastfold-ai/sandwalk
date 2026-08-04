@@ -18,7 +18,7 @@ class RuntimeSettings(ApiModel):
     recursion_limit: int = 100_000
     max_sdk_turns: int = 500
     group_tool_traces: bool = True
-    tool_trace_detail_limit: int = 1
+    tool_trace_detail_limit: int = 0
     background_watch_timeout_s: int = 7200
     interrupt_drain_timeout_s: int = 10
     parallel_max_threads: int = 5

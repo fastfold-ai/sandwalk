@@ -13,9 +13,19 @@ class _TraceReplayMixin:
 
         from ui.traces import TraceRenderer
 
+        transcript = getattr(self, "transcript", None) or getattr(
+            self.session, "transcript", None
+        )
+        sink = None
+        if transcript is not None:
+            from ui.terminal.transcript.sink import TranscriptSink
+
+            sink = TranscriptSink(transcript)
         trace_renderer = TraceRenderer(
             self.console,
             config=getattr(self.session, "config", None),
+            expand_store=getattr(self.session, "tool_expand_store", None),
+            sink=sink,
         )
         tool_inputs: dict[str, dict] = {}
         tool_names: dict[str, str] = {}

@@ -1,6 +1,3 @@
-  ▸ target.coessentiality  gene="CRBN"
-  ✓ target.coessentiality  2.3s
-    gene="CRBN"
-    Found 20 co-essential genes.
-  ✗ expression.pathway_enrichment
+  ✓ Ran target.coessentiality  2.3s ▸
+  ✗ Ran expression.pathway_enrichment ▸
     API key missing

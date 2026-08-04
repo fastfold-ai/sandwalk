@@ -115,6 +115,11 @@ DEFAULTS_LLM = {
     "output.auto_publish_html_batch": False,
 
     "ui.spinner": "benzene_breathing",
+    # Interactive owned-transcript mode enables mouse inside the TUI so wheel
+    # scrolls the session panel and clicks expand tools. This flag is only used
+    # by the legacy PromptSession path (non-transcript); leave false there so
+    # Warp/iTerm host scrollback still works.
+    "ui.mouse_support": False,
     "ui.mermaid.enabled": True,
     "ui.mermaid.ascii": False,
     "ui.mermaid.theme": "default",

@@ -33,6 +33,11 @@ class Session:
         self._scratchpad: list[Any] = []
         self._tool_health_failures: dict[str, list[float]] = {}
         self._tool_health_suppressed_until: dict[str, float] = {}
+        # Collapsed tool cards (legacy Rich path) + owned transcript (interactive).
+        from ui.traces.tool_expand import ToolExpandStore
+
+        self.tool_expand_store = ToolExpandStore()
+        self.transcript = None
         sync_process_env_from_config(self.config)
 
     def get_llm(self) -> LLMClient:

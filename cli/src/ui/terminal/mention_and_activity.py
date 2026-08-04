@@ -107,9 +107,42 @@ class _MentionAndActivityMixin:
         return candidates
 
     def _has_active_query(self) -> bool:
+        """True while a worker is alive (queueing / interrupt / slash guards)."""
         with self._run_lock:
             worker = self._worker_thread
             return bool(worker and worker.is_alive())
+
+    def _toolbar_is_busy(self) -> bool:
+        """True only while a turn is in-flight (not during post-run cleanup)."""
+        with self._run_lock:
+            return bool(getattr(self, "_active_query", None))
+
+    def _clear_toolbar_busy(self) -> None:
+        """Mark the toolbar idle and force a redraw (call as soon as the run returns)."""
+        with self._run_lock:
+            self._active_query = None
+            self._active_query_started_at = 0.0
+            self._active_activity = ""
+            self._active_activity_updated_at = 0.0
+            self._active_input_tokens = 0
+            self._active_output_tokens = 0
+            self._active_streamed_chars = 0
+        self._invalidate_prompt_toolbar(retries=8)
+
+    def _invalidate_prompt_toolbar(self, *, retries: int = 1) -> None:
+        """Invalidate the prompt UI, retrying if a console.print suspend is held."""
+        for _ in range(max(1, retries)):
+            if int(getattr(self, "_toolbar_refresh_suspend", 0) or 0) > 0:
+                time.sleep(0.02)
+                continue
+            try:
+                app = getattr(self, "_transcript_app", None) or self._prompt_session.app
+                if app and app.is_running:
+                    app.invalidate()
+                    return
+            except Exception:
+                return
+            time.sleep(0.02)
 
     def _queued_query_count(self) -> int:
         with self._run_lock:
@@ -147,18 +180,19 @@ class _MentionAndActivityMixin:
     def _live_refresh_loop(self) -> None:
         """Animate the busy toolbar without fighting Rich stdout writes.
 
-        prompt_toolkit's ``patch_stdout`` erases/redraws the prompt around each
-        print. Concurrent ``invalidate()`` calls cause the post-generation
-        flicker; suspend while ``console.print`` runs and only redraw when the
-        scanner frame actually changes.
+        Uses ``_toolbar_is_busy`` (active turn), not worker-thread liveness, so
+        the scanner clears as soon as the agent returns — even while usage
+        bookkeeping still runs on the worker.
         """
         last_frame = -1
-        was_active = False
+        was_busy = False
+        idle_retries = 0
         while True:
             try:
-                active = self._has_active_query()
-                if active:
-                    was_active = True
+                busy = self._toolbar_is_busy()
+                if busy:
+                    was_busy = True
+                    idle_retries = 0
                     if int(getattr(self, "_toolbar_refresh_suspend", 0) or 0) > 0:
                         time.sleep(0.03)
                         continue
@@ -172,21 +206,23 @@ class _MentionAndActivityMixin:
                     frame = int(time.time() / max(0.02, interval)) % n
                     if frame != last_frame:
                         last_frame = frame
-                        app = self._prompt_session.app
-                        if app and app.is_running:
-                            app.invalidate()
+                        self._invalidate_prompt_toolbar(retries=1)
                     time.sleep(0.03)
                     continue
 
-                # Busy → idle: let the final print settle, then one clean redraw.
-                if was_active:
-                    was_active = False
-                    last_frame = -1
-                    time.sleep(0.06)
+                # Busy → idle: keep retrying until redraw lands (suspend may hold).
+                if was_busy or idle_retries > 0:
+                    if was_busy:
+                        was_busy = False
+                        last_frame = -1
+                        idle_retries = 6
                     if int(getattr(self, "_toolbar_refresh_suspend", 0) or 0) == 0:
-                        app = self._prompt_session.app
-                        if app and app.is_running:
-                            app.invalidate()
+                        self._invalidate_prompt_toolbar(retries=1)
+                        idle_retries = 0
+                    else:
+                        idle_retries = max(0, idle_retries - 1)
+                        time.sleep(0.03)
+                        continue
             except Exception:
                 pass
             time.sleep(0.25)

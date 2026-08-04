@@ -49,6 +49,7 @@ def terminal():
         t._toolbar_spinner_markup = MagicMock(return_value="[*]")
         t._session_sdk_turn_rows = []
         t._session_sdk_input_tokens = 0
+        t._active_query = None
         return t
 
 
@@ -75,6 +76,7 @@ def test_mention_tab_bar(terminal):
 
 
 def test_active_query_toolbar_is_minimal_scanner(terminal):
+    terminal._toolbar_is_busy = MagicMock(return_value=True)
     terminal._has_active_query.return_value = True
     terminal._toolbar_spinner_markup = MagicMock(
         return_value='<style fg="#b8e0ff" bg="default">■</style>'
@@ -88,6 +90,7 @@ def test_active_query_toolbar_is_minimal_scanner(terminal):
 
 
 def test_active_query_toolbar_shows_queued_count(terminal):
+    terminal._toolbar_is_busy = MagicMock(return_value=True)
     terminal._has_active_query.return_value = True
     terminal._queued_queries = ["next"]
     terminal._toolbar_spinner_markup = MagicMock(
@@ -96,6 +99,15 @@ def test_active_query_toolbar_shows_queued_count(terminal):
     text = str(terminal._bottom_toolbar())
     assert "queued 1" in text
     assert "ctrl+c interrupt" in text
+
+
+def test_toolbar_idle_when_turn_cleared_but_worker_still_mocked_alive(terminal):
+    """Scanner must key off turn-busy, not worker thread liveness."""
+    terminal._active_query = None
+    terminal._has_active_query.return_value = True
+    terminal._toolbar_effort_label = MagicMock(return_value=None)
+    text = str(terminal._bottom_toolbar())
+    assert "ctrl+c interrupt" not in text
 
 
 def test_idle_toolbar_plan_modal_colors(terminal):

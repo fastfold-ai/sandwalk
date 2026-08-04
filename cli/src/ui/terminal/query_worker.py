@@ -30,6 +30,12 @@ class _QueryWorkerMixin:
                     elif not isinstance(event, str):
                         event = str(event or "")
 
+                    # Visible turn finished (usage footer printed). Clear scanner
+                    # before title LLM / store dual-write — those can take seconds.
+                    if event in {"turn_complete", "done"}:
+                        self._clear_toolbar_busy()
+                        return
+
                     if payload:
                         if "input_tokens" in payload or "output_tokens" in payload:
                             self._set_active_usage(
@@ -61,36 +67,43 @@ class _QueryWorkerMixin:
                     self.console.print(f"\n  [red]Execution error:[/red] {e}")
                     result = None
 
+                with self._run_lock:
+                    has_queued = bool(self._queued_queries)
+                    if has_queued:
+                        current = self._queued_queries.popleft()
+                    else:
+                        current = None
+
+                # Drop the scanner immediately — don't wait for usage bookkeeping.
+                if not has_queued:
+                    self._clear_toolbar_busy()
+                    with self._run_lock:
+                        self._worker_thread = None
+
                 if result is not None:
                     self._record_sdk_usage(result)
                     self._last_response = result.summary
                     self._update_suggestions(query, result.plan, result)
 
-                with self._run_lock:
-                    if self._queued_queries:
-                        current = self._queued_queries.popleft()
-                        # Visual break between queued turns only.
-                        self.console.print()
-                    else:
-                        self._worker_thread = None
-                        self._active_query = None
-                        self._active_query_started_at = 0.0
-                        self._active_activity = ""
-                        self._active_activity_updated_at = 0.0
-                        self._active_input_tokens = 0
-                        self._active_output_tokens = 0
-                        self._active_streamed_chars = 0
-                        break
+                if has_queued and current is not None:
+                    self.console.print()
+                    continue
+                break
         finally:
             with self._run_lock:
                 self._worker_thread = None
-                self._active_query = None
-                self._active_query_started_at = 0.0
-                self._active_activity = ""
-                self._active_activity_updated_at = 0.0
-                self._active_input_tokens = 0
-                self._active_output_tokens = 0
-                self._active_streamed_chars = 0
+            # Idempotent if already cleared above.
+            if hasattr(self, "_clear_toolbar_busy"):
+                self._clear_toolbar_busy()
+            else:
+                with self._run_lock:
+                    self._active_query = None
+                    self._active_query_started_at = 0.0
+                    self._active_activity = ""
+                    self._active_activity_updated_at = 0.0
+                    self._active_input_tokens = 0
+                    self._active_output_tokens = 0
+                    self._active_streamed_chars = 0
 
     def _current_placeholder(self):
         """Deprecated: ghost-text placeholders were removed from the prompt."""

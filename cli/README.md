@@ -34,7 +34,8 @@ Type a research question, or `/` for slash-command autocomplete. Shared sessions
 | `Ctrl+J` / `Alt+Enter` | Insert newline |
 | `Cmd+V` / `Ctrl+V` | Paste clipboard image or image path → orange `[Image N]` chip (saved under session `uploads/`) |
 | Path paste / drop | Same as paste: leading image path becomes `[Image N]` |
-| Mouse select / copy | Host terminal selection (Warp/iTerm). App mouse mode is off on purpose so drag-select works. |
+| Scroll history | Mouse wheel / `PgUp` `PgDn` / `Ctrl+↑↓` scroll the owned session transcript |
+| Expand tool | Click a `✓ Ran … ▸` line (or `Ctrl+E`) to expand/collapse args and output in place |
 
 On submit, chips expand to `@uploads/…` for the vision pipeline (same as the Web UI). Use a vision-capable model.
 

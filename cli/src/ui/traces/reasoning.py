@@ -20,10 +20,25 @@ class _ReasoningMixin:
             "in_progress": ("[~]", "yellow"),
             "pending": ("[ ]", "dim"),
         }
+        done = sum(1 for t in todos if isinstance(t, dict) and t.get("status") == "completed")
+        sink = getattr(self, "sink", None)
+        if sink is not None:
+            lines = [f"  ▸ todos  {done}/{len(todos)}"]
+            for todo in todos:
+                if not isinstance(todo, dict):
+                    continue
+                content = str(todo.get("content", "")).strip()
+                if not content:
+                    continue
+                status = str(todo.get("status", "pending")).lower()
+                mark, _style = marks.get(status, marks["pending"])
+                lines.append(f"    {mark} {content}")
+            sink.write_text("\n".join(lines), kind="system")
+            return
+
         header = Text()
         header.append("  \u25b8 ", style="bold cyan")
         header.append("todos", style="cyan")
-        done = sum(1 for t in todos if isinstance(t, dict) and t.get("status") == "completed")
         header.append(f"  {done}/{len(todos)}", style="dim")
         self.console.print(header)
 
@@ -43,6 +58,11 @@ class _ReasoningMixin:
     def render_reasoning(self, text: str) -> None:
         """Render Claude's reasoning text between tool calls."""
         if not text or not text.strip():
+            return
+
+        sink = getattr(self, "sink", None)
+        if sink is not None:
+            sink.write_text(text.strip(), kind="assistant")
             return
 
         from ui.traces import print_markdown_with_mermaid

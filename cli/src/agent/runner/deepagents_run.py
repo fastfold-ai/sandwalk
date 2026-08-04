@@ -209,9 +209,17 @@ class DeepAgentsRunMixin:
                 resolve_skill_source_dirs,
             )
 
+            transcript = getattr(self.session, "transcript", None)
+            sink = None
+            if transcript is not None:
+                from ui.terminal.transcript.sink import TranscriptSink
+
+                sink = TranscriptSink(transcript)
             trace_renderer = TraceRenderer(
                 self.session.console,
                 config=getattr(self.session, "config", None),
+                expand_store=getattr(self.session, "tool_expand_store", None),
+                sink=sink,
             )
             trace_events: list[dict] | None = [] if self.trace_store is not None else None
 
@@ -309,7 +317,7 @@ class DeepAgentsRunMixin:
                                 config.get("agent.group_tool_traces", True)
                             ),
                             tool_detail_limit=int(
-                                config.get("agent.tool_trace_detail_limit", 8)
+                                config.get("agent.tool_trace_detail_limit", 0)
                             ),
                         )
                     except Exception as stream_exc:  # noqa: BLE001

@@ -548,10 +548,33 @@ class TestProcessEvents:
             tool_detail_limit=2,
         ))
         assert len(result["tool_calls"]) == 4
-        # The two most recent calls render in full; older ones collapse to a
-        # compact console line.
+        # The two most recent calls render in full; older ones collapse.
         assert renderer.render_tool_complete.call_count == 2
-        assert renderer.console.print.call_count >= 2
+        assert renderer.render_tool_compact.call_count == 2
+
+    def test_grouped_tools_collapsed_by_default(self):
+        renderer = MagicMock()
+        renderer.console = MagicMock()
+        events = []
+        for i in range(3):
+            rid = f"r{i}"
+            events.append({"event": "on_tool_start", "name": "neo", "run_id": rid,
+                           "data": {"input": {"i": i}}})
+            events.append({"event": "on_tool_end", "name": "neo", "run_id": rid,
+                           "data": {"output": _ToolOut(f"out{i}")}})
+        events.append({"event": "on_chat_model_end",
+                       "data": {"output": _Msg("wrap up")}})
+        _run(dr.process_events(
+            _aiter(events),
+            trace_renderer=renderer,
+            headless=False,
+            display_name_map={"neo": "target.neo"},
+            allow_live_spinner=False,
+            group_tools=True,
+            tool_detail_limit=0,
+        ))
+        assert renderer.render_tool_compact.call_count == 3
+        assert renderer.render_tool_complete.call_count == 0
 
     def test_error_tool_renders_error_and_marks_trace(self):
         renderer = MagicMock()

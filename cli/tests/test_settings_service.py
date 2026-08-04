@@ -24,7 +24,7 @@ def test_settings_service_get_defaults(tmp_path: Path, monkeypatch):
     assert settings.recursion_limit >= 25
     assert settings.max_sdk_turns >= 1
     assert isinstance(settings.group_tool_traces, bool)
-    assert settings.tool_trace_detail_limit >= 1
+    assert settings.tool_trace_detail_limit >= 0
     assert settings.background_watch_timeout_s >= 60
     assert settings.interrupt_drain_timeout_s >= 1
     assert settings.parallel_max_threads >= 1

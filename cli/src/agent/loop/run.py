@@ -82,7 +82,19 @@ class LoopRunMixin:
                     )
                 except Exception:
                     pass
+            # Drop CLI busy toolbar even when the run fails after UI output.
+            try:
+                store_progress("turn_complete")
+            except Exception:
+                pass
             raise
+
+        # Usage footer / final text are already on screen. Clear the CLI scanner
+        # before title LLM + store dual-write (can take seconds).
+        try:
+            store_progress("turn_complete")
+        except Exception:
+            pass
 
         # Check for clarification request in result
         if result and result.raw_results:

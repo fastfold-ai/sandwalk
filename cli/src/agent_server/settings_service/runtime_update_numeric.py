@@ -38,7 +38,7 @@ def apply_numeric_updates(config: Config, payload: UpdateRuntimeSettingsRequest)
     if payload.tool_trace_detail_limit is not None:
         config.set(
             "agent.tool_trace_detail_limit",
-            clamp_int(payload.tool_trace_detail_limit, minimum=1, maximum=50, default=1),
+            clamp_int(payload.tool_trace_detail_limit, minimum=0, maximum=50, default=0),
         )
     if payload.background_watch_timeout_s is not None:
         config.set(

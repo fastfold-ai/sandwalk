@@ -142,7 +142,14 @@ class _BottomToolbarMixin:
         compat_backend = self._current_compatible_backend_label()
         if compat_backend:
             model = f"{model} · {compat_backend}"
-        if self._has_active_query():
+        # Prefer turn-busy (clears as soon as the agent returns) over worker
+        # thread liveness, which stays true during post-run bookkeeping.
+        toolbar_busy = (
+            self._toolbar_is_busy()
+            if hasattr(self, "_toolbar_is_busy")
+            else self._has_active_query()
+        )
+        if toolbar_busy:
             with self._run_lock:
                 queued = len(self._queued_queries)
             spinner = self._toolbar_spinner_markup()

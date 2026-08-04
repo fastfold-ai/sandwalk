@@ -118,6 +118,11 @@ class InteractiveTerminal(
         # Share one Console with the agent/trace renderer so stdout patching and
         # flicker guards apply to generation output as well as CLI chrome.
         self.session.console = self.console
+        from ui.terminal.transcript.store import TranscriptStore
+
+        self.transcript = TranscriptStore()
+        self.session.transcript = self.transcript
+        self._transcript_app = None
         self._toolbar_refresh_suspend = 0
         self._install_console_flicker_guard()
         self.history_file = CONFIG_DIR / "history"
@@ -181,6 +186,9 @@ class InteractiveTerminal(
         )
         self._attach_count = 0
         self._attach_map: dict[int, str] = {}
+        # Default off: enabling steals wheel scroll from Warp/iTerm (can't
+        # scroll agent history). Opt in: sandwalk config set ui.mouse_support true
+        mouse_support = bool(self.session.config.get("ui.mouse_support", False))
         self._prompt_session = PromptSession(
             history=FileHistory(str(self.history_file)),
             completer=self._merged_completer,
@@ -189,12 +197,8 @@ class InteractiveTerminal(
             lexer=AttachChipLexer(),
             key_bindings=_build_key_bindings(self),
             # Enter submits; Ctrl+J / Alt+Enter insert newlines.
-            # mouse_support must stay off: enabling it steals mouse events from
-            # the host (Warp/iTerm), which breaks drag-select / copy. Host
-            # selection + arrow keys work; click-to-place needs a TUI that owns
-            # the mouse (OpenTUI), not prompt_toolkit inside Warp.
             multiline=False,
-            mouse_support=False,
+            mouse_support=mouse_support,
         )
         # Separate session for secret entry prompts (API keys, etc.).
         # Avoids re-entrancy issues with the main interactive app session.
@@ -221,18 +225,47 @@ class InteractiveTerminal(
         self._prompt_session.default_buffer.on_completions_changed += _auto_highlight_first
 
     def _install_console_flicker_guard(self) -> None:
-        """Pause toolbar invalidate while Rich writes, so patch_stdout doesn't fight redraws."""
+        """Route Rich prints into the owned transcript; pause toolbar invalidate."""
         console = self.console
         original = console.print
 
         def _print(*args, **kwargs):
             self._toolbar_refresh_suspend += 1
             try:
+                transcript = getattr(self, "transcript", None)
+                if transcript is not None:
+                    from ui.terminal.transcript.sink import rich_print_to_text
+
+                    text = rich_print_to_text(
+                        *args, width=int(console.width or 100), **kwargs
+                    )
+                    if text.strip():
+                        transcript.append_text(text, kind="system")
+                    return None
                 return original(*args, **kwargs)
             finally:
                 self._toolbar_refresh_suspend = max(0, self._toolbar_refresh_suspend - 1)
 
         console.print = _print  # type: ignore[method-assign]
+
+    def _expand_tool_card(self, card=None) -> None:
+        """Toggle in-place expand for a tool entry in the owned transcript."""
+        transcript = getattr(self, "transcript", None)
+        if transcript is not None:
+            if card is not None and getattr(card, "entry_id", None) is not None:
+                transcript.toggle_tool(card.entry_id)
+            else:
+                transcript.toggle_last_tool()
+            self._invalidate_prompt_toolbar()
+            return
+        # Legacy path (no owned transcript): do not dump details under the prompt.
+        store = getattr(self.session, "tool_expand_store", None)
+        if store is None or not store.cards:
+            return
+        target = card or store.last_collapsed()
+        if target is None:
+            return
+        target.expanded = not target.expanded
 
     def _expand_attached_images(self, query: str) -> str:
         """Turn ``[Image N]`` chips (and leftover absolute paths) into ``@uploads/…``."""
@@ -248,29 +281,26 @@ class InteractiveTerminal(
         if workspace is not None:
             text, attach_map = rewrite_loose_image_paths(text, workspace, attach_map)
             self._attach_map = attach_map
-            self._attach_count = max(self._attach_count, max(attach_map.keys(), default=0))
+            self._attach_count = max(
+                int(getattr(self, "_attach_count", 0) or 0),
+                max(attach_map.keys(), default=0),
+            )
         return expand_image_chips(text, attach_map)
 
     def run(self, initial_context: dict = None, resume_id: str = None):
         """Run the interactive session."""
-        # Imported from the package namespace so tests can monkeypatch
-        # `ui.terminal.patch_stdout`.
-        from ui.terminal import patch_stdout
+        from prompt_toolkit.history import FileHistory
+
+        from ui.terminal.transcript.app import prompt_with_transcript
 
         context = initial_context or {}
-        term_width = self.console.width
         self._bootstrap_agent_loop(resume_id)
+        history = FileHistory(str(self.history_file))
 
         while True:
             try:
-                # Separator line above prompt
-                self.console.print(f"[#333333]{'─' * term_width}[/]")
-
-                with patch_stdout(raw=True):
-                    query = self._prompt_session.prompt(
-                        [("class:prompt", "❯ ")],
-                        bottom_toolbar=self._bottom_toolbar,
-                    ).strip()
+                self.transcript.append_separator()
+                query = prompt_with_transcript(self, history=history).strip()
                 self._show_exit_hint = False
                 self._show_interrupt_hint = False
             except EOFError:
@@ -280,7 +310,7 @@ class InteractiveTerminal(
                 break
             except KeyboardInterrupt:
                 # Ctrl+C at idle prompt — keep session alive (double-tap exits via binding).
-                self.console.print("  [dim]Interrupted.[/dim]")
+                self.transcript.append_text("Interrupted.", kind="system")
                 continue
 
             # Handle double Ctrl+C exit signal from key binding
@@ -462,7 +492,7 @@ class InteractiveTerminal(
                 self._advance_suggestion()
                 continue
             if cmd in ("clear", "/clear"):
-                self.console.clear()
+                self.transcript.clear()
                 self._advance_suggestion()
                 continue
             if cmd in ("copy", "/copy"):
@@ -543,5 +573,6 @@ class InteractiveTerminal(
 
             # Keep prompt available while one generation runs; extra user messages
             # are queued and executed serially by the worker.
+            self.transcript.append_text(query, kind="user")
             self._submit_query(query, context)
             self._advance_suggestion()

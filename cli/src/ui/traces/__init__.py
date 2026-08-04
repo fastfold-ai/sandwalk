@@ -32,8 +32,21 @@ class TraceRenderer(_ToolEventsMixin, _TaskEventsMixin, _ReasoningMixin):
 
     Accepts a ``Console`` at construction so tests can pass
     ``Console(file=StringIO())`` to capture output.
+
+    When ``agent.group_tool_traces`` is true and
+    ``agent.tool_trace_detail_limit`` is 0 (defaults), tools print as collapsed
+    one-liners. Pass ``sink`` (interactive transcript) to render into the owned
+    scrollable TUI instead of Rich scrollback.
     """
 
-    def __init__(self, console: Console | None = None, config=None):
+    def __init__(
+        self,
+        console: Console | None = None,
+        config=None,
+        expand_store=None,
+        sink=None,
+    ):
         self.console = console or Console()
         self.config = config
+        self.expand_store = expand_store
+        self.sink = sink

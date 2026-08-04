@@ -33,16 +33,14 @@ DEFAULTS_AGENT = {
     # Always-on prompt / Deep Agents surface size: high | medium | low.
     # high = full (default); medium ≈5k context; low ≈2.5–3k. Skills stay on.
     "agent.knowledge_level": "high",
-    # Tool-call rendering (deepagents runtime only). When True, the most recent
-    # `agent.tool_trace_detail_limit` tool calls in a consecutive batch stay in
-    # full detail (name, args, output) and older ones collapse progressively to a
-    # one-line, still named "✓ name (Xs)" entry as newer calls complete — the
-    # current/last call stays detailed while earlier ones compact away. Errors
-    # always show in full. Set False to show every tool call fully verbose.
+    # Tool-call rendering (deepagents runtime only). When True, tools print as
+    # collapsed one-liners: "✓ Ran name ▸". Set False for always-verbose cards
+    # (args + output under every tool).
     "agent.group_tool_traces": True,
-    # Trailing window: how many most-recent tool calls keep full detail before
-    # older ones collapse to compact named lines. 1 = only the last call full.
-    "agent.tool_trace_detail_limit": 1,
+    # 0 = all tools collapsed (default). N > 0 = keep the last N tools in a
+    # batch for full detail when the model resumes writing; older ones stay
+    # compact. Errors always show their message.
+    "agent.tool_trace_detail_limit": 0,
     # Max model↔tool loop iterations for the deepagents (LangGraph) runtime.
     # LangGraph requires a finite cap; default is effectively unlimited for
     # long training / fold / download workflows. Override via CLI:

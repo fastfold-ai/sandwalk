@@ -49,19 +49,22 @@ class EventProcessorToolEndMixin:
         if self.group_tools and display != "write_todos":
             if is_error:
                 self.group["errors"] = int(self.group["errors"]) + 1
-            # Buffer this result as the new "current" full-detail call; spill
-            # anything older than the trailing window out as a compact line.
-            self.pending.append(
-                {
-                    "name": display or "unknown",
-                    "input": tool_input,
-                    "result_text": result_text,
-                    "duration": duration,
-                    "is_error": is_error,
-                }
-            )
-            while len(self.pending) > self.detail_window:
-                self._flush_one(self.pending.pop(0), full=False)
+            item = {
+                "name": display or "unknown",
+                "input": tool_input,
+                "result_text": result_text,
+                "duration": duration,
+                "is_error": is_error,
+            }
+            # detail_window == 0 → collapsed one-liner immediately (default).
+            # detail_window > 0 → keep last N buffered; spill older as compact.
+            # Errors always flush now so failures aren't hidden in the buffer.
+            if is_error or self.detail_window <= 0:
+                self._flush_one(item, full=False)
+            else:
+                self.pending.append(item)
+                while len(self.pending) > self.detail_window:
+                    self._flush_one(self.pending.pop(0), full=False)
             self._emit_progress("activity", text=f"\u25b8 {display}")
             return
 

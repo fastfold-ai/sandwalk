@@ -24,7 +24,7 @@ class EventProcessorCoreMixin:
         code_trace_buffer: list[dict] | None = None,
         display_name_map: dict[str, str] | None = None,
         group_tools: bool = True,
-        tool_detail_limit: int = 8,
+        tool_detail_limit: int = 0,
     ) -> None:
         self.trace_renderer = trace_renderer
         self.headless = headless
@@ -44,11 +44,10 @@ class EventProcessorCoreMixin:
         self.code_cursor = 0
         self.spinner = {"obj": thinking_status}
         self.group = {"active": False, "count": 0, "errors": 0, "start": 0.0}
-        # Trailing-detail buffer: the most recent `detail_window` completed tools
-        # are held back and shown in full; as newer tools complete, older ones
-        # spill out of the window and are flushed as compact, still-named lines.
+        # 0 = collapsed one-liners for every tool (default). >0 = keep last N
+        # buffered and show them in full when the tool batch closes.
         self.pending: list[dict] = []
-        self.detail_window = max(1, int(tool_detail_limit))
+        self.detail_window = max(0, int(tool_detail_limit))
         self.token_usage = {
             "input_tokens": 0,
             "output_tokens": 0,

@@ -791,13 +791,12 @@ class TestTerminalUsageAndSpinnerHelpers:
         assert term._coerce_cost(False) == 0.0
         assert term._estimate_output_tokens_from_chars(21) == 5
 
-        term._toolbar_frames = ["A", "B"]
-        term._toolbar_frame_interval_s = 0.25
-        term._toolbar_spinner_palette = ["#111111", "#222222"]
-        with patch("ui.terminal.time.time", return_value=1.0):
+        term._toolbar_scanner_width = 10
+        term._toolbar_frame_interval_s = 0.04
+        with patch("ui.terminal.usage_persistence.time.time", return_value=1.0):
             markup = term._toolbar_spinner_markup()
         assert "style fg" in markup
-        assert "A" in markup or "B" in markup
+        assert "■" in markup or "⬝" in markup
 
     def test_record_sdk_usage_handles_missing_and_split_costs(self):
         term = _mk_terminal()

@@ -63,6 +63,8 @@ class TestTerminalMethods:
             t._run_lock = MagicMock()
             t._run_lock.__enter__ = MagicMock(return_value=None)
             t._run_lock.__exit__ = MagicMock(return_value=False)
+            t._attach_count = 0
+            t._attach_map = {}
             return t
 
     def test_model_display_name(self, terminal):
@@ -833,35 +835,11 @@ class TestTerminalMethods:
         mock_exec.assert_called_once_with(console_obj=terminal.console, cfg=terminal.session.config)
 
     def test_run_routes_commands_and_queries(self, terminal):
+        from ui.terminal.transcript.store import TranscriptStore
+
         terminal.console.width = 80
-        terminal._prompt_session = MagicMock()
-        terminal._prompt_session.prompt.side_effect = [
-            "/ help",
-            "/interrupt --force",
-            "/skills-add owner/repo@skills/x",
-            "/skills-find kinase",
-            "/skills-remove x",
-            "/skills",
-            "/model",
-            "/settings",
-            "/plan",
-            "/usage",
-            "/tasks refresh",
-            "/upgrade",
-            "/copy",
-            "/export out.md",
-            "/notebook out.ipynb",
-            "/compact concise summary",
-            "/new",
-            "/sessions",
-            "/resume abc",
-            "/agents 2 profile crbn",
-            "/case-study list",
-            "!echo hello",
-            "continue",
-            "find degraders",
-            "/quit",
-        ]
+        terminal.transcript = TranscriptStore()
+        terminal.history_file = MagicMock()
         terminal._current_placeholder = MagicMock(return_value="placeholder")
         terminal._has_active_query = MagicMock(return_value=False)
         terminal._advance_suggestion = MagicMock()
@@ -893,8 +871,38 @@ class TestTerminalMethods:
         terminal.agent._last_plan = None
         terminal.session.config.get.side_effect = lambda key, default=None: default
 
+        prompts = [
+            "/ help",
+            "/interrupt --force",
+            "/skills-add owner/repo@skills/x",
+            "/skills-find kinase",
+            "/skills-remove x",
+            "/skills",
+            "/model",
+            "/settings",
+            "/plan",
+            "/usage",
+            "/tasks refresh",
+            "/upgrade",
+            "/copy",
+            "/export out.md",
+            "/notebook out.ipynb",
+            "/compact concise summary",
+            "/new",
+            "/sessions",
+            "/resume abc",
+            "/agents 2 profile crbn",
+            "/case-study list",
+            "!echo hello",
+            "continue",
+            "find degraders",
+            "/quit",
+        ]
         fake_loop = MagicMock()
-        with patch("ui.terminal.patch_stdout"), patch("agent.loop.AgentLoop", return_value=fake_loop):
+        with patch(
+            "ui.terminal.transcript.app.prompt_with_transcript",
+            side_effect=prompts,
+        ), patch("agent.loop.AgentLoop", return_value=fake_loop):
             terminal.run(initial_context={"source": "test"})
 
         terminal._show_help.assert_called_once()
@@ -923,9 +931,11 @@ class TestTerminalMethods:
         terminal._print_exit_with_resume_hint.assert_called_once()
 
     def test_run_blocks_settings_commands_when_busy(self, terminal):
+        from ui.terminal.transcript.store import TranscriptStore
+
         terminal.console.width = 80
-        terminal._prompt_session = MagicMock()
-        terminal._prompt_session.prompt.side_effect = ["/model", "/quit"]
+        terminal.transcript = TranscriptStore()
+        terminal.history_file = MagicMock()
         terminal._current_placeholder = MagicMock(return_value="placeholder")
         terminal._has_active_query = MagicMock(return_value=True)
         terminal._advance_suggestion = MagicMock()
@@ -935,7 +945,10 @@ class TestTerminalMethods:
         terminal.session.config.get.side_effect = lambda key, default=None: default
 
         fake_loop = MagicMock()
-        with patch("ui.terminal.patch_stdout"), patch("agent.loop.AgentLoop", return_value=fake_loop):
+        with patch(
+            "ui.terminal.transcript.app.prompt_with_transcript",
+            side_effect=["/model", "/quit"],
+        ), patch("agent.loop.AgentLoop", return_value=fake_loop):
             terminal.run()
 
         terminal._switch_model.assert_not_called()
@@ -982,9 +995,11 @@ class TestTerminalMethods:
         terminal._ensure_boltz_cli_ready.assert_not_called()
 
     def test_run_resume_last_renders_history(self, terminal):
+        from ui.terminal.transcript.store import TranscriptStore
+
         terminal.console.width = 80
-        terminal._prompt_session = MagicMock()
-        terminal._prompt_session.prompt.side_effect = ["/quit"]
+        terminal.transcript = TranscriptStore()
+        terminal.history_file = MagicMock()
         terminal._current_placeholder = MagicMock(return_value="placeholder")
         terminal._has_active_query = MagicMock(return_value=False)
         terminal._print_exit_with_resume_hint = MagicMock()
@@ -996,7 +1011,10 @@ class TestTerminalMethods:
         resumed.trajectory.turns = [MagicMock()]
         resumed.trajectory.title = "Session title"
         resumed.trajectory.session_id = "abc12345"
-        with patch("ui.terminal.patch_stdout"), patch("agent.loop.AgentLoop.resume_latest", return_value=resumed):
+        with patch(
+            "ui.terminal.transcript.app.prompt_with_transcript",
+            side_effect=["/quit"],
+        ), patch("agent.loop.AgentLoop.resume_latest", return_value=resumed):
             terminal.run(resume_id="last")
 
         terminal._restore_usage_from_trajectory.assert_called_once()
@@ -1214,16 +1232,23 @@ class TestSkillsUpgradeTerminalPaths:
         terminal._advance_suggestion = MagicMock()
         terminal._request_interrupt = MagicMock(return_value=True)
         terminal._print_exit_with_resume_hint = MagicMock()
+        terminal._attach_count = 0
+        terminal._attach_map = {}
         return terminal
 
     def test_run_routes_skills_upgrade_command(self):
+        from ui.terminal.transcript.store import TranscriptStore
+
         terminal = self._make_terminal()
-        terminal._prompt_session = MagicMock()
-        terminal._prompt_session.prompt.side_effect = ["/skills-upgrade", "/quit"]
+        terminal.transcript = TranscriptStore()
+        terminal.history_file = MagicMock()
         terminal._upgrade_skills = MagicMock()
 
         fake_loop = MagicMock()
-        with patch("ui.terminal.patch_stdout"), patch(
+        with patch(
+            "ui.terminal.transcript.app.prompt_with_transcript",
+            side_effect=["/skills-upgrade", "/quit"],
+        ), patch(
             "agent.loop.AgentLoop", return_value=fake_loop
         ):
             terminal.run()

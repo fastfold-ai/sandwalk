@@ -76,20 +76,19 @@ async def process_events(
     code_trace_buffer: list[dict] | None = None,
     display_name_map: dict[str, str] | None = None,
     group_tools: bool = True,
-    tool_detail_limit: int = 8,
+    tool_detail_limit: int = 0,
 ) -> dict:
     """Consume ``astream_events`` (v2) into the ct result/trace contract.
 
     Produces the ExecutionResult, trace export, and usage-accounting shapes the
     UI and export layers expect.
 
-    Tool-call rendering: when ``group_tools`` is True, the most recent
-    ``tool_detail_limit`` tools in a consecutive batch are shown in full (name,
-    args, output) and older ones collapse progressively to a one-line, still
-    named ``✓ name (Xs)`` entry as newer tools complete — so the current/last
-    call stays detailed while earlier ones compact away. Errors are always shown
-    in full. Todos render as a checklist and the batch flushes whenever the
-    assistant writes text. Set ``group_tools`` False to show every tool in full.
+    Tool-call rendering: when ``group_tools`` is True and
+    ``tool_detail_limit`` is 0 (default), every tool prints as a collapsed
+    one-liner (``✓ Ran name ▸``). Set ``tool_detail_limit`` to N > 0 to keep
+    the last N tools in a batch for full detail when the batch closes; older
+    ones stay compact. Errors always show their message. Set ``group_tools``
+    False to show every tool in full.
     """
     processor = _EventProcessor(
         trace_renderer=trace_renderer,

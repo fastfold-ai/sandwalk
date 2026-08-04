@@ -44,10 +44,10 @@ def get_runtime_settings(config: Config) -> RuntimeSettings:
         ),
         group_tool_traces=bool_from_config(config, "agent.group_tool_traces", True),
         tool_trace_detail_limit=clamp_int(
-            config.get("agent.tool_trace_detail_limit", 1),
-            minimum=1,
+            config.get("agent.tool_trace_detail_limit", 0),
+            minimum=0,
             maximum=50,
-            default=1,
+            default=0,
         ),
         background_watch_timeout_s=clamp_int(
             config.get("agent.background_watch_timeout_s", 7200),

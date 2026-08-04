@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Interactive CLI owns a scrollable transcript panel: tool calls default to
+  collapsed `✓ Ran name ▸` lines, mouse wheel scrolls the session view, and
+  click / `Ctrl+E` expands or collapses tool details in place. Set
+  `agent.tool_trace_detail_limit` > 0 for a trailing full-detail window, or
+  `agent.group_tool_traces false` for always-verbose cards.
 - Prefer `sandwalk fork <share_id>` (kept `sandwalk agent fork` as an alias).
 - Interactive CLI sessions start with Plan mode **off**; `/plan` persists the toggle.
 - Removed idle status-bar “? for commands / Ctrl+O verbose” chrome and the

@@ -60,10 +60,35 @@ def _try_path_attach(terminal, event, text: str) -> bool:
     return True
 
 
-def _build_key_bindings(terminal):
+def _build_key_bindings(terminal, *, include_mouse: bool = True):
     """Key bindings: Tab completions, Ctrl+C double-tap to exit,
-    Enter submit / Ctrl+J·Alt+Enter newline, image paste."""
+    Enter submit / Ctrl+J·Alt+Enter newline, image paste.
+
+    ``include_mouse=False`` skips the custom Warp click-to-place Vt100 mouse
+    binding. The fullscreen transcript app must NOT bind it: key bindings have
+    no NotImplemented fallthrough, so a custom Vt100MouseEvent binding shadows
+    prompt_toolkit's default mouse dispatch and kills wheel scroll / clicks.
+    """
     kb = KeyBindings()
+
+    if include_mouse:
+        # Legacy inline-prompt path only: click-to-place cursor in Warp.
+        from ui.terminal.mouse_place import bind_mouse_place_cursor
+
+        bind_mouse_place_cursor(kb, terminal, prompt_width=2)
+
+    @kb.add("c-e")
+    def _expand_last_tool(event):
+        """Ctrl+E — toggle the most recent tool card in place."""
+        transcript = getattr(terminal, "transcript", None)
+        if transcript is not None:
+            transcript.toggle_last_tool()
+            event.app.invalidate()
+            return
+        expand = getattr(terminal, "_expand_tool_card", None)
+        if callable(expand):
+            expand(None)
+            event.app.invalidate()
 
     @kb.add("tab")
     def _start_completion(event):
@@ -137,10 +162,16 @@ def _build_key_bindings(terminal):
                 cs = buf.complete_state
             if cs and cs.current_completion:
                 buf.apply_completion(cs.current_completion)
-            buf.validate_and_handle()
-        else:
-            buf.cancel_completion()
-            buf.validate_and_handle()
+        # Owned transcript Application registers its own Enter (eager) to exit
+        # with buffer text; PromptSession uses validate_and_handle.
+        if getattr(terminal, "transcript", None) is not None:
+            text = buf.text
+            if text.strip():
+                buf.append_to_history()
+            buf.reset()
+            event.app.exit(result=text)
+            return
+        buf.validate_and_handle()
 
     @kb.add("c-v")
     def _paste_or_attach_image(event):

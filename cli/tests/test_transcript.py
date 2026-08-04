@@ -1,0 +1,162 @@
+"""Unit tests for the owned scrollable transcript."""
+
+from __future__ import annotations
+
+from ui.terminal.transcript.render import entry_lines, render_lines, tool_header_line
+from ui.terminal.transcript.store import TextEntry, ToolEntry, TranscriptStore
+
+
+def test_tool_toggle_changes_line_count():
+    store = TranscriptStore()
+    tool = store.append_tool(
+        name="shell.run",
+        args={"command": "ls"},
+        result="a\nb\nc",
+        duration=0.4,
+    )
+    collapsed = entry_lines(tool, width=80)
+    assert len(collapsed) == 1
+    assert "▸" in collapsed[0][2] or "\u25b8" in collapsed[0][2]
+
+    store.toggle_tool(tool.entry_id)
+    expanded = entry_lines(tool, width=80)
+    assert len(expanded) > 1
+    assert any("command=" in row[2] for row in expanded)
+
+
+def test_toggle_last_tool():
+    store = TranscriptStore()
+    store.append_tool(name="a", result="1")
+    b = store.append_tool(name="b", result="2")
+    store.toggle_last_tool()
+    assert b.expanded is True
+    store.toggle_last_tool()
+    assert b.expanded is False
+
+
+def test_scroll_offset_and_follow_tail():
+    store = TranscriptStore()
+    for i in range(30):
+        store.append_text(f"line {i}")
+    rows, _ = render_lines(store, width=40, height=5)
+    # Last visible text should be near the end while following tail.
+    flat = "".join(frag[1] for row in rows for frag in row)
+    assert "line 29" in flat
+
+    store.scroll_lines(10, viewport=5, total_lines=30)
+    assert store.follow_tail is False
+    rows2, _ = render_lines(store, width=40, height=5)
+    flat2 = "".join(frag[1] for row in rows2 for frag in row)
+    assert "line 29" not in flat2
+
+
+def test_render_hit_map_marks_tools():
+    store = TranscriptStore()
+    store.append_text("hello")
+    store.append_tool(name="neo", result="ok")
+    rows, hit = render_lines(store, width=80, height=10)
+    tool_hits = [e for e, _ in hit if isinstance(e, ToolEntry)]
+    assert tool_hits
+    text_hits = [e for e, idx in hit if isinstance(e, TextEntry) and idx >= 0]
+    assert text_hits
+
+
+def test_tool_header_arrow_flips():
+    entry = ToolEntry(name="x", expanded=False)
+    assert "\u25b8" in tool_header_line(entry)
+    entry.expanded = True
+    assert "\u25be" in tool_header_line(entry)
+
+
+def test_control_cursor_anchors_scroll():
+    """Window scrolls to keep cursor visible — cursor must anchor tail/manual scroll."""
+    from ui.terminal.transcript.control import TranscriptControl
+
+    class FakeWin:
+        vertical_scroll = 0
+
+    store = TranscriptStore()
+    for i in range(40):
+        store.append_text(f"line {i}")
+
+    control = TranscriptControl(store)
+    control.window = FakeWin()
+
+    # Following tail: cursor on the last line so the window pins to bottom.
+    content = control.create_content(80, 10)
+    assert content.cursor_position.y == content.line_count - 1
+    assert control.window.vertical_scroll == content.line_count - 10
+
+    # Scrolled up: cursor tracks the manual scroll position, not line 0.
+    store.follow_tail = False
+    control.window.vertical_scroll = 5
+    content2 = control.create_content(80, 10)
+    assert content2.cursor_position.y == 5
+
+
+def test_markdown_assistant_strips_emphasis_and_pads():
+    from ui.terminal.transcript.render import LEFT_PAD, entry_lines, markdown_to_plain
+
+    plain = markdown_to_plain("It handles **RNA** and **DNA**.", width=60)
+    assert "**" not in plain
+    assert "RNA" in plain
+    assert "DNA" in plain
+
+    store = TranscriptStore()
+    store.append_text("| Metric | Value |\n| --- | --- |\n| conf | 0.9 |", kind="assistant")
+    rows = entry_lines(store.entries[0], width=80)
+    assert rows
+    assert all(line.startswith(LEFT_PAD) or line == LEFT_PAD.rstrip() for _, _, line in rows)
+    joined = "\n".join(line for _, _, line in rows)
+    # Rich table render should not leave raw markdown pipe header alone as the only form,
+    # but must at least not keep emphasis markers and should include cell text.
+    assert "conf" in joined or "0.9" in joined
+    assert "**" not in joined
+
+
+def test_mermaid_fence_renders_not_raw_source():
+    from ui.terminal.transcript.render import entry_lines, markdown_to_plain
+
+    md = (
+        "Overview\n\n"
+        "```mermaid\n"
+        "flowchart TD\n"
+        "  A[Start] --> B[End]\n"
+        "```\n"
+    )
+    plain = markdown_to_plain(md, width=80, config={"ui.mermaid.enabled": True})
+    # Termaid/Rich should expand the diagram; raw fence marker must not remain.
+    assert "```mermaid" not in plain
+    assert "flowchart TD" not in plain or "Start" in plain
+    # At minimum the surrounding prose stays and fence markers are gone.
+    assert "Overview" in plain
+
+    store = TranscriptStore()
+    store.append_text(md, kind="assistant")
+    rows = entry_lines(store.entries[0], width=80, config={"ui.mermaid.enabled": True})
+    joined = "\n".join(line for _, _, line in rows)
+    assert "```mermaid" not in joined
+
+
+def test_trace_renderer_sink_skips_console_print():
+    from io import StringIO
+    from unittest.mock import MagicMock
+
+    from rich.console import Console
+
+    from ui.terminal.transcript.sink import TranscriptSink
+    from ui.terminal.transcript.store import TranscriptStore
+    from ui.traces import TraceRenderer
+
+    store = TranscriptStore()
+    sink = TranscriptSink(store)
+    buf = StringIO()
+    console = Console(file=buf, no_color=True, width=80)
+    console.print = MagicMock()
+    renderer = TraceRenderer(console, sink=sink)
+    renderer.render_tool_compact(
+        "shell.run", 0.5, args={"command": "ls"}, result="ok"
+    )
+    assert console.print.call_count == 0
+    assert len(store.entries) == 1
+    assert store.entries[0].name == "shell.run"
