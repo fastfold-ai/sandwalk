@@ -94,6 +94,53 @@ def test_control_cursor_anchors_scroll():
     assert content2.cursor_position.y == 5
 
 
+def test_mouse_click_toggles_each_tool_when_scrolled():
+    """Clicks use absolute content rows — must work for every tool past the fold."""
+    from prompt_toolkit.data_structures import Point
+    from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
+
+    from ui.terminal.transcript.control import TranscriptControl
+
+    class FakeWin:
+        vertical_scroll = 0
+
+    store = TranscriptStore()
+    for i in range(20):
+        store.append_text(f"pad {i}")
+    tools = [
+        store.append_tool(name="first", args={"a": 1}, result="r1"),
+        store.append_tool(name="second", args={"b": 2}, result="r2"),
+        store.append_tool(name="third", args={"c": 3}, result="r3"),
+    ]
+
+    control = TranscriptControl(store)
+    control.window = FakeWin()
+    control.create_content(80, 10)
+    assert control.window.vertical_scroll > 0
+
+    headers = [
+        i
+        for i, (entry, line_idx) in enumerate(control._hit_map)
+        if isinstance(entry, ToolEntry) and line_idx == 0
+    ]
+    assert len(headers) == 3
+
+    for tool, row in zip(tools, headers, strict=True):
+        for t in tools:
+            t.expanded = False
+        result = control.mouse_handler(
+            MouseEvent(
+                position=Point(x=2, y=row),
+                event_type=MouseEventType.MOUSE_DOWN,
+                button=MouseButton.LEFT,
+                modifiers=frozenset(),
+            )
+        )
+        assert result is None
+        assert tool.expanded is True
+        assert sum(1 for t in tools if t.expanded) == 1
+
+
 def test_markdown_assistant_strips_emphasis_and_pads():
     from ui.terminal.transcript.render import LEFT_PAD, entry_lines, markdown_to_plain
 

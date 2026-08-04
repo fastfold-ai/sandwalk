@@ -76,9 +76,9 @@ class TranscriptControl(UIControl):
             return NotImplemented
 
         if etype == MouseEventType.MOUSE_DOWN:
-            y = mouse_event.position.y
-            scroll = int(getattr(self.window, "vertical_scroll", 0) or 0)
-            idx = scroll + y
+            # Window already translates screen coords → UIContent row/col
+            # (absolute line index). Do not add vertical_scroll again.
+            idx = int(mouse_event.position.y)
             if idx < 0 or idx >= len(self._hit_map):
                 return NotImplemented
             entry, line_idx = self._hit_map[idx]
@@ -104,6 +104,3 @@ class TranscriptControl(UIControl):
 
     def move_cursor_up(self) -> None:
         self.scroll_by(-1)
-
-    def get_cursor_position(self) -> Point:
-        return Point(x=0, y=0)
