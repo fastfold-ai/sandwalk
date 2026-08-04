@@ -72,11 +72,23 @@ API_KEYS_LLM = {
         "free": False,
     },
     "llm.qwen_api_key": {
-        "name": "Qwen",
+        "name": "Qwen Cloud",
         "provider_key": "qwen",
-        "env_var": "DASHSCOPE_API_KEY",
-        "description": "Qwen (Alibaba DashScope) model access",
-        "url": "https://modelstudio.console.alibabacloud.com",
+        "env_var": "QWEN_API_KEY",
+        "env_var_aliases": "DASHSCOPE_API_KEY",
+        "description": "Qwen Cloud API key for Qwen models (OpenAI-compatible)",
+        "url": "https://home.qwencloud.com/api-keys",
+        "free": False,
+    },
+    "llm.qwen_base_url": {
+        "name": "Qwen endpoint",
+        "provider_key": "qwen",
+        "env_var": "QWEN_BASE_URL",
+        "description": (
+            "OpenAI-compatible base URL for Token Plan, Coding Plan, or "
+            "pay-as-you-go (leave empty to auto-detect on Test)"
+        ),
+        "secret": False,
         "free": False,
     },
     "llm.together_api_key": {

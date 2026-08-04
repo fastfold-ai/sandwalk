@@ -172,6 +172,22 @@ def _together_multimodal(model_id: str) -> set[ModalityKind]:
     return set()
 
 
+def _qwen_multimodal(model_id: str) -> set[ModalityKind]:
+    """Qwen Cloud marketplace Visual models (qwencloud.com/models)."""
+    value = model_id.lower()
+    # Native vision-language Qwen ids (image + video). Third-party resale
+    # models on the same endpoint (DeepSeek / GLM) stay text-only.
+    if (
+        value.startswith("qwen3.8")
+        or value.startswith("qwen3.7-plus")
+        or value.startswith("qwen3.7-flash")
+        or value.startswith("qwen3.6-flash")
+        or value.startswith("qwen3.6-plus")
+    ):
+        return {"image", "video"}
+    return set()
+
+
 def _normalize_local_model_name(model_id: str) -> str:
     """Strip org prefix and normalize separators for local tag matching."""
     value = (
@@ -252,10 +268,12 @@ def allowlist_modalities(
         return _moonshot_multimodal(value)
     if provider_norm == "together":
         return _together_multimodal(value)
-    # DeepSeek / MiniMax / Mistral / Qwen curated text flagships — no native
-    # image/PDF/audio/video injection (OpenWorker matrix; vision variants exist
-    # elsewhere, e.g. Pixtral, but are not in our curated picker lists).
-    if provider_norm in {"deepseek", "minimax", "mistral", "qwen"}:
+    if provider_norm == "qwen":
+        return _qwen_multimodal(value)
+    # DeepSeek / MiniMax / Mistral curated text flagships — no native
+    # image/PDF/audio/video injection (vision variants exist elsewhere, e.g.
+    # Pixtral, but are not in our curated picker lists).
+    if provider_norm in {"deepseek", "minimax", "mistral"}:
         return set()
     return set()
 

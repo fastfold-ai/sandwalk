@@ -145,36 +145,16 @@ class _BottomToolbarMixin:
         if self._has_active_query():
             with self._run_lock:
                 queued = len(self._queued_queries)
-                status = self._active_activity or "thinking..."
-                status_updated_at = self._active_activity_updated_at
-                started_at = self._active_query_started_at
-                in_tokens = self._active_input_tokens
-                out_tokens = self._active_output_tokens
-                streamed_chars = self._active_streamed_chars
-            elapsed_s = max(0, int(time.time() - started_at)) if started_at else 0
-            if elapsed_s < 60:
-                elapsed = f"{elapsed_s}s"
-            else:
-                elapsed = f"{elapsed_s // 60}m{elapsed_s % 60:02d}s"
-            stale_status = (time.time() - status_updated_at) > 2.5
-            if stale_status or status in {"thinking...", "starting..."}:
-                word_idx = int(time.time() / self._toolbar_word_interval_s) % max(1, len(self._toolbar_words))
-                status = f"{self._toolbar_words[word_idx]}..."
-            fallback_out = self._estimate_output_tokens_from_chars(streamed_chars)
-            shown_out = out_tokens if out_tokens > 0 else fallback_out
-            usage_label = ""
-            if in_tokens > 0 or shown_out > 0:
-                in_label = f"↑ {in_tokens}" if in_tokens > 0 else "↑ …"
-                usage_label = f" · {in_label} · ↓ {shown_out} tokens"
-            queued_label = f" · queued {queued}" if queued else ""
             spinner = self._toolbar_spinner_markup()
+            queued_label = (
+                f'<style fg="#555555" bg="default"> · queued {queued}</style>'
+                if queued
+                else ""
+            )
             return HTML(
                 f"{spinner}"
-                f'<style fg="#8be9fd" bg="default"> running {elapsed}</style>'
-                f'<style fg="#7f8790" bg="default">{usage_label}</style>'
-                f'<style fg="#8be9fd" bg="default">{queued_label}</style>'
-                f'<style fg="#50fa7b" bg="default"> {status}</style>'
-                '<style fg="#555555" bg="default"> · /interrupt · Ctrl+C interrupt</style>'
+                f"{queued_label}"
+                '<style fg="#555555" bg="default">  ctrl+c interrupt</style>'
             )
         # Mustard — matches local-web Plan mode composer accent (#9a7429).
         plan = (

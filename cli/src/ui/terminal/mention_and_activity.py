@@ -49,22 +49,58 @@ class _MentionAndActivityMixin:
                     )
             except Exception:
                 pass  # Workflows not available
-        # Add file candidates from configured data directory
+        # Add file candidates from session uploads/ + workspace, then data.base
         if include_files:
+            file_count = 0
+            limit = max(0, int(max_file_candidates))
+            seen: set[str] = set()
+
+            def _add_file(name: str, description: str) -> bool:
+                nonlocal file_count
+                if name in seen:
+                    return file_count >= limit
+                seen.add(name)
+                candidates.append((name, "file", description, "file"))
+                file_count += 1
+                return file_count >= limit
+
+            try:
+                from ui.terminal.attachments import session_workspace_path
+
+                workspace = session_workspace_path(self)
+                if workspace and workspace.is_dir():
+                    uploads = workspace / "uploads"
+                    if uploads.is_dir():
+                        for f in sorted(uploads.iterdir(), key=lambda p: p.name, reverse=True):
+                            if not f.is_file() or f.name.startswith("."):
+                                continue
+                            rel = f"uploads/{f.name}"
+                            if _add_file(rel, rel):
+                                break
+                    if file_count < limit:
+                        for f in workspace.rglob("*"):
+                            if not f.is_file() or f.name.startswith("."):
+                                continue
+                            try:
+                                rel = f.relative_to(workspace).as_posix()
+                            except ValueError:
+                                continue
+                            if rel.startswith("uploads/"):
+                                continue
+                            if _add_file(rel, rel):
+                                break
+            except Exception:
+                pass  # Best-effort workspace scan
+
             try:
                 data_base = self.session.config.get("data.base", "")
-                if data_base:
+                if data_base and file_count < limit:
                     data_path = Path(data_base)
                     if data_path.is_dir():
-                        file_count = 0
                         for f in data_path.rglob("*"):
                             if not f.is_file() or f.name.startswith("."):
                                 continue
-                            candidates.append(
-                                (f.name, "file", str(f.relative_to(data_path)), "file")
-                            )
-                            file_count += 1
-                            if file_count >= max(0, int(max_file_candidates)):
+                            if _add_file(f.name, str(f.relative_to(data_path))):
                                 break
             except Exception:
                 pass  # Best-effort file scanning
@@ -109,12 +145,48 @@ class _MentionAndActivityMixin:
             t.start()
 
     def _live_refresh_loop(self) -> None:
+        """Animate the busy toolbar without fighting Rich stdout writes.
+
+        prompt_toolkit's ``patch_stdout`` erases/redraws the prompt around each
+        print. Concurrent ``invalidate()`` calls cause the post-generation
+        flicker; suspend while ``console.print`` runs and only redraw when the
+        scanner frame actually changes.
+        """
+        last_frame = -1
+        was_active = False
         while True:
             try:
-                if self._has_active_query():
-                    app = self._prompt_session.app
-                    if app and app.is_running:
-                        app.invalidate()
+                active = self._has_active_query()
+                if active:
+                    was_active = True
+                    if int(getattr(self, "_toolbar_refresh_suspend", 0) or 0) > 0:
+                        time.sleep(0.03)
+                        continue
+                    from ui.status.scanner import scanner_frame_count
+
+                    interval = float(
+                        getattr(self, "_toolbar_frame_interval_s", 0.04) or 0.04
+                    )
+                    width = int(getattr(self, "_toolbar_scanner_width", 10) or 10)
+                    n = max(1, scanner_frame_count(width=width))
+                    frame = int(time.time() / max(0.02, interval)) % n
+                    if frame != last_frame:
+                        last_frame = frame
+                        app = self._prompt_session.app
+                        if app and app.is_running:
+                            app.invalidate()
+                    time.sleep(0.03)
+                    continue
+
+                # Busy → idle: let the final print settle, then one clean redraw.
+                if was_active:
+                    was_active = False
+                    last_frame = -1
+                    time.sleep(0.06)
+                    if int(getattr(self, "_toolbar_refresh_suspend", 0) or 0) == 0:
+                        app = self._prompt_session.app
+                        if app and app.is_running:
+                            app.invalidate()
             except Exception:
                 pass
             time.sleep(0.25)

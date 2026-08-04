@@ -1,10 +1,8 @@
-"""Mixin: _run_query_worker, _current_placeholder, _advance_suggestion, _update_suggestions, _refresh_cli_specialist_label, _refresh_cli_sandbox_label."""
+"""Mixin: _run_query_worker and CLI toolbar label refresh helpers."""
 
 from __future__ import annotations
 
 import time
-from prompt_toolkit.formatted_text import HTML
-from ui.terminal.mentions import _extract_llm_suggestions
 
 
 class _QueryWorkerMixin:
@@ -51,13 +49,11 @@ class _QueryWorkerMixin:
                         self._set_active_activity(event)
 
                 try:
-                    self.console.print()
                     result = self._run_with_clarification(
                         query,
                         ctx,
                         progress_callback=_progress_update,
                     )
-                    self.console.print()
                 except KeyboardInterrupt:
                     self.console.print("\n  [yellow]Interrupted.[/yellow]")
                     result = None
@@ -73,6 +69,8 @@ class _QueryWorkerMixin:
                 with self._run_lock:
                     if self._queued_queries:
                         current = self._queued_queries.popleft()
+                        # Visual break between queued turns only.
+                        self.console.print()
                     else:
                         self._worker_thread = None
                         self._active_query = None
@@ -95,31 +93,16 @@ class _QueryWorkerMixin:
                 self._active_streamed_chars = 0
 
     def _current_placeholder(self):
-        """Return the current ghost suggestion as dim placeholder text."""
-        text = self._suggestions[self._suggestion_idx % len(self._suggestions)]
-        return HTML(f'<style fg="#555555">{text}</style>')
+        """Deprecated: ghost-text placeholders were removed from the prompt."""
+        return None
 
     def _advance_suggestion(self):
-        """Move to next ghost suggestion."""
-        self._suggestion_idx = (self._suggestion_idx + 1) % len(self._suggestions)
+        """No-op — ghost suggestions are no longer shown in the prompt."""
+        return
 
     def _update_suggestions(self, query: str, plan=None, result=None):
-        """Replace suggestions with contextual follow-ups based on last query.
-
-        Uses LLM-suggested follow-ups extracted from the synthesis output.
-        """
-        suggestions = []
-
-        # Extract LLM-suggested follow-ups from synthesis
-        if result and hasattr(result, 'summary') and result.summary:
-            llm_suggestions = _extract_llm_suggestions(result.summary)
-            suggestions.extend(llm_suggestions)
-
-        if suggestions:
-            self._suggestions = suggestions[:5]
-            self._suggestion_idx = 0
-        else:
-            self._advance_suggestion()
+        """No-op — ghost suggestions are no longer shown in the prompt."""
+        return
 
     def _refresh_cli_specialist_label(self) -> None:
         """Cache active specialist name for the bottom toolbar."""

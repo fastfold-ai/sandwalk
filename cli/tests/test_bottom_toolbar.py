@@ -74,34 +74,28 @@ def test_mention_tab_bar(terminal):
     assert "Skills" in text
 
 
-def test_active_query_toolbar_elapsed_and_usage(terminal):
+def test_active_query_toolbar_is_minimal_scanner(terminal):
     terminal._has_active_query.return_value = True
-    terminal._active_activity = "searching"
-    terminal._active_activity_updated_at = time.time()
-    terminal._active_query_started_at = time.time() - 5
-    terminal._active_input_tokens = 12
-    terminal._active_output_tokens = 4
+    terminal._toolbar_spinner_markup = MagicMock(
+        return_value='<style fg="#b8e0ff" bg="default">■</style>'
+    )
     text = str(terminal._bottom_toolbar())
-    assert "running 5s" in text
-    assert "↑ 12" in text
-    assert "↓ 4 tokens" in text
-    assert "/interrupt" in text
+    assert "■" in text
+    assert "ctrl+c interrupt" in text
+    assert "running" not in text
+    assert "Hypothesizing" not in text
+    assert "/interrupt" not in text
 
 
-def test_active_query_stale_status_and_minute_elapsed(terminal):
+def test_active_query_toolbar_shows_queued_count(terminal):
     terminal._has_active_query.return_value = True
-    terminal._active_activity = "thinking..."
-    terminal._active_activity_updated_at = time.time() - 10
-    terminal._active_query_started_at = time.time() - 75
     terminal._queued_queries = ["next"]
-    terminal._active_input_tokens = 0
-    terminal._active_output_tokens = 0
-    terminal._active_streamed_chars = 40
+    terminal._toolbar_spinner_markup = MagicMock(
+        return_value='<style fg="#b8e0ff" bg="default">■</style>'
+    )
     text = str(terminal._bottom_toolbar())
-    assert "running 1m15s" in text
     assert "queued 1" in text
-    assert "↑ …" in text
-    assert "↓ 3 tokens" in text
+    assert "ctrl+c interrupt" in text
 
 
 def test_idle_toolbar_plan_modal_colors(terminal):

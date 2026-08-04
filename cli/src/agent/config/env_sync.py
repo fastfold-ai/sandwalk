@@ -103,16 +103,17 @@ def sync_process_env_from_config(
     for config_key, info in API_KEYS.items():
         if allowed is not None and config_key not in allowed:
             continue
-        env_name = str(info.get("env_var") or "").strip()
-        if not env_name:
+        env_names = _env_names_for_info(info)
+        if not env_names:
             continue
         value = _config_secret_for_env(cfg, config_key)
         if not value:
             continue
-        if only_missing and str(os.environ.get(env_name) or "").strip():
-            continue
-        os.environ[env_name] = value
-        applied.append(env_name)
+        for env_name in env_names:
+            if only_missing and str(os.environ.get(env_name) or "").strip():
+                continue
+            os.environ[env_name] = value
+            applied.append(env_name)
 
     for env_name, config_key in _EXTRA_ENV_FROM_CONFIG.items():
         if allowed is not None and config_key not in allowed:
@@ -137,9 +138,9 @@ def listed_integration_env_vars(config: "object | None" = None) -> list[str]:
     sync_process_env_from_config(config)
     names: list[str] = []
     for info in API_KEYS.values():
-        env_name = str(info.get("env_var") or "").strip()
-        if env_name and str(os.environ.get(env_name) or "").strip():
-            names.append(env_name)
+        for env_name in _env_names_for_info(info):
+            if str(os.environ.get(env_name) or "").strip():
+                names.append(env_name)
     for env_name in _EXTRA_ENV_FROM_CONFIG:
         if str(os.environ.get(env_name) or "").strip():
             names.append(env_name)
@@ -149,25 +150,43 @@ def listed_integration_env_vars(config: "object | None" = None) -> list[str]:
 def unset_process_env_for_config_keys(config_keys: list[str]) -> list[str]:
     """Remove process env vars that map to the given config keys (integration remove)."""
     removed: list[str] = []
-    env_by_config = {
-        config_key: str(info.get("env_var") or "").strip()
+    env_names_by_config: dict[str, list[str]] = {
+        config_key: _env_names_for_info(info)
         for config_key, info in API_KEYS.items()
     }
     for env_name, config_key in _EXTRA_ENV_FROM_CONFIG.items():
-        env_by_config.setdefault(config_key, env_name)
+        names = env_names_by_config.setdefault(config_key, [])
+        if env_name not in names:
+            names.append(env_name)
     for config_key in config_keys:
-        env_name = env_by_config.get(config_key)
-        if not env_name:
-            continue
-        if env_name in os.environ:
-            os.environ.pop(env_name, None)
-            removed.append(env_name)
+        for env_name in env_names_by_config.get(config_key) or []:
+            if env_name in os.environ:
+                os.environ.pop(env_name, None)
+                removed.append(env_name)
     return removed
+
+
+def _env_names_for_info(info: dict) -> list[str]:
+    """Primary env var plus optional aliases (comma/space separated)."""
+    names: list[str] = []
+    primary = str(info.get("env_var") or "").strip()
+    if primary:
+        names.append(primary)
+    aliases = str(info.get("env_var_aliases") or "").strip()
+    if aliases:
+        for part in aliases.replace(",", " ").split():
+            token = part.strip()
+            if token and token not in names:
+                names.append(token)
+    return names
 
 
 def env_var_mappings(api_keys: dict) -> dict[str, str]:
     """Build the env-var → config-key mapping used by ``Config.load()``."""
-    mappings = {str(info["env_var"]): key for key, info in api_keys.items()}
+    mappings: dict[str, str] = {}
+    for key, info in api_keys.items():
+        for env_name in _env_names_for_info(info):
+            mappings[env_name] = key
     mappings.update(
         {
             "ANTHROPIC_API_KEY": "llm.anthropic_api_key",
@@ -177,6 +196,8 @@ def env_var_mappings(api_keys: dict) -> dict[str, str]:
             "MOONSHOT_API_KEY": "llm.moonshot_api_key",
             "OPENROUTER_API_KEY": "llm.openrouter_api_key",
             "OPENCODE_API_KEY": "llm.opencode_api_key",
+            "QWEN_API_KEY": "llm.qwen_api_key",
+            "DASHSCOPE_API_KEY": "llm.qwen_api_key",
             "OPENAI_BASE_URL": "llm.openai_base_url",
             "CT_DATA_DIR": "data.base",
             "CT_LLM_PROVIDER": "llm.provider",

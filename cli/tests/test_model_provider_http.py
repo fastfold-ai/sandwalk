@@ -41,7 +41,7 @@ def test_probe_chat_completions_invalid_key(monkeypatch):
         model="gpt-5-nano",
     )
     assert result.ok is False
-    assert result.message == "Invalid API key."
+    assert result.message.startswith("Invalid API key.")
 
 
 def test_probe_llm_api_key_opencode_uses_chat(monkeypatch):
@@ -123,6 +123,60 @@ def test_probe_llm_api_key_google_uses_openai_compat_chat(monkeypatch):
     assert result.ok is True
     assert "openai" in seen["url"]
     assert seen["url"].endswith("/chat/completions")
+
+
+def test_probe_llm_api_key_qwen_subscription_discovers_token_plan(monkeypatch):
+    seen: list[str] = []
+
+    def _fake(url, headers, *, label, model, timeout=30.0):
+        seen.append(url)
+        from agent.doctor.model_provider_http import ModelsProbeResult
+
+        if "token-plan" in url and model == "qwen3.7-plus":
+            return ModelsProbeResult(
+                ok=True, message=f"{label} API key works.", status_code=200
+            )
+        return ModelsProbeResult(
+            ok=False,
+            message="Invalid API key. (invalid access token or token expired)",
+            status_code=401,
+        )
+
+    monkeypatch.setattr(
+        "agent.doctor.model_provider_http.probe_chat_completions", _fake
+    )
+    result = probe_llm_api_key("qwen", "sk-sp-token-test", label="Qwen Cloud")
+    assert result.ok is True
+    assert result.base_url == (
+        "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
+    )
+    assert seen[0].startswith(
+        "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/"
+    )
+
+
+def test_probe_llm_api_key_qwen_paygo_uses_compatible_mode(monkeypatch):
+    seen: dict = {}
+
+    def _fake(url, headers, *, label, model, timeout=30.0):
+        seen["url"] = url
+        seen["model"] = model
+        from agent.doctor.model_provider_http import ModelsProbeResult
+
+        return ModelsProbeResult(ok=True, message=f"{label} API key works.", status_code=200)
+
+    monkeypatch.setattr(
+        "agent.doctor.model_provider_http.probe_chat_completions", _fake
+    )
+    result = probe_llm_api_key("qwen", "sk-ws-paygo-test", label="Qwen Cloud")
+    assert result.ok is True
+    assert seen["url"] == (
+        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
+    )
+    assert seen["model"] == "qwen3.7-plus"
+    assert result.base_url == (
+        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    )
 
 
 def test_probe_models_endpoint_still_works(monkeypatch):

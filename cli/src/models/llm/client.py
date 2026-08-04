@@ -26,7 +26,7 @@ class LLMClient:
         "deepseek": "deepseek-v4-flash",
         "minimax": "MiniMax-M2.5",
         "mistral": "mistral-large-latest",
-        "qwen": "qwen3-max",
+        "qwen": "qwen3.7-plus",
         "together": "zai-org/GLM-5.2",
         "openrouter": "anthropic/claude-sonnet-5",
     }
@@ -46,7 +46,7 @@ class LLMClient:
         "mistral": ("https://api.mistral.ai/v1", "MISTRAL_API_KEY"),
         "qwen": (
             "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-            "DASHSCOPE_API_KEY",
+            "QWEN_API_KEY",
         ),
         "together": ("https://api.together.xyz/v1", "TOGETHER_API_KEY"),
         "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
@@ -87,8 +87,15 @@ class LLMClient:
         elif self.provider in self.OPENAI_COMPATIBLE_BASE_URLS:
             import openai
             default_base_url, env_var = self.OPENAI_COMPATIBLE_BASE_URLS[self.provider]
+            api_key = self.api_key or os.environ.get(env_var)
+            if self.provider == "qwen" and not api_key:
+                api_key = os.environ.get("DASHSCOPE_API_KEY")
+            if self.provider == "qwen" and not self.base_url:
+                from agent.config import resolve_qwen_base_url
+
+                default_base_url = resolve_qwen_base_url(api_key)  # first candidate
             client_kwargs = {
-                "api_key": self.api_key or os.environ.get(env_var),
+                "api_key": api_key,
                 "base_url": self.base_url or default_base_url,
             }
             if self.provider == "openrouter":

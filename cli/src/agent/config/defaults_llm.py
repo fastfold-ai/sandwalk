@@ -20,6 +20,8 @@ DEFAULTS_LLM = {
     "llm.minimax_api_key": None,
     "llm.mistral_api_key": None,
     "llm.qwen_api_key": None,
+    # Discovered OpenAI-compatible host for Token/Coding/pay-as-you-go plans.
+    "llm.qwen_base_url": None,
     "llm.together_api_key": None,
     "llm.openrouter_api_key": None,
     "llm.openai_compatible_api_key": None,  # legacy; migrated into profiles then cleared

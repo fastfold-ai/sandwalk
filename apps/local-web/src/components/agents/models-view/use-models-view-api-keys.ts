@@ -8,8 +8,7 @@ type ModelsViewApiKeysInput = {
   setError: (error: string | null) => void
   onSaveProviderKey: (
     key: string,
-    envVar: string,
-    value: string
+    values: Record<string, string>
   ) => Promise<void>
   onClearProviderKey: (key: string) => Promise<void>
   onTestProviderKey: (
@@ -38,6 +37,9 @@ export function useModelsViewApiKeys({
 }: ModelsViewApiKeysInput) {
   const [apiKeysOpen, setApiKeysOpen] = useState(true)
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({})
+  const [endpointDrafts, setEndpointDrafts] = useState<Record<string, string>>(
+    {}
+  )
   const [savingKeys, setSavingKeys] = useState<Record<string, boolean>>({})
   const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({})
   /** Overrides card status after Save/Test (Connected vs Unreachable). */
@@ -66,7 +68,8 @@ export function useModelsViewApiKeys({
       setStatusByKey(prev => ({ ...prev, [key]: 'connected' }))
       return result
     }
-    if (isInvalidKeyMessage(result.message)) {
+    // Qwen auth failures are often wrong endpoint/plan — never wipe the key.
+    if (key !== 'qwen' && isInvalidKeyMessage(result.message)) {
       try {
         await forgetProviderKey(key)
       } catch {
@@ -89,7 +92,18 @@ export function useModelsViewApiKeys({
       integration.fields.find(field => field.isSecret)?.envVar ||
       integration.envVar
     const value = (keyDrafts[integration.key] || '').trim()
-    if (!value) {
+    const values: Record<string, string> = {}
+    if (value) values[envVar] = value
+    if (integration.key === 'qwen') {
+      // Empty string clears to Auto-detect on the server.
+      values.QWEN_BASE_URL = endpointDrafts[integration.key] ?? ''
+    }
+    if (!value && !integration.configured) {
+      const message = `Enter a ${integration.name} API key to save.`
+      setError(message)
+      return { ok: false, message }
+    }
+    if (!value && Object.keys(values).length === 0) {
       const message = `Enter a ${integration.name} API key to save.`
       setError(message)
       return { ok: false, message }
@@ -97,13 +111,15 @@ export function useModelsViewApiKeys({
     setSavingKeys(prev => ({ ...prev, [integration.key]: true }))
     setError(null)
     try {
-      await onSaveProviderKey(integration.key, envVar, value)
-      setKeyDrafts(prev => ({ ...prev, [integration.key]: '' }))
+      await onSaveProviderKey(integration.key, values)
       const result = await onTestProviderKey(integration.key)
       await applyProbeResult(integration.key, result)
       if (result.ok) {
+        // Only clear the draft after a successful probe so a failed Test
+        // doesn't look like the key vanished.
+        if (value) setKeyDrafts(prev => ({ ...prev, [integration.key]: '' }))
         await load(true)
-      } else if (!isInvalidKeyMessage(result.message)) {
+      } else if (!isInvalidKeyMessage(result.message) || integration.key === 'qwen') {
         // Soft refresh so cards/models reflect saved-but-unreachable state.
         await load(false)
       }
@@ -159,11 +175,13 @@ export function useModelsViewApiKeys({
   return {
     apiKeysOpen,
     keyDrafts,
+    endpointDrafts,
     savingKeys,
     revealedKeys,
     statusByKey,
     setApiKeysOpen,
     setKeyDrafts,
+    setEndpointDrafts,
     setRevealedKeys,
     saveProviderKey,
     clearProviderKey,

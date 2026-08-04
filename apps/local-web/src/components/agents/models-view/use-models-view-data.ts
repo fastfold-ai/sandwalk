@@ -112,7 +112,7 @@ export function useModelsViewData({
       deepseek: 'DeepSeek',
       minimax: 'MiniMax',
       mistral: 'Mistral',
-      qwen: 'Qwen',
+      qwen: 'Qwen Cloud',
       together: 'Together AI',
       openrouter: 'OpenRouter',
       local: 'Local'

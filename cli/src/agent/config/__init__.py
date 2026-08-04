@@ -64,7 +64,16 @@ from .profile_ensure import ProfileEnsureMixin  # noqa: E402
 from .profile_heal import ProfileHealMixin  # noqa: E402
 from .profile_record import ProfileRecordMixin  # noqa: E402
 from .profile_seed import ProfileSeedMixin  # noqa: E402
-from .providers import OPENAI_COMPATIBLE_PROVIDERS, OPENAI_PROFILE_DEFAULTS  # noqa: E402
+from .providers import (  # noqa: E402
+    OPENAI_COMPATIBLE_PROVIDERS,
+    OPENAI_PROFILE_DEFAULTS,
+    QWEN_CODING_BASE_URL,
+    QWEN_PAYGO_BASE_URL,
+    QWEN_TOKEN_PLAN_BASE_URL,
+    normalize_qwen_base_url,
+    qwen_base_url_candidates,
+    resolve_qwen_base_url,
+)
 from .secrets_core import SecretsCoreMixin  # noqa: E402
 from .secrets_preflight import SecretsPreflightMixin  # noqa: E402
 from .tables import TablesMixin  # noqa: E402

@@ -9,10 +9,9 @@ from prompt_toolkit.styles import Style
 
 from ui.terminal.slash_commands import SLASH_COMMANDS
 
-# prompt_toolkit style — dim ghost text, colored prompt, dark completion menu
+# prompt_toolkit style — colored prompt, dark completion menu
 PT_STYLE = Style.from_dict({
     "prompt": "bold #50fa7b",
-    "placeholder": "#555555",
     # Force plain, non-reversed toolbar text so no default
     # prompt_toolkit badge/background styling bleeds through.
     "bottom-toolbar": "noinherit noreverse #8a8f98 bg:default",
@@ -30,6 +29,8 @@ PT_STYLE = Style.from_dict({
     "mention-dataset": "#50fa7b",  # green for dataset mentions
     "mention-file": "#ffd700",     # yellow for file mentions
     "mention-workflow": "#ff79c6",  # pink for workflow mentions
+    # Image attach chips — OpenCode-like orange on dark
+    "image-chip": "bold #111111 bg:#f0a030",
 })
 
 

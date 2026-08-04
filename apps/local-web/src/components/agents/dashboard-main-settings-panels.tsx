@@ -243,8 +243,8 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         onDiscoverEndpoint={(input, signal) =>
           client.discoverModelEndpoint(input, signal)
         }
-        onSaveProviderKey={async (key, envVar, value) => {
-          await client.updateIntegration(key, { [envVar]: value })
+        onSaveProviderKey={async (key, values) => {
+          await client.updateIntegration(key, values)
           await loadIntegrations()
           await loadModelOptions()
         }}

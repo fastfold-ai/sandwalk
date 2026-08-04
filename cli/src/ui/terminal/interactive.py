@@ -11,6 +11,7 @@ from prompt_toolkit.history import FileHistory
 from agent.config import CONFIG_DIR
 from ui.suggestions import DEFAULT_SUGGESTIONS
 
+from .attach_lexer import AttachChipLexer
 from .completion import MentionCompleter, MergedCompleter, PT_STYLE, SlashCompleter
 from .key_bindings import _build_key_bindings
 from .model_ids import AVAILABLE_MODELS  # noqa: F401 — re-exported via ui.terminal
@@ -114,6 +115,11 @@ class InteractiveTerminal(
         except Exception:
             pass
         self.console = Console()
+        # Share one Console with the agent/trace renderer so stdout patching and
+        # flicker guards apply to generation output as well as CLI chrome.
+        self.session.console = self.console
+        self._toolbar_refresh_suspend = 0
+        self._install_console_flicker_guard()
         self.history_file = CONFIG_DIR / "history"
         self.history_file.parent.mkdir(parents=True, exist_ok=True)
         self._last_interrupt = 0.0
@@ -150,11 +156,15 @@ class InteractiveTerminal(
         self._queued_queries: deque[tuple[str, dict]] = deque()
         self._live_refresh_thread: threading.Thread | None = None
         self._toolbar_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-        self._toolbar_frame_interval_s = 0.25
+        self._toolbar_frame_interval_s = 0.04  # comet scanner cadence
+        self._toolbar_scanner_width = 10
         self._toolbar_words = ["Thinking", "Planning", "Evaluating"]
         self._toolbar_word_interval_s = 3.0
         self._toolbar_spinner_palette = ["#50fa7b", "#8be9fd", "#7aa2f7", "#ffb86c"]
         self._init_toolbar_animation_profile()
+        # Busy toolbar uses the OpenCode-like scanner; keep a snappy cadence
+        # even if ui.spinner profile configures a slower helix interval.
+        self._toolbar_frame_interval_s = 0.04
         # Build @ mention completer with tool + dataset + file candidates
         mention_candidates = self._build_mention_candidates(include_tools=False, include_files=False)
         mention_completer = MentionCompleter(
@@ -169,13 +179,22 @@ class InteractiveTerminal(
             slash=SlashCompleter(),
             mention=mention_completer,
         )
+        self._attach_count = 0
+        self._attach_map: dict[int, str] = {}
         self._prompt_session = PromptSession(
             history=FileHistory(str(self.history_file)),
             completer=self._merged_completer,
             complete_while_typing=True,
             style=PT_STYLE,
+            lexer=AttachChipLexer(),
             key_bindings=_build_key_bindings(self),
-            multiline=False,  # Ctrl+J / Alt+Enter for newlines
+            # Enter submits; Ctrl+J / Alt+Enter insert newlines.
+            # mouse_support must stay off: enabling it steals mouse events from
+            # the host (Warp/iTerm), which breaks drag-select / copy. Host
+            # selection + arrow keys work; click-to-place needs a TUI that owns
+            # the mouse (OpenTUI), not prompt_toolkit inside Warp.
+            multiline=False,
+            mouse_support=False,
         )
         # Separate session for secret entry prompts (API keys, etc.).
         # Avoids re-entrancy issues with the main interactive app session.
@@ -201,6 +220,37 @@ class InteractiveTerminal(
 
         self._prompt_session.default_buffer.on_completions_changed += _auto_highlight_first
 
+    def _install_console_flicker_guard(self) -> None:
+        """Pause toolbar invalidate while Rich writes, so patch_stdout doesn't fight redraws."""
+        console = self.console
+        original = console.print
+
+        def _print(*args, **kwargs):
+            self._toolbar_refresh_suspend += 1
+            try:
+                return original(*args, **kwargs)
+            finally:
+                self._toolbar_refresh_suspend = max(0, self._toolbar_refresh_suspend - 1)
+
+        console.print = _print  # type: ignore[method-assign]
+
+    def _expand_attached_images(self, query: str) -> str:
+        """Turn ``[Image N]`` chips (and leftover absolute paths) into ``@uploads/…``."""
+        from ui.terminal.attachments import (
+            expand_image_chips,
+            rewrite_loose_image_paths,
+            session_workspace_path,
+        )
+
+        workspace = session_workspace_path(self)
+        text = query
+        attach_map = dict(getattr(self, "_attach_map", {}) or {})
+        if workspace is not None:
+            text, attach_map = rewrite_loose_image_paths(text, workspace, attach_map)
+            self._attach_map = attach_map
+            self._attach_count = max(self._attach_count, max(attach_map.keys(), default=0))
+        return expand_image_chips(text, attach_map)
+
     def run(self, initial_context: dict = None, resume_id: str = None):
         """Run the interactive session."""
         # Imported from the package namespace so tests can monkeypatch
@@ -220,7 +270,6 @@ class InteractiveTerminal(
                     query = self._prompt_session.prompt(
                         [("class:prompt", "❯ ")],
                         bottom_toolbar=self._bottom_toolbar,
-                        placeholder=self._current_placeholder(),
                     ).strip()
                 self._show_exit_hint = False
                 self._show_interrupt_hint = False
@@ -242,8 +291,9 @@ class InteractiveTerminal(
                 break
 
             if not query:
-                self._advance_suggestion()
                 continue
+
+            query = self._expand_attached_images(query)
 
             # Handle slash commands and plain commands
             cmd = query.lower()

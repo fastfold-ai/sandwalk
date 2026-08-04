@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
+
 from ui.terminal.mentions import build_mention_context
 from ui.terminal.mentions import extract_mentions
 
@@ -57,6 +59,11 @@ class _RunClarificationMixin:
             run_context["mention_context"] = mention_ctx
             query = cleaned_query
 
+        preflight_err = self._preflight_multimodal_attachments(query, run_context)
+        if preflight_err:
+            self.console.print(f"  [red]{preflight_err}[/red]")
+            return None
+
         max_clarifications = 3  # Prevent infinite clarification loops
 
         for _ in range(max_clarifications):
@@ -95,6 +102,75 @@ class _RunClarificationMixin:
             run_context,
             progress_callback=progress_callback,
         )
+
+    def _preflight_multimodal_attachments(self, query: str, run_context: dict) -> str | None:
+        """Validate ``@path`` image refs before starting the agent run.
+
+        Returns an error message when files are missing or the active model
+        cannot accept images; otherwise None.
+        """
+        try:
+            from agent.model_catalog.modality_support import (
+                modality_for_extension,
+                model_supports_modality,
+            )
+            from agent.runner.multimodal_user_message import extract_multimodal_paths
+            from ui.terminal.attachments import session_workspace_path
+        except Exception:  # noqa: BLE001
+            return None
+
+        paths = extract_multimodal_paths(query)
+        if not paths:
+            return None
+
+        image_paths = [
+            rel for rel in paths if modality_for_extension(Path(rel).suffix) == "image"
+        ]
+        if not image_paths:
+            return None
+
+        provider = str(
+            run_context.get("provider")
+            or getattr(self.session, "current_provider", None)
+            or self.session.config.get("llm.provider")
+            or ""
+        ).strip()
+        model_id = str(
+            run_context.get("model")
+            or getattr(self.session, "current_model", None)
+            or self.session.config.get("llm.model")
+            or ""
+        ).strip()
+
+        if not model_supports_modality(provider, model_id, "image"):
+            return (
+                f"Model `{model_id or 'unknown'}` does not support image input. "
+                f"Switch to a vision model or remove: {', '.join('@' + p for p in image_paths)}"
+            )
+
+        workspace = session_workspace_path(self)
+        if workspace is None:
+            return (
+                "Session workspace is unavailable; cannot load attached images. "
+                f"Referenced: {', '.join('@' + p for p in image_paths)}"
+            )
+
+        missing = []
+        for rel in image_paths:
+            candidate = (workspace / rel).resolve()
+            try:
+                candidate.relative_to(workspace.resolve())
+            except ValueError:
+                missing.append(rel)
+                continue
+            if not candidate.is_file():
+                missing.append(rel)
+        if missing:
+            return (
+                "Attached image file(s) not found in the session workspace: "
+                + ", ".join("@" + m for m in missing)
+            )
+        return None
 
     def _print_exit_with_resume_hint(self) -> None:
         """Print exit message with a copyable resume command."""

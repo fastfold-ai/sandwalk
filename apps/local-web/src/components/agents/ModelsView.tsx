@@ -85,8 +85,7 @@ export function ModelsView({
   ) => Promise<ModelProfileProbeResult>
   onSaveProviderKey: (
     key: string,
-    envVar: string,
-    value: string
+    values: Record<string, string>
   ) => Promise<void>
   onClearProviderKey: (key: string) => Promise<void>
   onTestProviderKey: (
@@ -207,12 +206,15 @@ export function ModelsView({
           open={state.apiKeysOpen}
           providerIntegrations={state.providerIntegrations}
           keyDrafts={state.keyDrafts}
-          savingKeys={state.savingKeys}
+          endpointDrafts={state.endpointDrafts}
           revealedKeys={state.revealedKeys}
           cloudStatusFor={state.cloudStatusFor}
           onOpenChange={state.setApiKeysOpen}
           onKeyDraftChange={(key, value) =>
             state.setKeyDrafts(prev => ({ ...prev, [key]: value }))
+          }
+          onEndpointDraftChange={(key, value) =>
+            state.setEndpointDrafts(prev => ({ ...prev, [key]: value }))
           }
           onRevealedKeyChange={(key, revealed) =>
             state.setRevealedKeys(prev => ({ ...prev, [key]: revealed }))

@@ -69,7 +69,7 @@ def _prompt_setup_providers(default_provider: str) -> list[str]:
         "deepseek": "DeepSeek",
         "minimax": "MiniMax",
         "mistral": "Mistral",
-        "qwen": "Qwen (Alibaba)",
+        "qwen": "Qwen Cloud",
         "together": "Together AI",
         "openrouter": "OpenRouter",
         "openai_compatible": "OpenAI-compatible custom endpoint",

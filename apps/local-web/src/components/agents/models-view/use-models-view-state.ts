@@ -54,8 +54,7 @@ type ModelsViewCallbacks = {
   ) => Promise<ModelProfileProbeResult>
   onSaveProviderKey: (
     key: string,
-    envVar: string,
-    value: string
+    values: Record<string, string>
   ) => Promise<void>
   onClearProviderKey: (key: string) => Promise<void>
   onTestProviderKey: (

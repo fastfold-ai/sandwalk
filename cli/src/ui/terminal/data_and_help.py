@@ -75,8 +75,9 @@ class _DataAndHelpMixin:
             + "\n".join(command_lines)
             + "\n\n"
             "**Shortcuts:**\n"
-            "- `Ctrl+J` or `Alt+Enter` — insert newline (multi-line input)\n"
-            "- `Tab` — accept ghost suggestion\n"
+            "- `Enter` — submit · `Ctrl+J` / `Alt+Enter` — newline\n"
+            "- Paste image / image path — orange `[Image N]` chip (`uploads/`)\n"
+            "- `Tab` — open slash / @ completions\n"
             "- `Ctrl+C` — interrupt active generation (double-tap forces stop)\n"
             "- `Ctrl+C` × 2 at idle prompt — exit\n"
             "\n"

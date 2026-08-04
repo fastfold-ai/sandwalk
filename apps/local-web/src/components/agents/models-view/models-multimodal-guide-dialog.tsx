@@ -40,7 +40,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   deepseek: 'DeepSeek',
   minimax: 'MiniMax',
   mistral: 'Mistral',
-  qwen: 'Qwen',
+  qwen: 'Qwen Cloud',
   together: 'Together AI',
   openrouter: 'OpenRouter',
   local: 'Local'

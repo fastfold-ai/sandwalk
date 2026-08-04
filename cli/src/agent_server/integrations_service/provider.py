@@ -19,6 +19,21 @@ from agent_server.integrations_service.metadata import (
 from agent_server.models import IntegrationField, IntegrationProvider, IntegrationUnlock
 
 
+def _env_secret(info: dict) -> str:
+    """Read the secret from the primary env var or any aliases."""
+    names = [str(info.get("env_var") or "").strip()]
+    aliases = str(info.get("env_var_aliases") or "").strip()
+    if aliases:
+        names.extend(part.strip() for part in aliases.replace(",", " ").split())
+    for name in names:
+        if not name:
+            continue
+        value = str(os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return ""
+
+
 class ProviderMixin:
     _lock: threading.RLock
     _providers: dict[str, list[tuple[str, dict]]]
@@ -81,10 +96,18 @@ class ProviderMixin:
         timestamps = self._updated_at(config)
         fields: list[IntegrationField] = []
         for config_key, info in entries:
-            env_value = str(os.environ.get(info["env_var"]) or "").strip()
             config_value = str(config.get(config_key) or "").strip()
-            value = env_value or config_value
-            source = "environment" if env_value else "config" if config_value else "none"
+            env_value = _env_secret(info)
+            # Prefer config over process env (long-lived agent-server can hold
+            # stale QWEN/DASHSCOPE vars after a key rotate).
+            value = config_value or env_value
+            source = (
+                "config"
+                if config_value
+                else "environment"
+                if env_value
+                else "none"
+            )
             fields.append(
                 IntegrationField(
                     env_var=str(info["env_var"]),
@@ -133,9 +156,11 @@ class ProviderMixin:
                 for unlock in unlocks
             ]
         configured_fields = [field for field in fields if field.configured]
+        # Endpoint / non-secret companions must not mark the provider "connected".
+        secret_configured = [field for field in configured_fields if field.is_secret]
         if key == "fastfold-cloud":
             # Slack Relay Agent needs the FastFold key — surface that on the unlock.
-            key_ready = bool(configured_fields)
+            key_ready = bool(secret_configured or configured_fields)
             unlocks = [
                 unlock.model_copy(
                     update={
@@ -151,14 +176,21 @@ class ProviderMixin:
                 else unlock
                 for unlock in unlocks
             ]
-        primary = configured_fields[0] if configured_fields else fields[0]
+        primary = (
+            secret_configured[0]
+            if secret_configured
+            else configured_fields[0]
+            if configured_fields
+            else fields[0]
+        )
+        secret_field = next((field for field in fields if field.is_secret), fields[0])
         return IntegrationProvider(
             key=key,
             name=str(metadata.get("name") or first_info["name"]),
             category=str(metadata.get("category") or category_for(first_config_key)),
             description=str(metadata.get("description") or first_info["description"]),
-            env_var=fields[0].env_var,
-            configured=bool(configured_fields),
+            env_var=secret_field.env_var,
+            configured=bool(secret_configured),
             source=primary.source,
             masked_preview=primary.masked_preview,
             setup_url=str(first_info.get("url") or "") or None,

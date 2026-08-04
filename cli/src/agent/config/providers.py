@@ -1,5 +1,72 @@
 """Provider metadata: first-party OpenAI-compatible providers and local profile defaults."""
 
+# Qwen Cloud plan endpoints (OpenAI-compatible). Keys are not interchangeable
+# across plans — Token Plan / Coding Plan / pay-as-you-go each need their own
+# base URL. Subscription keys often share the ``sk-sp-`` prefix, so Sandwalk
+# discovers the working endpoint on live Test and persists ``llm.qwen_base_url``.
+# Docs:
+#   https://docs.qwencloud.com/token-plan/faq
+#   https://docs.qwencloud.com/coding-plan/faq
+#   https://docs.qwencloud.com/developer-guides/getting-started/first-api-call
+QWEN_PAYGO_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+QWEN_CODING_BASE_URL = "https://coding-intl.dashscope.aliyuncs.com/v1"
+QWEN_TOKEN_PLAN_BASE_URL = (
+    "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
+)
+QWEN_SUBSCRIPTION_KEY_PREFIX = "sk-sp-"
+
+
+def qwen_base_url_candidates(api_key: str | None = None) -> list[str]:
+    """Ordered OpenAI-compatible base URLs to try for a Qwen Cloud API key."""
+    key = (api_key or "").strip()
+    if key.startswith(QWEN_SUBSCRIPTION_KEY_PREFIX):
+        # Token Plan and Coding Plan both use sk-sp-; Token Plan first because
+        # Coding Plan rejects non-coding-agent clients and returns a generic 401.
+        return [
+            QWEN_TOKEN_PLAN_BASE_URL,
+            QWEN_CODING_BASE_URL,
+            QWEN_PAYGO_BASE_URL,
+        ]
+    return [QWEN_PAYGO_BASE_URL, QWEN_TOKEN_PLAN_BASE_URL, QWEN_CODING_BASE_URL]
+
+
+def normalize_qwen_base_url(url: str | None) -> str:
+    """Normalize a user-pasted Qwen OpenAI-compatible base URL.
+
+    Users often paste the host without ``/compatible-mode/v1`` (Token Plan and
+    pay-as-you-go). Coding Plan uses bare ``/v1``.
+    """
+    text = (url or "").strip().rstrip("/")
+    if not text:
+        return ""
+    lower = text.lower()
+    if "compatible-mode" in lower or lower.endswith("/apps/anthropic"):
+        return text
+    if "coding-intl.dashscope.aliyuncs.com" in lower:
+        return text if lower.endswith("/v1") else f"{text}/v1"
+    if (
+        "token-plan." in lower
+        or "dashscope-intl.aliyuncs.com" in lower
+        or "dashscope.aliyuncs.com" in lower
+    ):
+        if lower.endswith("/v1"):
+            return f"{text[:-3]}/compatible-mode/v1"
+        return f"{text}/compatible-mode/v1"
+    return text
+
+
+def resolve_qwen_base_url(
+    api_key: str | None = None,
+    *,
+    configured: str | None = None,
+) -> str:
+    """Pick a Qwen Cloud base URL (persisted override wins, else first candidate)."""
+    override = normalize_qwen_base_url(configured)
+    if override:
+        return override
+    return qwen_base_url_candidates(api_key)[0]
+
+
 # First-party providers that speak the OpenAI-compatible protocol. Each routes
 # through the OpenAI SDK / LangChain "openai:" path with a fixed base URL and its
 # own API key. Set discover_models=true to fetch the live catalog from /v1/models
@@ -71,12 +138,14 @@ OPENAI_COMPATIBLE_PROVIDERS: dict[str, dict[str, str]] = {
         "default_model": "mistral-large-latest",
     },
     "qwen": {
-        "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "base_url": QWEN_PAYGO_BASE_URL,
         "config_key": "llm.qwen_api_key",
-        "env_var": "DASHSCOPE_API_KEY",
-        "label": "Qwen",
-        "signup_url": "https://modelstudio.console.alibabacloud.com",
-        "default_model": "qwen3-max",
+        "env_var": "QWEN_API_KEY",
+        # QwenCloud docs still document DASHSCOPE_API_KEY; accept either.
+        "env_var_aliases": "DASHSCOPE_API_KEY",
+        "label": "Qwen Cloud",
+        "signup_url": "https://home.qwencloud.com/api-keys",
+        "default_model": "qwen3.7-plus",
     },
     "together": {
         "base_url": "https://api.together.xyz/v1",

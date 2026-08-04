@@ -26,7 +26,8 @@ import { cn } from '@/lib/utils'
 import {
   LLM_API_KEY_COPY,
   LLM_API_KEY_ORDER,
-  primaryMaskedPreview
+  primaryMaskedPreview,
+  qwenEndpointValue
 } from './models-view-utils'
 import type { CloudKeyStatus } from './use-models-view-api-keys'
 
@@ -68,11 +69,12 @@ export function ModelsApiKeysSection({
   open,
   providerIntegrations,
   keyDrafts,
-  savingKeys,
+  endpointDrafts,
   revealedKeys,
   cloudStatusFor,
   onOpenChange,
   onKeyDraftChange,
+  onEndpointDraftChange,
   onRevealedKeyChange,
   onSaveProviderKey,
   onClearProviderKey,
@@ -81,11 +83,12 @@ export function ModelsApiKeysSection({
   open: boolean
   providerIntegrations: IntegrationSummary[]
   keyDrafts: Record<string, string>
-  savingKeys: Record<string, boolean>
+  endpointDrafts: Record<string, string>
   revealedKeys: Record<string, boolean>
   cloudStatusFor: (integration: IntegrationSummary) => CloudKeyStatus
   onOpenChange: (open: boolean) => void
   onKeyDraftChange: (key: string, value: string) => void
+  onEndpointDraftChange: (key: string, value: string) => void
   onRevealedKeyChange: (key: string, revealed: boolean) => void
   onSaveProviderKey: (
     integration: IntegrationSummary
@@ -96,7 +99,9 @@ export function ModelsApiKeysSection({
   ) => Promise<{ ok: boolean; message: string }>
 }) {
   const [activeKey, setActiveKey] = useState<string | null>(null)
-  const [testing, setTesting] = useState(false)
+  const [pendingAction, setPendingAction] = useState<
+    'test' | 'save' | 'remove' | null
+  >(null)
   const [testResult, setTestResult] = useState<{
     ok: boolean
     message: string
@@ -110,8 +115,14 @@ export function ModelsApiKeysSection({
 
   useEffect(() => {
     setTestResult(null)
-    setTesting(false)
+    setPendingAction(null)
   }, [activeKey])
+
+  useEffect(() => {
+    if (!activeIntegration || activeIntegration.key !== 'qwen') return
+    if (Object.prototype.hasOwnProperty.call(endpointDrafts, 'qwen')) return
+    onEndpointDraftChange('qwen', qwenEndpointValue(activeIntegration))
+  }, [activeIntegration, endpointDrafts, onEndpointDraftChange])
 
   const activeCopy = activeIntegration
     ? providerCopy(activeIntegration.key)
@@ -119,9 +130,11 @@ export function ModelsApiKeysSection({
   const activeDraft = activeIntegration
     ? keyDrafts[activeIntegration.key] || ''
     : ''
-  const activeSaving = activeIntegration
-    ? Boolean(savingKeys[activeIntegration.key])
-    : false
+  const activeEndpoint =
+    activeIntegration?.key === 'qwen'
+      ? (endpointDrafts.qwen ?? qwenEndpointValue(activeIntegration))
+      : ''
+  const busy = pendingAction !== null
   const canTest = Boolean(
     activeIntegration &&
       (activeIntegration.configured || activeDraft.trim())
@@ -129,7 +142,7 @@ export function ModelsApiKeysSection({
 
   const runTest = async () => {
     if (!activeIntegration) return
-    setTesting(true)
+    setPendingAction('test')
     setTestResult(null)
     try {
       if (typeof onTestProviderKey !== 'function') {
@@ -139,8 +152,8 @@ export function ModelsApiKeysSection({
         })
         return
       }
-      // Draft present → Save already runs a live probe; reuse that path.
-      if (activeDraft.trim()) {
+      // Draft key or Qwen endpoint change → Save path persists then probes.
+      if (activeDraft.trim() || activeIntegration.key === 'qwen') {
         const result = await onSaveProviderKey(activeIntegration)
         if (result) setTestResult(result)
         return
@@ -154,13 +167,13 @@ export function ModelsApiKeysSection({
           err instanceof Error ? err.message : 'Unable to test API key.'
       })
     } finally {
-      setTesting(false)
+      setPendingAction(null)
     }
   }
 
   const runSave = async () => {
     if (!activeIntegration) return
-    setTesting(true)
+    setPendingAction('save')
     setTestResult(null)
     try {
       const result = await onSaveProviderKey(activeIntegration)
@@ -172,12 +185,13 @@ export function ModelsApiKeysSection({
           err instanceof Error ? err.message : 'Unable to save API key.'
       })
     } finally {
-      setTesting(false)
+      setPendingAction(null)
     }
   }
 
   const runClear = async () => {
     if (!activeIntegration) return
+    setPendingAction('remove')
     setTestResult(null)
     try {
       await onClearProviderKey(activeIntegration)
@@ -188,6 +202,8 @@ export function ModelsApiKeysSection({
         message:
           err instanceof Error ? err.message : 'Unable to remove API key.'
       })
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -340,6 +356,33 @@ export function ModelsApiKeysSection({
                   </button>
                 </div>
 
+                {activeIntegration.key === 'qwen' ? (
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="qwen-endpoint"
+                      className="text-muted-foreground text-xs font-medium"
+                    >
+                      OpenAI-compatible endpoint
+                    </label>
+                    <Input
+                      id="qwen-endpoint"
+                      type="url"
+                      value={activeEndpoint}
+                      autoComplete="off"
+                      spellCheck={false}
+                      onChange={event =>
+                        onEndpointDraftChange('qwen', event.target.value)
+                      }
+                      placeholder="https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
+                      className="bg-muted/40 font-mono text-sm"
+                    />
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      Leave blank to auto-detect on Test. Paste the OpenAI
+                      Compatible URL from your Qwen Cloud API Keys page.
+                    </p>
+                  </div>
+                ) : null}
+
                 {activeIntegration.setupUrl ? (
                   <p className="text-muted-foreground text-sm">
                     No key yet?{' '}
@@ -380,10 +423,10 @@ export function ModelsApiKeysSection({
                     <Button
                       variant="ghost"
                       className="text-destructive hover:text-destructive"
-                      disabled={activeSaving || testing}
+                      disabled={busy}
                       onClick={() => void runClear()}
                     >
-                      {activeSaving ? (
+                      {pendingAction === 'remove' ? (
                         <Loader2 className="animate-spin" />
                       ) : (
                         <Trash2 />
@@ -393,22 +436,28 @@ export function ModelsApiKeysSection({
                   ) : null}
                   <Button
                     variant="ghost"
-                    disabled={!canTest || activeSaving || testing}
+                    disabled={!canTest || busy}
                     onClick={() => void runTest()}
                   >
-                    {testing ? <Loader2 className="animate-spin" /> : null}
+                    {pendingAction === 'test' ? (
+                      <Loader2 className="animate-spin" />
+                    ) : null}
                     Test
                   </Button>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
-                  <Button variant="ghost" onClick={() => setActiveKey(null)}>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => setActiveKey(null)}
+                  >
                     Cancel
                   </Button>
                   <Button
-                    disabled={activeSaving || testing || !activeDraft.trim()}
+                    disabled={busy || !activeDraft.trim()}
                     onClick={() => void runSave()}
                   >
-                    {activeSaving || testing ? (
+                    {pendingAction === 'save' ? (
                       <Loader2 className="animate-spin" />
                     ) : null}
                     Save

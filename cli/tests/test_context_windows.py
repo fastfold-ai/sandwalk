@@ -36,6 +36,23 @@ def test_gemini_and_xai():
     assert context_window_for_model("kimi-k2.7-code-highspeed") == 256_000
 
 
+def test_qwen_cloud_context_windows():
+    # https://docs.qwencloud.com/developer-guides/getting-started/text-generation-models
+    assert context_window_for_model("qwen3.8-max") == 1_000_000
+    assert context_window_for_model("qwen3.7-plus") == 1_000_000
+    assert context_window_for_model("qwen3.7-flash") == 1_000_000
+    assert context_window_for_model("qwen3.7-max") == 1_000_000
+    assert context_window_for_model("qwen3.6-flash") == 1_000_000
+    assert context_window_for_model("qwen3.6-35b-a3b") == 256_000
+    assert context_window_for_model("deepseek-v4-flash-0731") == 1_000_000
+    assert context_window_for_model("deepseek-v4-pro") == 1_000_000
+    assert context_window_for_model("glm-5.2") == 1_000_000
+    assert context_window_for_model("qwen3-max") == 256_000
+    assert context_window_for_model("qwen3-32b") == 128_000
+    assert context_window_for_model("qwen-long") == 10_000_000
+    assert context_window_for_model("qwen-plus") == 1_000_000
+
+
 def test_unknown_model_returns_none():
     assert context_window_for_model("mystery-model") is None
     assert context_window_for_model("") is None

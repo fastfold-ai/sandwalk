@@ -128,9 +128,44 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
     ],
     "qwen": [
         (
+            "qwen3.8-max",
+            "Qwen3.8 Max",
+            "Qwen Cloud flagship (1M context, image/video + reasoning)",
+        ),
+        (
+            "qwen3.7-plus",
+            "Qwen3.7 Plus",
+            "Qwen Cloud balanced model (1M context, image/video + tools)",
+        ),
+        (
+            "qwen3.7-max",
+            "Qwen3.7 Max",
+            "Qwen Cloud Qwen3.7 series max (1M context, text)",
+        ),
+        (
+            "qwen3.6-flash",
+            "Qwen3.6 Flash",
+            "Qwen Cloud vision-language Flash (1M context, image/video)",
+        ),
+        (
+            "deepseek-v4-flash-0731",
+            "DeepSeek V4 Flash",
+            "DeepSeek V4 Flash via Qwen Cloud (1M context)",
+        ),
+        (
+            "deepseek-v4-pro",
+            "DeepSeek V4 Pro",
+            "DeepSeek V4 Pro via Qwen Cloud (1M context)",
+        ),
+        (
+            "glm-5.2",
+            "GLM-5.2",
+            "Zhipu GLM-5.2 via Qwen Cloud (1M context)",
+        ),
+        (
             "qwen3-max",
             "Qwen3 Max",
-            "Alibaba Qwen flagship for general agent work",
+            "Legacy Qwen flagship id (256k context)",
         ),
     ],
     "together": [

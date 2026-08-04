@@ -34,11 +34,41 @@ class MentionCandidate:
     description: str   # truncated for display
 
 
+def _shield_multimodal_paths(text: str) -> tuple[str, list[str]]:
+    """Replace ``@uploads/…`` / other multimodal @paths with placeholders.
+
+    Prevents tool/dataset stripping from mangling path-like tokens such as
+    ``@uploads/foo.png`` (would otherwise become ``/foo.png``).
+    """
+    try:
+        from agent.runner.multimodal_user_message import _AT_PATH_RE
+    except Exception:  # noqa: BLE001
+        return text, []
+
+    protected: list[str] = []
+
+    def _protect(match: re.Match[str]) -> str:
+        protected.append(match.group(0))
+        return f"\x00PATH{len(protected) - 1}\x00"
+
+    return _AT_PATH_RE.sub(_protect, text), protected
+
+
+def _restore_multimodal_paths(text: str, protected: list[str]) -> str:
+    out = text
+    for i, token in enumerate(protected):
+        out = out.replace(f"\x00PATH{i}\x00", token)
+    return out
+
+
 def extract_mentions(text: str):
     """Parse @mentions from input text.
 
     Returns:
         tuple of (cleaned_query, tool_names, dataset_names, workflow_names)
+
+    Multimodal ``@path`` tokens (e.g. ``@uploads/foo.png``) are preserved in
+    the cleaned query so vision injection still sees them.
     """
     dataset_names_set = {d[0] for d in DATASET_CANDIDATES}
     workflow_names_set = _get_workflow_names()
@@ -49,12 +79,14 @@ def extract_mentions(text: str):
     datasets = []
     workflows = []
 
+    shielded, protected = _shield_multimodal_paths(text)
+
     # Find @category.tool_name mentions first
-    for m in tool_pattern.finditer(text):
+    for m in tool_pattern.finditer(shielded):
         tools.append(m.group(1))
 
     # Find @dataset and @workflow mentions (single word, no dot)
-    cleaned = tool_pattern.sub("", text)
+    cleaned = tool_pattern.sub("", shielded)
     for m in word_pattern.finditer(cleaned):
         name = m.group(1)
         if name in dataset_names_set:
@@ -62,10 +94,12 @@ def extract_mentions(text: str):
         elif name in workflow_names_set:
             workflows.append(name)
 
-    # Strip all recognized @mentions from query
-    query = re.sub(r"@\w+(?:\.\w+)?", "", text).strip()
-    # Collapse multiple spaces
-    query = re.sub(r"\s{2,}", " ", query)
+    # Strip recognized tool/dataset/workflow @mentions only — keep @path media.
+    query = re.sub(r"@\w+(?:\.\w+)?", "", shielded).strip()
+    query = _restore_multimodal_paths(query, protected)
+    # Collapse multiple spaces (but keep newlines for compose multiline)
+    query = re.sub(r"[^\S\n]{2,}", " ", query)
+    query = re.sub(r"\n{3,}", "\n\n", query)
 
     return query, tools, datasets, workflows
 

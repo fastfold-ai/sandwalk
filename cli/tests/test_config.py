@@ -349,10 +349,11 @@ def test_keys_table_uses_template_install_links_for_compatible_profiles():
     assert signup_col[custom_idx] == "—"
 
 
-def test_set_openai_key_rejects_invalid_format():
+def test_set_openai_key_accepts_any_nonempty_format():
+    # Prefix heuristics are not enforced — live probe validates auth.
     cfg = Config(data={})
-    with pytest.raises(ValueError, match="Invalid OpenAI API key format"):
-        cfg.set("llm.openai_api_key", "not-a-key")
+    cfg.set("llm.openai_api_key", "not-a-key")
+    assert cfg.get("llm.openai_api_key") == "not-a-key"
 
 
 def test_save_merges_only_dirty_keys_and_preserves_existing_secrets(monkeypatch, tmp_path):
@@ -616,10 +617,11 @@ def test_set_legacy_compatible_key_updates_active_profile_key():
     assert profile["api_key"] == "sk-unsloth-fresh"
 
 
-def test_set_anthropic_key_rejects_invalid_format():
+def test_set_anthropic_key_accepts_any_nonempty_format():
+    # Prefix heuristics are not enforced — live probe validates auth.
     cfg = Config(data={})
-    with pytest.raises(ValueError, match="Invalid Anthropic API key format"):
-        cfg.set("llm.anthropic_api_key", "sk-proj-not-anthropic")
+    cfg.set("llm.anthropic_api_key", "sk-proj-not-anthropic")
+    assert cfg.get("llm.anthropic_api_key") == "sk-proj-not-anthropic"
 
 
 def test_set_llm_key_blank_unsets_value():

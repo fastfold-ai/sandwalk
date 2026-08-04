@@ -26,6 +26,18 @@ uv run sandwalk
 
 Type a research question, or `/` for slash-command autocomplete. Shared sessions with the Web UI live under `~/.sandwalk/`.
 
+### Compose box
+
+| Shortcut | Action |
+|----------|--------|
+| `Enter` | Submit |
+| `Ctrl+J` / `Alt+Enter` | Insert newline |
+| `Cmd+V` / `Ctrl+V` | Paste clipboard image or image path → orange `[Image N]` chip (saved under session `uploads/`) |
+| Path paste / drop | Same as paste: leading image path becomes `[Image N]` |
+| Mouse select / copy | Host terminal selection (Warp/iTerm). App mouse mode is off on purpose so drag-select works. |
+
+On submit, chips expand to `@uploads/…` for the vision pipeline (same as the Web UI). Use a vision-capable model.
+
 ### Status bar
 
 Idle footer (left → right):
@@ -39,7 +51,7 @@ Idle footer (left → right):
 | Plan mode | Shown only when Plan mode is on |
 | Context | `context: N% (used/limit)` when the window is known |
 
-During a run the bar shows elapsed time, live token counts, and activity text.
+During a run the bar shows a compact comet scanner and `ctrl+c interrupt` (plus a queued count if messages are waiting).
 
 ### Plan mode
 
@@ -160,7 +172,7 @@ The table probes each profile (health, models path, key preview, discovered mode
 | `/clear` | Clear the screen |
 | `/exit` | Exit the terminal |
 
-Shortcuts: `Ctrl+J` / `Alt+Enter` newline · `Tab` accept suggestion · `Ctrl+C` interrupt (double-tap at idle to exit).
+Shortcuts: `Enter` submit · `Ctrl+J` / `Alt+Enter` newline · paste image → `[Image N]` · `Tab` completions · `Ctrl+C` interrupt (double-tap at idle to exit).
 
 ## Tests & coverage
 

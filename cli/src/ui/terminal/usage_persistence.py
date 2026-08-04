@@ -51,14 +51,14 @@ class _UsagePersistenceMixin:
             self._session_sdk_turn_rows = [r for r in rows if isinstance(r, dict)]
 
     def _toolbar_spinner_markup(self) -> str:
-        """Render spinner frame with subtle cycling color."""
-        frames = self._toolbar_frames or ["⠋"]
-        frame_idx = int(time.time() / self._toolbar_frame_interval_s) % len(frames)
-        palette = self._toolbar_spinner_palette or ["#8be9fd"]
-        color_idx = int(time.time() * 4) % len(palette)
-        frame = str(frames[frame_idx])
-        color = str(palette[color_idx])
-        return f'<style fg="{color}" bg="default">{frame}</style>'
+        """OpenCode-like comet / knight-rider scanner for the busy toolbar."""
+        from ui.status.scanner import scanner_frame_count, scanner_html
+
+        interval = float(getattr(self, "_toolbar_frame_interval_s", 0.04) or 0.04)
+        width = int(getattr(self, "_toolbar_scanner_width", 10) or 10)
+        n = scanner_frame_count(width=width)
+        frame_idx = int(time.time() / max(0.02, interval)) % n
+        return scanner_html(frame_idx, width=width)
 
     def _submit_query(self, query: str, context: dict) -> None:
         payload = (query, dict(context))

@@ -151,9 +151,9 @@ PROVIDER_METADATA = {
         "description": "Mistral API key for first-party Mistral models.",
     },
     "qwen": {
-        "name": "Qwen",
+        "name": "Qwen Cloud",
         "category": "AI Models",
-        "description": "Qwen (Alibaba DashScope) API key for first-party Qwen models.",
+        "description": "Qwen Cloud API key for first-party Qwen models (OpenAI-compatible).",
     },
     "together": {
         "name": "Together AI",

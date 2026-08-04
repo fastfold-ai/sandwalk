@@ -11,7 +11,7 @@ export const CLOUD_PROVIDERS = [
   { value: 'deepseek', label: 'DeepSeek' },
   { value: 'minimax', label: 'MiniMax' },
   { value: 'mistral', label: 'Mistral' },
-  { value: 'qwen', label: 'Qwen' },
+  { value: 'qwen', label: 'Qwen Cloud' },
   { value: 'together', label: 'Together AI' },
   { value: 'openrouter', label: 'OpenRouter' }
 ] as const
@@ -231,12 +231,12 @@ export const LLM_API_KEY_COPY: Record<
     placeholderUnset: 'Enter your Mistral API Key'
   },
   qwen: {
-    cardTitle: 'Qwen (Alibaba)',
-    title: 'Qwen API Key',
+    cardTitle: 'Qwen Cloud',
+    title: 'Qwen Cloud API Key',
     description:
-      'Use your DashScope key for Qwen models (Alibaba Model Studio).',
-    hostLabel: 'alibabacloud.com',
-    placeholderUnset: 'Enter your DashScope API Key'
+      'Paste your Qwen Cloud API key, then the OpenAI-compatible endpoint from your API Keys page (or leave the endpoint blank to auto-detect).',
+    hostLabel: 'home.qwencloud.com',
+    placeholderUnset: 'Enter your Qwen Cloud API Key'
   },
   together: {
     cardTitle: 'Together AI',
@@ -268,6 +268,11 @@ export function primaryMaskedPreview(integration: IntegrationSummary) {
     integration.fields.find(field => field.isSecret)?.maskedPreview ||
     integration.maskedPreview
   )
+}
+
+export function qwenEndpointValue(integration: IntegrationSummary) {
+  const field = integration.fields.find(item => item.envVar === 'QWEN_BASE_URL')
+  return (field?.maskedPreview || '').trim()
 }
 
 export function applyBackendDefaults(

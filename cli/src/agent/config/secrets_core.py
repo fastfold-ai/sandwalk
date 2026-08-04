@@ -4,8 +4,22 @@ import os
 import re
 from typing import Any
 
-from .constants import ANTHROPIC_API_KEY_PATTERN, OPENAI_API_KEY_PATTERN
-from .providers import OPENAI_COMPATIBLE_PROVIDERS
+from .providers import OPENAI_COMPATIBLE_PROVIDERS, resolve_qwen_base_url
+
+
+def _provider_env_names(meta: dict[str, str]) -> list[str]:
+    """Primary env var first, then any comma/space-separated aliases."""
+    names: list[str] = []
+    primary = str(meta.get("env_var") or "").strip()
+    if primary:
+        names.append(primary)
+    aliases = str(meta.get("env_var_aliases") or "").strip()
+    if aliases:
+        for part in aliases.replace(",", " ").split():
+            token = part.strip()
+            if token and token not in names:
+                names.append(token)
+    return names
 
 
 class SecretsCoreMixin:
@@ -32,36 +46,14 @@ class SecretsCoreMixin:
         *,
         openai_base_url: str | None = None,
     ) -> str | None:
-        """Validate provider API keys; return issue message, else None."""
-        normalized = cls._normalized_secret(value)
-        if normalized is None:
-            return None
+        """Normalize-only check for provider API keys.
 
-        if config_key == "llm.openai_api_key":
-            if not cls._is_openai_managed_base_url(openai_base_url):
-                return None
-            if normalized.startswith("sk-ant-"):
-                return (
-                    "Invalid OpenAI API key format: looks like an Anthropic key ('sk-ant-...'). "
-                    "Use an OpenAI key starting with 'sk-' (typically 'sk-proj-...')."
-                )
-            if not OPENAI_API_KEY_PATTERN.match(normalized):
-                return (
-                    "Invalid OpenAI API key format. Expected prefix 'sk-' "
-                    "(typically 'sk-proj-...')."
-                )
-            return None
-
-        if config_key == "llm.openai_compatible_api_key":
-            # Compatibility endpoints frequently use placeholder or custom keys.
-            return None
-
-        if config_key in {"llm.anthropic_api_key", "llm.api_key"}:
-            if not ANTHROPIC_API_KEY_PATTERN.match(normalized):
-                return (
-                    "Invalid Anthropic API key format. Expected prefix 'sk-ant-'."
-                )
-
+        Prefix / format heuristics are intentionally not enforced — providers
+        rotate key shapes (e.g. Qwen Cloud ``sk-sp-`` Coding Plan keys). Live
+        probe validation is the source of truth for auth.
+        """
+        _ = (config_key, openai_base_url)
+        cls._normalized_secret(value)
         return None
 
     @classmethod
@@ -81,9 +73,10 @@ class SecretsCoreMixin:
         provider = (provider or self.get("llm.provider", "anthropic")).lower()
         if provider in OPENAI_COMPATIBLE_PROVIDERS:
             meta = OPENAI_COMPATIBLE_PROVIDERS[provider]
-            env_key = self._normalized_secret(os.environ.get(meta["env_var"]))
-            if env_key:
-                return env_key
+            for env_name in _provider_env_names(meta):
+                env_key = self._normalized_secret(os.environ.get(env_name))
+                if env_key:
+                    return env_key
             return self._normalized_secret(self.get(meta["config_key"]))
         if provider == "openai":
             profile = self.get_openai_profile()
@@ -106,7 +99,15 @@ class SecretsCoreMixin:
         """Fixed base URL for first-party OpenAI-compatible providers (xai/google)."""
         provider = (provider or self.get("llm.provider", "anthropic")).lower()
         meta = OPENAI_COMPATIBLE_PROVIDERS.get(provider)
-        return meta["base_url"] if meta else None
+        if not meta:
+            return None
+        if provider == "qwen":
+            configured = self._normalized_secret(self.get("llm.qwen_base_url"))
+            return resolve_qwen_base_url(
+                self.llm_api_key("qwen"),
+                configured=configured,
+            )
+        return meta["base_url"]
 
     def llm_openai_base_url(self) -> str | None:
         """Return normalized OpenAI-compatible base URL, if configured."""

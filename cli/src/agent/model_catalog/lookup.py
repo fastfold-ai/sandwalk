@@ -58,9 +58,15 @@ def catalog_provider_for_model(model_id: str | None) -> str | None:
         return "moonshot"
     if lower.startswith("nvidia/"):
         return "nvidia"
+    # Qwen Cloud Token Plan dated DeepSeek flash id (not native DeepSeek API).
+    if lower == "deepseek-v4-flash-0731":
+        return "qwen"
     # Bare DeepSeek API ids (deepseek-v4-*); reseller paths use deepseek-ai/.
     if lower.startswith("deepseek") and not lower.startswith("deepseek-ai/"):
         return "deepseek"
+    # Bare Zhipu GLM ids served on Qwen Cloud (Together uses zai-org/…).
+    if lower.startswith("glm-"):
+        return "qwen"
     if lower.startswith("minimax") or lower.startswith("abab"):
         return "minimax"
     if (

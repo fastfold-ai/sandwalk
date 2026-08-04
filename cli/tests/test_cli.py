@@ -531,16 +531,16 @@ def test_config_set_agent_profile_rejects_invalid_value():
     mock_save.assert_not_called()
 
 
-def test_config_set_openai_key_rejects_invalid_format():
+def test_config_set_openai_key_accepts_any_nonempty_format():
     cfg = Config(data={})
     with patch("agent.config.Config.load", return_value=cfg), patch.object(
         cfg, "save"
     ) as mock_save:
         result = runner.invoke(app, ["config", "set", "llm.openai_api_key", "bad-key"])
 
-    assert result.exit_code == 2
-    assert "Invalid OpenAI API key format" in result.stdout
-    mock_save.assert_not_called()
+    assert result.exit_code == 0
+    assert cfg.get("llm.openai_api_key") == "bad-key"
+    mock_save.assert_called_once()
 
 
 def test_config_unset_removes_value():

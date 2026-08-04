@@ -16,6 +16,8 @@ class ModelsProbeResult:
     message: str
     model_count: int = 0
     status_code: int | None = None
+    # When set, caller may persist this as the provider's working base URL.
+    base_url: str | None = None
 
 
 _AUTH_MARKERS = (
@@ -45,13 +47,31 @@ _PROBE_MODELS = {
     "deepseek": "deepseek-v4-flash",
     "minimax": "MiniMax-M2.5",
     "mistral": "mistral-small-latest",
-    "qwen": "qwen3-max",
+    "qwen": "qwen3.7-plus",
     # Curated serverless id from the Together catalog (non-serverless
     # Meta-Llama Turbo returns HTTP 400 "Unable to access non-serverless model").
     "together": "zai-org/GLM-5.2",
     # OpenRouter free-tier ping; curated catalog default is Claude Sonnet.
     "openrouter": "openai/gpt-4o-mini",
 }
+
+# Models vary by Qwen plan; try a few cheap/common ids per endpoint.
+_QWEN_PROBE_MODELS = (
+    "qwen3.7-plus",
+    "qwen3.6-plus",
+    "qwen3.5-plus",
+    "qwen3-max",
+    "qwen3-coder-plus",
+)
+
+_QWEN_MODEL_MISS_MARKERS = (
+    "model not exist",
+    "model_not_found",
+    "model not found",
+    "not supported",
+    "access to model denied",
+    "not exist",
+)
 
 
 def _error_snippet(payload: object) -> str:
@@ -83,19 +103,21 @@ def _classify_http_result(
             message=success_message,
             status_code=code,
         )
+    snippet = _error_snippet(payload)[:160] if payload is not None else ""
     if code in (401, 403):
+        detail = f" ({snippet})" if snippet else ""
         return ModelsProbeResult(
             ok=False,
-            message="Invalid API key.",
+            message=f"Invalid API key.{detail}",
             status_code=code,
         )
     if any(m in body_lower for m in _AUTH_MARKERS):
+        detail = f" ({snippet})" if snippet else ""
         return ModelsProbeResult(
             ok=False,
-            message="Invalid API key.",
+            message=f"Invalid API key.{detail}",
             status_code=code,
         )
-    snippet = _error_snippet(payload)[:160] if payload is not None else ""
     if snippet:
         return ModelsProbeResult(
             ok=False,
@@ -321,6 +343,8 @@ def probe_llm_api_key(
 
     meta = OPENAI_COMPATIBLE_PROVIDERS[provider_key]
     resolved = str(meta.get("label") or provider_key)
+    if provider_key == "qwen":
+        return _probe_qwen_api_key(key, label=label or resolved, timeout=wait)
     base = str(meta["base_url"]).rstrip("/")
     headers = {"Authorization": f"Bearer {key}"}
     if provider_key == "openrouter":
@@ -336,6 +360,93 @@ def probe_llm_api_key(
         model=model,
         timeout=wait,
     )
+
+
+def _qwen_model_miss(result: ModelsProbeResult) -> bool:
+    text = (result.message or "").lower()
+    return any(marker in text for marker in _QWEN_MODEL_MISS_MARKERS)
+
+
+def _probe_qwen_api_key(
+    api_key: str,
+    *,
+    label: str,
+    timeout: float,
+) -> ModelsProbeResult:
+    """Try Token Plan / Coding Plan / pay-as-you-go hosts until auth succeeds."""
+    from agent.config import (
+        Config,
+        normalize_qwen_base_url,
+        qwen_base_url_candidates,
+    )
+
+    headers = {"Authorization": f"Bearer {api_key}"}
+    configured = normalize_qwen_base_url(
+        str(Config.load().get("llm.qwen_base_url") or "")
+    )
+    bases = [configured] if configured else qwen_base_url_candidates(api_key)
+    last = ModelsProbeResult(
+        ok=False,
+        message=f"Couldn't validate {label} API key against known Qwen Cloud endpoints.",
+    )
+    for base in bases:
+        host = str(base).rstrip("/")
+        if not host:
+            continue
+        endpoint_auth_failed = False
+        for model in _QWEN_PROBE_MODELS:
+            result = probe_chat_completions(
+                f"{host}/chat/completions",
+                headers,
+                label=label,
+                model=model,
+                timeout=timeout,
+            )
+            last = result
+            if result.ok:
+                return ModelsProbeResult(
+                    ok=True,
+                    message=result.message,
+                    status_code=result.status_code,
+                    base_url=host,
+                )
+            # Auth failure ⇒ wrong plan host (or truly bad key); try next host.
+            if result.status_code in (401, 403) and not _qwen_model_miss(result):
+                endpoint_auth_failed = True
+                break
+            # Model missing/denied on this host ⇒ key is accepted; try next model.
+            if _qwen_model_miss(result):
+                continue
+            # Other errors (rate limit, network): surface them with this host.
+            return ModelsProbeResult(
+                ok=False,
+                message=result.message,
+                status_code=result.status_code,
+                base_url=host,
+            )
+        if endpoint_auth_failed:
+            if configured:
+                return ModelsProbeResult(
+                    ok=False,
+                    message=(
+                        f"Invalid API key for the selected endpoint ({host}). "
+                        "Try Auto-detect, or pick the plan that matches your key."
+                    ),
+                    status_code=last.status_code,
+                    base_url=host,
+                )
+            continue
+        # Authenticated but no probe model worked — still remember the host.
+        return ModelsProbeResult(
+            ok=False,
+            message=(
+                f"{label} key is accepted at {host}, but no probe model responded. "
+                "Try setting a Token Plan model such as qwen3.7-plus."
+            ),
+            status_code=last.status_code,
+            base_url=host,
+        )
+    return last
 
 
 # Back-compat aliases used by older doctor helpers / tests.

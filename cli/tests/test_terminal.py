@@ -1,4 +1,4 @@
-"""Tests for contextual ghost-text suggestions and terminal features."""
+"""Tests for interactive terminal features."""
 
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
@@ -508,22 +508,20 @@ class TestTerminalMethods:
         terminal.console.print.assert_called_once()
         assert "blocked" in str(terminal.console.print.call_args).lower()
 
-    def test_advance_suggestion(self, terminal):
-        assert terminal._suggestion_idx == 0
+    def test_ghost_suggestion_helpers_are_noop(self, terminal):
+        """Ghost-text placeholders were removed; helpers stay as no-ops for callers."""
+        before = list(terminal._suggestions)
+        idx = terminal._suggestion_idx
         terminal._advance_suggestion()
-        assert terminal._suggestion_idx == 1
-
-    def test_update_suggestions_with_llm_result(self, terminal):
-        """_update_suggestions extracts LLM suggestions from result.summary."""
         result = MagicMock()
         result.summary = (
             "## Suggested Next Steps\n"
             "- **\"Check co-essential partners of BRCA1\"**\n"
-            "- **\"Run pathway enrichment on BRCA1 signature\"**\n"
         )
         terminal._update_suggestions("analyze BRCA1", result=result)
-        assert len(terminal._suggestions) == 2
-        assert any("BRCA1" in s for s in terminal._suggestions)
+        assert terminal._suggestion_idx == idx
+        assert terminal._suggestions == before
+        assert terminal._current_placeholder() is None
 
     def test_compact_context_calls_llm_chat_with_messages(self, terminal):
         from agent.trajectory import Trajectory, Turn

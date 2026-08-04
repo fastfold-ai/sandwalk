@@ -128,9 +128,20 @@ def openrouter_model_supports_reasoning(model_id: str | None) -> bool:
             for token in ("v3.1", "v3-1", "v3.2", "v4", "r1", "reasoner", "thinking")
         )
 
-    # Qwen3.7 reasoning models on OpenRouter.
+    # Qwen3.7+ hybrid thinking models (Qwen Cloud / OpenRouter).
     if vendor == "qwen" or slug.startswith("qwen"):
-        return "qwen3.7" in slug or "qwen3-7" in slug
+        return any(
+            token in slug
+            for token in (
+                "qwen3.8",
+                "qwen3.7",
+                "qwen3-7",
+                "qwen3.6",
+                "qwen3.5",
+                "thinking",
+                "qwq",
+            )
+        )
 
     # Thinking Machines Inkling.
     if "thinkingmachines" in vendor or "inkling" in slug:

@@ -193,6 +193,14 @@ class TestExtractMentions:
         assert datasets == []
         assert workflows == []
 
+    def test_preserves_upload_path_with_tool_mentions(self):
+        query, tools, datasets, workflows = extract_mentions(
+            "look at @uploads/shot.png with @target.coessentiality"
+        )
+        assert "@uploads/shot.png" in query
+        assert tools == ["target.coessentiality"]
+        assert "target.coessentiality" not in query
+
 
 # ---------------------------------------------------------------------------
 # build_mention_context

@@ -91,26 +91,58 @@ class MutateMixin:
         entries = self._providers.get(key)
         if entries is None:
             raise KeyError(key)
-        by_env = {str(info["env_var"]): config_key for config_key, info in entries}
-        normalized = {
-            env_name: str(value).strip()
-            for env_name, value in values.items()
-            if env_name in by_env and str(value).strip()
+        by_env = {
+            str(info["env_var"]): (config_key, info) for config_key, info in entries
         }
-        if not normalized:
+        sets: dict[str, str] = {}
+        clears: list[str] = []
+        for env_name, value in values.items():
+            entry = by_env.get(env_name)
+            if entry is None:
+                continue
+            config_key, info = entry
+            text = str(value).strip()
+            if text:
+                sets[env_name] = text
+                continue
+            # Explicit blank clears non-secret fields (e.g. Qwen endpoint = Auto).
+            if not bool(info.get("secret", True)):
+                clears.append(env_name)
+        if not sets and not clears:
             raise ValueError("At least one integration value is required.")
         with self._lock:
             config = Config.load()
-            for env_name, value in normalized.items():
-                config.set(by_env[env_name], value)
-                # Force into process env so web runs/PTY match CLI immediately.
-                os.environ[env_name] = value
-            self._mark_updated(
-                config,
-                [by_env[env_name] for env_name in normalized],
-            )
+            touched = []
+            for env_name, value in sets.items():
+                config_key, info = by_env[env_name]
+                stored = value
+                if config_key == "llm.qwen_base_url":
+                    from agent.config import normalize_qwen_base_url
+
+                    stored = normalize_qwen_base_url(value)
+                config.set(config_key, stored)
+                # Force-overwrite primary + aliases so a stale process env
+                # (e.g. old DASHSCOPE_API_KEY) cannot outrank the saved key.
+                from agent.config.env_sync import _env_names_for_info
+
+                for name in _env_names_for_info(info) or [env_name]:
+                    os.environ[name] = stored
+                touched.append(config_key)
+            for env_name in clears:
+                config_key, info = by_env[env_name]
+                config.unset(config_key)
+                from agent.config.env_sync import _env_names_for_info
+
+                for name in _env_names_for_info(info) or [env_name]:
+                    os.environ.pop(name, None)
+                touched.append(config_key)
+            self._mark_updated(config, touched)
             config.save()
             sync_process_env_from_config(config)
+            if clears:
+                unset_process_env_for_config_keys(
+                    [by_env[env_name][0] for env_name in clears]
+                )
         return self._provider(key, entries)
 
     def remove(self, key: str) -> IntegrationProvider:
@@ -132,7 +164,12 @@ class MutateMixin:
         return self._provider(key, entries)
 
     def _secret_value(self, key: str) -> str:
-        """Return the stored/env secret for an integration (empty if unset)."""
+        """Return the stored/env secret for an integration (empty if unset).
+
+        Prefer config.json over process env. The agent-server is long-lived, so
+        a stale ``QWEN_API_KEY`` / ``DASHSCOPE_API_KEY`` in ``os.environ`` can
+        otherwise outrank a freshly saved key and fail Test.
+        """
         entries = self._providers.get(key)
         if not entries:
             return ""
@@ -140,12 +177,14 @@ class MutateMixin:
         for config_key, info in entries:
             if not bool(info.get("secret", True)):
                 continue
-            env_value = str(os.environ.get(info["env_var"]) or "").strip()
-            if env_value:
-                return env_value
             config_value = str(config.get(config_key) or "").strip()
             if config_value:
                 return config_value
+            from agent_server.integrations_service.provider import _env_secret
+
+            env_value = _env_secret(info)
+            if env_value:
+                return env_value
         return ""
 
     def validate(self, key: str) -> ValidateIntegrationResponse:
@@ -161,13 +200,20 @@ class MutateMixin:
                 message=f"{provider.name} is not configured.",
             )
 
-        # LLM providers: cheap GET /models probe (no completion / no tokens).
+        # LLM providers: 1-token chat probe (GET /models is not trusted).
         if supports_llm_key_probe(key):
             result = probe_llm_api_key(
                 key,
                 self._secret_value(key),
                 label=provider.name,
             )
+            # Persist discovered host only when the user left endpoint on Auto.
+            if key == "qwen" and result.base_url:
+                with self._lock:
+                    config = Config.load()
+                    if not str(config.get("llm.qwen_base_url") or "").strip():
+                        config.set("llm.qwen_base_url", result.base_url)
+                        config.save()
             return ValidateIntegrationResponse(
                 ok=result.ok,
                 configured=True,
