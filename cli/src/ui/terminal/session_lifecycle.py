@@ -58,22 +58,22 @@ class _SessionLifecycleMixin:
         """Start a brand-new local session."""
         from agent.loop import AgentLoop
 
-        # Clear visible transcript so /new feels like a blank chat start.
-        self.console.clear()
-        try:
-            # Mirror startup UX when beginning a fresh session.
-            from cli import print_banner
-            # Add slight top margin so content isn't pinned to row 1.
-            self.console.print()
-            self.console.print()
-            self.console.print()
-            self.console.print()
-            self.console.print()
-            self.console.print()
-            print_banner(self.session.config)
-            self.console.print()
-        except Exception:
-            pass
+        # Clear owned transcript and restore the startup mark (fullscreen TUI).
+        transcript = getattr(self, "transcript", None)
+        if transcript is not None:
+            transcript.clear()
+            seed = getattr(self, "_seed_transcript_banner", None)
+            if callable(seed):
+                seed()
+        else:
+            try:
+                self.console.clear()
+                from cli.banner import print_banner
+
+                print_banner(self.session.config, console=self.console)
+                self.console.print()
+            except Exception:
+                pass
         self.agent = AgentLoop(self.session)
         self._reset_usage_counters()
         self._last_response = None

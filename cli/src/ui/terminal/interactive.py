@@ -228,6 +228,9 @@ class InteractiveTerminal(
         """Route Rich prints into the owned transcript; pause toolbar invalidate."""
         console = self.console
         original = console.print
+        # Keep the real printer for post-exit messages (resume hint) that must
+        # land on the host scrollback after the fullscreen app tears down.
+        self._console_print_original = original
 
         def _print(*args, **kwargs):
             self._toolbar_refresh_suspend += 1
@@ -287,292 +290,311 @@ class InteractiveTerminal(
             )
         return expand_image_chips(text, attach_map)
 
+    def _seed_transcript_banner(self) -> None:
+        """Put the sandwalk mark into the owned transcript (fullscreen hides stdout)."""
+        transcript = getattr(self, "transcript", None)
+        if transcript is None:
+            return
+        try:
+            from cli.banner import render_banner_ansi
+
+            width = int(getattr(self.console, "width", 0) or 100)
+            text = render_banner_ansi(self.session.config, width=width)
+        except Exception:  # noqa: BLE001
+            return
+        if text.strip():
+            transcript.append_text(text, kind="banner")
+
     def run(self, initial_context: dict = None, resume_id: str = None):
         """Run the interactive session."""
         from prompt_toolkit.history import FileHistory
 
-        from ui.terminal.transcript.app import prompt_with_transcript
+        from ui.terminal.transcript.app import run_transcript_session
 
         context = initial_context or {}
+        # Banner must live in the transcript — the fullscreen prompt app
+        # replaces the Rich scrollback where print_banner used to stay visible.
+        self._seed_transcript_banner()
         self._bootstrap_agent_loop(resume_id)
         history = FileHistory(str(self.history_file))
 
-        while True:
-            try:
-                self.transcript.append_separator()
-                query = prompt_with_transcript(self, history=history).strip()
-                self._show_exit_hint = False
-                self._show_interrupt_hint = False
-            except EOFError:
-                if self._has_active_query():
-                    self._request_interrupt(force=True)
-                self._print_exit_with_resume_hint()
-                break
-            except KeyboardInterrupt:
-                # Ctrl+C at idle prompt — keep session alive (double-tap exits via binding).
-                self.transcript.append_text("Interrupted.", kind="system")
-                continue
+        def on_submit(query: str) -> bool:
+            """Return False to end the persistent transcript session."""
+            self._show_exit_hint = False
+            self._show_interrupt_hint = False
+            return self._handle_repl_line(query, context)
 
-            # Handle double Ctrl+C exit signal from key binding
-            if query == "__EXIT__":
-                if self._has_active_query():
-                    self._request_interrupt(force=True)
-                self._print_exit_with_resume_hint()
-                break
+        try:
+            run_transcript_session(self, history=history, on_submit=on_submit)
+        except EOFError:
+            pass
+        finally:
+            # Resume hint must print *after* fullscreen exits, onto real scrollback
+            # (console.print is redirected into the transcript while the app runs).
+            if self._has_active_query():
+                self._request_interrupt(force=True)
+            self._print_exit_with_resume_hint()
 
-            if not query:
-                continue
+    def _handle_repl_line(self, query: str, context: dict) -> bool:
+        """Process one submitted line. Return False to exit the REPL."""
+        query = (query or "").strip()
+        if query == "__EXIT__":
+            # Interrupt + resume hint run in run() after the fullscreen app exits.
+            return False
 
-            query = self._expand_attached_images(query)
+        if not query:
+            return True
 
-            # Handle slash commands and plain commands
-            cmd = query.lower()
-            # Normalize accidental "/ command" spacing to "/command"
-            if cmd.startswith("/ "):
-                cmd = "/" + cmd[2:].lstrip()
-                query = "/" + query[2:].lstrip()
+        self.transcript.append_separator()
+        query = self._expand_attached_images(query)
 
-            # Auto-resolve partial slash commands — first match wins
-            # (e.g. "/mod" → "/model", "/co" → "/config")
-            if cmd.startswith("/") and cmd not in SLASH_COMMANDS:
-                prefix = cmd.split()[0]  # handle "/export file.md" → "/export"
-                matches = [c for c in SLASH_COMMANDS if c.startswith(prefix)]
-                if matches:
-                    cmd = matches[0] + cmd[len(prefix):]
-                    query = matches[0] + query[len(prefix):]
+        # Handle slash commands and plain commands
+        cmd = query.lower()
+        # Normalize accidental "/ command" spacing to "/command"
+        if cmd.startswith("/ "):
+            cmd = "/" + cmd[2:].lstrip()
+            query = "/" + query[2:].lstrip()
 
-            busy = self._has_active_query()
-            if cmd in ("exit", "quit", "q", "/exit", "/quit"):
-                if busy:
-                    self._request_interrupt(force=True)
-                self._print_exit_with_resume_hint()
-                break
-            if cmd.startswith("/interrupt") or cmd == "interrupt":
-                force = cmd.endswith("!") or "--force" in cmd or " force" in cmd
-                self._request_interrupt(force=force)
-                self._advance_suggestion()
-                continue
-            if busy and (
-                cmd.startswith("/model")
-                or cmd.startswith("/effort")
-                or cmd.startswith("/settings")
-                or cmd.startswith("/model-manager")
-                or cmd.startswith("/plan")
-                or cmd.startswith("/new")
-                or cmd.startswith("/sessions")
-                or cmd.startswith("/sync")
-                or cmd.startswith("/resume")
-                or cmd.startswith("/agents")
-                or cmd.startswith("/case-study")
-                or cmd.startswith("/compact")
-                or cmd.startswith("/export")
-                or cmd.startswith("/notebook")
-                or cmd.startswith("/upgrade")
-            ):
-                self.console.print("  [dim]Command unavailable while a generation is running.[/dim]")
-                self.console.print("  [dim]Use /interrupt, or wait for queued messages to run.[/dim]")
-                self._advance_suggestion()
-                continue
-            if cmd in ("help", "/help", "?"):
-                self._show_help()
-                self._advance_suggestion()
-                continue
-            if cmd in ("tools", "/tools"):
-                from tools import ensure_loaded, registry, tool_load_errors
-                ensure_loaded()
-                self.console.print(registry.list_tools_table())
-                errors = tool_load_errors()
-                if errors:
-                    names = ", ".join(sorted(errors.keys())[:8])
-                    extra = "" if len(errors) <= 8 else f" (+{len(errors) - 8} more)"
-                    self.console.print(
-                        f"[yellow]Warning:[/yellow] {len(errors)} tool module(s) failed to load: "
-                        f"{names}{extra}"
-                    )
-                self._advance_suggestion()
-                continue
-            cmd_head = cmd.split(maxsplit=1)[0]
-            cmd_rest = query.split(maxsplit=1)[1] if len(query.split(maxsplit=1)) > 1 else ""
-            if cmd_head in ("skills-add", "/skills-add", "skill-add", "/skill-add"):
-                self._add_skill(cmd_rest)
-                self._advance_suggestion()
-                continue
-            if cmd_head in ("skills-find", "/skills-find", "skill-find", "/skill-find"):
-                self._find_skills(cmd_rest)
-                self._advance_suggestion()
-                continue
-            if cmd_head in ("skills-upgrade", "/skills-upgrade", "skill-upgrade", "/skill-upgrade"):
-                self._upgrade_skills()
-                self._advance_suggestion()
-                continue
-            if cmd_head in ("skills-remove", "/skills-remove", "skill-remove", "/skill-remove"):
-                self._remove_skill(cmd_rest)
-                self._advance_suggestion()
-                continue
-            if cmd in ("skill", "/skill", "skills", "/skills"):
-                self._show_skills()
-                self._advance_suggestion()
-                continue
-            if cmd_head in ("specialist", "/specialist"):
-                self._handle_specialist_command(query)
-                self._advance_suggestion()
-                continue
-            if cmd_head in ("sandbox", "/sandbox"):
-                self._handle_sandbox_command(query)
-                self._advance_suggestion()
-                continue
-            if cmd_head in ("data", "/data"):
-                self._handle_data_command(query)
-                self._advance_suggestion()
-                continue
-            if cmd in ("model", "/model"):
-                self._switch_model()
-                self._advance_suggestion()
-                continue
-            if cmd in ("effort", "/effort") or cmd.startswith("/effort"):
-                self._handle_effort_command(query)
-                self._advance_suggestion()
-                continue
-            if cmd in ("settings", "/settings"):
-                self._change_settings()
-                self._advance_suggestion()
-                continue
-            if (
-                cmd == "model-manager"
-                or cmd.startswith("/model-manager")
-                or cmd == "model-details"
-                or cmd.startswith("/model-details")
-                or cmd == "compatible"
-                or cmd.startswith("/compatible")
-            ):
-                self._handle_model_manager_command(query)
-                self._advance_suggestion()
-                continue
-            if cmd in ("plan", "/plan"):
-                self._toggle_plan_mode()
-                self._advance_suggestion()
-                continue
-            if cmd in ("usage", "/usage"):
-                self._show_usage()
-                self._advance_suggestion()
-                continue
-            if cmd == "tasks" or cmd.startswith("/tasks"):
-                parts = query.strip().lower().split()
-                force_refresh = len(parts) > 1 and parts[1] in {"refresh", "-r", "--refresh", "force"}
-                self._show_tasks(force_refresh=force_refresh)
-                self._advance_suggestion()
-                continue
-            if cmd in ("config", "/config"):
-                from agent.config import Config
-                self.console.print(Config.load().to_table())
-                self._advance_suggestion()
-                continue
-            if cmd == "keys" or cmd.startswith("/keys"):
-                self._handle_keys_command(query)
-                self._advance_suggestion()
-                continue
-            if cmd == "mcp" or cmd.startswith("/mcp"):
-                self._handle_mcp_command(query)
-                self._advance_suggestion()
-                continue
-            if cmd in ("upgrade", "/upgrade"):
-                self._run_upgrade()
-                self._advance_suggestion()
-                continue
-            if cmd in ("doctor", "/doctor"):
-                from agent.doctor import has_errors, has_warnings, run_checks, to_table
-                checks = run_checks(self.session.config, session=self.session)
-                self.console.print(to_table(checks))
-                if has_errors(checks):
-                    self.console.print("  [red]Blocking issues found.[/red]")
-                elif has_warnings(checks):
-                    self.console.print("  [yellow]No blocking errors; warnings remain.[/yellow]")
-                else:
-                    self.console.print("  [green]No blocking issues found.[/green]")
-                self._advance_suggestion()
-                continue
-            if cmd in ("clear", "/clear"):
-                self.transcript.clear()
-                self._advance_suggestion()
-                continue
-            if cmd in ("copy", "/copy"):
-                self._copy_last_response()
-                continue
-            if cmd.startswith("/export-share"):
-                parts = query.split(maxsplit=1)
-                filename = parts[1] if len(parts) > 1 else None
-                self._export_share(filename)
-                continue
-            if cmd.startswith("/export"):
-                parts = query.split(maxsplit=1)
-                filename = parts[1] if len(parts) > 1 else None
-                self._export_session(filename)
-                continue
-            if cmd.startswith("/notebook"):
-                parts = query.split(maxsplit=1)
-                filename = parts[1] if len(parts) > 1 else None
-                self._export_notebook(filename)
-                continue
-            if cmd.startswith("/compact"):
-                parts = query.split(maxsplit=1)
-                instructions = parts[1] if len(parts) > 1 else None
-                self._compact_context(instructions)
-                continue
-            if cmd in ("new", "/new"):
-                self._new_session()
-                continue
-            if cmd.startswith("/sessions") or cmd == "sessions":
-                parts = query.split(maxsplit=2)
-                action = parts[1].strip().lower() if len(parts) > 1 else ""
-                if action in {"delete", "del", "rm", "remove"}:
-                    target = parts[2].strip() if len(parts) > 2 else None
-                    self._delete_session(target)
-                else:
-                    self._list_sessions()
-                continue
-            if cmd.startswith("/sync") or cmd == "sync":
-                parts = query.split()
-                force = any(part in {"--force", "-f", "force"} for part in parts[1:])
-                self._sync_sessions(force=force)
-                continue
-            if cmd.startswith("/resume"):
-                parts = query.split(maxsplit=1)
-                sid = parts[1].strip() if len(parts) > 1 else None
-                self._resume_session(sid)
-                continue
-            if cmd.startswith("/agents"):
-                self._handle_agents_command(query, context)
-                continue
-            if cmd.startswith("/case-study"):
-                self._handle_case_study_command(query, context)
-                continue
+        # Auto-resolve partial slash commands — first match wins
+        # (e.g. "/mod" → "/model", "/co" → "/config")
+        if cmd.startswith("/") and cmd not in SLASH_COMMANDS:
+            prefix = cmd.split()[0]  # handle "/export file.md" → "/export"
+            matches = [c for c in SLASH_COMMANDS if c.startswith(prefix)]
+            if matches:
+                cmd = matches[0] + cmd[len(prefix):]
+                query = matches[0] + query[len(prefix):]
 
-            # ! prefix — shell command
-            if query.startswith("!"):
-                self._run_shell(query[1:].strip())
-                continue
-
-            # "continue" — resume interrupted synthesis or continue conversation
-            if cmd in ("continue", "go on", "keep going"):
-                if self.agent._last_plan is not None:
-                    self.console.print("  [cyan]Continuing synthesis...[/cyan]\n")
-                    try:
-                        result = self.agent.continue_synthesis()
-                        self.console.print()
-                    except KeyboardInterrupt:
-                        self.console.print("\n  [dim]Interrupted.[/dim]")
-                        continue
-                    if result is not None:
-                        self._last_response = result.summary
-                        self._update_suggestions(
-                            self.agent._last_query or query, result.plan, result,
-                        )
-                    continue
-                # No interrupted state — fall through to normal query
-                # (planner will use session history to understand context)
-
-            # Keep prompt available while one generation runs; extra user messages
-            # are queued and executed serially by the worker.
-            self.transcript.append_text(query, kind="user")
-            self._submit_query(query, context)
+        busy = self._has_active_query()
+        if cmd in ("exit", "quit", "q", "/exit", "/quit"):
+            # Interrupt + resume hint run in run() after the fullscreen app exits.
+            return False
+        if cmd.startswith("/interrupt") or cmd == "interrupt":
+            force = cmd.endswith("!") or "--force" in cmd or " force" in cmd
+            self._request_interrupt(force=force)
             self._advance_suggestion()
+            return True
+        if busy and (
+            cmd.startswith("/model")
+            or cmd.startswith("/effort")
+            or cmd.startswith("/settings")
+            or cmd.startswith("/model-manager")
+            or cmd.startswith("/plan")
+            or cmd.startswith("/new")
+            or cmd.startswith("/sessions")
+            or cmd.startswith("/sync")
+            or cmd.startswith("/resume")
+            or cmd.startswith("/agents")
+            or cmd.startswith("/case-study")
+            or cmd.startswith("/compact")
+            or cmd.startswith("/export")
+            or cmd.startswith("/notebook")
+            or cmd.startswith("/upgrade")
+        ):
+            self.console.print("  [dim]Command unavailable while a generation is running.[/dim]")
+            self.console.print("  [dim]Use /interrupt, or wait for queued messages to run.[/dim]")
+            self._advance_suggestion()
+            return True
+        if cmd in ("help", "/help", "?"):
+            self._show_help()
+            self._advance_suggestion()
+            return True
+        if cmd in ("tools", "/tools"):
+            from tools import ensure_loaded, registry, tool_load_errors
+            ensure_loaded()
+            self.console.print(registry.list_tools_table())
+            errors = tool_load_errors()
+            if errors:
+                names = ", ".join(sorted(errors.keys())[:8])
+                extra = "" if len(errors) <= 8 else f" (+{len(errors) - 8} more)"
+                self.console.print(
+                    f"[yellow]Warning:[/yellow] {len(errors)} tool module(s) failed to load: "
+                    f"{names}{extra}"
+                )
+            self._advance_suggestion()
+            return True
+        cmd_head = cmd.split(maxsplit=1)[0]
+        cmd_rest = query.split(maxsplit=1)[1] if len(query.split(maxsplit=1)) > 1 else ""
+        if cmd_head in ("skills-add", "/skills-add", "skill-add", "/skill-add"):
+            self._add_skill(cmd_rest)
+            self._advance_suggestion()
+            return True
+        if cmd_head in ("skills-find", "/skills-find", "skill-find", "/skill-find"):
+            self._find_skills(cmd_rest)
+            self._advance_suggestion()
+            return True
+        if cmd_head in ("skills-upgrade", "/skills-upgrade", "skill-upgrade", "/skill-upgrade"):
+            self._upgrade_skills()
+            self._advance_suggestion()
+            return True
+        if cmd_head in ("skills-remove", "/skills-remove", "skill-remove", "/skill-remove"):
+            self._remove_skill(cmd_rest)
+            self._advance_suggestion()
+            return True
+        if cmd in ("skill", "/skill", "skills", "/skills"):
+            self._show_skills()
+            self._advance_suggestion()
+            return True
+        if cmd_head in ("specialist", "/specialist"):
+            self._handle_specialist_command(query)
+            self._advance_suggestion()
+            return True
+        if cmd_head in ("sandbox", "/sandbox"):
+            self._handle_sandbox_command(query)
+            self._advance_suggestion()
+            return True
+        if cmd_head in ("data", "/data"):
+            self._handle_data_command(query)
+            self._advance_suggestion()
+            return True
+        if cmd in ("model", "/model"):
+            self._switch_model()
+            self._advance_suggestion()
+            return True
+        if cmd in ("effort", "/effort") or cmd.startswith("/effort"):
+            self._handle_effort_command(query)
+            self._advance_suggestion()
+            return True
+        if cmd in ("settings", "/settings"):
+            self._change_settings()
+            self._advance_suggestion()
+            return True
+        if (
+            cmd == "model-manager"
+            or cmd.startswith("/model-manager")
+            or cmd == "model-details"
+            or cmd.startswith("/model-details")
+            or cmd == "compatible"
+            or cmd.startswith("/compatible")
+        ):
+            self._handle_model_manager_command(query)
+            self._advance_suggestion()
+            return True
+        if cmd in ("plan", "/plan"):
+            self._toggle_plan_mode()
+            self._advance_suggestion()
+            return True
+        if cmd in ("usage", "/usage"):
+            self._show_usage()
+            self._advance_suggestion()
+            return True
+        if cmd == "tasks" or cmd.startswith("/tasks"):
+            parts = query.strip().lower().split()
+            force_refresh = len(parts) > 1 and parts[1] in {"refresh", "-r", "--refresh", "force"}
+            self._show_tasks(force_refresh=force_refresh)
+            self._advance_suggestion()
+            return True
+        if cmd in ("config", "/config"):
+            from agent.config import Config
+            self.console.print(Config.load().to_table())
+            self._advance_suggestion()
+            return True
+        if cmd == "keys" or cmd.startswith("/keys"):
+            self._handle_keys_command(query)
+            self._advance_suggestion()
+            return True
+        if cmd == "mcp" or cmd.startswith("/mcp"):
+            self._handle_mcp_command(query)
+            self._advance_suggestion()
+            return True
+        if cmd in ("upgrade", "/upgrade"):
+            self._run_upgrade()
+            self._advance_suggestion()
+            return True
+        if cmd in ("doctor", "/doctor"):
+            from agent.doctor import has_errors, has_warnings, run_checks, to_table
+            checks = run_checks(self.session.config, session=self.session)
+            self.console.print(to_table(checks))
+            if has_errors(checks):
+                self.console.print("  [red]Blocking issues found.[/red]")
+            elif has_warnings(checks):
+                self.console.print("  [yellow]No blocking errors; warnings remain.[/yellow]")
+            else:
+                self.console.print("  [green]No blocking issues found.[/green]")
+            self._advance_suggestion()
+            return True
+        if cmd in ("clear", "/clear"):
+            self.transcript.clear()
+            self._seed_transcript_banner()
+            self._advance_suggestion()
+            return True
+        if cmd in ("copy", "/copy"):
+            self._copy_last_response()
+            return True
+        if cmd.startswith("/export-share"):
+            parts = query.split(maxsplit=1)
+            filename = parts[1] if len(parts) > 1 else None
+            self._export_share(filename)
+            return True
+        if cmd.startswith("/export"):
+            parts = query.split(maxsplit=1)
+            filename = parts[1] if len(parts) > 1 else None
+            self._export_session(filename)
+            return True
+        if cmd.startswith("/notebook"):
+            parts = query.split(maxsplit=1)
+            filename = parts[1] if len(parts) > 1 else None
+            self._export_notebook(filename)
+            return True
+        if cmd.startswith("/compact"):
+            parts = query.split(maxsplit=1)
+            instructions = parts[1] if len(parts) > 1 else None
+            self._compact_context(instructions)
+            return True
+        if cmd in ("new", "/new"):
+            self._new_session()
+            return True
+        if cmd.startswith("/sessions") or cmd == "sessions":
+            parts = query.split(maxsplit=2)
+            action = parts[1].strip().lower() if len(parts) > 1 else ""
+            if action in {"delete", "del", "rm", "remove"}:
+                target = parts[2].strip() if len(parts) > 2 else None
+                self._delete_session(target)
+            else:
+                self._list_sessions()
+            return True
+        if cmd.startswith("/sync") or cmd == "sync":
+            parts = query.split()
+            force = any(part in {"--force", "-f", "force"} for part in parts[1:])
+            self._sync_sessions(force=force)
+            return True
+        if cmd.startswith("/resume"):
+            parts = query.split(maxsplit=1)
+            sid = parts[1].strip() if len(parts) > 1 else None
+            self._resume_session(sid)
+            return True
+        if cmd.startswith("/agents"):
+            self._handle_agents_command(query, context)
+            return True
+        if cmd.startswith("/case-study"):
+            self._handle_case_study_command(query, context)
+            return True
+
+        # ! prefix — shell command
+        if query.startswith("!"):
+            self._run_shell(query[1:].strip())
+            return True
+
+        # "continue" — resume interrupted synthesis or continue conversation
+        if cmd in ("continue", "go on", "keep going"):
+            if self.agent._last_plan is not None:
+                self.console.print("  [cyan]Continuing synthesis...[/cyan]\n")
+                try:
+                    result = self.agent.continue_synthesis()
+                    self.console.print()
+                except KeyboardInterrupt:
+                    self.console.print("\n  [dim]Interrupted.[/dim]")
+                    return True
+                if result is not None:
+                    self._last_response = result.summary
+                    self._update_suggestions(
+                        self.agent._last_query or query, result.plan, result,
+                    )
+                return True
+            # No interrupted state — fall through to normal query
+
+        # Keep prompt available while one generation runs; extra user messages
+        # are queued and executed serially by the worker.
+        self.transcript.append_text(query, kind="user")
+        self._submit_query(query, context)
+        self._advance_suggestion()
+        return True

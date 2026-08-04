@@ -151,17 +151,28 @@ class _MentionAndActivityMixin:
     def _request_interrupt(self, force: bool = False) -> bool:
         runner = getattr(getattr(self, "agent", None), "_runner", None)
         if runner is None or not hasattr(runner, "request_interrupt"):
-            self.console.print("  [dim]No active runner to interrupt.[/dim]")
+            self._print_interrupt_notice("  [dim]No active runner to interrupt.[/dim]")
             return False
         ok = bool(runner.request_interrupt(force=force))
         if ok:
             if force:
-                self.console.print("  [yellow]Force stop requested.[/yellow]")
+                self._print_interrupt_notice("  [yellow]Force stop requested.[/yellow]")
             else:
-                self.console.print("  [dim]Interrupt requested…[/dim]")
+                self._print_interrupt_notice("  [dim]Interrupt requested…[/dim]")
         else:
-            self.console.print("  [dim]No active generation to interrupt.[/dim]")
+            self._print_interrupt_notice("  [dim]No active generation to interrupt.[/dim]")
         return ok
+
+    def _print_interrupt_notice(self, message: str) -> None:
+        """Avoid flooding the transcript when Ctrl+C is held/spammed."""
+        now = time.time()
+        last = float(getattr(self, "_last_interrupt_notice_at", 0.0) or 0.0)
+        prev = getattr(self, "_last_interrupt_notice", None)
+        if message == prev and (now - last) < 0.8:
+            return
+        self._last_interrupt_notice = message
+        self._last_interrupt_notice_at = now
+        self.console.print(message)
 
     def _ensure_live_refresh_thread(self) -> None:
         """Keep toolbar status live while generation runs."""

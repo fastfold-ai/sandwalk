@@ -145,6 +145,51 @@ def test_mouse_click_toggles_each_tool_when_scrolled():
         assert sum(1 for t in tools if t.expanded) == 1
 
 
+def test_store_subscribe_can_unsubscribe():
+    store = TranscriptStore()
+    hits = []
+    unsub = store.subscribe(lambda: hits.append(1))
+    store.append_text("a")
+    unsub()
+    store.append_text("b")
+    assert hits == [1]
+
+
+def test_render_cache_skips_rerender_when_revision_unchanged():
+    from ui.terminal.transcript.control import TranscriptControl
+
+    class FakeWin:
+        vertical_scroll = 0
+
+    store = TranscriptStore()
+    store.append_text("hello")
+    control = TranscriptControl(store)
+    control.window = FakeWin()
+    control.create_content(80, 10)
+    rows_id = id(control._rows)
+    rev = store.revision
+    # Toolbar-style invalidate with no store change must reuse cached rows.
+    control.create_content(80, 10)
+    assert id(control._rows) == rows_id
+    assert store.revision == rev
+    store.append_text("world")
+    control.create_content(80, 10)
+    assert id(control._rows) != rows_id
+
+
+def test_banner_kind_preserves_mark_without_left_pad():
+    from ui.terminal.transcript.render import LEFT_PAD, entry_lines
+
+    store = TranscriptStore()
+    store.append_text("██\nsandwalk v0.0.1\n12 tools · 3 skills", kind="banner")
+    rows = entry_lines(store.entries[0], width=80)
+    joined = "\n".join(line for _, _, line in rows)
+    assert "sandwalk" in joined
+    assert "██" in joined
+    # Banner keeps Rich spacing; do not force the transcript LEFT_PAD.
+    assert not all(line.startswith(LEFT_PAD) for _, _, line in rows if line.strip())
+
+
 def test_drag_selects_text_without_toggling_tool():
     from prompt_toolkit.data_structures import Point
     from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType

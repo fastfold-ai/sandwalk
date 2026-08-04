@@ -22,6 +22,16 @@ from ui.terminal import (  # type: ignore[import-untyped]
 )
 
 
+def _fake_transcript_session(prompts):
+    """Drive ``run_transcript_session`` by feeding lines into ``on_submit``."""
+
+    def _run(terminal, history=None, on_submit=None):
+        for prompt in prompts:
+            if on_submit is None or not on_submit(prompt):
+                return
+
+    return _run
+
 
 class TestSlashCommands:
     """Verify all expected slash commands are registered."""
@@ -699,15 +709,18 @@ class TestTerminalMethods:
         terminal._session_sdk_models = {"gpt-5.5"}
         terminal._session_sdk_turn_rows = [{"turn": 1}]
 
+        from ui.terminal.transcript.store import TranscriptStore
+
+        terminal.transcript = TranscriptStore()
+        terminal.transcript.append_text("old", kind="user")
+        terminal._seed_transcript_banner = MagicMock()
         new_loop = MagicMock()
         new_loop.trajectory.session_id = "new12345"
-        with patch("agent.loop.AgentLoop", return_value=new_loop), patch(
-            "cli.print_banner"
-        ) as mock_print_banner:
+        with patch("agent.loop.AgentLoop", return_value=new_loop):
             terminal._new_session()
 
-        terminal.console.clear.assert_called_once()
-        mock_print_banner.assert_called_once()
+        # Banner is re-seeded into the owned transcript (not Rich scrollback).
+        terminal._seed_transcript_banner.assert_called_once()
         assert terminal.agent is new_loop
         assert terminal._last_response is None
         assert terminal._session_sdk_calls == 0
@@ -725,8 +738,11 @@ class TestTerminalMethods:
         terminal.agent = MagicMock()
         terminal.agent.trajectory.session_id = "d0b0571d"
         terminal.agent.trajectory.turns = [MagicMock()]
+        terminal._console_print_original = MagicMock()
         terminal._print_exit_with_resume_hint()
-        printed = " ".join(str(c) for c in terminal.console.print.call_args_list)
+        printed = " ".join(
+            str(c) for c in terminal._console_print_original.call_args_list
+        )
         assert "Resume this session with:" in printed
         assert "sandwalk --resume d0b0571d" in printed
 
@@ -734,8 +750,11 @@ class TestTerminalMethods:
         terminal.agent = MagicMock()
         terminal.agent.trajectory.session_id = "d0b0571d"
         terminal.agent.trajectory.turns = []
+        terminal._console_print_original = MagicMock()
         terminal._print_exit_with_resume_hint()
-        printed = " ".join(str(c) for c in terminal.console.print.call_args_list)
+        printed = " ".join(
+            str(c) for c in terminal._console_print_original.call_args_list
+        )
         assert "Goodbye!" in printed
         assert "Resume this session with:" not in printed
 
@@ -900,8 +919,8 @@ class TestTerminalMethods:
         ]
         fake_loop = MagicMock()
         with patch(
-            "ui.terminal.transcript.app.prompt_with_transcript",
-            side_effect=prompts,
+            "ui.terminal.transcript.app.run_transcript_session",
+            side_effect=_fake_transcript_session(prompts),
         ), patch("agent.loop.AgentLoop", return_value=fake_loop):
             terminal.run(initial_context={"source": "test"})
 
@@ -946,8 +965,8 @@ class TestTerminalMethods:
 
         fake_loop = MagicMock()
         with patch(
-            "ui.terminal.transcript.app.prompt_with_transcript",
-            side_effect=["/model", "/quit"],
+            "ui.terminal.transcript.app.run_transcript_session",
+            side_effect=_fake_transcript_session(["/model", "/quit"]),
         ), patch("agent.loop.AgentLoop", return_value=fake_loop):
             terminal.run()
 
@@ -1012,8 +1031,8 @@ class TestTerminalMethods:
         resumed.trajectory.title = "Session title"
         resumed.trajectory.session_id = "abc12345"
         with patch(
-            "ui.terminal.transcript.app.prompt_with_transcript",
-            side_effect=["/quit"],
+            "ui.terminal.transcript.app.run_transcript_session",
+            side_effect=_fake_transcript_session(["/quit"]),
         ), patch("agent.loop.AgentLoop.resume_latest", return_value=resumed):
             terminal.run(resume_id="last")
 
@@ -1246,8 +1265,8 @@ class TestSkillsUpgradeTerminalPaths:
 
         fake_loop = MagicMock()
         with patch(
-            "ui.terminal.transcript.app.prompt_with_transcript",
-            side_effect=["/skills-upgrade", "/quit"],
+            "ui.terminal.transcript.app.run_transcript_session",
+            side_effect=_fake_transcript_session(["/skills-upgrade", "/quit"]),
         ), patch(
             "agent.loop.AgentLoop", return_value=fake_loop
         ):

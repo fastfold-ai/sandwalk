@@ -154,6 +154,14 @@ def entry_rows(
             )
             return [(entry, i, frags) for i, frags in enumerate(styled)]
 
+        # Startup mark + meta (Rich ANSI); keep original spacing, no extra pad.
+        if entry.kind == "banner":
+            rows: list[tuple[Entry, int, StyleAndTextTuples]] = []
+            for i, line in enumerate(entry.text.split("\n")):
+                body = list(to_formatted_text(ANSI(line))) if line else [("", "")]
+                rows.append((entry, i, body))
+            return rows or [(entry, 0, [("", "")])]
+
         prefix = "❯ " if entry.kind == "user" else ""
         body = prefix + entry.text if prefix else entry.text
         style = {

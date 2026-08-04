@@ -1,7 +1,7 @@
 """Startup banner rendering for interactive/batch CLI runs."""
 
 from _version import __version__
-from cli.app import BANNER, console
+from cli.app import BANNER, console  # console: monkeypatched by tests
 from cli.banner_support import (
     _count_installed_claude_skills,
     _get_cached_skills_update_safe,
@@ -13,14 +13,20 @@ from cli.subscription import _format_plan_label, _resolve_fastfold_subscription_
 from cli.version_check import _get_cached_upgrade_available_version
 
 
-def print_banner(cfg=None):
-    """Print the startup banner with the sandwalk mark."""
+def print_banner(cfg=None, *, console=None):
+    """Print the startup banner with the sandwalk mark.
+
+    ``console`` defaults to the shared CLI console; pass a capture Console
+    (e.g. StringIO-backed) to render into the owned transcript instead.
+    """
     from rich.padding import Padding
     from rich.table import Table
     from rich.text import Text
 
     from agent.config import Config
 
+    # Prefer explicit console; else module ``console`` (tests patch this).
+    out = console if console is not None else globals()["console"]
     cfg = cfg or Config.load()
     n_tools = _get_loaded_tool_count_hint()
     n_skills = _count_installed_claude_skills()
@@ -81,4 +87,22 @@ def print_banner(cfg=None):
     header.add_column()
     # Nudge mark down so it sits nearer the vertical center of the meta block.
     header.add_row(Padding(logo_text, (1, 0, 0, 0)), Padding(meta_text, (0, 0, 0, 1)))
-    console.print(header)
+    out.print(header)
+
+
+def render_banner_ansi(cfg=None, *, width: int = 100) -> str:
+    """Render the startup banner to an ANSI string for the transcript panel."""
+    from io import StringIO
+
+    from rich.console import Console
+
+    buf = StringIO()
+    capture = Console(
+        file=buf,
+        width=max(40, int(width or 100)),
+        force_terminal=True,
+        color_system="256",
+        highlight=False,
+    )
+    print_banner(cfg, console=capture)
+    return buf.getvalue().rstrip("\n")

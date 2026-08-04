@@ -77,9 +77,11 @@ class TranscriptControl(UIControl):
         self.window = None  # set by app after Window is created
         self._hit_map: list[tuple[object, int]] = []
         self._plain_lines: list[str] = []
+        self._rows: list = []
         self._height = 1
         self._width = 80
         self._line_count = 0
+        self._cache_key: tuple[int, int] | None = None
         # Drag selection (in-app; mouse tracking blocks host selection).
         self._sel_anchor: Point | None = None
         self._sel_end: Point | None = None
@@ -143,13 +145,20 @@ class TranscriptControl(UIControl):
     def create_content(self, width: int, height: int) -> UIContent:
         self._width = max(20, width)
         self._height = max(1, height)
-        rows, hit_map = render_all_lines(
-            self.store, width=self._width, config=self.config
-        )
-        self._hit_map = hit_map
-        self._plain_lines = [
-            "".join(piece for _style, piece in row) for row in rows
-        ]
+        # Re-render only when store content or width changes — toolbar animation
+        # invalidates often and must not re-run Rich/markdown over the full history.
+        key = (int(self.store.revision), self._width)
+        if key != self._cache_key:
+            rows, hit_map = render_all_lines(
+                self.store, width=self._width, config=self.config
+            )
+            self._rows = rows
+            self._hit_map = hit_map
+            self._plain_lines = [
+                "".join(piece for _style, piece in row) for row in rows
+            ]
+            self._cache_key = key
+        rows = self._rows
         self._line_count = len(rows)
 
         # The Window scrolls to keep ``cursor_position`` visible, so the

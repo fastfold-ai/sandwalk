@@ -16,7 +16,7 @@ class TextEntry:
     """Plain / markdown-ish text block (user, assistant, system chrome)."""
 
     text: str
-    kind: str = "text"  # text | user | assistant | system
+    kind: str = "text"  # text | user | assistant | system | banner
     entry_id: int = field(default_factory=lambda: next(_ids))
 
 
@@ -50,10 +50,23 @@ class TranscriptStore:
         self.entries: list[Entry] = []
         self.scroll_offset = 0  # lines from bottom; 0 = pinned to end
         self.follow_tail = True
+        self.revision = 0  # bumps when rendered content changes
         self._listeners: list[Callable[[], None]] = []
 
-    def subscribe(self, callback: Callable[[], None]) -> None:
+    def subscribe(self, callback: Callable[[], None]) -> Callable[[], None]:
+        """Register a change listener; returns an unsubscribe callable."""
         self._listeners.append(callback)
+
+        def _unsubscribe() -> None:
+            try:
+                self._listeners.remove(callback)
+            except ValueError:
+                pass
+
+        return _unsubscribe
+
+    def _bump(self) -> None:
+        self.revision += 1
 
     def _notify(self) -> None:
         for cb in list(self._listeners):
@@ -67,6 +80,7 @@ class TranscriptStore:
             self.entries.clear()
             self.scroll_offset = 0
             self.follow_tail = True
+            self._bump()
         self._notify()
 
     def append_text(self, text: str, *, kind: str = "text") -> TextEntry:
@@ -75,6 +89,7 @@ class TranscriptStore:
             self.entries.append(entry)
             if self.follow_tail:
                 self.scroll_offset = 0
+            self._bump()
         self._notify()
         return entry
 
@@ -84,6 +99,7 @@ class TranscriptStore:
             self.entries.append(entry)
             if self.follow_tail:
                 self.scroll_offset = 0
+            self._bump()
         self._notify()
         return entry
 
@@ -109,6 +125,7 @@ class TranscriptStore:
             self.entries.append(entry)
             if self.follow_tail:
                 self.scroll_offset = 0
+            self._bump()
         self._notify()
         return entry
 
@@ -124,6 +141,7 @@ class TranscriptStore:
             for entry in self.entries:
                 if isinstance(entry, ToolEntry) and entry.entry_id == entry_id:
                     entry.expanded = not entry.expanded
+                    self._bump()
                     self._notify()
                     return entry
         return None
@@ -133,6 +151,7 @@ class TranscriptStore:
             for entry in reversed(self.entries):
                 if isinstance(entry, ToolEntry):
                     entry.expanded = not entry.expanded
+                    self._bump()
                     self._notify()
                     return entry
         return None

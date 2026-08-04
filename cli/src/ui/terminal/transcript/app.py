@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import threading
+import time
+from collections.abc import Callable
+
 from prompt_toolkit.application import Application
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.filters import Condition
@@ -36,6 +40,9 @@ _TRANSCRIPT_STYLE = {
     "transcript-selected": "reverse",
 }
 
+# Coalesce store/toolbar invalidates so Rich re-renders can't pin the UI.
+_INVALIDATE_MIN_INTERVAL_S = 0.05
+
 
 def _merge_style():
     from prompt_toolkit.styles import Style
@@ -43,8 +50,17 @@ def _merge_style():
     return merge_styles([PT_STYLE, Style.from_dict(_TRANSCRIPT_STYLE)])
 
 
-def prompt_with_transcript(terminal, *, history: History | None = None) -> str:
-    """Block until the user submits a line; transcript stays interactive."""
+def run_transcript_session(
+    terminal,
+    *,
+    history: History | None = None,
+    on_submit: Callable[[str], bool],
+) -> None:
+    """Run one persistent fullscreen transcript until ``on_submit`` returns False.
+
+    Returning False from ``on_submit`` exits the session (e.g. /quit). Raising
+    ``EOFError`` from Ctrl+D with an empty buffer also ends the session.
+    """
     store = terminal.transcript
     config = getattr(getattr(terminal, "session", None), "config", None)
     control = TranscriptControl(store, config=config)
@@ -58,15 +74,13 @@ def prompt_with_transcript(terminal, *, history: History | None = None) -> str:
     )
 
     def _toolbar():
-        result = terminal._bottom_toolbar()
-        return result
+        return terminal._bottom_toolbar()
 
     transcript_window = Window(
         content=control,
         height=Dimension(weight=1),
         wrap_lines=False,
         dont_extend_height=False,
-        # Allow the window to receive wheel events over the transcript area.
         allow_scroll_beyond_bottom=False,
     )
     control.window = transcript_window
@@ -104,7 +118,7 @@ def prompt_with_transcript(terminal, *, history: History | None = None) -> str:
         ],
     )
 
-    kb = _build_transcript_bindings(terminal, store, control, buf)
+    kb = _build_transcript_bindings(terminal, store, control, buf, on_submit)
 
     app = Application(
         layout=Layout(root, focused_element=buf),
@@ -115,19 +129,49 @@ def prompt_with_transcript(terminal, *, history: History | None = None) -> str:
         erase_when_done=False,
     )
 
-    def _invalidate():
+    invalidate_lock = threading.Lock()
+    invalidate_state = {"last": 0.0, "pending": False}
+
+    def _invalidate_now() -> None:
         try:
             if app.is_running:
                 app.invalidate()
         except Exception:  # noqa: BLE001
             pass
 
-    store.subscribe(_invalidate)
+    def _invalidate() -> None:
+        """Debounce invalidates from worker threads + toolbar animation."""
+        now = time.monotonic()
+        with invalidate_lock:
+            wait = _INVALIDATE_MIN_INTERVAL_S - (now - invalidate_state["last"])
+            if wait <= 0:
+                invalidate_state["last"] = now
+                invalidate_state["pending"] = False
+                do_now = True
+            else:
+                if invalidate_state["pending"]:
+                    return
+                invalidate_state["pending"] = True
+                do_now = False
+                delay = wait
+        if do_now:
+            _invalidate_now()
+            return
+
+        def _flush() -> None:
+            time.sleep(delay)
+            with invalidate_lock:
+                invalidate_state["pending"] = False
+                invalidate_state["last"] = time.monotonic()
+            _invalidate_now()
+
+        threading.Thread(target=_flush, daemon=True, name="ct-invalidate").start()
+
+    unsubscribe = store.subscribe(_invalidate)
     terminal._transcript_app = app
     terminal._transcript_buffer = buf
     app._sandwalk_terminal = terminal  # type: ignore[attr-defined]
 
-    # Auto-highlight first slash completion (same as PromptSession path).
     def _auto_highlight_first(buffer):
         if (
             buffer.text.lstrip().startswith("/")
@@ -142,26 +186,39 @@ def prompt_with_transcript(terminal, *, history: History | None = None) -> str:
     try:
         result = app.run()
     finally:
+        unsubscribe()
         terminal._transcript_app = None
+        terminal._transcript_buffer = None
 
     if result is None:
         raise EOFError
-    return str(result)
 
 
-def _build_transcript_bindings(terminal, store, control, buf) -> KeyBindings:
-    """Reuse interactive keybindings; Enter exits the app with buffer text.
+def prompt_with_transcript(terminal, *, history: History | None = None) -> str:
+    """One-shot prompt (tests / legacy). Prefer ``run_transcript_session``."""
+    box: dict[str, str | None] = {"value": None}
 
-    ``include_mouse=False`` is critical: the default prompt_toolkit mouse
-    binding must stay active so wheel events reach the transcript Window
-    (native scroll) and clicks reach ``TranscriptControl.mouse_handler``.
+    def _on_submit(text: str) -> bool:
+        box["value"] = text
+        return False
+
+    run_transcript_session(terminal, history=history, on_submit=_on_submit)
+    if box["value"] is None:
+        raise EOFError
+    return str(box["value"])
+
+
+def _build_transcript_bindings(
+    terminal, store, control, buf, on_submit: Callable[[str], bool]
+) -> KeyBindings:
+    """Bindings for the persistent transcript app.
+
+    ``include_mouse=False`` keeps prompt_toolkit's default mouse dispatch so
+    wheel scroll and ``TranscriptControl.mouse_handler`` work.
     """
     from ui.terminal.key_bindings import _build_key_bindings
 
     kb = _build_key_bindings(terminal, include_mouse=False)
-
-    def _submit(event, text: str):
-        event.app.exit(result=text)
 
     @kb.add("enter", eager=True)
     def _enter(event):
@@ -177,9 +234,17 @@ def _build_transcript_bindings(terminal, store, control, buf) -> KeyBindings:
         if text.strip():
             buffer.append_to_history()
         buffer.reset()
-        # Jump back to the live tail when the user sends a message.
         store.pin_tail()
-        _submit(event, text)
+        # Keep the Application alive across turns — exiting/recreating it every
+        # submit flickers the screen and stacked store listeners freeze the UI.
+        try:
+            keep_going = on_submit(text)
+        except Exception:  # noqa: BLE001
+            keep_going = True
+        if not keep_going:
+            event.app.exit(result=text if text != "__EXIT__" else "__EXIT__")
+        else:
+            event.app.invalidate()
 
     @kb.add("escape", "enter", eager=True)
     def _alt_enter(event):
@@ -194,13 +259,11 @@ def _build_transcript_bindings(terminal, store, control, buf) -> KeyBindings:
 
     @kb.add(Keys.PageUp)
     def _page_up(event):
-        # Toward older history (smaller vertical_scroll).
         control.scroll_by(-(max(1, control._height - 1)))
         event.app.invalidate()
 
     @kb.add(Keys.PageDown)
     def _page_down(event):
-        # Toward newer content / tail.
         control.scroll_by(max(1, control._height - 1))
         event.app.invalidate()
 
@@ -214,7 +277,6 @@ def _build_transcript_bindings(terminal, store, control, buf) -> KeyBindings:
         control.scroll_by(3)
         event.app.invalidate()
 
-    # Override Ctrl+E to toggle in transcript store (in-place).
     @kb.add("c-e", eager=True)
     def _expand(event):
         store.toggle_last_tool()

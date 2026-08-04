@@ -173,8 +173,14 @@ class _RunClarificationMixin:
         return None
 
     def _print_exit_with_resume_hint(self) -> None:
-        """Print exit message with a copyable resume command."""
-        self.console.print("\nGoodbye!\n")
+        """Print exit message with a copyable resume command.
+
+        Uses the real terminal printer when the flicker guard has redirected
+        ``console.print`` into the owned transcript — otherwise the goodbye /
+        resume lines vanish with the fullscreen app.
+        """
+        printer = getattr(self, "_console_print_original", None) or self.console.print
+        printer("\nGoodbye!\n")
         session_id = None
         has_messages = False
         if hasattr(self, "agent") and getattr(self.agent, "trajectory", None):
@@ -182,5 +188,5 @@ class _RunClarificationMixin:
             session_id = getattr(trajectory, "session_id", None)
             has_messages = bool(getattr(trajectory, "turns", None))
         if session_id and has_messages:
-            self.console.print("Resume this session with:")
-            self.console.print(f"[cyan]sandwalk --resume {session_id}[/cyan]")
+            printer("Resume this session with:")
+            printer(f"[cyan]sandwalk --resume {session_id}[/cyan]")

@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Interactive transcript shows the sandwalk startup banner again (fullscreen
+  TUI had replaced the Rich scrollback where it used to live).
+- Transcript TUI no longer recreates the fullscreen app on every send (screen
+  flicker) or stacks invalidate listeners that froze the UI mid-response.
+- Exit goodbye / `sandwalk --resume …` hint prints to the real terminal again
+  after the fullscreen transcript closes.
 - `sandwalk fork` / `sandwalk agent fork` now imports the forked chat into the
   shared SQLite store so it appears in the Web UI Agents list immediately
   (no separate `sandwalk sync` required).
