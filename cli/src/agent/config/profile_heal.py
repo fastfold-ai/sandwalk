@@ -2,13 +2,45 @@
 
 from typing import Any
 
-from .providers import OPENAI_PROFILE_DEFAULTS
+from .providers import OPENAI_COMPATIBLE_PROVIDERS, OPENAI_PROFILE_DEFAULTS
 
 _LOCAL_COMPATIBLE_BACKENDS = {"ollama", "unsloth", "omlx", "ds4", "llama_cpp", "lm_studio"}
 
 
 class ProfileHealMixin:
     """Third phase of ``_ensure_openai_profiles_data``: mismatch healing."""
+
+    @staticmethod
+    def _provider_hosts_model(provider: str, model_id: str) -> bool:
+        """True when ``provider`` is allowed to serve ``model_id``.
+
+        The same bare id can be hosted by multiple providers (static catalog
+        and/or discovery gateways). Explicit ``discover_models`` gateways always
+        keep the user's selection; otherwise we require a static catalog listing
+        or a matching first-party heuristic owner.
+        """
+        provider_norm = str(provider or "").strip().lower()
+        model = str(model_id or "").strip()
+        if not provider_norm or not model:
+            return False
+
+        meta = OPENAI_COMPATIBLE_PROVIDERS.get(provider_norm) or {}
+        if str(meta.get("discover_models") or "").lower() in {"1", "true", "yes"}:
+            return True
+
+        from agent.model_catalog import (
+            catalog_provider_for_model,
+            catalog_providers_for_model,
+        )
+
+        owners = catalog_providers_for_model(model)
+        if provider_norm in owners:
+            return True
+        # No multi-owner static row — fall back to the single-owner heuristic
+        # (prefix rules for unlisted gemini-/claude-/gpt- variants, etc.).
+        if owners:
+            return False
+        return catalog_provider_for_model(model) == provider_norm
 
     @classmethod
     def _heal_profile_mismatches(
@@ -30,6 +62,7 @@ class ProfileHealMixin:
             provider_raw == "anthropic"
             and configured_model
             and not cls._looks_like_anthropic_model(configured_model)
+            and not cls._provider_hosts_model(provider_raw, configured_model)
         ):
             from agent.model_catalog import catalog_provider_for_model
 
@@ -51,8 +84,13 @@ class ProfileHealMixin:
                             break
                     active_profile = model_match_profile or compatible_profile_ids[0]
 
-        # Heal first-party cloud catalog mismatches (e.g. Gemini under openai).
-        if configured_model:
+        # Heal first-party cloud catalog mismatches (e.g. Gemini under openai),
+        # but never steal a model from a provider that can host it — including
+        # discovery gateways (OpenCode Zen, OpenRouter) that share bare ids.
+        if (
+            configured_model
+            and not cls._provider_hosts_model(provider_raw, configured_model)
+        ):
             from agent.model_catalog import catalog_provider_for_model
 
             catalog_provider = catalog_provider_for_model(configured_model)

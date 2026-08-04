@@ -14,8 +14,9 @@ def _cloud_catalog_items(
     items: list[AgentModel] = []
     for entry in cloud_catalog_models():
         model_id = entry["id"]
+        provider = entry["provider"]
         known_ids.add(model_id)
-        enabled = model_id not in hidden
+        enabled = not cfg.is_model_hidden(model_id, provider)
         if enabled_only and not enabled:
             continue
         items.append(
@@ -23,14 +24,14 @@ def _cloud_catalog_items(
                 id=model_id,
                 label=entry["label"],
                 description=entry["description"],
-                provider=entry["provider"],
+                provider=provider,
                 source="cloud",
                 profile_id=None,
                 backend=None,
                 enabled=enabled,
                 health=None,
                 context_window=context_window_for_model(model_id),
-                **_reasoning_fields(cfg, entry["provider"], model_id),
+                **_reasoning_fields(cfg, provider, model_id),
             )
         )
     return items
@@ -42,23 +43,24 @@ def _custom_model_items(
     items: list[AgentModel] = []
     for entry in cfg.custom_models():
         model_id = entry["id"]
+        provider = entry["provider"]
         known_ids.add(model_id)
-        enabled = model_id not in hidden
+        enabled = not cfg.is_model_hidden(model_id, provider)
         if enabled_only and not enabled:
             continue
         items.append(
             AgentModel(
                 id=model_id,
                 label=entry["label"],
-                description=f"Custom {entry['provider']} model",
-                provider=entry["provider"],
+                description=f"Custom {provider} model",
+                provider=provider,
                 source="custom",
                 profile_id=None,
                 backend=None,
                 enabled=enabled,
                 health=None,
                 context_window=context_window_for_model(model_id),
-                **_reasoning_fields(cfg, entry["provider"], model_id),
+                **_reasoning_fields(cfg, provider, model_id),
             )
         )
     return items

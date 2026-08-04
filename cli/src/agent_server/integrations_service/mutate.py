@@ -137,6 +137,21 @@ class MutateMixin:
                     os.environ.pop(name, None)
                 touched.append(config_key)
             self._mark_updated(config, touched)
+            # After saving a secret, clear this provider's scoped auto-hides
+            # (from when it was unconfigured). Do not run on every Models list
+            # — that would wipe intentional per-provider toggles.
+            saved_secret = False
+            for env_name in sets:
+                _config_key, info = by_env[env_name]
+                if bool(info.get("secret", True)):
+                    saved_secret = True
+                    break
+            if saved_secret:
+                from agent_server.models_service.mutate import (
+                    enable_models_for_provider,
+                )
+
+                enable_models_for_provider(config, key)
             config.save()
             sync_process_env_from_config(config)
             if clears:

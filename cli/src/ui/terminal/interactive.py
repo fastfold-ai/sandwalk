@@ -167,7 +167,7 @@ class InteractiveTerminal(
         self._toolbar_word_interval_s = 3.0
         self._toolbar_spinner_palette = ["#50fa7b", "#8be9fd", "#7aa2f7", "#ffb86c"]
         self._init_toolbar_animation_profile()
-        # Busy toolbar uses the OpenCode-like scanner; keep a snappy cadence
+        # Busy toolbar uses the comet scanner; keep a snappy cadence
         # even if ui.spinner profile configures a slower helix interval.
         self._toolbar_frame_interval_s = 0.04
         # Build @ mention completer with tool + dataset + file candidates
@@ -428,7 +428,6 @@ class InteractiveTerminal(
         if not query:
             return True
 
-        self.transcript.append_separator()
         # Keep chip labels for transcript display; expand paths only for the agent.
         display_query = query
         query = self._expand_attached_images(query)

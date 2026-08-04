@@ -29,7 +29,7 @@ PT_STYLE = Style.from_dict({
     "mention-dataset": "#50fa7b",  # green for dataset mentions
     "mention-file": "#ffd700",     # yellow for file mentions
     "mention-workflow": "#ff79c6",  # pink for workflow mentions
-    # Image attach chips — OpenCode-like orange on dark
+    # Image attach chips — orange chip on dark
     "image-chip": "bold #111111 bg:#f0a030",
 })
 

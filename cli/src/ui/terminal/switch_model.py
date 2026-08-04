@@ -28,7 +28,11 @@ class _SwitchModelMixin:
                 if model_id == "__custom_openai_compatible__":
                     # Profile management moved to /model-manager.
                     continue
-                if model_id in hidden_models:
+                # Provider-scoped hide: moonshot:kimi-k3 must not hide opencode.
+                if isinstance(cfg, Config):
+                    if cfg.is_model_hidden(model_id, prov):
+                        continue
+                elif model_id in hidden_models:
                     continue
                 models_with_provider.append(
                     {
@@ -44,11 +48,19 @@ class _SwitchModelMixin:
         # when an API key is configured — same behavior as the Models dashboard.
         if isinstance(cfg, Config):
             from agent.config import OPENAI_COMPATIBLE_PROVIDERS
-            from agent.model_catalog import format_discovered_model_label
+            from agent.model_catalog import (
+                format_discovered_model_label,
+                opencode_model_is_supported,
+            )
             from agent.model_discovery import probe_compatible_profile
 
-            existing_ids = {
-                str(item.get("model_id") or "") for item in models_with_provider
+            # Same bare id may appear under multiple providers (Zen + Moonshot).
+            existing_keys = {
+                (
+                    str(item.get("provider") or ""),
+                    str(item.get("model_id") or ""),
+                )
+                for item in models_with_provider
             }
             for prov, meta in OPENAI_COMPATIBLE_PROVIDERS.items():
                 if str(meta.get("discover_models") or "").strip().lower() not in {
@@ -75,9 +87,12 @@ class _SwitchModelMixin:
                     if fallback:
                         discovered_models = [fallback]
                 for model_id in discovered_models:
-                    if model_id in hidden_models or model_id in existing_ids:
+                    if prov == "opencode" and not opencode_model_is_supported(model_id):
                         continue
-                    existing_ids.add(model_id)
+                    key = (prov, model_id)
+                    if key in existing_keys or cfg.is_model_hidden(model_id, prov):
+                        continue
+                    existing_keys.add(key)
                     models_with_provider.append(
                         {
                             "provider": prov,

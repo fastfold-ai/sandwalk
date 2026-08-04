@@ -21,7 +21,9 @@ class _AgentBootstrapMixin:
                     f"  [green]Resumed session[/green] "
                     f"[bold]{self.agent.trajectory.session_id}[/bold] — {title} ({n} turns)"
                 )
-                self._render_resumed_history(self.console.width, turns=self.agent.trajectory.turns)
+                self._render_resumed_history(
+                    self.console.width, turns=self.agent.trajectory.turns
+                )
                 self.console.print()
             except FileNotFoundError as e:
                 self.console.print(f"  [yellow]{e}[/yellow]")

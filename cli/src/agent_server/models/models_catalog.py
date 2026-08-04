@@ -44,3 +44,6 @@ class CreateAgentModelRequest(ApiModel):
 
 class UpdateAgentModelRequest(ApiModel):
     enabled: bool | None = None
+    # When set, toggle only this provider's row for a shared bare model id
+    # (e.g. kimi-k3 on moonshot vs opencode).
+    provider: str | None = None

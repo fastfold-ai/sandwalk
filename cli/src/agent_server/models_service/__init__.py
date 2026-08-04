@@ -47,8 +47,14 @@ class ModelsService:
     ) -> AgentModelList:
         return _list_models(Config.load(), enabled_only=enabled_only, discover=discover)
 
-    def set_model_enabled(self, model_id: str, enabled: bool) -> AgentModel:
-        return _set_model_enabled(model_id, enabled)
+    def set_model_enabled(
+        self,
+        model_id: str,
+        enabled: bool,
+        *,
+        provider: str | None = None,
+    ) -> AgentModel:
+        return _set_model_enabled(model_id, enabled, provider=provider)
 
     def create_custom_model(self, payload: CreateAgentModelRequest) -> AgentModel:
         return _create_custom_model(payload)

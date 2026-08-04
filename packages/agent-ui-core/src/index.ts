@@ -1047,7 +1047,8 @@ export interface ModelsProvider {
   updateModelEnabled(
     modelId: string,
     enabled: boolean,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    provider?: string | null
   ): Promise<AgentModel>
   listModelProfiles(options?: {
     includeCloud?: boolean

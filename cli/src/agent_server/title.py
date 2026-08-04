@@ -32,6 +32,20 @@ TITLE_SYSTEM_PROMPT = (
     "Return only the title text — no quotes, labels, or explanation."
 )
 
+# Models sometimes echo or paraphrase the title instruction instead of naming
+# the chat — reject those so /sessions Preview stays useful.
+_TITLE_INSTRUCTION_MARKERS = (
+    "generate a short",
+    "concise title",
+    "max 4 word",
+    "based on the user intent",
+    "return only the title",
+    "the user wants me to generate",
+    "title for this chat",
+    "title based on",
+)
+_MAX_GENERATED_TITLE_WORDS = 8
+
 
 @dataclass(frozen=True)
 class TitleResult:
@@ -60,10 +74,23 @@ def sanitize_generated_title(raw_title: str | None) -> str:
     return title
 
 
+def looks_like_title_instruction(title: str | None) -> bool:
+    """True when ``title`` looks like an echoed title-generation prompt."""
+    value = " ".join(str(title or "").lower().split())
+    if not value:
+        return False
+    if any(marker in value for marker in _TITLE_INSTRUCTION_MARKERS):
+        return True
+    # Real auto-titles are short; long "…title…" strings are usually meta.
+    return "title" in value and len(value.split()) > _MAX_GENERATED_TITLE_WORDS
+
+
 def is_placeholder_title(title: str | None) -> bool:
     """Legacy helper for display/CLI; auto-title gating uses ``title_source``."""
     value = (title or "").strip().lower()
     if not value or value in PLACEHOLDER_TITLES:
+        return True
+    if looks_like_title_instruction(title):
         return True
     return (
         "greeting chat" in value
@@ -173,12 +200,18 @@ def generate_session_title(
             max_tokens=32,
         )
         title = sanitize_generated_title(response.content)
-        if title and not is_placeholder_title(title):
+        if (
+            title
+            and not is_placeholder_title(title)
+            and len(title.split()) <= _MAX_GENERATED_TITLE_WORDS
+        ):
             return TitleResult(title=title, final=True)
         logger.debug(
-            "Session title model returned empty/placeholder title (provider=%s model=%s)",
+            "Session title model returned empty/placeholder/instruction title "
+            "(provider=%s model=%s title=%r)",
             getattr(llm, "provider", "?"),
             getattr(llm, "model", "?"),
+            title,
         )
     except Exception as exc:
         # Title generation is best-effort — never break the session for it.

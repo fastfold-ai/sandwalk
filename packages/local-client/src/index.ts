@@ -1974,11 +1974,15 @@ export class LocalAgentClient
   updateModelEnabled(
     modelId: string,
     enabled: boolean,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    provider?: string | null
   ): Promise<AgentModel> {
     return this.request<AgentModel>(`/models/${encodeURIComponent(modelId)}`, {
       method: 'PATCH',
-      body: JSON.stringify({ enabled }),
+      body: JSON.stringify({
+        enabled,
+        ...(provider ? { provider } : {})
+      }),
       headers: { 'content-type': 'application/json' },
       signal
     })

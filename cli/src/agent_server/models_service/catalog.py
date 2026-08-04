@@ -26,7 +26,9 @@ def list_models(
         cfg.save()
 
     hidden = set(cfg.hidden_models())
-    # Track static/custom ids so discovered entries don't duplicate them.
+    # Bare ids already present in the static/custom catalog. Used only for
+    # OpenRouter "fresh discovery → start hidden" seeding — not to suppress
+    # the same id under another provider (OpenCode Zen, Qwen, …).
     known_ids: set[str] = set()
 
     items: list[AgentModel] = []
@@ -40,11 +42,12 @@ def list_models(
         _profile_discovered_items(cfg, hidden, enabled_only=enabled_only, discover=discover)
     )
 
-    # De-dupe by (id, profile_id) preferring first occurrence.
-    seen: set[tuple[str, str | None]] = set()
+    # De-dupe by (provider, id, profile_id) so the same bare id can appear
+    # under Moonshot and OpenCode Zen (e.g. kimi-k3) without collapsing.
+    seen: set[tuple[str, str, str | None]] = set()
     unique: list[AgentModel] = []
     for item in items:
-        key = (item.id, item.profile_id)
+        key = (item.provider, item.id, item.profile_id)
         if key in seen:
             continue
         seen.add(key)

@@ -107,6 +107,23 @@ def test_claude_and_gpt_image_pdf():
     assert model_supports_audio_inputs("openai", "gpt-4o") is False
 
 
+def test_gateway_providers_use_model_family_modalities():
+    # OpenCode / OpenRouter host vendor families under one provider label.
+    assert model_supports_image_inputs("opencode", "kimi-k3") is True
+    assert model_supports_video_inputs("opencode", "kimi-k3") is True
+    assert model_supports_image_inputs("opencode", "kimi-k2.7-code") is False
+    assert model_supports_image_inputs("opencode", "claude-sonnet-4-5") is True
+    assert model_supports_pdf_inputs("opencode", "claude-sonnet-4-5") is True
+    assert model_supports_image_inputs("opencode", "gpt-5.4") is True
+    assert model_supports_image_inputs("openrouter", "kimi-k3") is True
+    assert model_supports_image_inputs(
+        "openrouter", "anthropic/claude-sonnet-5"
+    ) is True
+    assert model_supports_pdf_inputs(
+        "openrouter", "anthropic/claude-sonnet-5"
+    ) is True
+
+
 def test_gemini_full_multimodal():
     assert model_supports_image_inputs("google", "gemini-2.5-flash") is True
     assert model_supports_pdf_inputs("google", "gemini-2.5-flash") is True

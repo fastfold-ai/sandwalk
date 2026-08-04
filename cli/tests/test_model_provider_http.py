@@ -66,6 +66,7 @@ def test_probe_llm_api_key_opencode_uses_chat(monkeypatch):
     assert result.ok is False
     assert seen["url"] == "https://opencode.ai/zen/v1/chat/completions"
     assert seen["headers"]["Authorization"] == "Bearer sk-bogus"
+    assert seen["model"] == "kimi-k2.7-code"
 
 
 def test_probe_llm_api_key_nvidia_uses_chat(monkeypatch):

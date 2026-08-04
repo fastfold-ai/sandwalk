@@ -21,11 +21,30 @@ class ModelHiddenMixin:
             }
         )
 
-    def is_model_hidden(self, model_id: str) -> bool:
+    @staticmethod
+    def provider_model_key(provider: str | None, model_id: str) -> str:
+        """Stable hide key for a provider-scoped catalog row."""
+        mid = str(model_id or "").strip()
+        prov = str(provider or "").strip().lower()
+        if prov and mid:
+            return f"{prov}:{mid}"
+        return mid
+
+    def is_model_hidden(self, model_id: str, provider: str | None = None) -> bool:
+        """True when ``model_id`` is hidden globally or for ``provider``.
+
+        Provider sync writes ``{provider}:{model_id}`` so Moonshot auto-hide
+        does not suppress the same bare id under OpenCode Zen.
+        """
         target = str(model_id or "").strip()
         if not target:
             return False
-        return target in set(self.hidden_models())
+        hidden = set(self.hidden_models())
+        if target in hidden:
+            return True
+        if provider:
+            return self.provider_model_key(provider, target) in hidden
+        return False
 
     def set_model_hidden(self, model_id: str, hidden: bool) -> list[str]:
         """Hide or show a model ID for agent use. Returns the updated hidden list."""

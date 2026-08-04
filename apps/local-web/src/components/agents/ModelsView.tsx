@@ -54,7 +54,8 @@ export function ModelsView({
   onUpdateModelEnabled: (
     modelId: string,
     enabled: boolean,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    provider?: string | null
   ) => Promise<AgentModel>
   onCreateCustomModel: (
     input: CreateAgentModelInput,

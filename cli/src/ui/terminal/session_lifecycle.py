@@ -2,9 +2,28 @@
 
 from __future__ import annotations
 
+
 class _SessionLifecycleMixin:
+    def _reset_transcript_canvas(self) -> None:
+        """Clear the TUI to a fresh banner — like starting a new session."""
+        transcript = getattr(self, "transcript", None)
+        if transcript is not None:
+            transcript.clear()
+            seed = getattr(self, "_seed_transcript_banner", None)
+            if callable(seed):
+                seed()
+            return
+        try:
+            self.console.clear()
+            from cli.banner import print_banner
+
+            print_banner(self.session.config, console=self.console)
+            self.console.print()
+        except Exception:
+            pass
+
     def _resume_session(self, identifier: str = None):
-        """Resume a previous session."""
+        """Resume a previous session and replay its history into the TUI."""
         from agent.loop import AgentLoop
         from agent.trajectory import Trajectory
 
@@ -33,10 +52,17 @@ class _SessionLifecycleMixin:
         try:
             self.agent = AgentLoop.resume(self.session, session_id)
             self._restore_usage_from_trajectory()
+            self._last_response = None
             n = len(self.agent.trajectory.turns)
             title = self.agent.trajectory.title or "untitled"
-            self.console.print(f"  [green]Resumed[/green] [bold]{session_id}[/bold] — {title} ({n} turns)")
-            self._render_resumed_history(self.console.width, turns=self.agent.trajectory.turns)
+            # Clear the prior active session's scrollback, then show resumed turns.
+            self._reset_transcript_canvas()
+            self.console.print(
+                f"  [green]Resumed[/green] [bold]{session_id}[/bold] — {title} ({n} turns)"
+            )
+            self._render_resumed_history(
+                self.console.width, turns=self.agent.trajectory.turns
+            )
         except FileNotFoundError:
             self.console.print(f"  [yellow]Session '{session_id}' not found.[/yellow]")
 
@@ -58,22 +84,7 @@ class _SessionLifecycleMixin:
         """Start a brand-new local session."""
         from agent.loop import AgentLoop
 
-        # Clear owned transcript and restore the startup mark (fullscreen TUI).
-        transcript = getattr(self, "transcript", None)
-        if transcript is not None:
-            transcript.clear()
-            seed = getattr(self, "_seed_transcript_banner", None)
-            if callable(seed):
-                seed()
-        else:
-            try:
-                self.console.clear()
-                from cli.banner import print_banner
-
-                print_banner(self.session.config, console=self.console)
-                self.console.print()
-            except Exception:
-                pass
+        self._reset_transcript_canvas()
         self.agent = AgentLoop(self.session)
         self._reset_usage_counters()
         self._last_response = None

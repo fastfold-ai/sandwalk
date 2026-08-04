@@ -274,18 +274,96 @@ def test_opencode_discovers_models_when_key_set(
     opencode_ids = {
         item.id for item in listed.data if item.provider == "opencode"
     }
-    # Ids owned by the static catalog (kimi-k2.7-code → moonshot,
-    # deepseek-v4-flash → deepseek) stay with their providers; discovery
-    # only surfaces ids the catalog doesn't already list.
-    assert opencode_ids == {"glm-5.2"}
-    glm = next(item for item in listed.data if item.id == "glm-5.2")
+    # Discovered Zen ids surface under provider=opencode even when the same
+    # bare id is also curated for Moonshot / DeepSeek / Qwen.
+    assert opencode_ids == {"kimi-k2.7-code", "glm-5.2", "deepseek-v4-flash"}
+    assert any(
+        item.id == "kimi-k2.7-code" and item.provider == "moonshot"
+        for item in listed.data
+    )
+    glm = next(
+        item
+        for item in listed.data
+        if item.id == "glm-5.2" and item.provider == "opencode"
+    )
+    # Enabled even when Qwen/Moonshot/DeepSeek lack keys (provider-scoped hide).
     assert glm.enabled is True
     assert glm.source == "cloud"
     assert glm.label == "GLM 5.2"
+    kimi = next(
+        item
+        for item in listed.data
+        if item.id == "kimi-k2.7-code" and item.provider == "opencode"
+    )
+    assert kimi.enabled is True
 
     # No models when discover=False (static catalog has no opencode entries).
     static = service.list_models(discover=False)
     assert all(item.provider != "opencode" for item in static.data)
+
+
+def test_shared_model_ids_can_exist_under_multiple_providers(
+    isolated_config: Config, monkeypatch: pytest.MonkeyPatch
+):
+    """Same bare id (kimi-k3, glm-5.2, deepseek-v4-pro) across providers."""
+    from agent.config import Config as ConfigCls
+    from agent_server.models import UpdateAgentModelRequest
+
+    cfg = ConfigCls.load()
+    cfg.set("llm.opencode_api_key", "oc-test-key")
+    cfg.set("llm.qwen_api_key", "qwen-test-key")
+    cfg.set("llm.moonshot_api_key", "moonshot-test-key")
+    cfg.set("llm.deepseek_api_key", "deepseek-test-key")
+    cfg.save()
+
+    monkeypatch.setattr(
+        "agent_server.models_service.probe_compatible_profile",
+        lambda **_kwargs: {
+            "health": "ok",
+            "models": ["kimi-k3", "glm-5.2", "deepseek-v4-pro"],
+            "models_source": "v1_models",
+            "error": None,
+        },
+    )
+
+    service = ModelsService()
+    listed = service.list_models(discover=True)
+
+    kimi_rows = [item for item in listed.data if item.id == "kimi-k3"]
+    providers = {item.provider for item in kimi_rows}
+    assert {"moonshot", "opencode"} <= providers
+    assert all(item.enabled for item in kimi_rows)
+
+    glm_rows = [item for item in listed.data if item.id == "glm-5.2"]
+    assert {"qwen", "opencode"} <= {item.provider for item in glm_rows}
+
+    deepseek_rows = [item for item in listed.data if item.id == "deepseek-v4-pro"]
+    assert {"deepseek", "qwen", "opencode"} <= {
+        item.provider for item in deepseek_rows
+    }
+
+    # Toggling OpenCode off must not hide the Moonshot row.
+    service.update_model(
+        "kimi-k3",
+        UpdateAgentModelRequest(enabled=False, provider="opencode"),
+    )
+    after = service.list_models(discover=True)
+    assert (
+        next(
+            item
+            for item in after.data
+            if item.id == "kimi-k3" and item.provider == "opencode"
+        ).enabled
+        is False
+    )
+    assert (
+        next(
+            item
+            for item in after.data
+            if item.id == "kimi-k3" and item.provider == "moonshot"
+        ).enabled
+        is True
+    )
 
 
 def test_format_discovered_model_label():

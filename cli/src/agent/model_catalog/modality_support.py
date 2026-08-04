@@ -235,6 +235,30 @@ def _local_multimodal(model_id: str) -> set[ModalityKind]:
     return set()
 
 
+def _gateway_multimodal(model_id: str) -> set[ModalityKind]:
+    """Modalities for discovery gateways that host many first-party families.
+
+    Same bare id can be served by Moonshot and OpenCode Zen (e.g. ``kimi-k3``);
+    capabilities follow the model family, not the gateway label. OpenRouter-style
+    ``org/name`` ids are matched on the bare name as well.
+    """
+    value = str(model_id or "").strip()
+    candidates = [value]
+    if "/" in value:
+        candidates.append(value.rsplit("/", 1)[-1])
+    kinds: set[ModalityKind] = set()
+    for candidate in candidates:
+        kinds |= _openai_cloud_multimodal(candidate)
+        kinds |= _anthropic_multimodal(candidate)
+        kinds |= _google_multimodal(candidate)
+        kinds |= _xai_multimodal(candidate)
+        kinds |= _moonshot_multimodal(candidate)
+        kinds |= _together_multimodal(candidate)
+        kinds |= _qwen_multimodal(candidate)
+        kinds |= _local_multimodal(candidate)
+    return kinds
+
+
 def allowlist_modalities(
     provider: str | None,
     model_id: str | None,
@@ -248,11 +272,12 @@ def allowlist_modalities(
     if provider_norm in {"local", "compatible", "openai-compatible"}:
         return _local_multimodal(value)
 
-    if provider_norm in {"openai", "opencode", "nvidia"}:
+    # OpenCode Zen / OpenRouter discover many vendor families under one provider.
+    if provider_norm in {"opencode", "openrouter"}:
+        return _gateway_multimodal(value)
+
+    if provider_norm in {"openai", "nvidia"}:
         kinds = _openai_cloud_multimodal(value)
-        # OpenCode may host Claude behind an OpenAI-compatible proxy.
-        if provider_norm == "opencode" and value.lower().startswith("claude-"):
-            kinds |= _anthropic_multimodal(value)
         # Local VLMs (oMLX / Ollama / MLX) are catalogued as provider=local but
         # remapped to openai at runtime for the OpenAI-compatible wire protocol.
         # Keep vision injection working for those model ids.

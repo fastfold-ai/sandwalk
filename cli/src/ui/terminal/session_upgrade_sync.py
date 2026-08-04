@@ -63,9 +63,35 @@ class _SessionUpgradeSyncMixin:
             normalized = " ".join(str(value or "untitled").split())
             return normalized[:max_len] if normalized else "untitled"
 
+        def _first_turn_query(path: object) -> str:
+            try:
+                from pathlib import Path
+
+                with open(Path(str(path or ""))) as handle:
+                    # Skip meta line, then first turn query if present.
+                    handle.readline()
+                    line = handle.readline().strip()
+                if not line:
+                    return ""
+                import json
+
+                record = json.loads(line)
+                if record.get("type") == "turn":
+                    return str(record.get("query") or "").strip()
+            except Exception:
+                return ""
+            return ""
+
+        from agent_server.title import is_placeholder_title
+
         for s in sessions[:20]:
             sid = str(s.get("session_id", "?"))
-            title = _preview_text(s.get("title"))
+            raw_title = str(s.get("title") or "").strip()
+            # Auto-title sometimes echoes the title prompt; prefer the first
+            # user query so Preview stays readable.
+            if is_placeholder_title(raw_title):
+                raw_title = _first_turn_query(s.get("path")) or raw_title
+            title = _preview_text(raw_title)
             model = str(s.get("model") or "—")
             n_turns = int(s.get("n_turns") or 0)
             updated_at = s.get("updated_at", s.get("created_at"))

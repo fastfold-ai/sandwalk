@@ -110,6 +110,11 @@ class _BottomToolbarMixin:
         except Exception:  # noqa: BLE001 — never break the prompt toolbar
             return None
 
+    # Soft panel on white: #f5f5f5 over #ffffff (truecolor; sync app style).
+    _COMPOSE_BG = "#f5f5f5"
+    # Sandwalk gold (compose bar + Agent lead); related to plan mustard #9a7429.
+    _COMPOSE_ACCENT = "#c9a227"
+
     def _bottom_toolbar(self):
         try:
             return self._render_bottom_toolbar()
@@ -118,38 +123,53 @@ class _BottomToolbarMixin:
                 '<style fg="#555555" bg="default">sandwalk</style>'
             )
 
-    def _render_bottom_toolbar(self):
+    def _toolbar_html(self, fragment: str) -> HTML:
+        return HTML(fragment)
+
+    def _with_bg(self, fragment: str, bg: str) -> str:
+        return fragment.replace('bg="default"', f'bg="{bg}"')
+
+    def _toolbar_is_turn_busy(self) -> bool:
+        if hasattr(self, "_toolbar_is_busy"):
+            return bool(self._toolbar_is_busy())
+        return bool(self._has_active_query())
+
+    def _toolbar_special_markup(
+        self, *, bg: str = "default", include_busy: bool = True
+    ) -> str | None:
+        """Exit / interrupt / mention / busy lines shared by both toolbars."""
         if self._show_exit_hint:
-            return HTML('<style fg="#888888" bg="default">Press Ctrl+C again to exit</style>')
+            return self._with_bg(
+                '<style fg="#888888" bg="default">Press Ctrl+C again to exit</style>',
+                bg,
+            )
         if self._show_interrupt_hint:
-            return HTML('<style fg="#ffb86c" bg="default">Interrupt requested · press Ctrl+C again to force stop</style>')
-        # Show tab bar when @ mention completions are active
+            return self._with_bg(
+                '<style fg="#ffb86c" bg="default">'
+                "Interrupt requested · press Ctrl+C again to force stop"
+                "</style>",
+                bg,
+            )
         if self._mention_completing():
             mc = self._merged_completer.mention_completer
             tabs = []
             for i, label in enumerate(mc.TABS):
                 if i == mc._active_tab:
-                    tabs.append(f'<style fg="#50fa7b" bg="default"><b>[{label}]</b></style>')
+                    tabs.append(
+                        f'<style fg="#50fa7b" bg="default"><b>[{label}]</b></style>'
+                    )
                 else:
-                    tabs.append(f'<style fg="#555555" bg="default"> {label} </style>')
+                    tabs.append(
+                        f'<style fg="#555555" bg="default"> {label} </style>'
+                    )
             tab_bar = "  ".join(tabs)
-            return HTML(f'{tab_bar}  <style fg="#555555" bg="default">·  ←/→ switch tab</style>')
-
-        model = self._model_display_name()
-        effort_label = self._toolbar_effort_label()
-        if effort_label:
-            model = f"{model} · {effort_label}"
-        compat_backend = self._current_compatible_backend_label()
-        if compat_backend:
-            model = f"{model} · {compat_backend}"
-        # Prefer turn-busy (clears as soon as the agent returns) over worker
-        # thread liveness, which stays true during post-run bookkeeping.
-        toolbar_busy = (
-            self._toolbar_is_busy()
-            if hasattr(self, "_toolbar_is_busy")
-            else self._has_active_query()
-        )
-        if toolbar_busy:
+            return self._with_bg(
+                f'{tab_bar}  <style fg="#555555" bg="default">'
+                "·  ←/→ switch tab"
+                "</style>",
+                bg,
+            )
+        if include_busy and self._toolbar_is_turn_busy():
             with self._run_lock:
                 queued = len(self._queued_queries)
             spinner = self._toolbar_spinner_markup()
@@ -158,11 +178,151 @@ class _BottomToolbarMixin:
                 if queued
                 else ""
             )
-            return HTML(
-                f"{spinner}"
-                f"{queued_label}"
-                '<style fg="#555555" bg="default">  ctrl+c interrupt</style>'
+            return self._with_bg(
+                f"{spinner}{queued_label}"
+                '<style fg="#555555" bg="default">  ctrl+c interrupt</style>',
+                bg,
             )
+        return None
+
+    def _toolbar_model_label(self) -> str:
+        model = self._model_display_name()
+        effort_label = self._toolbar_effort_label()
+        if effort_label:
+            model = f"{model} · {effort_label}"
+        compat_backend = self._current_compatible_backend_label()
+        if compat_backend:
+            model = f"{model} · {compat_backend}"
+        return model
+
+    def _compose_lead_label(self) -> str:
+        label = getattr(self, "_cli_specialist_label", None)
+        if label:
+            return str(label)
+        if self.session.config.get("agent.plan_preview", False):
+            return "Plan"
+        return "Agent"
+
+    def _compose_provider_label(self) -> str | None:
+        """Short provider label shown muted after the model name."""
+        try:
+            compat = self._current_compatible_backend_label()
+            if compat:
+                return str(compat)
+            _pid, label, _endpoint = self._current_provider_status()
+            text = str(label or "").strip()
+            if not text:
+                return None
+            # Keep the compose line short for verbose compat profiles.
+            if text.startswith("OpenAI-compatible"):
+                return "Compatible"
+            return text
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _compose_meta_toolbar(self):
+        """Model / sandbox (idle) or gold scanner + interrupt (busy) inside panel."""
+        try:
+            bg = self._COMPOSE_BG
+            accent = self._COMPOSE_ACCENT
+            # Exit / interrupt / mention still replace the in-panel line.
+            special = self._toolbar_special_markup(bg=bg, include_busy=False)
+            if special is not None:
+                return self._toolbar_html(special)
+
+            from html import escape as _html_escape
+
+            # Busy: scanner + interrupt stay inside the soft panel.
+            if self._toolbar_is_turn_busy():
+                with self._run_lock:
+                    queued = len(self._queued_queries)
+                spinner = self._toolbar_spinner_markup(palette="gold")
+                # Force compose bg on scanner cells so they don't punch white holes.
+                spinner = self._with_bg(spinner, bg)
+                queued_label = (
+                    f'<style fg="#8a8f98" bg="{bg}"> · queued {queued}</style>'
+                    if queued
+                    else ""
+                )
+                return self._toolbar_html(
+                    f"{spinner}{queued_label}"
+                    f'<style fg="#8a8f98" bg="{bg}">  ctrl+c interrupt</style>'
+                )
+
+            # Idle: lead · model provider · sandbox
+            # Provider sits muted right after the model (no middle-dot).
+            lead = self._compose_lead_label()
+            model = _html_escape(self._model_display_name())
+            effort = self._toolbar_effort_label()
+            if effort:
+                model = f"{model} · {_html_escape(effort)}"
+            provider = self._compose_provider_label()
+            provider_frag = (
+                f'<style fg="#8a8f98" bg="{bg}"> {_html_escape(provider)}</style>'
+                if provider
+                else ""
+            )
+            sandbox_label = getattr(self, "_cli_sandbox_label", None) or "Local Sandbox"
+            is_modal = "modal" in sandbox_label.lower()
+            sandbox_fg = "#5a9e4a" if is_modal else "#8a8f98"
+            frag = (
+                f'<style fg="{accent}" bg="{bg}">{_html_escape(lead)}</style>'
+                f'<style fg="#aaaaaa" bg="{bg}"> · </style>'
+                f'<style fg="#333333" bg="{bg}">{model}</style>'
+                f"{provider_frag}"
+                f'<style fg="#aaaaaa" bg="{bg}"> · </style>'
+                f'<style fg="{sandbox_fg}" bg="{bg}">'
+                f"{_html_escape(sandbox_label)}</style>"
+            )
+            if self.session.config.get("agent.plan_preview", False) and lead != "Plan":
+                frag += (
+                    f'<style fg="#aaaaaa" bg="{bg}"> · </style>'
+                    f'<style fg="#9a7429" bg="{bg}">plan</style>'
+                )
+            return self._toolbar_html(frag)
+        except Exception:  # noqa: BLE001
+            return HTML(
+                f'<style fg="#555555" bg="{self._COMPOSE_BG}">sandwalk</style>'
+            )
+
+    def _compose_status_toolbar(self):
+        """Path + context under the soft compose panel."""
+        try:
+            from html import escape as _html_escape
+
+            # Exit/interrupt replace the path row.
+            if self._show_exit_hint or self._show_interrupt_hint:
+                special = self._toolbar_special_markup(
+                    bg="default", include_busy=False
+                )
+                return self._toolbar_html(special or "")
+
+            left = (
+                f'<style fg="#8a8f98" bg="default">'
+                f"{_html_escape(_short_cwd_label())}</style>"
+            )
+            context = self._toolbar_context_label()
+            if not context:
+                return self._toolbar_html(left)
+            right = (
+                f'<style fg="#7f8790" bg="default">'
+                f"{_html_escape(context)}</style>"
+            )
+            # Outer margin (2+2) + gold bar (2) + inner pads for the transcript layout.
+            cols = max(40, int(get_terminal_size().columns or 80) - 11)
+            pad = max(1, cols - _html_plain_len(left) - _html_plain_len(right))
+            return self._toolbar_html(f"{left}{' ' * pad}{right}")
+        except Exception:  # noqa: BLE001
+            return HTML('<style fg="#555555" bg="default">sandwalk</style>')
+
+    def _render_bottom_toolbar(self):
+        special = self._toolbar_special_markup(bg="default")
+        if special is not None:
+            return self._toolbar_html(special)
+
+        from html import escape as _html_escape
+
+        model = _html_escape(self._toolbar_model_label())
         # Mustard — matches local-web Plan mode composer accent (#9a7429).
         plan = (
             ' <style fg="#555555" bg="default">·</style> '
@@ -173,14 +333,10 @@ class _BottomToolbarMixin:
         specialist = ""
         label = getattr(self, "_cli_specialist_label", None)
         if label:
-            from html import escape as _html_escape
-
             specialist = (
                 f' <style fg="#555555" bg="default">·</style> '
                 f'<style fg="#bd93f9" bg="default">{_html_escape(label)}</style>'
             )
-        from html import escape as _html_escape
-
         sandbox_label = getattr(self, "_cli_sandbox_label", None) or "Local Sandbox"
         is_modal = "modal" in sandbox_label.lower()
         # Modal brand lime (#7fee64); Local Sandbox stays muted gray.
@@ -199,11 +355,11 @@ class _BottomToolbarMixin:
         )
         context = self._toolbar_context_label()
         if not context:
-            return HTML(left)
+            return self._toolbar_html(left)
         right = f'<style fg="#7f8790" bg="default">{_html_escape(context)}</style>'
         cols = max(40, int(get_terminal_size().columns or 80))
         pad = max(1, cols - _html_plain_len(left) - _html_plain_len(right))
-        return HTML(f"{left}{' ' * pad}{right}")
+        return self._toolbar_html(f"{left}{' ' * pad}{right}")
 
     def _init_toolbar_animation_profile(self) -> None:
         """Load spinner/word profile for prompt-owned live animation."""

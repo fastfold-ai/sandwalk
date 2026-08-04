@@ -668,6 +668,35 @@ class TestTerminalMethods:
         mock_resume.assert_called_once()
         assert mock_resume.call_args.args[1] == "abc12345"
 
+    def test_resume_session_clears_then_renders_history(self, terminal):
+        from ui.terminal.transcript.store import TranscriptStore
+
+        sessions = [{"session_id": "abc12345"}]
+        terminal.transcript = TranscriptStore()
+        terminal.transcript.append_text("old noisy turn", kind="user")
+        terminal._seed_transcript_banner = MagicMock()
+        terminal._restore_usage_from_trajectory = MagicMock()
+        terminal._render_resumed_history = MagicMock()
+        terminal._last_response = "stale"
+
+        resumed = MagicMock()
+        resumed.trajectory.turns = [MagicMock(), MagicMock()]
+        resumed.trajectory.title = "Full resume"
+        resumed.trajectory.session_id = "abc12345"
+        with patch("agent.trajectory.Trajectory.list_sessions", return_value=sessions), patch(
+            "agent.loop.AgentLoop.resume", return_value=resumed
+        ):
+            terminal._resume_session("abc12345")
+
+        terminal._seed_transcript_banner.assert_called_once()
+        terminal._render_resumed_history.assert_called_once()
+        assert terminal._last_response is None
+        assert terminal.agent is resumed
+        printed = " ".join(str(c) for c in terminal.console.print.call_args_list)
+        assert "Resumed" in printed
+        assert "Full resume" in printed
+        assert "2 turns" in printed
+
     def test_delete_session_accepts_prefix(self, terminal):
         sessions = [
             {"session_id": "abc12345"},
@@ -766,6 +795,7 @@ class TestTerminalMethods:
         printed = " ".join(str(c) for c in terminal.console.print.call_args_list)
         assert "Session History" in printed
         assert "what can you do?" in printed
+        assert "❯" not in printed
         markdown_calls = [
             c.args[0]
             for c in terminal.console.print.call_args_list
@@ -773,6 +803,30 @@ class TestTerminalMethods:
         ]
         assert markdown_calls
         assert markdown_calls[0].markup == "I can help with target discovery."
+
+    def test_render_resumed_history_uses_compose_user_box(self, terminal):
+        from ui.terminal.transcript.render import entry_rows
+        from ui.terminal.transcript.store import TranscriptStore
+
+        turn = MagicMock()
+        turn.query = "@uploads/clip.png what's this?"
+        turn.answer = "A capybara."
+        terminal.transcript = TranscriptStore()
+        terminal._render_resumed_history(80, [turn])
+
+        user_entries = [
+            e for e in terminal.transcript.entries if getattr(e, "kind", None) == "user"
+        ]
+        assert len(user_entries) == 1
+        rows = entry_rows(user_entries[0], width=80)
+        joined = "".join(t for _e, _i, frags in rows for _s, t in frags)
+        assert "what's this?" in joined
+        assert "[Image 1]" in joined
+        assert "❯" not in joined
+        assert any("┃" in t for _e, _i, frags in rows for _s, t in frags)
+        assert any(
+            getattr(e, "kind", None) == "assistant" for e in terminal.transcript.entries
+        )
 
     def test_render_resumed_history_prefers_trace_replay(self, terminal):
         turn = MagicMock()

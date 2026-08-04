@@ -6,6 +6,7 @@ class _ProfilePromptsMixin:
     def _model_display_name(self, model_id: str = None) -> str:
         """Get a short display name for a model ID."""
         model_id = model_id or self.session.current_model
+        value = str(model_id or "").strip()
         names = {
             "claude-sonnet-4-5-20250929": "Sonnet 4.5",
             "claude-haiku-4-5-20251001": "Haiku 4.5",
@@ -21,7 +22,32 @@ class _ProfilePromptsMixin:
             "gpt-4o": "GPT-4o",
             "gpt-4o-mini": "GPT-4o Mini",
         }
-        return names.get(model_id, model_id)
+        if value in names:
+            return names[value]
+        # Prefer the active provider's catalog row when the same id is shared
+        # across gateways (e.g. kimi-k3 on Moonshot vs OpenCode Zen).
+        provider = None
+        try:
+            cfg = getattr(self.session, "config", None)
+            if cfg is not None:
+                provider = str(cfg.get("llm.provider") or "").strip().lower() or None
+        except Exception:  # noqa: BLE001
+            provider = None
+        try:
+            from agent.model_catalog import catalog_label_for_model
+
+            labeled = catalog_label_for_model(value, provider=provider)
+            if labeled:
+                return labeled
+        except Exception:  # noqa: BLE001
+            pass
+        # Discovered / gateway ids: kimi-k3 → Kimi K3, gpt-5.4 → GPT 5.4.
+        try:
+            from agent.model_catalog import format_discovered_model_label
+
+            return format_discovered_model_label(value)
+        except Exception:  # noqa: BLE001
+            return value or str(model_id or "")
 
     def _prompt_select_compatible_profile_id(
         self,

@@ -12,7 +12,9 @@ from agent.model_catalog.data import (
 from agent.model_catalog.context_windows import context_window_for_model
 from agent.model_catalog.lookup import (
     CATALOG_MODEL_ALIASES,
+    catalog_label_for_model,
     catalog_provider_for_model,
+    catalog_providers_for_model,
     cloud_catalog_models,
     resolve_catalog_model_id,
     terminal_available_models,
@@ -97,7 +99,9 @@ __all__ = [
     "allowlist_modalities",
     "anthropic_model_omits_temperature",
     "anthropic_model_supports_effort",
+    "catalog_label_for_model",
     "catalog_provider_for_model",
+    "catalog_providers_for_model",
     "clamp_openai_reasoning_effort",
     "cloud_catalog_models",
     "compatible_profile_supports_thinking",

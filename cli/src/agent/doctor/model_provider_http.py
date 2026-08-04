@@ -43,7 +43,9 @@ _PROBE_MODELS = {
     "xai": "grok-4.5",
     "moonshot": "kimi-k2.7-code-highspeed",
     "nvidia": "meta/llama-3.1-8b-instruct",
-    "opencode": "gpt-5-nano",
+    # GPT Zen models need /responses; chat completions return HTTP 400.
+    # Ping a chat-native open model (matches provider default_model).
+    "opencode": "kimi-k2.7-code",
     "deepseek": "deepseek-v4-flash",
     "minimax": "MiniMax-M2.5",
     "mistral": "mistral-small-latest",

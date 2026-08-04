@@ -14,7 +14,8 @@ type ModelsViewDataCallbacks = {
   onUpdateModelEnabled: (
     modelId: string,
     enabled: boolean,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    provider?: string | null
   ) => Promise<AgentModel>
   onListProfiles: (signal?: AbortSignal) => Promise<ModelProfile[]>
 }
@@ -171,14 +172,20 @@ export function useModelsViewData({
   }
 
   const toggleModel = async (model: AgentModel) => {
-    const key = `${model.profileId || 'cloud'}:${model.id}`
+    const key = `${model.provider}:${model.profileId || 'cloud'}:${model.id}`
     setPendingEnabled(prev => ({ ...prev, [key]: true }))
     setError(null)
     try {
-      const updated = await onUpdateModelEnabled(model.id, !model.enabled)
+      const updated = await onUpdateModelEnabled(
+        model.id,
+        !model.enabled,
+        undefined,
+        model.provider
+      )
       setModels(prev =>
         prev.map(item =>
           item.id === model.id &&
+          item.provider === model.provider &&
           item.profileId === model.profileId &&
           item.source === model.source
             ? { ...item, enabled: updated.enabled }

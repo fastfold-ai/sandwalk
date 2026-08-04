@@ -7,6 +7,28 @@ from ui.markdown import print_markdown_with_mermaid
 
 
 class _ResumedHistoryMixin:
+    def _append_resumed_user(self, query: str) -> None:
+        """User turns use the compose-style soft box (same as live input)."""
+        transcript = getattr(self, "transcript", None)
+        if transcript is not None:
+            transcript.append_text(query, kind="user")
+            return
+        # Legacy / non-TUI fallback — never prefix with ❯.
+        self.console.print(query, markup=False)
+
+    def _append_resumed_assistant(self, answer: str) -> None:
+        """Assistant body — markdown in the transcript when available."""
+        transcript = getattr(self, "transcript", None)
+        if transcript is not None:
+            transcript.append_text(answer, kind="assistant")
+            return
+        print_markdown_with_mermaid(
+            self.console,
+            answer,
+            config=getattr(self.session, "config", None),
+            markdown_factory=RichMarkdown,
+        )
+
     def _render_resumed_history(self, term_width: int, turns: list) -> None:
         """Render saved turns so resumed sessions reopen with full context."""
         if not turns:
@@ -18,9 +40,8 @@ class _ResumedHistoryMixin:
         for idx, turn in enumerate(turns):
             query = str(getattr(turn, "query", "") or "").strip()
             answer = str(getattr(turn, "answer", "") or "").strip()
-            self.console.print(f"[#333333]{'─' * term_width}[/]")
             if query:
-                self.console.print(f"❯ {query}", markup=False)
+                self._append_resumed_user(query)
             rendered_from_trace = False
             duration_s = None
             input_tokens = None
@@ -50,12 +71,7 @@ class _ResumedHistoryMixin:
                     )
                     output_tokens = self._coerce_int(row.get("output_tokens"))
             if answer and not rendered_from_trace:
-                print_markdown_with_mermaid(
-                    self.console,
-                    answer,
-                    config=getattr(self.session, "config", None),
-                    markdown_factory=RichMarkdown,
-                )
+                self._append_resumed_assistant(answer)
             if duration_s is not None or input_tokens is not None or output_tokens is not None:
                 self._render_turn_usage_footer(
                     term_width=term_width,

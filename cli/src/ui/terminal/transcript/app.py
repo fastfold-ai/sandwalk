@@ -13,11 +13,16 @@ from prompt_toolkit.history import History
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import Layout
-from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit, Window
+from prompt_toolkit.layout.containers import (
+    Float,
+    FloatContainer,
+    HSplit,
+    VSplit,
+    Window,
+)
 from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.menus import CompletionsMenu
-from prompt_toolkit.layout.processors import BeforeInput
 from prompt_toolkit.styles import merge_styles
 
 from ui.terminal.attach_lexer import AttachChipLexer
@@ -28,10 +33,13 @@ from ui.terminal.transcript.control import TranscriptControl
 # Match the pre-transcript Rich look: muted user chrome, cyan tools (like the
 # old ▸ start indicator), soft green only on the checkmark via tool line text,
 # default fg for assistant body (Rich ANSI supplies emphasis/links).
+# Soft compose panel (pad + fill). Keep bg in sync with _COMPOSE_BG.
 _TRANSCRIPT_STYLE = {
-    "transcript-sep": "#333333",
+    "transcript-sep": "#d0d0d0",
     "transcript-text": "",
-    "transcript-user": "bold",
+    # User turns share the compose soft panel (sync _COMPOSE_BG / accent).
+    "transcript-user": "bg:#f5f5f5 #222222",
+    "transcript-user-accent": "#c9a227",
     "transcript-system": "#7f8790",
     "transcript-tool": "#8be9fd",
     "transcript-tool-ok": "#98c379",
@@ -40,7 +48,16 @@ _TRANSCRIPT_STYLE = {
     "transcript-selected": "reverse",
     # Same orange chip as the compose AttachChipLexer / PT_STYLE.
     "image-chip": "bold #111111 bg:#f0a030",
+    # Soft panel #f5f5f5 on white #ffffff (sync _COMPOSE_BG; needs truecolor).
+    "transcript-compose": "bg:#f5f5f5 #222222",
+    "transcript-compose.prompt": "bold #555555",
+    # Gold accent outside the soft panel (default/terminal bg behind it).
+    "transcript-compose-accent": "#c9a227",
+    "transcript-status": "bg:default #8a8f98",
 }
+
+# Cursor OSC color (Warp/VT100); matches sandwalk green accent.
+_COMPOSE_CURSOR = "#50fa7b"
 
 # Coalesce store/toolbar invalidates so Rich re-renders can't pin the UI.
 _INVALIDATE_MIN_INTERVAL_S = 0.05
@@ -75,8 +92,11 @@ def run_transcript_session(
         name="input",
     )
 
-    def _toolbar():
-        return terminal._bottom_toolbar()
+    def _meta():
+        return terminal._compose_meta_toolbar()
+
+    def _status():
+        return terminal._compose_status_toolbar()
 
     transcript_window = Window(
         content=control,
@@ -87,28 +107,109 @@ def run_transcript_session(
     )
     control.window = transcript_window
 
+    # One soft panel wraps input + meta + pads; path/context sit below.
+    compose_input = Window(
+        BufferControl(
+            buffer=buf,
+            lexer=AttachChipLexer(),
+            focusable=True,
+        ),
+        height=Dimension(min=1, max=6),
+        wrap_lines=True,
+        dont_extend_height=True,
+        style="class:transcript-compose",
+    )
+
+    def _hpad(width: int = 2) -> Window:
+        return Window(
+            width=width,
+            char=" ",
+            style="class:transcript-compose",
+        )
+
+    def _vpad(height: int = 1) -> Window:
+        # Exact height — plain height=1 spacers were collapsing in practice.
+        return Window(
+            height=Dimension.exact(height),
+            char=" ",
+            style="class:transcript-compose",
+            dont_extend_height=True,
+        )
+
+    # Style every row so the panel fill is continuous (incl. meta + pads).
+    compose_panel = HSplit(
+        [
+            _vpad(1),
+            VSplit([_hpad(2), compose_input, _hpad(2)], padding=0),
+            _vpad(1),
+            VSplit(
+                [
+                    _hpad(2),
+                    Window(
+                        FormattedTextControl(_meta),
+                        height=Dimension.exact(1),
+                        dont_extend_height=True,
+                        style="class:transcript-compose",
+                    ),
+                    _hpad(2),
+                ],
+                padding=0,
+            ),
+            _vpad(1),  # bottom inset under meta
+        ],
+        padding=0,
+        style="class:transcript-compose",
+    )
+    status_bar = VSplit(
+        [
+            # Align under panel text (gold bar is outside the gray box).
+            Window(width=2, char=" "),
+            Window(
+                FormattedTextControl(_status),
+                height=1,
+                dont_extend_height=True,
+                style="class:bottom-toolbar",
+            ),
+            Window(width=2, char=" "),
+        ],
+        padding=0,
+    )
+
+    def _outer(width: int = 2) -> Window:
+        # Margin outside the soft panel — keep off the terminal edge.
+        return Window(width=width, char=" ")
+
+    # Gold bar sits left of the gray panel (outside the box), slightly heavier ┃.
+    compose_block = VSplit(
+        [
+            _outer(),
+            Window(
+                width=1,
+                char="┃",
+                style="class:transcript-compose-accent",
+            ),
+            compose_panel,
+            _outer(),
+        ],
+        padding=0,
+    )
+    status_block = VSplit(
+        [
+            _outer(),
+            Window(width=1, char=" "),  # same column as gold bar
+            status_bar,
+            _outer(),
+        ],
+        padding=0,
+    )
+
     root = FloatContainer(
         content=HSplit(
             [
                 transcript_window,
-                Window(height=1, char="─", style="class:transcript-sep"),
-                Window(
-                    BufferControl(
-                        buffer=buf,
-                        lexer=AttachChipLexer(),
-                        input_processors=[BeforeInput([("class:prompt", "❯ ")])],
-                        focusable=True,
-                    ),
-                    height=Dimension(min=1, max=8),
-                    wrap_lines=True,
-                    dont_extend_height=True,
-                ),
-                Window(
-                    FormattedTextControl(_toolbar),
-                    height=1,
-                    dont_extend_height=True,
-                    style="class:bottom-toolbar",
-                ),
+                Window(height=1),  # breath between history and composer
+                compose_block,
+                status_block,
             ]
         ),
         floats=[
@@ -122,10 +223,14 @@ def run_transcript_session(
 
     kb = _build_transcript_bindings(terminal, store, control, buf, on_submit)
 
+    from prompt_toolkit.output.color_depth import ColorDepth
+
     app = Application(
         layout=Layout(root, focused_element=buf),
         key_bindings=kb,
         style=_merge_style(),
+        # Soft #f5f5f5 panel washes out to white without 24-bit color.
+        color_depth=ColorDepth.TRUE_COLOR,
         full_screen=True,
         mouse_support=True,
         erase_when_done=False,
@@ -185,9 +290,32 @@ def run_transcript_session(
 
     buf.on_completions_changed += _auto_highlight_first
 
+    def _set_cursor_color(color: str | None) -> None:
+        """Best-effort VT cursor color (OSC 12); reset with OSC 112."""
+        try:
+            out = getattr(app, "output", None)
+            write = getattr(out, "write_raw", None) or getattr(out, "write", None)
+            if write is None:
+                import sys
+
+                write = sys.stdout.write
+            if color:
+                write(f"\x1b]12;{color}\x07")
+            else:
+                write("\x1b]112\x07")
+            flush = getattr(out, "flush", None)
+            if callable(flush):
+                flush()
+        except Exception:  # noqa: BLE001
+            pass
+
+    # Re-assert each frame — some hosts (Warp) reset cursor color on redraw.
+    app.before_render += lambda _app: _set_cursor_color(_COMPOSE_CURSOR)
+
     try:
         result = app.run()
     finally:
+        _set_cursor_color(None)
         unsubscribe()
         terminal._transcript_app = None
         terminal._transcript_buffer = None

@@ -87,7 +87,10 @@ def print_banner(cfg=None, *, console=None):
     header.add_column()
     # Nudge mark down so it sits nearer the vertical center of the meta block.
     header.add_row(Padding(logo_text, (1, 0, 0, 0)), Padding(meta_text, (0, 0, 0, 1)))
-    out.print(header)
+    # Extra inset so the mark isn't flush against the terminal / transcript edge.
+    out.print()
+    out.print(Padding(header, (1, 3, 1, 3)))
+    out.print()
 
 
 def render_banner_ansi(cfg=None, *, width: int = 100) -> str:

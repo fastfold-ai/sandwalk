@@ -10,7 +10,14 @@ from agent_server.models_service.catalog_discovery import _discover_models_enabl
 
 
 def disable_models_for_provider(cfg: Config, provider: str) -> list[str]:
-    """Hide catalog + custom models for an LLM provider. Returns ids newly hidden."""
+    """Hide catalog + custom models for an LLM provider. Returns ids newly hidden.
+
+    Uses provider-scoped keys (``moonshot:kimi-k3``) so auto-hiding an
+    unconfigured provider does not disable the same bare id under another
+    provider (e.g. OpenCode Zen discovered ``kimi-k3``).
+    """
+    from agent.model_catalog import DEFAULT_DISABLED_MODELS
+
     target = str(provider or "").strip()
     if not target or not supports_llm_key_probe(target):
         return []
@@ -23,12 +30,36 @@ def disable_models_for_provider(cfg: Config, provider: str) -> list[str]:
         if str(item.get("provider") or "") == target:
             ids.append(str(item["id"]))
     newly_hidden: list[str] = []
+    hidden = set(cfg.hidden_models())
+    changed = False
     for model_id in ids:
-        if cfg.is_model_hidden(model_id):
-            continue
-        cfg.set_model_hidden(model_id, True)
-        newly_hidden.append(model_id)
+        scoped = cfg.provider_model_key(target, model_id)
+        if scoped not in hidden:
+            hidden.add(scoped)
+            newly_hidden.append(scoped)
+            changed = True
+        # Drop legacy bare-id auto-hides so shared ids can surface elsewhere.
+        if model_id in hidden and model_id not in DEFAULT_DISABLED_MODELS:
+            hidden.discard(model_id)
+            changed = True
+    if changed:
+        cfg.set("llm.hidden_models", sorted(hidden))
     return newly_hidden
+
+
+def enable_models_for_provider(cfg: Config, provider: str) -> list[str]:
+    """Clear provider-scoped auto-hides when a key is present."""
+    target = str(provider or "").strip()
+    if not target or not supports_llm_key_probe(target):
+        return []
+    prefix = f"{target}:"
+    hidden = set(cfg.hidden_models())
+    removed = sorted(item for item in hidden if item.startswith(prefix))
+    if not removed:
+        return []
+    hidden.difference_update(removed)
+    cfg.set("llm.hidden_models", sorted(hidden))
+    return removed
 
 
 def _cloud_provider_key_present(cfg: Config, provider: str) -> bool:
@@ -50,7 +81,12 @@ def _cloud_provider_key_present(cfg: Config, provider: str) -> bool:
 
 
 def sync_models_for_unconfigured_providers(cfg: Config) -> bool:
-    """Hide models for LLM providers with no key. Returns True if config changed."""
+    """Hide models for LLM providers with no key. Returns True if config changed.
+
+    Does not auto-unhide when a key is present — that would wipe user toggles
+    on every Models list. Call ``enable_models_for_provider`` from the
+    integrations save path when a key is newly stored.
+    """
     changed = False
     providers = ("anthropic", "openai", *OPENAI_COMPATIBLE_PROVIDERS.keys())
     for provider in providers:
@@ -61,18 +97,40 @@ def sync_models_for_unconfigured_providers(cfg: Config) -> bool:
     return changed
 
 
-def set_model_enabled(model_id: str, enabled: bool) -> AgentModel:
+def set_model_enabled(
+    model_id: str,
+    enabled: bool,
+    *,
+    provider: str | None = None,
+) -> AgentModel:
     cfg = Config.load()
     target = str(model_id or "").strip()
     if not target:
         raise ValueError("model_id is required.")
-    cfg.set_model_hidden(target, hidden=not enabled)
+    provider_norm = str(provider or "").strip().lower() or None
+    # Prefer provider-scoped keys so toggling OpenCode kimi-k3 does not
+    # hide/show the Moonshot row with the same bare id.
+    hide_key = (
+        cfg.provider_model_key(provider_norm, target)
+        if provider_norm
+        else target
+    )
+    cfg.set_model_hidden(hide_key, hidden=not enabled)
+    # Clear the opposite form so scoped/bare state cannot fight.
+    if provider_norm:
+        if target in set(cfg.hidden_models()) and enabled:
+            cfg.set_model_hidden(target, hidden=False)
     cfg.save()
 
     # Return a compact representation without rediscovering endpoints.
-    catalog = {item["id"]: item for item in cloud_catalog_models()}
-    if target in catalog:
-        entry = catalog[target]
+    catalog_rows = [
+        item
+        for item in cloud_catalog_models()
+        if item["id"] == target
+        and (not provider_norm or item["provider"] == provider_norm)
+    ]
+    if catalog_rows:
+        entry = catalog_rows[0]
         return AgentModel(
             id=target,
             label=entry["label"],
@@ -84,7 +142,15 @@ def set_model_enabled(model_id: str, enabled: bool) -> AgentModel:
             enabled=enabled,
             health=None,
         )
-    custom = next((item for item in cfg.custom_models() if item["id"] == target), None)
+    custom = next(
+        (
+            item
+            for item in cfg.custom_models()
+            if item["id"] == target
+            and (not provider_norm or item.get("provider") == provider_norm)
+        ),
+        None,
+    )
     if custom:
         return AgentModel(
             id=target,
@@ -97,18 +163,20 @@ def set_model_enabled(model_id: str, enabled: bool) -> AgentModel:
             enabled=enabled,
             health=None,
         )
-    # Discovered cloud proxy models (e.g. OpenCode Go) are not in the static
-    # catalog — attribute them to the discoverable provider that has a key.
-    for provider, meta in OPENAI_COMPATIBLE_PROVIDERS.items():
+    # Discovered cloud proxy models (e.g. OpenCode Zen) are not in the static
+    # catalog — attribute them to the requested / configured discover provider.
+    for discover_provider, meta in OPENAI_COMPATIBLE_PROVIDERS.items():
         if not _discover_models_enabled(meta):
             continue
-        if not cfg.llm_api_key(provider):
+        if provider_norm and discover_provider != provider_norm:
+            continue
+        if not cfg.llm_api_key(discover_provider):
             continue
         return AgentModel(
             id=target,
             label=format_discovered_model_label(target),
-            description=f"{meta.get('label') or provider} (discovered)",
-            provider=provider,
+            description=f"{meta.get('label') or discover_provider} (discovered)",
+            provider=discover_provider,
             source="cloud",
             profile_id=None,
             backend=None,
@@ -119,7 +187,7 @@ def set_model_enabled(model_id: str, enabled: bool) -> AgentModel:
         id=target,
         label=target,
         description=None,
-        provider="local",
+        provider=provider_norm or "local",
         source="profile",
         profile_id=None,
         backend=None,
@@ -144,7 +212,7 @@ def create_custom_model(payload: CreateAgentModelRequest) -> AgentModel:
         source="custom",
         profile_id=None,
         backend=None,
-        enabled=record["id"] not in set(cfg.hidden_models()),
+        enabled=not cfg.is_model_hidden(record["id"], record["provider"]),
         health=None,
     )
 
@@ -161,4 +229,8 @@ def delete_custom_model(model_id: str) -> bool:
 def update_model(model_id: str, payload: UpdateAgentModelRequest) -> AgentModel:
     if payload.enabled is None:
         raise ValueError("enabled is required.")
-    return set_model_enabled(model_id, bool(payload.enabled))
+    return set_model_enabled(
+        model_id,
+        bool(payload.enabled),
+        provider=payload.provider,
+    )

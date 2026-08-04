@@ -100,12 +100,13 @@ def _provider_discovered_items(
             hidden.clear()
             hidden.update(active_hidden)
         for model_id in discovered:
-            if model_id in known_ids:
-                continue
             if provider == "opencode" and not opencode_model_is_supported(model_id):
                 continue
+            # Same bare id is allowed under multiple providers (Moonshot
+            # ``kimi-k3`` + OpenCode Zen ``kimi-k3``, Qwen ``glm-5.2`` + Zen,
+            # etc.). ``known_ids`` is only for OpenRouter fresh-id seeding.
             known_ids.add(model_id)
-            enabled = model_id not in active_hidden
+            enabled = not cfg.is_model_hidden(model_id, provider)
             if enabled_only and not enabled:
                 continue
             context_window = context_windows.get(model_id)

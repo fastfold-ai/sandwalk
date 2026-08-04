@@ -185,7 +185,7 @@ export function ModelsListSection({
           </div>
         ) : (
           visibleModels.map(model => {
-            const key = `${model.profileId || model.source}:${model.id}`
+            const key = `${model.provider}:${model.profileId || model.source}:${model.id}`
             const sourceLabel =
               model.source === 'cloud'
                 ? `${model.provider} · cloud`

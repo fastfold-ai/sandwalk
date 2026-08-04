@@ -19,6 +19,13 @@ from ui.traces.formatting import format_args, format_duration, truncate_output
 LEFT_PAD = "  "
 _PAD_FRAG: StyleAndTextTuples = [("", LEFT_PAD)]
 
+# User message soft panel — match compose box (outer margin + gold ┃ + #f5f5f5).
+_USER_OUTER = "  "
+_USER_ACCENT = "┃"
+_USER_INNER = "  "
+_USER_STYLE = "class:transcript-user"
+_USER_ACCENT_STYLE = "class:transcript-user-accent"
+
 
 def markdown_to_plain(text: str, *, width: int, config=None) -> str:
     """Plain (no-ANSI) markdown render — used by tests and fallbacks."""
@@ -135,6 +142,63 @@ def _style_plain(style: str, text: str) -> StyleAndTextTuples:
     return [(style, text)]
 
 
+def _user_panel_fill(panel_w: int) -> StyleAndTextTuples:
+    return [
+        ("", _USER_OUTER),
+        (_USER_ACCENT_STYLE, _USER_ACCENT),
+        (_USER_STYLE, " " * panel_w),
+    ]
+
+
+def _user_panel_content(
+    content_frags: StyleAndTextTuples,
+    *,
+    content_len: int,
+    panel_w: int,
+) -> StyleAndTextTuples:
+    """One soft-panel row: outer margin + gold ┃ + padded content fill."""
+    inner_pad = len(_USER_INNER)
+    used = inner_pad + content_len + inner_pad
+    fill = max(0, panel_w - used)
+    return [
+        ("", _USER_OUTER),
+        (_USER_ACCENT_STYLE, _USER_ACCENT),
+        (_USER_STYLE, _USER_INNER),
+        *content_frags,
+        (_USER_STYLE, (" " * fill) + _USER_INNER),
+    ]
+
+
+def user_message_rows(
+    text: str,
+    *,
+    width: int,
+) -> list[StyleAndTextTuples]:
+    """Compose-style soft box for a user turn (no ❯ prefix)."""
+    from ui.terminal.attachments import chipify_uploads_for_display, style_with_image_chips
+
+    raw = chipify_uploads_for_display(text)
+    outer_w = len(_USER_OUTER)
+    panel_w = max(8, width - outer_w - 1)
+    inner_w = max(1, panel_w - 2 * len(_USER_INNER))
+    body_lines = _wrap(raw, inner_w)
+    use_chips = "[Image " in raw
+
+    rows: list[StyleAndTextTuples] = [_user_panel_fill(panel_w)]
+    for line in body_lines:
+        if use_chips:
+            frags = style_with_image_chips(line, _USER_STYLE)
+        else:
+            frags = [(_USER_STYLE, line)] if line else [(_USER_STYLE, "")]
+        rows.append(
+            _user_panel_content(frags, content_len=len(line), panel_w=panel_w)
+        )
+    rows.append(_user_panel_fill(panel_w))
+    # Breath before the assistant reply (outside the soft panel).
+    rows.append([("", "")])
+    return rows
+
+
 def entry_rows(
     entry: Entry,
     *,
@@ -154,7 +218,8 @@ def entry_rows(
             )
             return [(entry, i, frags) for i, frags in enumerate(styled)]
 
-        # Startup mark + meta (Rich ANSI); keep original spacing, no extra pad.
+        # Startup mark + meta (Rich ANSI). Banner already has Rich Padding;
+        # leave blank lines alone so the inset breathes.
         if entry.kind == "banner":
             rows: list[tuple[Entry, int, StyleAndTextTuples]] = []
             for i, line in enumerate(entry.text.split("\n")):
@@ -170,21 +235,22 @@ def entry_rows(
                 rows.append((entry, i, body))
             return rows or [(entry, 0, [("", "")])]
 
-        prefix = "❯ " if entry.kind == "user" else ""
+        if entry.kind == "user":
+            boxed = user_message_rows(entry.text, width=width)
+            return [(entry, i, frags) for i, frags in enumerate(boxed)]
+
         raw = entry.text
         # Show the same orange [Image N] chips as the compose box (not @uploads/…).
-        if entry.kind == "user" or "@uploads/" in raw or "[Image " in raw:
+        if "@uploads/" in raw or "[Image " in raw:
             from ui.terminal.attachments import chipify_uploads_for_display
 
             raw = chipify_uploads_for_display(raw)
-        body = prefix + raw if prefix else raw
         style = {
-            "user": "class:transcript-user",
             "system": "class:transcript-system",
         }.get(entry.kind, "class:transcript-text")
         out: list[tuple[Entry, int, StyleAndTextTuples]] = []
-        use_chips = "[Image " in body
-        for i, line in enumerate(_wrap(body, inner)):
+        use_chips = "[Image " in raw
+        for i, line in enumerate(_wrap(raw, inner)):
             if use_chips:
                 from ui.terminal.attachments import style_with_image_chips
 

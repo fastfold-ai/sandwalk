@@ -200,11 +200,12 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         key="models-api-key-test-v3"
         integrations={integrations}
         onListModels={options => client.listModels(options)}
-        onUpdateModelEnabled={async (modelId, enabled, signal) => {
+        onUpdateModelEnabled={async (modelId, enabled, signal, provider) => {
           const updated = await client.updateModelEnabled(
             modelId,
             enabled,
-            signal
+            signal,
+            provider
           )
           void loadModelOptions()
           return updated

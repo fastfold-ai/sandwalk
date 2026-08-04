@@ -199,11 +199,30 @@ def test_user_message_renders_upload_as_image_chip():
     store.append_text("@uploads/20260804-clip.png what's this?", kind="user")
     rows = entry_rows(store.entries[0], width=80)
     assert rows
-    frags = rows[0][2]
-    joined = "".join(t for _s, t in frags)
+    joined = "".join(t for _e, _i, frags in rows for _s, t in frags)
     assert "[Image 1]" in joined
+    assert "what's this?" in joined
     assert "@uploads/" not in joined
-    assert any("image-chip" in s for s, _t in frags)
+    assert "❯" not in joined
+    assert any("image-chip" in s for _e, _i, frags in rows for s, _t in frags)
+    # Compose-style soft box: gold accent + soft panel fill.
+    assert any(
+        "transcript-user-accent" in s for _e, _i, frags in rows for s, _t in frags
+    )
+    assert any("transcript-user" in s for _e, _i, frags in rows for s, _t in frags)
+    assert any("┃" in t for _e, _i, frags in rows for _s, t in frags)
+
+
+def test_user_message_box_has_no_prompt_arrow():
+    from ui.terminal.transcript.render import entry_lines
+
+    store = TranscriptStore()
+    store.append_text("hello sandwalk", kind="user")
+    lines = [line for _, _, line in entry_lines(store.entries[0], width=60)]
+    joined = "\n".join(lines)
+    assert "hello sandwalk" in joined
+    assert "❯" not in joined
+    assert any("┃" in line for line in lines)
 
 
 def test_banner_kind_preserves_mark_without_left_pad():

@@ -1,8 +1,8 @@
-"""OpenCode-like knight-rider / comet scanner for the busy toolbar."""
+"""Knight-rider / comet scanner for the busy toolbar."""
 
 from __future__ import annotations
 
-# Bright head → fading trail (green).
+# Bright head → fading trail (green) — classic toolbar.
 _TRAIL = (
     "#c8ffd8",  # head
     "#7dffa0",
@@ -12,8 +12,26 @@ _TRAIL = (
     "#0f4a28",
 )
 _INACTIVE = "#1a2a1e"
+
+# Compose accent (matches transcript gold bar / _COMPOSE_ACCENT).
+_TRAIL_GOLD = (
+    "#f0e0a0",  # head
+    "#e0c86a",
+    "#c9a227",
+    "#9a7429",
+    "#6e5320",
+    "#3d2e12",
+)
+_INACTIVE_GOLD = "#ebe4d4"
+
 _ACTIVE_CHAR = "■"
 _INACTIVE_CHAR = "⬝"
+_PALETTES = {
+    "green": (_TRAIL, _INACTIVE),
+    "gold": (_TRAIL_GOLD, _INACTIVE_GOLD),
+    # Alias kept for older call sites.
+    "purple": (_TRAIL_GOLD, _INACTIVE_GOLD),
+}
 
 
 def _color_index(
@@ -27,7 +45,7 @@ def _color_index(
 ) -> int:
     """Return trail index (0=brightest) or -1 for inactive.
 
-    Cycle: forward → hold end → backward → hold start (OpenCode-style).
+    Cycle: forward → hold end → backward → hold start.
     """
     forward = width
     backward = width - 1
@@ -72,9 +90,11 @@ def scanner_cells(
     trail: int | None = None,
     hold_end: int = 4,
     hold_start: int = 6,
+    palette: str = "green",
 ) -> list[tuple[str, str]]:
     """Return ``[(hex_color, char), ...]`` for one scanner frame."""
-    length = trail if trail is not None else len(_TRAIL)
+    colors, inactive = _PALETTES.get(palette, _PALETTES["green"])
+    length = trail if trail is not None else len(colors)
     cells: list[tuple[str, str]] = []
     for i in range(width):
         idx = _color_index(
@@ -85,10 +105,10 @@ def scanner_cells(
             hold_end=hold_end,
             hold_start=hold_start,
         )
-        if idx < 0 or idx >= len(_TRAIL):
-            cells.append((_INACTIVE, _INACTIVE_CHAR))
+        if idx < 0 or idx >= len(colors):
+            cells.append((inactive, _INACTIVE_CHAR))
         else:
-            cells.append((_TRAIL[idx], _ACTIVE_CHAR))
+            cells.append((colors[idx], _ACTIVE_CHAR))
     return cells
 
 
@@ -96,10 +116,11 @@ def scanner_html(
     frame: int,
     *,
     width: int = 10,
+    palette: str = "green",
 ) -> str:
     """prompt_toolkit HTML snippet for one scanner frame."""
     parts = []
-    for color, char in scanner_cells(frame, width=width):
+    for color, char in scanner_cells(frame, width=width, palette=palette):
         parts.append(f'<style fg="{color}" bg="default">{char}</style>')
     return "".join(parts)
 

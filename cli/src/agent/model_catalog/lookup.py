@@ -34,19 +34,59 @@ def cloud_catalog_models() -> list[CatalogModel]:
     return items
 
 
-def catalog_provider_for_model(model_id: str | None) -> str | None:
-    """Return the cloud catalog provider for a model id, if known.
+def catalog_providers_for_model(model_id: str | None) -> list[str]:
+    """Return every static-catalog provider that lists ``model_id`` exactly.
 
-    Exact catalog matches win; otherwise use stable id prefixes so unlisted
-    Gemini/Claude/Grok variants still map correctly.
+    The same bare id can appear under multiple providers (e.g. ``kimi-k3`` on
+    Moonshot while also discoverable on OpenCode Zen). Callers that know the
+    active ``llm.provider`` must prefer that over a single heuristic owner.
     """
     value = str(model_id or "").strip()
     if not value:
-        return None
+        return []
+    found: list[str] = []
     for provider, rows in AVAILABLE_MODELS.items():
         for mid, _label, _description in rows:
             if mid == value:
-                return provider
+                found.append(provider)
+                break
+    return found
+
+
+def catalog_label_for_model(
+    model_id: str | None, *, provider: str | None = None
+) -> str | None:
+    """Return a catalog display label, preferring ``provider`` when it lists the id."""
+    value = str(model_id or "").strip()
+    if not value:
+        return None
+    provider_norm = str(provider or "").strip().lower()
+    if provider_norm:
+        for mid, label, _description in AVAILABLE_MODELS.get(provider_norm, []):
+            if mid == value and label:
+                return str(label)
+    for _provider, rows in AVAILABLE_MODELS.items():
+        for mid, label, _description in rows:
+            if mid == value and label:
+                return str(label)
+    return None
+
+
+def catalog_provider_for_model(model_id: str | None) -> str | None:
+    """Return a cloud catalog provider for a model id, if known.
+
+    Exact catalog matches win (first provider in ``AVAILABLE_MODELS`` order).
+    The same bare id can be offered by multiple providers (e.g. ``kimi-k3``
+    on Moonshot and OpenCode Zen) — callers that know the active provider
+    should prefer ``llm.provider`` / ``catalog_providers_for_model`` over this
+    heuristic. Prefix rules cover unlisted Gemini/Claude/Grok variants.
+    """
+    owners = catalog_providers_for_model(model_id)
+    if owners:
+        return owners[0]
+    value = str(model_id or "").strip()
+    if not value:
+        return None
     lower = value.lower()
     if lower.startswith("gemini-"):
         return "google"
