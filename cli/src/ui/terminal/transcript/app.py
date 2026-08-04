@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from prompt_toolkit.application import Application
 from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.filters import Condition
 from prompt_toolkit.history import History
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
@@ -32,6 +33,7 @@ _TRANSCRIPT_STYLE = {
     "transcript-tool-ok": "#98c379",
     "transcript-tool-error": "#ff5555",
     "transcript-tool-detail": "#7f8790",
+    "transcript-selected": "reverse",
 }
 
 
@@ -216,6 +218,17 @@ def _build_transcript_bindings(terminal, store, control, buf) -> KeyBindings:
     @kb.add("c-e", eager=True)
     def _expand(event):
         store.toggle_last_tool()
+        event.app.invalidate()
+
+    @kb.add("c-c", filter=Condition(control.has_selection), eager=True)
+    def _copy_selection(event):
+        control.copy_selection_to_clipboard()
+        control.clear_selection()
+        event.app.invalidate()
+
+    @kb.add("escape", filter=Condition(control.has_selection), eager=True)
+    def _clear_selection(event):
+        control.clear_selection()
         event.app.invalidate()
 
     return kb

@@ -36,6 +36,7 @@ Type a research question, or `/` for slash-command autocomplete. Shared sessions
 | Path paste / drop | Same as paste: leading image path becomes `[Image N]` |
 | Scroll history | Mouse wheel / `PgUp` `PgDn` / `Ctrl+↑↓` scroll the owned session transcript |
 | Expand tool | Click a `✓ Ran … ▸` line (or `Ctrl+E`) to expand/collapse args and output in place |
+| Select text | Drag across the transcript to highlight; selection copies on mouse-up (`Ctrl+C` / `Esc`) |
 
 On submit, chips expand to `@uploads/…` for the vision pipeline (same as the Web UI). Use a vision-capable model.
 

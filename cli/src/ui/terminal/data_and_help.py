@@ -77,6 +77,7 @@ class _DataAndHelpMixin:
             "**Shortcuts:**\n"
             "- `Enter` — submit · `Ctrl+J` / `Alt+Enter` — newline\n"
             "- Click a `✓ Ran … ▸` tool line — expand/collapse details in place\n"
+            "- Drag to select transcript text (copies on release; `Ctrl+C` / `Esc`)\n"
             "- Mouse wheel / `PgUp` `PgDn` — scroll the session transcript\n"
             "- `Ctrl+E` — toggle the latest tool card\n"
             "- Paste image / image path — orange `[Image N]` chip (`uploads/`)\n"

@@ -94,11 +94,23 @@ def test_control_cursor_anchors_scroll():
     assert content2.cursor_position.y == 5
 
 
-def test_mouse_click_toggles_each_tool_when_scrolled():
-    """Clicks use absolute content rows — must work for every tool past the fold."""
+def _click(control, x: int, y: int) -> None:
     from prompt_toolkit.data_structures import Point
     from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
 
+    for etype in (MouseEventType.MOUSE_DOWN, MouseEventType.MOUSE_UP):
+        control.mouse_handler(
+            MouseEvent(
+                position=Point(x=x, y=y),
+                event_type=etype,
+                button=MouseButton.LEFT,
+                modifiers=frozenset(),
+            )
+        )
+
+
+def test_mouse_click_toggles_each_tool_when_scrolled():
+    """Clicks use absolute content rows — must work for every tool past the fold."""
     from ui.terminal.transcript.control import TranscriptControl
 
     class FakeWin:
@@ -128,17 +140,65 @@ def test_mouse_click_toggles_each_tool_when_scrolled():
     for tool, row in zip(tools, headers, strict=True):
         for t in tools:
             t.expanded = False
-        result = control.mouse_handler(
-            MouseEvent(
-                position=Point(x=2, y=row),
-                event_type=MouseEventType.MOUSE_DOWN,
-                button=MouseButton.LEFT,
-                modifiers=frozenset(),
-            )
-        )
-        assert result is None
+        _click(control, 2, row)
         assert tool.expanded is True
         assert sum(1 for t in tools if t.expanded) == 1
+
+
+def test_drag_selects_text_without_toggling_tool():
+    from prompt_toolkit.data_structures import Point
+    from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
+
+    from ui.terminal.transcript.control import TranscriptControl
+
+    class FakeWin:
+        vertical_scroll = 0
+
+    store = TranscriptStore()
+    store.append_text("hello selectable world")
+    tool = store.append_tool(name="neo", args={"x": 1}, result="ok")
+
+    control = TranscriptControl(store)
+    control.window = FakeWin()
+    control.create_content(80, 20)
+    plain = control._plain_lines[0]
+    start = plain.index("selectable")
+    end = start + len("selectable") - 1
+
+    control.mouse_handler(
+        MouseEvent(
+            position=Point(x=start, y=0),
+            event_type=MouseEventType.MOUSE_DOWN,
+            button=MouseButton.LEFT,
+            modifiers=frozenset(),
+        )
+    )
+    control.mouse_handler(
+        MouseEvent(
+            position=Point(x=end, y=0),
+            event_type=MouseEventType.MOUSE_MOVE,
+            button=MouseButton.LEFT,
+            modifiers=frozenset(),
+        )
+    )
+    control.mouse_handler(
+        MouseEvent(
+            position=Point(x=end, y=0),
+            event_type=MouseEventType.MOUSE_UP,
+            button=MouseButton.LEFT,
+            modifiers=frozenset(),
+        )
+    )
+
+    assert control.selected_text() == "selectable"
+    assert tool.expanded is False
+    assert control.has_selection() is True
+
+    # Highlight appears in rendered fragments.
+    content = control.create_content(80, 20)
+    frags = content.get_line(0)
+    selected = "".join(text for style, text in frags if "transcript-selected" in style)
+    assert "selectable" in selected
 
 
 def test_markdown_assistant_strips_emphasis_and_pads():
