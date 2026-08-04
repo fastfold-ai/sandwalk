@@ -56,13 +56,20 @@ def markdown_to_styled_lines(
         from ui.markdown.render import print_markdown_with_mermaid
 
         buf = StringIO()
+        # soft_wrap=False so Rich hard-wraps to `width`. soft_wrap=True leaves
+        # one long line for the host terminal; our Window has wrap_lines=False
+        # and would clip mid-word on the right edge.
+        # Also pin height: Rich only honors width alone when height is set too
+        # (otherwise TERM=dumb / tty probe can force an 80-col size).
+        wrap_w = max(20, int(width))
         console = Console(
             file=buf,
-            width=max(40, width),
+            width=wrap_w,
+            height=10_000,
             force_terminal=bool(colored),
             color_system="256" if colored else None,
             highlight=False,
-            soft_wrap=True,
+            soft_wrap=False,
         )
         print_markdown_with_mermaid(console, text, config=config)
         raw = buf.getvalue().rstrip("\n")
@@ -238,6 +245,10 @@ def entry_rows(
         if entry.kind == "user":
             boxed = user_message_rows(entry.text, width=width)
             return [(entry, i, frags) for i, frags in enumerate(boxed)]
+
+        # Intentional spacer rows (console.print() with no args).
+        if not (entry.text or "").strip():
+            return [(entry, 0, [("", "")])]
 
         raw = entry.text
         # Show the same orange [Image N] chips as the compose box (not @uploads/…).

@@ -680,9 +680,12 @@ class TestTerminalMethods:
         terminal._last_response = "stale"
 
         resumed = MagicMock()
-        resumed.trajectory.turns = [MagicMock(), MagicMock()]
+        turn = MagicMock()
+        turn.query = "what's this?"
+        resumed.trajectory.turns = [turn, MagicMock()]
         resumed.trajectory.title = "Full resume"
         resumed.trajectory.session_id = "abc12345"
+        resumed.trajectory.save = MagicMock()
         with patch("agent.trajectory.Trajectory.list_sessions", return_value=sessions), patch(
             "agent.loop.AgentLoop.resume", return_value=resumed
         ):
@@ -696,6 +699,22 @@ class TestTerminalMethods:
         assert "Resumed" in printed
         assert "Full resume" in printed
         assert "2 turns" in printed
+
+    def test_session_display_title_heals_instruction_echo(self, terminal):
+        turn = MagicMock()
+        turn.query = "what's this ?[Image 1]"
+        terminal.agent = MagicMock()
+        terminal.agent.trajectory.title = (
+            "The user wants me to generate a short, concise title (max 4 words)"
+        )
+        terminal.agent.trajectory.turns = [turn]
+        terminal.agent.trajectory.save = MagicMock()
+
+        title = terminal._session_display_title()
+        assert "generate a short" not in title.lower()
+        assert "what's this" in title.lower()
+        assert terminal.agent.trajectory.title == title
+        terminal.agent.trajectory.save.assert_called_once()
 
     def test_delete_session_accepts_prefix(self, terminal):
         sessions = [

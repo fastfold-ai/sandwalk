@@ -5,6 +5,95 @@ import random
 from cli.constants import _FASTFOLD_CORE_SKILL_NAMES
 from ui.terminal import SLASH_COMMANDS
 
+# Short aliases for a few Anthropic/OpenAI catalog ids (banner + compose parity).
+_BANNER_MODEL_ALIASES = {
+    "claude-sonnet-4-5-20250929": "Sonnet 4.5",
+    "claude-haiku-4-5-20251001": "Haiku 4.5",
+    "claude-opus-4-6": "Opus 4.6",
+    "gpt-4o": "GPT-4o",
+    "gpt-4o-mini": "GPT-4o Mini",
+}
+
+
+def _banner_model_display_name(cfg) -> str | None:
+    """Friendly model label for the banner (not the raw API id)."""
+    model_raw = str(cfg.get("llm.model") or "").strip()
+    if not model_raw:
+        return None
+    if model_raw in _BANNER_MODEL_ALIASES:
+        return _BANNER_MODEL_ALIASES[model_raw]
+    provider = str(cfg.get("llm.provider") or "").strip().lower() or None
+    try:
+        from agent.model_catalog import catalog_label_for_model, format_discovered_model_label
+
+        labeled = catalog_label_for_model(model_raw, provider=provider)
+        if labeled:
+            return labeled
+        return format_discovered_model_label(model_raw)
+    except Exception:
+        return model_raw
+
+
+def _banner_provider_label(cfg) -> str | None:
+    """Provider label shown muted after the model name (compose meta style)."""
+    provider = str(cfg.get("llm.provider") or "").strip().lower()
+    if not provider:
+        return None
+    if provider == "anthropic":
+        return "Anthropic"
+    if provider == "openai":
+        # Local / OpenAI-compatible profiles surface the backend name instead.
+        try:
+            if hasattr(cfg, "get_openai_profile"):
+                profile = cfg.get_openai_profile()
+            else:
+                profile = None
+        except Exception:
+            profile = None
+        backend = ""
+        if isinstance(profile, dict):
+            backend = str(profile.get("backend") or "").strip().lower()
+        if backend and backend != "openai":
+            names = {
+                "ollama": "Ollama",
+                "unsloth": "Unsloth",
+                "omlx": "oMLX",
+                "ds4": "DS4",
+                "llama_cpp": "llama.cpp",
+                "lm_studio": "LM Studio",
+            }
+            return names.get(backend, "Compatible")
+        return "OpenAI"
+    try:
+        from agent.config import OPENAI_COMPATIBLE_PROVIDERS
+
+        meta = OPENAI_COMPATIBLE_PROVIDERS.get(provider) or {}
+        label = str(meta.get("label") or "").strip()
+        return label or provider
+    except Exception:
+        return provider
+
+
+def banner_model_provider_markup(cfg) -> str | None:
+    """Rich markup: ``Kimi K3 OpenCode Zen`` (model + muted provider)."""
+    model_name = _banner_model_display_name(cfg)
+    if not model_name:
+        return None
+    provider_label = _banner_provider_label(cfg)
+    # Match compose meta: model darker gray, provider softer gray, space-separated.
+    parts = [f"[#555555]{model_name}[/]"]
+    if provider_label:
+        parts.append(f"[#8a8f98]{provider_label}[/]")
+    try:
+        from agent.model_catalog import config_selected_effort_label
+
+        effort_label = config_selected_effort_label(cfg)
+    except Exception:
+        effort_label = None
+    if effort_label:
+        parts.append(f"[#8a8f98]· {effort_label}[/]")
+    return " ".join(parts)
+
 
 def _installed_claude_skill_names() -> list[str]:
     """Return installed skill names across all tiers (global, project, bundled)."""

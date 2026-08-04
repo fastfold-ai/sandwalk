@@ -273,7 +273,9 @@ class InteractiveTerminal(
                         text = rich_print_to_text(
                             *args, width=int(console.width or 100), **kwargs
                         )
-                        if text.strip():
+                        # Keep blank console.print() calls — Session History /
+                        # usage-footer margins rely on them.
+                        if text.strip() or not args:
                             transcript.append_text(text, kind="system")
                     return None
                 if transcript is not None:
@@ -282,7 +284,7 @@ class InteractiveTerminal(
                     text = rich_print_to_text(
                         *args, width=int(console.width or 100), **kwargs
                     )
-                    if text.strip():
+                    if text.strip() or not args:
                         transcript.append_text(text, kind="system")
                     return None
                 return original(*args, **kwargs)

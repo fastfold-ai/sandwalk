@@ -22,10 +22,35 @@ class _SessionLifecycleMixin:
         except Exception:
             pass
 
+    def _session_display_title(self, *, heal: bool = True) -> str:
+        """Readable session title; heal instruction-echo junk from auto-title."""
+        from agent_server.title import fallback_title_from_query, is_placeholder_title
+
+        traj = getattr(getattr(self, "agent", None), "trajectory", None)
+        if traj is None:
+            return "untitled"
+        title = str(getattr(traj, "title", None) or "").strip()
+        if title and not is_placeholder_title(title):
+            return title
+        turns = list(getattr(traj, "turns", None) or [])
+        query = ""
+        if turns:
+            query = str(getattr(turns[0], "query", "") or "").strip()
+        healed = fallback_title_from_query(query) if query else ""
+        if healed and heal:
+            traj.title = healed
+            try:
+                traj.save()
+            except Exception:
+                pass
+            return healed
+        return healed or title or "untitled"
+
     def _resume_session(self, identifier: str = None):
         """Resume a previous session and replay its history into the TUI."""
         from agent.loop import AgentLoop
         from agent.trajectory import Trajectory
+        from rich.markup import escape
 
         sessions = Trajectory.list_sessions()
         if not sessions:
@@ -54,11 +79,12 @@ class _SessionLifecycleMixin:
             self._restore_usage_from_trajectory()
             self._last_response = None
             n = len(self.agent.trajectory.turns)
-            title = self.agent.trajectory.title or "untitled"
+            title = self._session_display_title()
             # Clear the prior active session's scrollback, then show resumed turns.
             self._reset_transcript_canvas()
             self.console.print(
-                f"  [green]Resumed[/green] [bold]{session_id}[/bold] — {title} ({n} turns)"
+                f"  [green]Resumed[/green] [bold]{escape(session_id)}[/bold] — "
+                f"{escape(title)} ({n} turns)"
             )
             self._render_resumed_history(
                 self.console.width, turns=self.agent.trajectory.turns

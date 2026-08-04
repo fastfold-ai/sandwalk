@@ -225,6 +225,28 @@ def test_user_message_box_has_no_prompt_arrow():
     assert any("┃" in line for line in lines)
 
 
+def test_resize_reflows_to_current_width():
+    """Wrap always tracks the live window width so text stays fully visible."""
+    from ui.terminal.transcript.control import TranscriptControl
+
+    store = TranscriptStore()
+    store.append_text("hello world " * 20, kind="assistant")
+    control = TranscriptControl(store)
+
+    narrow = control.create_content(40, 10)
+    assert control._cache_key == (int(store.revision), 40)
+    narrow_lines = narrow.line_count
+
+    wide = control.create_content(120, 10)
+    assert control._cache_key == (int(store.revision), 120)
+    # Wider wrap should produce fewer (or equal) content rows before height pad.
+    assert control._line_count <= narrow_lines
+
+    # Lines are padded to the window width so shrink-resizes clear ghosts.
+    line0 = "".join(t for _s, t in wide.get_line(0))
+    assert len(line0) >= 120
+
+
 def test_banner_kind_preserves_mark_without_left_pad():
     from ui.terminal.transcript.render import LEFT_PAD, entry_lines
 
@@ -292,6 +314,33 @@ def test_drag_selects_text_without_toggling_tool():
     frags = content.get_line(0)
     selected = "".join(text for style, text in frags if "transcript-selected" in style)
     assert "selectable" in selected
+
+
+def test_markdown_assistant_hard_wraps_to_width():
+    """Rich soft_wrap must be off — long assistant lines must not clip mid-word."""
+    from ui.terminal.transcript.render import LEFT_PAD, entry_lines, markdown_to_plain
+
+    text = (
+        "That's a capybara (Hydrochoerus hydrochaeris) — the world's largest living rodent. "
+        "It's a sharp, well-lit photo of one standing in short grass, given the clean "
+        "lighting and isolated background."
+    )
+    width = 60
+    plain = markdown_to_plain(text, width=width)
+    lines = plain.splitlines()
+    assert len(lines) > 1
+    # LEFT_PAD is applied after Rich wraps to `width`, so each visible line
+    # is at most pad + wrap-width (Rich may leave trailing spaces).
+    assert max(len(line) for line in lines) <= len(LEFT_PAD) + width + 2
+    assert "isolated" in plain  # not clipped away at the right edge
+
+    store = TranscriptStore()
+    store.append_text(text, kind="assistant")
+    rows = entry_lines(store.entries[0], width=width)
+    plain_rows = [line.rstrip() for _, _, line in rows]
+    assert len(plain_rows) > 1
+    assert max(len(line) for line in plain_rows) <= width
+    assert any("isolated" in line for line in plain_rows)
 
 
 def test_markdown_assistant_strips_emphasis_and_pads():

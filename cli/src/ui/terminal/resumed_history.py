@@ -37,6 +37,7 @@ class _ResumedHistoryMixin:
         trace_blocks = self._load_trace_blocks()
         self.console.print()
         self.console.print("  [cyan]Session History[/cyan]")
+        self.console.print()  # breath below the heading before the first turn
         for idx, turn in enumerate(turns):
             query = str(getattr(turn, "query", "") or "").strip()
             answer = str(getattr(turn, "answer", "") or "").strip()

@@ -145,8 +145,9 @@ class TranscriptControl(UIControl):
     def create_content(self, width: int, height: int) -> UIContent:
         self._width = max(20, width)
         self._height = max(1, height)
-        # Re-render only when store content or width changes — toolbar animation
-        # invalidates often and must not re-run Rich/markdown over the full history.
+        # Always wrap to the live window width so resize never leaves clipped
+        # or narrow-column text. Toolbar animation must not re-run Rich/markdown
+        # unless the store revision or width actually changed.
         key = (int(self.store.revision), self._width)
         if key != self._cache_key:
             rows, hit_map = render_all_lines(
@@ -160,6 +161,7 @@ class TranscriptControl(UIControl):
             self._cache_key = key
         rows = self._rows
         self._line_count = len(rows)
+        pad_width = self._width
 
         # The Window scrolls to keep ``cursor_position`` visible, so the
         # cursor *is* our scroll anchor: last line while following the tail,
@@ -177,26 +179,35 @@ class TranscriptControl(UIControl):
 
         def get_line(i: int):
             if i < 0 or i >= len(rows):
-                return []
+                # Clear stale cells on unused rows after a shrink-resize.
+                return [("", " " * pad_width)] if pad_width > 0 else []
             frags = list(rows[i])
-            if bounds is None or not self.has_selection():
-                return frags
-            start, end = bounds
-            if i < start.y or i > end.y:
-                return frags
-            line_len = len(self._plain_lines[i]) if i < len(self._plain_lines) else 0
-            if start.y == end.y:
-                lo, hi = sorted((start.x, end.x))
-                return _overlay_selection(frags, lo, hi + 1)
-            if i == start.y:
-                return _overlay_selection(frags, start.x, max(start.x, line_len) + 1)
-            if i == end.y:
-                return _overlay_selection(frags, 0, end.x + 1)
-            return _overlay_selection(frags, 0, line_len + 1)
+            if bounds is not None and self.has_selection():
+                start, end = bounds
+                if start.y <= i <= end.y:
+                    line_len = (
+                        len(self._plain_lines[i]) if i < len(self._plain_lines) else 0
+                    )
+                    if start.y == end.y:
+                        lo, hi = sorted((start.x, end.x))
+                        frags = _overlay_selection(frags, lo, hi + 1)
+                    elif i == start.y:
+                        frags = _overlay_selection(
+                            frags, start.x, max(start.x, line_len) + 1
+                        )
+                    elif i == end.y:
+                        frags = _overlay_selection(frags, 0, end.x + 1)
+                    else:
+                        frags = _overlay_selection(frags, 0, line_len + 1)
+            # Pad to full width so shrink-resizes erase previous glyphs.
+            plain_len = sum(len(t) for _s, t in frags)
+            if plain_len < pad_width:
+                frags = [*frags, ("", " " * (pad_width - plain_len))]
+            return frags
 
         return UIContent(
             get_line=get_line,
-            line_count=len(rows),
+            line_count=max(len(rows), self._height),
             cursor_position=cursor,
             show_cursor=False,
         )

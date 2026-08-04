@@ -138,6 +138,8 @@ class _TraceReplayMixin:
 
         width = max(40, int(term_width or self.console.width or 100))
         inner_width = max(10, width - 2)
+        # Small top margin so the footer isn't flush against the answer body.
+        self.console.print()
         if len(left) + len(right) + 1 <= inner_width:
             spaces = max(1, inner_width - len(left) - len(right))
             self.console.print(
