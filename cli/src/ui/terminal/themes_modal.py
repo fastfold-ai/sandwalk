@@ -268,29 +268,43 @@ class ThemesModalHost:
             style="class:themes-dialog",
         )
 
-        # Frame the dialog so it reads as a modal over live transcript content.
-        # (TTYs can't alpha-blend; a full-screen dim would erase the session.)
-        framed = HSplit(
+        # Drop shadow (1 cell down/right) — classic TUI depth cue.
+        with_shadow = HSplit(
             [
-                Window(
-                    height=1,
-                    char="─",
-                    style="class:themes-frame",
+                VSplit(
+                    [
+                        dialog,
+                        Window(
+                            width=1,
+                            char=" ",
+                            style="class:themes-shadow",
+                        ),
+                    ],
+                    height=Dimension.exact(DIALOG_HEIGHT),
                 ),
-                dialog,
-                Window(
+                VSplit(
+                    [
+                        # Indent so the bottom strip sits under the dialog,
+                        # offset one cell right (with the right-edge column).
+                        Window(width=1, char=" "),
+                        Window(
+                            width=DIALOG_WIDTH,
+                            height=1,
+                            char=" ",
+                            style="class:themes-shadow",
+                        ),
+                    ],
                     height=1,
-                    char="─",
-                    style="class:themes-frame",
                 ),
             ],
-            width=Dimension.exact(DIALOG_WIDTH),
-            height=Dimension.exact(DIALOG_HEIGHT + 2),
+            width=Dimension.exact(DIALOG_WIDTH + 1),
+            height=Dimension.exact(DIALOG_HEIGHT + 1),
             style="class:themes-dialog",
         )
-        dialog_layer = ConditionalContainer(content=framed, filter=self.is_open)
+        dialog_layer = ConditionalContainer(content=with_shadow, filter=self.is_open)
 
-        # Centered float only — transcript stays visible around the panel.
+        # Centered dialog; backdrop dim is applied to base transcript styles
+        # while open (TTYs have no true alpha overlay).
         self.floats = [
             Float(
                 content=dialog_layer,
@@ -499,6 +513,44 @@ class ThemesModalHost:
             pass
 
 
+def _overlay_black(hex_color: str, alpha: float = 0.55) -> str:
+    """Blend ``#RRGGBB`` toward black (OpenCode backdrop ≈ rgba(0,0,0,150))."""
+    raw = (hex_color or "").strip().lstrip("#")
+    if len(raw) != 6:
+        return hex_color
+    try:
+        r = int(raw[0:2], 16)
+        g = int(raw[2:4], 16)
+        b = int(raw[4:6], 16)
+    except ValueError:
+        return hex_color
+    keep = max(0.0, min(1.0, 1.0 - alpha))
+    return f"#{int(r * keep):02x}{int(g * keep):02x}{int(b * keep):02x}"
+
+
+def _dim_style_string(style: str, alpha: float = 0.55) -> str:
+    import re
+
+    return re.sub(
+        r"#[0-9a-fA-F]{6}",
+        lambda m: _overlay_black(m.group(0), alpha),
+        style or "",
+    )
+
+
+def dim_transcript_styles_for_backdrop(
+    styles: dict[str, str], *, alpha: float = 0.55
+) -> dict[str, str]:
+    """Veil session chrome under a black wash; keep themes-* modal keys bright."""
+    out: dict[str, str] = {}
+    for key, val in styles.items():
+        if str(key).startswith("themes-"):
+            out[key] = val
+            continue
+        out[key] = _dim_style_string(val, alpha)
+    return out
+
+
 def themes_modal_style_extras(colors: dict[str, str]) -> dict[str, str]:
     """Extra style keys for the themes overlay (merged into transcript styles)."""
     from ui.terminal.theme import _contrast_on
@@ -509,6 +561,7 @@ def themes_modal_style_extras(colors: dict[str, str]) -> dict[str, str]:
     muted = colors["muted_fg"]
     canvas = colors["canvas_bg"]
     on_accent = _contrast_on(accent)
+    shadow = _overlay_black(canvas, 0.75)
     return {
         "themes-dialog": f"bg:{panel} {panel_fg}",
         "themes-title": f"bg:{panel} {panel_fg} bold",
@@ -521,8 +574,7 @@ def themes_modal_style_extras(colors: dict[str, str]) -> dict[str, str]:
         "themes-preview": f"bg:{canvas} {colors['canvas_fg']}",
         "themes-preview-panel": f"bg:{panel} {panel_fg}",
         "themes-preview-accent": f"bg:{canvas} {accent}",
-        "themes-frame": f"bg:{panel} {muted}",
-        "themes-dim": f"fg:{muted}",
+        "themes-shadow": f"bg:{shadow}",
     }
 
 

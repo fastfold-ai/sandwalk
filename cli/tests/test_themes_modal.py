@@ -37,3 +37,23 @@ def test_run_themes_modal_skips_under_pytest():
     from ui.terminal.themes_modal import run_themes_modal
 
     assert run_themes_modal(object()) is False
+
+
+def test_overlay_black_blends_toward_black():
+    from ui.terminal.themes_modal import _overlay_black
+
+    assert _overlay_black("#ffffff", 0.5) == "#7f7f7f"
+    assert _overlay_black("#000000", 0.5) == "#000000"
+
+
+def test_backdrop_dim_keeps_themes_styles_bright():
+    from ui.terminal.themes_modal import dim_transcript_styles_for_backdrop
+
+    styles = {
+        "transcript-root": "bg:#ffffff #111111",
+        "themes-dialog": "bg:#abcdef #000000",
+    }
+    out = dim_transcript_styles_for_backdrop(styles, alpha=0.5)
+    assert out["themes-dialog"] == "bg:#abcdef #000000"
+    assert out["transcript-root"] != styles["transcript-root"]
+    assert "#7f7f7f" in out["transcript-root"]

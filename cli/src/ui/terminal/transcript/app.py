@@ -46,23 +46,26 @@ _COMPOSE_BOX_RIGHT = _COMPOSE_OUTER
 _INVALIDATE_MIN_INTERVAL_S = 0.05
 
 
-def _merge_style(config=None):
+def _merge_style(config=None, *, backdrop_dim: bool = False):
     from prompt_toolkit.styles import Style
 
     theme = resolve_ui_theme(config)
     palette = resolve_ui_palette(config)
+    styles = transcript_style_dict(theme, palette=palette, config=config)
+    if backdrop_dim:
+        from ui.terminal.themes_modal import dim_transcript_styles_for_backdrop
+
+        styles = dim_transcript_styles_for_backdrop(styles)
     return merge_styles(
         [
             PT_STYLE,
-            Style.from_dict(
-                transcript_style_dict(theme, palette=palette, config=config)
-            ),
+            Style.from_dict(styles),
         ]
     )
 
 
-def _theme_fingerprint(config=None) -> tuple[str, str]:
-    return (resolve_ui_theme(config), resolve_ui_palette(config))
+def _theme_fingerprint(config=None, *, backdrop_dim: bool = False) -> tuple[str, str, bool]:
+    return (resolve_ui_theme(config), resolve_ui_palette(config), backdrop_dim)
 
 
 def run_transcript_session(
@@ -260,12 +263,14 @@ def run_transcript_session(
                 live_cfg = sess.config
         except Exception:  # noqa: BLE001
             pass
-        fp = _theme_fingerprint(live_cfg)
+        host = getattr(terminal, "_themes_modal_host", None)
+        dim = bool(host is not None and getattr(host.state, "open", False))
+        fp = _theme_fingerprint(live_cfg, backdrop_dim=dim)
         if not force and fp == theme_state["fp"]:
             return
         theme_state["fp"] = fp
         try:
-            app.style = _merge_style(live_cfg)
+            app.style = _merge_style(live_cfg, backdrop_dim=dim)
         except Exception:  # noqa: BLE001
             pass
 
