@@ -31,6 +31,9 @@ DEFAULTS_LLM = {
     "llm.openai_active_profile": None,
     "llm.openai_default_profile": None,
     "llm.hidden_models": [],
+    # /models picker: pinned favorites + recently selected (provider:model keys).
+    "llm.favorite_models": [],
+    "llm.recent_models": [],
     # OpenRouter ids already default-disabled on first discovery (opt-in).
     "llm.openrouter_seen_models": [],
     "llm.custom_models": [],

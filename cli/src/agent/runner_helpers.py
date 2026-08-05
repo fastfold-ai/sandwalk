@@ -181,7 +181,7 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             f"{detail}\n"
             "The configured provider returned 404 (model or endpoint not found).\n"
             "Verify `llm.model` and `llm.openai_base_url` for your selected profile,\n"
-            "then retry (you can update via `/model` or `sandwalk setup`).",
+            "then retry (you can update via `/models` or `sandwalk setup`).",
         )
 
     is_context = (
@@ -240,7 +240,7 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             "Provider unavailable",
             f"{detail}\n"
             "The model provider is temporarily unavailable.\n"
-            "Try again shortly, or switch models/providers with `/model`.",
+            "Try again shortly, or switch models/providers with `/models`.",
         )
 
     if "recursion" in low and "limit" in low:

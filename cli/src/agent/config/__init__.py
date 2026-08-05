@@ -56,6 +56,7 @@ from .env_sync import (  # noqa: E402
 )
 from .legacy import migrate_tree as _migrate_tree  # noqa: E402
 from .model_custom import ModelCustomMixin  # noqa: E402
+from .model_favorites import ModelFavoritesMixin  # noqa: E402
 from .model_hidden import ModelHiddenMixin  # noqa: E402
 from .profile_backend_infer import ProfileBackendInferMixin  # noqa: E402
 from .profile_bootstrap import ProfileBootstrapMixin  # noqa: E402
@@ -109,6 +110,7 @@ class Config(
     ProfileRecordMixin,
     ProfileBackendInferMixin,
     ModelHiddenMixin,
+    ModelFavoritesMixin,
     ModelCustomMixin,
     SecretsCoreMixin,
     SecretsPreflightMixin,

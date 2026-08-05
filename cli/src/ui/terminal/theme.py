@@ -227,6 +227,7 @@ def transcript_style_dict(
     accent = p["accent"]
     on_accent = _contrast_on(accent)
     muted = p["muted_fg"]
+    from ui.terminal.models_modal import models_modal_style_extras
     from ui.terminal.themes_modal import themes_modal_style_extras
 
     out = {
@@ -262,6 +263,7 @@ def transcript_style_dict(
         "scrollbar.arrow": f"bg:{p['panel_bg']} {muted}",
     }
     out.update(themes_modal_style_extras(p))
+    out.update(models_modal_style_extras(p))
     return out
 
 

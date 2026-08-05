@@ -37,11 +37,12 @@ class TestSlashCommands:
     """Verify all expected slash commands are registered."""
 
     def test_core_commands_registered(self):
-        expected = ["/help", "/tools", "/model", "/settings", "/usage", "/copy",
+        expected = ["/help", "/tools", "/models", "/settings", "/usage", "/copy",
                     "/export", "/compact", "/new", "/sessions", "/resume", "/upgrade",
                     "/clear", "/exit", "/config", "/keys", "/doctor"]
         for cmd in expected:
             assert cmd in SLASH_COMMANDS, f"{cmd} not in SLASH_COMMANDS"
+        assert "/model" not in SLASH_COMMANDS
 
     def test_slash_commands_have_descriptions(self):
         for cmd, desc in SLASH_COMMANDS.items():
@@ -971,7 +972,7 @@ class TestTerminalMethods:
             "/skills-find kinase",
             "/skills-remove x",
             "/skills",
-            "/model",
+            "/models",
             "/settings",
             "/plan",
             "/usage",
@@ -1040,7 +1041,7 @@ class TestTerminalMethods:
         fake_loop = MagicMock()
         with patch(
             "ui.terminal.transcript.app.run_transcript_session",
-            side_effect=_fake_transcript_session(["/model", "/quit"]),
+            side_effect=_fake_transcript_session(["/models", "/quit"]),
         ), patch("agent.loop.AgentLoop", return_value=fake_loop):
             terminal.run()
 

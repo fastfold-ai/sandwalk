@@ -13,7 +13,7 @@ SLASH_COMMANDS = {
     "/skills-remove": "Remove a globally-installed skill",
     "/specialist": "Set/list specialists (/specialist <slug> | use|clear|list|show)",
     "/sandbox": "Pick Local / Modal compute presets (+ edit base image)",
-    "/model": "Switch LLM model/provider interactively",
+    "/models": "Model picker with search and favorites",
     "/effort": "Set Effort / Fast (thinking) for the active model",
     "/settings": "Configure UI and agent preferences",
     "/themes": "Theme picker with search and live preview",

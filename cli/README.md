@@ -65,7 +65,7 @@ See also [docs: Plan mode](../docs/content/cli/plan.mdx) and the Web UI Plan mod
 
 ### Sandbox (`/sandbox`)
 
-Bare `/sandbox` opens a numbered picker (same idea as `/model`):
+Bare `/sandbox` opens a numbered picker (same idea as `/models`):
 
 1. **Local Sandbox** — this machine  
 2. **Modal CPU** presets (2·8, 4·16, …) — matches the Web UI  
@@ -89,9 +89,9 @@ Other forms:
 CLI preference key: `agent.cli_sandbox` (`builtin` | `modal`).  
 Compute/image keys: `sandbox.compute_type`, `sandbox.gpu_class`, `sandbox.cpu_cores`, `sandbox.ram_gb`, `sandbox.cpu_image`, `sandbox.gpu_image`.
 
-### Models (`/model`)
+### Models (`/models`)
 
-Bare `/model` opens a numbered picker of **enabled** catalog models (same list as Dashboard → Models). Pick a cloud or local entry to switch the active session model.
+Bare `/models` opens a searchable picker of **enabled** catalog models (same list as Dashboard → Models). Pick a cloud or local entry to switch the active session model. Use `ctrl+f` to pin favorites.
 
 - Hidden / disabled models are omitted (toggle them in the Web UI Models view).
 - Status bar shows the active model id; `/usage` shows tokens for the session.
@@ -106,7 +106,7 @@ Config keys: `llm.provider`, `llm.model`, `llm.moonshot_api_key`, `llm.model_rea
 
 ### Model Manager (`/model-manager`)
 
-Manage **OpenAI-compatible** endpoints (local / proxy). Profile CRUD lives here — not under `/model`.
+Manage **OpenAI-compatible** endpoints (local / proxy). Profile CRUD lives here — not under `/models`.
 
 ```text
 /model-manager
@@ -131,14 +131,14 @@ For each profile you set endpoint type, base URL, optional API key, and default 
 | 6 | LM Studio | `/v1/models` |
 | 7 | Other OpenAI-compatible | `/v1/models`, then `/api/tags` |
 
-The table probes each profile (health, models path, key preview, discovered model ids). After adding a profile, use `/model` to select one of its models.
+The table probes each profile (health, models path, key preview, discovered model ids). After adding a profile, use `/models` to select one of its models.
 
 ### Slash commands
 
 | Slash | Description |
 |-------|-------------|
 | `/help` | Show command reference with examples |
-| `/model` | Switch LLM model / provider interactively |
+| `/models` | Switch LLM model / provider interactively |
 | `/effort` | Set Effort / Fast (thinking) for the active model |
 | `/model-manager` | Manage OpenAI-compatible profiles (add / edit / delete) |
 | `/keys` | API key status (`profile`, `set-compatible`, `set-moonshot`, `set-boltz`) |

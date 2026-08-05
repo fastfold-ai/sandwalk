@@ -447,7 +447,7 @@ class InteractiveTerminal(
             query = "/" + query[2:].lstrip()
 
         # Auto-resolve partial slash commands — first match wins
-        # (e.g. "/mod" → "/model", "/co" → "/config")
+        # (e.g. "/mod" → "/models", "/co" → "/config")
         if cmd.startswith("/") and cmd not in SLASH_COMMANDS:
             prefix = cmd.split()[0]  # handle "/export file.md" → "/export"
             matches = [c for c in SLASH_COMMANDS if c.startswith(prefix)]
@@ -540,8 +540,14 @@ class InteractiveTerminal(
             self._handle_data_command(query)
             self._advance_suggestion()
             return True
-        if cmd in ("model", "/model"):
-            self._schedule_host_terminal(self._switch_model)
+        if cmd in ("models", "/models"):
+            # In-app overlay when the transcript app is live (same as /themes).
+            host = getattr(self, "_models_modal_host", None)
+            app = getattr(self, "_transcript_app", None)
+            if host is not None and getattr(app, "is_running", False):
+                self._switch_model()
+            else:
+                self._schedule_host_terminal(self._switch_model)
             self._advance_suggestion()
             return True
         if cmd in ("effort", "/effort") or cmd.startswith("/effort"):

@@ -140,7 +140,7 @@ def catalog_provider_for_model(model_id: str | None) -> str | None:
 
 
 def terminal_available_models() -> dict[str, list[tuple[str, str, str]]]:
-    """Catalog shape used by the interactive terminal `/model` command.
+    """Catalog shape used by the interactive terminal `/models` command.
 
     Mirrors the full cloud catalog (all providers) so the CLI and the web UI
     stay consistent and centralized on AVAILABLE_MODELS.
