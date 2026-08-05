@@ -5,8 +5,8 @@ Provides a REPL-style interface for continuous research sessions.
 
 This package is split by responsibility:
     slash_commands.py  — SLASH_COMMANDS registry
-    mentions.py         — @ mention parsing, dataset candidates, LLM-output helpers
-    completion.py        — prompt_toolkit completers (slash + mention)
+    mentions.py         — # mention parsing, dataset candidates, LLM-output helpers
+    completion.py        — prompt_toolkit completers (slash + # tools + @ files)
     key_bindings.py      — custom prompt_toolkit key bindings
     plan_preview.py       — Rich rendering of a plan for approval
     interactive.py       — the InteractiveTerminal REPL itself
@@ -28,7 +28,13 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 from rich.console import Console
 
-from .completion import MentionCompleter, MergedCompleter, PT_STYLE, SlashCompleter
+from .completion import (
+    FileMentionCompleter,
+    MentionCompleter,
+    MergedCompleter,
+    PT_STYLE,
+    SlashCompleter,
+)
 from .interactive import (
     AVAILABLE_MODELS,
     DEFAULT_SUGGESTIONS,
@@ -55,6 +61,7 @@ __all__ = [
     "DEFAULT_SUGGESTIONS",
     "InteractiveTerminal",
     "KNOWN_DATASETS",
+    "FileMentionCompleter",
     "MentionCandidate",
     "MentionCompleter",
     "MergedCompleter",

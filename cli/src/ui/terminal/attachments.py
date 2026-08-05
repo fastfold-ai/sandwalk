@@ -38,6 +38,27 @@ _UPLOAD_AT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# File mention chips: ``@[README.md]`` / ``@[notes·2.md]`` — orange like images.
+_FILE_CHIP_RE = re.compile(r"@\[[^\]]+\]")
+_SKIP_DIR_NAMES = frozenset({
+    ".git",
+    ".hg",
+    ".svn",
+    ".venv",
+    "venv",
+    "node_modules",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".tox",
+    "dist",
+    "build",
+    "target",
+    ".next",
+    ".turbo",
+    ".cache",
+})
+
 # Absolute / home / file:// image path at the start of pasted text (optional rest).
 _LEADING_PATH_RE = re.compile(
     r"^(?P<path>"
@@ -174,6 +195,64 @@ def chip_label(n: int) -> str:
     return f"[Image {n}]"
 
 
+def register_file_chip(terminal, agent_path: str, *, display_name: str | None = None) -> str:
+    """Record a file path and return a unique orange ``@[filename]`` chip."""
+    path = str(agent_path or "").strip()
+    if not path:
+        return "@[file]"
+    mapping: dict[str, str] = getattr(terminal, "_file_attach_map", None) or {}
+    terminal._file_attach_map = mapping
+    for chip, existing in mapping.items():
+        if existing == path:
+            return chip
+    base = (display_name or Path(path.lstrip("@")).name or "file").strip() or "file"
+    # Keep chips single-token (no spaces / brackets inside).
+    base = re.sub(r"[\s\[\]]+", "_", base)
+    chip = f"@[{base}]"
+    if chip in mapping:
+        n = int(getattr(terminal, "_file_attach_count", 0) or 0) + 1
+        terminal._file_attach_count = n
+        stem = Path(base).stem
+        suffix = Path(base).suffix
+        chip = f"@[{stem}·{n}{suffix}]"
+    mapping[chip] = path
+    terminal._file_attach_count = max(
+        int(getattr(terminal, "_file_attach_count", 0) or 0),
+        len(mapping),
+    )
+    return chip
+
+
+def expand_file_chips(text: str, file_map: dict[str, str] | None) -> str:
+    """Replace ``@[filename]`` file chips with agent path tokens."""
+    if not text or not file_map:
+        return text
+    # Longest chip first so ``@[a·2.md]`` wins over ``@[a.md]`` prefixes.
+    chips = sorted(file_map.keys(), key=len, reverse=True)
+    out = text
+    for chip in chips:
+        path = file_map.get(chip)
+        if not path:
+            continue
+        out = out.replace(chip, path)
+    return out
+
+
+def find_file_chips(text: str) -> list[str]:
+    """Return unique ``@[filename]`` chips in display order."""
+    if not text:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for match in _FILE_CHIP_RE.finditer(text):
+        chip = match.group(0)
+        if chip in seen:
+            continue
+        seen.add(chip)
+        out.append(chip)
+    return out
+
+
 def chipify_uploads_for_display(text: str) -> str:
     """Replace ``@uploads/…`` image tokens with ``[Image N]`` for UI display."""
     if not text or not _UPLOAD_AT_RE.search(text):
@@ -190,20 +269,41 @@ def chipify_uploads_for_display(text: str) -> str:
 
 
 def style_with_image_chips(
-    text: str, base_style: str
+    text: str,
+    base_style: str,
+    *,
+    file_chips: list[str] | None = None,
 ) -> list[tuple[str, str]]:
-    """Split text into FormattedText fragments, highlighting ``[Image N]`` chips."""
+    """Split text into FormattedText fragments, highlighting attach chips."""
     if not text:
         return [(base_style, "")]
-    if not _CHIP_LABEL_RE.search(text):
+    spans: list[tuple[int, int]] = [
+        (m.start(), m.end()) for m in _CHIP_LABEL_RE.finditer(text)
+    ]
+    for chip in sorted(file_chips or [], key=len, reverse=True):
+        start = 0
+        while True:
+            idx = text.find(chip, start)
+            if idx < 0:
+                break
+            spans.append((idx, idx + len(chip)))
+            start = idx + len(chip)
+    if not spans:
         return [(base_style, text)]
+    # Merge overlaps (prefer earlier/longer).
+    spans.sort(key=lambda s: (s[0], -(s[1] - s[0])))
+    merged: list[tuple[int, int]] = []
+    for start, end in spans:
+        if merged and start < merged[-1][1]:
+            continue
+        merged.append((start, end))
     out: list[tuple[str, str]] = []
     pos = 0
-    for match in _CHIP_LABEL_RE.finditer(text):
-        if match.start() > pos:
-            out.append((base_style, text[pos : match.start()]))
-        out.append(("class:image-chip", match.group(0)))
-        pos = match.end()
+    for start, end in merged:
+        if start > pos:
+            out.append((base_style, text[pos:start]))
+        out.append(("class:image-chip", text[start:end]))
+        pos = end
     if pos < len(text):
         out.append((base_style, text[pos:]))
     return out

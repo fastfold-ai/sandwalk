@@ -251,6 +251,10 @@ def transcript_style_dict(
         "transcript-tool-ok": "#16a34a" if mode == "light" else "#98c379",
         "transcript-tool-error": "#dc2626" if mode == "light" else "#ff5555",
         "transcript-tool-detail": p["system_fg"],
+        # Underlined absolute paths / URLs — click-to-open in the TUI.
+        "transcript-link": (
+            "underline bold #0284c7" if mode == "light" else "underline bold #7dd3fc"
+        ),
         "transcript-selected": "reverse",
         "image-chip": "bold #111111 bg:#f0a030",
         "transcript-compose": panel,

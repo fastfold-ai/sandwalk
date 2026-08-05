@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Compose ``@`` file search across the session workspace and current cwd;
+  Enter inserts an orange ``@[filename]`` chip without sending (so you can type
+  more around it); the chip expands to a usable path for the agent on submit.
 - Interactive `/sandbox` picker aligned with the Web UI (Local + Modal CPU/GPU
   presets) and inline base-image edit after a Modal choice.
 - CLI status bar: working-directory path and `context: N% (used/limit)` when the
@@ -20,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Tool / dataset / workflow mentions move from ``@`` to ``#`` (←/→ tabs unchanged);
+  ``@`` is reserved for file chips.
 - Interactive CLI owns a scrollable transcript panel: tool calls default to
   collapsed `✓ Ran name ▸` lines, mouse wheel scrolls the session view, and
   click / `Ctrl+E` expands or collapses tool details in place. Drag to select

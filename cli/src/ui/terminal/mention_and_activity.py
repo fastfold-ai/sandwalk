@@ -14,12 +14,13 @@ class _MentionAndActivityMixin:
         *,
         include_tools: bool = True,
         include_workflows: bool = True,
-        include_files: bool = True,
+        include_files: bool = False,
         max_file_candidates: int = 500,
     ) -> list[tuple[str, str, str, str]]:
-        """Build the candidate list for @ mention completion.
+        """Build the candidate list for ``#`` tool/dataset/workflow completion.
 
         Returns (name, category, description, kind) tuples.
+        Files are handled separately by ``_build_file_candidates`` (``@``).
         """
         candidates = []
         # Add datasets
@@ -49,61 +50,88 @@ class _MentionAndActivityMixin:
                     )
             except Exception:
                 pass  # Workflows not available
-        # Add file candidates from session uploads/ + workspace, then data.base
+        # Legacy: optional files on # completer (normally False).
         if include_files:
-            file_count = 0
-            limit = max(0, int(max_file_candidates))
-            seen: set[str] = set()
+            candidates.extend(
+                self._build_file_candidates(max_file_candidates=max_file_candidates)
+            )
+        return candidates
 
-            def _add_file(name: str, description: str) -> bool:
-                nonlocal file_count
-                if name in seen:
-                    return file_count >= limit
-                seen.add(name)
-                candidates.append((name, "file", description, "file"))
-                file_count += 1
-                return file_count >= limit
+    def _build_file_candidates(
+        self,
+        *,
+        max_file_candidates: int = 500,
+    ) -> list[tuple[str, str, str, str]]:
+        """Build ``@`` file candidates from session workspace + cwd (+ data.base).
 
+        Each candidate name is the agent path token: ``@rel`` under the session
+        workspace, otherwise an absolute filesystem path.
+        """
+        from ui.terminal.attachments import _SKIP_DIR_NAMES, session_workspace_path
+
+        candidates: list[tuple[str, str, str, str]] = []
+        limit = max(0, int(max_file_candidates))
+        seen: set[str] = set()
+
+        def _add(agent_path: str, description: str) -> bool:
+            if agent_path in seen:
+                return len(candidates) >= limit
+            seen.add(agent_path)
+            candidates.append((agent_path, "file", description, "file"))
+            return len(candidates) >= limit
+
+        def _scan_root(root: Path, *, label: str, as_workspace: bool) -> None:
+            if not root.is_dir() or len(candidates) >= limit:
+                return
             try:
-                from ui.terminal.attachments import session_workspace_path
-
-                workspace = session_workspace_path(self)
-                if workspace and workspace.is_dir():
-                    uploads = workspace / "uploads"
-                    if uploads.is_dir():
-                        for f in sorted(uploads.iterdir(), key=lambda p: p.name, reverse=True):
-                            if not f.is_file() or f.name.startswith("."):
-                                continue
-                            rel = f"uploads/{f.name}"
-                            if _add_file(rel, rel):
-                                break
-                    if file_count < limit:
-                        for f in workspace.rglob("*"):
-                            if not f.is_file() or f.name.startswith("."):
-                                continue
-                            try:
-                                rel = f.relative_to(workspace).as_posix()
-                            except ValueError:
-                                continue
-                            if rel.startswith("uploads/"):
-                                continue
-                            if _add_file(rel, rel):
-                                break
+                for f in root.rglob("*"):
+                    if len(candidates) >= limit:
+                        return
+                    if not f.is_file() or f.name.startswith("."):
+                        continue
+                    try:
+                        parts = f.relative_to(root).parts
+                    except ValueError:
+                        continue
+                    if any(
+                        part in _SKIP_DIR_NAMES or part.startswith(".")
+                        for part in parts[:-1]
+                    ):
+                        continue
+                    rel = "/".join(parts)
+                    if as_workspace:
+                        agent_path = f"@{rel}"
+                        desc = f"workspace · {rel}"
+                    else:
+                        agent_path = str(f.resolve())
+                        desc = f"{label} · {rel}"
+                    if _add(agent_path, desc):
+                        return
             except Exception:
-                pass  # Best-effort workspace scan
+                pass
 
-            try:
-                data_base = self.session.config.get("data.base", "")
-                if data_base and file_count < limit:
-                    data_path = Path(data_base)
-                    if data_path.is_dir():
-                        for f in data_path.rglob("*"):
-                            if not f.is_file() or f.name.startswith("."):
-                                continue
-                            if _add_file(f.name, str(f.relative_to(data_path))):
-                                break
-            except Exception:
-                pass  # Best-effort file scanning
+        try:
+            workspace = session_workspace_path(self)
+            ws_resolved = (
+                workspace.resolve() if workspace and workspace.is_dir() else None
+            )
+            if ws_resolved is not None:
+                _scan_root(ws_resolved, label="workspace", as_workspace=True)
+            cwd = Path.cwd().resolve()
+            if cwd.is_dir() and cwd != ws_resolved:
+                _scan_root(cwd, label="cwd", as_workspace=False)
+        except Exception:
+            pass
+
+        try:
+            data_base = self.session.config.get("data.base", "")
+            if data_base and len(candidates) < limit:
+                data_path = Path(data_base).expanduser().resolve()
+                if data_path.is_dir():
+                    _scan_root(data_path, label="data", as_workspace=False)
+        except Exception:
+            pass
+
         return candidates
 
     def _has_active_query(self) -> bool:

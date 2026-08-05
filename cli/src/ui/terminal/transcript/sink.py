@@ -47,6 +47,8 @@ def rich_print_to_text(*args: Any, width: int = 100, **kwargs: Any) -> str:
 
     from rich.console import Console
 
+    from ui.markdown.theme import markdown_rich_theme
+
     buf = StringIO()
     console = Console(
         file=buf,
@@ -54,6 +56,9 @@ def rich_print_to_text(*args: Any, width: int = 100, **kwargs: Any) -> str:
         force_terminal=True,
         color_system="256",
         highlight=False,
+        theme=markdown_rich_theme(),
     )
     console.print(*args, **kwargs)
-    return buf.getvalue().rstrip("\n")
+    from ui.markdown.links import strip_osc8_hyperlinks
+
+    return strip_osc8_hyperlinks(buf.getvalue()).rstrip("\n")

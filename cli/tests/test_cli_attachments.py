@@ -85,6 +85,19 @@ def test_chipify_uploads_for_display():
     assert chip == "[Image 1]"
 
 
+def test_find_and_style_file_chips():
+    from ui.terminal.attachments import find_file_chips, style_with_image_chips
+
+    text = "@[model_0.cif] what is this file?"
+    chips = find_file_chips(text)
+    assert chips == ["@[model_0.cif]"]
+    frags = style_with_image_chips(text, "class:transcript-user", file_chips=chips)
+    chip = "".join(t for s, t in frags if "image-chip" in s)
+    assert chip == "@[model_0.cif]"
+    plain = "".join(t for s, t in frags if "image-chip" not in s)
+    assert "what is this file?" in plain
+
+
 def test_chipify_keeps_existing_chip_numbers():
     from ui.terminal.attachments import chipify_uploads_for_display
 
@@ -129,13 +142,13 @@ def test_read_clipboard_image_macos_mocked(tmp_path: Path, monkeypatch):
 
 def test_extract_mentions_preserves_upload_paths():
     query, tools, datasets, workflows = extract_mentions(
-        "describe @uploads/20260101-clip.png with @target.coessentiality @depmap"
+        "describe @uploads/20260101-clip.png with #target.coessentiality #depmap"
     )
     assert "@uploads/20260101-clip.png" in query
     assert "target.coessentiality" in tools
     assert "depmap" in datasets
     assert "target.coessentiality" not in query
-    assert "@depmap" not in query
+    assert "#depmap" not in query
 
 
 def test_extract_mentions_keeps_path_when_only_media():

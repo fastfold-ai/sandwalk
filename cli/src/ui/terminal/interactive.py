@@ -12,7 +12,13 @@ from agent.config import CONFIG_DIR
 from ui.suggestions import DEFAULT_SUGGESTIONS
 
 from .attach_lexer import AttachChipLexer
-from .completion import MentionCompleter, MergedCompleter, PT_STYLE, SlashCompleter
+from .completion import (
+    FileMentionCompleter,
+    MentionCompleter,
+    MergedCompleter,
+    PT_STYLE,
+    SlashCompleter,
+)
 from .key_bindings import _build_key_bindings
 from .model_ids import AVAILABLE_MODELS  # noqa: F401 — re-exported via ui.terminal
 from .slash_commands import SLASH_COMMANDS
@@ -116,7 +122,9 @@ class InteractiveTerminal(
             self.session.config.set("agent.plan_preview", False)
         except Exception:
             pass
-        self.console = Console()
+        from ui.markdown.theme import markdown_rich_theme
+
+        self.console = Console(theme=markdown_rich_theme(config=config))
         # Share one Console with the agent/trace renderer so stdout patching and
         # flicker guards apply to generation output as well as CLI chrome.
         self.session.console = self.console
@@ -172,31 +180,42 @@ class InteractiveTerminal(
         # Busy toolbar uses the comet scanner; keep a snappy cadence
         # even if ui.spinner profile configures a slower helix interval.
         self._toolbar_frame_interval_s = 0.04
-        # Build @ mention completer with tool + dataset + file candidates
-        mention_candidates = self._build_mention_candidates(include_tools=False, include_files=False)
+        # # → tools/datasets/workflows; @ → workspace + cwd file chips
+        mention_candidates = self._build_mention_candidates(
+            include_tools=False, include_files=False
+        )
         mention_completer = MentionCompleter(
             mention_candidates,
             lazy_loader=lambda: self._build_mention_candidates(
                 include_tools=True,
-                include_files=True,
-                max_file_candidates=500,
+                include_files=False,
             ),
+        )
+        file_completer = FileMentionCompleter(
+            self,
+            lazy_loader=lambda: self._build_file_candidates(max_file_candidates=500),
         )
         self._merged_completer = MergedCompleter(
             slash=SlashCompleter(),
             mention=mention_completer,
+            files=file_completer,
         )
         self._attach_count = 0
         self._attach_map: dict[int, str] = {}
+        self._file_attach_count = 0
+        self._file_attach_map: dict[str, str] = {}
         # Default off: enabling steals wheel scroll from Warp/iTerm (can't
         # scroll agent history). Opt in: sandwalk config set ui.mouse_support true
         mouse_support = bool(self.session.config.get("ui.mouse_support", False))
+        chip_lexer = AttachChipLexer(
+            file_chips=lambda: list(getattr(self, "_file_attach_map", {}) or {})
+        )
         self._prompt_session = PromptSession(
             history=FileHistory(str(self.history_file)),
             completer=self._merged_completer,
             complete_while_typing=True,
             style=PT_STYLE,
-            lexer=AttachChipLexer(),
+            lexer=chip_lexer,
             key_bindings=_build_key_bindings(self),
             # Enter submits; Ctrl+J / Alt+Enter insert newlines.
             multiline=False,
@@ -361,8 +380,9 @@ class InteractiveTerminal(
         target.expanded = not target.expanded
 
     def _expand_attached_images(self, query: str) -> str:
-        """Turn ``[Image N]`` chips (and leftover absolute paths) into ``@uploads/…``."""
+        """Turn image/file chips into agent path tokens (``@uploads/…``, ``@rel``, abs)."""
         from ui.terminal.attachments import (
+            expand_file_chips,
             expand_image_chips,
             rewrite_loose_image_paths,
             session_workspace_path,
@@ -378,7 +398,8 @@ class InteractiveTerminal(
                 int(getattr(self, "_attach_count", 0) or 0),
                 max(attach_map.keys(), default=0),
             )
-        return expand_image_chips(text, attach_map)
+        text = expand_image_chips(text, attach_map)
+        return expand_file_chips(text, getattr(self, "_file_attach_map", None))
 
     def _seed_transcript_banner(self) -> None:
         """Put the sandwalk mark into the owned transcript (fullscreen hides stdout)."""

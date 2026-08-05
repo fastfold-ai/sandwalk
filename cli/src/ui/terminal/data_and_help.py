@@ -64,37 +64,42 @@ class _DataAndHelpMixin:
         self.console.print(r"  [dim]Usage:[/dim] /data \[list | status | pull <name> | pull-all]")
 
     def _show_help(self):
+        # Plain command names (no backticks) — Rich's default markdown.code is
+        # ``bold cyan on black`` chips that look harsh in light themes.
         command_lines = ["**Slash Commands:**"]
         for command in sorted(SLASH_COMMANDS.keys()):
-            command_lines.append(f"- `{command}` — {SLASH_COMMANDS[command]}")
+            command_lines.append(f"- **{command}** — {SLASH_COMMANDS[command]}")
 
         help_text = (
             "**Usage:**\n"
             "- Type any research question to investigate.\n"
-            "- `!command` — run one shell command safely (no pipes/chaining; e.g., `!ls .`).\n"
+            "- **!command** — run one shell command safely (no pipes/chaining; e.g., !ls .).\n"
             + "\n".join(command_lines)
             + "\n\n"
             "**Shortcuts:**\n"
-            "- `Enter` — submit · `Ctrl+J` / `Alt+Enter` — newline\n"
-            "- Click a `✓ Ran … ▸` tool line — expand/collapse details in place\n"
-            "- Drag to select transcript text (copies on release; `Ctrl+C` / `Esc`)\n"
-            "- Mouse wheel / `PgUp` `PgDn` — scroll the session transcript\n"
-            "- `Ctrl+E` — toggle the latest tool card\n"
-            "- Paste image / image path — orange `[Image N]` chip (`uploads/`)\n"
-            "- `Tab` — open slash / @ completions\n"
-            "- `Ctrl+C` — interrupt active generation (double-tap forces stop)\n"
-            "- `Ctrl+C` × 2 at idle prompt — exit\n"
+            "- **Enter** — submit · **Ctrl+J** / **Alt+Enter** — newline\n"
+            "- Click a ✓ Ran … ▸ tool line — expand/collapse details in place\n"
+            "- Drag to select transcript text (copies on release; Ctrl+C / Esc)\n"
+            "- Mouse wheel / PgUp PgDn — scroll the session transcript\n"
+            "- **Ctrl+E** — toggle the latest tool card\n"
+            "- Paste image / image path — orange [Image N] chip (uploads/)\n"
+            "- **@** — search files (workspace + cwd); Enter inserts orange @[file] chip (does not send)\n"
+            "- **#** — tools / datasets / workflows (←/→ tabs)\n"
+            "- **Tab** — open slash / # / @ completions\n"
+            "- **Ctrl+C** — interrupt active generation (double-tap forces stop)\n"
+            "- **Ctrl+C** × 2 at idle prompt — exit\n"
             "\n"
             "**Tips:**\n"
-            "- `/sandbox` — pick Local or Modal CPU/GPU (same presets as the Web UI); edit base image after Modal.\n"
-            "- `/plan` — toggle Plan mode (CLI sessions start in Agent mode).\n"
+            "- **/sandbox** — pick Local or Modal CPU/GPU (same presets as the Web UI); "
+            "edit base image after Modal.\n"
+            "- **/plan** — toggle Plan mode (CLI sessions start in Agent mode).\n"
             "- Status bar shows model · specialist · sandbox · cwd · context % when known.\n"
             "\n"
             "**Examples:**\n"
-            '- `find top genetically supported Parkinson targets`\n'
-            '- `/agents 3 find repurposing hypotheses for ulcerative colitis`\n'
-            '- `/case-study list` then `/case-study revlimid`\n'
-            '- `sandwalk report publish` (from shell) to convert latest markdown report to HTML.'
+            "- find top genetically supported Parkinson targets\n"
+            "- /agents 3 find repurposing hypotheses for ulcerative colitis\n"
+            "- /case-study list then /case-study revlimid\n"
+            "- sandwalk report publish (from shell) to convert latest markdown report to HTML."
         )
         self.console.print(Panel(
             LeftMarkdown(help_text),

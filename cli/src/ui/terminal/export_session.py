@@ -70,7 +70,11 @@ class _ExportSessionMixin:
                 lines.append("\n---\n")
 
         path.write_text("\n".join(lines))
-        self.console.print(f"  [green]Exported to[/green] {path}")
+        # Bare absolute path on its own (underlined via transcript link styling);
+        # prompt_toolkit strips OSC-8, so click-to-open handles open in-TUI.
+        abs_path = str(path.resolve())
+        self.console.print("  [green]Exported to[/green]")
+        self.console.print(f"  {abs_path}")
         return path
 
     def _send_export_to_slack(self, markdown: str, report_name: str) -> dict:

@@ -1126,7 +1126,7 @@ class TestTerminalMethods:
         terminal.agent = MagicMock()
         terminal.agent.run.side_effect = [ClarificationNeeded(clar), result]
 
-        output = terminal._run_with_clarification("study @depmap signals", {"foo": "bar"})
+        output = terminal._run_with_clarification("study #depmap signals", {"foo": "bar"})
 
         assert output is result
         assert terminal.agent.run.call_count == 2
@@ -1148,23 +1148,27 @@ class TestTerminalMethods:
 
 
 class TestExtractMentions:
-    """Tests for extract_mentions() — parsing @ tokens from query text."""
+    """Tests for extract_mentions() — parsing # tokens from query text."""
 
     def test_tool_mention(self):
-        query, tools, datasets, workflows = extract_mentions("analyze CRBN with @target.coessentiality")
+        query, tools, datasets, workflows = extract_mentions(
+            "analyze CRBN with #target.coessentiality"
+        )
         assert "target.coessentiality" in tools
         assert datasets == []
         assert workflows == []
-        assert "@" not in query
+        assert "#" not in query
 
     def test_dataset_mention(self):
-        query, tools, datasets, workflows = extract_mentions("check sensitivity in @depmap @prism")
+        query, tools, datasets, workflows = extract_mentions(
+            "check sensitivity in #depmap #prism"
+        )
         assert set(datasets) == {"depmap", "prism"}
-        assert "@" not in query
+        assert "#" not in query
 
     def test_mixed_mentions(self):
         query, tools, datasets, workflows = extract_mentions(
-            "@depmap find @target.coessentiality for CRBN"
+            "#depmap find #target.coessentiality for CRBN"
         )
         assert "target.coessentiality" in tools
         assert "depmap" in datasets
@@ -1178,7 +1182,9 @@ class TestExtractMentions:
         assert workflows == []
 
     def test_workflow_mention(self):
-        query, tools, datasets, workflows = extract_mentions("run @target_validation on KRAS")
+        query, tools, datasets, workflows = extract_mentions(
+            "run #target_validation on KRAS"
+        )
         assert "target_validation" in workflows
         assert tools == []
         assert datasets == []
@@ -1186,7 +1192,7 @@ class TestExtractMentions:
 
     def test_mixed_with_workflow(self):
         query, tools, datasets, workflows = extract_mentions(
-            "@depmap @target_validation check CRBN"
+            "#depmap #target_validation check CRBN"
         )
         assert "depmap" in datasets
         assert "target_validation" in workflows
@@ -1223,7 +1229,7 @@ class TestBuildMentionContext:
 
 
 class TestMentionCompleterTabs:
-    """Tests for MentionCompleter tabbed filtering."""
+    """Tests for MentionCompleter tabbed filtering (#)."""
 
     @pytest.fixture
     def candidates(self):
@@ -1232,7 +1238,6 @@ class TestMentionCompleterTabs:
             ("expression.pathway_enrichment", "expression", "Pathway enrichment analysis", "tool"),
             ("depmap", "dataset", "DepMap CRISPR/model data", "dataset"),
             ("prism", "dataset", "PRISM drug sensitivity", "dataset"),
-            ("CRISPRGeneEffect.csv", "file", "depmap/CRISPRGeneEffect.csv", "file"),
             ("target_validation", "workflow", "Validate a potential drug target (5 steps)", "workflow"),
         ]
 
@@ -1246,41 +1251,35 @@ class TestMentionCompleterTabs:
 
     def test_all_tab_shows_everything(self, completer):
         completer._active_tab = 0
-        completions = self._get_completions(completer, "@")
-        assert len(completions) == 6
+        completions = self._get_completions(completer, "#")
+        assert len(completions) == 5
 
     def test_tools_tab_filters(self, completer):
         completer._active_tab = 1
-        completions = self._get_completions(completer, "@")
+        completions = self._get_completions(completer, "#")
         assert len(completions) == 2
         assert all("tool" in c.style for c in completions)
 
     def test_db_tab_filters(self, completer):
         completer._active_tab = 2
-        completions = self._get_completions(completer, "@")
+        completions = self._get_completions(completer, "#")
         assert len(completions) == 2
         names = {c.text for c in completions}
-        assert names == {"@depmap", "@prism"}
-
-    def test_files_tab_filters(self, completer):
-        completer._active_tab = 3
-        completions = self._get_completions(completer, "@")
-        assert len(completions) == 1
-        assert completions[0].text == "@CRISPRGeneEffect.csv"
+        assert names == {"#depmap", "#prism"}
 
     def test_flows_tab_filters(self, completer):
-        completer._active_tab = 4  # Flows
-        completions = self._get_completions(completer, "@")
+        completer._active_tab = 3  # Flows
+        completions = self._get_completions(completer, "#")
         assert len(completions) == 1
-        assert completions[0].text == "@target_validation"
+        assert completions[0].text == "#target_validation"
         assert "workflow" in completions[0].style
 
     def test_substring_match(self, completer):
-        completions = self._get_completions(completer, "@coess")
+        completions = self._get_completions(completer, "#coess")
         assert len(completions) == 1
-        assert completions[0].text == "@target.coessentiality"
+        assert completions[0].text == "#target.coessentiality"
 
-    def test_no_at_returns_nothing(self, completer):
+    def test_no_hash_returns_nothing(self, completer):
         completions = self._get_completions(completer, "hello world")
         assert len(completions) == 0
 
@@ -1301,8 +1300,8 @@ class TestMergedCompleterDispatch:
         completions = self._get_completions(merged, "/he")
         assert any(c.text == "/help" for c in completions)
 
-    def test_at_routes_to_mention(self, merged):
-        completions = self._get_completions(merged, "query @dep")
+    def test_hash_routes_to_mention(self, merged):
+        completions = self._get_completions(merged, "query #dep")
         assert any("depmap" in c.display_text for c in completions)
 
     def test_no_trigger_yields_nothing(self, merged):

@@ -18,9 +18,20 @@ def _format_tool_result(result: Any, max_chars: int = 8000) -> str:
     if summary:
         parts.append(summary)
 
-    # Include key data fields
+    # Absolute download paths next — keep them whole so the model can cite them
+    # even when stdout is dominated by long CloudFront URLs.
     skip = {"summary"}
+    local_paths = result.get("local_paths")
+    if isinstance(local_paths, list) and local_paths:
+        listed = "\n".join(str(p) for p in local_paths if str(p).strip())
+        if listed:
+            parts.append(f"local_paths:\n{listed}")
+        skip.add("local_paths")
+
+    # Include key data fields
     compact = {"top_hits", "top_terms"}
+    # Prefer more room for stdout when it carries download paths.
+    stdout_budget = 4000 if "local_paths" in skip else 1500
     for key, val in result.items():
         if key in skip:
             continue
@@ -29,8 +40,9 @@ def _format_tool_result(result: Any, max_chars: int = 8000) -> str:
             parts.append(f"{key}: {type(val).__name__} with {count} entries")
             continue
         val_str = str(val)
-        if len(val_str) > 1500:
-            val_str = val_str[:1500] + f"... [{len(val_str)} chars total]"
+        budget = stdout_budget if key == "stdout" else 1500
+        if len(val_str) > budget:
+            val_str = val_str[:budget] + f"... [{len(val_str)} chars total]"
         parts.append(f"{key}: {val_str}")
 
     text = "\n".join(parts)

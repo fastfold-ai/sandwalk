@@ -395,6 +395,20 @@ class DeepAgentsBuildMixin:
                 "status, or generated job/workflow ID. Ask me to run the submission now and I will "
                 "execute it and return the real ID from tool output."
             )
+        else:
+            # Deterministic: if tools downloaded files, ensure full absolute paths
+            # appear even when the model middle-truncates names in prose.
+            try:
+                from agent.local_artifact_paths import (
+                    append_downloaded_artifacts_block,
+                    collect_paths_from_tool_calls,
+                )
+
+                summary = append_downloaded_artifacts_block(
+                    summary, collect_paths_from_tool_calls(tool_calls)
+                )
+            except Exception:  # noqa: BLE001
+                pass
 
         answer = None
         if sandbox:

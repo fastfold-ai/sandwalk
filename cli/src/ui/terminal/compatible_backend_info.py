@@ -99,10 +99,21 @@ class _CompatibleBackendInfoMixin:
         return "Custom"
 
     def _mention_completing(self) -> bool:
-        """Check if @ mention completions are currently active."""
+        """Check if ``#`` tool/dataset/workflow completions are currently active."""
+        try:
+            from prompt_toolkit.application.current import get_app
+
+            buf = get_app().current_buffer
+            if buf.complete_state and "#" in (buf.text or ""):
+                # Prefer # trigger when both # and @ are present.
+                at = (buf.text or "").rfind("@")
+                hash_pos = (buf.text or "").rfind("#")
+                return hash_pos >= 0 and hash_pos >= at
+        except Exception:
+            pass
         try:
             buf = self._prompt_session.app.current_buffer
-            if buf.complete_state and "@" in buf.text:
+            if buf.complete_state and "#" in buf.text:
                 return True
         except Exception:
             pass

@@ -126,17 +126,28 @@ def shell_run(command: str, working_dir: str = None, timeout: int = 30, **kwargs
     if len(stderr) > 5000:
         stderr = stderr[:5000] + f"\n... [truncated, total {len(result.stderr)} chars]"
 
+    from agent.local_artifact_paths import extract_local_artifact_paths
+
+    local_paths = extract_local_artifact_paths(stdout)
+
     if result.returncode == 0:
-        output_preview = stdout.strip()[:200] if stdout.strip() else "(no output)"
-        summary = f"Command succeeded (exit 0): {output_preview}"
+        if local_paths:
+            listed = "\n".join(local_paths[:40])
+            summary = f"Command succeeded (exit 0). Local files:\n{listed}"
+        else:
+            output_preview = stdout.strip()[:200] if stdout.strip() else "(no output)"
+            summary = f"Command succeeded (exit 0): {output_preview}"
     else:
         err_preview = stderr.strip()[:200] if stderr.strip() else stdout.strip()[:200]
         summary = f"Command failed (exit {result.returncode}): {err_preview}"
 
-    return {
+    out = {
         "summary": summary,
         "exit_code": result.returncode,
         "stdout": stdout,
         "stderr": stderr,
         "command": command,
     }
+    if local_paths:
+        out["local_paths"] = local_paths
+    return out

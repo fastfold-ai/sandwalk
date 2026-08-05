@@ -63,6 +63,12 @@ When a **Session workspace** path is listed below (or in `SANDWALK_SESSION_WORKS
   ``$SANDWALK_SESSION_WORKSPACE/...`` so an unset variable cannot expand to
   ``/artifacts/...``. Relative paths like ``./artifacts/...`` are fine only when
   the shell cwd is already the session workspace.
+- When citing a saved file for the user, print the **full absolute path** as
+  plain text on its own line when possible. **Never** middle-truncate
+  filenames, job ids, or directory segments with ``...`` / ``…`` (bad:
+  ``output_..._model_0.cif``; good: the complete basename and full absolute
+  path). Avoid wrapping paths in backticks — the terminal opens bare absolute
+  paths on click.
 - You may read installed skill directories under ``$SANDWALK_SKILLS_DIR/...``
   (or the absolute path from the skills listing) to run scripts; never treat
   those as the download or write destination.

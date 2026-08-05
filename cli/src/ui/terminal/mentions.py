@@ -1,4 +1,4 @@
-"""Parsing @ mentions (tools/datasets/workflows) out of user input."""
+"""Parsing # mentions (tools/datasets/workflows) out of user input."""
 
 from __future__ import annotations
 
@@ -34,27 +34,27 @@ class MentionCandidate:
     description: str   # truncated for display
 
 
-def _shield_multimodal_paths(text: str) -> tuple[str, list[str]]:
-    """Replace ``@uploads/…`` / other multimodal @paths with placeholders.
+def _shield_at_paths(text: str) -> tuple[str, list[str]]:
+    """Replace ``@path/…`` tokens with placeholders during # mention parsing.
 
-    Prevents tool/dataset stripping from mangling path-like tokens such as
-    ``@uploads/foo.png`` (would otherwise become ``/foo.png``).
+    Protects multimodal ``@uploads/…`` and workspace file refs from being
+    mangled when stripping ``#tool`` / ``#dataset`` mentions.
     """
-    try:
-        from agent.runner.multimodal_user_message import _AT_PATH_RE
-    except Exception:  # noqa: BLE001
-        return text, []
-
+    # Any @token that looks path-like (has a slash or image/media suffix).
+    path_re = re.compile(
+        r"@(?:uploads/[^\s]+|[^\s]+/[^\s]+|[^\s]+\.(?:png|jpe?g|gif|webp|heic|heif|pdf|cif|pdb|svg|json|md|py|ts|tsx|js|csv|txt|yml|yaml))\b",
+        re.IGNORECASE,
+    )
     protected: list[str] = []
 
     def _protect(match: re.Match[str]) -> str:
         protected.append(match.group(0))
         return f"\x00PATH{len(protected) - 1}\x00"
 
-    return _AT_PATH_RE.sub(_protect, text), protected
+    return path_re.sub(_protect, text), protected
 
 
-def _restore_multimodal_paths(text: str, protected: list[str]) -> str:
+def _restore_at_paths(text: str, protected: list[str]) -> str:
     out = text
     for i, token in enumerate(protected):
         out = out.replace(f"\x00PATH{i}\x00", token)
@@ -62,30 +62,29 @@ def _restore_multimodal_paths(text: str, protected: list[str]) -> str:
 
 
 def extract_mentions(text: str):
-    """Parse @mentions from input text.
+    """Parse ``#`` tool/dataset/workflow mentions from input text.
 
     Returns:
         tuple of (cleaned_query, tool_names, dataset_names, workflow_names)
 
-    Multimodal ``@path`` tokens (e.g. ``@uploads/foo.png``) are preserved in
-    the cleaned query so vision injection still sees them.
+    ``@path`` file/media tokens are preserved in the cleaned query.
     """
     dataset_names_set = {d[0] for d in DATASET_CANDIDATES}
     workflow_names_set = _get_workflow_names()
-    tool_pattern = re.compile(r"@(\w+\.\w+)")
-    word_pattern = re.compile(r"@(\w+)")
+    tool_pattern = re.compile(r"#(\w+\.\w+)")
+    word_pattern = re.compile(r"#(\w+)")
 
     tools = []
     datasets = []
     workflows = []
 
-    shielded, protected = _shield_multimodal_paths(text)
+    shielded, protected = _shield_at_paths(text)
 
-    # Find @category.tool_name mentions first
+    # Find #category.tool_name mentions first
     for m in tool_pattern.finditer(shielded):
         tools.append(m.group(1))
 
-    # Find @dataset and @workflow mentions (single word, no dot)
+    # Find #dataset and #workflow mentions (single word, no dot)
     cleaned = tool_pattern.sub("", shielded)
     for m in word_pattern.finditer(cleaned):
         name = m.group(1)
@@ -94,9 +93,9 @@ def extract_mentions(text: str):
         elif name in workflow_names_set:
             workflows.append(name)
 
-    # Strip recognized tool/dataset/workflow @mentions only — keep @path media.
-    query = re.sub(r"@\w+(?:\.\w+)?", "", shielded).strip()
-    query = _restore_multimodal_paths(query, protected)
+    # Strip recognized #tool/dataset/workflow mentions only — keep @paths.
+    query = re.sub(r"#\w+(?:\.\w+)?", "", shielded).strip()
+    query = _restore_at_paths(query, protected)
     # Collapse multiple spaces (but keep newlines for compose multiline)
     query = re.sub(r"[^\S\n]{2,}", " ", query)
     query = re.sub(r"\n{3,}", "\n\n", query)

@@ -70,7 +70,9 @@ class _ExportShareAndMiscMixin:
             path = output_dir / f"session_{slug}.ipynb"
 
         save_notebook(nb, path)
-        self.console.print(f"  [green]Notebook exported to[/green] {path}")
+        abs_path = str(path.resolve())
+        self.console.print("  [green]Notebook exported to[/green]")
+        self.console.print(f"  {abs_path}")
         self.console.print(f"  [dim]Open with: jupyter lab {path}[/dim]")
 
     def _compact_context(self, instructions: str = None):

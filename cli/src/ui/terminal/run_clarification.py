@@ -52,7 +52,7 @@ class _RunClarificationMixin:
         except Exception:  # noqa: BLE001
             run_context.setdefault("sandbox_backend", "builtin")
 
-        # Extract @mentions and inject into context
+        # Extract # tool/dataset/workflow mentions and inject into context
         cleaned_query, mention_tools, mention_datasets, mention_workflows = extract_mentions(query)
         if mention_tools or mention_datasets or mention_workflows:
             mention_ctx = build_mention_context(mention_tools, mention_datasets, mention_workflows)

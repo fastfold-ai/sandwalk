@@ -10,6 +10,7 @@ from prompt_toolkit.formatted_text import StyleAndTextTuples
 from prompt_toolkit.layout.controls import UIContent, UIControl
 from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
 
+from ui.terminal.path_links import link_at, open_link, style_link_spans
 from ui.terminal.transcript.render import render_all_lines
 from ui.terminal.transcript.store import ToolEntry, TranscriptStore
 
@@ -182,12 +183,13 @@ class TranscriptControl(UIControl):
                 # Clear stale cells on unused rows after a shrink-resize.
                 return [("", " " * pad_width)] if pad_width > 0 else []
             frags = list(rows[i])
+            plain = self._plain_lines[i] if i < len(self._plain_lines) else ""
+            if plain:
+                frags = style_link_spans(frags, plain)
             if bounds is not None and self.has_selection():
                 start, end = bounds
                 if start.y <= i <= end.y:
-                    line_len = (
-                        len(self._plain_lines[i]) if i < len(self._plain_lines) else 0
-                    )
+                    line_len = len(plain)
                     if start.y == end.y:
                         lo, hi = sorted((start.x, end.x))
                         frags = _overlay_selection(frags, lo, hi + 1)
@@ -255,9 +257,15 @@ class TranscriptControl(UIControl):
                 self.copy_selection_to_clipboard()
                 return None
 
-            # Plain click — clear selection and toggle tool if hit.
+            # Plain click — open path/URL under cursor, else toggle tool card.
             self.clear_selection()
             idx = pos.y
+            if 0 <= idx < len(self._plain_lines):
+                hit = link_at(self._plain_lines[idx], pos.x)
+                if hit is not None:
+                    kind, target = hit
+                    if open_link(kind, target):
+                        return None
             if 0 <= idx < len(self._hit_map):
                 entry, line_idx = self._hit_map[idx]
                 if isinstance(entry, ToolEntry) and line_idx >= 0:

@@ -676,6 +676,7 @@ class TestTerminalInitAndMentionCandidates:
             return SimpleNamespace(
                 app=SimpleNamespace(is_running=False, invalidate=MagicMock()),
                 default_buffer=SimpleNamespace(on_completions_changed=_Hook()),
+                prompt=MagicMock(return_value=""),
             )
 
         fake_session = SimpleNamespace(
@@ -696,34 +697,52 @@ class TestTerminalInitAndMentionCandidates:
         assert term._plain_prompt_session is not None
         assert term._merged_completer is not None
 
-    def test_build_mention_candidates_includes_tools_workflows_and_files(self):
+    def test_build_mention_candidates_includes_tools_and_workflows(self):
+        term = _mk_terminal()
+        fake_tool = SimpleNamespace(
+            name="target.search", category="target", description="search"
+        )
+        fake_registry = SimpleNamespace(list_tools=lambda: [fake_tool])
+        fake_workflows = {
+            "wf-a": {"description": "workflow", "steps": ["a", "b"]},
+        }
+
+        with patch("tools.registry", fake_registry), patch(
+            "tools.ensure_loaded", return_value=None
+        ), patch("agent.workflows.WORKFLOWS", fake_workflows):
+            candidates = term._build_mention_candidates(include_files=False)
+
+        names = [c[0] for c in candidates]
+        assert "target.search" in names
+        assert "wf-a" in names
+
+    def test_build_file_candidates_includes_data_base_files(self):
         term = _mk_terminal()
         with tempfile.TemporaryDirectory() as td:
             from pathlib import Path
 
             root = Path(td)
-            (root / "a.txt").write_text("x", encoding="utf-8")
-            (root / ".hidden").write_text("x", encoding="utf-8")
+            empty = root / "empty"
+            empty.mkdir()
+            data = root / "data"
+            data.mkdir()
+            (data / "a.txt").write_text("x", encoding="utf-8")
+            (data / ".hidden").write_text("x", encoding="utf-8")
             term.session.config.get = MagicMock(
-                side_effect=lambda key, default=None: str(root) if key == "data.base" else default
+                side_effect=lambda key, default=None: (
+                    str(data) if key == "data.base" else default
+                )
             )
-
-            fake_tool = SimpleNamespace(name="target.search", category="target", description="search")
-            fake_registry = SimpleNamespace(list_tools=lambda: [fake_tool])
-            fake_workflows = {
-                "wf-a": {"description": "workflow", "steps": ["a", "b"]},
-            }
-
-            with patch("tools.registry", fake_registry), patch(
-                "tools.ensure_loaded", return_value=None
-            ), patch("agent.workflows.WORKFLOWS", fake_workflows):
-                candidates = term._build_mention_candidates()
+            with patch(
+                "ui.terminal.attachments.session_workspace_path", return_value=None
+            ), patch(
+                "ui.terminal.mention_and_activity.Path.cwd", return_value=empty
+            ):
+                candidates = term._build_file_candidates()
 
         names = [c[0] for c in candidates]
-        assert "target.search" in names
-        assert "wf-a" in names
-        assert "a.txt" in names
-        assert ".hidden" not in names
+        assert any(n.endswith("a.txt") for n in names)
+        assert not any(n.endswith(".hidden") for n in names)
 
 
 class TestTerminalSessionAndCommandBranches:

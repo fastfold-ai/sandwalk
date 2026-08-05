@@ -213,6 +213,22 @@ def test_user_message_renders_upload_as_image_chip():
     assert any("┃" in t for _e, _i, frags in rows for _s, t in frags)
 
 
+def test_user_message_renders_file_mention_as_orange_chip():
+    from ui.terminal.transcript.render import entry_rows
+
+    store = TranscriptStore()
+    chip = "@[output_7addce64-8059-490b-b70f-61de66a4db78_model_0.cif]"
+    store.append_text(f"{chip} what is this file?", kind="user")
+    rows = entry_rows(store.entries[0], width=120)
+    joined = "".join(t for _e, _i, frags in rows for _s, t in frags)
+    assert chip in joined
+    assert "what is this file?" in joined
+    chip_text = "".join(
+        t for _e, _i, frags in rows for s, t in frags if "image-chip" in s
+    )
+    assert chip_text == chip
+
+
 def test_user_message_box_has_no_prompt_arrow():
     from ui.terminal.transcript.render import entry_lines
 
@@ -314,6 +330,55 @@ def test_drag_selects_text_without_toggling_tool():
     frags = content.get_line(0)
     selected = "".join(text for style, text in frags if "transcript-selected" in style)
     assert "selectable" in selected
+
+
+def test_click_opens_absolute_path_in_transcript():
+    from unittest.mock import patch
+
+    from prompt_toolkit.data_structures import Point
+    from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
+
+    from ui.terminal.transcript.control import TranscriptControl
+
+    class FakeWin:
+        vertical_scroll = 0
+
+    path = "/Users/juliocesar/Projects/sandwalk/cli/exports/session_demo.md"
+    store = TranscriptStore()
+    store.append_text(f"  {path}")
+
+    control = TranscriptControl(store)
+    control.window = FakeWin()
+    content = control.create_content(120, 10)
+    # Find the line that contains the path (may have left-pad).
+    line_idx = next(
+        i for i, line in enumerate(control._plain_lines) if path in line
+    )
+    x = control._plain_lines[line_idx].index(path) + 2
+    frags = content.get_line(line_idx)
+    assert any("transcript-link" in style for style, _t in frags)
+
+    with patch("ui.terminal.transcript.control.open_link", return_value=True) as open_fn:
+        control.mouse_handler(
+            MouseEvent(
+                position=Point(x=x, y=line_idx),
+                event_type=MouseEventType.MOUSE_DOWN,
+                button=MouseButton.LEFT,
+                modifiers=frozenset(),
+            )
+        )
+        control.mouse_handler(
+            MouseEvent(
+                position=Point(x=x, y=line_idx),
+                event_type=MouseEventType.MOUSE_UP,
+                button=MouseButton.LEFT,
+                modifiers=frozenset(),
+            )
+        )
+        open_fn.assert_called_once()
+        kind, target = open_fn.call_args[0]
+        assert kind == "path"
+        assert target == path
 
 
 def test_resume_line_keeps_left_pad_when_wrapped():

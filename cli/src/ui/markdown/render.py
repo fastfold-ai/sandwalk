@@ -11,6 +11,19 @@ from ui.markdown.config_utils import _as_bool, _config_get
 from ui.markdown.fences import _split_mermaid_fences
 from ui.markdown.heading import LeftMarkdown
 from ui.markdown.mermaid_source import _neaten_mermaid_source
+from ui.markdown.links import expose_markdown_links
+from ui.markdown.paths import unwrap_path_code_spans
+
+
+def _workspace_from_config(config: Any = None) -> str | None:
+    if config is None:
+        return None
+    try:
+        raw = config.get("session.workspace_path") or config.get("workspace_path")
+    except Exception:  # noqa: BLE001
+        raw = None
+    text = str(raw or "").strip()
+    return text or None
 
 
 def _print_mermaid_block(
@@ -55,10 +68,15 @@ def print_markdown_with_mermaid(
     *,
     config: Any = None,
     markdown_factory: Callable[[str], Markdown] = LeftMarkdown,
+    workspace: str | None = None,
 ) -> None:
     """Render markdown text, converting mermaid fences to terminal diagrams."""
     if not text or not text.strip():
         return
+
+    ws = workspace if workspace is not None else _workspace_from_config(config)
+    # Bare URLs survive the transcript (OSC-8 does not); unwrap path code too.
+    text = expose_markdown_links(unwrap_path_code_spans(text, workspace=ws))
 
     mermaid_enabled = _as_bool(_config_get(config, "ui.mermaid.enabled", True), True)
     if not mermaid_enabled:

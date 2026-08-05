@@ -148,20 +148,21 @@ def _build_key_bindings(terminal, *, include_mouse: bool = True):
         """Option+Enter / Alt+Enter inserts newline."""
         event.app.current_buffer.insert_text("\n")
 
-    # Enter always submits when completions are not forcing slash accept.
+    # Enter always submits when completions are not forcing slash/file accept.
     # (multiline=False makes this the default; keep explicit for clarity.)
     @kb.add("enter", filter=has_completions)
     def _accept_first_completion(event):
-        """When completions are visible on a / command, accept the current
-        (or first) completion and submit."""
+        """Accept @ file chip without sending; / applies then submits."""
+        from ui.terminal.completion_accept import (
+            accept_file_completion,
+            accept_slash_completion,
+        )
+
         buf = event.app.current_buffer
-        cs = buf.complete_state
-        if buf.text.lstrip().startswith("/") and cs and cs.completions:
-            if cs.complete_index is None:
-                buf.go_to_completion(0)
-                cs = buf.complete_state
-            if cs and cs.current_completion:
-                buf.apply_completion(cs.current_completion)
+        if accept_file_completion(buf):
+            event.app.invalidate()
+            return
+        accept_slash_completion(buf)
         # Owned transcript Application registers its own Enter (eager) to exit
         # with buffer text; PromptSession uses validate_and_handle.
         if getattr(terminal, "transcript", None) is not None:
@@ -224,25 +225,38 @@ def _build_key_bindings(terminal, *, include_mouse: bool = True):
 
     @kb.add("right", filter=has_completions)
     def _mention_tab_right(event):
-        """Switch to next mention tab while completions are visible."""
+        """Switch to next # mention tab while tool completions are visible."""
         completer = terminal._merged_completer
         if completer is None:
             return
+        buf = event.app.current_buffer
+        # File (@) completions have no tabs.
+        from ui.terminal.completion import _last_trigger
+
+        text = buf.document.text_before_cursor
+        trigger = _last_trigger(text)
+        if trigger is not None and trigger[0] == "@":
+            return
         mc = completer.mention_completer
         mc._active_tab = (mc._active_tab + 1) % len(mc.TABS)
-        buf = event.app.current_buffer
         buf.cancel_completion()
         buf.start_completion()
 
     @kb.add("left", filter=has_completions)
     def _mention_tab_left(event):
-        """Switch to previous mention tab while completions are visible."""
+        """Switch to previous # mention tab while tool completions are visible."""
         completer = terminal._merged_completer
         if completer is None:
             return
+        from ui.terminal.completion import _last_trigger
+
+        buf = event.app.current_buffer
+        text = buf.document.text_before_cursor
+        trigger = _last_trigger(text)
+        if trigger is not None and trigger[0] == "@":
+            return
         mc = completer.mention_completer
         mc._active_tab = (mc._active_tab - 1) % len(mc.TABS)
-        buf = event.app.current_buffer
         buf.cancel_completion()
         buf.start_completion()
 

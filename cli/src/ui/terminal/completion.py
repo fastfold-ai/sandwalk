@@ -1,8 +1,9 @@
-"""prompt_toolkit style + completers for slash commands and @ mentions."""
+"""prompt_toolkit style + completers for slash commands, # tools, and @ files."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.filters import has_completions, is_done, to_filter
@@ -63,7 +64,7 @@ class _FullWidthCompletionsMenuControl(CompletionsMenuControl):
 
 
 class ComposeCompletionsMenu(ConditionalContainer):
-    """Slash/@ menu sized to the compose panel (full width, accent ┃ border)."""
+    """Slash/#/@ menu sized to the compose panel (full width, accent ┃ border)."""
 
     def __init__(
         self,
@@ -133,14 +134,40 @@ PT_STYLE = Style.from_dict({
     "scrollbar.background": "bg:#f5f5f5",
     "scrollbar.button": "bg:#c8c8c8",
     "scrollbar.arrow": "bg:#f5f5f5 #aaaaaa",
-    # Mention kind colors
+    # Mention kind colors (# tools / datasets / workflows)
     "mention-tool": "#00d7ff",     # cyan for tool mentions
     "mention-dataset": "#50fa7b",  # green for dataset mentions
-    "mention-file": "#ffd700",     # yellow for file mentions
+    "mention-file": "#ffd700",     # yellow for file mentions (menu)
     "mention-workflow": "#ff79c6",  # pink for workflow mentions
-    # Image attach chips — orange chip on dark
+    # Image / file attach chips — orange chip
     "image-chip": "bold #111111 bg:#f0a030",
 })
+
+
+def _last_at_trigger(text: str) -> int:
+    """Index of the latest ``@`` that starts a file search (not an ``@[chip]``)."""
+    pos = -1
+    start = 0
+    while True:
+        idx = text.find("@", start)
+        if idx < 0:
+            break
+        # ``@[filename]`` chips keep the @; skip them as open triggers.
+        if idx + 1 >= len(text) or text[idx + 1] != "[":
+            pos = idx
+        start = idx + 1
+    return pos
+
+
+def _last_trigger(text: str) -> tuple[str, int] | None:
+    """Return ``("#"|"@", index)`` for the latest mention trigger, if any."""
+    at_pos = _last_at_trigger(text)
+    hash_pos = text.rfind("#")
+    if at_pos < 0 and hash_pos < 0:
+        return None
+    if at_pos > hash_pos:
+        return "@", at_pos
+    return "#", hash_pos
 
 
 class SlashCompleter(Completer):
@@ -159,20 +186,19 @@ class SlashCompleter(Completer):
 
 
 class MentionCompleter(Completer):
-    """Autocomplete tools, datasets, and files when input contains @.
+    """Autocomplete tools, datasets, and workflows when input contains ``#``.
 
-    Supports tabbed filtering via TABS (All / Tools / DB / Files).
+    Supports tabbed filtering via TABS (All / Tools / DB / Flows).
     Candidates are ``(name, category, description, kind)`` tuples where
-    *kind* is ``"tool"``, ``"dataset"``, or ``"file"``.
+    *kind* is ``"tool"``, ``"dataset"``, or ``"workflow"``.
     """
 
-    TABS = ["All", "Tools", "DB", "Files", "Flows"]
+    TABS = ["All", "Tools", "DB", "Flows"]
     _TAB_FILTERS = {
         0: None,          # All
         1: "tool",        # Tools
         2: "dataset",     # DB
-        3: "file",        # Files
-        4: "workflow",    # Flows
+        3: "workflow",    # Flows
     }
 
     def __init__(
@@ -206,13 +232,13 @@ class MentionCompleter(Completer):
     def get_completions(self, document, complete_event):
         self._ensure_lazy_loaded()
         text = document.text_before_cursor
-        # Find the last @ in the text
-        at_pos = text.rfind("@")
-        if at_pos < 0:
+        trigger = _last_trigger(text)
+        if trigger is None or trigger[0] != "#":
             return
+        hash_pos = trigger[1]
 
-        partial = text[at_pos + 1:].lower()
-        replace_len = len(text) - at_pos  # replace from @ onwards
+        partial = text[hash_pos + 1 :].lower()
+        replace_len = len(text) - hash_pos  # replace from # onwards
 
         # Filter by active tab
         kind_filter = self._TAB_FILTERS.get(self._active_tab)
@@ -220,12 +246,16 @@ class MentionCompleter(Completer):
         # Group by category for ordering
         by_category: dict[str, list[tuple]] = {}
         for name, category, description, kind in self.candidates:
+            if kind == "file":
+                continue
             if kind_filter and kind != kind_filter:
                 continue
             # Case-insensitive substring match against name, category, description
-            if (partial in name.lower()
-                    or partial in category.lower()
-                    or partial in description.lower()):
+            if (
+                partial in name.lower()
+                or partial in category.lower()
+                or partial in description.lower()
+            ):
                 by_category.setdefault(category, []).append(
                     (name, description, kind)
                 )
@@ -234,34 +264,128 @@ class MentionCompleter(Completer):
         styles = {
             "tool": "class:mention-tool",
             "dataset": "class:mention-dataset",
-            "file": "class:mention-file",
             "workflow": "class:mention-workflow",
         }
 
         for category in sorted(by_category):
             for name, description, kind in sorted(by_category[category]):
                 yield Completion(
-                    f"@{name}",
+                    f"#{name}",
                     start_position=-replace_len,
                     display_meta=description,
                     style=styles.get(kind, ""),
                 )
 
 
-class MergedCompleter(Completer):
-    """Delegates to SlashCompleter for / and MentionCompleter for @."""
+class FileMentionCompleter(Completer):
+    """Autocomplete workspace + cwd files when input contains ``@``.
 
-    def __init__(self, slash: Completer, mention: MentionCompleter):
+    On select, inserts an orange ``[filename]`` chip (via completion text) that
+    expands to a usable path for the agent on submit.
+    """
+
+    def __init__(
+        self,
+        terminal: object,
+        candidates: list[tuple[str, str, str, str]] | None = None,
+        *,
+        lazy_loader: Callable[[], list[tuple[str, str, str, str]]] | None = None,
+    ):
+        self._terminal = terminal
+        self.candidates = candidates or []
+        self._lazy_loader = lazy_loader
+        self._lazy_loaded = lazy_loader is None
+
+    def set_candidates(self, candidates: list[tuple[str, str, str, str]]) -> None:
+        self.candidates = candidates
+
+    def _ensure_lazy_loaded(self) -> None:
+        if self._lazy_loaded:
+            return
+        self._lazy_loaded = True
+        if self._lazy_loader is None:
+            return
+        try:
+            loaded = self._lazy_loader()
+            if loaded:
+                self.set_candidates(loaded)
+        except Exception:
+            pass
+
+    def get_completions(self, document, complete_event):
+        from ui.terminal.attachments import register_file_chip
+
+        self._ensure_lazy_loaded()
+        text = document.text_before_cursor
+        trigger = _last_trigger(text)
+        if trigger is None or trigger[0] != "@":
+            return
+        at_pos = trigger[1]
+        partial = text[at_pos + 1 :].lower()
+        replace_len = len(text) - at_pos
+
+        matches: list[tuple[str, str, str]] = []
+        for name, _category, description, kind in self.candidates:
+            if kind != "file":
+                continue
+            if (
+                partial in name.lower()
+                or partial in description.lower()
+                or partial in Path(name).name.lower()
+            ):
+                matches.append((name, description, kind))
+
+        # Prefer shorter / shallower paths first, then alpha.
+        matches.sort(key=lambda item: (item[0].count("/"), item[0].lower()))
+
+        for name, description, _kind in matches[:80]:
+            # ``name`` is the agent path token (@rel or absolute).
+            bare = name[1:] if name.startswith("@") else name
+            chip = register_file_chip(
+                self._terminal, name, display_name=Path(bare).name
+            )
+            yield Completion(
+                chip,
+                start_position=-replace_len,
+                display=bare if "/" in bare else Path(bare).name,
+                display_meta=description,
+                # Same default completion text color as ``/`` slash commands
+                # (not the yellow mention-file accent).
+            )
+
+
+class MergedCompleter(Completer):
+    """Delegates to SlashCompleter (/), MentionCompleter (#), FileMentionCompleter (@)."""
+
+    def __init__(
+        self,
+        slash: Completer,
+        mention: MentionCompleter,
+        files: FileMentionCompleter | None = None,
+    ):
         self._slash = slash
         self._mention = mention
+        self._files = files
 
     @property
     def mention_completer(self) -> MentionCompleter:
         return self._mention
 
+    @property
+    def file_completer(self) -> FileMentionCompleter | None:
+        return self._files
+
     def get_completions(self, document, complete_event):
         text = document.text_before_cursor
         if text.lstrip().startswith("/"):
             yield from self._slash.get_completions(document, complete_event)
-        elif "@" in text:
+            return
+        trigger = _last_trigger(text)
+        if trigger is None:
+            return
+        kind, _pos = trigger
+        if kind == "#" and self._mention is not None:
             yield from self._mention.get_completions(document, complete_event)
+            return
+        if kind == "@" and self._files is not None:
+            yield from self._files.get_completions(document, complete_event)

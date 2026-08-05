@@ -42,6 +42,7 @@ def markdown_to_styled_lines(
     width: int,
     config=None,
     colored: bool = True,
+    workspace: str | None = None,
 ) -> list[StyleAndTextTuples]:
     """Render markdown (+ mermaid fences) to per-line FormattedText.
 
@@ -51,9 +52,12 @@ def markdown_to_styled_lines(
     if not text or not text.strip():
         return []
     try:
+        import os
+
         from rich.console import Console
 
         from ui.markdown.render import print_markdown_with_mermaid
+        from ui.markdown.theme import markdown_rich_theme
 
         buf = StringIO()
         # soft_wrap=False so Rich hard-wraps to `width`. soft_wrap=True leaves
@@ -70,16 +74,38 @@ def markdown_to_styled_lines(
             color_system="256" if colored else None,
             highlight=False,
             soft_wrap=False,
+            theme=markdown_rich_theme(config=config),
         )
-        print_markdown_with_mermaid(console, text, config=config)
-        raw = buf.getvalue().rstrip("\n")
+        ws = workspace
+        if not ws:
+            try:
+                ws = str(
+                    getattr(config, "get", lambda *_a, **_k: None)(
+                        "session.workspace_path"
+                    )
+                    or ""
+                ).strip() or None
+            except Exception:  # noqa: BLE001
+                ws = None
+        if not ws:
+            ws = str(os.environ.get("SANDWALK_SESSION_WORKSPACE") or "").strip() or None
+        print_markdown_with_mermaid(
+            console, text, config=config, workspace=ws
+        )
+        from ui.markdown.links import strip_osc8_hyperlinks
+
+        # prompt_toolkit ANSI does not parse OSC-8; strip before convert or
+        # users see ``8;id=…;https://…Label8;;`` garbage.
+        raw = strip_osc8_hyperlinks(buf.getvalue()).rstrip("\n")
     except Exception:  # noqa: BLE001
         raw = text
 
     rows: list[StyleAndTextTuples] = []
     for line in raw.split("\n"):
         if colored:
-            body = list(to_formatted_text(ANSI(line)))
+            from ui.markdown.links import strip_osc8_hyperlinks
+
+            body = list(to_formatted_text(ANSI(strip_osc8_hyperlinks(line))))
         else:
             body = [("", line)]
         rows.append([*_PAD_FRAG, *body] if body else list(_PAD_FRAG))
@@ -182,19 +208,26 @@ def user_message_rows(
     width: int,
 ) -> list[StyleAndTextTuples]:
     """Compose-style soft box for a user turn (no ❯ prefix)."""
-    from ui.terminal.attachments import chipify_uploads_for_display, style_with_image_chips
+    from ui.terminal.attachments import (
+        chipify_uploads_for_display,
+        find_file_chips,
+        style_with_image_chips,
+    )
 
     raw = chipify_uploads_for_display(text)
+    file_chips = find_file_chips(raw)
     outer_w = len(_USER_OUTER)
     panel_w = max(8, width - outer_w - 1)
     inner_w = max(1, panel_w - 2 * len(_USER_INNER))
     body_lines = _wrap(raw, inner_w)
-    use_chips = "[Image " in raw
+    use_chips = "[Image " in raw or bool(file_chips)
 
     rows: list[StyleAndTextTuples] = [_user_panel_fill(panel_w)]
     for line in body_lines:
         if use_chips:
-            frags = style_with_image_chips(line, _USER_STYLE)
+            frags = style_with_image_chips(
+                line, _USER_STYLE, file_chips=file_chips
+            )
         else:
             frags = [(_USER_STYLE, line)] if line else [(_USER_STYLE, "")]
         rows.append(
@@ -276,17 +309,25 @@ def entry_rows(
         # Startup mark + meta (Rich ANSI). Banner already has Rich Padding;
         # leave blank lines alone so the inset breathes.
         if entry.kind == "banner":
+            from ui.markdown.links import strip_osc8_hyperlinks
+
             rows: list[tuple[Entry, int, StyleAndTextTuples]] = []
             for i, line in enumerate(entry.text.split("\n")):
-                body = list(to_formatted_text(ANSI(line))) if line else [("", "")]
+                clean = strip_osc8_hyperlinks(line)
+                body = list(to_formatted_text(ANSI(clean))) if clean else [("", "")]
                 rows.append((entry, i, body))
             return rows or [(entry, 0, [("", "")])]
 
         # Rich → transcript keeps ANSI; render it (model lists, tables, etc.).
-        if entry.kind in {"system", "text"} and "\x1b[" in entry.text:
+        if entry.kind in {"system", "text"} and (
+            "\x1b[" in entry.text or "\x1b]8;" in entry.text
+        ):
+            from ui.markdown.links import strip_osc8_hyperlinks
+
             rows: list[tuple[Entry, int, StyleAndTextTuples]] = []
             for i, line in enumerate(entry.text.split("\n")):
-                body = list(to_formatted_text(ANSI(line))) if line else [("", "")]
+                clean = strip_osc8_hyperlinks(line)
+                body = list(to_formatted_text(ANSI(clean))) if clean else [("", "")]
                 rows.append((entry, i, body))
             return rows or [(entry, 0, [("", "")])]
 
@@ -299,21 +340,24 @@ def entry_rows(
             return [(entry, 0, [("", "")])]
 
         raw = entry.text
-        # Show the same orange [Image N] chips as the compose box (not @uploads/…).
+        # Show the same orange [Image N] / @[file] chips as the compose box.
         if "@uploads/" in raw or "[Image " in raw:
             from ui.terminal.attachments import chipify_uploads_for_display
 
             raw = chipify_uploads_for_display(raw)
+        from ui.terminal.attachments import find_file_chips, style_with_image_chips
+
+        file_chips = find_file_chips(raw)
         style = {
             "system": "class:transcript-system",
         }.get(entry.kind, "class:transcript-text")
         out: list[tuple[Entry, int, StyleAndTextTuples]] = []
-        use_chips = "[Image " in raw
+        use_chips = "[Image " in raw or bool(file_chips)
         for i, line in enumerate(_wrap(raw, inner)):
             if use_chips:
-                from ui.terminal.attachments import style_with_image_chips
-
-                frags = style_with_image_chips(line, style)
+                frags = style_with_image_chips(
+                    line, style, file_chips=file_chips
+                )
                 out.append((entry, i, [("", LEFT_PAD), *frags]))
             else:
                 out.append((entry, i, _style_plain(style, _pad(line))))

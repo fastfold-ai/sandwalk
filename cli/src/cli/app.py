@@ -5,6 +5,8 @@ from contextlib import contextmanager
 import typer
 from rich.console import Console
 
+from ui.markdown.theme import markdown_rich_theme
+
 # ─── Startup banner (sandwalk mark — compact 3-bar weave) ───
 # Left low → middle high → right low (weave, like the full mark).
 BANNER = """
@@ -27,7 +29,7 @@ app = typer.Typer(
     ),
     no_args_is_help=False,
 )
-console = Console()
+console = Console(theme=markdown_rich_theme())
 
 
 @contextmanager

@@ -143,7 +143,7 @@ class TestTerminalKeyBindings:
     def test_mention_tabs(self):
         terminal = _build_terminal_for_bindings(active_query=False)
         kb = _build_key_bindings(terminal)
-        buf = _FakeBuffer(text="@")
+        buf = _FakeBuffer(text="#")
         app = SimpleNamespace(current_buffer=buf, invalidate=MagicMock(), is_running=True)
         event = SimpleNamespace(app=app)
 
@@ -181,7 +181,8 @@ class TestTerminalKeyBindings:
 
         _handler(kb, "_accept_first_completion")(event)
 
-        assert buf.cancel_called is True
+        # Non-slash Enter with completions open just submits (no apply/cancel).
+        assert buf.applied_completion is None
         assert buf.validated is True
 
     def test_newline_bindings_insert_newline_text(self):

@@ -111,7 +111,11 @@ def run_transcript_session(
     compose_input = Window(
         BufferControl(
             buffer=buf,
-            lexer=AttachChipLexer(),
+            lexer=AttachChipLexer(
+                file_chips=lambda: list(
+                    getattr(terminal, "_file_attach_map", {}) or {}
+                )
+            ),
             focusable=True,
         ),
         height=Dimension(min=1, max=6),
@@ -449,14 +453,17 @@ def _build_transcript_bindings(
 
     @kb.add("enter", filter=modal_closed, eager=True)
     def _enter(event):
+        from ui.terminal.completion_accept import (
+            accept_file_completion,
+            accept_slash_completion,
+        )
+
         buffer = event.app.current_buffer
-        cs = buffer.complete_state
-        if buffer.text.lstrip().startswith("/") and cs and cs.completions:
-            if cs.complete_index is None:
-                buffer.go_to_completion(0)
-                cs = buffer.complete_state
-            if cs and cs.current_completion:
-                buffer.apply_completion(cs.current_completion)
+        # @ file pick: insert orange @[filename] chip only — do not send yet.
+        if accept_file_completion(buffer):
+            event.app.invalidate()
+            return
+        accept_slash_completion(buffer)
         text = buffer.text
         if text.strip():
             buffer.append_to_history()
