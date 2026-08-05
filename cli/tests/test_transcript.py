@@ -94,6 +94,33 @@ def test_control_cursor_anchors_scroll():
     assert content2.cursor_position.y == 5
 
 
+def test_control_defers_rewrap_during_resize_storm():
+    """Rapid width changes must not re-run markdown wrap on every pixel."""
+    import time
+
+    from ui.terminal.transcript.control import TranscriptControl, _REWRAP_SETTLE_S
+
+    store = TranscriptStore()
+    store.append_text("hello world " * 20)
+    control = TranscriptControl(store)
+
+    control.create_content(80, 12)
+    assert control._wrap_width == 80
+    first_key = control._cache_key
+
+    control.create_content(70, 12)
+    control.create_content(60, 12)
+    # Still showing the settled wrap while the drag continues.
+    assert control._wrap_width == 80
+    assert control._cache_key == first_key
+    assert control._pending_wrap_width == 60
+
+    deadline = time.time() + _REWRAP_SETTLE_S + 0.4
+    while time.time() < deadline and control._wrap_width != 60:
+        time.sleep(0.02)
+    assert control._wrap_width == 60
+
+
 def _click(control, x: int, y: int) -> None:
     from prompt_toolkit.data_structures import Point
     from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
@@ -276,8 +303,10 @@ def test_user_message_box_has_no_prompt_arrow():
 
 
 def test_resize_reflows_to_current_width():
-    """Wrap always tracks the live window width so text stays fully visible."""
-    from ui.terminal.transcript.control import TranscriptControl
+    """After resize settles, wrap tracks the live width so text stays visible."""
+    import time
+
+    from ui.terminal.transcript.control import TranscriptControl, _REWRAP_SETTLE_S
 
     store = TranscriptStore()
     store.append_text("hello world " * 20, kind="assistant")
@@ -285,16 +314,22 @@ def test_resize_reflows_to_current_width():
 
     narrow = control.create_content(40, 10)
     assert control._cache_key == (int(store.revision), 40)
-    narrow_lines = narrow.line_count
+    narrow_lines = control._line_count
 
-    wide = control.create_content(120, 10)
-    assert control._cache_key == (int(store.revision), 120)
-    # Wider wrap should produce fewer (or equal) content rows before height pad.
-    assert control._line_count <= narrow_lines
-
-    # Lines are padded to the window width so shrink-resizes clear ghosts.
-    line0 = "".join(t for _s, t in wide.get_line(0))
+    # Mid-drag: pad/truncate to the new width without rewrapping yet.
+    mid = control.create_content(120, 10)
+    assert control._wrap_width == 40
+    line0 = "".join(t for _s, t in mid.get_line(0))
     assert len(line0) >= 120
+
+    deadline = time.time() + _REWRAP_SETTLE_S + 0.4
+    while time.time() < deadline and control._wrap_width != 120:
+        time.sleep(0.02)
+    assert control._wrap_width == 120
+    # Force a paint at the settled wrap width.
+    control.create_content(120, 10)
+    assert control._cache_key == (int(store.revision), 120)
+    assert control._line_count <= narrow_lines
 
 
 def test_banner_kind_preserves_mark_without_left_pad():

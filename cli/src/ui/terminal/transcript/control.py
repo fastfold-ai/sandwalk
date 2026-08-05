@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import threading
+import time
 
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.formatted_text import StyleAndTextTuples
@@ -13,6 +15,10 @@ from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
 from ui.terminal.path_links import link_at, open_link, style_link_spans
 from ui.terminal.transcript.render import render_all_lines
 from ui.terminal.transcript.store import ToolEntry, TranscriptStore
+
+# Align with resize debounce in transcript.resize (OpenTUI default 100ms).
+# Keep the previous wrap while dragging; reflow once the width settles.
+_REWRAP_SETTLE_S = 0.10
 
 
 def _merge_frags(frags: StyleAndTextTuples) -> StyleAndTextTuples:
@@ -81,8 +87,12 @@ class TranscriptControl(UIControl):
         self._rows: list = []
         self._height = 1
         self._width = 80
+        self._wrap_width = 80
         self._line_count = 0
         self._cache_key: tuple[int, int] | None = None
+        self._rewrap_lock = threading.Lock()
+        self._rewrap_token = 0
+        self._pending_wrap_width: int | None = None
         # Drag selection (in-app; mouse tracking blocks host selection).
         self._sel_anchor: Point | None = None
         self._sel_end: Point | None = None
@@ -143,16 +153,52 @@ class TranscriptControl(UIControl):
         _copy_to_clipboard(text)
         return text
 
+    def _schedule_rewrap(self, width: int) -> None:
+        """Commit a new wrap width after resize settles, then invalidate once."""
+        with self._rewrap_lock:
+            self._pending_wrap_width = width
+            self._rewrap_token += 1
+            token = self._rewrap_token
+
+        def _flush() -> None:
+            time.sleep(_REWRAP_SETTLE_S)
+            with self._rewrap_lock:
+                if token != self._rewrap_token:
+                    return
+                pending = self._pending_wrap_width
+                self._pending_wrap_width = None
+            if pending is None or pending == self._wrap_width:
+                return
+            self._wrap_width = pending
+            self._cache_key = None
+            try:
+                from prompt_toolkit.application.current import get_app
+
+                app = get_app()
+                if app.is_running:
+                    app.invalidate()
+            except Exception:  # noqa: BLE001
+                pass
+
+        threading.Thread(
+            target=_flush, daemon=True, name="sandwalk-transcript-rewrap"
+        ).start()
+
     def create_content(self, width: int, height: int) -> UIContent:
         self._width = max(20, width)
         self._height = max(1, height)
-        # Always wrap to the live window width so resize never leaves clipped
-        # or narrow-column text. Toolbar animation must not re-run Rich/markdown
-        # unless the store revision or width actually changed.
-        key = (int(self.store.revision), self._width)
+        # First paint (or empty cache): wrap immediately to the live width.
+        # During a drag-resize, keep the last wrap and reflow after settle so
+        # Rich/markdown is not re-run on every SIGWINCH.
+        if self._cache_key is None:
+            self._wrap_width = self._width
+        elif self._width != self._wrap_width:
+            self._schedule_rewrap(self._width)
+
+        key = (int(self.store.revision), self._wrap_width)
         if key != self._cache_key:
             rows, hit_map = render_all_lines(
-                self.store, width=self._width, config=self.config
+                self.store, width=self._wrap_width, config=self.config
             )
             self._rows = rows
             self._hit_map = hit_map
@@ -201,8 +247,25 @@ class TranscriptControl(UIControl):
                         frags = _overlay_selection(frags, 0, end.x + 1)
                     else:
                         frags = _overlay_selection(frags, 0, line_len + 1)
-            # Pad to full width so shrink-resizes erase previous glyphs.
+            # Fit to the live window: truncate on shrink mid-resize, pad on grow
+            # so previous glyphs are erased without a full rewrap yet.
             plain_len = sum(len(t) for _s, t in frags)
+            if plain_len > pad_width > 0:
+                kept: StyleAndTextTuples = []
+                col = 0
+                for style, text in frags:
+                    if col >= pad_width:
+                        break
+                    take = pad_width - col
+                    if len(text) <= take:
+                        kept.append((style, text))
+                        col += len(text)
+                    else:
+                        kept.append((style, text[:take]))
+                        col = pad_width
+                        break
+                frags = kept
+                plain_len = pad_width
             if plain_len < pad_width:
                 frags = [*frags, ("", " " * (pad_width - plain_len))]
             return frags

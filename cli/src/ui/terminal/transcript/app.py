@@ -44,6 +44,8 @@ _COMPOSE_BOX_RIGHT = _COMPOSE_OUTER
 
 # Coalesce store/toolbar invalidates so Rich re-renders can't pin the UI.
 _INVALIDATE_MIN_INTERVAL_S = 0.05
+# Cap non-resize invalidate storms (toolbar animation, store updates).
+_MIN_REDRAW_INTERVAL_S = 1.0 / 24.0
 
 
 def _merge_style(config=None, *, backdrop_dim: bool = False):
@@ -237,6 +239,16 @@ def run_transcript_session(
 
     theme_state = {"fp": _theme_fingerprint(config)}
 
+    from ui.terminal.transcript.resize import SyncUpdateGate, install_smooth_resize
+
+    sync_gate = SyncUpdateGate()
+
+    def _begin_sync_update(application) -> None:
+        sync_gate.begin(application.output)
+
+    def _end_sync_update(application) -> None:
+        sync_gate.end(application.output)
+
     app = Application(
         layout=Layout(root, focused_element=buf),
         key_bindings=kb,
@@ -246,7 +258,15 @@ def run_transcript_session(
         full_screen=True,
         mouse_support=True,
         erase_when_done=False,
+        # Cap toolbar/store invalidate storms. Resize uses a separate
+        # debounced path (install_smooth_resize) — ptk's default _on_resize
+        # erase_down is what blanks the screen on every SIGWINCH.
+        min_redraw_interval=_MIN_REDRAW_INTERVAL_S,
+        before_render=_begin_sync_update,
+        after_render=_end_sync_update,
     )
+    # OpenCode-style: debounce SIGWINCH ~100ms and never erase mid-drag.
+    install_smooth_resize(app, sync=sync_gate)
     terminal._transcript_app = app
 
     invalidate_lock = threading.Lock()
