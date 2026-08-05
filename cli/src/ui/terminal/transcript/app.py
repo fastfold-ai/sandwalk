@@ -270,10 +270,12 @@ def run_transcript_session(
         themes_host = getattr(terminal, "_themes_modal_host", None)
         models_host = getattr(terminal, "_models_modal_host", None)
         skills_host = getattr(terminal, "_skills_modal_host", None)
+        mcp_host = getattr(terminal, "_mcp_modal_host", None)
         dim = bool(
             (themes_host is not None and getattr(themes_host.state, "open", False))
             or (models_host is not None and getattr(models_host.state, "open", False))
             or (skills_host is not None and getattr(skills_host.state, "open", False))
+            or (mcp_host is not None and getattr(mcp_host.state, "open", False))
         )
         fp = _theme_fingerprint(live_cfg, backdrop_dim=dim)
         if not force and fp == theme_state["fp"]:
@@ -294,7 +296,8 @@ def run_transcript_session(
 
     terminal._ui_theme_refresh = _force_theme_refresh
 
-    # In-app /themes, /models, /skills overlays (centered dialogs over transcript).
+    # In-app picker overlays (centered dialogs over transcript).
+    from ui.terminal.mcp_modal import McpModalHost
     from ui.terminal.models_modal import ModelsModalHost
     from ui.terminal.skills_modal import SkillsModalHost
     from ui.terminal.themes_modal import ThemesModalHost
@@ -323,17 +326,26 @@ def run_transcript_session(
         on_style_refresh=_force_theme_refresh,
         focus_compose=_focus_compose,
     )
+    mcp_host = McpModalHost(
+        terminal,
+        app=app,
+        on_style_refresh=_force_theme_refresh,
+        focus_compose=_focus_compose,
+    )
     terminal._themes_modal_host = themes_host
     terminal._models_modal_host = models_host
     terminal._skills_modal_host = skills_host
+    terminal._mcp_modal_host = mcp_host
     root.floats.extend(themes_host.floats)
     root.floats.extend(models_host.floats)
     root.floats.extend(skills_host.floats)
+    root.floats.extend(mcp_host.floats)
     app.key_bindings = merge_key_bindings(
         [
             themes_host.key_bindings,
             models_host.key_bindings,
             skills_host.key_bindings,
+            mcp_host.key_bindings,
             kb,
         ]
     )
@@ -380,8 +392,15 @@ def run_transcript_session(
     app._sandwalk_terminal = terminal  # type: ignore[attr-defined]
 
     def _auto_highlight_first(buffer):
+        from ui.terminal.completion import _last_slash_trigger
+
+        before = ""
+        try:
+            before = buffer.document.text_before_cursor
+        except Exception:  # noqa: BLE001
+            before = str(buffer.text or "")
         if (
-            buffer.text.lstrip().startswith("/")
+            _last_slash_trigger(before) >= 0
             and buffer.complete_state
             and buffer.complete_state.complete_index is None
             and buffer.complete_state.completions
@@ -428,6 +447,7 @@ def run_transcript_session(
         terminal._themes_modal_host = None
         terminal._models_modal_host = None
         terminal._skills_modal_host = None
+        terminal._mcp_modal_host = None
 
     if result is None:
         raise EOFError
@@ -464,6 +484,7 @@ def _build_transcript_bindings(
             "_themes_modal_host",
             "_models_modal_host",
             "_skills_modal_host",
+            "_mcp_modal_host",
         ):
             host = getattr(terminal, attr, None)
             if host is not None and getattr(host.state, "open", False):
@@ -484,20 +505,28 @@ def _build_transcript_bindings(
         if accept_file_completion(buffer):
             event.app.invalidate()
             return
+        from ui.terminal.completion import prepare_slash_submit
+
         accept_slash_completion(buffer)
         text = buffer.text
+        # ``hi /mcps`` → run /mcps but keep ``hi `` in compose for chip insert.
+        submit_text, restore_prefix = prepare_slash_submit(text)
         if text.strip():
             buffer.append_to_history()
         buffer.reset()
+        if restore_prefix:
+            buffer.insert_text(restore_prefix)
         store.pin_tail()
         # Keep the Application alive across turns — exiting/recreating it every
         # submit flickers the screen and stacked store listeners freeze the UI.
         try:
-            keep_going = on_submit(text)
+            keep_going = on_submit(submit_text)
         except Exception:  # noqa: BLE001
             keep_going = True
         if not keep_going:
-            event.app.exit(result=text if text != "__EXIT__" else "__EXIT__")
+            event.app.exit(
+                result=submit_text if submit_text != "__EXIT__" else "__EXIT__"
+            )
         else:
             event.app.invalidate()
 

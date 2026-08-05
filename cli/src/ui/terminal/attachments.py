@@ -42,6 +42,8 @@ _UPLOAD_AT_RE = re.compile(
 _FILE_CHIP_RE = re.compile(r"@\[[^\]]+\]")
 # Skills picker inserts ``skill: <name>`` — pink chips in compose + transcript.
 _SKILL_CHIP_RE = re.compile(r"skill:\s+[^\s]+", re.IGNORECASE)
+# MCP picker inserts ``mcp: <id>`` — cyan chips in compose + transcript.
+_MCP_CHIP_RE = re.compile(r"mcp:\s+[^\s]+", re.IGNORECASE)
 # Expanded agent path tokens stored in session history (not already ``@[chip]``).
 # Skip ``@uploads/…`` — those become ``[Image N]`` via chipify_uploads_for_display.
 _AT_AGENT_PATH_RE = re.compile(r"@(?!\[)(?!uploads/)([^\s\[\]]+)")
@@ -279,6 +281,21 @@ def find_skill_chips(text: str) -> list[str]:
     return out
 
 
+def find_mcp_chips(text: str) -> list[str]:
+    """Return unique ``mcp: <id>`` chips in display order."""
+    if not text:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for match in _MCP_CHIP_RE.finditer(text):
+        chip = match.group(0)
+        if chip in seen:
+            continue
+        seen.add(chip)
+        out.append(chip)
+    return out
+
+
 def _display_chip_for_path(path: str, *, counts: dict[str, int]) -> str:
     """Build a unique ``@[basename]`` chip for a stored agent path."""
     bare = path[1:] if path.startswith("@") else path
@@ -357,6 +374,7 @@ def style_with_image_chips(
     *,
     file_chips: list[str] | None = None,
     skill_chips: list[str] | None = None,
+    mcp_chips: list[str] | None = None,
 ) -> list[tuple[str, str]]:
     """Split text into FormattedText fragments, highlighting attach chips."""
     if not text:
@@ -382,6 +400,15 @@ def style_with_image_chips(
             if idx < 0:
                 break
             spans.append((idx, idx + len(chip), "class:skill-chip"))
+            start = idx + len(chip)
+    mcps = mcp_chips if mcp_chips is not None else find_mcp_chips(text)
+    for chip in sorted(mcps, key=len, reverse=True):
+        start = 0
+        while True:
+            idx = text.find(chip, start)
+            if idx < 0:
+                break
+            spans.append((idx, idx + len(chip), "class:mcp-chip"))
             start = idx + len(chip)
     if not spans:
         return [(base_style, text)]

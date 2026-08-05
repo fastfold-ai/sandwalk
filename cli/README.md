@@ -145,7 +145,7 @@ The table probes each profile (health, models path, key preview, discovered mode
 | `/sandbox` | Pick Local / Modal compute presets (+ edit base image) |
 | `/plan` | Toggle Plan mode (starts off; writes `plans/*.md` until Agent mode) |
 | `/specialist` | Set / list specialists (`<slug>` \| `use` \| `clear` \| `list` \| `show`) |
-| `/mcp` | MCP servers (`connect` \| `enable` \| `validate` \| `add` \| `remove`) |
+| `/mcps` | MCP picker (`connect` \| `enable` \| `validate` \| `add` \| `remove`) |
 | `/tools` | List tools with status (stable / experimental) |
 | `/skills` | List loaded skills (filtered to active specialist if set) |
 | `/skills-add` | Install a skill from GitHub / local path / name |

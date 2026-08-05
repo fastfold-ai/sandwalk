@@ -162,15 +162,20 @@ def _build_key_bindings(terminal, *, include_mouse: bool = True):
         if accept_file_completion(buf):
             event.app.invalidate()
             return
+        from ui.terminal.completion import prepare_slash_submit
+
         accept_slash_completion(buf)
         # Owned transcript Application registers its own Enter (eager) to exit
         # with buffer text; PromptSession uses validate_and_handle.
         if getattr(terminal, "transcript", None) is not None:
             text = buf.text
+            submit_text, restore_prefix = prepare_slash_submit(text)
             if text.strip():
                 buf.append_to_history()
             buf.reset()
-            event.app.exit(result=text)
+            if restore_prefix:
+                buf.insert_text(restore_prefix)
+            event.app.exit(result=submit_text)
             return
         buf.validate_and_handle()
 

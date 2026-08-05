@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Enter / click inserts ``skill: <name>`` into compose (keep typing); Space
   toggles enable. ``skill:`` mentions render as pink chips (compose + transcript).
   Rich table remains as a non-TTY / test fallback.
+- Interactive ``/mcps`` picker (same chrome as ``/skills``): search, lean
+  status/id/transport; Enter / click inserts ``mcp: <id>`` (cyan chip); Space
+  toggles enable. Subcommands (``connect``, ``validate``, …) keep working.
+  The old ``/mcp`` slash command is removed (use ``/mcps``).
 - Compose ``@`` file search across the session workspace and current cwd;
   Enter inserts an orange ``@[filename]`` chip without sending (so you can type
   more around it); the chip expands to a usable path for the agent on submit.

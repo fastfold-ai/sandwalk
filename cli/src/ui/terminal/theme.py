@@ -232,6 +232,7 @@ def transcript_style_dict(
     accent = p["accent"]
     on_accent = _contrast_on(accent)
     muted = p["muted_fg"]
+    from ui.terminal.mcp_modal import mcp_modal_style_extras
     from ui.terminal.models_modal import models_modal_style_extras
     from ui.terminal.skills_modal import skills_modal_style_extras
     from ui.terminal.themes_modal import themes_modal_style_extras
@@ -260,6 +261,8 @@ def transcript_style_dict(
         "image-chip": "bold #111111 bg:#f0a030",
         # Skills picker inserts — pink chip (brand-adjacent magenta).
         "skill-chip": "bold #111111 bg:#f472b6",
+        # MCP picker inserts — cyan chip (distinct from skill pink).
+        "mcp-chip": "bold #111111 bg:#22d3ee",
         "transcript-compose": panel,
         "transcript-compose.prompt": f"bold {p['prompt_fg']}",
         "transcript-compose-accent": f"bg:{p['canvas_bg']} {accent}",
@@ -279,6 +282,7 @@ def transcript_style_dict(
     out.update(themes_modal_style_extras(p))
     out.update(models_modal_style_extras(p))
     out.update(skills_modal_style_extras(p))
+    out.update(mcp_modal_style_extras(p))
     return out
 
 

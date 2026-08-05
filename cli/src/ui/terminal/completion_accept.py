@@ -39,8 +39,11 @@ def accept_file_completion(buffer) -> bool:
 def accept_slash_completion(buffer) -> bool:
     """Apply the current/first ``/`` completion. Returns True if applied."""
     cs = getattr(buffer, "complete_state", None)
-    text = getattr(buffer, "text", "") or ""
-    if not text.lstrip().startswith("/") or not cs or not getattr(cs, "completions", None):
+    completions = getattr(cs, "completions", None) if cs is not None else None
+    if not cs or not completions:
+        return False
+    # Slash menu entries always start with ``/``.
+    if not _completion_text(completions[0]).startswith("/"):
         return False
     if cs.complete_index is None:
         buffer.go_to_completion(0)

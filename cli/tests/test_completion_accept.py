@@ -62,3 +62,10 @@ def test_accept_slash_completion_applies():
     buf = _Buf(text="/he", completions=[help_c], current=None)
     assert accept_slash_completion(buf) is True
     assert buf.applied is help_c
+
+
+def test_accept_slash_completion_after_preceding_text():
+    help_c = SimpleNamespace(text="/help")
+    buf = _Buf(text="hi /he", completions=[help_c], current=help_c)
+    assert accept_slash_completion(buf) is True
+    assert buf.applied is help_c

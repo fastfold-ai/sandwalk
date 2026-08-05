@@ -1,4 +1,4 @@
-"""Highlight ``[Image N]``, ``@[file]``, and ``skill: name`` chips in the prompt."""
+"""Highlight ``[Image N]``, ``@[file]``, ``skill:``, and ``mcp:`` chips."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from prompt_toolkit.lexers import Lexer
 _IMAGE_CHIP_RE = re.compile(r"\[Image\s+\d+\]")
 _FILE_CHIP_RE = re.compile(r"@\[[^\]]+\]")
 _SKILL_CHIP_RE = re.compile(r"skill:\s+[^\s]+", re.IGNORECASE)
+_MCP_CHIP_RE = re.compile(r"mcp:\s+[^\s]+", re.IGNORECASE)
 
 
 class AttachChipLexer(Lexer):
@@ -58,6 +59,8 @@ class AttachChipLexer(Lexer):
                     start = idx + len(chip)
             for m in _SKILL_CHIP_RE.finditer(line):
                 spans.append((m.start(), m.end(), "class:skill-chip"))
+            for m in _MCP_CHIP_RE.finditer(line):
+                spans.append((m.start(), m.end(), "class:mcp-chip"))
             if not spans:
                 return [("", line)] if line else []
             spans.sort(key=lambda s: (s[0], -(s[1] - s[0])))

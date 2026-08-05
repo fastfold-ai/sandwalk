@@ -143,6 +143,8 @@ PT_STYLE = Style.from_dict({
     "image-chip": "bold #111111 bg:#f0a030",
     # Skills picker inserts — pink chip
     "skill-chip": "bold #111111 bg:#f472b6",
+    # MCP picker inserts — cyan chip
+    "mcp-chip": "bold #111111 bg:#22d3ee",
 })
 
 
@@ -161,30 +163,121 @@ def _last_at_trigger(text: str) -> int:
     return pos
 
 
+def _last_slash_trigger(text: str) -> int:
+    """Index of the latest ``/`` that starts a slash-command token.
+
+    A slash counts when it is at the start of the buffer or preceded by
+    whitespace (so ``hi /mod`` works, but ``https://`` and ``a/b`` do not).
+    """
+    pos = -1
+    start = 0
+    while True:
+        idx = text.find("/", start)
+        if idx < 0:
+            break
+        if idx == 0 or text[idx - 1].isspace():
+            pos = idx
+        start = idx + 1
+    return pos
+
+
+def extract_trailing_slash_command(text: str) -> str | None:
+    """If prose is followed by a known ``/cmd``, return that command line.
+
+    Used so ``hi /mcps`` runs the picker instead of sending chat. Pure leading
+    slash lines return None (existing dispatch already handles them).
+    """
+    raw = (text or "").rstrip()
+    if not raw:
+        return None
+    pos = _last_slash_trigger(raw)
+    if pos <= 0:
+        return None
+    suffix = raw[pos:].strip()
+    if not suffix.startswith("/"):
+        return None
+    head = suffix.split(None, 1)[0]
+    rest = suffix[len(head) :]
+    head_l = head.lower()
+    by_lower = {cmd.lower(): cmd for cmd in SLASH_COMMANDS}
+    if head_l in by_lower:
+        return by_lower[head_l] + rest
+    # Same first-match prefix rule as interactive slash dispatch.
+    matches = [cmd for cmd in SLASH_COMMANDS if cmd.startswith(head)]
+    if not matches:
+        matches = [cmd for cmd in SLASH_COMMANDS if cmd.startswith(head_l)]
+    if matches:
+        return matches[0] + rest
+    return None
+
+
+# Slash commands whose Enter action inserts a chip into compose (like @ / #).
+_CHIP_PICKER_SLASH_HEADS = frozenset({"/skills", "/skill", "/mcps"})
+
+
+def is_chip_picker_slash(command: str) -> bool:
+    """True for ``/skills`` / ``/mcps`` (insert into compose, keep preceding text)."""
+    head = (command or "").strip().split(None, 1)[0].lower()
+    return head in _CHIP_PICKER_SLASH_HEADS
+
+
+def prepare_slash_submit(text: str) -> tuple[str, str]:
+    """Split mid-line chip-picker slash submits into (command, restore_prefix).
+
+    Example: ``hi /mcps`` → (``/mcps``, ``hi ``) so the modal can append
+    ``mcp: id`` after the kept prose. Non-picker commands drop the prefix.
+    When there is no trailing slash command, returns ``(text, "")``.
+    """
+    raw = text or ""
+    trailing = extract_trailing_slash_command(raw)
+    if trailing is None:
+        return raw, ""
+    pos = _last_slash_trigger(raw.rstrip())
+    prefix = raw[:pos] if pos > 0 else ""
+    if prefix and is_chip_picker_slash(trailing):
+        if not prefix[-1].isspace():
+            prefix += " "
+        return trailing, prefix
+    return trailing, ""
+
+
 def _last_trigger(text: str) -> tuple[str, int] | None:
-    """Return ``("#"|"@", index)`` for the latest mention trigger, if any."""
+    """Return ``("/"|"#"|"@", index)`` for the latest compose trigger, if any."""
+    slash_pos = _last_slash_trigger(text)
     at_pos = _last_at_trigger(text)
     hash_pos = text.rfind("#")
-    if at_pos < 0 and hash_pos < 0:
+    best = -1
+    kind = ""
+    if slash_pos > best:
+        best = slash_pos
+        kind = "/"
+    if at_pos > best:
+        best = at_pos
+        kind = "@"
+    if hash_pos > best:
+        best = hash_pos
+        kind = "#"
+    if best < 0:
         return None
-    if at_pos > hash_pos:
-        return "@", at_pos
-    return "#", hash_pos
+    return kind, best
 
 
 class SlashCompleter(Completer):
-    """Autocomplete slash commands when input starts with /."""
+    """Autocomplete slash commands after ``/`` (start of input or after space)."""
 
     def get_completions(self, document, complete_event):
         text = document.text_before_cursor
-        if text.startswith("/"):
-            for cmd, desc in SLASH_COMMANDS.items():
-                if cmd.startswith(text):
-                    yield Completion(
-                        cmd,
-                        start_position=-len(text),
-                        display_meta=desc,
-                    )
+        slash_pos = _last_slash_trigger(text)
+        if slash_pos < 0:
+            return
+        fragment = text[slash_pos:]
+        for cmd, desc in SLASH_COMMANDS.items():
+            if cmd.startswith(fragment):
+                yield Completion(
+                    cmd,
+                    start_position=-len(fragment),
+                    display_meta=desc,
+                )
 
 
 class MentionCompleter(Completer):
@@ -379,13 +472,13 @@ class MergedCompleter(Completer):
 
     def get_completions(self, document, complete_event):
         text = document.text_before_cursor
-        if text.lstrip().startswith("/"):
-            yield from self._slash.get_completions(document, complete_event)
-            return
         trigger = _last_trigger(text)
         if trigger is None:
             return
         kind, _pos = trigger
+        if kind == "/":
+            yield from self._slash.get_completions(document, complete_event)
+            return
         if kind == "#" and self._mention is not None:
             yield from self._mention.get_completions(document, complete_event)
             return

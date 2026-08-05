@@ -236,10 +236,18 @@ class InteractiveTerminal(
         # Auto-highlight (not apply) the first completion for slash commands
         # so the dropdown shows which item will be accepted on Enter.
         def _auto_highlight_first(buf):
-            if (buf.text.lstrip().startswith("/")
-                    and buf.complete_state
-                    and buf.complete_state.complete_index is None
-                    and buf.complete_state.completions):
+            from ui.terminal.completion import _last_slash_trigger
+
+            try:
+                before = buf.document.text_before_cursor
+            except Exception:  # noqa: BLE001
+                before = str(buf.text or "")
+            if (
+                _last_slash_trigger(before) >= 0
+                and buf.complete_state
+                and buf.complete_state.complete_index is None
+                and buf.complete_state.completions
+            ):
                 # Set the index directly — this highlights without changing text
                 buf.complete_state.go_to_index(0)
 
@@ -456,6 +464,13 @@ class InteractiveTerminal(
         if not query:
             return True
 
+        # Mid-line slash pick: ``hi /mcps`` → run ``/mcps``, do not chat the prose.
+        from ui.terminal.completion import extract_trailing_slash_command
+
+        trailing = extract_trailing_slash_command(query)
+        if trailing:
+            query = trailing
+
         # Keep chip labels for transcript display; expand paths only for the agent.
         display_query = query
         query = self._expand_attached_images(query)
@@ -634,8 +649,20 @@ class InteractiveTerminal(
             self._schedule_host_terminal(self._handle_keys_command, query)
             self._advance_suggestion()
             return True
-        if cmd == "mcp" or cmd.startswith("/mcp"):
-            self._schedule_host_terminal(self._handle_mcp_command, query)
+        if cmd == "mcps" or cmd.startswith("/mcps"):
+            parts = query.strip().split()
+            if parts and parts[0].lstrip("/").lower() == "mcps":
+                parts = parts[1:]
+            # Bare /mcps opens the in-app picker (same as /skills).
+            if not parts or parts[0].lower() in {"list", "status", "ls"}:
+                host = getattr(self, "_mcp_modal_host", None)
+                app = getattr(self, "_transcript_app", None)
+                if host is not None and getattr(app, "is_running", False):
+                    self._show_mcp()
+                else:
+                    self._schedule_host_terminal(self._show_mcp)
+            else:
+                self._schedule_host_terminal(self._handle_mcp_command, query)
             self._advance_suggestion()
             return True
         if cmd in ("upgrade", "/upgrade"):

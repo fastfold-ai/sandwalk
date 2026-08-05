@@ -135,15 +135,33 @@ class _BoltzSetupMixin:
         else:
             self.console.print("  [dim]Skipped boltz-api install.[/dim]")
 
+    def _show_mcp(self) -> None:
+        """Open the searchable MCP modal (Rich table as fallback)."""
+        host = getattr(self, "_mcp_modal_host", None)
+        app = getattr(self, "_transcript_app", None)
+        if host is not None and getattr(app, "is_running", False):
+            host.open()
+            return
+        from ui.terminal.mcp_modal import run_mcp_modal
+
+        if run_mcp_modal(self):
+            return
+        from agent.mcp_manage import handle_mcp_argv
+
+        handle_mcp_argv(["list"], self.console)
+
     def _handle_mcp_command(self, query: str) -> None:
-        """Handle /mcp — list and manage MCP servers (Deep Agents–style)."""
+        """Handle /mcps — modal for list; subcommands keep the CLI path."""
         from agent.mcp_manage import handle_mcp_argv
 
         parts = query.strip().split()
-        # Drop leading /mcp or mcp
-        if parts and parts[0].lstrip("/").lower() == "mcp":
+        # Drop leading /mcps or mcps
+        if parts and parts[0].lstrip("/").lower() == "mcps":
             parts = parts[1:]
-        handle_mcp_argv(parts or ["list"], self.console)
+        if not parts or parts[0].lower() in {"list", "status", "ls"}:
+            self._show_mcp()
+            return
+        handle_mcp_argv(parts, self.console)
 
     def _handle_specialist_command(self, query: str) -> None:
         """Handle /specialist — list and activate run profiles."""

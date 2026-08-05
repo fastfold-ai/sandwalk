@@ -212,6 +212,7 @@ def user_message_rows(
         chipify_file_paths_for_display,
         chipify_uploads_for_display,
         find_file_chips,
+        find_mcp_chips,
         find_skill_chips,
         style_with_image_chips,
     )
@@ -219,11 +220,17 @@ def user_message_rows(
     raw = chipify_file_paths_for_display(chipify_uploads_for_display(text))
     file_chips = find_file_chips(raw)
     skill_chips = find_skill_chips(raw)
+    mcp_chips = find_mcp_chips(raw)
     outer_w = len(_USER_OUTER)
     panel_w = max(8, width - outer_w - 1)
     inner_w = max(1, panel_w - 2 * len(_USER_INNER))
     body_lines = _wrap(raw, inner_w)
-    use_chips = "[Image " in raw or bool(file_chips) or bool(skill_chips)
+    use_chips = (
+        "[Image " in raw
+        or bool(file_chips)
+        or bool(skill_chips)
+        or bool(mcp_chips)
+    )
 
     rows: list[StyleAndTextTuples] = [_user_panel_fill(panel_w)]
     for line in body_lines:
@@ -233,6 +240,7 @@ def user_message_rows(
                 _USER_STYLE,
                 file_chips=file_chips,
                 skill_chips=skill_chips,
+                mcp_chips=mcp_chips,
             )
         else:
             frags = [(_USER_STYLE, line)] if line else [(_USER_STYLE, "")]
@@ -353,17 +361,24 @@ def entry_rows(
             raw = chipify_uploads_for_display(raw)
         from ui.terminal.attachments import (
             find_file_chips,
+            find_mcp_chips,
             find_skill_chips,
             style_with_image_chips,
         )
 
         file_chips = find_file_chips(raw)
         skill_chips = find_skill_chips(raw)
+        mcp_chips = find_mcp_chips(raw)
         style = {
             "system": "class:transcript-system",
         }.get(entry.kind, "class:transcript-text")
         out: list[tuple[Entry, int, StyleAndTextTuples]] = []
-        use_chips = "[Image " in raw or bool(file_chips) or bool(skill_chips)
+        use_chips = (
+            "[Image " in raw
+            or bool(file_chips)
+            or bool(skill_chips)
+            or bool(mcp_chips)
+        )
         for i, line in enumerate(_wrap(raw, inner)):
             if use_chips:
                 frags = style_with_image_chips(
@@ -371,6 +386,7 @@ def entry_rows(
                     style,
                     file_chips=file_chips,
                     skill_chips=skill_chips,
+                    mcp_chips=mcp_chips,
                 )
                 out.append((entry, i, [("", LEFT_PAD), *frags]))
             else:

@@ -627,6 +627,7 @@ def dim_transcript_styles_for_backdrop(
             key_s.startswith("themes-")
             or key_s.startswith("models-")
             or key_s.startswith("skills-")
+            or key_s.startswith("mcp-")
         ):
             out[key] = val
             continue

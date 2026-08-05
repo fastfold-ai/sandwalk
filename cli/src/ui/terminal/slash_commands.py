@@ -19,7 +19,7 @@ SLASH_COMMANDS = {
     "/themes": "Theme picker with search and live preview",
     "/config": "Show active runtime configuration",
     "/keys": "Show API key status (/keys profile | set-compatible | set-moonshot | set-boltz)",
-    "/mcp": "List and manage MCP servers (/mcp connect|enable|validate|add|remove)",
+    "/mcps": "MCP picker — Enter inserts mcp: id, Space toggles (/mcps connect …)",
     "/model-manager": "Manage OpenAI-compatible profiles (add/edit/delete)",
     "/upgrade": "Upgrade sandwalk via uv",
     "/doctor": "Run readiness diagnostics and fix hints",

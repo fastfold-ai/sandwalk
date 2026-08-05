@@ -148,6 +148,50 @@ class TestMergedCompleter:
         names = [c.text for c in results]
         assert "/tools" in names
 
+    def test_slash_commands_after_preceding_text(self):
+        merged = MergedCompleter(
+            SlashCompleter(),
+            MentionCompleter(SAMPLE_CANDIDATES),
+        )
+        text = "hi /tool"
+        doc = Document(text, len(text))
+        results = list(merged.get_completions(doc, None))
+        names = [c.text for c in results]
+        assert "/tools" in names
+        # Replace only the ``/tool`` fragment, not the leading ``hi ``.
+        assert results[0].start_position == -len("/tool")
+
+    def test_slash_does_not_trigger_inside_url_or_path(self):
+        merged = MergedCompleter(
+            SlashCompleter(),
+            MentionCompleter(SAMPLE_CANDIDATES),
+        )
+        for text in ("https://example.com", "path/to/file"):
+            doc = Document(text, len(text))
+            assert list(merged.get_completions(doc, None)) == []
+
+    def test_extract_trailing_slash_command(self):
+        from ui.terminal.completion import extract_trailing_slash_command
+
+        assert extract_trailing_slash_command("hi /mcps") == "/mcps"
+        assert extract_trailing_slash_command("hi wahts this /mcps") == "/mcps"
+        assert extract_trailing_slash_command("/mcps") is None
+        assert extract_trailing_slash_command("just chat") is None
+        assert extract_trailing_slash_command("see /mod") == "/models"
+
+    def test_prepare_slash_submit_keeps_prefix_for_chip_pickers(self):
+        from ui.terminal.completion import prepare_slash_submit
+
+        assert prepare_slash_submit("hi /mcps") == ("/mcps", "hi ")
+        assert prepare_slash_submit("ask about fold /skills") == (
+            "/skills",
+            "ask about fold ",
+        )
+        # Non-chip pickers still drop the prose.
+        assert prepare_slash_submit("hi /help") == ("/help", "")
+        assert prepare_slash_submit("/mcps") == ("/mcps", "")
+        assert prepare_slash_submit("just chat") == ("just chat", "")
+
     def test_hash_mentions(self):
         merged = MergedCompleter(
             SlashCompleter(),

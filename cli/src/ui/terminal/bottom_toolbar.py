@@ -111,11 +111,12 @@ class _BottomToolbarMixin:
             return None
 
     def _picker_modal_open(self) -> bool:
-        """True while an in-app /themes, /models, or /skills overlay is open."""
+        """True while an in-app picker overlay is open."""
         for attr in (
             "_themes_modal_host",
             "_models_modal_host",
             "_skills_modal_host",
+            "_mcp_modal_host",
         ):
             host = getattr(self, attr, None)
             if host is not None and getattr(getattr(host, "state", None), "open", False):
