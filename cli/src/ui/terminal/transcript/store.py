@@ -93,6 +93,13 @@ class TranscriptStore:
         self._notify()
         return entry
 
+    def update_text(self, entry: TextEntry, text: str) -> None:
+        """Mutate a text entry in place and notify listeners (spinner lines)."""
+        entry.text = text.rstrip("\n")
+        with self._lock:
+            self._bump()
+        self._notify()
+
     def append_separator(self) -> SeparatorEntry:
         entry = SeparatorEntry()
         with self._lock:

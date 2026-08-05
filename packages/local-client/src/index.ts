@@ -1198,6 +1198,25 @@ export class LocalAgentClient
     )
   }
 
+  compactSession(
+    sessionId: string,
+    input: { instructions?: string | null } = {},
+    signal?: AbortSignal
+  ): Promise<{ turnsBefore: number; turnsAfter: number; summary: string }> {
+    return this.request<{
+      turnsBefore: number
+      turnsAfter: number
+      summary: string
+    }>(`/sessions/${encodeURIComponent(sessionId)}/compact`, {
+      method: 'POST',
+      body: JSON.stringify({
+        instructions: input.instructions ?? null
+      }),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
   async deleteSession(sessionId: string, signal?: AbortSignal): Promise<void> {
     await this.request<{ deleted: boolean }>(
       `/sessions/${encodeURIComponent(sessionId)}`,

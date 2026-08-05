@@ -61,6 +61,8 @@ export function Composer({
   onEnsureWorkspaceFiles,
   runtimeSettings,
   tokenUsage,
+  compactBusy = false,
+  onCompact,
   onModelSelect,
   onReasoningSettingsChange,
   onSpecialistSelect,
@@ -333,6 +335,8 @@ export function Composer({
                 sandboxStatus={sandboxStatus ?? null}
                 sandboxPhase={sandboxPhase}
                 tokenUsage={tokenUsage}
+                compactBusy={compactBusy}
+                onCompact={onCompact}
                 showMic={voice.showMic}
                 voiceReady={voice.ready}
                 voiceBusy={voice.busy}

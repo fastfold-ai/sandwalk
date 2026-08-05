@@ -13,6 +13,16 @@ class _ModelManagerCommandMixin:
         from rich.table import Table
 
         from agent.config import Config
+        from ui.terminal.model_manager_modal import run_model_manager_modal
+
+        _ = query
+        host = getattr(self, "_model_manager_modal_host", None)
+        app = getattr(self, "_transcript_app", None)
+        if host is not None and getattr(app, "is_running", False):
+            host.open()
+            return
+        if run_model_manager_modal(self):
+            return
 
         cfg = Config.load()
         self.session.config = cfg

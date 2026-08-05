@@ -310,6 +310,14 @@ export function useSessionChatStream({
               )
             } else if (event.type === 'session.updated') {
               void loadSessionsRef.current?.()
+              // Compact (and similar) rewrites history — refresh the transcript.
+              void client.listMessages(id).then(history => {
+                patchChat(id, prev => ({
+                  ...prev,
+                  messages: history,
+                  messagesLoaded: true
+                }))
+              })
             } else if (
               event.type === 'run.completed' ||
               event.type === 'run.failed' ||

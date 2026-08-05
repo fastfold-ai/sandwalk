@@ -48,6 +48,7 @@ type UseAgentComposerSlotPropsInput = {
   setWorkspaceVersion: AgentComposerSlotProps['setWorkspaceVersion']
   runtimeSettings: RuntimeSettings | null
   tokenUsage: AgentComposerSlotProps['tokenUsage']
+  onMessagesReloaded?: AgentComposerSlotProps['onMessagesReloaded']
   selectSessionSpecialist: AgentComposerSlotProps['selectSessionSpecialist']
   selectSessionSandboxBackend: AgentComposerSlotProps['selectSessionSandboxBackend']
   updateSessionSandboxCompute: AgentComposerSlotProps['updateSessionSandboxCompute']
@@ -100,6 +101,7 @@ export function buildAgentComposerSlotProps(
     setWorkspaceVersion: input.setWorkspaceVersion,
     runtimeSettings: input.runtimeSettings,
     tokenUsage: input.tokenUsage,
+    onMessagesReloaded: input.onMessagesReloaded,
     selectSessionSpecialist: input.selectSessionSpecialist,
     selectSessionSandboxBackend: input.selectSessionSandboxBackend,
     updateSessionSandboxCompute: input.updateSessionSandboxCompute,

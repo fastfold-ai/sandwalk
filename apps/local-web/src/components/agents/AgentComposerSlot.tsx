@@ -1,5 +1,6 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
+  AgentMessage,
   AgentSession,
   AgentSkill,
   AgentSkillDetail,
@@ -10,6 +11,7 @@ import type {
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
+import { useState } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -78,6 +80,7 @@ type AgentComposerSlotProps = {
   onEnsureWorkspaceFiles?: () => void | Promise<void>
   runtimeSettings: RuntimeSettings | null
   tokenUsage: { inputTokens: number; outputTokens: number }
+  onMessagesReloaded?: (messages: AgentMessage[]) => void
   selectSessionSpecialist: (specialistId: string | null) => Promise<void>
   selectSessionSandboxBackend: (
     backend: 'builtin' | 'modal'
@@ -132,6 +135,7 @@ export function AgentComposerSlot({
   onEnsureWorkspaceFiles,
   runtimeSettings,
   tokenUsage,
+  onMessagesReloaded,
   selectSessionSpecialist,
   selectSessionSandboxBackend,
   updateSessionSandboxCompute,
@@ -142,6 +146,7 @@ export function AgentComposerSlot({
   setRuntimeSettings,
   loadModelOptions
 }: AgentComposerSlotProps) {
+  const [compactBusy, setCompactBusy] = useState(false)
   return (
     <>
       <QueuedMessages
@@ -248,6 +253,31 @@ export function AgentComposerSlot({
         }}
         runtimeSettings={runtimeSettings}
         tokenUsage={tokenUsage}
+        compactBusy={compactBusy}
+        onCompact={
+          sessionId && !isDraftAgentSessionId(sessionId)
+            ? async () => {
+                if (compactBusy || runActive) return
+                setCompactBusy(true)
+                try {
+                  const result = await client.compactSession(sessionId)
+                  const history = await client.listMessages(sessionId)
+                  onMessagesReloaded?.(history)
+                  toast.success(
+                    `Compacted ${result.turnsBefore} turns → ${result.turnsAfter}`
+                  )
+                } catch (cause) {
+                  toast.error(
+                    cause instanceof Error
+                      ? cause.message
+                      : 'Compact failed'
+                  )
+                } finally {
+                  setCompactBusy(false)
+                }
+              }
+            : undefined
+        }
         onSpecialistSelect={selectSessionSpecialist}
         onCreateSpecialist={() => navigate('/dashboard/specialists/new')}
         onManageSpecialists={() => navigate('/dashboard/specialists')}

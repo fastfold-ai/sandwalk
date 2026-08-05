@@ -10,6 +10,8 @@ from agent_server.app_deps import AppDeps
 from agent_server.models import (
     AgentSession,
     AutoTitleSessionRequest,
+    CompactSessionRequest,
+    CompactSessionResponse,
     CreateSessionRequest,
     DeleteSessionResponse,
     InterruptRunResponse,
@@ -19,6 +21,7 @@ from agent_server.models import (
     SubmitApprovalsResponse,
     UpdateSessionRequest,
 )
+from agent_server.service import SessionBusyError
 
 
 def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
@@ -134,6 +137,28 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
         if await asyncio.to_thread(store.get_session, session_id) is None:
             raise HTTPException(status_code=404, detail="Session not found.")
         return InterruptRunResponse(interrupted=service.interrupt(session_id))
+
+    @app.post(
+        "/v1/sessions/{session_id}/compact",
+        response_model=CompactSessionResponse,
+    )
+    async def compact_session(
+        session_id: str,
+        payload: CompactSessionRequest | None = None,
+    ) -> CompactSessionResponse:
+        body = payload or CompactSessionRequest()
+        try:
+            return await asyncio.to_thread(
+                service.compact_session,
+                session_id,
+                instructions=body.instructions,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Session not found.") from exc
+        except SessionBusyError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post(
         "/v1/sessions/{session_id}/approvals",

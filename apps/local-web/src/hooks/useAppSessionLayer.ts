@@ -244,6 +244,15 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     setWorkspaceVersion: args.setWorkspaceVersion,
     runtimeSettings: args.runtimeSettings,
     tokenUsage: chat.tokenUsage,
+    onMessagesReloaded: history => {
+      const id = args.sessionId
+      if (!id) return
+      chat.patchChat(id, prev => ({
+        ...prev,
+        messages: history,
+        messagesLoaded: true
+      }))
+    },
     selectSessionSpecialist: actions.selectSessionSpecialist,
     selectSessionSandboxBackend: sandbox.selectSessionSandboxBackend,
     updateSessionSandboxCompute: sandbox.updateSessionSandboxCompute,

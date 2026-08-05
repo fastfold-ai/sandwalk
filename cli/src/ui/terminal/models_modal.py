@@ -1,6 +1,6 @@
-"""OpenCode-style /models modal: search, favorites (Ctrl+F), arrows, Esc cancel.
+"""In-app /models modal: search, favorites (Ctrl+F), arrows, Esc cancel.
 
-In-app centered Float over the live transcript (same chrome as /themes).
+Centered Float over the live transcript (same chrome as /themes).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from ui.terminal.themes_modal import (
 )
 
 DIALOG_WIDTH = 64
-PAD_X = 3  # left/right inset (OpenCode-like)
+PAD_X = 3  # left/right inset
 # top + title + search + gap + list + gap + status + hints + bottom
 LIST_HEIGHT = 25
 DIALOG_HEIGHT = 8 + LIST_HEIGHT

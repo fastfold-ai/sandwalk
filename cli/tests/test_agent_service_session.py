@@ -319,3 +319,52 @@ def test_manual_rename_marks_title_source_user(tmp_path: Path, monkeypatch):
     again = svc.auto_title_session(session.id, force=True)
     assert again.title == "My custom name"
     assert again.title_source == "user"
+
+
+def test_compact_session_summarizes_older_turns(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("agent_server.service.CONFIG_DIR", tmp_path / "cfg")
+    store = AgentStore(tmp_path / "agent.db")
+    svc = AgentService(store)
+    session = svc.create_session(title="Compact me", workspace_path=None)
+    for index in range(1, 4):
+        store.add_message(
+            session_id=session.id, role="user", content=f"query {index}"
+        )
+        store.add_message(
+            session_id=session.id, role="assistant", content=f"answer {index}"
+        )
+
+    class _FakeLLM:
+        def chat(self, **_kwargs):
+            return MagicMock(content="Compressed findings about queries 1-2.")
+
+    class _FakeSession:
+        def __init__(self, **_kwargs):
+            pass
+
+        def get_llm(self):
+            return _FakeLLM()
+
+    monkeypatch.setattr("agent.config.Config.load", classmethod(lambda cls: MagicMock()))
+    monkeypatch.setattr("agent.session.Session", _FakeSession)
+
+    result = svc.compact_session(session.id)
+    assert result.turns_before == 3
+    assert result.turns_after == 2
+    messages = store.list_messages(session.id)
+    assert len(messages) == 4
+    assert messages[0].content == "[session summary]"
+    assert "Compressed findings" in messages[1].content
+    assert messages[2].content == "query 3"
+    assert messages[3].content == "answer 3"
+
+
+def test_compact_session_rejects_short_history(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("agent_server.service.CONFIG_DIR", tmp_path / "cfg")
+    store = AgentStore(tmp_path / "agent.db")
+    svc = AgentService(store)
+    session = svc.create_session(title="Short", workspace_path=None)
+    store.add_message(session_id=session.id, role="user", content="q1")
+    store.add_message(session_id=session.id, role="assistant", content="a1")
+    with pytest.raises(ValueError, match="too short"):
+        svc.compact_session(session.id)

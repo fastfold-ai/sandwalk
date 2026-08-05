@@ -115,8 +115,17 @@ class _EffortCommandMixin:
     def _handle_effort_command(self, query: str = "") -> None:
         """`/effort` — set Effort / Fast for the active model."""
         from agent.config import Config
+        from ui.terminal.effort_modal import run_effort_modal
 
         _ = query
+        host = getattr(self, "_effort_modal_host", None)
+        app = getattr(self, "_transcript_app", None)
+        if host is not None and getattr(app, "is_running", False):
+            host.open()
+            return
+        if run_effort_modal(self):
+            return
+
         cfg = getattr(self.session, "config", None) or Config.load()
         provider = str(
             getattr(self.session, "current_provider", None)

@@ -117,6 +117,13 @@ class _BottomToolbarMixin:
             "_models_modal_host",
             "_skills_modal_host",
             "_mcp_modal_host",
+            "_settings_modal_host",
+            "_sessions_modal_host",
+            "_effort_modal_host",
+            "_sandbox_modal_host",
+            "_model_manager_modal_host",
+            "_tools_modal_host",
+            "_specialist_modal_host",
         ):
             host = getattr(self, attr, None)
             if host is not None and getattr(getattr(host, "state", None), "open", False):

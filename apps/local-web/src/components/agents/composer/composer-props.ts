@@ -61,6 +61,8 @@ export type ComposerProps = {
   onEnsureWorkspaceFiles?: () => void | Promise<void>
   runtimeSettings: RuntimeSettings | null
   tokenUsage: { inputTokens: number; outputTokens: number }
+  compactBusy?: boolean
+  onCompact?: () => void | Promise<void>
   onModelSelect: (
     provider: string,
     model: string,

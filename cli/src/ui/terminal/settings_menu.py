@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
-from prompt_toolkit.formatted_text import HTML
-
 
 class _SettingsMenuMixin:
     def _change_settings(self):
-        """Interactive settings configuration menu."""
+        """Interactive settings — prefer in-app modal when transcript is live."""
+        from ui.terminal.settings_modal import run_settings_modal
+
+        host = getattr(self, "_settings_modal_host", None)
+        app = getattr(self, "_transcript_app", None)
+        if host is not None and getattr(app, "is_running", False):
+            host.open()
+            return
+        if run_settings_modal(self):
+            return
+
+        # Legacy Rich/_getch fallback when no TTY modal is available.
         from agent.config import AGENT_PROFILE_PRESETS, Config
         from ui.status import SPINNERS
 
@@ -24,6 +33,7 @@ class _SettingsMenuMixin:
             self.console.print("\n  Select option: ", end="")
 
             import sys
+
             sys.stdout.flush()
 
             try:
@@ -36,7 +46,7 @@ class _SettingsMenuMixin:
 
             if choice == "0":
                 break
-            elif choice == "1":
+            if choice == "1":
                 spinners = list(SPINNERS.keys())
                 current_spinner = cfg.get("ui.spinner", "dna_helix")
                 self.console.print("\n  [cyan]UI Loading Spinner[/cyan]")
@@ -45,15 +55,12 @@ class _SettingsMenuMixin:
                     self.console.print(f"  {marker} [{i}] {spinner_id}")
                 self.console.print("\n  Select spinner: ", end="")
                 sys.stdout.flush()
-
                 try:
                     s_choice = self._getch()
                 except KeyboardInterrupt:
                     self.console.print()
                     return
-
                 self.console.print(s_choice)
-
                 if s_choice.isdigit() and 1 <= int(s_choice) <= len(spinners):
                     new_spinner = spinners[int(s_choice) - 1]
                     if new_spinner != current_spinner:
@@ -62,7 +69,6 @@ class _SettingsMenuMixin:
                         self.console.print(f"  [green]Spinner updated to:[/green] {new_spinner}")
                 else:
                     self.console.print("  [dim]Cancelled.[/dim]")
-
             elif choice == "2":
                 profiles = list(AGENT_PROFILE_PRESETS.keys())
                 current_profile = cfg.get("agent.profile", "research")
@@ -72,15 +78,12 @@ class _SettingsMenuMixin:
                     self.console.print(f"  {marker} [{i}] {profile_id}")
                 self.console.print("\n  Select profile: ", end="")
                 sys.stdout.flush()
-
                 try:
                     p_choice = self._getch()
                 except KeyboardInterrupt:
                     self.console.print()
                     return
-
                 self.console.print(p_choice)
-
                 if p_choice.isdigit() and 1 <= int(p_choice) <= len(profiles):
                     new_profile = profiles[int(p_choice) - 1]
                     if new_profile != current_profile:
@@ -89,22 +92,18 @@ class _SettingsMenuMixin:
                         self.console.print(f"  [green]Profile updated to:[/green] {new_profile}")
                 else:
                     self.console.print("  [dim]Cancelled.[/dim]")
-
             elif choice == "3":
                 current_html = cfg.get("output.auto_publish_html_interactive", True)
                 self.console.print("\n  [cyan]Auto-publish HTML Reports[/cyan]")
                 self.console.print(f"  Current: [bold]{'Yes' if current_html else 'No'}[/bold]")
                 self.console.print("\n  Enable? (y/n): ", end="")
                 sys.stdout.flush()
-
                 try:
                     h_choice = self._getch().lower()
                 except KeyboardInterrupt:
                     self.console.print()
                     return
-
                 self.console.print(h_choice)
-
                 if h_choice == "y":
                     cfg.set("output.auto_publish_html_interactive", True)
                     cfg.save()

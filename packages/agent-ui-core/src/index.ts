@@ -1620,6 +1620,11 @@ export interface AgentClient {
     input?: { force?: boolean },
     signal?: AbortSignal
   ): Promise<AgentSession>
+  compactSession?(
+    sessionId: string,
+    input?: { instructions?: string | null },
+    signal?: AbortSignal
+  ): Promise<{ turnsBefore: number; turnsAfter: number; summary: string }>
   deleteSession(sessionId: string, signal?: AbortSignal): Promise<void>
   listMessages(sessionId: string, signal?: AbortSignal): Promise<AgentMessage[]>
   listEventHistory(

@@ -1,4 +1,4 @@
-"""Mixin: _handle_data_command, _show_help."""
+"""Mixin: _handle_data_command, _show_help, _run_doctor."""
 
 from __future__ import annotations
 
@@ -9,6 +9,99 @@ from ui.terminal.slash_commands import SLASH_COMMANDS
 
 
 class _DataAndHelpMixin:
+    def _run_doctor(self) -> None:
+        """Run readiness checks without suspending the fullscreen TUI.
+
+        Probes are network-heavy; running them on the enter handler freezes the
+        app, and ``run_in_terminal`` blanks the alternate screen for the whole
+        wait. Background the work and stream the table into the transcript.
+        """
+        import threading
+
+        if bool(getattr(self, "_doctor_running", False)):
+            self.console.print("  [dim]Doctor already running…[/dim]")
+            return
+
+        from agent.doctor import has_errors, has_warnings, run_checks, to_table
+        from ui.status.spinners import SPINNERS
+
+        self._doctor_running = True
+        cfg = self.session.config
+        session = self.session
+        style = str(cfg.get("ui.spinner") or "benzene_breathing")
+        spinner_conf = SPINNERS.get(style) or SPINNERS["benzene_breathing"]
+        frames = [str(f) for f in spinner_conf.get("frames", []) if str(f)] or ["·"]
+        interval_s = max(0.05, int(spinner_conf.get("interval_ms", 125)) / 1000.0)
+        stop_spin = threading.Event()
+        status_entry = self._doctor_status_entry(frames[0])
+
+        def _spin() -> None:
+            i = 0
+            while not stop_spin.wait(interval_s):
+                frame = frames[i % len(frames)]
+                self._doctor_set_status(status_entry, f"  {frame} Running diagnostics…")
+                i += 1
+
+        def _worker() -> None:
+            try:
+                checks = run_checks(cfg, session=session)
+            except Exception as exc:  # noqa: BLE001
+                stop_spin.set()
+                self._doctor_set_status(status_entry, f"  Doctor failed: {exc}")
+                self.console.print(f"  [red]Doctor failed:[/red] {exc}")
+                self._doctor_running = False
+                self._invalidate_after_doctor()
+                return
+            try:
+                stop_spin.set()
+                self._doctor_set_status(status_entry, "  Diagnostics complete")
+                self.console.print(to_table(checks))
+                if has_errors(checks):
+                    self.console.print("  [red]Blocking issues found.[/red]")
+                elif has_warnings(checks):
+                    self.console.print(
+                        "  [yellow]No blocking errors; warnings remain.[/yellow]"
+                    )
+                else:
+                    self.console.print("  [green]No blocking issues found.[/green]")
+            finally:
+                stop_spin.set()
+                self._doctor_running = False
+                self._invalidate_after_doctor()
+
+        threading.Thread(target=_spin, daemon=True, name="sandwalk-doctor-spin").start()
+        threading.Thread(target=_worker, daemon=True, name="sandwalk-doctor").start()
+
+    def _doctor_status_entry(self, frame: str):
+        """Seed the animated diagnostics line in the owned transcript."""
+        transcript = getattr(self, "transcript", None)
+        line = f"  {frame} Running diagnostics…"
+        if transcript is not None:
+            return transcript.append_text(line, kind="system")
+        self.console.print(f"  [cyan]{frame}[/cyan] Running diagnostics…")
+        return None
+
+    def _doctor_set_status(self, entry, text: str) -> None:
+        transcript = getattr(self, "transcript", None)
+        if entry is not None and transcript is not None:
+            transcript.update_text(entry, text)
+            return
+        # Fallback when no owned transcript (rare / tests).
+        if entry is None:
+            self.console.print(text)
+
+    def _invalidate_after_doctor(self) -> None:
+        try:
+            self._invalidate_prompt_toolbar(retries=2)
+        except Exception:  # noqa: BLE001
+            pass
+        app = getattr(self, "_transcript_app", None)
+        try:
+            if app is not None and getattr(app, "is_running", False):
+                app.invalidate()
+        except Exception:  # noqa: BLE001
+            pass
+
     def _handle_data_command(self, query: str) -> None:
         """Interactive dataset management: /data [list | status | pull <name> | pull-all]."""
         try:

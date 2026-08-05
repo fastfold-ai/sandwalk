@@ -37,6 +37,8 @@ export function ComposerToolbar({
   sandboxStatus,
   sandboxPhase,
   tokenUsage,
+  compactBusy = false,
+  onCompact,
   showMic = false,
   voiceReady = false,
   voiceBusy = null,
@@ -68,6 +70,8 @@ export function ComposerToolbar({
   sandboxStatus: SessionSandboxStatus | null
   sandboxPhase: SandboxActionPhase
   tokenUsage: { inputTokens: number; outputTokens: number }
+  compactBusy?: boolean
+  onCompact?: () => void | Promise<void>
   showMic?: boolean
   voiceReady?: boolean
   voiceBusy?: string | null
@@ -170,6 +174,9 @@ export function ComposerToolbar({
             resolveComposerModelOption(modelOptions, runtimeSettings)
               ?.contextWindow
           }
+          compactDisabled={running}
+          compactBusy={compactBusy}
+          onCompact={onCompact}
         />
         {showMic ? (
           <Button

@@ -787,13 +787,20 @@ class TestTerminalSessionAndCommandBranches:
 
     def test_handle_agents_command_usage_and_prompt_branches(self):
         term = _mk_terminal()
-        term._run_orchestrated = MagicMock()
+        term._start_orchestrated = MagicMock()
         term._handle_agents_command("/agents", {})
         term._handle_agents_command("/agents 0", {})
-        term._prompt_session.prompt.side_effect = [KeyboardInterrupt(), ""]
         term._handle_agents_command("/agents 2", {})
         term._handle_agents_command("/agents 2", {})
-        term._run_orchestrated.assert_not_called()
+        term._start_orchestrated.assert_not_called()
+
+    def test_handle_agents_command_starts_orchestrated(self):
+        term = _mk_terminal()
+        term._start_orchestrated = MagicMock()
+        term._handle_agents_command("/agents 3 profile crbn", {"source": "t"})
+        term._start_orchestrated.assert_called_once_with(
+            "profile crbn", {"source": "t"}, 3
+        )
 
     def test_handle_case_study_list_and_unknown(self):
         term = _mk_terminal()

@@ -59,7 +59,7 @@ class _ThemeCommandMixin:
         self._refresh_ui_theme()
 
     def _prompt_theme_interactive(self, cfg) -> None:
-        """OpenCode-style modal (search + live preview); numbered list fallback."""
+        """In-app modal (search + live preview); numbered list fallback."""
         # Prefer in-app overlay while the transcript Application owns the TTY.
         host = getattr(self, "_themes_modal_host", None)
         app = getattr(self, "_transcript_app", None)

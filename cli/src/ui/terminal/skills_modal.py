@@ -1,4 +1,4 @@
-"""OpenCode-style /skills modal: search, lean rows, Esc close.
+"""In-app /skills modal: search, lean rows, Esc close.
 
 In-app centered Float over the live transcript (same chrome as /models).
 """

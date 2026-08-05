@@ -39,10 +39,11 @@ class TestSlashCommands:
     def test_core_commands_registered(self):
         expected = ["/help", "/tools", "/models", "/settings", "/usage", "/copy",
                     "/export", "/compact", "/new", "/sessions", "/resume", "/upgrade",
-                    "/clear", "/exit", "/config", "/keys", "/doctor"]
+                    "/exit", "/config", "/keys", "/doctor"]
         for cmd in expected:
             assert cmd in SLASH_COMMANDS, f"{cmd} not in SLASH_COMMANDS"
         assert "/model" not in SLASH_COMMANDS
+        assert "/clear" not in SLASH_COMMANDS
 
     def test_slash_commands_have_descriptions(self):
         for cmd, desc in SLASH_COMMANDS.items():
@@ -538,6 +539,8 @@ class TestTerminalMethods:
         assert terminal._current_placeholder() is None
 
     def test_compact_context_calls_llm_chat_with_messages(self, terminal):
+        import time
+
         from agent.trajectory import Trajectory, Turn
 
         terminal.agent = MagicMock()
@@ -552,8 +555,14 @@ class TestTerminalMethods:
         mock_llm = MagicMock()
         mock_llm.chat.return_value = MagicMock(content="session summary text")
         terminal.session.get_llm.return_value = mock_llm
+        terminal.session.config = MagicMock()
+        terminal.session.config.get.return_value = "benzene_breathing"
 
         terminal._compact_context("focus on actionable outcomes")
+        deadline = time.time() + 2.0
+        while getattr(terminal, "_compact_running", False) and time.time() < deadline:
+            time.sleep(0.01)
+        assert not getattr(terminal, "_compact_running", False)
 
         kwargs = mock_llm.chat.call_args.kwargs
         assert kwargs["system"].startswith("You are a research session summarizer")

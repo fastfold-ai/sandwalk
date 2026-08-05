@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
+import threading
 import time
 
 
@@ -76,51 +77,130 @@ class _ExportShareAndMiscMixin:
         self.console.print(f"  [dim]Open with: jupyter lab {path}[/dim]")
 
     def _compact_context(self, instructions: str = None):
-        """Summarize session trajectory to free context window space."""
-        if not hasattr(self, 'agent') or not self.agent.trajectory.turns:
+        """Summarize session trajectory; LLM call runs off the UI thread.
+
+        Blocking ``llm.chat`` on the enter handler freezes the fullscreen TUI
+        (same class of bug as ``/doctor``). Background the work and animate a
+        status line in the transcript until the summary lands.
+        """
+        if not hasattr(self, "agent") or not self.agent.trajectory.turns:
             self.console.print("  [dim]Nothing to compact yet.[/dim]")
             return
 
-        n_turns = len(self.agent.trajectory.turns)
+        trajectory = self.agent.trajectory
+        n_turns = len(trajectory.turns)
         if n_turns <= 2:
             self.console.print("  [dim]Session too short to compact.[/dim]")
             return
+        if bool(getattr(self, "_compact_running", False)):
+            self.console.print("  [dim]Compaction already running…[/dim]")
+            return
 
-        # Build a summary of the session using the LLM
-        context = self.agent.trajectory.context_for_planner()
+        context = trajectory.context_for_planner()
         focus = f"\nFocus: {instructions}" if instructions else ""
         prompt = (
             f"Summarize this research session into a brief paragraph that preserves "
             f"key findings, entities, and conclusions. Be specific about results and numbers.{focus}\n\n"
             f"{context}"
         )
+        entities = list(trajectory.entities())
+        last_turn = trajectory.turns[-1]
+        session = self.session
+
+        self._compact_running = True
+        stop_spin = threading.Event()
+        from ui.status.spinners import SPINNERS
 
         try:
-            llm = self.session.get_llm()
-            response = llm.chat(
-                system="You are a research session summarizer. Be concise but preserve specific results.",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=1200,
-            )
-            summary = response.content if hasattr(response, "content") else str(response)
-            if not summary.strip():
-                raise ValueError("Summarizer returned empty output")
+            style = str(session.config.get("ui.spinner") or "benzene_breathing")
+        except Exception:  # noqa: BLE001
+            style = "benzene_breathing"
+        spinner_conf = SPINNERS.get(style) or SPINNERS["benzene_breathing"]
+        frames = [str(f) for f in spinner_conf.get("frames", []) if str(f)] or ["·"]
+        interval_s = max(0.05, int(spinner_conf.get("interval_ms", 125)) / 1000.0)
 
-            # Replace all turns except the last one with a single summary turn
-            from agent.trajectory import Turn
-            last_turn = self.agent.trajectory.turns[-1]
-            summary_turn = Turn(
-                query="[session summary]",
-                answer=summary,
-                entities=list(self.agent.trajectory.entities()),
-                tools_used=[],
-                timestamp=time.time(),
+        transcript = getattr(self, "transcript", None)
+        status_entry = None
+        if transcript is not None:
+            status_entry = transcript.append_text(
+                f"  {frames[0]} Compacting session…", kind="system"
             )
-            self.agent.trajectory.turns = [summary_turn, last_turn]
-            self.console.print(f"  [green]Compacted[/green] {n_turns} turns → 2 (summary + last)")
-        except Exception as e:
-            self.console.print(f"  [red]Compact failed:[/red] {e}")
+        else:
+            self.console.print(f"  [cyan]{frames[0]}[/cyan] Compacting session…")
+
+        def _set_status(text: str) -> None:
+            if status_entry is not None and transcript is not None:
+                transcript.update_text(status_entry, text)
+                return
+            if status_entry is None:
+                self.console.print(text)
+
+        def _spin() -> None:
+            i = 0
+            while not stop_spin.wait(interval_s):
+                _set_status(f"  {frames[i % len(frames)]} Compacting session…")
+                i += 1
+
+        def _worker() -> None:
+            err = None
+            summary = ""
+            try:
+                llm = session.get_llm()
+                response = llm.chat(
+                    system=(
+                        "You are a research session summarizer. "
+                        "Be concise but preserve specific results."
+                    ),
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2,
+                    max_tokens=1200,
+                )
+                summary = response.content if hasattr(response, "content") else str(response)
+                if not str(summary).strip():
+                    raise ValueError("Summarizer returned empty output")
+            except Exception as exc:  # noqa: BLE001
+                err = exc
+
+            stop_spin.set()
+            try:
+                if err is not None:
+                    _set_status(f"  Compact failed: {err}")
+                    self.console.print(f"  [red]Compact failed:[/red] {err}")
+                    return
+                from agent.trajectory import Turn
+
+                summary_turn = Turn(
+                    query="[session summary]",
+                    answer=summary,
+                    entities=entities,
+                    tools_used=[],
+                    timestamp=time.time(),
+                )
+                trajectory.turns = [summary_turn, last_turn]
+                try:
+                    if getattr(trajectory, "session_id", None):
+                        trajectory.save()
+                except Exception:  # noqa: BLE001
+                    pass
+                _set_status("  Compaction complete")
+                self.console.print(
+                    f"  [green]Compacted[/green] {n_turns} turns → 2 (summary + last)"
+                )
+            finally:
+                self._compact_running = False
+                try:
+                    self._invalidate_prompt_toolbar(retries=2)
+                except Exception:  # noqa: BLE001
+                    pass
+                app = getattr(self, "_transcript_app", None)
+                try:
+                    if app is not None and getattr(app, "is_running", False):
+                        app.invalidate()
+                except Exception:  # noqa: BLE001
+                    pass
+
+        threading.Thread(target=_spin, daemon=True, name="sandwalk-compact-spin").start()
+        threading.Thread(target=_worker, daemon=True, name="sandwalk-compact").start()
 
     def _run_shell(self, cmd: str):
         """Execute a shell command and display output."""

@@ -103,6 +103,16 @@ class InterruptRunResponse(ApiModel):
     interrupted: bool
 
 
+class CompactSessionRequest(ApiModel):
+    instructions: str | None = None
+
+
+class CompactSessionResponse(ApiModel):
+    turns_before: int
+    turns_after: int = 2
+    summary: str
+
+
 class HitlDecision(ApiModel):
     type: Literal["approve", "edit", "reject", "respond"]
     message: str | None = None

@@ -171,7 +171,6 @@ The table probes each profile (health, models path, key preview, discovered mode
 | `/doctor` | Run readiness diagnostics and fix hints |
 | `/upgrade` | Upgrade sandwalk via uv |
 | `/interrupt` | Interrupt the active generation (add `!` to force) |
-| `/clear` | Clear the screen |
 | `/exit` | Exit the terminal |
 
 Shortcuts: `Enter` submit · `Ctrl+J` / `Alt+Enter` newline · paste image → `[Image N]` · `Tab` completions · `Ctrl+C` interrupt (double-tap at idle to exit).

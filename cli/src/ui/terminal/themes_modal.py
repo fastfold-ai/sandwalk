@@ -1,4 +1,4 @@
-"""OpenCode-style /themes modal: search, arrows, hover preview, Esc restores.
+"""In-app /themes modal: search, arrows, hover preview, Esc restores.
 
 When the transcript Application is running, the modal is an in-app centered
 Float over the live session (content stays visible around it). Live preview
@@ -592,7 +592,7 @@ class ThemesModalHost:
 
 
 def _overlay_black(hex_color: str, alpha: float = 0.55) -> str:
-    """Blend ``#RRGGBB`` toward black (OpenCode backdrop ≈ rgba(0,0,0,150))."""
+    """Blend ``#RRGGBB`` toward black (backdrop wash ≈ rgba(0,0,0,150))."""
     raw = (hex_color or "").strip().lstrip("#")
     if len(raw) != 6:
         return hex_color
@@ -628,6 +628,13 @@ def dim_transcript_styles_for_backdrop(
             or key_s.startswith("models-")
             or key_s.startswith("skills-")
             or key_s.startswith("mcp-")
+            or key_s.startswith("settings-")
+            or key_s.startswith("sessions-")
+            or key_s.startswith("effort-")
+            or key_s.startswith("sandbox-")
+            or key_s.startswith("mm-")
+            or key_s.startswith("tools-")
+            or key_s.startswith("specialist-")
         ):
             out[key] = val
             continue

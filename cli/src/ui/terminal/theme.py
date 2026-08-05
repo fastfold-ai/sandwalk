@@ -232,10 +232,17 @@ def transcript_style_dict(
     accent = p["accent"]
     on_accent = _contrast_on(accent)
     muted = p["muted_fg"]
+    from ui.terminal.effort_modal import effort_modal_style_extras
     from ui.terminal.mcp_modal import mcp_modal_style_extras
+    from ui.terminal.model_manager_modal import model_manager_modal_style_extras
     from ui.terminal.models_modal import models_modal_style_extras
+    from ui.terminal.sandbox_modal import sandbox_modal_style_extras
+    from ui.terminal.sessions_modal import sessions_modal_style_extras
+    from ui.terminal.settings_modal import settings_modal_style_extras
     from ui.terminal.skills_modal import skills_modal_style_extras
+    from ui.terminal.specialist_modal import specialist_modal_style_extras
     from ui.terminal.themes_modal import themes_modal_style_extras
+    from ui.terminal.tools_modal import tools_modal_style_extras
 
     # Tool-call name: pale Dracula cyan washes out on light canvases.
     tool_fg = "bold #0284c7" if mode == "light" else "#7dd3fc"
@@ -267,7 +274,7 @@ def transcript_style_dict(
         "transcript-compose.prompt": f"bold {p['prompt_fg']}",
         "transcript-compose-accent": f"bg:{p['canvas_bg']} {accent}",
         "transcript-status": f"bg:{p['canvas_bg']} {muted}",
-        # Slash / @ menu — same panel as compose, accent selection (opencode-like).
+        # Slash / @ menu — same panel as compose, accent selection.
         "completion-menu": panel,
         "completion-menu.completion": panel,
         "completion-menu.completion.current": f"bg:{accent} {on_accent} bold",
@@ -283,6 +290,13 @@ def transcript_style_dict(
     out.update(models_modal_style_extras(p))
     out.update(skills_modal_style_extras(p))
     out.update(mcp_modal_style_extras(p))
+    out.update(settings_modal_style_extras(p))
+    out.update(sessions_modal_style_extras(p))
+    out.update(effort_modal_style_extras(p))
+    out.update(sandbox_modal_style_extras(p))
+    out.update(model_manager_modal_style_extras(p))
+    out.update(tools_modal_style_extras(p))
+    out.update(specialist_modal_style_extras(p))
     return out
 
 

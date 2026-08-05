@@ -19,7 +19,17 @@ class _SessionUpgradeSyncMixin:
             self.console.print("  [dim]Tip: restart sandwalk to confirm the new version.[/dim]")
 
     def _list_sessions(self):
-        """Show recent saved sessions."""
+        """Show recent saved sessions (prefer in-app Sessions modal)."""
+        from ui.terminal.sessions_modal import run_sessions_modal
+
+        host = getattr(self, "_sessions_modal_host", None)
+        app = getattr(self, "_transcript_app", None)
+        if host is not None and getattr(app, "is_running", False):
+            host.open()
+            return
+        if run_sessions_modal(self):
+            return
+
         from rich.table import Table
 
         from agent.trajectory import Trajectory

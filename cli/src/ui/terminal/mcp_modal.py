@@ -1,4 +1,4 @@
-"""OpenCode-style /mcps modal: search, lean rows, Esc close.
+"""In-app /mcps modal: search, lean rows, Esc close.
 
 In-app centered Float over the live transcript (same chrome as /skills).
 Enter inserts ``mcp: <id>``; Space toggles enable.

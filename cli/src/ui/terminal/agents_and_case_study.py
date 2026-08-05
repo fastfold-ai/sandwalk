@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+import threading
+import time
+
+
 class _AgentsAndCaseStudyMixin:
     def _handle_agents_command(self, query: str, context: dict):
-        """Handle /agents N [query] command."""
+        """Handle /agents N <query> without suspending the fullscreen TUI.
+
+        Nested PromptSession / ``run_in_terminal`` blanks the alt screen
+        (blink). Require the research question on the command line and run the
+        orchestrator on a worker thread so the UI stays responsive.
+        """
         parts = query.split(maxsplit=2)
-        # /agents N query  or  /agents N
+        # /agents N query
         if len(parts) < 2 or not parts[1].isdigit():
             self.console.print(
-                "  [dim]Usage: /agents N [query]  "
+                "  [dim]Usage: /agents N <query>  "
                 "(e.g., /agents 3 profile lenalidomide)[/dim]"
             )
             return
@@ -19,31 +28,79 @@ class _AgentsAndCaseStudyMixin:
             self.console.print("  [dim]Need at least 1 agent.[/dim]")
             return
 
-        if len(parts) > 2:
-            agent_query = parts[2]
-        else:
-            # Prompt for query
-            try:
-                agent_query = self._prompt_session.prompt(
-                    [("class:prompt", "  Research question: ")],
-                ).strip()
-            except (EOFError, KeyboardInterrupt):
-                self.console.print("  [dim]Cancelled.[/dim]")
-                return
-            if not agent_query:
-                self.console.print("  [dim]Cancelled.[/dim]")
+        if len(parts) < 3 or not parts[2].strip():
+            self.console.print(
+                "  [dim]Usage: /agents N <query>  "
+                "(e.g., /agents 3 profile lenalidomide)[/dim]"
+            )
+            return
+
+        self._start_orchestrated(parts[2].strip(), context, n_threads)
+
+    def _start_orchestrated(self, query: str, context: dict, n_threads: int) -> None:
+        """Run multi-agent orchestration on the query worker thread."""
+        if self._has_active_query():
+            self.console.print(
+                "  [dim]Command unavailable while a generation is running.[/dim]"
+            )
+            return
+
+        start_refresh = False
+        with self._run_lock:
+            worker = self._worker_thread
+            if worker and worker.is_alive():
+                self.console.print(
+                    "  [dim]Command unavailable while a generation is running.[/dim]"
+                )
                 return
 
-        self._run_orchestrated(agent_query, context, n_threads)
+            def _worker() -> None:
+                try:
+                    with self._run_lock:
+                        self._active_query = query
+                        self._active_query_started_at = time.time()
+                        self._active_activity = f"Running {n_threads} agents…"
+                        self._active_activity_updated_at = time.time()
+                        self._active_input_tokens = 0
+                        self._active_output_tokens = 0
+                        self._active_streamed_chars = 0
+                    self._run_orchestrated(query, context, n_threads)
+                finally:
+                    with self._run_lock:
+                        self._worker_thread = None
+                    if hasattr(self, "_clear_toolbar_busy"):
+                        self._clear_toolbar_busy()
+                    else:
+                        with self._run_lock:
+                            self._active_query = None
+
+            worker = threading.Thread(
+                target=_worker,
+                daemon=True,
+                name="sandwalk-agents",
+            )
+            self._worker_thread = worker
+            self._active_query = query
+            self._active_query_started_at = time.time()
+            self._active_activity = f"Running {n_threads} agents…"
+            self._active_activity_updated_at = time.time()
+            self._active_input_tokens = 0
+            self._active_output_tokens = 0
+            self._active_streamed_chars = 0
+            start_refresh = True
+            worker.start()
+
+        if start_refresh and hasattr(self, "_ensure_live_refresh_thread"):
+            self._ensure_live_refresh_thread()
 
     def _run_orchestrated(self, query: str, context: dict, n_threads: int):
-        """Run a query using the multi-agent orchestrator."""
+        """Run a query using the multi-agent orchestrator (blocking)."""
         from agent.orchestrator import ResearchOrchestrator
 
         orchestrator = ResearchOrchestrator(
             self.session,
             n_threads=n_threads,
-            trajectory=self.agent.trajectory if hasattr(self, 'agent') else None,
+            trajectory=self.agent.trajectory if hasattr(self, "agent") else None,
         )
 
         try:

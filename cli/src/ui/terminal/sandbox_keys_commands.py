@@ -25,6 +25,15 @@ class _SandboxKeysCommandsMixin:
             format_current_sandbox_summary,
             sandbox_pick_options,
         )
+        from ui.terminal.sandbox_modal import run_sandbox_modal
+
+        host = getattr(self, "_sandbox_modal_host", None)
+        app = getattr(self, "_transcript_app", None)
+        if host is not None and getattr(app, "is_running", False):
+            host.open()
+            return
+        if run_sandbox_modal(self):
+            return
 
         cfg = getattr(self.session, "config", None) or Config.load()
         options = sandbox_pick_options()

@@ -527,8 +527,15 @@ class InteractiveTerminal(
             return True
         if cmd in ("tools", "/tools"):
             from tools import ensure_loaded, registry, tool_load_errors
-            ensure_loaded()
-            self.console.print(registry.list_tools_table())
+            from ui.terminal.tools_modal import run_tools_modal
+
+            host = getattr(self, "_tools_modal_host", None)
+            app = getattr(self, "_transcript_app", None)
+            if host is not None and getattr(app, "is_running", False):
+                host.open()
+            elif not run_tools_modal(self):
+                ensure_loaded()
+                self.console.print(registry.list_tools_table())
             errors = tool_load_errors()
             if errors:
                 names = ", ".join(sorted(errors.keys())[:8])
@@ -569,11 +576,38 @@ class InteractiveTerminal(
             self._advance_suggestion()
             return True
         if cmd_head in ("specialist", "/specialist"):
-            self._schedule_host_terminal(self._handle_specialist_command, query)
+            parts = query.strip().split()
+            if parts and parts[0].lstrip("/").lower() == "specialist":
+                parts = parts[1:]
+            action = (parts[0].lower() if parts else "list")
+            # Bare /specialist → in-app picker (select / None).
+            if not parts or action in {"list", "ls"}:
+                host = getattr(self, "_specialist_modal_host", None)
+                app = getattr(self, "_transcript_app", None)
+                if host is not None and getattr(app, "is_running", False):
+                    host.open()
+                else:
+                    from ui.terminal.specialist_modal import run_specialist_modal
+
+                    if not run_specialist_modal(self):
+                        self._handle_specialist_command(query)
+            elif action in {"show", "get", "info", "active", "status"}:
+                self._handle_specialist_command(query)
+            else:
+                self._schedule_host_terminal(self._handle_specialist_command, query)
             self._advance_suggestion()
             return True
         if cmd_head in ("sandbox", "/sandbox"):
-            self._schedule_host_terminal(self._handle_sandbox_command, query)
+            parts = query.strip().split()
+            if len(parts) <= 1:
+                host = getattr(self, "_sandbox_modal_host", None)
+                app = getattr(self, "_transcript_app", None)
+                if host is not None and getattr(app, "is_running", False):
+                    self._handle_sandbox_command(query)
+                else:
+                    self._schedule_host_terminal(self._handle_sandbox_command, query)
+            else:
+                self._handle_sandbox_command(query)
             self._advance_suggestion()
             return True
         if cmd_head in ("data", "/data"):
@@ -592,11 +626,21 @@ class InteractiveTerminal(
             self._advance_suggestion()
             return True
         if cmd in ("effort", "/effort") or cmd.startswith("/effort"):
-            self._schedule_host_terminal(self._handle_effort_command, query)
+            host = getattr(self, "_effort_modal_host", None)
+            app = getattr(self, "_transcript_app", None)
+            if host is not None and getattr(app, "is_running", False):
+                self._handle_effort_command(query)
+            else:
+                self._schedule_host_terminal(self._handle_effort_command, query)
             self._advance_suggestion()
             return True
         if cmd in ("settings", "/settings"):
-            self._schedule_host_terminal(self._change_settings)
+            host = getattr(self, "_settings_modal_host", None)
+            app = getattr(self, "_transcript_app", None)
+            if host is not None and getattr(app, "is_running", False):
+                self._change_settings()
+            else:
+                self._schedule_host_terminal(self._change_settings)
             self._advance_suggestion()
             return True
         if (
@@ -623,7 +667,12 @@ class InteractiveTerminal(
             or cmd == "compatible"
             or cmd.startswith("/compatible")
         ):
-            self._schedule_host_terminal(self._handle_model_manager_command, query)
+            host = getattr(self, "_model_manager_modal_host", None)
+            app = getattr(self, "_transcript_app", None)
+            if host is not None and getattr(app, "is_running", False):
+                self._handle_model_manager_command(query)
+            else:
+                self._schedule_host_terminal(self._handle_model_manager_command, query)
             self._advance_suggestion()
             return True
         if cmd in ("plan", "/plan"):
@@ -646,7 +695,12 @@ class InteractiveTerminal(
             self._advance_suggestion()
             return True
         if cmd == "keys" or cmd.startswith("/keys"):
-            self._schedule_host_terminal(self._handle_keys_command, query)
+            parts = query.strip().split()
+            # Bare /keys is a status table — keep it in the transcript.
+            if len(parts) <= 1:
+                self._handle_keys_command(query)
+            else:
+                self._schedule_host_terminal(self._handle_keys_command, query)
             self._advance_suggestion()
             return True
         if cmd == "mcps" or cmd.startswith("/mcps"):
@@ -670,20 +724,9 @@ class InteractiveTerminal(
             self._advance_suggestion()
             return True
         if cmd in ("doctor", "/doctor"):
-            from agent.doctor import has_errors, has_warnings, run_checks, to_table
-            checks = run_checks(self.session.config, session=self.session)
-            self.console.print(to_table(checks))
-            if has_errors(checks):
-                self.console.print("  [red]Blocking issues found.[/red]")
-            elif has_warnings(checks):
-                self.console.print("  [yellow]No blocking errors; warnings remain.[/yellow]")
-            else:
-                self.console.print("  [green]No blocking issues found.[/green]")
-            self._advance_suggestion()
-            return True
-        if cmd in ("clear", "/clear"):
-            self.transcript.clear()
-            self._seed_transcript_banner()
+            # Background thread → transcript (do not host-suspend: that blanks
+            # the alt-screen for the whole multi-probe wait).
+            self._run_doctor()
             self._advance_suggestion()
             return True
         if cmd in ("copy", "/copy"):
@@ -719,7 +762,12 @@ class InteractiveTerminal(
                 target = parts[2].strip() if len(parts) > 2 else None
                 self._schedule_host_terminal(self._delete_session, target)
             else:
-                self._list_sessions()
+                host = getattr(self, "_sessions_modal_host", None)
+                app = getattr(self, "_transcript_app", None)
+                if host is not None and getattr(app, "is_running", False):
+                    self._list_sessions()
+                else:
+                    self._schedule_host_terminal(self._list_sessions)
             return True
         if cmd.startswith("/sync") or cmd == "sync":
             parts = query.split()
@@ -729,10 +777,20 @@ class InteractiveTerminal(
         if cmd.startswith("/resume"):
             parts = query.split(maxsplit=1)
             sid = parts[1].strip() if len(parts) > 1 else None
-            self._schedule_host_terminal(self._resume_session, sid)
+            if sid:
+                # Direct id resume — no nested picker needed.
+                self._resume_session(sid)
+            else:
+                host = getattr(self, "_sessions_modal_host", None)
+                app = getattr(self, "_transcript_app", None)
+                if host is not None and getattr(app, "is_running", False):
+                    self._list_sessions()
+                else:
+                    self._schedule_host_terminal(self._resume_session, sid)
             return True
         if cmd.startswith("/agents"):
-            self._schedule_host_terminal(self._handle_agents_command, query, context)
+            # Always in-app: host suspend blinks; orchestrator runs on a worker.
+            self._handle_agents_command(query, context)
             return True
         if cmd.startswith("/case-study"):
             self._schedule_host_terminal(self._handle_case_study_command, query, context)

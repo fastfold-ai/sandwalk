@@ -267,16 +267,24 @@ def run_transcript_session(
                 live_cfg = sess.config
         except Exception:  # noqa: BLE001
             pass
-        themes_host = getattr(terminal, "_themes_modal_host", None)
-        models_host = getattr(terminal, "_models_modal_host", None)
-        skills_host = getattr(terminal, "_skills_modal_host", None)
-        mcp_host = getattr(terminal, "_mcp_modal_host", None)
-        dim = bool(
-            (themes_host is not None and getattr(themes_host.state, "open", False))
-            or (models_host is not None and getattr(models_host.state, "open", False))
-            or (skills_host is not None and getattr(skills_host.state, "open", False))
-            or (mcp_host is not None and getattr(mcp_host.state, "open", False))
-        )
+        dim = False
+        for attr in (
+            "_themes_modal_host",
+            "_models_modal_host",
+            "_skills_modal_host",
+            "_mcp_modal_host",
+            "_settings_modal_host",
+            "_sessions_modal_host",
+            "_effort_modal_host",
+            "_sandbox_modal_host",
+            "_model_manager_modal_host",
+            "_tools_modal_host",
+            "_specialist_modal_host",
+        ):
+            host = getattr(terminal, attr, None)
+            if host is not None and getattr(getattr(host, "state", None), "open", False):
+                dim = True
+                break
         fp = _theme_fingerprint(live_cfg, backdrop_dim=dim)
         if not force and fp == theme_state["fp"]:
             return
@@ -297,10 +305,17 @@ def run_transcript_session(
     terminal._ui_theme_refresh = _force_theme_refresh
 
     # In-app picker overlays (centered dialogs over transcript).
+    from ui.terminal.effort_modal import EffortModalHost
     from ui.terminal.mcp_modal import McpModalHost
+    from ui.terminal.model_manager_modal import ModelManagerModalHost
     from ui.terminal.models_modal import ModelsModalHost
+    from ui.terminal.sandbox_modal import SandboxModalHost
+    from ui.terminal.sessions_modal import SessionsModalHost
+    from ui.terminal.settings_modal import SettingsModalHost
     from ui.terminal.skills_modal import SkillsModalHost
+    from ui.terminal.specialist_modal import SpecialistModalHost
     from ui.terminal.themes_modal import ThemesModalHost
+    from ui.terminal.tools_modal import ToolsModalHost
 
     def _focus_compose() -> None:
         try:
@@ -308,46 +323,32 @@ def run_transcript_session(
         except Exception:  # noqa: BLE001
             pass
 
-    themes_host = ThemesModalHost(
-        terminal,
-        app=app,
-        on_style_refresh=_force_theme_refresh,
-        focus_compose=_focus_compose,
+    host_ctors = (
+        ("_themes_modal_host", ThemesModalHost),
+        ("_models_modal_host", ModelsModalHost),
+        ("_skills_modal_host", SkillsModalHost),
+        ("_mcp_modal_host", McpModalHost),
+        ("_settings_modal_host", SettingsModalHost),
+        ("_sessions_modal_host", SessionsModalHost),
+        ("_effort_modal_host", EffortModalHost),
+        ("_sandbox_modal_host", SandboxModalHost),
+        ("_model_manager_modal_host", ModelManagerModalHost),
+        ("_tools_modal_host", ToolsModalHost),
+        ("_specialist_modal_host", SpecialistModalHost),
     )
-    models_host = ModelsModalHost(
-        terminal,
-        app=app,
-        on_style_refresh=_force_theme_refresh,
-        focus_compose=_focus_compose,
-    )
-    skills_host = SkillsModalHost(
-        terminal,
-        app=app,
-        on_style_refresh=_force_theme_refresh,
-        focus_compose=_focus_compose,
-    )
-    mcp_host = McpModalHost(
-        terminal,
-        app=app,
-        on_style_refresh=_force_theme_refresh,
-        focus_compose=_focus_compose,
-    )
-    terminal._themes_modal_host = themes_host
-    terminal._models_modal_host = models_host
-    terminal._skills_modal_host = skills_host
-    terminal._mcp_modal_host = mcp_host
-    root.floats.extend(themes_host.floats)
-    root.floats.extend(models_host.floats)
-    root.floats.extend(skills_host.floats)
-    root.floats.extend(mcp_host.floats)
+    modal_hosts = []
+    for attr, ctor in host_ctors:
+        host = ctor(
+            terminal,
+            app=app,
+            on_style_refresh=_force_theme_refresh,
+            focus_compose=_focus_compose,
+        )
+        setattr(terminal, attr, host)
+        root.floats.extend(host.floats)
+        modal_hosts.append(host)
     app.key_bindings = merge_key_bindings(
-        [
-            themes_host.key_bindings,
-            models_host.key_bindings,
-            skills_host.key_bindings,
-            mcp_host.key_bindings,
-            kb,
-        ]
+        [host.key_bindings for host in modal_hosts] + [kb]
     )
 
     def _invalidate_now() -> None:
@@ -444,10 +445,20 @@ def run_transcript_session(
         unsubscribe()
         terminal._transcript_app = None
         terminal._transcript_buffer = None
-        terminal._themes_modal_host = None
-        terminal._models_modal_host = None
-        terminal._skills_modal_host = None
-        terminal._mcp_modal_host = None
+        for attr in (
+            "_themes_modal_host",
+            "_models_modal_host",
+            "_skills_modal_host",
+            "_mcp_modal_host",
+            "_settings_modal_host",
+            "_sessions_modal_host",
+            "_effort_modal_host",
+            "_sandbox_modal_host",
+            "_model_manager_modal_host",
+            "_tools_modal_host",
+            "_specialist_modal_host",
+        ):
+            setattr(terminal, attr, None)
 
     if result is None:
         raise EOFError
@@ -485,6 +496,13 @@ def _build_transcript_bindings(
             "_models_modal_host",
             "_skills_modal_host",
             "_mcp_modal_host",
+            "_settings_modal_host",
+            "_sessions_modal_host",
+            "_effort_modal_host",
+            "_sandbox_modal_host",
+            "_model_manager_modal_host",
+            "_tools_modal_host",
+            "_specialist_modal_host",
         ):
             host = getattr(terminal, attr, None)
             if host is not None and getattr(host.state, "open", False):

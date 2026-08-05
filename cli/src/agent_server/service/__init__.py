@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 
 from agent.config import CONFIG_DIR
+from agent_server.service.compacting import _CompactingMixin
 from agent_server.service.lifecycle import SessionBusyError, _LifecycleMixin
 from agent_server.service.run_pipeline import _RunPipelineMixin
 from agent_server.service.sessions_crud import _SessionCrudMixin
@@ -88,7 +89,13 @@ def resolve_session_workspace(
     return workspace
 
 
-class AgentService(_SessionCrudMixin, _TitlingMixin, _LifecycleMixin, _RunPipelineMixin):
+class AgentService(
+    _SessionCrudMixin,
+    _TitlingMixin,
+    _CompactingMixin,
+    _LifecycleMixin,
+    _RunPipelineMixin,
+):
     """Owns active runs while delegating persistence to :class:`AgentStore`."""
 
     def __init__(self, store: AgentStore) -> None:

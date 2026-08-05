@@ -63,7 +63,7 @@ class _SwitchModelMixin:
         """Interactive model switcher (in-app modal, else numbered list)."""
         from agent.config import Config
 
-        # Prefer OpenCode-style in-app / nested modal.
+        # Prefer in-app / nested modal.
         host = getattr(self, "_models_modal_host", None)
         app = getattr(self, "_transcript_app", None)
         if host is not None and getattr(app, "is_running", False):
