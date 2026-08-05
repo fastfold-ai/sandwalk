@@ -392,8 +392,14 @@ def run_transcript_session(
     # Re-assert each frame — some hosts (Warp) reset cursor color on redraw.
     app.before_render += lambda _app: _set_cursor_color(_COMPOSE_CURSOR)
 
+    # Capture stdout/stderr while the fullscreen app owns the TTY. Without this,
+    # library/logging dumps (e.g. LangGraph task notes + traceback from
+    # logger.warning) write into the alternate screen and shatter the compose box.
+    from prompt_toolkit.patch_stdout import patch_stdout
+
     try:
-        result = app.run()
+        with patch_stdout(raw=True):
+            result = app.run()
     finally:
         _set_cursor_color(None)
         unsubscribe()

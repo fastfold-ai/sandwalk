@@ -17,18 +17,25 @@ def _quiet_noisy_loggers() -> None:
         logging.getLogger(name).setLevel(logging.WARNING)
 
 
-def ensure_logging_configured() -> Path:
+def ensure_logging_configured(*, log_name: str = "agent-server.log") -> Path:
     """Attach a rotating file handler under ~/.sandwalk/logs if missing.
 
     Captures app + uvicorn loggers. Quiets noisy HTTP client libraries so doctor
     connectivity probes do not flood the diagnostics bundle.
+
+    Interactive CLI should call this too — without a root handler, Python's
+    ``lastResort`` dumps WARNING+ (including runner tracebacks) to stderr and
+    corrupts the fullscreen transcript TUI.
     """
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    log_path = LOGS_DIR / "agent-server.log"
+    log_path = LOGS_DIR / log_name
     root = logging.getLogger()
-    marker = "fastfold-agent-server-file"
+    marker = f"sandwalk-file:{log_name}"
+    # Legacy marker from earlier agent-server-only setup.
+    legacy = "fastfold-agent-server-file" if log_name == "agent-server.log" else None
     for handler in root.handlers:
-        if getattr(handler, "_fastfold_marker", None) == marker:
+        existing = getattr(handler, "_fastfold_marker", None)
+        if existing == marker or (legacy is not None and existing == legacy):
             _quiet_noisy_loggers()
             return log_path
 
@@ -60,6 +67,11 @@ def ensure_logging_configured() -> Path:
         "File logging enabled at %s", log_path
     )
     return log_path
+
+
+def ensure_cli_logging_configured() -> Path:
+    """File-only logging for the interactive / one-shot CLI (not uvicorn)."""
+    return ensure_logging_configured(log_name="cli.log")
 
 
 def uvicorn_log_config(log_path: Path) -> dict:

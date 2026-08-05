@@ -67,7 +67,12 @@ def run_interactive(
     import faulthandler
     import traceback
 
+    from agent.diagnostics import ensure_cli_logging_configured
     from ui.terminal import InteractiveTerminal
+
+    # File-only logging so runner WARNING+tracebacks don't hit stderr and
+    # shatter the fullscreen transcript TUI (Python lastResort → stderr).
+    ensure_cli_logging_configured()
 
     # Surface native crashes (segfaults) that otherwise look like a silent exit.
     faulthandler.enable()

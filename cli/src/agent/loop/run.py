@@ -124,14 +124,19 @@ class LoopRunMixin:
                 answer=result.summary or "",
                 plan=result.plan,
             )
+            is_error_result = bool(
+                isinstance(result.raw_results, dict) and result.raw_results.get("error")
+            )
             if not self.trajectory.title or self._is_placeholder_title(
                 self.trajectory.title
             ):
+                from agent_server.title import fallback_title_from_query
+
                 # Headless/server runs: never block completion on a title LLM
                 # call — agent_server retitles asynchronously via title_source.
-                if self.headless:
-                    from agent_server.title import fallback_title_from_query
-
+                # Error turns must also skip the title LLM: after a 429 the same
+                # model often hangs on retries and leaves the CLI "stuck loading".
+                if self.headless or is_error_result:
                     self.trajectory.title = (
                         fallback_title_from_query(query) or "New research session"
                     )

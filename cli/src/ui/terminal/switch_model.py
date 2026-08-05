@@ -59,28 +59,6 @@ class _SwitchModelMixin:
             f"[dim]provider={selected_provider}[/dim]"
         )
 
-        # Effort prompt needs a host PromptSession — schedule when transcript owns TTY.
-        if isinstance(cfg, Config) and self._model_supports_effort_ui(
-            cfg, selected_provider, model_id
-        ):
-            schedule = getattr(self, "_schedule_host_terminal", None)
-            app = getattr(self, "_transcript_app", None)
-            if callable(schedule) and getattr(app, "is_running", False):
-                schedule(
-                    self._prompt_and_save_model_effort,
-                    cfg,
-                    provider=selected_provider,
-                    model_id=model_id,
-                    display=display,
-                )
-            else:
-                self._prompt_and_save_model_effort(
-                    cfg,
-                    provider=selected_provider,
-                    model_id=model_id,
-                    display=display,
-                )
-
     def _switch_model(self):
         """Interactive model switcher (in-app modal, else numbered list)."""
         from agent.config import Config

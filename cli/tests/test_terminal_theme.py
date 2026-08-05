@@ -73,6 +73,15 @@ def test_transcript_style_embeds_panel_bg():
     assert "bg:#f5f5f5" in light["transcript-compose"]
 
 
+def test_transcript_tool_color_stronger_on_light():
+    light = transcript_style_dict("light", palette="default")
+    dark = transcript_style_dict("dark", palette="default")
+    assert "#0284c7" in light["transcript-tool"]
+    assert "bold" in light["transcript-tool"]
+    assert "#7dd3fc" in dark["transcript-tool"]
+    assert light["transcript-tool"] != dark["transcript-tool"]
+
+
 def test_transcript_style_paints_full_tui_canvas():
     """Named palettes set the whole TUI background (sidebar → canvas)."""
     noir = transcript_style_dict("dark", palette="neonnoir")

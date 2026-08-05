@@ -10,13 +10,19 @@ file-length cap; re-exported here so `from agent.diagnostics import ...`
 keeps working unchanged.
 """
 
-from .logging_setup import LOGS_DIR, ensure_logging_configured, uvicorn_log_config
+from .logging_setup import (
+    LOGS_DIR,
+    ensure_cli_logging_configured,
+    ensure_logging_configured,
+    uvicorn_log_config,
+)
 from .redact import _HOME, _redact_obj, _redact_text
 from .zipper import build_diagnostics_zip
 
 __all__ = [
     "LOGS_DIR",
     "build_diagnostics_zip",
+    "ensure_cli_logging_configured",
     "ensure_logging_configured",
     "uvicorn_log_config",
 ]

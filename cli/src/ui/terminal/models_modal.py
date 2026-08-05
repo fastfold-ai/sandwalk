@@ -34,6 +34,7 @@ class _ModelRow:
     context: str = ""  # e.g. "1M", "200k"
     effort: str = ""  # e.g. "Medium", "Low · Fast"
     meta: str = ""  # right-aligned fallback (provider) when no effort
+    favorite: bool = False
 
 
 @dataclass
@@ -164,19 +165,28 @@ def build_model_rows(
     add_section("Recent", recent_only)
 
     shown = set(favorite_keys) | set(recent_only)
-    # Remaining grouped by provider_label.
+    # Remaining grouped by canonical provider label (case-insensitive merge).
+    from ui.terminal.model_options import provider_display_label
+
     rest = [
         opt
         for opt in matched
         if option_pref_key(opt) not in shown
     ]
     groups: dict[str, list[dict]] = {}
+    group_titles: dict[str, str] = {}
     for opt in rest:
-        label = str(opt.get("provider_label") or opt.get("provider") or "Models")
-        groups.setdefault(label, []).append(opt)
-    for label in sorted(groups.keys(), key=str.lower):
+        raw = str(opt.get("provider_label") or opt.get("provider") or "Models")
+        title = provider_display_label(
+            str(opt.get("provider") or ""), fallback=raw
+        )
+        key = title.casefold()
+        groups.setdefault(key, []).append(opt)
+        group_titles.setdefault(key, title)
+    for key in sorted(groups.keys()):
+        label = group_titles[key]
         rows.append(_ModelRow(kind="header", title=label, search=label.lower()))
-        for opt in groups[label]:
+        for opt in groups[key]:
             rows.append(
                 _row_for_option(
                     opt, favorite=option_pref_key(opt) in fav_set, config=config
@@ -189,14 +199,16 @@ def build_model_rows(
 def _row_for_option(
     opt: dict, *, favorite: bool, config: Any | None = None
 ) -> _ModelRow:
+    from ui.terminal.model_options import provider_display_label
+
     display = str(opt.get("display") or opt.get("model_id") or "")
-    meta = str(opt.get("provider_label") or opt.get("provider") or "")
+    meta = provider_display_label(
+        str(opt.get("provider") or ""),
+        fallback=str(opt.get("provider_label") or opt.get("provider") or ""),
+    )
     context = _context_label_for_option(opt)
     effort = _effort_label_for_option(opt, config)
-    if favorite and not display.startswith("★"):
-        title = f"★ {display}"
-    else:
-        title = display
+    title = display
     search = " ".join(
         [
             display,
@@ -216,6 +228,7 @@ def _row_for_option(
         context=context,
         effort=effort,
         meta=meta,
+        favorite=favorite,
     )
 
 
@@ -305,6 +318,7 @@ class ModelsModalHost:
         self._on_style_refresh = on_style_refresh
         self._focus_compose = focus_compose
         self.state = _ModelsModalState()
+        self._list_viewport_h = LIST_HEIGHT
         self.search_buf = Buffer(name="models-search", multiline=False)
         self.search_buf.on_text_changed += self._on_search_text
 
@@ -327,6 +341,7 @@ class ModelsModalHost:
             def create_content(self, width: int, height: int) -> UIContent:
                 st = host.state
                 rows = st.filtered
+                host._list_viewport_h = max(1, height)
                 if st.index >= st.scroll + height:
                     st.scroll = st.index - height + 1
                 elif st.index < st.scroll:
@@ -357,7 +372,13 @@ class ModelsModalHost:
                         if selected
                         else "class:models-row"
                     )
-                    gutter = "●" if is_current else " "
+                    # One-char gutter column so ★ / ● / blank align with titles.
+                    if row.favorite:
+                        gutter = "★"
+                    elif is_current:
+                        gutter = "●"
+                    else:
+                        gutter = " "
                     gutter_style = (
                         "class:models-row-selected"
                         if selected
@@ -400,14 +421,21 @@ class ModelsModalHost:
                 )
 
             def mouse_handler(self, mouse_event):
+                etype = mouse_event.event_type
+                if etype == MouseEventType.SCROLL_UP:
+                    host._scroll_by(-3)
+                    return None
+                if etype == MouseEventType.SCROLL_DOWN:
+                    host._scroll_by(3)
+                    return None
                 y = mouse_event.position.y + host.state.scroll
-                if mouse_event.event_type == MouseEventType.MOUSE_MOVE:
+                if etype == MouseEventType.MOUSE_MOVE:
                     host._move_to(y)
                     return None
-                if mouse_event.event_type == MouseEventType.MOUSE_DOWN:
+                if etype == MouseEventType.MOUSE_DOWN:
                     host._move_to(y)
                     return None
-                if mouse_event.event_type == MouseEventType.MOUSE_UP:
+                if etype == MouseEventType.MOUSE_UP:
                     host._move_to(y)
                     host.confirm()
                     return None
@@ -662,6 +690,26 @@ class ModelsModalHost:
                 self.state.index = i
                 self._invalidate()
                 return
+
+    def _scroll_by(self, delta: int) -> None:
+        """Mouse-wheel viewport scroll (does not wrap)."""
+        rows = self.state.filtered
+        if not rows:
+            return
+        vh = max(1, int(getattr(self, "_list_viewport_h", LIST_HEIGHT) or LIST_HEIGHT))
+        max_scroll = max(0, len(rows) - vh)
+        nxt = max(0, min(max_scroll, self.state.scroll + delta))
+        if nxt == self.state.scroll:
+            return
+        self.state.scroll = nxt
+        # Keep the highlight inside the visible window.
+        if self.state.index < self.state.scroll:
+            self.state.index = first_selectable_index(rows, self.state.scroll)
+        elif self.state.index >= self.state.scroll + vh:
+            self.state.index = first_selectable_index(
+                rows, self.state.scroll + vh - 1
+            )
+        self._invalidate()
 
     def _move_to(self, idx: int) -> None:
         rows = self.state.filtered

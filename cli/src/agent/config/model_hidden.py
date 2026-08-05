@@ -61,8 +61,14 @@ class ModelHiddenMixin:
         return next_list
 
     def _migrate_catalog_defaults(self) -> None:
-        """Seed newly default-disabled catalog models into hidden_models once."""
+        """Seed newly default-disabled catalog models into hidden_models once.
+
+        Also unhides curated OpenRouter models that are default-enabled so a
+        prior discovery seed (opt-in hide) does not keep them stuck off after
+        we promote them into the curated enabled set.
+        """
         from agent.model_catalog import (
+            AVAILABLE_MODELS,
             CATALOG_DEFAULTS_VERSION,
             DEFAULT_DISABLED_MODELS,
         )
@@ -76,6 +82,14 @@ class ModelHiddenMixin:
 
         hidden = set(self.hidden_models())
         hidden.update(DEFAULT_DISABLED_MODELS)
+        curated_enabled = {
+            mid
+            for mid, _label, _desc in AVAILABLE_MODELS.get("openrouter", [])
+            if mid not in DEFAULT_DISABLED_MODELS
+        }
+        for mid in curated_enabled:
+            hidden.discard(mid)
+            hidden.discard(f"openrouter:{mid}")
         self.set("llm.hidden_models", sorted(hidden))
         self.set("llm.catalog_defaults_version", CATALOG_DEFAULTS_VERSION)
         try:

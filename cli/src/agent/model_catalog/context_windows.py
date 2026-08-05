@@ -32,7 +32,9 @@ _EXACT_CONTEXT_WINDOWS: dict[str, int] = {
     "grok-4.20": 256_000,
     # Moonshot / Kimi (per platform.kimi.ai)
     "kimi-k3": 1_000_000,
+    "moonshotai/kimi-k3": 1_000_000,
     "kimi-k2.6": 256_000,
+    "moonshotai/kimi-k2.6": 256_000,
     "kimi-k2.5": 256_000,
     "kimi-k2.7-code": 256_000,
     "kimi-k2.7-code-highspeed": 256_000,

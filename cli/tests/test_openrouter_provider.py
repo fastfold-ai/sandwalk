@@ -42,6 +42,7 @@ def test_openrouter_catalog_and_lookup():
         "deepseek/deepseek-v4-pro",
         "thinkingmachines/inkling",
         "qwen/qwen3.7-flash",
+        "moonshotai/kimi-k3",
         "moonshotai/kimi-k2.6",
         "mistralai/mistral-large-2512",
         "meta/muse-spark-1.1",
@@ -52,6 +53,7 @@ def test_openrouter_catalog_and_lookup():
     } <= ids
     assert "z-ai/glm-5.2" not in DEFAULT_DISABLED_MODELS
     assert "xiaomi/mimo-v2.5" not in DEFAULT_DISABLED_MODELS
+    assert "moonshotai/kimi-k3" not in DEFAULT_DISABLED_MODELS
     # Curated highlights stay small; full catalog comes from discovery.
     assert len(ids) <= 40
     assert "moonshotai/kimi-k2.5" not in ids

@@ -291,3 +291,33 @@ class TestTaskNotificationEdge:
         r._notify_terminal_task_completion("task1", "completed")
         write.assert_not_called()
         flush.assert_not_called()
+
+
+class TestPrintFriendlyError:
+    def test_transcript_gets_plain_text_not_panel(self):
+        from ui.terminal.transcript.store import TranscriptStore
+
+        store = TranscriptStore()
+        console = MagicMock()
+        session = SimpleNamespace(console=console, transcript=store)
+        r = AgentRunner(session=session, trajectory=None, headless=False)
+        body = (
+            "moonshotai/kimi-k3 is rate-limited upstream.\n"
+            "The model provider is rate-limiting or overloaded (429).\n"
+            "During task with name 'model' and id 'abc'\n"
+            "Wait a few seconds and try again."
+        )
+        r._print_friendly_error("Rate limited", body)
+        texts = [e.text for e in store.entries if getattr(e, "text", None)]
+        joined = "\n".join(texts)
+        assert "Rate limited" in joined
+        assert "429" in joined
+        assert "During task with name" not in joined
+        console.print.assert_not_called()
+
+    def test_no_transcript_uses_panel(self):
+        console = MagicMock()
+        session = SimpleNamespace(console=console, transcript=None)
+        r = AgentRunner(session=session, trajectory=None, headless=False)
+        r._print_friendly_error("Rate limited", "try again")
+        assert console.print.called

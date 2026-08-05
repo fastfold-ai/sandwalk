@@ -117,10 +117,37 @@ class UsageUIMixin:
     # ------------------------------------------------------------------
 
     def _print_friendly_error(self, title: str, body: str) -> None:
-        """Render a concise, actionable error to the console (no traceback)."""
+        """Render a concise, actionable error (no traceback).
+
+        Owned transcript sessions get plain padded lines — Rich ``Panel`` box
+        drawing + any stray stderr dumps used to corrupt the fullscreen
+        prompt_toolkit compose box. Non-transcript CLIs keep the Panel.
+        """
         if getattr(self, "_headless", False):
             return
-        console = getattr(getattr(self, "session", None), "console", None)
+        session = getattr(self, "session", None)
+        transcript = getattr(session, "transcript", None) if session is not None else None
+        console = getattr(session, "console", None) if session is not None else None
+
+        lines = [str(title or "").strip() or "Error"]
+        for raw in str(body or "").splitlines():
+            # LangGraph attaches these via Exception.add_note; never surface them.
+            if raw.startswith("During task with name ") or raw.startswith(
+                "Before task with name "
+            ):
+                continue
+            lines.append(raw)
+        plain = "\n".join(f"  {line}" if line else "" for line in lines)
+
+        if transcript is not None:
+            try:
+                transcript.append_text("", kind="system")
+                transcript.append_text(plain, kind="system")
+            except Exception:  # noqa: BLE001
+                if console is not None:
+                    console.print(f"\n[red]{plain}[/red]")
+            return
+
         if console is None:
             return
         try:
@@ -129,15 +156,15 @@ class UsageUIMixin:
             console.print()
             console.print(
                 Panel(
-                    body,
-                    title=f"[bold red]{title}[/bold red]",
+                    "\n".join(lines[1:]) if len(lines) > 1 else str(body or ""),
+                    title=f"[bold red]{lines[0]}[/bold red]",
                     border_style="red",
                     expand=False,
                     padding=(0, 1),
                 )
             )
         except Exception:  # noqa: BLE001
-            console.print(f"\n  [red]{title}:[/red] {body}")
+            console.print(f"\n  [red]{lines[0]}:[/red] {body}")
 
     @staticmethod
     def _make_error_result(query: str, error: str, duration: float) -> ExecutionResult:

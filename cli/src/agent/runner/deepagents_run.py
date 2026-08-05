@@ -401,11 +401,23 @@ class DeepAgentsRunMixin:
                 logger.warning(
                     "deepagents query failed (%s): %s\n%s", title, e, traceback.format_exc()
                 )
+                # Drop the gold scanner immediately — title/store work after
+                # return must not leave the compose box stuck on "ctrl+c interrupt".
+                if progress_callback is not None:
+                    try:
+                        progress_callback("turn_complete")
+                    except Exception:  # noqa: BLE001
+                        pass
                 self._print_friendly_error(title, body)
                 return self._make_error_result(
                     query, f"{title}: {body.splitlines()[0]}", duration
                 )
             logger.error("deepagents query failed: %s\n%s", e, traceback.format_exc())
+            if progress_callback is not None:
+                try:
+                    progress_callback("turn_complete")
+                except Exception:  # noqa: BLE001
+                    pass
             return self._make_error_result(query, str(e), duration)
         finally:
             if thinking_status is not None:

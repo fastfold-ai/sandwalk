@@ -66,6 +66,10 @@ class _QueryWorkerMixin:
                 except Exception as e:
                     self.console.print(f"\n  [red]Execution error:[/red] {e}")
                     result = None
+                finally:
+                    # Always idle the compose scanner when the agent returns —
+                    # even if later usage/title work raises or hangs.
+                    self._clear_toolbar_busy()
 
                 with self._run_lock:
                     has_queued = bool(self._queued_queries)

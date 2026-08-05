@@ -110,11 +110,38 @@ class _BottomToolbarMixin:
         except Exception:  # noqa: BLE001 — never break the prompt toolbar
             return None
 
+    def _picker_modal_open(self) -> bool:
+        """True while an in-app /themes or /models overlay is open."""
+        for attr in ("_themes_modal_host", "_models_modal_host"):
+            host = getattr(self, attr, None)
+            if host is not None and getattr(getattr(host, "state", None), "open", False):
+                return True
+        return False
+
+    def _dim_hex_if_modal(self, color: str, *, alpha: float = 0.55) -> str:
+        """Match backdrop wash for HTML toolbar colors while a picker is open."""
+        raw = str(color or "").strip()
+        if not self._picker_modal_open():
+            return raw
+        if not (raw.startswith("#") and len(raw) == 7):
+            return raw
+        from ui.terminal.themes_modal import _overlay_black
+
+        return _overlay_black(raw, alpha)
+
     def _compose_palette(self) -> dict[str, str]:
         from ui.terminal.theme import panel_palette, resolve_ui_theme
 
         cfg = getattr(getattr(self, "session", None), "config", None)
-        return panel_palette(resolve_ui_theme(cfg), config=cfg)
+        palette = panel_palette(resolve_ui_theme(cfg), config=cfg)
+        if not self._picker_modal_open():
+            return palette
+        # Compose/status toolbars paint HTML with absolute hex; dim them so
+        # they sit under the same veil as the style-dict transcript chrome.
+        return {
+            key: self._dim_hex_if_modal(val) if isinstance(val, str) else val
+            for key, val in palette.items()
+        }
 
     @property
     def _COMPOSE_BG(self) -> str:
@@ -277,7 +304,8 @@ class _BottomToolbarMixin:
             )
             sandbox_label = getattr(self, "_cli_sandbox_label", None) or "Local Sandbox"
             is_modal = "modal" in sandbox_label.lower()
-            sandbox_fg = "#5a9e4a" if is_modal else muted
+            sandbox_fg = self._dim_hex_if_modal("#5a9e4a") if is_modal else muted
+            plan_fg = self._dim_hex_if_modal("#9a7429")
             frag = (
                 f'<style fg="{accent}" bg="{bg}">{_html_escape(lead)}</style>'
                 f'<style fg="{sep}" bg="{bg}"> · </style>'
@@ -290,7 +318,7 @@ class _BottomToolbarMixin:
             if self.session.config.get("agent.plan_preview", False) and lead != "Plan":
                 frag += (
                     f'<style fg="{sep}" bg="{bg}"> · </style>'
-                    f'<style fg="#9a7429" bg="{bg}">plan</style>'
+                    f'<style fg="{plan_fg}" bg="{bg}">plan</style>'
                 )
             return self._toolbar_html(frag)
         except Exception:  # noqa: BLE001

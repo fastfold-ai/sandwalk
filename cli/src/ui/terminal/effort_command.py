@@ -1,4 +1,4 @@
-"""Mixin: per-model Effort / Fast (thinking) prompts for /model and /effort."""
+"""Mixin: per-model Effort / Fast (thinking) prompts for /effort."""
 
 from __future__ import annotations
 

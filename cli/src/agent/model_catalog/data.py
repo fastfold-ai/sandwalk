@@ -256,6 +256,11 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
             "Alibaba Qwen3.7 Flash via OpenRouter",
         ),
         (
+            "moonshotai/kimi-k3",
+            "Kimi K3",
+            "Moonshot Kimi K3 via OpenRouter",
+        ),
+        (
             "moonshotai/kimi-k2.6",
             "Kimi K2.6",
             "Moonshot Kimi via OpenRouter",
@@ -370,7 +375,9 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
 }
 
 # Bump when the default-enabled set changes so existing configs get migrated once.
-CATALOG_DEFAULTS_VERSION = 6
+# Also bump when curated OpenRouter models become default-enabled so prior
+# discovery-seeded hides are cleared (see Config._migrate_catalog_defaults).
+CATALOG_DEFAULTS_VERSION = 7
 
 # Models present in the catalog but hidden by default. Users can re-enable them
 # from Dashboard → Models; toggling simply removes them from the hidden list.

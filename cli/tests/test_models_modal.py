@@ -33,7 +33,10 @@ def test_build_model_rows_favorites_and_recent_first():
     )
     titles = [r.title for r in rows]
     assert titles[0] == "Favorites"
-    assert "★" in titles[1] and "claude-b" in titles[1]
+    assert rows[1].kind == "model"
+    assert rows[1].favorite is True
+    assert "★" not in rows[1].title
+    assert "claude-b" in rows[1].title
     assert "Recent" in titles
     # Favorited key should not also appear under Recent.
     recent_idx = titles.index("Recent")
@@ -98,6 +101,32 @@ def test_format_context_window_label():
     assert format_context_window_label(1_050_000) == "1.05M"
     assert format_context_window_label(200_000) == "200k"
     assert format_context_window_label(None) == ""
+
+
+def test_provider_display_label_unifies_openrouter():
+    from ui.terminal.model_options import provider_display_label
+
+    assert provider_display_label("openrouter") == "OpenRouter"
+    assert provider_display_label("openrouter", fallback="OpenRouter") == "OpenRouter"
+    assert provider_display_label("anthropic") == "Anthropic"
+
+
+def test_build_model_rows_merges_openrouter_case_variants():
+    from ui.terminal.models_modal import build_model_rows
+
+    opts = [
+        _opt("openrouter", "anthropic/claude-opus-5", display="Claude Opus 5", label="openrouter"),
+        _opt(
+            "openrouter",
+            "inclusionai/ling-2.6-flash",
+            display="Inclusionai/ling 2.6 Flash",
+            label="OpenRouter",
+        ),
+    ]
+    rows = build_model_rows(opts, favorite_keys=[], recent_keys=[])
+    headers = [r.title for r in rows if r.kind == "header"]
+    assert headers.count("OpenRouter") == 1
+    assert "openrouter" not in headers
 
 
 def test_build_model_rows_includes_context_and_effort():

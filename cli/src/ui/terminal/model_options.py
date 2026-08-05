@@ -6,6 +6,35 @@ from typing import Any
 
 from .model_ids import AVAILABLE_MODELS
 
+# Cloud catalog ids that are not in OPENAI_COMPATIBLE_PROVIDERS.
+_CLOUD_PROVIDER_LABELS = {
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+}
+
+
+def provider_display_label(provider: str, *, fallback: str | None = None) -> str:
+    """Canonical section title for a provider id (avoids openrouter vs OpenRouter)."""
+    prov = str(provider or "").strip().lower()
+    if not prov:
+        return str(fallback or "Models").strip() or "Models"
+    if prov in _CLOUD_PROVIDER_LABELS:
+        return _CLOUD_PROVIDER_LABELS[prov]
+    try:
+        from agent.config import OPENAI_COMPATIBLE_PROVIDERS
+
+        meta = OPENAI_COMPATIBLE_PROVIDERS.get(prov) or {}
+        label = str(meta.get("label") or "").strip()
+        if label:
+            return label
+    except Exception:  # noqa: BLE001
+        pass
+    text = str(fallback or provider or "Models").strip() or "Models"
+    # If fallback is just the raw id, title-case it for display.
+    if text.lower() == prov:
+        return prov.capitalize() if len(prov) <= 4 else text.title()
+    return text
+
 
 def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
     """Return ``(options, discovery_warnings)`` for the model picker.
@@ -42,7 +71,7 @@ def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
                     "display": display,
                     "desc": desc,
                     "profile_id": None,
-                    "provider_label": prov,
+                    "provider_label": provider_display_label(prov),
                 }
             )
 
@@ -100,7 +129,9 @@ def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
                         "display": format_discovered_model_label(model_id),
                         "desc": f"{label} (discovered)",
                         "profile_id": None,
-                        "provider_label": label,
+                        "provider_label": provider_display_label(
+                            prov, fallback=label
+                        ),
                     }
                 )
 

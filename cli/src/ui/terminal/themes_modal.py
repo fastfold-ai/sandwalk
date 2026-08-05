@@ -35,8 +35,10 @@ class _ThemesModalState:
 
 
 DIALOG_WIDTH = 56
-DIALOG_HEIGHT = 20  # title + search + list(~12) + preview + hints
+PAD_X = 3  # left/right inset (match /models)
+# top + title + search + gap + list + gap + preview + hints + bottom
 LIST_HEIGHT = 12
+DIALOG_HEIGHT = 8 + LIST_HEIGHT
 
 
 def build_theme_options(palettes: list[dict], mode: str) -> list[_ThemeOption]:
@@ -120,6 +122,7 @@ class ThemesModalHost:
         self._on_style_refresh = on_style_refresh
         self._focus_compose = focus_compose
         self.state = _ThemesModalState(options=[])
+        self._list_viewport_h = LIST_HEIGHT
         self.search_buf = Buffer(name="themes-search", multiline=False)
         self.search_buf.on_text_changed += self._on_search_text
 
@@ -148,6 +151,7 @@ class ThemesModalHost:
                 )
                 panel_bg = colors["panel_bg"]
                 rows = st.filtered
+                host._list_viewport_h = max(1, height)
                 if st.index >= st.scroll + height:
                     st.scroll = st.index - height + 1
                 elif st.index < st.scroll:
@@ -172,7 +176,10 @@ class ThemesModalHost:
                         if selected
                         else "class:themes-row-current"
                     )
-                    frags: list[tuple[str, str]] = [(gutter_style, f" {gutter} ")]
+                    inset = " " * PAD_X
+                    frags: list[tuple[str, str]] = [
+                        (gutter_style, f"{inset}{gutter} ")
+                    ]
                     if opt.kind == "palette":
                         frags.extend(
                             _swatch_frags(get_palette(opt.value), panel_bg=panel_bg)
@@ -180,12 +187,12 @@ class ThemesModalHost:
                     else:
                         frags.append((f"bg:{panel_bg}", "  "))
                     label = opt.title
-                    used = 6
-                    max_label = max(1, width - used)
+                    used = PAD_X + 4  # inset + gutter + swatch
+                    max_label = max(1, width - used - PAD_X)
                     if len(label) > max_label:
                         label = label[: max_label - 1] + "…"
-                    pad = " " * max(0, width - used - len(label))
-                    frags.append((style, f"{label}{pad}"))
+                    pad = " " * max(0, width - used - len(label) - PAD_X)
+                    frags.append((style, f"{label}{pad}{inset}"))
                     return frags
 
                 return UIContent(
@@ -195,14 +202,21 @@ class ThemesModalHost:
                 )
 
             def mouse_handler(self, mouse_event):
+                etype = mouse_event.event_type
+                if etype == MouseEventType.SCROLL_UP:
+                    host._scroll_by(-3)
+                    return None
+                if etype == MouseEventType.SCROLL_DOWN:
+                    host._scroll_by(3)
+                    return None
                 y = mouse_event.position.y + host.state.scroll
-                if mouse_event.event_type == MouseEventType.MOUSE_MOVE:
+                if etype == MouseEventType.MOUSE_MOVE:
                     host._move_to(y)
                     return None
-                if mouse_event.event_type == MouseEventType.MOUSE_DOWN:
+                if etype == MouseEventType.MOUSE_DOWN:
                     host._move_to(y)
                     return None
-                if mouse_event.event_type == MouseEventType.MOUSE_UP:
+                if etype == MouseEventType.MOUSE_UP:
                     host._move_to(y)
                     host.confirm()
                     return None
@@ -215,53 +229,107 @@ class ThemesModalHost:
             style="class:themes-dialog",
         )
 
-        dialog = HSplit(
+        def _side_pad():
+            return Window(
+                width=PAD_X,
+                char=" ",
+                style="class:themes-dialog",
+                dont_extend_width=True,
+            )
+
+        # Title left + esc pinned top-right (same chrome as /models).
+        header = VSplit(
             [
+                _side_pad(),
                 Window(
-                    content=FormattedTextControl(self._header),
-                    height=1,
+                    content=FormattedTextControl(
+                        lambda: [("class:themes-title", "Themes")]
+                    ),
+                    dont_extend_width=True,
                     style="class:themes-dialog",
                 ),
-                VSplit(
-                    [
-                        Window(
-                            width=9,
-                            content=FormattedTextControl(
-                                lambda: [("class:themes-search.prompt", "  Search ")]
-                            ),
-                            style="class:themes-search",
-                        ),
-                        Window(
-                            content=BufferControl(
-                                buffer=self.search_buf, focusable=True
-                            ),
-                            height=1,
-                            style="class:themes-search",
-                        ),
-                    ],
+                Window(char=" ", style="class:themes-dialog"),
+                Window(
+                    content=FormattedTextControl(
+                        lambda: [("class:themes-hint", "esc")]
+                    ),
+                    width=3,
+                    dont_extend_width=True,
+                    style="class:themes-dialog",
+                ),
+                _side_pad(),
+            ],
+            height=1,
+            style="class:themes-dialog",
+        )
+
+        search = VSplit(
+            [
+                _side_pad(),
+                Window(
+                    width=7,
+                    content=FormattedTextControl(
+                        lambda: [("class:themes-search.prompt", "Search ")]
+                    ),
+                    style="class:themes-search",
+                ),
+                Window(
+                    content=BufferControl(buffer=self.search_buf, focusable=True),
                     height=1,
                     style="class:themes-search",
                 ),
-                Window(height=1, char=" ", style="class:themes-dialog"),
-                list_window,
-                Window(height=1, char=" ", style="class:themes-dialog"),
+                _side_pad(),
+            ],
+            height=1,
+            style="class:themes-search",
+        )
+
+        preview = VSplit(
+            [
+                _side_pad(),
                 Window(
                     content=FormattedTextControl(self._preview_strip),
                     height=1,
                     style="class:themes-preview",
                 ),
+                _side_pad(),
+            ],
+            height=1,
+            style="class:themes-preview",
+        )
+
+        hints = VSplit(
+            [
+                _side_pad(),
                 Window(
                     content=FormattedTextControl(
                         lambda: [
                             (
                                 "class:themes-hint",
-                                "  ↑/↓ or hover preview · enter confirm · esc cancel",
+                                "↑/↓ or hover preview · enter confirm",
                             )
                         ]
                     ),
                     height=1,
                     style="class:themes-dialog",
                 ),
+                _side_pad(),
+            ],
+            height=1,
+            style="class:themes-dialog",
+        )
+
+        dialog = HSplit(
+            [
+                Window(height=1, char=" ", style="class:themes-dialog"),
+                header,
+                search,
+                Window(height=1, char=" ", style="class:themes-dialog"),
+                list_window,
+                Window(height=1, char=" ", style="class:themes-dialog"),
+                preview,
+                hints,
+                Window(height=1, char=" ", style="class:themes-dialog"),
             ],
             width=Dimension.exact(DIALOG_WIDTH),
             height=Dimension.exact(DIALOG_HEIGHT),
@@ -341,20 +409,14 @@ class ThemesModalHost:
         def _esc(_event):
             host.cancel()
 
-    def _header(self):
-        return [
-            ("class:themes-title", "  Themes"),
-            ("class:themes-hint", "                              esc  "),
-        ]
-
     def _preview_strip(self):
         from ui.terminal.theme import get_palette
 
         name = get_palette(self.state.preview_palette)["name"]
         return [
             ("class:themes-preview-accent", "┃"),
-            ("class:themes-preview-panel", f" {name} · {self.state.preview_mode}  "),
-            ("class:themes-hint", "preview"),
+            ("class:themes-preview-panel", f" {name} · {self.state.preview_mode}"),
+            ("class:themes-hint", " preview"),
         ]
 
     def _resolved_mode(self) -> str:
@@ -389,6 +451,22 @@ class ThemesModalHost:
         if not self.state.filtered:
             return
         self.state.index = (self.state.index + delta) % len(self.state.filtered)
+        self._apply_preview(self.state.filtered[self.state.index])
+
+    def _scroll_by(self, delta: int) -> None:
+        rows = self.state.filtered
+        if not rows:
+            return
+        vh = max(1, int(getattr(self, "_list_viewport_h", LIST_HEIGHT) or LIST_HEIGHT))
+        max_scroll = max(0, len(rows) - vh)
+        nxt = max(0, min(max_scroll, self.state.scroll + delta))
+        if nxt == self.state.scroll:
+            return
+        self.state.scroll = nxt
+        if self.state.index < self.state.scroll:
+            self.state.index = self.state.scroll
+        elif self.state.index >= self.state.scroll + vh:
+            self.state.index = self.state.scroll + vh - 1
         self._apply_preview(self.state.filtered[self.state.index])
 
     def _move_to(self, idx: int) -> None:

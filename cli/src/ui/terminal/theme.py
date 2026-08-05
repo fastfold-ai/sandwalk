@@ -221,7 +221,12 @@ def transcript_style_dict(
     config: Any = None,
 ) -> dict[str, str]:
     """prompt_toolkit style entries for the owned transcript + compose panel."""
-    p = panel_palette(theme, palette=palette, config=config)
+    mode: ThemeName = (
+        resolve_ui_theme(config)
+        if theme is None
+        else ("dark" if str(theme).strip().lower() == "dark" else "light")
+    )
+    p = panel_palette(mode, palette=palette, config=config)
     canvas = f"bg:{p['canvas_bg']} {p['canvas_fg']}"
     panel = f"bg:{p['panel_bg']} {p['panel_fg']}"
     accent = p["accent"]
@@ -230,6 +235,8 @@ def transcript_style_dict(
     from ui.terminal.models_modal import models_modal_style_extras
     from ui.terminal.themes_modal import themes_modal_style_extras
 
+    # Tool-call name: pale Dracula cyan washes out on light canvases.
+    tool_fg = "bold #0284c7" if mode == "light" else "#7dd3fc"
     out = {
         # Full-TUI canvas (sidebar equivalent from Sandwalk UI presets).
         "": canvas,
@@ -240,9 +247,9 @@ def transcript_style_dict(
         "transcript-user-accent": accent,
         "transcript-system": p["system_fg"],
         "transcript-resume": p["resume_fg"],
-        "transcript-tool": "#8be9fd",
-        "transcript-tool-ok": "#98c379",
-        "transcript-tool-error": "#ff5555",
+        "transcript-tool": tool_fg,
+        "transcript-tool-ok": "#16a34a" if mode == "light" else "#98c379",
+        "transcript-tool-error": "#dc2626" if mode == "light" else "#ff5555",
         "transcript-tool-detail": p["system_fg"],
         "transcript-selected": "reverse",
         "image-chip": "bold #111111 bg:#f0a030",
