@@ -269,9 +269,11 @@ def run_transcript_session(
             pass
         themes_host = getattr(terminal, "_themes_modal_host", None)
         models_host = getattr(terminal, "_models_modal_host", None)
+        skills_host = getattr(terminal, "_skills_modal_host", None)
         dim = bool(
             (themes_host is not None and getattr(themes_host.state, "open", False))
             or (models_host is not None and getattr(models_host.state, "open", False))
+            or (skills_host is not None and getattr(skills_host.state, "open", False))
         )
         fp = _theme_fingerprint(live_cfg, backdrop_dim=dim)
         if not force and fp == theme_state["fp"]:
@@ -292,8 +294,9 @@ def run_transcript_session(
 
     terminal._ui_theme_refresh = _force_theme_refresh
 
-    # In-app /themes and /models overlays (centered dialogs over live transcript).
+    # In-app /themes, /models, /skills overlays (centered dialogs over transcript).
     from ui.terminal.models_modal import ModelsModalHost
+    from ui.terminal.skills_modal import SkillsModalHost
     from ui.terminal.themes_modal import ThemesModalHost
 
     def _focus_compose() -> None:
@@ -314,12 +317,25 @@ def run_transcript_session(
         on_style_refresh=_force_theme_refresh,
         focus_compose=_focus_compose,
     )
+    skills_host = SkillsModalHost(
+        terminal,
+        app=app,
+        on_style_refresh=_force_theme_refresh,
+        focus_compose=_focus_compose,
+    )
     terminal._themes_modal_host = themes_host
     terminal._models_modal_host = models_host
+    terminal._skills_modal_host = skills_host
     root.floats.extend(themes_host.floats)
     root.floats.extend(models_host.floats)
+    root.floats.extend(skills_host.floats)
     app.key_bindings = merge_key_bindings(
-        [themes_host.key_bindings, models_host.key_bindings, kb]
+        [
+            themes_host.key_bindings,
+            models_host.key_bindings,
+            skills_host.key_bindings,
+            kb,
+        ]
     )
 
     def _invalidate_now() -> None:
@@ -411,6 +427,7 @@ def run_transcript_session(
         terminal._transcript_buffer = None
         terminal._themes_modal_host = None
         terminal._models_modal_host = None
+        terminal._skills_modal_host = None
 
     if result is None:
         raise EOFError
@@ -443,7 +460,11 @@ def _build_transcript_bindings(
     kb = _build_key_bindings(terminal, include_mouse=False)
 
     def _picker_modal_closed() -> bool:
-        for attr in ("_themes_modal_host", "_models_modal_host"):
+        for attr in (
+            "_themes_modal_host",
+            "_models_modal_host",
+            "_skills_modal_host",
+        ):
             host = getattr(terminal, attr, None)
             if host is not None and getattr(host.state, "open", False):
                 return False

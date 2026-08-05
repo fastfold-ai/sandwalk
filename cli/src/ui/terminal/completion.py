@@ -141,6 +141,8 @@ PT_STYLE = Style.from_dict({
     "mention-workflow": "#ff79c6",  # pink for workflow mentions
     # Image / file attach chips — orange chip
     "image-chip": "bold #111111 bg:#f0a030",
+    # Skills picker inserts — pink chip
+    "skill-chip": "bold #111111 bg:#f472b6",
 })
 
 

@@ -209,24 +209,30 @@ def user_message_rows(
 ) -> list[StyleAndTextTuples]:
     """Compose-style soft box for a user turn (no ❯ prefix)."""
     from ui.terminal.attachments import (
+        chipify_file_paths_for_display,
         chipify_uploads_for_display,
         find_file_chips,
+        find_skill_chips,
         style_with_image_chips,
     )
 
-    raw = chipify_uploads_for_display(text)
+    raw = chipify_file_paths_for_display(chipify_uploads_for_display(text))
     file_chips = find_file_chips(raw)
+    skill_chips = find_skill_chips(raw)
     outer_w = len(_USER_OUTER)
     panel_w = max(8, width - outer_w - 1)
     inner_w = max(1, panel_w - 2 * len(_USER_INNER))
     body_lines = _wrap(raw, inner_w)
-    use_chips = "[Image " in raw or bool(file_chips)
+    use_chips = "[Image " in raw or bool(file_chips) or bool(skill_chips)
 
     rows: list[StyleAndTextTuples] = [_user_panel_fill(panel_w)]
     for line in body_lines:
         if use_chips:
             frags = style_with_image_chips(
-                line, _USER_STYLE, file_chips=file_chips
+                line,
+                _USER_STYLE,
+                file_chips=file_chips,
+                skill_chips=skill_chips,
             )
         else:
             frags = [(_USER_STYLE, line)] if line else [(_USER_STYLE, "")]
@@ -345,18 +351,26 @@ def entry_rows(
             from ui.terminal.attachments import chipify_uploads_for_display
 
             raw = chipify_uploads_for_display(raw)
-        from ui.terminal.attachments import find_file_chips, style_with_image_chips
+        from ui.terminal.attachments import (
+            find_file_chips,
+            find_skill_chips,
+            style_with_image_chips,
+        )
 
         file_chips = find_file_chips(raw)
+        skill_chips = find_skill_chips(raw)
         style = {
             "system": "class:transcript-system",
         }.get(entry.kind, "class:transcript-text")
         out: list[tuple[Entry, int, StyleAndTextTuples]] = []
-        use_chips = "[Image " in raw or bool(file_chips)
+        use_chips = "[Image " in raw or bool(file_chips) or bool(skill_chips)
         for i, line in enumerate(_wrap(raw, inner)):
             if use_chips:
                 frags = style_with_image_chips(
-                    line, style, file_chips=file_chips
+                    line,
+                    style,
+                    file_chips=file_chips,
+                    skill_chips=skill_chips,
                 )
                 out.append((entry, i, [("", LEFT_PAD), *frags]))
             else:

@@ -98,6 +98,42 @@ def test_find_and_style_file_chips():
     assert "what is this file?" in plain
 
 
+def test_find_and_style_skill_chips_pink():
+    from ui.terminal.attachments import find_skill_chips, style_with_image_chips
+
+    text = "skill: md_openmm_calvados what is this for?"
+    chips = find_skill_chips(text)
+    assert chips == ["skill: md_openmm_calvados"]
+    frags = style_with_image_chips(text, "class:transcript-user")
+    chip = "".join(t for s, t in frags if "skill-chip" in s)
+    assert chip == "skill: md_openmm_calvados"
+    assert not any("image-chip" in s for s, _t in frags)
+
+
+def test_chipify_file_paths_for_display_restores_basename_chips():
+    from ui.terminal.attachments import chipify_file_paths_for_display
+
+    path = (
+        "@artifacts/fold/7addce64-8059-490b-b70f-61de66a4db78/"
+        "plddt_pae_metrics.json"
+    )
+    text = chipify_file_paths_for_display(f"{path} what is this?")
+    assert text == "@[plddt_pae_metrics.json] what is this?"
+    assert "@artifacts/" not in text
+
+
+def test_chipify_file_paths_skips_uploads_and_existing_chips():
+    from ui.terminal.attachments import chipify_file_paths_for_display
+
+    text = chipify_file_paths_for_display(
+        "@[keep.cif] @uploads/clip.png @artifacts/fold/x/model_0.cif"
+    )
+    assert "@[keep.cif]" in text
+    assert "@uploads/clip.png" in text  # left for image chipify
+    assert "@[model_0.cif]" in text
+    assert "@artifacts/" not in text
+
+
 def test_chipify_keeps_existing_chip_numbers():
     from ui.terminal.attachments import chipify_uploads_for_display
 

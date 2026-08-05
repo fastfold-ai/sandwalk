@@ -40,6 +40,17 @@ _UPLOAD_AT_RE = re.compile(
 
 # File mention chips: ``@[README.md]`` / ``@[notes·2.md]`` — orange like images.
 _FILE_CHIP_RE = re.compile(r"@\[[^\]]+\]")
+# Skills picker inserts ``skill: <name>`` — pink chips in compose + transcript.
+_SKILL_CHIP_RE = re.compile(r"skill:\s+[^\s]+", re.IGNORECASE)
+# Expanded agent path tokens stored in session history (not already ``@[chip]``).
+# Skip ``@uploads/…`` — those become ``[Image N]`` via chipify_uploads_for_display.
+_AT_AGENT_PATH_RE = re.compile(r"@(?!\[)(?!uploads/)([^\s\[\]]+)")
+# Absolute / home / relative file paths (cwd attaches) with a suffix.
+_ABS_FILE_PATH_RE = re.compile(
+    r"(?<![\w@./])"
+    r"((?:~/|/|\./|\.\./)[^\s\[\]]*?\.[A-Za-z0-9]{1,16})"
+    r"(?=[\s,;:!?)\]]|$)"
+)
 _SKIP_DIR_NAMES = frozenset({
     ".git",
     ".hg",
@@ -253,6 +264,78 @@ def find_file_chips(text: str) -> list[str]:
     return out
 
 
+def find_skill_chips(text: str) -> list[str]:
+    """Return unique ``skill: <name>`` chips in display order."""
+    if not text:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for match in _SKILL_CHIP_RE.finditer(text):
+        chip = match.group(0)
+        if chip in seen:
+            continue
+        seen.add(chip)
+        out.append(chip)
+    return out
+
+
+def _display_chip_for_path(path: str, *, counts: dict[str, int]) -> str:
+    """Build a unique ``@[basename]`` chip for a stored agent path."""
+    bare = path[1:] if path.startswith("@") else path
+    base = (Path(bare).name or "file").strip() or "file"
+    base = re.sub(r"[\s\[\]]+", "_", base)
+    n = counts.get(base, 0) + 1
+    counts[base] = n
+    if n == 1:
+        return f"@[{base}]"
+    stem = Path(base).stem
+    suffix = Path(base).suffix
+    return f"@[{stem}·{n}{suffix}]"
+
+
+def chipify_file_paths_for_display(text: str) -> str:
+    """Restore orange ``@[filename]`` chips from expanded session path tokens.
+
+    Live turns keep ``@[…]`` chips; persisted queries store ``@rel/path`` or
+    absolute paths. Re-chipify on render so resume matches compose styling.
+    """
+    if not text:
+        return text
+    counts: dict[str, int] = {}
+    # Seed from existing chips so ·N numbering stays unique in the message.
+    for chip in find_file_chips(text):
+        inner = chip[2:-1]  # strip @[ ]
+        m = re.match(r"^(?P<stem>.*?)·(?P<n>\d+)(?P<suf>\.[^.]+)?$", inner)
+        if m:
+            family = f"{m.group('stem')}{m.group('suf') or ''}"
+            counts[family] = max(counts.get(family, 0), int(m.group("n")))
+        else:
+            counts[inner] = max(counts.get(inner, 0), 1)
+
+    path_to_chip: dict[str, str] = {}
+
+    def _chip_for(path: str) -> str:
+        if path in path_to_chip:
+            return path_to_chip[path]
+        chip = _display_chip_for_path(path, counts=counts)
+        path_to_chip[path] = chip
+        return chip
+
+    # Longer matches first when substituting abs paths after @ tokens.
+    out = text
+
+    def _at_repl(match: re.Match[str]) -> str:
+        return _chip_for(match.group(0))
+
+    out = _AT_AGENT_PATH_RE.sub(_at_repl, out)
+
+    def _abs_repl(match: re.Match[str]) -> str:
+        return _chip_for(match.group(1))
+
+    out = _ABS_FILE_PATH_RE.sub(_abs_repl, out)
+    return out
+
+
 def chipify_uploads_for_display(text: str) -> str:
     """Replace ``@uploads/…`` image tokens with ``[Image N]`` for UI display."""
     if not text or not _UPLOAD_AT_RE.search(text):
@@ -273,12 +356,15 @@ def style_with_image_chips(
     base_style: str,
     *,
     file_chips: list[str] | None = None,
+    skill_chips: list[str] | None = None,
 ) -> list[tuple[str, str]]:
     """Split text into FormattedText fragments, highlighting attach chips."""
     if not text:
         return [(base_style, "")]
-    spans: list[tuple[int, int]] = [
-        (m.start(), m.end()) for m in _CHIP_LABEL_RE.finditer(text)
+    # (start, end, style_class)
+    spans: list[tuple[int, int, str]] = [
+        (m.start(), m.end(), "class:image-chip")
+        for m in _CHIP_LABEL_RE.finditer(text)
     ]
     for chip in sorted(file_chips or [], key=len, reverse=True):
         start = 0
@@ -286,23 +372,32 @@ def style_with_image_chips(
             idx = text.find(chip, start)
             if idx < 0:
                 break
-            spans.append((idx, idx + len(chip)))
+            spans.append((idx, idx + len(chip), "class:image-chip"))
+            start = idx + len(chip)
+    skills = skill_chips if skill_chips is not None else find_skill_chips(text)
+    for chip in sorted(skills, key=len, reverse=True):
+        start = 0
+        while True:
+            idx = text.find(chip, start)
+            if idx < 0:
+                break
+            spans.append((idx, idx + len(chip), "class:skill-chip"))
             start = idx + len(chip)
     if not spans:
         return [(base_style, text)]
     # Merge overlaps (prefer earlier/longer).
     spans.sort(key=lambda s: (s[0], -(s[1] - s[0])))
-    merged: list[tuple[int, int]] = []
-    for start, end in spans:
+    merged: list[tuple[int, int, str]] = []
+    for start, end, style in spans:
         if merged and start < merged[-1][1]:
             continue
-        merged.append((start, end))
+        merged.append((start, end, style))
     out: list[tuple[str, str]] = []
     pos = 0
-    for start, end in merged:
+    for start, end, style in merged:
         if start > pos:
             out.append((base_style, text[pos:start]))
-        out.append(("class:image-chip", text[start:end]))
+        out.append((style, text[start:end]))
         pos = end
     if pos < len(text):
         out.append((base_style, text[pos:]))

@@ -619,11 +619,15 @@ def _dim_style_string(style: str, alpha: float = 0.55) -> str:
 def dim_transcript_styles_for_backdrop(
     styles: dict[str, str], *, alpha: float = 0.55
 ) -> dict[str, str]:
-    """Veil session chrome under a black wash; keep themes-/models-* keys bright."""
+    """Veil session chrome under a black wash; keep picker modal keys bright."""
     out: dict[str, str] = {}
     for key, val in styles.items():
         key_s = str(key)
-        if key_s.startswith("themes-") or key_s.startswith("models-"):
+        if (
+            key_s.startswith("themes-")
+            or key_s.startswith("models-")
+            or key_s.startswith("skills-")
+        ):
             out[key] = val
             continue
         out[key] = _dim_style_string(val, alpha)

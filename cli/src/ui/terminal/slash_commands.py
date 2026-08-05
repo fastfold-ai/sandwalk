@@ -6,7 +6,7 @@ SLASH_COMMANDS = {
     "/help": "Show command reference with examples",
     "/tools": "List all tools with status (stable/experimental)",
     "/data": "Manage local datasets (/data list | status | pull <name> | pull-all)",
-    "/skills": "List loaded skills (filtered to active specialist if set)",
+    "/skills": "Skills picker — Enter inserts skill: name, Space toggles",
     "/skills-add": "Install a skill from GitHub/local path/name",
     "/skills-find": "Discover installable skills from the catalog",
     "/skills-upgrade": "Sync the Fastfold catalog and update installed skills",

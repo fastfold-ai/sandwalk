@@ -544,8 +544,13 @@ class InteractiveTerminal(
             self._advance_suggestion()
             return True
         if cmd in ("skill", "/skill", "skills", "/skills"):
-            # Display-only — keep the table in the transcript (no host flash).
-            self._show_skills()
+            # In-app overlay when the transcript app is live (same as /models).
+            host = getattr(self, "_skills_modal_host", None)
+            app = getattr(self, "_transcript_app", None)
+            if host is not None and getattr(app, "is_running", False):
+                self._show_skills()
+            else:
+                self._schedule_host_terminal(self._show_skills)
             self._advance_suggestion()
             return True
         if cmd_head in ("specialist", "/specialist"):

@@ -229,6 +229,40 @@ def test_user_message_renders_file_mention_as_orange_chip():
     assert chip_text == chip
 
 
+def test_user_message_renders_skill_mention_as_pink_chip():
+    from ui.terminal.transcript.render import entry_rows
+
+    store = TranscriptStore()
+    store.append_text("skill: fold what is this for?", kind="user")
+    rows = entry_rows(store.entries[0], width=80)
+    joined = "".join(t for _e, _i, frags in rows for _s, t in frags)
+    assert "skill: fold" in joined
+    chip_text = "".join(
+        t for _e, _i, frags in rows for s, t in frags if "skill-chip" in s
+    )
+    assert chip_text == "skill: fold"
+
+
+def test_user_message_chipifies_expanded_paths_on_resume():
+    """Persisted queries store @rel/path; resume should show @[basename] chips."""
+    from ui.terminal.transcript.render import entry_rows
+
+    store = TranscriptStore()
+    path = (
+        "@artifacts/fold/7addce64-8059-490b-b70f-61de66a4db78/"
+        "plddt_pae_metrics.json"
+    )
+    store.append_text(f"{path} what is this?", kind="user")
+    rows = entry_rows(store.entries[0], width=120)
+    joined = "".join(t for _e, _i, frags in rows for _s, t in frags)
+    assert "@[plddt_pae_metrics.json]" in joined
+    assert "@artifacts/" not in joined
+    chip_text = "".join(
+        t for _e, _i, frags in rows for s, t in frags if "image-chip" in s
+    )
+    assert chip_text == "@[plddt_pae_metrics.json]"
+
+
 def test_user_message_box_has_no_prompt_arrow():
     from ui.terminal.transcript.render import entry_lines
 

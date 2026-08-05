@@ -627,11 +627,23 @@ class TestTerminalPresentationAndSkills:
 
     def test_skills_commands_cover_usage_and_success_paths(self):
         term = _mk_terminal()
+        # Modal skips under pytest; table fallback still prints.
         with patch("agent.skills.list_skills", return_value=[]):
             term._show_skills()
         with patch(
             "agent.skills.list_skills",
-            return_value=[SimpleNamespace(name="fold", source="repo", description="desc")],
+            return_value=[
+                SimpleNamespace(
+                    name="fold",
+                    source="repo",
+                    description="desc",
+                    enabled=True,
+                    author="fastfold-ai",
+                    version="1.0.0",
+                    category="catalog",
+                    updated_at="",
+                )
+            ],
         ):
             term._show_skills()
         with patch("agent.skills.install_skill", return_value={"ok": True, "summary": "installed"}):

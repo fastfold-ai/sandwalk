@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
+
 class _SkillsCommandsMixin:
     def _show_skills(self):
-        """List currently loaded skills in interactive mode."""
+        """Open the searchable skills modal (Rich table as fallback)."""
+        host = getattr(self, "_skills_modal_host", None)
+        app = getattr(self, "_transcript_app", None)
+        if host is not None and getattr(app, "is_running", False):
+            host.open()
+            return
+        from ui.terminal.skills_modal import run_skills_modal
+
+        if run_skills_modal(self):
+            return
+        self._print_skills_table()
+
+    def _print_skills_table(self):
+        """Legacy Rich table when the modal cannot open (tests / non-TTY)."""
         from rich.table import Table
 
         from agent.skills import display_author, display_updated, display_version, list_skills
