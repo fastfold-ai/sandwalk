@@ -110,6 +110,50 @@ def test_install_catalog_clears_removed(tmp_path: Path, monkeypatch):
     assert catalog_id not in suggested_catalog_ids(store)
 
 
+def test_reset_featured_defaults_reinstalls_missing(tmp_path: Path, monkeypatch):
+    _cfg(tmp_path, monkeypatch)
+    store = AgentStore(tmp_path / "agent.db")
+    get_or_export_mcp_json(store)
+
+    # Avoid PyMOL launcher side effects — pick a remote featured template.
+    entry = next(
+        e for e in MCP_CATALOG if e.featured and e.transport != "stdio"
+    )
+    existing = next(s for s in store.list_mcp_servers() if s.catalog_id == entry.id)
+    mark_catalog_removed(entry.id)
+    store.delete_mcp_server(existing.id)
+    assert entry.id in suggested_catalog_ids(store)
+
+    # Custom (user-added) server must survive reset.
+    custom = store.create_mcp_server(
+        name="My Custom MCP",
+        transport="streamable_http",
+        command=None,
+        args=[],
+        url="https://example.invalid/custom-mcp",
+        enabled=True,
+        description="user custom",
+    )
+
+    svc = McpService(store)
+    result = svc.reset_featured_defaults()
+    assert entry.id in result["installed"]
+    assert result["errors"] == []
+    assert entry.id not in suggested_catalog_ids(store)
+    assert entry.id not in get_removed_catalog_ids()
+
+    by_id = {s.id: s for s in store.list_mcp_servers()}
+    assert custom.id in by_id
+    assert by_id[custom.id].name == "My Custom MCP"
+    assert getattr(by_id[custom.id], "catalog_id", None) in (None, "")
+
+    # Already at defaults — nothing left to install; custom still untouched.
+    again = svc.reset_featured_defaults()
+    assert again["installed"] == []
+    assert again["errors"] == []
+    assert custom.id in {s.id for s in store.list_mcp_servers()}
+
+
 def test_apply_mcp_json_deletes_missing_catalog(tmp_path: Path, monkeypatch):
     _cfg(tmp_path, monkeypatch)
     store = AgentStore(tmp_path / "agent.db")

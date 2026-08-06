@@ -75,7 +75,13 @@ class DeepAgentsBuildMixin:
             session_id=session_id_for_tools or None,
         )
         try:
-            external_tools = await create_external_mcp_tools(ctx.get("mcp_servers"))
+            tools_by_server: dict[str, list[str]] = {}
+            external_tools = await create_external_mcp_tools(
+                ctx.get("mcp_servers"),
+                out_tools_by_server=tools_by_server,
+            )
+            if tools_by_server:
+                ctx["mcp_tools_by_server"] = tools_by_server
             existing_names = {getattr(tool, "name", "") for tool in tools}
             tools.extend(
                 tool
@@ -265,6 +271,18 @@ class DeepAgentsBuildMixin:
             skill_mention_ctx = ""
         if skill_mention_ctx:
             context_parts.append(skill_mention_ctx)
+        try:
+            from agent.mcp_manage.mentions import build_mcp_mention_context
+
+            mcp_mention_ctx = build_mcp_mention_context(
+                query,
+                mcp_servers=list(ctx.get("mcp_servers") or []),
+                mcp_tools_by_server=dict(ctx.get("mcp_tools_by_server") or {}),
+            )
+        except Exception:  # noqa: BLE001
+            mcp_mention_ctx = ""
+        if mcp_mention_ctx:
+            context_parts.append(mcp_mention_ctx)
         if context_parts:
             user_prompt = query + "\n\nContext:\n" + "\n".join(context_parts)
         return user_prompt, ctx
@@ -353,6 +371,22 @@ class DeepAgentsBuildMixin:
         }
         if flags.include_domain_subagents:
             create_kwargs["subagents"] = build_domain_subagents()
+        # Always install modality sanitizer so text-only providers (DeepSeek,
+        # many local LLMs) do not 400 on MCP image/file tool results.
+        from agent.deepagents_runtime.modality_sanitize import (
+            UnsupportedModalityMiddleware,
+        )
+
+        provider = str(config.get("llm.provider", "") or "").strip().lower()
+        model_id = str(config.get("llm.model", "") or "").strip()
+        middleware = [
+            UnsupportedModalityMiddleware(
+                provider=provider,
+                model_id=model_id,
+                workspace_path=workspace_root,
+                profile=getattr(model, "profile", None),
+            )
+        ]
         if flags.excluded_deepagents_tools:
             # Strip excluded tools *and* their middleware system prompts
             # (write_todos / task). Plain _ToolExclusionMiddleware leaves those
@@ -361,11 +395,12 @@ class DeepAgentsBuildMixin:
                 KnowledgeLevelMiddleware,
             )
 
-            create_kwargs["middleware"] = (
+            middleware.append(
                 KnowledgeLevelMiddleware(
                     excluded=frozenset(flags.excluded_deepagents_tools)
-                ),
+                )
             )
+        create_kwargs["middleware"] = tuple(middleware)
         agent = create_deep_agent(**create_kwargs)
         return agent, sandbox_handle
 

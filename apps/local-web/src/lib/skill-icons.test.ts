@@ -30,6 +30,13 @@ describe('isFeaturedSkill', () => {
     expect(
       isFeaturedSkill({ name: 'x', author: 'other', source: 'user' })
     ).toBe(false)
+    expect(
+      isFeaturedSkill({
+        name: 'convert-documents-to-markdown',
+        author: 'firecrawl',
+        source: 'firecrawl/anydoc'
+      })
+    ).toBe(true)
   })
 })
 
@@ -118,6 +125,9 @@ describe('skillIcon helpers', () => {
   })
 
   it('infers Hugging Face logos and keeps mapped skill logos by name', () => {
+    expect(skillIcon({ name: 'convert-documents-to-markdown', iconSrc: null })).toBe(
+      '/integrations/firecrawl.png'
+    )
     expect(skillIcon({ name: 'diagrams_mermaid', iconSrc: null })).toBe(
       '/mermaid-logo.png'
     )

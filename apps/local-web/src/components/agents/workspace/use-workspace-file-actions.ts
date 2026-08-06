@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
+import { toast } from 'sonner'
 
 import {
   downloadWorkspaceFile,
   downloadWorkspaceZip
 } from '@/lib/workspace-download'
+import { formatWorkspaceUploadError } from '@/lib/workspace-upload'
 
 import { normalizeFileContent } from '../workspace-utils'
 import {
@@ -469,9 +471,14 @@ export function useWorkspaceFileActions(
 
   const handleUploadChange = (uploads: FileList | null) => {
     const items = Array.from(uploads || [])
+    if (items.length === 0) return
     void Promise.all(
       items.map(file => client.uploadFile(sessionId, file, 'uploads'))
-    ).then(() => refresh())
+    )
+      .then(() => refresh())
+      .catch(error => {
+        toast.error(formatWorkspaceUploadError(error))
+      })
   }
 
   return {

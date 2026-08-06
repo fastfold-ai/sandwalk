@@ -12,7 +12,7 @@ from typing import Literal
 
 from agent_server.models import WorkspaceFile, WorkspaceFileContent
 from agent_server.project_folder import PROJECT_FOLDER_LINK_NAME
-from agent_server.workspace.constants import MAX_FILE_SIZE, TEXT_SUFFIXES
+from agent_server.workspace.constants import TEXT_SUFFIXES
 from agent_server.workspace.errors import WorkspacePathError
 
 _SKIP_DIR_NAMES = frozenset({".git", "__pycache__", ".venv"})
@@ -136,9 +136,6 @@ class WorkspaceReadMixin:
         path = self.resolve(relative_path, must_exist=True)
         if not path.is_file():
             raise IsADirectoryError(relative_path)
-        size = path.stat().st_size
-        if size > MAX_FILE_SIZE:
-            raise WorkspacePathError(f"File exceeds the {MAX_FILE_SIZE // (1024 * 1024)}MB limit.")
         data = path.read_bytes()
         mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         is_text = mime_type.startswith("text/") or path.suffix.lower() in TEXT_SUFFIXES

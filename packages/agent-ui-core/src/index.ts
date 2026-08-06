@@ -1191,6 +1191,11 @@ export interface McpProvider {
     catalogId: string,
     options?: { force?: boolean; signal?: AbortSignal }
   ): Promise<McpServer>
+  /** Re-install all missing featured catalog templates. */
+  resetFeaturedMcpDefaults?(signal?: AbortSignal): Promise<{
+    installed: string[]
+    errors: Array<{ id: string; error: string }>
+  }>
   connectMcpCatalog(
     catalogId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string },
@@ -1274,11 +1279,42 @@ export type AgentSkill = {
   updateAvailable?: boolean
   latestVersion?: string | null
   updateChannel?: 'release' | 'commit' | string | null
+  hasRuntimeDeps?: boolean
+  depsStatus?: string | null
 }
 
 export type AgentSkillDetail = AgentSkill & {
   content: string
   directory: string | null
+}
+
+export type AgentSkillDepCheck = {
+  name: string
+  status: string
+  detail: string
+  fix?: string
+}
+
+export type AgentSkillDepSetupStep = {
+  title: string
+  body: string
+}
+
+export type AgentSkillDepsStatus = {
+  adapterId: string
+  skillName: string
+  status: string
+  summary: string
+  command?: string
+  hasRuntimeDeps?: boolean
+  checks: AgentSkillDepCheck[]
+  setupSteps: AgentSkillDepSetupStep[]
+}
+
+export type AgentSkillDepsInstallResult = {
+  ok: boolean
+  summary: string
+  status: AgentSkillDepsStatus | null
 }
 
 export type AgentSkillSource = {
@@ -1405,6 +1441,19 @@ export interface SkillProvider {
   installSkill(source: string, signal?: AbortSignal): Promise<string[]>
   removeSkill(name: string, signal?: AbortSignal): Promise<void>
   upgradeSkills(signal?: AbortSignal): Promise<string[]>
+  getSkillDeps?(
+    name: string,
+    signal?: AbortSignal
+  ): Promise<AgentSkillDepsStatus>
+  doctorSkillDeps?(
+    name: string,
+    signal?: AbortSignal
+  ): Promise<AgentSkillDepsStatus>
+  installSkillDeps?(
+    name: string,
+    options?: { force?: boolean },
+    signal?: AbortSignal
+  ): Promise<AgentSkillDepsInstallResult>
 }
 
 export interface FileProvider {

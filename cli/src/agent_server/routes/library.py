@@ -21,7 +21,6 @@ from agent_server.models.library import (
     UseLibraryInChatResponse,
     WriteLibraryContentRequest,
 )
-from agent_server.workspace import MAX_FILE_SIZE
 
 LibraryKindFilter = Literal["image", "document", "structure", "code", "other"]
 
@@ -53,9 +52,7 @@ def register_library_routes(app: FastAPI, deps: AppDeps) -> None:
     async def upload_library_file(
         file: UploadFile = File(...),
     ) -> LibraryItem:
-        data = await file.read(MAX_FILE_SIZE + 1)
-        if len(data) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=413, detail="File exceeds the 40MB limit.")
+        data = await file.read()
         return await asyncio.to_thread(
             library.ingest_bytes,
             data,
@@ -147,8 +144,6 @@ def register_library_routes(app: FastAPI, deps: AppDeps) -> None:
                 data = payload.content.encode("utf-8")
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=400, detail="Invalid file content.") from exc
-        if len(data) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=413, detail="File exceeds the 40MB limit.")
         try:
             await asyncio.to_thread(library.write_content, item_id, data)
         except KeyError as exc:

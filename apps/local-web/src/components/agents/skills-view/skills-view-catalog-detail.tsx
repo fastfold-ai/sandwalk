@@ -19,6 +19,10 @@ import {
 } from '@/lib/skills-catalog'
 
 import {
+  SkillsDetailDepsPanel,
+  type SkillDepsHandlers
+} from './skills-view-detail-deps'
+import {
   InstallCommandBlock,
   SkillsBreadcrumb,
   SkillsShMetrics
@@ -37,7 +41,8 @@ export function SkillsCatalogDetailView({
   isInstalled,
   onBack,
   onCopyInstall,
-  onInstall
+  onInstall,
+  depsHandlers = null
 }: {
   catalogSkillRoute: { id: string; source: string; skill: string } | null
   catalogDetail: AgentCatalogSkillDetail | null
@@ -52,6 +57,7 @@ export function SkillsCatalogDetailView({
   onBack: () => void
   onCopyInstall: () => void
   onInstall: () => void
+  depsHandlers?: SkillDepsHandlers | null
 }) {
   const catalogSource = String(
     catalogDetail?.source || catalogSkillRoute?.source || ''
@@ -182,6 +188,17 @@ export function SkillsCatalogDetailView({
                   </div>
                 ) : null}
               </div>
+
+              {depsHandlers &&
+              (catalogSlug === 'convert-documents-to-markdown' ||
+                catalogSource.toLowerCase().includes('firecrawl/anydoc')) ? (
+                <SkillsDetailDepsPanel
+                  skillName={
+                    catalogSlug || 'convert-documents-to-markdown'
+                  }
+                  handlers={depsHandlers}
+                />
+              ) : null}
 
               <div className="space-y-2">
                 <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">

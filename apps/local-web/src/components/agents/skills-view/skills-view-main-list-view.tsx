@@ -22,6 +22,7 @@ import {
 import { SkillsListSidebar } from './skills-view-list-sidebar'
 import { SkillsMainListToolbar } from './skills-view-main-list-toolbar'
 import { SkillsRemoveDialog } from './skills-view-shared'
+import type { FeaturedPendingSkill } from './skills-view-utils'
 
 export function SkillsMainListView({
   skills,
@@ -39,6 +40,7 @@ export function SkillsMainListView({
   enabledCount,
   disabledCount,
   featuredVisible,
+  featuredPendingInstall = [],
   nonFeaturedVisible,
   visible,
   disableEligibleCount,
@@ -63,6 +65,7 @@ export function SkillsMainListView({
   batchToast,
   pendingEnabled,
   pendingRemove,
+  pendingFeaturedInstall = {},
   removeTarget,
   isCatalogSkillInstalled,
   onQueryChange,
@@ -81,7 +84,8 @@ export function SkillsMainListView({
   onSetFilteredEnabled,
   onRemoveFiltered,
   onRemoveDialogOpenChange,
-  onConfirmRemove
+  onConfirmRemove,
+  onInstallFeatured
 }: {
   skills: AgentSkill[]
   loading: boolean
@@ -98,6 +102,7 @@ export function SkillsMainListView({
   enabledCount: number
   disabledCount: number
   featuredVisible: AgentSkill[]
+  featuredPendingInstall?: FeaturedPendingSkill[]
   nonFeaturedVisible: AgentSkill[]
   visible: AgentSkill[]
   disableEligibleCount: number
@@ -122,6 +127,7 @@ export function SkillsMainListView({
   batchToast: { message: string; tone: 'success' | 'warning' } | null
   pendingEnabled: Record<string, boolean>
   pendingRemove: Record<string, boolean>
+  pendingFeaturedInstall?: Record<string, boolean>
   removeTarget:
     | { type: 'single'; name: string }
     | { type: 'filtered'; count: number }
@@ -144,6 +150,7 @@ export function SkillsMainListView({
   onRemoveFiltered: () => void
   onRemoveDialogOpenChange: (open: boolean) => void
   onConfirmRemove: () => void
+  onInstallFeatured?: (item: FeaturedPendingSkill) => void
 }) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const activeFilterCount =
@@ -226,6 +233,7 @@ export function SkillsMainListView({
                 loading={loading}
                 visible={visible}
                 featuredVisible={featuredVisible}
+                featuredPendingInstall={featuredPendingInstall}
                 nonFeaturedVisible={nonFeaturedVisible}
                 categoryFilter={categoryFilter}
                 disableEligibleCount={disableEligibleCount}
@@ -234,11 +242,13 @@ export function SkillsMainListView({
                 batchBusy={batchBusy}
                 pendingEnabled={pendingEnabled}
                 pendingRemove={pendingRemove}
+                pendingFeaturedInstall={pendingFeaturedInstall}
                 onOpen={onOpen}
                 onToggleEnabled={onToggleEnabled}
                 onRemove={onRemove}
                 onSetFilteredEnabled={onSetFilteredEnabled}
                 onRemoveFiltered={onRemoveFiltered}
+                onInstallFeatured={onInstallFeatured}
               />
             )}
           </div>

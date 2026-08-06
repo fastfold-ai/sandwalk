@@ -32,6 +32,7 @@ export const INTEGRATION_ICONS: Record<
   slack: { src: '/integrations/slack.png' },
   'skills-sh': { src: '/integrations/vercel.png', invertInDark: true },
   pymol: { src: '/integrations/pymol.png' },
+  raymol: { src: '/integrations/raymol.png' },
   tamarind: { src: '/integrations/tamarind.png' },
   latch: { src: '/integrations/latch.png' },
   neurosnap: { src: '/integrations/neurosnap.png' },

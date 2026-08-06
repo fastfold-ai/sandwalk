@@ -1,5 +1,5 @@
-import { Check, Copy, Download, Loader2, RotateCcw } from 'lucide-react'
-import { useState } from 'react'
+import { Check, Copy, Download, ExternalLink, Loader2, RotateCcw } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,9 @@ import {
 import type { McpDetailViewState } from './use-mcp-detail-view'
 
 const PLUGIN_ZIP = 'https://sandwalk.sh/pymol/plugin.zip'
+const RAYMOL_URL = 'https://raymol.io/'
+
+type SetupStep = { title: string; body: ReactNode }
 
 export function McpDetailLocalSetupDialog({
   open,
@@ -29,7 +32,8 @@ export function McpDetailLocalSetupDialog({
   const entry = state.catalogEntry
   if (!entry || entry.transport !== 'stdio') return null
 
-  const setupUrl = entry.setupUrl || PLUGIN_ZIP
+  const isRaymol = entry.id === 'raymol'
+  const setupUrl = entry.setupUrl || (isRaymol ? RAYMOL_URL : PLUGIN_ZIP)
   const [copied, setCopied] = useState(false)
   const [installing, setInstalling] = useState(false)
 
@@ -37,7 +41,7 @@ export function McpDetailLocalSetupDialog({
     try {
       await navigator.clipboard.writeText(setupUrl)
       setCopied(true)
-      toast.success('Plugin zip URL copied')
+      toast.success(isRaymol ? 'Download URL copied' : 'Plugin zip URL copied')
       window.setTimeout(() => setCopied(false), 1500)
     } catch {
       toast.error('Could not copy URL')
@@ -49,9 +53,16 @@ export function McpDetailLocalSetupDialog({
     setInstalling(true)
     try {
       await onInstallLocal({ force })
-      toast.success(force ? 'Launcher reinstalled' : 'Launcher installed', {
-        description: entry.name
-      })
+      toast.success(
+        force
+          ? isRaymol
+            ? 'RayMol bridge re-checked'
+            : 'Launcher reinstalled'
+          : isRaymol
+            ? 'RayMol bridge ready'
+            : 'Launcher installed',
+        { description: entry.name }
+      )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err), {
         description: entry.name
@@ -61,7 +72,44 @@ export function McpDetailLocalSetupDialog({
     }
   }
 
-  const steps = [
+  const installButtons = onInstallLocal ? (
+    <div className="flex flex-wrap gap-2">
+      {!entry.configured ? (
+        <Button
+          type="button"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          disabled={installing}
+          onClick={() => void runInstall(false)}
+        >
+          {installing ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Download className="size-3.5" />
+          )}
+          {isRaymol ? 'Install bridge' : 'Install launcher'}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 gap-1.5 text-xs"
+          disabled={installing}
+          onClick={() => void runInstall(true)}
+        >
+          {installing ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <RotateCcw className="size-3.5" />
+          )}
+          {isRaymol ? 'Re-check bridge' : 'Reinstall launcher'}
+        </Button>
+      )}
+    </div>
+  ) : null
+
+  const pymolSteps: SetupStep[] = [
     {
       title: 'Install the PyMOL plugin',
       body: (
@@ -91,42 +139,7 @@ export function McpDetailLocalSetupDialog({
             ) : null}
             .
           </p>
-          {onInstallLocal ? (
-            <div className="flex flex-wrap gap-2">
-              {!entry.configured ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-7 gap-1.5 text-xs"
-                  disabled={installing}
-                  onClick={() => void runInstall(false)}
-                >
-                  {installing ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Download className="size-3.5" />
-                  )}
-                  Install launcher
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 gap-1.5 text-xs"
-                  disabled={installing}
-                  onClick={() => void runInstall(true)}
-                >
-                  {installing ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <RotateCcw className="size-3.5" />
-                  )}
-                  Reinstall launcher
-                </Button>
-              )}
-            </div>
-          ) : null}
+          {installButtons}
         </div>
       )
     },
@@ -151,13 +164,92 @@ export function McpDetailLocalSetupDialog({
     }
   ]
 
+  const raymolSteps: SetupStep[] = [
+    {
+      title: 'Install RayMol',
+      body: (
+        <div className="space-y-2">
+          <p>
+            Get RayMol from{' '}
+            <a
+              href={RAYMOL_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="text-foreground inline-flex items-center gap-1 underline underline-offset-2"
+            >
+              raymol.io
+              <ExternalLink className="size-3" />
+            </a>{' '}
+            — use the <strong>direct DMG</strong> or{' '}
+            <code className="bg-muted rounded px-1 py-0.5 text-[11px]">
+              brew install --cask javierbq/raymol/raymol
+            </code>
+            . Mac App Store builds do not include MCP.
+          </p>
+        </div>
+      )
+    },
+    {
+      title: 'Enable MCP in RayMol',
+      body: (
+        <>
+          Open RayMol → toolbar <strong>RayMol MCP</strong> → toggle{' '}
+          <strong>Enable MCP server</strong>. The server listens on localhost
+          only (token-protected).
+        </>
+      )
+    },
+    {
+      title: 'Allow MCP access in RayMol',
+      body: (
+        <>
+          Once MCP is on, RayMol prompts to <strong>Allow</strong> access when
+          a client connects. Click <strong>Allow</strong> — otherwise the MCP
+          connection will not establish and tools will fail.
+        </>
+      )
+    },
+    {
+      title: 'Connect Sandwalk',
+      body: (
+        <div className="space-y-2">
+          <p>
+            Run{' '}
+            <code className="bg-muted rounded px-1 py-0.5 text-[11px]">
+              sandwalk mcp install raymol
+            </code>{' '}
+            or use the button below. Sandwalk spawns{' '}
+            <code className="bg-muted rounded px-1 py-0.5 text-[11px]">
+              RayMol --mcp-bridge
+            </code>
+            . Approve the Allow prompt in RayMol when it appears.
+          </p>
+          {installButtons}
+        </div>
+      )
+    },
+    {
+      title: 'Enable in Sandwalk',
+      body: (
+        <>
+          Use the enable toggle on this page. Keep RayMol open with MCP enabled
+          (and access Allowed) while the agent runs.
+        </>
+      )
+    }
+  ]
+
+  const steps = isRaymol ? raymolSteps : pymolSteps
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg gap-4">
         <DialogHeader>
           <DialogTitle>Setup checklist</DialogTitle>
           <DialogDescription>
-            Local stdio bridge to a live PyMOL session via agentic-pymol.
+            {isRaymol
+              ? 'Local stdio bridge to RayMol via RayMol --mcp-bridge.'
+              : 'Local stdio bridge to a live PyMOL session via agentic-pymol.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -199,9 +291,14 @@ export function McpDetailLocalSetupDialog({
 
         {entry.command ? (
           <p className="text-muted-foreground text-xs">
-            Launcher command:{' '}
+            Bridge command:{' '}
             <code className="bg-muted rounded px-1 py-0.5">
               {entry.command}
+              {entry.args?.length
+                ? ` ${entry.args.join(' ')}`
+                : isRaymol
+                  ? ' --mcp-bridge'
+                  : ''}
             </code>
             {entry.configured ? ' (ready)' : ' (not installed yet)'}
           </p>

@@ -43,6 +43,12 @@ from agent.deepagents_runtime.event_text import (
 )
 from agent.deepagents_runtime.langchain_tools import create_ct_langchain_tools
 from agent.deepagents_runtime.mcp_tools import create_external_mcp_tools
+from agent.deepagents_runtime.modality_sanitize import (
+    UnsupportedModalityMiddleware,
+    sanitize_content_blocks,
+    sanitize_messages,
+    unsupported_modalities,
+)
 from agent.deepagents_runtime.prompt_budget import measure_deepagents_builtin_tool_schemas
 from agent.deepagents_runtime.skills_index import build_skills_index_text
 from agent.deepagents_runtime.skills_sources import (
@@ -78,6 +84,10 @@ __all__ = [
     "process_events",
     "provider_needs_openai_tool_cap",
     "resolve_skill_source_dirs",
+    "sanitize_content_blocks",
+    "sanitize_messages",
     "skill_source_dirs",
     "skill_source_dirs_for_names",
+    "UnsupportedModalityMiddleware",
+    "unsupported_modalities",
 ]

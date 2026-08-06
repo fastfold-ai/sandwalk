@@ -9,7 +9,14 @@ keeps working unchanged.
 """
 
 from .dispatch import handle_mcp_argv
+from .mentions import build_mcp_mention_context, extract_mcp_mentions
 from .resolve import resolve_server_ref
 from .status import print_mcp_status
 
-__all__ = ["handle_mcp_argv", "print_mcp_status", "resolve_server_ref"]
+__all__ = [
+    "build_mcp_mention_context",
+    "extract_mcp_mentions",
+    "handle_mcp_argv",
+    "print_mcp_status",
+    "resolve_server_ref",
+]

@@ -225,8 +225,12 @@ export function AgentComposerSlot({
         onUpload={async files => {
           // Stay on /agents/new after materializing so the composer does not
           // remount (no skeleton / thumbnail flicker). Route swaps on send.
+          // Any format / size is accepted (local workspace).
           const id = await ensureAgentSession(undefined, { navigate: false })
-          if (!id || isDraftAgentSessionId(id)) return []
+          if (!id || isDraftAgentSessionId(id)) {
+            toast.error('Could not create session for upload')
+            return []
+          }
           const activeModel = resolveComposerModelOption(modelOptions, {
             provider: runtimeSettings?.provider || '',
             model: runtimeSettings?.model || '',

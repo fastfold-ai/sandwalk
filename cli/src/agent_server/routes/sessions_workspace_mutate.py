@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, Query, UploadFile
 
 from agent_server.app_deps import AppDeps
 from agent_server.models import (
@@ -14,7 +14,6 @@ from agent_server.models import (
     WorkspaceFileContent,
     WorkspaceMutationResponse,
 )
-from agent_server.workspace import MAX_FILE_SIZE
 from agent_server.workspace.filenames import (
     sanitize_upload_filename,
     unique_upload_relative_path,
@@ -32,9 +31,7 @@ def register_workspace_mutate_routes(app: FastAPI, deps: AppDeps) -> None:
         relative_dir: str = Form(default="uploads"),
     ) -> WorkspaceFileContent:
         workspace = deps.session_workspace(session_id)
-        data = await file.read(MAX_FILE_SIZE + 1)
-        if len(data) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=413, detail="File exceeds the 40MB limit.")
+        data = await file.read()
         # Never trust client filenames (spaces, path segments, unicode tricks).
         safe_name = sanitize_upload_filename(file.filename)
         relative_path = unique_upload_relative_path(

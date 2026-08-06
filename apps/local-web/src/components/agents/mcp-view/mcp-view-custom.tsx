@@ -48,7 +48,8 @@ export function McpCustomSection({
   onDeleteMcp,
   onConnectCustom,
   onConnectCatalog,
-  onInstallCatalog
+  onInstallCatalog,
+  onResetFeaturedDefaults
 }: {
   installedServers: McpServer[]
   suggestedCatalog: McpCatalogEntry[]
@@ -92,6 +93,7 @@ export function McpCustomSection({
     input: { method: 'oauth' | 'api_key'; apiKey?: string }
   ) => Promise<ConnectMcpResult>
   onInstallCatalog?: (catalogId: string) => void | Promise<void>
+  onResetFeaturedDefaults?: () => void | Promise<void>
 }) {
   const [showAddForm, setShowAddForm] = useState(false)
 
@@ -115,6 +117,7 @@ export function McpCustomSection({
         <McpSuggestedStrip
           suggested={suggestedCatalog}
           onInstall={onInstallCatalog}
+          onResetDefaults={onResetFeaturedDefaults}
           onOpenCatalog={onOpenCatalog}
         />
       ) : null}

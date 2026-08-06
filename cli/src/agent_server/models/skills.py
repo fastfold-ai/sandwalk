@@ -22,6 +22,8 @@ class SkillSummary(ApiModel):
     update_available: bool = False
     latest_version: str | None = None
     update_channel: str | None = None
+    has_runtime_deps: bool = False
+    deps_status: str | None = None
 
 
 class SkillList(ApiModel):
@@ -143,3 +145,36 @@ class CatalogSkillAudit(ApiModel):
     source: str
     slug: str
     audits: list[CatalogSkillAuditEntry] = Field(default_factory=list)
+
+
+class SkillDepCheck(ApiModel):
+    name: str
+    status: str
+    detail: str
+    fix: str = ""
+
+
+class SkillDepSetupStep(ApiModel):
+    title: str
+    body: str
+
+
+class SkillDepsStatus(ApiModel):
+    adapter_id: str
+    skill_name: str
+    status: str
+    summary: str
+    command: str = ""
+    has_runtime_deps: bool = True
+    checks: list[SkillDepCheck] = Field(default_factory=list)
+    setup_steps: list[SkillDepSetupStep] = Field(default_factory=list)
+
+
+class InstallSkillDepsRequest(ApiModel):
+    force: bool = False
+
+
+class SkillDepsInstallResponse(ApiModel):
+    ok: bool
+    summary: str
+    status: SkillDepsStatus | None = None

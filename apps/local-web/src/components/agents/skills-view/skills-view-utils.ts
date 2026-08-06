@@ -1,5 +1,6 @@
 import type { AgentCatalogSkill, AgentSkill } from '@sandwalk/agent-ui-core'
 
+import { FEATURED_SKILL_CATALOG } from '@/components/agents/onboarding/onboarding-skills-shared'
 import { isFeaturedSkill } from '@/lib/skill-icons'
 import { compareSkillsBySearchRank, skillMatchesSearch } from '@/lib/skill-search'
 import {
@@ -9,6 +10,12 @@ import {
   skillAuthorLabel,
   splitSkillSourceSpec
 } from '@/lib/skills-catalog'
+
+export type FeaturedPendingSkill = {
+  name: string
+  description: string
+  source: string
+}
 
 export function buildInstalledSkillIndex(skills: AgentSkill[]) {
   const index = new Map<string, Set<string>>()
@@ -78,7 +85,28 @@ export function computeSkillsListData(skills: AgentSkill[], filters: SkillsListF
     result[author] = (result[author] || 0) + 1
     return result
   }, {})
-  const featuredCount = skills.filter(skill => isFeaturedSkill(skill)).length
+  const installedNames = new Set(skills.map(skill => skill.name))
+  const featuredPendingInstall = FEATURED_SKILL_CATALOG.filter(item => {
+    if (installedNames.has(item.name)) return false
+    // Not installed yet — only surface when browsing all/featured, not status slices.
+    if (filters.statusFilter !== 'all') return false
+    if (filters.authorFilter !== 'all') return false
+    if (
+      filters.categoryFilter !== 'all' &&
+      filters.categoryFilter !== 'featured'
+    ) {
+      return false
+    }
+    const queryText = filters.query.trim().toLowerCase()
+    if (!queryText) return true
+    return (
+      item.name.toLowerCase().includes(queryText) ||
+      item.description.toLowerCase().includes(queryText)
+    )
+  })
+  const featuredCount =
+    skills.filter(skill => isFeaturedSkill(skill)).length +
+    featuredPendingInstall.length
   const enabledCount = skills.filter(skill => skill.enabled).length
   const disabledCount = skills.length - enabledCount
   const visible = skills.filter(skill => {
@@ -129,6 +157,7 @@ export function computeSkillsListData(skills: AgentSkill[], filters: SkillsListF
     visible,
     orderedVisible,
     featuredVisible,
+    featuredPendingInstall,
     nonFeaturedVisible,
     filteredSkillNames,
     disableEligibleCount,

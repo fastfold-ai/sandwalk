@@ -3,6 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { useComposerAttachments } from './useComposerAttachments'
 
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), message: vi.fn(), success: vi.fn() }
+}))
+
 afterEach(() => {
   vi.restoreAllMocks()
 })

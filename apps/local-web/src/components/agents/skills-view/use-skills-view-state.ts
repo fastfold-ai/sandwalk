@@ -109,7 +109,8 @@ export function useSkillsViewState({
     onBulkAction,
     onSetEnabled,
     onRemove,
-    onUpgrade
+    onUpgrade,
+    onInstall
   })
 
   const catalog = useSkillsViewCatalog({

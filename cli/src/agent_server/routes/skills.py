@@ -13,9 +13,12 @@ from agent_server.models import (
     CatalogSkillAudit,
     CatalogSkillDetail,
     CatalogSkillList,
+    InstallSkillDepsRequest,
     InstallSkillRequest,
     SkillBatchActionRequest,
     SkillBatchActionResponse,
+    SkillDepsInstallResponse,
+    SkillDepsStatus,
     SkillDetail,
     SkillList,
     SkillMutationResponse,
@@ -109,6 +112,40 @@ def register_skill_routes(app: FastAPI, deps: AppDeps) -> None:
         if icon_path is None:
             raise HTTPException(status_code=404, detail="Skill icon not found.")
         return FileResponse(icon_path, filename=icon_path.name)
+
+    @app.get("/v1/skills/{skill_name}/deps", response_model=SkillDepsStatus)
+    async def get_skill_deps(skill_name: str) -> SkillDepsStatus:
+        try:
+            return await asyncio.to_thread(skills_service.get_deps, skill_name)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get("/v1/skills/{skill_name}/deps/doctor", response_model=SkillDepsStatus)
+    async def doctor_skill_deps(skill_name: str) -> SkillDepsStatus:
+        try:
+            return await asyncio.to_thread(skills_service.doctor_deps, skill_name)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post(
+        "/v1/skills/{skill_name}/deps/install",
+        response_model=SkillDepsInstallResponse,
+    )
+    async def install_skill_deps(
+        skill_name: str, payload: InstallSkillDepsRequest | None = None
+    ) -> SkillDepsInstallResponse:
+        body = payload or InstallSkillDepsRequest()
+        try:
+            result = await asyncio.to_thread(
+                skills_service.install_deps,
+                skill_name,
+                force=bool(body.force),
+            )
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if not result.ok:
+            raise HTTPException(status_code=400, detail=result.summary)
+        return result
 
     @app.patch("/v1/skills/{skill_name}", response_model=SkillDetail)
     async def update_skill(skill_name: str, payload: UpdateSkillRequest) -> SkillDetail:

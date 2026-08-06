@@ -76,6 +76,7 @@ DEFAULTS_LLM = {
     "mcp.huggingface_tool_count": None,
     "mcp.tavily_tool_count": None,
     "mcp.pymol_tool_count": None,
+    "mcp.raymol_tool_count": None,
     "mcp.tamarind_status_message": None,
     "mcp.neurosnap_status_message": None,
     "mcp.latch_status_message": None,

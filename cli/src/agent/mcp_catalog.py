@@ -40,6 +40,12 @@ def _pymol_command() -> str:
     return str(launcher_path())
 
 
+def _raymol_command() -> str:
+    from agent.mcps.raymol_mcp import launcher_path
+
+    return str(launcher_path())
+
+
 MCP_CATALOG: list[McpCatalogEntry] = [
     McpCatalogEntry(
         id="pymol",
@@ -58,6 +64,23 @@ MCP_CATALOG: list[McpCatalogEntry] = [
         # command resolved dynamically in catalog_create_kwargs / catalog_as_dicts
         command=None,
         args=[],
+    ),
+    McpCatalogEntry(
+        id="raymol",
+        name="RayMol",
+        description=(
+            "Drive RayMol (Metal PyMOL for Apple Silicon) — fetch structures, "
+            "run commands, change representations, and capture the viewport."
+        ),
+        url=None,
+        transport="stdio",
+        auth_mode="none",
+        preferred_auth="api_key",
+        docs_url="https://raymol.io/",
+        setup_url="https://raymol.io/",
+        featured=True,
+        command=None,
+        args=["--mcp-bridge"],
     ),
     McpCatalogEntry(
         id="tamarind",
@@ -186,6 +209,8 @@ def resolve_catalog_command(entry: McpCatalogEntry) -> str | None:
         return entry.command
     if entry.id == "pymol":
         return _pymol_command()
+    if entry.id == "raymol":
+        return _raymol_command()
     return entry.command
 
 

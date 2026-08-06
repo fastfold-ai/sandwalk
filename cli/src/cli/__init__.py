@@ -32,7 +32,7 @@ from cli.main import entry
 from cli import (  # noqa: F401
     auth, bench, case_study, config, data, doctor, fork, knowledge,
     knowledge_quality, mcp, release_check, report, report_notebook, run,
-    sandbox, serve, skills, skills_manage, specialists, sync, tool, trace,
+    sandbox, serve, skills, skills_deps, skills_manage, specialists, sync, tool, trace,
     trace_export, upgrade,
 )
 from cli.setup import wizard as setup_wizard  # noqa: F401

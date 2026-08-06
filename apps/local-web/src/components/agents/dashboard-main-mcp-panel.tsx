@@ -154,6 +154,15 @@ export function DashboardMainMcpPanel({
         await client.installMcpCatalog(catalogId)
         await refreshMcp()
       }}
+      onResetFeaturedDefaults={
+        client.resetFeaturedMcpDefaults
+          ? async () => {
+              const result = await client.resetFeaturedMcpDefaults!()
+              await refreshMcp()
+              return result
+            }
+          : undefined
+      }
       onOpenCatalog={entry =>
         navigate(`/dashboard/mcp/catalog/${encodeURIComponent(entry.id)}`)
       }

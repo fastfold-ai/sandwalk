@@ -10,6 +10,7 @@ import { skillInstallSource, type SkillsViewMode } from '@/lib/skills-catalog'
 
 import { resolveInstalledDetailPresentation } from './skills-view-installed-detail'
 import type { useSkillsViewFilters } from './use-skills-view-filters'
+import type { FeaturedPendingSkill } from './skills-view-utils'
 
 type SkillsViewListActionsInput = {
   mode: SkillsViewMode
@@ -23,6 +24,7 @@ type SkillsViewListActionsInput = {
   onSetEnabled: (name: string, enabled: boolean) => Promise<void>
   onRemove: (name: string) => Promise<void>
   onUpgrade: () => Promise<string[]>
+  onInstall: (source: string) => Promise<string[] | void>
 }
 
 export function useSkillsViewListActions({
@@ -33,10 +35,14 @@ export function useSkillsViewListActions({
   onBulkAction,
   onSetEnabled,
   onRemove,
-  onUpgrade
+  onUpgrade,
+  onInstall
 }: SkillsViewListActionsInput) {
   const [pendingEnabled, setPendingEnabled] = useState<Record<string, boolean>>({})
   const [pendingRemove, setPendingRemove] = useState<Record<string, boolean>>({})
+  const [pendingFeaturedInstall, setPendingFeaturedInstall] = useState<
+    Record<string, boolean>
+  >({})
   const [pendingUpgrade, setPendingUpgrade] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<
     | { type: 'single'; name: string }
@@ -186,9 +192,39 @@ export function useSkillsViewListActions({
     }
   }
 
+  const installFeaturedSkill = useCallback(
+    async (item: FeaturedPendingSkill) => {
+      if (batchBusy || pendingFeaturedInstall[item.name]) return
+      setPendingFeaturedInstall(current => ({ ...current, [item.name]: true }))
+      setBatchBusy(true)
+      try {
+        await onInstall(item.source)
+        setBatchToast({
+          message: `Installed ${item.name}.`,
+          tone: 'success'
+        })
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : `Could not install ${item.name}.`
+        setBatchToast({ message, tone: 'warning' })
+      } finally {
+        setPendingFeaturedInstall(current => {
+          const next = { ...current }
+          delete next[item.name]
+          return next
+        })
+        setBatchBusy(false)
+      }
+    },
+    [batchBusy, onInstall, pendingFeaturedInstall]
+  )
+
   return {
     pendingEnabled,
     pendingRemove,
+    pendingFeaturedInstall,
     pendingUpgrade,
     removeTarget,
     batchBusy,
@@ -203,6 +239,7 @@ export function useSkillsViewListActions({
     confirmRemoveSkill,
     setFilteredEnabled,
     handleRemoveDialogOpenChange,
-    upgradeSkills
+    upgradeSkills,
+    installFeaturedSkill
   }
 }

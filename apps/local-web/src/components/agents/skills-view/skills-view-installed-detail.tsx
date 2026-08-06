@@ -23,6 +23,10 @@ import { catalogCoordsFromInstalledSkill, skillsShSkillUrl, stripFrontmatter } f
 import { cn } from '@/lib/utils'
 
 import {
+  SkillsDetailDepsPanel,
+  type SkillDepsHandlers
+} from './skills-view-detail-deps'
+import {
   InstallCommandBlock,
   SkillEnabledToggle,
   SkillsBreadcrumb,
@@ -59,7 +63,8 @@ export function SkillsInstalledDetailView({
   onRemove,
   onRemoveDialogOpenChange,
   onConfirmRemove,
-  onToggleEnabled
+  onToggleEnabled,
+  depsHandlers = null
 }: {
   detail: AgentSkillDetail
   catalogSearchEnabled: boolean
@@ -92,6 +97,7 @@ export function SkillsInstalledDetailView({
   onRemoveDialogOpenChange: (open: boolean) => void
   onConfirmRemove: () => void
   onToggleEnabled: (name: string, enabled: boolean) => void
+  depsHandlers?: SkillDepsHandlers | null
 }) {
   const localCatalogSource = String(
     localCatalogDetail?.source ||
@@ -299,6 +305,15 @@ export function SkillsInstalledDetailView({
                     onCopy={onCopyInstall}
                   />
                 </div>
+              ) : null}
+
+              {depsHandlers &&
+              (detail.hasRuntimeDeps ||
+                detail.name === 'convert-documents-to-markdown') ? (
+                <SkillsDetailDepsPanel
+                  skillName={detail.name}
+                  handlers={depsHandlers}
+                />
               ) : null}
 
               <MarkdownContent

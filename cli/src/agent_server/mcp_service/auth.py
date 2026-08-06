@@ -87,6 +87,10 @@ def credentials_configured(entry: McpCatalogEntry, config: Config | None = None)
             from agent.mcps.pymol_mcp import launcher_ready
 
             return launcher_ready()
+        if entry.id == "raymol":
+            from agent.mcps.raymol_mcp import launcher_ready
+
+            return launcher_ready()
         return bool(entry.command or entry.id)
     return resolve_auth_headers(entry, config) is not None
 

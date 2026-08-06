@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import type { ComposerAttachmentItem } from '@/components/agents/composer/ComposerAttachments'
 import { fileChipToken } from '@/components/agents/composer-parts'
+import { formatWorkspaceUploadError } from '@/lib/workspace-upload'
 
 export type UploadedComposerFile = {
   path: string
@@ -118,8 +120,8 @@ export function useComposerAttachments(
           })
         )
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Upload failed'
+        const message = formatWorkspaceUploadError(error)
+        toast.error(message)
         setAttachments(current =>
           current.map(item =>
             pending.some(p => p.id === item.id)

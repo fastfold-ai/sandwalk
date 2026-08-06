@@ -29,18 +29,29 @@ class InstallMixin:
             if not ok:
                 raise RuntimeError(message)
             launcher_message = message
+        elif catalog_id == "raymol":
+            from agent.mcps.raymol_mcp import ensure_launcher
+
+            ok, message = ensure_launcher(force=force)
+            if not ok:
+                raise RuntimeError(message)
+            launcher_message = message
 
         server = install_catalog_server(self.store, catalog_id)
 
-        # Keep stdio command in sync with the resolved launcher path.
+        # Keep stdio command/args in sync with the resolved launcher path.
         if entry.transport == "stdio":
             from agent.mcp_catalog import resolve_catalog_command
 
             command = resolve_catalog_command(entry)
+            args = list(entry.args or [])
+            updates: dict[str, Any] = {}
             if command and server.command != command:
-                server = (
-                    self.store.update_mcp_server(server.id, command=command) or server
-                )
+                updates["command"] = command
+            if list(server.args or []) != args:
+                updates["args"] = args
+            if updates:
+                server = self.store.update_mcp_server(server.id, **updates) or server
 
         enable_result: dict[str, Any] | None = None
         if entry.transport == "stdio" or entry.auth_mode == "none":
@@ -52,3 +63,33 @@ class InstallMixin:
             "launcherMessage": launcher_message,
             "enable": enable_result,
         }
+
+    def reset_featured_defaults(self) -> dict[str, Any]:
+        """Re-install every missing featured catalog template.
+
+        Add-only: never deletes or updates custom servers (no ``catalog_id``)
+        or already-installed featured rows. Same path as per-id install
+        (PyMOL runs the managed launcher). Partial failures are reported
+        without aborting the rest.
+        """
+        from agent_server.mcp_json_config import (
+            install_catalog_server,
+            suggested_catalog_ids,
+        )
+
+        missing = suggested_catalog_ids(self.store)
+        installed: list[str] = []
+        errors: list[dict[str, str]] = []
+        for catalog_id in missing:
+            try:
+                entry = get_catalog_entry(catalog_id)
+                if entry is not None and (
+                    entry.transport == "stdio" or entry.auth_mode == "none"
+                ):
+                    self.install_featured(catalog_id)
+                else:
+                    install_catalog_server(self.store, catalog_id)
+                installed.append(catalog_id)
+            except Exception as exc:  # noqa: BLE001 — continue remaining installs
+                errors.append({"id": catalog_id, "error": str(exc)})
+        return {"installed": installed, "errors": errors}

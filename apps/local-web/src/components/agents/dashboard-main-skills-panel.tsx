@@ -127,6 +127,12 @@ export function DashboardMainSkillsPanel({
         }
         return installed
       }}
+      depsHandlers={{
+        getDeps: (name, signal) => client.getSkillDeps(name, signal),
+        doctorDeps: (name, signal) => client.doctorSkillDeps(name, signal),
+        installDeps: (name, options, signal) =>
+          client.installSkillDeps(name, options, signal)
+      }}
     />
   )
 }

@@ -82,6 +82,8 @@ class CatalogListMixin:
         elif (info.source or "") == "bundled" and not category:
             category = "Built-in"
         update = update or {}
+        from agent.skills.deps import has_runtime_deps
+
         return SkillSummary(
             name=info.name,
             description=info.description or "",
@@ -97,6 +99,8 @@ class CatalogListMixin:
             update_available=bool(update.get("available")),
             latest_version=str(update["latest"]) if update.get("latest") else None,
             update_channel=str(update["channel"]) if update.get("channel") else None,
+            has_runtime_deps=has_runtime_deps(info.name),
+            deps_status=None,
         )
 
     @staticmethod

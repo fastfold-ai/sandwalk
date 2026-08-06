@@ -4,7 +4,10 @@ Suggested MCP servers shipped in the Sandwalk dashboard (`/dashboard/mcp`) and C
 
 Remote defaults are **off** until Connect succeeds. Credentials are stored in `~/.sandwalk/config.json` (same store as Integrations / `sandwalk keys`).
 
-Local stdio (PyMOL) uses a managed launcher under `~/.sandwalk/pymol-mcp/` — see [pymol-mcp.md](../pymol-mcp.md).
+Local stdio:
+
+- **PyMOL** — managed launcher under `~/.sandwalk/pymol-mcp/` — see [pymol-mcp.md](../pymol-mcp.md).
+- **RayMol** — `RayMol --mcp-bridge` to the app’s built-in MCP — see [raymol-mcp.md](../raymol-mcp.md).
 
 Runtime uses [`langchain-mcp-adapters`](https://docs.langchain.com/oss/python/langchain/mcp) `MultiServerMCPClient` (stdio / SSE / streamable HTTP + auth headers).
 
@@ -13,6 +16,7 @@ Runtime uses [`langchain-mcp-adapters`](https://docs.langchain.com/oss/python/la
 | ID | Name | Endpoint | Auth |
 |----|------|----------|------|
 | `pymol` | PyMOL | local stdio (`~/.sandwalk/pymol-mcp/bin/agentic-pymol`) | auto token |
+| `raymol` | RayMol | local stdio (`RayMol --mcp-bridge`) | app token |
 | `tamarind` | Tamarind Bio | `https://mcp.tamarind.bio/mcp` | `x-api-key` |
 | `latch` | Latch Bio | `https://mcp.latch.bio/mcp` | OAuth |
 | `neurosnap` | Neurosnap | `https://neurosnap.ai/mcp` | Bearer / `X-API-KEY` |
@@ -25,7 +29,9 @@ sandwalk mcp                 # status (catalog + registered)
 sandwalk mcp list
 sandwalk mcp catalog
 sandwalk mcp install pymol   # managed local launcher + enable
+sandwalk mcp install raymol  # resolve RayMol app + enable
 sandwalk mcp doctor pymol
+sandwalk mcp doctor raymol
 sandwalk mcp connect neurosnap --api-key "$NEUROSNAP_API_KEY"
 sandwalk mcp validate neurosnap
 sandwalk mcp enable|disable <id>

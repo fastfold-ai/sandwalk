@@ -105,11 +105,41 @@ async def _load_one_server(name: str, connection: dict[str, Any]) -> list[Any]:
     return list(await client.get_tools())
 
 
-async def create_external_mcp_tools(servers: list[dict] | None) -> list[Any]:
+def _index_keys_for_server(server: dict[str, Any], connection_name: str) -> list[str]:
+    """Stable keys so mcp: chips can resolve loaded tool names."""
+    keys: list[str] = []
+    for field in ("catalog_id", "id", "name"):
+        value = str(server.get(field) or "").strip()
+        if value:
+            keys.append(value)
+            keys.append(value.lower().replace("_", "-").replace(" ", "-"))
+    conn = str(connection_name or "").strip()
+    if conn:
+        keys.append(conn)
+        keys.append(conn.lower().replace("_", "-").replace(" ", "-"))
+    # Preserve order, drop dupes.
+    out: list[str] = []
+    seen: set[str] = set()
+    for key in keys:
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+async def create_external_mcp_tools(
+    servers: list[dict] | None,
+    *,
+    out_tools_by_server: dict[str, list[str]] | None = None,
+) -> list[Any]:
     """Load tools from enabled stdio/SSE/streamable-HTTP MCP servers.
 
     Each server is loaded independently so one failing remote (expired OAuth,
     unreachable host, …) does not drop healthy servers like local PyMOL.
+
+    When ``out_tools_by_server`` is provided, it is filled with tool name lists
+    keyed by catalog id / server id / display name for mcp: mention steering.
     """
     if not servers:
         return []
@@ -138,10 +168,18 @@ async def create_external_mcp_tools(servers: list[dict] | None) -> list[Any]:
                 exc,
             )
             continue
+        server_tool_names: list[str] = []
         for tool in loaded:
             tool_name = str(getattr(tool, "name", "") or "").strip()
-            if not tool_name or tool_name in seen_names:
+            if not tool_name:
+                continue
+            if tool_name not in server_tool_names:
+                server_tool_names.append(tool_name)
+            if tool_name in seen_names:
                 continue
             seen_names.add(tool_name)
             tools.append(tool)
+        if out_tools_by_server is not None and server_tool_names:
+            for key in _index_keys_for_server(server, name):
+                out_tools_by_server[key] = list(server_tool_names)
     return tools

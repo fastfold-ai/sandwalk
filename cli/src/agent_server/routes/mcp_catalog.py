@@ -14,6 +14,8 @@ from agent_server.models import (
     McpCatalogList,
     McpServer,
     McpToolDetail,
+    ResetFeaturedMcpError,
+    ResetFeaturedMcpResponse,
     ValidateMcpResponse,
 )
 
@@ -31,6 +33,29 @@ def register_mcp_catalog_routes(app: FastAPI, deps: AppDeps) -> None:
         rows = await asyncio.to_thread(_list)
         return McpCatalogList(
             data=[McpCatalogEntryStatus.model_validate(row) for row in rows]
+        )
+
+    @app.post(
+        "/v1/mcp-servers/catalog/reset-defaults",
+        response_model=ResetFeaturedMcpResponse,
+    )
+    async def reset_featured_mcp_defaults() -> ResetFeaturedMcpResponse:
+        """Re-install missing featured catalog templates (after user delete)."""
+
+        def _reset() -> dict:
+            return mcp_service.reset_featured_defaults()
+
+        result = await asyncio.to_thread(_reset)
+        return ResetFeaturedMcpResponse(
+            installed=list(result.get("installed") or []),
+            errors=[
+                ResetFeaturedMcpError(
+                    id=str(item.get("id") or ""),
+                    error=str(item.get("error") or ""),
+                )
+                for item in (result.get("errors") or [])
+                if isinstance(item, dict)
+            ],
         )
 
     @app.post(

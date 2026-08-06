@@ -2,6 +2,18 @@ import type { AgentSkill } from '@sandwalk/agent-ui-core'
 
 const SANDWALK_MARK = '/sandwalk-mark.svg'
 
+/** Explicit featured names (includes non-FastFold sources like Firecrawl anydoc). */
+const FEATURED_SKILL_NAMES = new Set([
+  'fold',
+  'boltz',
+  'protein_design_boltzgen',
+  'md_openmm_calvados',
+  'md_openmmdl',
+  'diagrams_mermaid',
+  'slack_report',
+  'convert-documents-to-markdown'
+])
+
 const SKILL_ICON_BY_NAME: Record<
   string,
   { src: string; invertInDark?: boolean }
@@ -11,6 +23,9 @@ const SKILL_ICON_BY_NAME: Record<
   slack_report: { src: '/integrations/slack.png' },
   md_openmm_calvados: { src: '/models/openmm-seeklogo.svg' },
   md_openmmdl: { src: '/models/openmmdl.png' },
+  'convert-documents-to-markdown': {
+    src: '/integrations/firecrawl.png'
+  },
   'skill-creator': { src: SANDWALK_MARK, invertInDark: true },
   'skill-find': { src: SANDWALK_MARK, invertInDark: true }
 }
@@ -26,13 +41,17 @@ function isBundledSkill(
 export function isFeaturedSkill(
   skill: Pick<AgentSkill, 'name' | 'author' | 'source'>
 ): boolean {
+  const name = String(skill.name || '').trim()
+  if (FEATURED_SKILL_NAMES.has(name)) return true
   const author = String(skill.author || '').toLowerCase()
   const source = String(skill.source || '').toLowerCase()
   return (
     author.includes('fastfold') ||
     author === 'sandwalk' ||
+    author.includes('firecrawl') ||
     source === 'bundled' ||
-    source.includes('fastfold-ai')
+    source.includes('fastfold-ai') ||
+    source.includes('firecrawl/anydoc')
   )
 }
 

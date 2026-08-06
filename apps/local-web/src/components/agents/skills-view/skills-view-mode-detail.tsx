@@ -3,6 +3,7 @@ import type { AgentSkillDetail } from '@sandwalk/agent-ui-core'
 import { DetailPageSkeleton } from '@/components/agents/PageSkeletons'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
+import type { SkillDepsHandlers } from './skills-view-detail-deps'
 import { SkillsInstalledDetailView } from './skills-view-installed-detail'
 import { SkillsBreadcrumb } from './skills-view-shared'
 import type { useSkillsViewState } from './use-skills-view-state'
@@ -11,12 +12,14 @@ export function SkillsViewDetailMode({
   detail,
   catalogSearchEnabled,
   state,
-  onBack
+  onBack,
+  depsHandlers = null
 }: {
   detail: AgentSkillDetail
   catalogSearchEnabled: boolean
   state: ReturnType<typeof useSkillsViewState>
   onBack: () => void
+  depsHandlers?: SkillDepsHandlers | null
 }) {
   if (!state.detailPresentation) {
     return (
@@ -59,6 +62,7 @@ export function SkillsViewDetailMode({
       onRemoveDialogOpenChange={state.handleRemoveDialogOpenChange}
       onConfirmRemove={() => void state.confirmRemoveSkill()}
       onToggleEnabled={(name, enabled) => void state.setSkillEnabled(name, enabled)}
+      depsHandlers={depsHandlers}
     />
   )
 }

@@ -48,6 +48,12 @@ export const FEATURED_SKILL_CATALOG: Array<{
     name: 'slack_report',
     description: 'Share research updates to Slack.',
     source: 'fastfold-ai/skills@skills/slack_report'
+  },
+  {
+    name: 'convert-documents-to-markdown',
+    description:
+      'Convert Word, PowerPoint, Excel, PDF, and more to Markdown (anydoc).',
+    source: 'firecrawl/anydoc'
   }
 ]
 

@@ -19,6 +19,8 @@ import type {
   AgentSkill,
   AgentSkillBatchAction,
   AgentSkillBatchResult,
+  AgentSkillDepsInstallResult,
+  AgentSkillDepsStatus,
   AgentSkillDetail,
   AgentSkillSource,
   HitlDecision,
@@ -1680,6 +1682,42 @@ export class LocalAgentClient
     )
   }
 
+  getSkillDeps(
+    name: string,
+    signal?: AbortSignal
+  ): Promise<AgentSkillDepsStatus> {
+    return this.request<AgentSkillDepsStatus>(
+      `/skills/${encodeURIComponent(name)}/deps`,
+      { signal }
+    )
+  }
+
+  doctorSkillDeps(
+    name: string,
+    signal?: AbortSignal
+  ): Promise<AgentSkillDepsStatus> {
+    return this.request<AgentSkillDepsStatus>(
+      `/skills/${encodeURIComponent(name)}/deps/doctor`,
+      { signal }
+    )
+  }
+
+  installSkillDeps(
+    name: string,
+    options?: { force?: boolean },
+    signal?: AbortSignal
+  ): Promise<AgentSkillDepsInstallResult> {
+    return this.request<AgentSkillDepsInstallResult>(
+      `/skills/${encodeURIComponent(name)}/deps/install`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ force: Boolean(options?.force) }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
+
   setSkillEnabled(
     name: string,
     enabled: boolean,
@@ -2262,6 +2300,17 @@ export class LocalAgentClient
         signal: options?.signal
       }
     )
+  }
+
+  /** Re-install every missing featured catalog template. */
+  resetFeaturedMcpDefaults(signal?: AbortSignal): Promise<{
+    installed: string[]
+    errors: Array<{ id: string; error: string }>
+  }> {
+    return this.request('/mcp-servers/catalog/reset-defaults', {
+      method: 'POST',
+      signal
+    })
   }
 
   connectMcpCatalog(

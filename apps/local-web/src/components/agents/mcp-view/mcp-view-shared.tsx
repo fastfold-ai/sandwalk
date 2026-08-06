@@ -26,6 +26,7 @@ export function headersFromRows(rows: HeaderRow[]): Record<string, string> | nul
 
 export const MCP_ICONS: Record<string, { src: string; invertInDark?: boolean }> = {
   pymol: { src: '/integrations/pymol.png' },
+  raymol: { src: '/integrations/raymol.png' },
   tamarind: { src: '/integrations/tamarind.png' },
   latch: { src: '/integrations/latch.png' },
   neurosnap: { src: '/integrations/neurosnap.png' },

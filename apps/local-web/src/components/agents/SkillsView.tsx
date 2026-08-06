@@ -14,6 +14,7 @@ import {
   SkillsFeaturedOverview,
   SkillsMainListView
 } from './skills-view/skills-view-list'
+import type { SkillDepsHandlers } from './skills-view/skills-view-detail-deps'
 import { SkillsViewDetailMode } from './skills-view/skills-view-mode-detail'
 import {
   SkillsViewCatalogMode,
@@ -51,6 +52,7 @@ export function SkillsView({
   onSetEnabled,
   onRemove,
   onUpgrade,
+  depsHandlers = null,
   embedded = false
 }: {
   mode: SkillsViewMode
@@ -104,6 +106,7 @@ export function SkillsView({
   onSetEnabled: (name: string, enabled: boolean) => Promise<void>
   onRemove: (name: string) => Promise<void>
   onUpgrade: () => Promise<string[]>
+  depsHandlers?: SkillDepsHandlers | null
   embedded?: boolean
 }) {
   const state = useSkillsViewState({
@@ -147,6 +150,7 @@ export function SkillsView({
         state={state}
         catalogSkillRoute={catalogSkillRoute}
         onBack={onBack}
+        depsHandlers={depsHandlers}
       />
     )
   }
@@ -158,6 +162,7 @@ export function SkillsView({
         catalogSearchEnabled={catalogSearchEnabled}
         state={state}
         onBack={onBack}
+        depsHandlers={depsHandlers}
       />
     )
   }
@@ -198,6 +203,7 @@ export function SkillsView({
       enabledCount={state.listData.enabledCount}
       disabledCount={state.listData.disabledCount}
       featuredVisible={state.listData.featuredVisible}
+      featuredPendingInstall={state.listData.featuredPendingInstall}
       nonFeaturedVisible={state.listData.nonFeaturedVisible}
       visible={state.listData.visible}
       disableEligibleCount={state.listData.disableEligibleCount}
@@ -222,6 +228,7 @@ export function SkillsView({
       batchToast={state.batchToast}
       pendingEnabled={state.pendingEnabled}
       pendingRemove={state.pendingRemove}
+      pendingFeaturedInstall={state.pendingFeaturedInstall}
       removeTarget={state.removeTarget}
       isCatalogSkillInstalled={state.checkCatalogSkillInstalled}
       onQueryChange={state.setQuery}
@@ -247,6 +254,7 @@ export function SkillsView({
       onRemoveFiltered={() => void state.removeFiltered()}
       onRemoveDialogOpenChange={state.handleRemoveDialogOpenChange}
       onConfirmRemove={() => void state.confirmRemoveSkill()}
+      onInstallFeatured={item => void state.installFeaturedSkill(item)}
     />
   )
 }

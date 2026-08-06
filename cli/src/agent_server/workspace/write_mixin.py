@@ -9,7 +9,6 @@ import tempfile
 from pathlib import Path
 
 from agent_server.models import WorkspaceFileContent
-from agent_server.workspace.constants import MAX_FILE_SIZE
 from agent_server.workspace.errors import WorkspaceConflictError, WorkspacePathError
 
 
@@ -36,8 +35,6 @@ class WorkspaceWriteMixin:
             if encoding == "base64"
             else content.encode("utf-8")
         )
-        if len(data) > MAX_FILE_SIZE:
-            raise WorkspacePathError(f"File exceeds the {MAX_FILE_SIZE // (1024 * 1024)}MB limit.")
         path.parent.mkdir(parents=True, exist_ok=True)
         file_descriptor, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
         try:
@@ -51,8 +48,6 @@ class WorkspaceWriteMixin:
         return self.read(self.relative(path))
 
     def upload(self, relative_path: str, data: bytes) -> WorkspaceFileContent:
-        if len(data) > MAX_FILE_SIZE:
-            raise WorkspacePathError(f"File exceeds the {MAX_FILE_SIZE // (1024 * 1024)}MB limit.")
         return self.write(
             relative_path,
             content=base64.b64encode(data).decode("ascii"),

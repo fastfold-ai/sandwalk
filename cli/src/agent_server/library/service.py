@@ -22,7 +22,7 @@ from agent_server.models.library import (
 )
 from agent_server.service import AgentService
 from agent_server.store import AgentStore
-from agent_server.workspace import MAX_FILE_SIZE, TEXT_SUFFIXES
+from agent_server.workspace import TEXT_SUFFIXES
 from agent_server.workspace.filenames import (
     sanitize_upload_filename,
     unique_upload_relative_path,
@@ -240,7 +240,7 @@ class LibraryService:
             size = path.stat().st_size
         except OSError:
             return "skipped"
-        if size <= 0 or size > MAX_FILE_SIZE:
+        if size <= 0:
             return "skipped"
         sha256, _ = self.blobs.put_file(path)
         existing = self.store.get_library_item_by_sha(sha256)
@@ -270,10 +270,6 @@ class LibraryService:
         item = self.store.get_library_item(item_id)
         if item is None:
             raise KeyError(item_id)
-        if len(data) > MAX_FILE_SIZE:
-            raise ValueError(
-                f"File exceeds the {MAX_FILE_SIZE // (1024 * 1024)}MB limit."
-            )
         old_sha = item.sha256
         sha256, size = self.blobs.put_bytes(data)
         name = item.display_name or item.original_name

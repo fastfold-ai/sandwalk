@@ -1,5 +1,5 @@
 import type { AgentSkill } from '@sandwalk/agent-ui-core'
-import { Box } from 'lucide-react'
+import { Box, Download, Loader2 } from 'lucide-react'
 
 import {
   CardGridSkeleton,
@@ -19,11 +19,13 @@ import {
   SkillEnabledToggle,
   SkillRemoveButton
 } from './skills-view-shared'
+import type { FeaturedPendingSkill } from './skills-view-utils'
 
 export function SkillsInstalledGridSection({
   loading,
   visible,
   featuredVisible,
+  featuredPendingInstall = [],
   nonFeaturedVisible,
   categoryFilter,
   disableEligibleCount,
@@ -32,15 +34,18 @@ export function SkillsInstalledGridSection({
   batchBusy,
   pendingEnabled,
   pendingRemove,
+  pendingFeaturedInstall = {},
   onOpen,
   onToggleEnabled,
   onRemove,
   onSetFilteredEnabled,
-  onRemoveFiltered
+  onRemoveFiltered,
+  onInstallFeatured
 }: {
   loading: boolean
   visible: AgentSkill[]
   featuredVisible: AgentSkill[]
+  featuredPendingInstall?: FeaturedPendingSkill[]
   nonFeaturedVisible: AgentSkill[]
   categoryFilter: string
   disableEligibleCount: number
@@ -49,11 +54,13 @@ export function SkillsInstalledGridSection({
   batchBusy: boolean
   pendingEnabled: Record<string, boolean>
   pendingRemove: Record<string, boolean>
+  pendingFeaturedInstall?: Record<string, boolean>
   onOpen: (name: string) => void
   onToggleEnabled: (name: string, enabled: boolean) => void
   onRemove: (name: string) => void
   onSetFilteredEnabled: (enabled: boolean) => void
   onRemoveFiltered: () => void
+  onInstallFeatured?: (item: FeaturedPendingSkill) => void
 }) {
   if (loading) {
     return (
@@ -70,7 +77,9 @@ export function SkillsInstalledGridSection({
     )
   }
 
-  if (visible.length === 0) {
+  const featuredTotal = featuredVisible.length + featuredPendingInstall.length
+
+  if (visible.length === 0 && featuredPendingInstall.length === 0) {
     return (
       <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-sm">
         No skills match the current search/filter.
@@ -80,10 +89,10 @@ export function SkillsInstalledGridSection({
 
   return (
     <div className="space-y-4 pb-4">
-      {featuredVisible.length > 0 ? (
+      {featuredTotal > 0 ? (
         <section className="space-y-2">
           <p className="text-muted-foreground text-xs font-medium">
-            Featured ({featuredVisible.length})
+            Featured ({featuredTotal})
           </p>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {featuredVisible.map(skill => {
@@ -135,6 +144,60 @@ export function SkillsInstalledGridSection({
                       pending={Boolean(pendingRemove[skill.name]) || batchBusy}
                       onRemove={onRemove}
                     />
+                  </div>
+                </div>
+              )
+            })}
+            {featuredPendingInstall.map(item => {
+              const iconSource = featuredSkillIcon({
+                name: item.name,
+                iconSrc: null
+              })
+              const installing = Boolean(pendingFeaturedInstall[item.name])
+              return (
+                <div
+                  key={`pending:${item.name}`}
+                  className="bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg border border-dashed border-border/70 p-3 transition-colors"
+                >
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={iconSource}
+                        alt=""
+                        className={cn(
+                          'size-7 rounded object-contain',
+                          skillIconInvertInDark({
+                            name: item.name,
+                            iconSrc: null
+                          }) && 'dark:invert'
+                        )}
+                      />
+                      <span className="truncate text-sm font-medium">
+                        {item.name}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                      Not installed · {item.source}
+                    </p>
+                    <p className="text-muted-foreground mt-1 line-clamp-2 text-sm">
+                      {item.description}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 pt-0.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      disabled={installing || batchBusy || !onInstallFeatured}
+                      onClick={() => onInstallFeatured?.(item)}
+                    >
+                      {installing ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Download className="size-3.5" />
+                      )}
+                      Install
+                    </Button>
                   </div>
                 </div>
               )

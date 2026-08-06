@@ -56,3 +56,15 @@ class ConnectMcpCatalogResponse(ApiModel):
     tool_count: int | None = None
     message: str | None = None
     tools: list[str] = Field(default_factory=list)
+
+
+class ResetFeaturedMcpError(ApiModel):
+    id: str
+    error: str
+
+
+class ResetFeaturedMcpResponse(ApiModel):
+    """Result of re-installing missing featured catalog templates."""
+
+    installed: list[str] = Field(default_factory=list)
+    errors: list[ResetFeaturedMcpError] = Field(default_factory=list)

@@ -5,6 +5,7 @@ import {
 } from '@/lib/skills-catalog'
 
 import { SkillsCatalogDetailView } from './skills-view-catalog-detail'
+import type { SkillDepsHandlers } from './skills-view-detail-deps'
 import {
   SkillsImportFileView,
   SkillsImportGithubView,
@@ -15,11 +16,13 @@ import type { useSkillsViewState } from './use-skills-view-state'
 export function SkillsViewCatalogMode({
   state,
   catalogSkillRoute,
-  onBack
+  onBack,
+  depsHandlers = null
 }: {
   state: ReturnType<typeof useSkillsViewState>
   catalogSkillRoute: { id: string; source: string; skill: string } | null
   onBack: () => void
+  depsHandlers?: SkillDepsHandlers | null
 }) {
   const catalogSource = String(
     state.catalogDetail?.source || catalogSkillRoute?.source || ''
@@ -64,6 +67,7 @@ export function SkillsViewCatalogMode({
           catalogSlug
         )
       }
+      depsHandlers={depsHandlers}
     />
   )
 }

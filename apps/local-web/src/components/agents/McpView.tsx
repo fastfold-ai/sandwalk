@@ -4,8 +4,9 @@ import type {
   McpJsonDocument,
   McpServer
 } from '@sandwalk/agent-ui-core'
-import { Code2 } from 'lucide-react'
+import { Code2, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -33,6 +34,7 @@ export function McpView({
   onOpenServer,
   onConnectCustom,
   onInstallCatalog,
+  onResetFeaturedDefaults,
   onLoadMcpJson,
   onSaveMcpJson,
   embedded = false
@@ -66,12 +68,73 @@ export function McpView({
   ) => Promise<ConnectMcpResult>
   /** Re-add a removed catalog template (Suggested strip). */
   onInstallCatalog?: (catalogId: string) => Promise<void>
+  /** Re-install all missing featured catalog templates. */
+  onResetFeaturedDefaults?: () => Promise<{
+    installed: string[]
+    errors: Array<{ id: string; error: string }>
+  }>
   onLoadMcpJson?: () => Promise<{ path: string; document: McpJsonDocument }>
   onSaveMcpJson?: (document: McpJsonDocument) => Promise<void>
   embedded?: boolean
 }) {
   const [jsonOpen, setJsonOpen] = useState(false)
+  const [resettingDefaults, setResettingDefaults] = useState(false)
   const canEditJson = Boolean(onLoadMcpJson && onSaveMcpJson)
+
+  const runResetDefaults = async () => {
+    if (!onResetFeaturedDefaults || resettingDefaults) return
+    setResettingDefaults(true)
+    try {
+      const result = await onResetFeaturedDefaults()
+      const n = result.installed.length
+      if (n === 0 && result.errors.length === 0) {
+        toast.message('Featured MCPs already at defaults')
+      } else if (n > 0) {
+        toast.success(
+          n === 1
+            ? 'Restored 1 featured MCP'
+            : `Restored ${n} featured MCPs`
+        )
+      }
+      for (const item of result.errors) {
+        toast.error(`${item.id}: ${item.error}`)
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not reset featured MCPs'
+      )
+    } finally {
+      setResettingDefaults(false)
+    }
+  }
+
+  const headerActions = (
+    <div className="flex flex-wrap items-center gap-2">
+      {onResetFeaturedDefaults ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={resettingDefaults}
+          onClick={() => void runResetDefaults()}
+        >
+          <RotateCcw className="size-3.5" />
+          Reset to defaults
+        </Button>
+      ) : null}
+      {canEditJson ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => setJsonOpen(true)}
+        >
+          <Code2 className="size-3.5" />
+          Edit mcp.json
+        </Button>
+      ) : null}
+    </div>
+  )
 
   const view = useMcpView({
     mcpServers,
@@ -122,30 +185,10 @@ export function McpView({
                 Integrations / keys.
               </p>
             </div>
-            {canEditJson ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setJsonOpen(true)}
-              >
-                <Code2 className="size-3.5" />
-                Edit mcp.json
-              </Button>
-            ) : null}
+            {headerActions}
           </div>
-        ) : canEditJson ? (
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setJsonOpen(true)}
-            >
-              <Code2 className="size-3.5" />
-              Edit mcp.json
-            </Button>
-          </div>
+        ) : onResetFeaturedDefaults || canEditJson ? (
+          <div className="flex justify-end">{headerActions}</div>
         ) : null}
 
         <div className="space-y-6 pb-4">
@@ -188,6 +231,9 @@ export function McpView({
             onConnectCustom={onConnectCustom}
             onConnectCatalog={onConnectCatalog}
             onInstallCatalog={onInstallCatalog}
+            onResetFeaturedDefaults={
+              onResetFeaturedDefaults ? runResetDefaults : undefined
+            }
           />
         </div>
       </div>

@@ -143,7 +143,7 @@ export function McpCatalogCard({
               if (!view.configured && !view.enabled) {
                 toast.error(
                   isLocal
-                    ? 'Run setup first (install plugin + sandwalk mcp install pymol), then enable.'
+                    ? `Run setup first (sandwalk mcp install ${view.id}), then enable.`
                     : 'Connect with OAuth or API key first, then enable.',
                   { description: view.name },
                 )

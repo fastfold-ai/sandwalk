@@ -36,11 +36,18 @@ class EnableMixin:
         if enabled:
             if not credentials_configured(entry):
                 if entry.transport == "stdio" or entry.auth_mode == "none":
+                    if entry.id == "pymol":
+                        raise ValueError(
+                            f"{entry.name} launcher is not installed — "
+                            "run: sandwalk mcp install pymol"
+                        )
+                    if entry.id == "raymol":
+                        raise ValueError(
+                            f"{entry.name} app not found — install from "
+                            "https://raymol.io/ then run: sandwalk mcp install raymol"
+                        )
                     raise ValueError(
-                        f"{entry.name} launcher is not installed — "
-                        "run: sandwalk mcp install pymol"
-                        if entry.id == "pymol"
-                        else f"{entry.name} is not ready — install the local MCP command first"
+                        f"{entry.name} is not ready — install the local MCP command first"
                     )
                 raise ValueError(
                     f"{entry.name} is not configured — Connect with OAuth or API key first"

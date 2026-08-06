@@ -7,8 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Workspace / Library uploads: removed the per-file size cap (was 40MB). Local
+  sessions can attach any format and any size; failed uploads toast the API
+  error instead of failing silently.
+
 ### Added
 
+- Featured **anydoc** skill (`convert-documents-to-markdown` from
+  ``firecrawl/anydoc``) plus a reusable **skill runtime-deps** adapter:
+  ``sandwalk skills deps status|install|reinstall|doctor``,
+  ``GET/POST /v1/skills/{name}/deps*``, and Install / Reinstall / Health on the
+  skill detail page (managed Node install under
+  ``$SANDWALK_CONFIG_DIR/skill-deps/anydoc/``). See ``cli/docs/anydoc-skill.md``.
 - Featured **PyMOL** local MCP (plugin **v0.0.1**): Plugin Manager zip
   (`https://sandwalk.sh/pymol/plugin.zip`), managed launcher under
   ``~/.sandwalk/pymol-mcp/``, ``sandwalk mcp install pymol`` /
@@ -37,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/api/tags` with `/api/show` fallback; Web model picker shows a **1M** badge
   for ≥1M windows.
 - Session sandbox status exposes `gpuImage` / `baseImage` for the active compute mode.
+- MCP page **Reset to defaults** restores missing featured catalog templates
+  after delete (``POST /v1/mcp-servers/catalog/reset-defaults``).
+- Featured **RayMol** local MCP: install from [raymol.io](https://raymol.io/),
+  enable MCP in the app, then ``sandwalk mcp install raymol`` / one-click UI
+  Install (``RayMol --mcp-bridge``). See ``cli/docs/raymol-mcp.md``.
 
 ### Changed
 
@@ -55,6 +72,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Text-only providers (DeepSeek, many local LLMs) no longer 400 when an MCP
+  tool returns an image (e.g. RayMol ``capture_viewport``): unsupported
+  multimodal blocks are replaced with a text stub before the provider call,
+  and bytes are saved under ``artifacts/tool-images/`` when a session
+  workspace is set.
 - Stop rewriting ``llm.provider`` from model-id prefixes (e.g. local oMLX
   ``Qwen*`` weights labeled as Qwen Cloud). Provider + active profile from
   config/storage are source of truth; heal only falls back when an OpenAI

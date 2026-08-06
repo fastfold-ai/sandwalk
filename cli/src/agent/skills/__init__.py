@@ -79,6 +79,12 @@ SUGGESTED_SKILL_SOURCES = [
         "description": "Official Fastfold AI skills for folding, design, and MD",
     },
     {
+        "provider": "Firecrawl",
+        "source": "firecrawl/anydoc",
+        "url": "https://github.com/firecrawl/anydoc",
+        "description": "Convert Word, PowerPoint, Excel, PDF, and more to Markdown",
+    },
+    {
         "provider": "K-Dense-AI",
         "source": "K-Dense-AI/scientific-agent-skills",
         "url": "https://github.com/K-Dense-AI/scientific-agent-skills",
@@ -223,6 +229,12 @@ from .mentions import (  # noqa: E402
     build_skill_mention_context,
     extract_skill_mentions,
 )
+from .deps import (  # noqa: E402
+    doctor_skill,
+    has_runtime_deps,
+    install_skill_deps,
+    status_for,
+)
 
 __all__ = [
     "SkillInfo",
@@ -275,4 +287,8 @@ __all__ = [
     "fetch_path_latest_commit",
     "package_version",
     "resolve_bundled_path_commit",
+    "doctor_skill",
+    "has_runtime_deps",
+    "install_skill_deps",
+    "status_for",
 ]
