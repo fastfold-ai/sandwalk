@@ -69,6 +69,8 @@ export function Composer({
   onCreateSpecialist,
   onManageSpecialists,
   onAddModels,
+  onLoadModelPreferences,
+  onToggleModelFavorite,
   onSandboxBackendSelect,
   onSandboxComputeChange,
   onSandboxStart,
@@ -348,6 +350,8 @@ export function Composer({
                 onCreateSpecialist={onCreateSpecialist}
                 onManageSpecialists={onManageSpecialists}
                 onAddModels={onAddModels}
+                onLoadModelPreferences={onLoadModelPreferences}
+                onToggleModelFavorite={onToggleModelFavorite}
                 onSandboxBackendSelect={onSandboxBackendSelect}
                 onSandboxComputeChange={onSandboxComputeChange}
                 onSandboxStart={onSandboxStart}

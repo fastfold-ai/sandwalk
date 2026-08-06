@@ -48,6 +48,7 @@ export function McpCustomSection({
   onDeleteMcp,
   onConnectCustom,
   onConnectCatalog,
+  onRefresh,
   onInstallCatalog,
   onResetFeaturedDefaults
 }: {
@@ -92,6 +93,7 @@ export function McpCustomSection({
     catalogId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string }
   ) => Promise<ConnectMcpResult>
+  onRefresh?: () => Promise<void>
   onInstallCatalog?: (catalogId: string) => void | Promise<void>
   onResetFeaturedDefaults?: () => void | Promise<void>
 }) {
@@ -110,6 +112,7 @@ export function McpCustomSection({
         onDeleteMcp={onDeleteMcp}
         onConnectCustom={onConnectCustom}
         onConnectCatalog={onConnectCatalog}
+        onRefresh={onRefresh}
         onAddNew={() => setShowAddForm(true)}
       />
 

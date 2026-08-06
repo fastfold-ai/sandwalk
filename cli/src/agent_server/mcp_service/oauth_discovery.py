@@ -37,6 +37,8 @@ def discover_oauth_for_url(
         candidates.insert(0, "https://mcp.linear.app/.well-known/oauth-protected-resource/mcp")
     if catalog_id == "paperclip":
         candidates.insert(0, "https://paperclip.gxl.ai/.well-known/oauth-protected-resource")
+    if catalog_id == "exa":
+        candidates.insert(0, "https://mcp.exa.ai/.well-known/oauth-protected-resource/mcp")
 
     # MCP clients MUST prefer WWW-Authenticate resource_metadata when present.
     challenged = _mcp_service._probe_resource_metadata_url(url)

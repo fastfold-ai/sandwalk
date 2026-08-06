@@ -37,6 +37,7 @@ export const INTEGRATION_ICONS: Record<
   latch: { src: '/integrations/latch.png' },
   neurosnap: { src: '/integrations/neurosnap.png' },
   paperclip: { src: '/integrations/paperclip.png' },
+  exa: { src: '/integrations/exa.png' },
   huggingface: { src: '/integrations/huggingface.png' },
   linear: { src: '/integrations/linear.png' },
 }

@@ -169,6 +169,21 @@ class UsageUIMixin:
             console.print(f"\n  [red]{lines[0]}:[/red] {body}")
 
     @staticmethod
+    def _friendly_agent_error(error: str) -> str:
+        """Rewrite provider jargon into actionable Sandwalk guidance."""
+        text = str(error or "").strip()
+        lower = text.lower()
+        if (
+            "reasoning is mandatory" in lower
+            and "cannot be disabled" in lower
+        ):
+            return (
+                "Reasoning is mandatory for this model — disable Fast mode "
+                "(thinking must stay on)."
+            )
+        return text
+
+    @staticmethod
     def _make_error_result(query: str, error: str, duration: float) -> ExecutionResult:
         """Build an ExecutionResult representing a failed query."""
         plan = Plan(query=query, steps=[])
@@ -176,7 +191,7 @@ class UsageUIMixin:
         summary = (
             _FILE_ACCESS_MESSAGE
             if any(marker in normalized for marker in _FILE_ACCESS_ERROR_MARKERS)
-            else f"Agent SDK error: {error}"
+            else f"Agent SDK error: {UsageUIMixin._friendly_agent_error(error)}"
         )
         return ExecutionResult(
             plan=plan,

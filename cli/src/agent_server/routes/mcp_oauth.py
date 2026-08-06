@@ -54,10 +54,26 @@ def register_mcp_oauth_routes(app: FastAPI, deps: AppDeps) -> None:
                 "message": result.get("message"),
             }
         )
+        # Retry postMessage: opener can be briefly unavailable; desktop system
+        # browser has no opener (Tauri polls instead).
         html = f"""<!doctype html><html><body style="font-family:system-ui;padding:2rem">
           <h2>{"Connected" if result.get("ok") else "Connected with errors"}</h2>
           <p>{result.get("message") or ""}</p>
-          <p>You can close this window and return to FastFold.</p>
-          <script>window.opener&&window.opener.postMessage({payload},'*');setTimeout(()=>window.close(),800);</script>
+          <p>You can close this window and return to Sandwalk.</p>
+          <script>
+          (function(){{
+            var payload = {payload};
+            var tries = 0;
+            function notify(){{
+              tries += 1;
+              try {{
+                if (window.opener) window.opener.postMessage(payload, '*');
+              }} catch (e) {{}}
+              if (tries < 5) setTimeout(notify, 250);
+              else setTimeout(function(){{ try {{ window.close(); }} catch (e) {{}} }}, 400);
+            }}
+            notify();
+          }})();
+          </script>
           </body></html>"""
         return Response(content=html, media_type="text/html")

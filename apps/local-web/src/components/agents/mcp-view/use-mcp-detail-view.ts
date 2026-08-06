@@ -7,6 +7,7 @@ import type {
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
+import { disposeMcpOAuthWatch } from './mcp-oauth-browser'
 import { useMcpDetailConnect } from './use-mcp-detail-connect'
 
 export type McpDetailViewInput = {
@@ -170,6 +171,7 @@ export function useMcpDetailView({
       if (catalogEntry?.id && catalogId && catalogId !== catalogEntry.id) {
         return
       }
+      disposeMcpOAuthWatch()
       if (data.ok) {
         toast.dismiss()
         toast.success(data.message || 'Connected via OAuth', {

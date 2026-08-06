@@ -232,6 +232,11 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
             "OpenAI GPT-5.6 Luna via OpenRouter",
         ),
         (
+            "openai/gpt-5.6-luna-pro",
+            "GPT-5.6 Luna Pro",
+            "OpenAI GPT-5.6 Luna Pro via OpenRouter",
+        ),
+        (
             "google/gemini-3.5-flash",
             "Gemini 3.5 Flash",
             "Google — fast Gemini 3.5 via OpenRouter",
@@ -388,7 +393,7 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
 # Bump when the default-enabled set changes so existing configs get migrated once.
 # Also bump when curated OpenRouter models become default-enabled so prior
 # discovery-seeded hides are cleared (see Config._migrate_catalog_defaults).
-CATALOG_DEFAULTS_VERSION = 9
+CATALOG_DEFAULTS_VERSION = 10
 
 # Models present in the catalog but hidden by default. Users can re-enable them
 # from Dashboard → Models; toggling simply removes them from the hidden list.

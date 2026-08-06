@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button'
 import {
   type ComposerModelOption,
+  type ComposerModelPreferences,
   resolveComposerModelOption
 } from '@/lib/composer-models'
 import { cn } from '@/lib/utils'
@@ -50,6 +51,8 @@ export function ComposerToolbar({
   onCreateSpecialist,
   onManageSpecialists,
   onAddModels,
+  onLoadModelPreferences,
+  onToggleModelFavorite,
   onSandboxBackendSelect,
   onSandboxComputeChange,
   onSandboxStart,
@@ -92,6 +95,11 @@ export function ComposerToolbar({
   onCreateSpecialist?: () => void
   onManageSpecialists?: () => void
   onAddModels?: () => void
+  onLoadModelPreferences?: () => Promise<ComposerModelPreferences>
+  onToggleModelFavorite?: (option: ComposerModelOption) => Promise<{
+    favorite: boolean
+    favorites: string[]
+  }>
   onSandboxBackendSelect?: (
     backend: 'builtin' | 'modal'
   ) => void | Promise<void>
@@ -143,6 +151,8 @@ export function ComposerToolbar({
           onModelSelect={onModelSelect}
           onReasoningSettingsChange={onReasoningSettingsChange}
           onAddModels={onAddModels}
+          onLoadModelPreferences={onLoadModelPreferences}
+          onToggleModelFavorite={onToggleModelFavorite}
         />
         {onSpecialistSelect ? (
           <ComposerSpecialistPicker

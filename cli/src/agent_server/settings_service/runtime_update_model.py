@@ -49,3 +49,17 @@ def apply_model_update(config: Config, payload: UpdateRuntimeSettingsRequest) ->
 
     if payload.model is not None:
         config.set("llm.model", payload.model)
+        # Keep /models picker Recent in sync with web + CLI selection.
+        profile_id = None
+        if provider in {"openai", "local"}:
+            try:
+                active = str(config.active_openai_profile_id() or "").strip()
+            except Exception:  # noqa: BLE001
+                active = ""
+            if active and active != "openai_cloud":
+                profile_id = active
+        config.push_recent_model(
+            payload.model,
+            provider or None,
+            profile_id=profile_id,
+        )

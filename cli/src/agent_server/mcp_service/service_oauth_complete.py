@@ -72,6 +72,16 @@ class OAuthCompleteMixin:
                     custom_oauth_token_key(server_id, "token_expires_at"),
                     str(int(time.time()) + int(expires_in)),
                 )
+            if pending.get("token_endpoint"):
+                cfg.set(
+                    custom_oauth_token_key(server_id, "token_endpoint"),
+                    str(pending["token_endpoint"]),
+                )
+            if pending.get("resource"):
+                cfg.set(
+                    custom_oauth_token_key(server_id, "oauth_resource"),
+                    str(pending["resource"]),
+                )
             cfg.save()
             mcp_url = str(pending.get("mcp_url") or "")
             server = next(
@@ -119,6 +129,11 @@ class OAuthCompleteMixin:
                 f"mcp.{catalog_id}_token_expires_at",
                 str(int(time.time()) + int(expires_in)),
             )
+        # Persist AS endpoints so later refresh can run without rediscovery.
+        if pending.get("token_endpoint"):
+            cfg.set(f"mcp.{catalog_id}_token_endpoint", str(pending["token_endpoint"]))
+        if pending.get("resource"):
+            cfg.set(f"mcp.{catalog_id}_oauth_resource", str(pending["resource"]))
         cfg.save()
 
         result = _mcp_service.probe_mcp_server(

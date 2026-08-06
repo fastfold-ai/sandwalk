@@ -230,6 +230,7 @@ export function McpView({
             onDeleteMcp={id => void onDeleteMcp(id)}
             onConnectCustom={onConnectCustom}
             onConnectCatalog={onConnectCatalog}
+            onRefresh={onRefresh}
             onInstallCatalog={onInstallCatalog}
             onResetFeaturedDefaults={
               onResetFeaturedDefaults ? runResetDefaults : undefined

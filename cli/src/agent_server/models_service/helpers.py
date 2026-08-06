@@ -9,6 +9,7 @@ from agent.model_catalog import (
     get_model_reasoning,
     modality_capability_fields,
     model_supports_reasoning_effort,
+    model_supports_reasoning_fast,
     reasoning_effort_options,
 )
 from agent_server.models import ModelProfile
@@ -56,6 +57,9 @@ def _reasoning_fields(
     supports = model_supports_reasoning_effort(
         provider, model_id, compatible_backend=compatible_backend
     )
+    supports_fast = supports and model_supports_reasoning_fast(
+        provider, model_id, compatible_backend=compatible_backend
+    )
     effort, fast = get_model_reasoning(
         cfg.get("llm.model_reasoning"),
         provider,
@@ -63,6 +67,7 @@ def _reasoning_fields(
     )
     return {
         "supports_reasoning_effort": supports,
+        "supports_reasoning_fast": supports_fast,
         "reasoning_effort_options": (
             reasoning_effort_options(
                 provider, model_id, compatible_backend=compatible_backend
@@ -71,6 +76,6 @@ def _reasoning_fields(
             else []
         ),
         "reasoning_effort": effort if supports else None,
-        "reasoning_fast": bool(fast) if supports else False,
+        "reasoning_fast": bool(fast) if supports_fast else False,
         **modality_capability_fields(provider, model_id),
     }

@@ -39,6 +39,7 @@ def test_paperclip_catalog_entry_featured_over_linear():
     linear = get_catalog_entry("linear")
     huggingface = get_catalog_entry("huggingface")
     tavily = get_catalog_entry("tavily")
+    exa = get_catalog_entry("exa")
     assert paperclip is not None
     assert linear is not None
     assert huggingface is not None
@@ -61,6 +62,15 @@ def test_paperclip_catalog_entry_featured_over_linear():
     assert tavily.api_key_config_key == "api.tavily_api_key"
     assert tavily.api_key_header == "Authorization"
     assert tavily.api_key_header_prefix == "Bearer "
+    assert exa is not None
+    assert exa.featured is True
+    assert exa.auth_mode == "api_key_or_oauth"
+    assert exa.preferred_auth == "oauth"
+    assert exa.url == "https://mcp.exa.ai/mcp"
+    assert exa.api_key_config_key == "mcp.exa_api_key"
+    assert exa.api_key_env_var == "EXA_API_KEY"
+    assert exa.api_key_header == "x-api-key"
+    assert exa.api_key_header_prefix == ""
     assert {e.id for e in MCP_CATALOG} >= {
         "pymol",
         "tamarind",
@@ -69,6 +79,7 @@ def test_paperclip_catalog_entry_featured_over_linear():
         "paperclip",
         "huggingface",
         "tavily",
+        "exa",
         "linear",
     }
     assert "betterstack" not in {e.id for e in MCP_CATALOG}
@@ -320,6 +331,49 @@ def test_oauth_reconnect_required_when_expired_without_refresh(
     message = oauth_reconnect_required(entry, Config.load())
     assert message is not None
     assert "expired" in message.lower()
+
+
+def test_resolve_auth_headers_refreshes_expired_oauth(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
+    (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
+    cfg = Config({})
+    cfg.set("mcp.exa_access_token", "stale-access")
+    cfg.set("mcp.exa_refresh_token", "refresh-me")
+    cfg.set("mcp.exa_token_expires_at", "1")
+    cfg.set("mcp.exa_client_id", "cid")
+    cfg.set("mcp.exa_token_endpoint", "https://example.com/token")
+    cfg.set("mcp.exa_oauth_resource", "https://mcp.exa.ai/mcp")
+    cfg.save()
+
+    from agent_server import mcp_service as mod
+
+    calls: list[dict] = []
+
+    def fake_http(url, method="GET", form=None, headers=None, body=None):
+        calls.append({"url": url, "method": method, "form": form})
+        return (
+            200,
+            {
+                "access_token": "fresh-access",
+                "refresh_token": "refresh-me",
+                "expires_in": 3600,
+            },
+        )
+
+    monkeypatch.setattr(mod, "_http_json", fake_http)
+
+    entry = get_catalog_entry("exa")
+    assert entry is not None
+    headers = resolve_auth_headers(entry, Config.load())
+    assert headers is not None
+    assert headers.get("Authorization") == "Bearer fresh-access"
+    assert calls and calls[0]["form"]["grant_type"] == "refresh_token"
+    reloaded = Config.load()
+    assert reloaded.get("mcp.exa_access_token") == "fresh-access"
+    assert float(reloaded.get("mcp.exa_token_expires_at") or 0) > 1_000_000_000
 
 
 def test_tool_count_and_status_message_roundtrip(tmp_path: Path, monkeypatch):

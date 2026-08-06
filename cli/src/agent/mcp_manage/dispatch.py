@@ -27,7 +27,7 @@ _HELP_TEXT = """
   mcp remove <id|name>
 
 Uses langchain-mcp-adapters MultiServerMCPClient (stdio / sse / streamable_http + headers).
-Suggested servers: pymol, tamarind, latch, neurosnap, paperclip, linear
+Suggested servers: pymol, tamarind, latch, neurosnap, paperclip, exa, linear
 """
 
 

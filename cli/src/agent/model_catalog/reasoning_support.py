@@ -177,7 +177,7 @@ def openrouter_model_reasoning_mandatory(model_id: str | None) -> bool:
     """Return True when OpenRouter rejects ``reasoning.effort: none``.
 
     Matches curated models whose OpenRouter ``reasoning.mandatory`` is true
-    (e.g. Gemini 2.5 Pro, Grok 4.5).
+    (e.g. Gemini 2.5 Pro, Grok 4.5, Meta Muse Spark).
     """
     _, slug = _openrouter_slug(model_id)
     if not slug:
@@ -186,7 +186,31 @@ def openrouter_model_reasoning_mandatory(model_id: str | None) -> bool:
         return True
     if "grok-4.5" in slug or "grok-4-5" in slug:
         return True
+    # Muse Spark requires thinking; Fast (effort none) is rejected by the API.
+    if "muse-spark" in slug or ("muse" in slug and "spark" in slug):
+        return True
     return False
+
+
+def model_supports_reasoning_fast(
+    provider: str | None,
+    model_id: str | None,
+    *,
+    compatible_backend: str | None = None,
+) -> bool:
+    """Return False when Fast (thinking off) is not allowed for this model.
+
+    Models with mandatory reasoning still expose Effort (Low/Medium/High) but
+    must not offer Fast, which maps to ``effort: none``.
+    """
+    if not model_supports_reasoning_effort(
+        provider, model_id, compatible_backend=compatible_backend
+    ):
+        return False
+    prov = str(provider or "").strip().lower()
+    if prov == "openrouter" and openrouter_model_reasoning_mandatory(model_id):
+        return False
+    return True
 
 
 def openrouter_model_omits_temperature(model_id: str | None) -> bool:

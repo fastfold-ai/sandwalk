@@ -12,8 +12,11 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   type ComposerModelOption,
+  type ComposerModelPreferences,
+  composerModelPrefKey,
   formatModelEffortBadge,
   formatPickerContextBadge,
+  rankComposerModelOptions,
   resolveComposerModelOption
 } from '@/lib/composer-models'
 
@@ -22,7 +25,9 @@ export function ComposerModelPicker({
   runtimeSettings,
   onModelSelect,
   onReasoningSettingsChange,
-  onAddModels
+  onAddModels,
+  onLoadModelPreferences,
+  onToggleModelFavorite
 }: {
   modelOptions: ComposerModelOption[]
   runtimeSettings: RuntimeSettings | null
@@ -38,10 +43,19 @@ export function ComposerModelPicker({
     reasoningFast?: boolean
   }) => Promise<void>
   onAddModels?: () => void
+  onLoadModelPreferences?: () => Promise<ComposerModelPreferences>
+  onToggleModelFavorite?: (option: ComposerModelOption) => Promise<{
+    favorite: boolean
+    favorites: string[]
+  }>
 }) {
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
   const [effortMenuOpen, setEffortMenuOpen] = useState(false)
+  const [preferences, setPreferences] = useState<ComposerModelPreferences>({
+    favorites: [],
+    recent: []
+  })
 
   const selectedModel: ComposerModelOption =
     resolveComposerModelOption(modelOptions, runtimeSettings) ||
@@ -78,23 +92,30 @@ export function ComposerModelPicker({
     : null
   const contextBadge = formatPickerContextBadge(selectedModel.contextWindow)
 
-  const filteredModelOptions = useMemo(() => {
-    const needle = modelSearch.trim().toLowerCase()
-    if (!needle) return modelOptions
-    return modelOptions.filter(option => {
-      const haystack = [
-        option.label,
-        option.model,
-        option.provider,
-        option.speed || '',
-        option.source || '',
-        option.profileId || ''
-      ]
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(needle)
-    })
-  }, [modelOptions, modelSearch])
+  const sections = useMemo(
+    () => rankComposerModelOptions(modelOptions, modelSearch, preferences),
+    [modelOptions, modelSearch, preferences]
+  )
+
+  const favoriteSet = useMemo(
+    () => new Set(preferences.favorites),
+    [preferences.favorites]
+  )
+
+  useEffect(() => {
+    if (!modelPickerOpen || !onLoadModelPreferences) return
+    let cancelled = false
+    void onLoadModelPreferences()
+      .then(next => {
+        if (!cancelled) setPreferences(next)
+      })
+      .catch(() => {
+        // Keep last known favorites/recent if the request fails.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [modelPickerOpen, onLoadModelPreferences])
 
   useEffect(() => {
     if (!modelPickerOpen || modelSearch.trim()) return
@@ -116,7 +137,8 @@ export function ComposerModelPicker({
     modelSearch,
     selectedModel.model,
     selectedModel.provider,
-    selectedModel.profileId
+    selectedModel.profileId,
+    sections
   ])
 
   return (
@@ -183,23 +205,49 @@ export function ComposerModelPicker({
                 <div className="text-muted-foreground px-3 py-3 text-sm">
                   No enabled models. Turn models on in Dashboard → Models.
                 </div>
-              ) : filteredModelOptions.length === 0 ? (
+              ) : sections.length === 0 ? (
                 <div className="text-muted-foreground px-3 py-3 text-sm">
                   No models match “{modelSearch.trim()}”.
                 </div>
               ) : (
-                filteredModelOptions.map(option => (
-                  <ComposerModelPickerOption
-                    key={`${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`}
-                    option={option}
-                    modelOptions={modelOptions}
-                    runtimeSettings={runtimeSettings}
-                    effortMenuOpen={effortMenuOpen}
-                    onEffortMenuOpenChange={setEffortMenuOpen}
-                    onModelSelect={onModelSelect}
-                    onReasoningSettingsChange={onReasoningSettingsChange}
-                    onModelSearchClear={() => setModelSearch('')}
-                  />
+                sections.map(section => (
+                  <div key={section.title || 'all'}>
+                    {section.title ? (
+                      <div className="text-muted-foreground px-3 pt-2 pb-1 text-[11px] font-medium tracking-wide uppercase">
+                        {section.title}
+                      </div>
+                    ) : null}
+                    {section.options.map(option => (
+                      <ComposerModelPickerOption
+                        key={`${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`}
+                        option={option}
+                        modelOptions={modelOptions}
+                        runtimeSettings={runtimeSettings}
+                        favorite={favoriteSet.has(composerModelPrefKey(option))}
+                        effortMenuOpen={effortMenuOpen}
+                        onEffortMenuOpenChange={setEffortMenuOpen}
+                        onModelSelect={onModelSelect}
+                        onReasoningSettingsChange={onReasoningSettingsChange}
+                        onModelSearchClear={() => setModelSearch('')}
+                        onClosePicker={() => {
+                          setModelPickerOpen(false)
+                          setModelSearch('')
+                          setEffortMenuOpen(false)
+                        }}
+                        onToggleFavorite={
+                          onToggleModelFavorite
+                            ? async () => {
+                                const result = await onToggleModelFavorite(option)
+                                setPreferences(prev => ({
+                                  ...prev,
+                                  favorites: result.favorites
+                                }))
+                              }
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </div>
                 ))
               )}
             </div>

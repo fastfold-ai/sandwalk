@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from agent.config import Config
-from agent.model_catalog import get_model_reasoning, upsert_model_reasoning
+from agent.model_catalog import (
+    get_model_reasoning,
+    model_supports_reasoning_fast,
+    upsert_model_reasoning,
+)
 from agent_server.models import UpdateRuntimeSettingsRequest
 
 
@@ -16,12 +20,15 @@ def apply_reasoning_update(config: Config, payload: UpdateRuntimeSettingsRequest
     target_model = str(
         payload.model if payload.model is not None else (config.get("llm.model") or "")
     ).strip()
+    fast = payload.reasoning_fast
+    if fast and not model_supports_reasoning_fast(target_provider, target_model):
+        fast = False
     store = upsert_model_reasoning(
         config.get("llm.model_reasoning"),
         target_provider,
         target_model,
         effort=payload.reasoning_effort,
-        fast=payload.reasoning_fast,
+        fast=fast,
     )
     config.set("llm.model_reasoning", store)
     effort, fast = get_model_reasoning(store, target_provider, target_model)

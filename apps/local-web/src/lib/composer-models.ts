@@ -9,6 +9,8 @@ export type ComposerModelOption = {
   source?: 'cloud' | 'profile' | 'custom'
   backend?: string | null
   supportsReasoningEffort?: boolean
+  /** False when Fast (thinking off) is not allowed for this model. */
+  supportsReasoningFast?: boolean
   reasoningEffortOptions?: string[]
   reasoningEffort?: string | null
   reasoningFast?: boolean
@@ -120,6 +122,7 @@ export function toComposerModelOptions(
     description?: string | null
     enabled: boolean
     supportsReasoningEffort?: boolean
+    supportsReasoningFast?: boolean
     reasoningEffortOptions?: string[]
     reasoningEffort?: string | null
     reasoningFast?: boolean
@@ -141,9 +144,13 @@ export function toComposerModelOptions(
       source: model.source,
       backend: model.backend ?? null,
       supportsReasoningEffort: Boolean(model.supportsReasoningEffort),
+      supportsReasoningFast: model.supportsReasoningFast !== false,
       reasoningEffortOptions: model.reasoningEffortOptions || [],
       reasoningEffort: model.reasoningEffort ?? 'medium',
-      reasoningFast: Boolean(model.reasoningFast),
+      reasoningFast:
+        model.supportsReasoningFast === false
+          ? false
+          : Boolean(model.reasoningFast),
       contextWindow:
         typeof model.contextWindow === 'number' && model.contextWindow > 0
           ? model.contextWindow
@@ -259,4 +266,168 @@ export function formatModelEffortBadge(option: {
   return `${formatReasoningEffortLabel(option.reasoningEffort)}${
     option.reasoningFast ? ' Fast' : ''
   }`
+}
+
+/** Strip vendor prefixes (`deepseek/deepseek-v4-flash` → `deepseek-v4-flash`). */
+export function composerModelBareId(modelId: string): string {
+  const raw = String(modelId || '').trim()
+  const slash = raw.lastIndexOf('/')
+  return slash >= 0 ? raw.slice(slash + 1) : raw
+}
+
+/** Stable favorites/recent key — matches CLI ``Config.model_pref_key``. */
+export function composerModelPrefKey(option: {
+  provider: string
+  model: string
+  profileId?: string | null
+}): string {
+  const mid = String(option.model || '').trim()
+  const pid = String(option.profileId || '').trim()
+  const prov = String(option.provider || '')
+    .trim()
+    .toLowerCase()
+  if (pid) return `local:${pid}:${mid}`
+  if (prov && mid) return `${prov}:${mid}`
+  return mid
+}
+
+/** Higher is better. Returns -1 when the option does not match ``query``. */
+export function scoreComposerModelSearch(
+  option: ComposerModelOption,
+  query: string
+): number {
+  const q = query.trim().toLowerCase()
+  if (!q) return 0
+  const label = option.label.toLowerCase()
+  const model = option.model.toLowerCase()
+  const bare = composerModelBareId(option.model).toLowerCase()
+  const provider = String(option.provider || '')
+    .trim()
+    .toLowerCase()
+  const speed = String(option.speed || '')
+    .trim()
+    .toLowerCase()
+  const words = label.split(/[\s\-_/]+/).filter(Boolean)
+
+  if (label === q || model === q || bare === q) return 1000
+  if (label.startsWith(q)) return 900
+  if (bare.startsWith(q) || model.startsWith(q)) return 850
+  if (words.some(word => word.startsWith(q))) return 800
+  if (provider.startsWith(q) || speed.startsWith(q)) return 700
+  if (label.includes(q)) return 500
+  if (bare.includes(q) || model.includes(q)) return 400
+  if (provider.includes(q) || speed.includes(q)) return 300
+  const haystack = [
+    label,
+    model,
+    provider,
+    speed,
+    option.source || '',
+    option.profileId || ''
+  ]
+    .join(' ')
+    .toLowerCase()
+  if (haystack.includes(q)) return 100
+  return -1
+}
+
+export type ComposerModelPreferences = {
+  favorites: string[]
+  recent: string[]
+}
+
+export type RankedComposerModelSection = {
+  title: string | null
+  options: ComposerModelOption[]
+}
+
+/**
+ * Filter + rank for the composer picker. Empty query → Favorites → Recent → rest.
+ * With a query → relevance-ranked matches (favorites boosted slightly).
+ */
+export function rankComposerModelOptions(
+  options: ComposerModelOption[],
+  query: string,
+  preferences?: ComposerModelPreferences | null
+): RankedComposerModelSection[] {
+  const favKeys = preferences?.favorites || []
+  const recentKeys = preferences?.recent || []
+  const favSet = new Set(favKeys)
+  const needle = query.trim()
+
+  if (needle) {
+    const scored = options
+      .map(option => {
+        const score = scoreComposerModelSearch(option, needle)
+        if (score < 0) return null
+        const key = composerModelPrefKey(option)
+        const boost = favSet.has(key) ? 50 : 0
+        return { option, score: score + boost }
+      })
+      .filter((row): row is { option: ComposerModelOption; score: number } =>
+        Boolean(row)
+      )
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score
+        return a.option.label.localeCompare(b.option.label)
+      })
+    if (scored.length === 0) return []
+    return [{ title: null, options: scored.map(row => row.option) }]
+  }
+
+  const byKey = new Map(
+    options.map(option => [composerModelPrefKey(option), option])
+  )
+  const sections: RankedComposerModelSection[] = []
+  const seen = new Set<string>()
+
+  const take = (title: string, keys: string[]) => {
+    const rows = keys
+      .map(key => byKey.get(key))
+      .filter((option): option is ComposerModelOption => Boolean(option))
+      .filter(option => {
+        const key = composerModelPrefKey(option)
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+    if (rows.length > 0) sections.push({ title, options: rows })
+  }
+
+  take('Favorites', favKeys)
+  take(
+    'Recent',
+    recentKeys.filter(key => !favSet.has(key))
+  )
+
+  const rest = options.filter(option => !seen.has(composerModelPrefKey(option)))
+  if (rest.length > 0) {
+    sections.push({ title: sections.length > 0 ? 'Models' : null, options: rest })
+  }
+  return sections
+}
+
+/** Shared search score for Models dashboard rows (AgentModel-shaped). */
+export function scoreModelCatalogSearch(
+  model: {
+    id: string
+    label: string
+    provider: string
+    description?: string | null
+    source?: string | null
+    profileId?: string | null
+  },
+  query: string
+): number {
+  return scoreComposerModelSearch(
+    {
+      provider: model.provider,
+      model: model.id,
+      label: model.label,
+      speed: model.provider,
+      profileId: model.profileId,
+      source: (model.source as ComposerModelOption['source']) || undefined
+    },
+    query
+  )
 }

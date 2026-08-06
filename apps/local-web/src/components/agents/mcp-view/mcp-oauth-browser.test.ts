@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { isTauri, openInSystemBrowser } from '@/lib/desktop'
 
-import { openMcpOAuthBrowser } from './mcp-oauth-browser'
+import {
+  disposeMcpOAuthWatch,
+  openMcpOAuthBrowser
+} from './mcp-oauth-browser'
 
 vi.mock('@/lib/desktop', () => ({
   isTauri: vi.fn(),
@@ -13,6 +16,7 @@ describe('openMcpOAuthBrowser', () => {
   beforeEach(() => {
     vi.mocked(isTauri).mockReset()
     vi.mocked(openInSystemBrowser).mockReset()
+    disposeMcpOAuthWatch()
   })
 
   it('opens OAuth in the system browser from Tauri', async () => {
@@ -28,24 +32,59 @@ describe('openMcpOAuthBrowser', () => {
     popup.mockRestore()
   })
 
-  it('refreshes Tauri state when the user returns from OAuth', async () => {
+  it('keeps polling after early focus so late OAuth completion refreshes', async () => {
+    vi.useFakeTimers()
+    vi.mocked(isTauri).mockReturnValue(true)
+    const onReturn = vi.fn()
+
+    const watch = await openMcpOAuthBrowser(
+      'https://example.com/oauth',
+      onReturn
+    )
+    // Immediate tick + first focus.
+    expect(onReturn).toHaveBeenCalledTimes(1)
+    window.dispatchEvent(new Event('focus'))
+    await vi.advanceTimersByTimeAsync(400)
+    expect(onReturn).toHaveBeenCalledTimes(2)
+
+    // Previous bug: listener was one-shot. Second focus + interval must still run.
+    window.dispatchEvent(new Event('focus'))
+    await vi.advanceTimersByTimeAsync(400)
+    expect(onReturn).toHaveBeenCalledTimes(3)
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(onReturn.mock.calls.length).toBeGreaterThanOrEqual(4)
+
+    watch.dispose()
+    const calls = onReturn.mock.calls.length
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(onReturn).toHaveBeenCalledTimes(calls)
+    vi.useRealTimers()
+  })
+
+  it('stops watching when disposeMcpOAuthWatch is called', async () => {
     vi.useFakeTimers()
     vi.mocked(isTauri).mockReturnValue(true)
     const onReturn = vi.fn()
 
     await openMcpOAuthBrowser('https://example.com/oauth', onReturn)
-    window.dispatchEvent(new Event('focus'))
-    await vi.advanceTimersByTimeAsync(500)
-
-    expect(onReturn).toHaveBeenCalledOnce()
+    expect(onReturn).toHaveBeenCalledTimes(1)
+    disposeMcpOAuthWatch()
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(onReturn).toHaveBeenCalledTimes(1)
     vi.useRealTimers()
   })
 
-  it('keeps a named popup in the web app', async () => {
+  it('keeps a named popup in the web app and still watches for return', async () => {
+    vi.useFakeTimers()
     vi.mocked(isTauri).mockReturnValue(false)
     const popup = vi.spyOn(window, 'open').mockReturnValue({} as Window)
+    const onReturn = vi.fn()
 
-    await openMcpOAuthBrowser('https://example.com/oauth')
+    const watch = await openMcpOAuthBrowser(
+      'https://example.com/oauth',
+      onReturn
+    )
 
     expect(popup).toHaveBeenCalledWith(
       'https://example.com/oauth',
@@ -53,7 +92,10 @@ describe('openMcpOAuthBrowser', () => {
       'width=560,height=720'
     )
     expect(openInSystemBrowser).not.toHaveBeenCalled()
+    expect(onReturn).toHaveBeenCalledTimes(1)
+    watch.dispose()
     popup.mockRestore()
+    vi.useRealTimers()
   })
 
   it('reports blocked web popups', async () => {

@@ -122,6 +122,8 @@ def test_settings_service_update_runtime_knobs(tmp_path: Path, monkeypatch):
     assert sonnet.model == "claude-sonnet-5"
     assert sonnet.reasoning_effort == "low"
     assert sonnet.reasoning_fast is False
+    assert "anthropic:claude-sonnet-5" in cfg.recent_models()
+    assert "openai:gpt-5.6-sol" in cfg.recent_models()
 
 
 def test_settings_service_onboarding(tmp_path: Path, monkeypatch):

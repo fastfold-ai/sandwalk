@@ -58,7 +58,12 @@ def effort_modal_style_extras(colors: dict[str, str]) -> dict[str, str]:
     return out
 
 
-def build_effort_rows(*, query: str = "", current_label: str = "") -> list[_EffortRow]:
+def build_effort_rows(
+    *,
+    query: str = "",
+    current_label: str = "",
+    allow_fast: bool = True,
+) -> list[_EffortRow]:
     rows = [
         _EffortRow(
             kind="header",
@@ -67,6 +72,8 @@ def build_effort_rows(*, query: str = "", current_label: str = "") -> list[_Effo
         )
     ]
     for effort, fast, label in EFFORT_OPTIONS:
+        if fast and not allow_fast:
+            continue
         rows.append(
             _EffortRow(
                 kind="option",
@@ -386,8 +393,15 @@ class EffortModalHost:
             host.cancel()
 
     def _rebuild_rows(self) -> None:
+        from agent.model_catalog import model_supports_reasoning_fast
+
+        allow_fast = model_supports_reasoning_fast(
+            self.state.provider, self.state.model_id
+        )
         self.state.rows = build_effort_rows(
-            query=self.state.query, current_label=self.state.current_label
+            query=self.state.query,
+            current_label=self.state.current_label,
+            allow_fast=allow_fast,
         )
         self.state.filtered = list(self.state.rows)
         self.state.index = first_selectable_index(self.state.filtered)

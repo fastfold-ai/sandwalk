@@ -14,7 +14,10 @@ import {
   type SandboxActionPhase,
   type SandboxComputeChange
 } from '@/components/agents/composer/sandbox-utils'
-import { type ComposerModelOption } from '@/lib/composer-models'
+import {
+  type ComposerModelOption,
+  type ComposerModelPreferences
+} from '@/lib/composer-models'
 
 export type { SandboxActionPhase, SandboxComputeChange }
 
@@ -78,6 +81,11 @@ export type ComposerProps = {
   onCreateSpecialist?: () => void
   onManageSpecialists?: () => void
   onAddModels?: () => void
+  onLoadModelPreferences?: () => Promise<ComposerModelPreferences>
+  onToggleModelFavorite?: (option: ComposerModelOption) => Promise<{
+    favorite: boolean
+    favorites: string[]
+  }>
   onSandboxBackendSelect?: (
     backend: 'builtin' | 'modal'
   ) => void | Promise<void>

@@ -26,6 +26,9 @@ import type {
   HitlDecision,
   BackendHealth,
   CreateAgentModelInput,
+  ModelPreferences,
+  ToggleModelFavoriteInput,
+  ToggleModelFavoriteResult,
   DatasetSummary,
   DatasetInstallResult,
   DoctorReport,
@@ -2037,6 +2040,29 @@ export class LocalAgentClient
       { signal: options?.signal }
     )
     return result.data
+  }
+
+  getModelPreferences(signal?: AbortSignal): Promise<ModelPreferences> {
+    return this.request<ModelPreferences>('/models/preferences', { signal })
+  }
+
+  toggleModelFavorite(
+    input: ToggleModelFavoriteInput,
+    signal?: AbortSignal
+  ): Promise<ToggleModelFavoriteResult> {
+    return this.request<ToggleModelFavoriteResult>(
+      '/models/preferences/favorite',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          model: input.model,
+          ...(input.provider ? { provider: input.provider } : {}),
+          ...(input.profileId ? { profileId: input.profileId } : {})
+        }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
   }
 
   updateModelEnabled(

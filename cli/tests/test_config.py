@@ -763,6 +763,18 @@ class TestValidateConfig:
         })
         assert not any("Unknown config key" in issue for issue in issues)
 
+    def test_exa_mcp_oauth_keys_are_known(self):
+        issues = _validate_config({
+            "mcp.exa_api_key": "exa-key",
+            "mcp.exa_access_token": "tok",
+            "mcp.exa_refresh_token": "ref",
+            "mcp.exa_token_expires_at": "2026-07-28T00:00:00+00:00",
+            "mcp.exa_client_id": "cid",
+            "mcp.exa_tool_count": 2,
+            "mcp.exa_status_message": "ok",
+        })
+        assert not any("Unknown config key" in issue for issue in issues)
+
     def test_custom_mcp_oauth_keys_are_known(self):
         """Dynamic mcp.custom_<uuid>_* keys written by OAuth must not warn.
 

@@ -19,7 +19,10 @@ import {
   isAuthReconnectMessage,
   serverNeedsAuth
 } from './mcp-custom-server-helpers'
-import { openMcpOAuthBrowser } from './mcp-oauth-browser'
+import {
+  disposeMcpOAuthWatch,
+  openMcpOAuthBrowser
+} from './mcp-oauth-browser'
 import { formatConnectError, McpToggle } from './mcp-view-shared'
 
 export { customServerNeedsAuth }
@@ -35,6 +38,7 @@ export function McpCustomServerList({
   onDeleteMcp,
   onConnectCustom,
   onConnectCatalog,
+  onRefresh,
   onAddNew
 }: {
   installedServers: McpServer[]
@@ -53,6 +57,7 @@ export function McpCustomServerList({
     catalogId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string }
   ) => Promise<ConnectMcpResult>
+  onRefresh?: () => Promise<void>
   onAddNew?: () => void
 }) {
   const [apiKeyServerId, setApiKeyServerId] = useState<string | null>(null)
@@ -79,12 +84,14 @@ export function McpCustomServerList({
         if (serverId !== waitingId) return
       }
 
+      disposeMcpOAuthWatch()
       setWaitingId(null)
       setWaitingCatalogId(null)
       setPendingId(null)
       if (data.ok) {
         toast.dismiss()
         toast.success(data.message || 'Connected via OAuth')
+        void onRefresh?.()
       } else {
         setApiKeyServerId(prev => prev || waitingId)
         toast.error(data.error || 'OAuth failed')
@@ -92,7 +99,34 @@ export function McpCustomServerList({
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [waitingId, waitingCatalogId])
+  }, [onRefresh, waitingId, waitingCatalogId])
+
+  // Clear "Waiting for callback…" once catalog/server shows connected (Tauri
+  // system-browser OAuth has no window.opener postMessage).
+  useEffect(() => {
+    if (!waitingId && !waitingCatalogId) return
+    const server = installedServers.find(item => item.id === waitingId)
+    const catalog = waitingCatalogId
+      ? catalogById.get(waitingCatalogId)
+      : server?.catalogId
+        ? catalogById.get(server.catalogId)
+        : undefined
+    const ready = Boolean(
+      (catalog && catalog.configured) ||
+        (server && !serverNeedsAuth(server, catalog))
+    )
+    if (!ready) return
+    disposeMcpOAuthWatch()
+    setWaitingId(null)
+    setWaitingCatalogId(null)
+    toast.dismiss()
+    toast.success(
+      catalog
+        ? `Connected · ${catalog.toolCount ?? 0} tools`
+        : 'Connected via OAuth',
+      { description: catalog?.name || server?.name }
+    )
+  }, [catalogById, installedServers, waitingCatalogId, waitingId])
 
   const connectOAuth = async (server: McpServer) => {
     setPendingId(server.id)
@@ -105,9 +139,11 @@ export function McpCustomServerList({
           : null
       if (!result) return
       if (result.authorizeUrl) {
-        await openMcpOAuthBrowser(result.authorizeUrl)
         setWaitingId(server.id)
         setWaitingCatalogId(server.catalogId || null)
+        await openMcpOAuthBrowser(result.authorizeUrl, async () => {
+          await onRefresh?.()
+        })
         toast.message('Complete sign-in in your browser…', {
           description: server.name
         })

@@ -174,6 +174,14 @@ PROVIDER_METADATA = {
         "category": "MCP",
         "description": "Tavily MCP credentials for real-time web search and extraction.",
     },
+    "exa": {
+        "name": "Exa",
+        "category": "MCP",
+        "description": (
+            "Exa MCP credentials for web search, page fetch, and research "
+            "(papers, patents, molecules)."
+        ),
+    },
     "slack": {
         "name": "Slack",
         "category": "Communication",

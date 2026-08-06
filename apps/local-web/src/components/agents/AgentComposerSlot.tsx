@@ -27,7 +27,8 @@ import {
 } from '@/lib/attachment-mime'
 import {
   type ComposerModelOption,
-  resolveComposerModelOption} from '@/lib/composer-models'
+  resolveComposerModelOption
+} from '@/lib/composer-models'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { mediaObjectUrlFromFile } from '@/lib/media-src'
 import {
@@ -286,6 +287,14 @@ export function AgentComposerSlot({
         onCreateSpecialist={() => navigate('/dashboard/specialists/new')}
         onManageSpecialists={() => navigate('/dashboard/specialists')}
         onAddModels={() => navigate('/dashboard/models')}
+        onLoadModelPreferences={() => client.getModelPreferences()}
+        onToggleModelFavorite={option =>
+          client.toggleModelFavorite({
+            provider: option.provider,
+            model: option.model,
+            profileId: option.profileId
+          })
+        }
         onSandboxBackendSelect={selectSessionSandboxBackend}
         onSandboxComputeChange={changes =>
           void updateSessionSandboxCompute(changes)

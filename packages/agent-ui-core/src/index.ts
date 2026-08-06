@@ -836,6 +836,8 @@ export type AgentModel = {
   health: string | null
   /** True when Effort / Fast controls apply (OpenAI GPT-5 / o-series, etc.). */
   supportsReasoningEffort?: boolean
+  /** False when Fast (thinking off) is rejected — e.g. Muse Spark. */
+  supportsReasoningFast?: boolean
   reasoningEffortOptions?: string[]
   /** Per-model effort level (low|medium|high). */
   reasoningEffort?: string | null
@@ -854,6 +856,22 @@ export type CreateAgentModelInput = {
   id: string
   provider?: string
   label?: string | null
+}
+
+export type ModelPreferences = {
+  favorites: string[]
+  recent: string[]
+}
+
+export type ToggleModelFavoriteInput = {
+  provider?: string | null
+  model: string
+  profileId?: string | null
+}
+
+export type ToggleModelFavoriteResult = {
+  favorite: boolean
+  favorites: string[]
 }
 
 export type ModelProfile = {
@@ -1044,6 +1062,11 @@ export interface ModelsProvider {
     discover?: boolean
     signal?: AbortSignal
   }): Promise<AgentModel[]>
+  getModelPreferences?(signal?: AbortSignal): Promise<ModelPreferences>
+  toggleModelFavorite?(
+    input: ToggleModelFavoriteInput,
+    signal?: AbortSignal
+  ): Promise<ToggleModelFavoriteResult>
   createCustomModel?(
     input: CreateAgentModelInput,
     signal?: AbortSignal

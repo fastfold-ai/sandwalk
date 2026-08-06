@@ -71,6 +71,14 @@ API_KEYS_EXTRA = {
         "url": "https://paperclip.gxl.ai/keys",
         "free": True,
     },
+    "mcp.exa_api_key": {
+        "name": "Exa",
+        "provider_key": "exa",
+        "env_var": "EXA_API_KEY",
+        "description": "Exa MCP API key (x-api-key) for web search and page fetch",
+        "url": "https://dashboard.exa.ai/api-keys",
+        "free": True,
+    },
     "mcp.linear_api_key": {
         "name": "Linear",
         "provider_key": "linear",

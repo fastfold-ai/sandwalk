@@ -1,6 +1,8 @@
 import type { AgentModel, IntegrationSummary, ModelProfile } from '@sandwalk/agent-ui-core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { scoreModelCatalogSearch } from '@/lib/composer-models'
+
 import {
   LLM_API_KEY_ORDER,
   MODEL_LIST_PREVIEW_LIMIT
@@ -128,8 +130,8 @@ export function useModelsViewData({
   }, [models])
 
   const filteredModels = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return models.filter(model => {
+    const needle = query.trim()
+    const filtered = models.filter(model => {
       const isLocal = model.source === 'profile'
       const isCloud = model.source === 'cloud' || model.source === 'custom'
       if (sourceFilter === 'local' && !isLocal) return false
@@ -137,17 +139,14 @@ export function useModelsViewData({
       const providerKey = isLocal ? 'local' : model.provider
       if (providerFilter !== 'all' && providerKey !== providerFilter) return false
       if (!needle) return true
-      const haystack = [
-        model.id,
-        model.label,
-        model.description || '',
-        model.provider,
-        model.source,
-        model.profileId || ''
-      ]
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(needle)
+      return scoreModelCatalogSearch(model, needle) >= 0
+    })
+    if (!needle) return filtered
+    return [...filtered].sort((a, b) => {
+      const scoreDiff =
+        scoreModelCatalogSearch(b, needle) - scoreModelCatalogSearch(a, needle)
+      if (scoreDiff !== 0) return scoreDiff
+      return a.label.localeCompare(b.label)
     })
   }, [models, query, sourceFilter, providerFilter])
 

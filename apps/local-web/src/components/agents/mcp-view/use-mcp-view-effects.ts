@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { disposeMcpOAuthWatch } from './mcp-oauth-browser'
 import { type CatalogStatusPatch } from './mcp-view-shared'
 
 export function useMcpHashFocus() {
@@ -74,6 +75,7 @@ export function useMcpOAuthMessage(
       const data = event.data
       if (!data || data.type !== 'fastfold-mcp-oauth') return
       const catalogId = String(data.catalogId || '')
+      disposeMcpOAuthWatch()
       if (data.ok) {
         toast.dismiss()
         toast.success(data.message || 'Connected via OAuth', {

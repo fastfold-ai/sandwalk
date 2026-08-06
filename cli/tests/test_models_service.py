@@ -594,6 +594,23 @@ def test_model_supports_reasoning_effort():
     assert effective_openrouter_reasoning(
         effort="high", fast=True, model_id="deepseek/deepseek-chat-v3.1"
     ) == {"effort": "none"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="meta/muse-spark-1.2"
+    ) == {"effort": "low"}
+    from agent.model_catalog import (
+        model_supports_reasoning_fast,
+        openrouter_model_reasoning_mandatory,
+    )
+
+    assert openrouter_model_reasoning_mandatory("meta/muse-spark-1.2") is True
+    assert (
+        model_supports_reasoning_fast("openrouter", "meta/muse-spark-1.2")
+        is False
+    )
+    assert (
+        model_supports_reasoning_fast("openrouter", "anthropic/claude-sonnet-5")
+        is True
+    )
 
 
 def test_anthropic_model_omits_temperature():
@@ -637,3 +654,34 @@ def test_custom_models_http_routes(isolated_config: Config, tmp_path: Path):
 
     missing = client.delete("/v1/models/claude-custom-x")
     assert missing.status_code == 404
+
+
+def test_model_preferences_http_routes(isolated_config: Config, tmp_path: Path):
+    app = create_app(store_path=tmp_path / "agent-prefs.db", allowed_hosts=["testserver"])
+    client = TestClient(app)
+
+    empty = client.get("/v1/models/preferences")
+    assert empty.status_code == 200
+    assert empty.json()["favorites"] == []
+    assert empty.json()["recent"] == []
+
+    toggled = client.post(
+        "/v1/models/preferences/favorite",
+        json={"provider": "deepseek", "model": "deepseek-v4-flash"},
+    )
+    assert toggled.status_code == 200
+    body = toggled.json()
+    assert body["favorite"] is True
+    assert body["favorites"] == ["deepseek:deepseek-v4-flash"]
+
+    again = client.get("/v1/models/preferences")
+    assert again.status_code == 200
+    assert again.json()["favorites"] == ["deepseek:deepseek-v4-flash"]
+
+    untoggled = client.post(
+        "/v1/models/preferences/favorite",
+        json={"provider": "deepseek", "model": "deepseek-v4-flash"},
+    )
+    assert untoggled.status_code == 200
+    assert untoggled.json()["favorite"] is False
+    assert untoggled.json()["favorites"] == []

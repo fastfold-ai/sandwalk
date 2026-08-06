@@ -14,7 +14,9 @@ const MCP_ICONS: Record<string, { src: string; invertInDark?: boolean }> = {
   latch: { src: '/integrations/latch.png' },
   neurosnap: { src: '/integrations/neurosnap.png' },
   paperclip: { src: '/integrations/paperclip.png' },
+  exa: { src: '/integrations/exa.png' },
   huggingface: { src: '/integrations/huggingface.png' },
+  tavily: { src: '/tavily-color.png' },
   linear: { src: '/integrations/linear.png' }
 }
 

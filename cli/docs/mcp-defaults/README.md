@@ -20,6 +20,7 @@ Runtime uses [`langchain-mcp-adapters`](https://docs.langchain.com/oss/python/la
 | `tamarind` | Tamarind Bio | `https://mcp.tamarind.bio/mcp` | `x-api-key` |
 | `latch` | Latch Bio | `https://mcp.latch.bio/mcp` | OAuth |
 | `neurosnap` | Neurosnap | `https://neurosnap.ai/mcp` | Bearer / `X-API-KEY` |
+| `exa` | Exa | `https://mcp.exa.ai/mcp` | OAuth preferred **or** `x-api-key` |
 | `linear` | Linear | `https://mcp.linear.app/mcp` | OAuth preferred **or** Bearer |
 
 ## CLI

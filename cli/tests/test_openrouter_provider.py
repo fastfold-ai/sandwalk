@@ -37,6 +37,7 @@ def test_openrouter_catalog_and_lookup():
         "anthropic/claude-opus-5",
         "openai/gpt-5.6-terra",
         "openai/gpt-5.6-luna",
+        "openai/gpt-5.6-luna-pro",
         "google/gemini-3.5-flash",
         "x-ai/grok-4.5",
         "deepseek/deepseek-v4-pro",
@@ -61,6 +62,7 @@ def test_openrouter_catalog_and_lookup():
     # Terra / Luna enabled by default; optional extras stay hidden.
     assert "openai/gpt-5.6-terra" not in DEFAULT_DISABLED_MODELS
     assert "openai/gpt-5.6-luna" not in DEFAULT_DISABLED_MODELS
+    assert "openai/gpt-5.6-luna-pro" not in DEFAULT_DISABLED_MODELS
     assert "meta/muse-spark-1.1" in DEFAULT_DISABLED_MODELS
     assert "thinkingmachines/inkling-small" in DEFAULT_DISABLED_MODELS
     assert "nvidia/nemotron-3-ultra-550b-a55b:free" in DEFAULT_DISABLED_MODELS

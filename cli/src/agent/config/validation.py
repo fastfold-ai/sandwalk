@@ -12,6 +12,7 @@ from .defaults import DEFAULTS
 _CUSTOM_MCP_KEY_RE = re.compile(
     r"^mcp\.custom_.+_("
     r"headers|access_token|refresh_token|token_expires_at|"
+    r"token_endpoint|oauth_resource|"
     r"client_id|client_secret|tool_count|status_message"
     r")$"
 )

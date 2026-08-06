@@ -1,5 +1,5 @@
 import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
-import { Check } from 'lucide-react'
+import { Check, Star } from 'lucide-react'
 
 import { ComposerModelEffortMenu } from '@/components/agents/composer/ComposerModelEffortMenu'
 import {
@@ -15,15 +15,19 @@ export function ComposerModelPickerOption({
   option,
   modelOptions,
   runtimeSettings,
+  favorite = false,
   effortMenuOpen,
   onEffortMenuOpenChange,
   onModelSelect,
   onReasoningSettingsChange,
-  onModelSearchClear
+  onModelSearchClear,
+  onToggleFavorite,
+  onClosePicker
 }: {
   option: ComposerModelOption
   modelOptions: ComposerModelOption[]
   runtimeSettings: RuntimeSettings | null
+  favorite?: boolean
   effortMenuOpen: boolean
   onEffortMenuOpenChange: (open: boolean) => void
   onModelSelect: (
@@ -38,6 +42,9 @@ export function ComposerModelPickerOption({
     reasoningFast?: boolean
   }) => Promise<void>
   onModelSearchClear: () => void
+  onToggleFavorite?: () => void | Promise<void>
+  /** Close picker after a plain row select — not Edit / star. */
+  onClosePicker?: () => void
 }) {
   const isSelected = isComposerModelSelected(
     option,
@@ -66,9 +73,8 @@ export function ComposerModelPickerOption({
   const selectModel = () => {
     void onModelSelect(option.provider, option.model, option.profileId)
     onModelSearchClear()
-    if (!optionSupportsEffort) {
-      onEffortMenuOpenChange(false)
-    }
+    onEffortMenuOpenChange(false)
+    onClosePicker?.()
   }
 
   return (
@@ -115,6 +121,28 @@ export function ComposerModelPickerOption({
         ) : null}
       </span>
       <div className="relative z-10 flex shrink-0 items-center gap-2">
+        {onToggleFavorite ? (
+          <button
+            type="button"
+            title={favorite ? 'Unpin favorite' : 'Pin favorite'}
+            aria-label={favorite ? 'Unpin favorite' : 'Pin favorite'}
+            className={cn(
+              'rounded-sm p-0.5',
+              favorite
+                ? 'text-muted-foreground'
+                : 'text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+            )}
+            onClick={event => {
+              event.preventDefault()
+              event.stopPropagation()
+              void onToggleFavorite()
+            }}
+          >
+            <Star
+              className={cn('size-2.5', favorite && 'fill-current')}
+            />
+          </button>
+        ) : null}
         {optionSupportsEffort ? (
           isSelected && onReasoningSettingsChange ? (
             <ComposerModelEffortMenu

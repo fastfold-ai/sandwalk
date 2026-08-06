@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  composerModelPrefKey,
   formatComposerModelLabel,
   formatContextWindow,
   formatPickerContextBadge,
   isComposerModelSelected,
   modelOptionBadge,
+  rankComposerModelOptions,
   resolveComposerModelOption,
+  scoreComposerModelSearch,
   toComposerModelOptions
 } from './composer-models'
 
@@ -67,6 +70,13 @@ describe('modelOptionBadge', () => {
     )
   })
 
+  it('prefers provider over generic Custom for custom cloud models', () => {
+    expect(modelOptionBadge({ source: 'custom', provider: 'openai' })).toBe(
+      'OpenAI'
+    )
+  })
+})
+
 describe('formatComposerModelLabel', () => {
   it('strips via-provider suffixes', () => {
     expect(formatComposerModelLabel('DeepSeek V4 Pro · via Together')).toBe(
@@ -74,13 +84,6 @@ describe('formatComposerModelLabel', () => {
     )
     expect(formatComposerModelLabel('Inkling · via Together')).toBe('Inkling')
     expect(formatComposerModelLabel('Claude Opus 4.6')).toBe('Claude Opus 4.6')
-  })
-})
-
-  it('prefers provider over generic Custom for custom cloud models', () => {
-    expect(modelOptionBadge({ source: 'custom', provider: 'openai' })).toBe(
-      'OpenAI'
-    )
   })
 })
 
@@ -133,6 +136,7 @@ describe('toComposerModelOptions', () => {
         source: 'cloud',
         backend: null,
         supportsReasoningEffort: false,
+        supportsReasoningFast: true,
         reasoningEffortOptions: [],
         reasoningEffort: 'medium',
         reasoningFast: false,
@@ -151,6 +155,7 @@ describe('toComposerModelOptions', () => {
         source: 'cloud',
         backend: null,
         supportsReasoningEffort: false,
+        supportsReasoningFast: true,
         reasoningEffortOptions: [],
         reasoningEffort: 'medium',
         reasoningFast: false,
@@ -169,6 +174,7 @@ describe('toComposerModelOptions', () => {
         source: 'profile',
         backend: 'omlx',
         supportsReasoningEffort: false,
+        supportsReasoningFast: true,
         reasoningEffortOptions: [],
         reasoningEffort: 'medium',
         reasoningFast: false,
@@ -243,5 +249,57 @@ describe('resolveComposerModelOption', () => {
     expect(resolveComposerModelOption(options, runtime)?.speed).toBe('DS4')
     expect(isComposerModelSelected(options[1], runtime, options)).toBe(true)
     expect(isComposerModelSelected(options[0], runtime, options)).toBe(false)
+  })
+})
+
+describe('scoreComposerModelSearch', () => {
+  it('ranks DeepSeek above unrelated models for Deep', () => {
+    const deepseek = {
+      provider: 'deepseek',
+      model: 'deepseek-v4-flash',
+      label: 'DeepSeek V4 Flash',
+      speed: 'DeepSeek'
+    }
+    const opus = {
+      provider: 'anthropic',
+      model: 'claude-opus-5',
+      label: 'Opus 5',
+      speed: 'Anthropic'
+    }
+    expect(scoreComposerModelSearch(deepseek, 'Deep')).toBeGreaterThan(
+      scoreComposerModelSearch(opus, 'Deep')
+    )
+    expect(scoreComposerModelSearch(opus, 'Deep')).toBe(-1)
+  })
+})
+
+describe('rankComposerModelOptions', () => {
+  it('sections favorites and recent when not searching', () => {
+    const options: Parameters<typeof rankComposerModelOptions>[0] = [
+      {
+        provider: 'anthropic',
+        model: 'claude-sonnet-5',
+        label: 'Sonnet 5',
+        speed: 'Anthropic',
+        source: 'cloud'
+      },
+      {
+        provider: 'deepseek',
+        model: 'deepseek-v4-flash',
+        label: 'DeepSeek V4 Flash',
+        speed: 'DeepSeek',
+        source: 'cloud'
+      }
+    ]
+    const sections = rankComposerModelOptions(options, '', {
+      favorites: [composerModelPrefKey(options[1])],
+      recent: [composerModelPrefKey(options[0])]
+    })
+    expect(sections.map(section => section.title)).toEqual([
+      'Favorites',
+      'Recent'
+    ])
+    expect(sections[0].options[0].model).toBe('deepseek-v4-flash')
+    expect(sections[1].options[0].model).toBe('claude-sonnet-5')
   })
 })

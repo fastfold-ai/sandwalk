@@ -9,12 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- MCP OAuth Connect no longer sticks on “Waiting for callback…” in the desktop
+  app: system-browser auth has no ``window.opener``, so the UI now polls +
+  re-listens on focus until credentials land (no manual reload).
 - Workspace / Library uploads: removed the per-file size cap (was 40MB). Local
   sessions can attach any format and any size; failed uploads toast the API
   error instead of failing silently.
 
 ### Added
 
+- Featured **Exa** MCP (`https://mcp.exa.ai/mcp`): OAuth Connect preferred
+  (browser sign-in) with optional ``EXA_API_KEY`` / ``x-api-key`` fallback for
+  web search and page fetch. Bundled integration icon; see
+  ``cli/docs/mcp-defaults/`` and https://docs.exa.ai/reference/exa-mcp.
 - Featured **anydoc** skill (`convert-documents-to-markdown` from
   ``firecrawl/anydoc``) plus a reusable **skill runtime-deps** adapter:
   ``sandwalk skills deps status|install|reinstall|doctor``,

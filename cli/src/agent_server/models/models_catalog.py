@@ -18,6 +18,8 @@ class AgentModel(ApiModel):
     enabled: bool = True
     health: str | None = None
     supports_reasoning_effort: bool = False
+    # False when Fast (thinking off) is rejected — e.g. Muse Spark mandatory reasoning.
+    supports_reasoning_fast: bool = True
     reasoning_effort_options: list[str] = Field(default_factory=list)
     # Per-model Effort/Fast (only meaningful when supports_reasoning_effort).
     reasoning_effort: str | None = None
@@ -47,3 +49,21 @@ class UpdateAgentModelRequest(ApiModel):
     # When set, toggle only this provider's row for a shared bare model id
     # (e.g. kimi-k3 on moonshot vs opencode).
     provider: str | None = None
+
+
+class ModelPreferences(ApiModel):
+    """Pinned favorites + recently selected models (``provider:model`` keys)."""
+
+    favorites: list[str] = Field(default_factory=list)
+    recent: list[str] = Field(default_factory=list)
+
+
+class ToggleModelFavoriteRequest(ApiModel):
+    provider: str | None = None
+    model: str
+    profile_id: str | None = None
+
+
+class ToggleModelFavoriteResponse(ApiModel):
+    favorite: bool
+    favorites: list[str] = Field(default_factory=list)

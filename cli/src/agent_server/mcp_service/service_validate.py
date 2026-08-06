@@ -77,6 +77,7 @@ class ValidateMixin:
             reconnect = oauth_reconnect_required(entry, cfg)
             if reconnect:
                 save_status_message(catalog_id, reconnect)
+                clear_tool_count(catalog_id)
                 return {
                     "ok": False,
                     "toolCount": 0,
@@ -84,7 +85,18 @@ class ValidateMixin:
                     "tools": [],
                     "toolDetails": [],
                 }
-            return _mcp_service.probe_mcp_server(url=entry.url or "", headers=headers)
+            result = _mcp_service.probe_mcp_server(
+                url=entry.url or "", headers=headers
+            )
+            if result.get("ok"):
+                save_tool_count(catalog_id, int(result.get("toolCount") or 0))
+                save_status_message(catalog_id, None)
+            else:
+                clear_tool_count(catalog_id)
+                save_status_message(
+                    catalog_id, str(result.get("message") or "Connection failed")
+                )
+            return result
 
         if server_id:
             server = next(

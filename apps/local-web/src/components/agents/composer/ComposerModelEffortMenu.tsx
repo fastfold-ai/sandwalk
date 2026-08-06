@@ -89,38 +89,42 @@ export function ComposerModelEffortMenu({
             )
           })}
         </div>
-        <div className="text-muted-foreground border-t px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
-          Options
-        </div>
-        <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-          <span className="text-sm font-medium">Fast</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={optionFast}
-            aria-label="Fast mode"
-            className={cn(
-              'relative h-5 w-9 shrink-0 rounded-full transition-colors',
-              optionFast ? 'bg-primary' : 'bg-muted-foreground/30'
-            )}
-            onClick={event => {
-              event.preventDefault()
-              event.stopPropagation()
-              void onReasoningSettingsChange({
-                provider: option.provider,
-                model: option.model,
-                reasoningFast: !optionFast
-              })
-            }}
-          >
-            <span
-              className={cn(
-                'bg-background pointer-events-none absolute top-0.5 left-0.5 size-4 rounded-full border border-black/5 shadow-sm transition-transform',
-                optionFast && 'translate-x-4'
-              )}
-            />
-          </button>
-        </div>
+        {option.supportsReasoningFast !== false ? (
+          <>
+            <div className="text-muted-foreground border-t px-3 py-2 text-[11px] font-medium tracking-wide uppercase">
+              Options
+            </div>
+            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+              <span className="text-sm font-medium">Fast</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={optionFast}
+                aria-label="Fast mode"
+                className={cn(
+                  'relative h-5 w-9 shrink-0 rounded-full transition-colors',
+                  optionFast ? 'bg-primary' : 'bg-muted-foreground/30'
+                )}
+                onClick={event => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  void onReasoningSettingsChange({
+                    provider: option.provider,
+                    model: option.model,
+                    reasoningFast: !optionFast
+                  })
+                }}
+              >
+                <span
+                  className={cn(
+                    'bg-background pointer-events-none absolute top-0.5 left-0.5 size-4 rounded-full border border-black/5 shadow-sm transition-transform',
+                    optionFast && 'translate-x-4'
+                  )}
+                />
+              </button>
+            </div>
+          </>
+        ) : null}
       </PopoverContent>
     </Popover>
   )

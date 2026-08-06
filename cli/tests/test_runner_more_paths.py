@@ -123,6 +123,15 @@ class TestNotificationAndUsageFormatting:
         assert result.raw_results["error"] == "boom"
         assert result.duration_s == 3.5
 
+    def test_make_error_result_rewrites_mandatory_reasoning(self):
+        result = AgentRunner._make_error_result(
+            "hi",
+            "Reasoning is mandatory for this endpoint and cannot be disabled.",
+            0.5,
+        )
+        assert "disable Fast mode" in result.summary
+        assert "Agent SDK error:" in result.summary
+
     def test_make_error_result_links_file_access_settings(self):
         error = (
             "Path:/Users/example/private.txt outside root directory: "

@@ -139,8 +139,62 @@ def resolve_custom_server_headers(server: Any, *, config: Config | None = None) 
         dynamic = run_headers_helper_command(str(helper).strip())
         if dynamic:
             return ensure_mcp_http_headers(dynamic)
-    access = str(cfg.get(custom_oauth_token_key(server.id, "access_token")) or "").strip()
+    access = _ensure_fresh_custom_oauth_token(server, cfg)
     if access:
         return ensure_mcp_http_headers({"Authorization": f"Bearer {access}"})
     static = get_custom_headers(cfg, server.id)
     return ensure_mcp_http_headers(static) if static else None
+
+
+def _custom_oauth_expired(cfg: Config, server_id: str, *, skew_seconds: int = 60) -> bool:
+    raw = cfg.get(custom_oauth_token_key(server_id, "token_expires_at"))
+    if raw is None or str(raw).strip() == "":
+        return False
+    try:
+        expires_at = float(raw)
+    except (TypeError, ValueError):
+        return False
+    import time
+
+    return time.time() >= (expires_at - max(0, skew_seconds))
+
+
+def _ensure_fresh_custom_oauth_token(server: Any, cfg: Config) -> str | None:
+    """Refresh custom-server OAuth access token when expired."""
+    from agent_server.mcp_service.auth import _refresh_oauth_access_token
+
+    server_id = str(server.id)
+    prefix = f"mcp.custom_{server_id}"
+    access = str(cfg.get(custom_oauth_token_key(server_id, "access_token")) or "").strip()
+    if not access:
+        return None
+    if not _custom_oauth_expired(cfg, server_id):
+        return access
+    refresh = str(cfg.get(custom_oauth_token_key(server_id, "refresh_token")) or "").strip()
+    if not refresh:
+        return access
+    client_id = str(cfg.get(custom_oauth_token_key(server_id, "client_id")) or "").strip()
+    client_secret = (
+        str(cfg.get(custom_oauth_token_key(server_id, "client_secret")) or "").strip()
+        or None
+    )
+    token_endpoint = str(
+        cfg.get(custom_oauth_token_key(server_id, "token_endpoint")) or ""
+    ).strip()
+    resource = str(
+        cfg.get(custom_oauth_token_key(server_id, "oauth_resource"))
+        or getattr(server, "url", None)
+        or ""
+    ).strip()
+    if not token_endpoint or not client_id:
+        return access
+    refreshed = _refresh_oauth_access_token(
+        prefix=prefix,
+        refresh_token=refresh,
+        client_id=client_id,
+        client_secret=client_secret,
+        token_endpoint=token_endpoint,
+        resource=resource,
+        cfg=cfg,
+    )
+    return refreshed or None

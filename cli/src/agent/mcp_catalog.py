@@ -179,6 +179,24 @@ MCP_CATALOG: list[McpCatalogEntry] = [
         featured=True,
     ),
     McpCatalogEntry(
+        id="exa",
+        name="Exa",
+        description=(
+            "Web search and page fetch for science and research — papers, "
+            "patents, molecules, and the open web via Exa MCP."
+        ),
+        url="https://mcp.exa.ai/mcp",
+        auth_mode="api_key_or_oauth",
+        preferred_auth="oauth",
+        api_key_config_key="mcp.exa_api_key",
+        api_key_env_var="EXA_API_KEY",
+        api_key_header="x-api-key",
+        docs_url="https://docs.exa.ai/reference/exa-mcp",
+        setup_url="https://dashboard.exa.ai",
+        integration_key="exa",
+        featured=True,
+    ),
+    McpCatalogEntry(
         id="linear",
         name="Linear",
         description="Issues, projects, and comments for product and ops workflows.",

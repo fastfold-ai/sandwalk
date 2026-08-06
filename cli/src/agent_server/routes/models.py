@@ -6,11 +6,15 @@ import asyncio
 
 from fastapi import FastAPI, HTTPException, Query
 
+from agent.config import Config
 from agent_server.app_deps import AppDeps
 from agent_server.models import (
     AgentModel,
     AgentModelList,
     CreateAgentModelRequest,
+    ModelPreferences,
+    ToggleModelFavoriteRequest,
+    ToggleModelFavoriteResponse,
     UpdateAgentModelRequest,
 )
 
@@ -28,6 +32,39 @@ def register_model_routes(app: FastAPI, deps: AppDeps) -> None:
             enabled_only=enabled_only,
             discover=discover,
         )
+
+    @app.get("/v1/models/preferences", response_model=ModelPreferences)
+    async def get_model_preferences() -> ModelPreferences:
+        def _load() -> ModelPreferences:
+            cfg = Config.load()
+            return ModelPreferences(
+                favorites=cfg.favorite_models(),
+                recent=cfg.recent_models(),
+            )
+
+        return await asyncio.to_thread(_load)
+
+    @app.post(
+        "/v1/models/preferences/favorite",
+        response_model=ToggleModelFavoriteResponse,
+    )
+    async def toggle_model_favorite(
+        payload: ToggleModelFavoriteRequest,
+    ) -> ToggleModelFavoriteResponse:
+        def _toggle() -> ToggleModelFavoriteResponse:
+            cfg = Config.load()
+            favorite = cfg.toggle_model_favorite(
+                payload.model,
+                payload.provider,
+                profile_id=payload.profile_id,
+            )
+            cfg.save()
+            return ToggleModelFavoriteResponse(
+                favorite=favorite,
+                favorites=cfg.favorite_models(),
+            )
+
+        return await asyncio.to_thread(_toggle)
 
     @app.post("/v1/models", response_model=AgentModel, status_code=201)
     async def create_custom_model(payload: CreateAgentModelRequest) -> AgentModel:
