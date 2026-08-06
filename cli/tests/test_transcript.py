@@ -302,6 +302,28 @@ def test_user_message_box_has_no_prompt_arrow():
     assert any("┃" in line for line in lines)
 
 
+def test_user_message_box_has_margin_above_panel():
+    """System/usage lines must not sit flush against the user soft-panel."""
+    from ui.terminal.transcript.render import entry_lines, render_all_lines
+
+    store = TranscriptStore()
+    store.append_text("hello sandwalk", kind="user")
+    lines = [line for _, _, line in entry_lines(store.entries[0], width=60)]
+    assert lines[0].strip() == ""
+    assert any("┃" in line for line in lines[1:])
+
+    store.append_text("✻ Validated for 18s\t↑ 22,599 ↓ 11", kind="usage")
+    store.append_text("next turn", kind="user")
+    rows, _hits = render_all_lines(store, width=60)
+    plain = ["".join(t for _s, t in frags) for frags in rows]
+    usage_idx = next(i for i, line in enumerate(plain) if "Validated for 18s" in line)
+    next_user = next(
+        i for i, line in enumerate(plain[usage_idx + 1 :], usage_idx + 1) if "┃" in line
+    )
+    assert next_user > usage_idx + 1
+    assert plain[usage_idx + 1].strip() == ""
+
+
 def test_resize_reflows_to_current_width():
     """After resize settles, wrap tracks the live width so text stays visible."""
     import time

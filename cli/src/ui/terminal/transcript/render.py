@@ -232,7 +232,9 @@ def user_message_rows(
         or bool(mcp_chips)
     )
 
-    rows: list[StyleAndTextTuples] = [_user_panel_fill(panel_w)]
+    # Margin above the soft panel so system/usage lines ("Switched to…",
+    # "✻ Validated for…") are not flush against the user box.
+    rows: list[StyleAndTextTuples] = [[("", "")], _user_panel_fill(panel_w)]
     for line in body_lines:
         if use_chips:
             frags = style_with_image_chips(
