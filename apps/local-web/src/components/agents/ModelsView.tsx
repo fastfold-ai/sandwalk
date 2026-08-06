@@ -45,6 +45,7 @@ export function ModelsView({
   onClearProviderKey,
   onTestProviderKey,
   onRevealStoredSecret,
+  onRevealProfileSecret,
   embedded = false
 }: {
   integrations: IntegrationSummary[]
@@ -95,6 +96,8 @@ export function ModelsView({
   ) => Promise<{ ok: boolean; message: string }>
   /** Load a saved API key for show/copy in the key modal. */
   onRevealStoredSecret: (key: string) => Promise<string>
+  /** Load a saved Local LLM API key for show/copy / discover. */
+  onRevealProfileSecret: (profileId: string) => Promise<string>
   /** Compact chrome for setup wizard embedding. */
   embedded?: boolean
 }) {
@@ -139,7 +142,8 @@ export function ModelsView({
     onDiscoverEndpoint,
     onSaveProviderKey,
     onClearProviderKey: runClearProviderKey,
-    onTestProviderKey: runTestProviderKey
+    onTestProviderKey: runTestProviderKey,
+    onRevealProfileSecret
   })
   const [multimodalGuideOpen, setMultimodalGuideOpen] = useState(false)
 
@@ -256,6 +260,8 @@ export function ModelsView({
         selectedBackend={state.selectedBackend}
         savingProfile={state.savingProfile}
         discovering={state.discovering}
+        testingProfile={state.testingProfile}
+        testResult={state.testResult}
         discoveredModels={state.discoveredModels}
         discoverSource={state.discoverSource}
         discoverError={state.discoverError}
@@ -273,9 +279,11 @@ export function ModelsView({
           state.resetDiscoverState()
         }}
         onDiscoverModels={() => void state.discoverModels()}
+        onTestProfile={() => void state.testProfile()}
         onSaveProfile={() => void state.saveProfile()}
         onRemoveProfile={profile => void state.removeProfile(profile)}
         onShowProfileApiKeyChange={state.setShowProfileApiKey}
+        onRevealStoredSecret={onRevealProfileSecret}
         onResetDiscoverState={state.resetDiscoverState}
       />
 

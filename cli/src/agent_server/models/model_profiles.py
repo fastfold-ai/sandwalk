@@ -55,3 +55,10 @@ class ModelProfileProbeResult(ApiModel):
 class DeleteModelProfileResponse(ApiModel):
     ok: bool
     id: str
+
+
+class ModelProfileSecretResponse(ApiModel):
+    """Raw stored profile API key for local reveal/copy (user opt-in)."""
+
+    configured: bool
+    value: str

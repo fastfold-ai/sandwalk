@@ -2116,6 +2116,17 @@ export class LocalAgentClient
     })
   }
 
+  /** Fetch the stored Local LLM API key for reveal/copy (user opt-in). */
+  revealModelProfileSecret(
+    profileId: string,
+    signal?: AbortSignal
+  ): Promise<{ configured: boolean; value: string }> {
+    return this.request<{ configured: boolean; value: string }>(
+      `/model-profiles/${encodeURIComponent(profileId)}/secret`,
+      { signal }
+    )
+  }
+
   probeModelProfile(
     profileId: string,
     signal?: AbortSignal

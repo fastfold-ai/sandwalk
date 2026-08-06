@@ -26,7 +26,7 @@ from agent_server.models.library import DeleteLibraryItemResponse, LibraryItem, 
 from agent_server.models.mcp_catalog import ConnectMcpCatalogRequest, ConnectMcpCatalogResponse, McpCatalogEntryStatus, McpCatalogList, UpdateMcpCatalogRequest
 from agent_server.models.mcp_json_config import McpJsonConfigRequest, McpJsonConfigResponse
 from agent_server.models.mcp_servers import CreateMcpServerRequest, McpServer, McpServerList, McpToolDetail, UpdateMcpServerRequest, ValidateMcpResponse
-from agent_server.models.model_profiles import DeleteModelProfileResponse, DiscoverModelEndpointRequest, ModelProfile, ModelProfileList, ModelProfileProbeResult, UpsertModelProfileRequest
+from agent_server.models.model_profiles import DeleteModelProfileResponse, DiscoverModelEndpointRequest, ModelProfile, ModelProfileList, ModelProfileProbeResult, ModelProfileSecretResponse, UpsertModelProfileRequest
 from agent_server.models.models_catalog import AgentModel, AgentModelList, CreateAgentModelRequest, UpdateAgentModelRequest
 from agent_server.models.projects import AgentProject, CreateProjectRequest, DeleteProjectResponse, ProjectList, UpdateProjectRequest
 from agent_server.models.sessions import AgentSession, AutoTitleSessionRequest, CompactSessionRequest, CompactSessionResponse, CreateSessionRequest, DeleteSessionResponse, HitlDecision, InterruptRunResponse, OrganizeLabel, SandboxBackendChoice, SessionList, SessionRevision, SessionSandboxStatus, SessionSource, SessionStatus, SubmitApprovalsRequest, SubmitApprovalsResponse, TitleSource, UpdateSessionRequest

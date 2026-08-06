@@ -184,10 +184,19 @@ def test_models_http_routes(isolated_config: Config, tmp_path: Path, monkeypatch
             "backend": "lm_studio",
             "base_url": "http://127.0.0.1:1234/v1",
             "default_model": "local-chat",
+            "api_key": "sk-local-test-secret",
         },
     )
     assert created.status_code == 201
     profile_id = created.json()["id"]
+    assert created.json()["hasApiKey"] is True
+    assert created.json()["apiKeyPreview"]
+
+    revealed = client.get(f"/v1/model-profiles/{profile_id}/secret")
+    assert revealed.status_code == 200
+    secret_body = revealed.json()
+    assert secret_body["configured"] is True
+    assert secret_body["value"] == "sk-local-test-secret"
 
     probed = client.post(f"/v1/model-profiles/{profile_id}/probe")
     assert probed.status_code == 200

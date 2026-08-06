@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop rewriting ``llm.provider`` from model-id prefixes (e.g. local oMLX
+  ``Qwen*`` weights labeled as Qwen Cloud). Provider + active profile from
+  config/storage are source of truth; heal only falls back when an OpenAI
+  cloud model id is stuck on a local backend.
 - Interactive transcript shows the sandwalk startup banner again (fullscreen
   TUI had replaced the Rich scrollback where it used to live).
 - Transcript TUI no longer recreates the fullscreen app on every send (screen

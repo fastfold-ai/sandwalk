@@ -61,6 +61,15 @@ class ProfileBootstrapMixin:
                 or (configured_model and not cls._looks_like_anthropic_model(configured_model))
             ):
                 data["llm.openai_active_profile"] = bootstrap_id
+                # Compat profiles speak OpenAI wire protocol. When we activate a
+                # bootstrapped local profile for a non-Anthropic model, set the
+                # stored provider explicitly — do not leave it for catalog-prefix
+                # heal to guess later.
+                if configured_model and not cls._looks_like_anthropic_model(
+                    configured_model
+                ):
+                    data["llm.provider"] = "openai"
+                    provider_raw = "openai"
         return configured_model, provider_raw
 
     @classmethod

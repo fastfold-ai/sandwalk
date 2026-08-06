@@ -259,6 +259,10 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
           const revealed = await client.revealIntegrationSecret(key)
           return revealed.value
         }}
+        onRevealProfileSecret={async profileId => {
+          const revealed = await client.revealModelProfileSecret(profileId)
+          return revealed.value
+        }}
       />
     )
   }

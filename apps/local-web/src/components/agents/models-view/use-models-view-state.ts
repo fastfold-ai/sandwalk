@@ -61,6 +61,7 @@ type ModelsViewCallbacks = {
   onTestProviderKey: (
     key: string
   ) => Promise<{ ok: boolean; message: string }>
+  onRevealProfileSecret?: (profileId: string) => Promise<string>
 }
 
 export function useModelsViewState(callbacks: ModelsViewCallbacks) {
@@ -97,7 +98,8 @@ export function useModelsViewState(callbacks: ModelsViewCallbacks) {
     onUpdateProfile: callbacks.onUpdateProfile,
     onDeleteProfile: callbacks.onDeleteProfile,
     onProbeProfile: callbacks.onProbeProfile,
-    onDiscoverEndpoint: callbacks.onDiscoverEndpoint
+    onDiscoverEndpoint: callbacks.onDiscoverEndpoint,
+    onRevealProfileSecret: callbacks.onRevealProfileSecret
   })
 
   return {

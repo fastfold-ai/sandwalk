@@ -2,12 +2,15 @@ import type { ModelProfile } from '@sandwalk/agent-ui-core'
 import {
   Check,
   ChevronDown,
+  Copy,
   Eye,
   EyeOff,
   Loader2,
   RefreshCw,
   Trash2
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -27,6 +30,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { copyText } from '@/lib/clipboard'
+import { cn } from '@/lib/utils'
 
 import { ProfileBackendIcon } from './models-view-shared'
 import {
@@ -43,6 +48,8 @@ export function ModelsProfileDialog({
   selectedBackend,
   savingProfile,
   discovering,
+  testingProfile,
+  testResult,
   discoveredModels,
   discoverSource,
   discoverError,
@@ -51,9 +58,11 @@ export function ModelsProfileDialog({
   onFormChange,
   onBackendChange,
   onDiscoverModels,
+  onTestProfile,
   onSaveProfile,
   onRemoveProfile,
   onShowProfileApiKeyChange,
+  onRevealStoredSecret,
   onResetDiscoverState
 }: {
   open: boolean
@@ -62,6 +71,8 @@ export function ModelsProfileDialog({
   selectedBackend: (typeof PROFILE_BACKENDS)[number]
   savingProfile: boolean
   discovering: boolean
+  testingProfile: boolean
+  testResult: { ok: boolean; message: string } | null
   discoveredModels: string[]
   discoverSource: string | null
   discoverError: string | null
@@ -72,11 +83,89 @@ export function ModelsProfileDialog({
   ) => void
   onBackendChange: (backend: ProfileBackendValue) => void
   onDiscoverModels: () => void
+  onTestProfile: () => void
   onSaveProfile: () => void
   onRemoveProfile?: (profile: ModelProfile) => void
   onShowProfileApiKeyChange: (value: boolean | ((open: boolean) => boolean)) => void
+  /** Load the saved Local LLM API key into the draft for show/copy. */
+  onRevealStoredSecret?: (profileId: string) => Promise<string>
   onResetDiscoverState: () => void
 }) {
+  const [secretAction, setSecretAction] = useState<'reveal' | 'copy' | null>(
+    null
+  )
+  const [copied, setCopied] = useState(false)
+  const busy =
+    savingProfile || discovering || testingProfile || secretAction !== null
+
+  useEffect(() => {
+    setSecretAction(null)
+    setCopied(false)
+  }, [editing?.id, open])
+
+  const ensureStoredSecret = async (): Promise<string> => {
+    const draft = form.apiKey.trim()
+    if (draft) return draft
+    if (!editing?.hasApiKey || !onRevealStoredSecret) return ''
+    const value = (await onRevealStoredSecret(editing.id)).trim()
+    if (value) {
+      onFormChange(prev => ({ ...prev, apiKey: value }))
+    }
+    return value
+  }
+
+  const toggleReveal = async () => {
+    if (showProfileApiKey) {
+      onShowProfileApiKeyChange(false)
+      return
+    }
+    if (editing?.hasApiKey && !form.apiKey.trim()) {
+      if (!onRevealStoredSecret) {
+        onShowProfileApiKeyChange(true)
+        return
+      }
+      setSecretAction('reveal')
+      try {
+        await ensureStoredSecret()
+        onShowProfileApiKeyChange(true)
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Unable to reveal saved key'
+        )
+      } finally {
+        setSecretAction(null)
+      }
+      return
+    }
+    onShowProfileApiKeyChange(true)
+  }
+
+  const copySecret = async () => {
+    setSecretAction('copy')
+    try {
+      const value = await ensureStoredSecret()
+      if (!value) {
+        toast.error('No API key to copy')
+        return
+      }
+      onShowProfileApiKeyChange(true)
+      const ok = await copyText(value)
+      if (ok) {
+        setCopied(true)
+        toast.success('API key copied')
+        window.setTimeout(() => setCopied(false), 1500)
+      } else {
+        toast.error('Could not copy — select the key manually')
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Unable to copy saved key'
+      )
+    } finally {
+      setSecretAction(null)
+    }
+  }
+
   return (
     <Dialog
       open={open}
@@ -192,23 +281,45 @@ export function ModelsProfileDialog({
                       ? 'Optional (Ollama usually needs none)'
                       : 'Optional'
                 }
-                className="pr-10 font-mono text-sm"
+                className="pr-16 font-mono text-sm"
                 autoComplete="off"
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute top-1/2 right-1 size-7 -translate-y-1/2"
-                onClick={() => onShowProfileApiKeyChange(open => !open)}
-                aria-label={showProfileApiKey ? 'Hide API key' : 'Show API key'}
-              >
-                {showProfileApiKey ? (
-                  <EyeOff className="size-4" />
-                ) : (
-                  <Eye className="size-4" />
-                )}
-              </Button>
+              <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-0.5">
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-md"
+                  aria-label="Copy API key"
+                  title="Copy API key"
+                  disabled={busy}
+                  onClick={() => void copySecret()}
+                >
+                  {secretAction === 'copy' ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : copied ? (
+                    <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Copy className="size-4" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-md"
+                  aria-label={
+                    showProfileApiKey ? 'Hide API key' : 'Show API key'
+                  }
+                  title={showProfileApiKey ? 'Hide API key' : 'Show API key'}
+                  disabled={busy}
+                  onClick={() => void toggleReveal()}
+                >
+                  {secretAction === 'reveal' ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : showProfileApiKey ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -271,27 +382,51 @@ export function ModelsProfileDialog({
               {discoverError}
             </span>
           ) : null}
+          {testResult ? (
+            <p
+              className={cn(
+                'shrink-0 rounded-md px-3 py-2 text-sm',
+                testResult.ok
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                  : 'bg-amber-500/15 text-amber-900 dark:text-amber-200'
+              )}
+            >
+              {testResult.message}
+            </p>
+          ) : null}
         </div>
 
         <DialogFooter className="shrink-0 gap-2 sm:justify-between">
-          {editing && onRemoveProfile ? (
+          <div className="flex flex-wrap gap-2">
+            {editing && onRemoveProfile ? (
+              <Button
+                variant="ghost"
+                className="text-destructive hover:text-destructive"
+                disabled={busy}
+                onClick={() => onRemoveProfile(editing)}
+              >
+                <Trash2 />
+                Remove
+              </Button>
+            ) : null}
             <Button
               variant="ghost"
-              className="text-destructive hover:text-destructive"
-              disabled={savingProfile}
-              onClick={() => onRemoveProfile(editing)}
+              disabled={busy || !form.baseUrl.trim()}
+              onClick={onTestProfile}
             >
-              <Trash2 />
-              Remove
+              {testingProfile ? <Loader2 className="animate-spin" /> : null}
+              Test
             </Button>
-          ) : (
-            <span />
-          )}
+          </div>
           <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
-            <Button disabled={savingProfile} onClick={onSaveProfile}>
+            <Button disabled={busy} onClick={onSaveProfile}>
               {savingProfile ? <Loader2 className="animate-spin" /> : null}
               Save
             </Button>

@@ -370,7 +370,8 @@ def test_run_checks_core_llm_errors_without_keys():
     assert checks["llm"].status == "error"
 
 
-def test_heal_gemini_model_under_openai_provider():
+def test_config_trusts_stored_provider_over_model_id_heuristic():
+    """llm.provider is source of truth — catalog prefixes must not rewrite it."""
     from agent.model_catalog import catalog_provider_for_model
 
     assert catalog_provider_for_model("gemini-3.1-flash-lite") == "google"
@@ -380,57 +381,41 @@ def test_heal_gemini_model_under_openai_provider():
             "llm.provider": "openai",
             "llm.model": "gemini-3.1-flash-lite",
             "llm.google_api_key": "gk-test",
-            "llm.openai_active_profile": "ollama_local",
+            "llm.openai_active_profile": "openai_cloud",
             "llm.openai_profiles": {
                 "openai_cloud": {
                     "label": "OpenAI Cloud",
                     "backend": "openai",
                     "base_url": "https://api.openai.com/v1",
-                },
-                "ollama_local": {
-                    "label": "Ollama",
-                    "backend": "ollama",
-                    "base_url": "http://localhost:11434/v1",
-                },
-            },
-        }
-    )
-    assert cfg.get("llm.provider") == "google"
-    assert "Google Gemini" in cfg.llm_selection_summary()
-    assert "gemini-3.1-flash-lite" in cfg.llm_selection_summary()
-    assert "provider=openai" not in cfg.llm_selection_summary()
-
-
-def test_heal_openai_model_under_google_provider():
-    cfg = Config(
-        data={
-            "llm.provider": "google",
-            "llm.model": "gpt-5.6-sol",
-            "llm.openai_api_key": "sk-test-key",
-            "llm.openai_active_profile": "ollama_local",
-            "llm.openai_profiles": {
-                "openai_cloud": {
-                    "label": "OpenAI Cloud",
-                    "backend": "openai",
-                    "base_url": "https://api.openai.com/v1",
-                },
-                "ollama_local": {
-                    "label": "Ollama",
-                    "backend": "ollama",
-                    "base_url": "http://localhost:11434/v1",
-                    "default_model": "llama3.1",
                 },
             },
         }
     )
     assert cfg.get("llm.provider") == "openai"
+    assert cfg.get("llm.model") == "gemini-3.1-flash-lite"
+
+
+def test_config_keeps_google_provider_even_with_openai_model_id():
+    cfg = Config(
+        data={
+            "llm.provider": "google",
+            "llm.model": "gpt-5.6-sol",
+            "llm.openai_api_key": "sk-test-key",
+            "llm.openai_active_profile": "openai_cloud",
+            "llm.openai_profiles": {
+                "openai_cloud": {
+                    "label": "OpenAI Cloud",
+                    "backend": "openai",
+                    "base_url": "https://api.openai.com/v1",
+                },
+            },
+        }
+    )
+    assert cfg.get("llm.provider") == "google"
     assert cfg.get("llm.model") == "gpt-5.6-sol"
-    assert cfg.get("llm.openai_active_profile") == "openai_cloud"
-    assert "OpenAI" in cfg.llm_selection_summary()
-    assert "gpt-5.6-sol" in cfg.llm_selection_summary()
 
 
-def test_heal_anthropic_with_gemini_model_prefers_google():
+def test_config_keeps_anthropic_provider_with_gemini_model_id():
     cfg = Config(
         data={
             "llm.provider": "anthropic",
@@ -442,16 +427,10 @@ def test_heal_anthropic_with_gemini_model_prefers_google():
                     "backend": "openai",
                     "base_url": "https://api.openai.com/v1",
                 },
-                "ollama_local": {
-                    "label": "Ollama",
-                    "backend": "ollama",
-                    "base_url": "http://localhost:11434/v1",
-                    "default_model": "llama3.1",
-                },
             },
         }
     )
-    assert cfg.get("llm.provider") == "google"
+    assert cfg.get("llm.provider") == "anthropic"
 
 
 def test_to_report_scope_core(monkeypatch):

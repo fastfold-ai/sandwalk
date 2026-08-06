@@ -36,6 +36,7 @@ from agent_server.models_service.profiles import discover_endpoint as _discover_
 from agent_server.models_service.profiles import get_profile as _get_profile
 from agent_server.models_service.profiles import list_profiles as _list_profiles
 from agent_server.models_service.profiles import probe_profile as _probe_profile
+from agent_server.models_service.profiles import reveal_profile_secret as _reveal_profile_secret
 from agent_server.models_service.profiles import upsert_profile as _upsert_profile
 
 __all__ = ["ModelsService"]
@@ -70,6 +71,9 @@ class ModelsService:
 
     def get_profile(self, profile_id: str) -> ModelProfile | None:
         return _get_profile(Config.load(), profile_id)
+
+    def reveal_profile_secret(self, profile_id: str):
+        return _reveal_profile_secret(Config.load(), profile_id)
 
     def upsert_profile(self, payload: UpsertModelProfileRequest) -> ModelProfile:
         return _upsert_profile(Config.load(), payload)

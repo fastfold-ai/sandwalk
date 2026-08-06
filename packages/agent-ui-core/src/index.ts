@@ -1069,6 +1069,11 @@ export interface ModelsProvider {
     signal?: AbortSignal
   ): Promise<ModelProfile>
   deleteModelProfile(profileId: string, signal?: AbortSignal): Promise<void>
+  /** Fetch the stored Local LLM API key for reveal/copy (user opt-in). */
+  revealModelProfileSecret?(
+    profileId: string,
+    signal?: AbortSignal
+  ): Promise<{ configured: boolean; value: string }>
   probeModelProfile(
     profileId: string,
     signal?: AbortSignal

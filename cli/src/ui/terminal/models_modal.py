@@ -635,14 +635,54 @@ class ModelsModalHost:
             host.cancel()
 
     def _status_strip(self):
+        """Footer for the highlighted row (not frozen session provider status)."""
         st = self.state
+        opt = self._current_option()
+        model = st.current_model or "—"
         label = st.provider_label or st.current_provider or "—"
         endpoint = st.provider_endpoint or ""
+        if opt:
+            model = str(opt.get("model_id") or model or "—")
+            profile_id = str(opt.get("profile_id") or "").strip()
+            if profile_id:
+                backend = str(opt.get("backend") or "").strip().lower()
+                display_name = getattr(
+                    self.terminal, "_compatible_backend_display_name", None
+                )
+                backend_label = (
+                    display_name(backend)
+                    if callable(display_name) and backend
+                    else "Local"
+                )
+                label = (
+                    f"Local ({backend_label})"
+                    if backend_label and backend_label != "Local"
+                    else "Local"
+                )
+                endpoint = ""
+                cfg = self._cfg()
+                if hasattr(cfg, "get_openai_profile"):
+                    try:
+                        profile = cfg.get_openai_profile(profile_id)
+                    except Exception:  # noqa: BLE001
+                        profile = None
+                    if isinstance(profile, dict):
+                        endpoint = str(profile.get("base_url") or "").strip()
+            else:
+                from ui.terminal.model_options import provider_display_label
+
+                label = provider_display_label(
+                    str(opt.get("provider") or ""),
+                    fallback=str(
+                        opt.get("provider_label") or opt.get("provider") or label
+                    ),
+                )
+                endpoint = ""
         # Leave room for side pads already applied by the status VSplit.
         max_ep = max(12, DIALOG_WIDTH - PAD_X * 2 - 28)
         if len(endpoint) > max_ep:
             endpoint = endpoint[: max_ep - 1] + "…"
-        bits = [st.current_model or "—", label]
+        bits = [model or "—", label]
         if endpoint:
             bits.append(endpoint)
         text = " · ".join(bits)

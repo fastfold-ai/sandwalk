@@ -9,6 +9,7 @@ from agent_server.models import (
     ModelProfile,
     ModelProfileList,
     ModelProfileProbeResult,
+    ModelProfileSecretResponse,
     UpsertModelProfileRequest,
 )
 from agent_server.models_service.helpers import _to_profile
@@ -34,6 +35,18 @@ def get_profile(cfg: Config, profile_id: str) -> ModelProfile | None:
         active=cfg.active_openai_profile_id(),
         default=cfg.default_openai_profile_id(),
     )
+
+
+def reveal_profile_secret(cfg: Config, profile_id: str) -> ModelProfileSecretResponse:
+    """Return the raw stored API key for local UI reveal/copy."""
+    selected = str(profile_id or "").strip()
+    if not selected:
+        raise KeyError(profile_id)
+    profile = cfg.get_openai_profile(selected)
+    if profile is None:
+        raise KeyError(selected)
+    value = str(profile.get("api_key") or "").strip()
+    return ModelProfileSecretResponse(configured=bool(value), value=value)
 
 
 def upsert_profile(cfg: Config, payload: UpsertModelProfileRequest) -> ModelProfile:

@@ -13,6 +13,7 @@ from agent_server.models import (
     ModelProfile,
     ModelProfileList,
     ModelProfileProbeResult,
+    ModelProfileSecretResponse,
     UpsertModelProfileRequest,
 )
 
@@ -62,6 +63,23 @@ def register_model_profile_routes(app: FastAPI, deps: AppDeps) -> None:
             return await asyncio.to_thread(models_service.upsert_profile, merged)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get(
+        "/v1/model-profiles/{profile_id}/secret",
+        response_model=ModelProfileSecretResponse,
+    )
+    async def reveal_model_profile_secret(
+        profile_id: str,
+    ) -> ModelProfileSecretResponse:
+        """Return the stored profile API key for local reveal/copy."""
+        try:
+            return await asyncio.to_thread(
+                models_service.reveal_profile_secret, profile_id
+            )
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=404, detail="Model profile not found."
+            ) from exc
 
     @app.delete("/v1/model-profiles/{profile_id}", response_model=DeleteModelProfileResponse)
     async def delete_model_profile(profile_id: str) -> DeleteModelProfileResponse:

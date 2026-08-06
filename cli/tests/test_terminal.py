@@ -134,6 +134,36 @@ class TestTerminalMethods:
         assert "gemma4:e2b-mlx" in str(toolbar)
         assert "Unsloth" in str(toolbar)
 
+    def test_compose_provider_label_omlx_not_qwen_cloud_for_local_qwen_id(self, terminal):
+        """Local oMLX Qwen* weights must not surface as Qwen Cloud in the compose bar."""
+        def _cfg_get(key, default=None):
+            values = {
+                "llm.provider": "openai",
+                "llm.openai_base_url": "http://localhost:8000/v1",
+                "llm.openai_compatible_backend": "omlx",
+                "agent.plan_preview": False,
+            }
+            return values.get(key, default)
+
+        terminal.session.config.get.side_effect = _cfg_get
+        terminal.session.config.get_openai_profile.return_value = {
+            "id": "omlx",
+            "label": "oMLX",
+            "backend": "omlx",
+            "base_url": "http://localhost:8000/v1",
+            "api_key": "",
+        }
+        terminal.session.current_model = "Qwen3.6-35B-A3B-OptiQ-4bit"
+        terminal.session.verbose = False
+        terminal._show_interrupt_hint = False
+        terminal._worker_thread = None
+        terminal._queued_queries = []
+        assert terminal._compose_provider_label() == "oMLX"
+        # Prefer the compose meta line (Agent · model provider · sandbox).
+        compose = str(terminal._compose_meta_toolbar())
+        assert "Qwen Cloud" not in compose
+        assert "oMLX" in compose
+
     def test_bottom_toolbar_shows_sandbox_next_to_specialist(self, terminal):
         def _cfg_get(key, default=None):
             values = {
