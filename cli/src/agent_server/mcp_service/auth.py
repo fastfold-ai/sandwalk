@@ -82,10 +82,18 @@ def oauth_reconnect_required(
 
 
 def credentials_configured(entry: McpCatalogEntry, config: Config | None = None) -> bool:
+    if entry.transport == "stdio" or entry.auth_mode == "none":
+        if entry.id == "pymol":
+            from agent.mcps.pymol_mcp import launcher_ready
+
+            return launcher_ready()
+        return bool(entry.command or entry.id)
     return resolve_auth_headers(entry, config) is not None
 
 
 def auth_method_in_use(entry: McpCatalogEntry, config: Config | None = None) -> str | None:
+    if entry.transport == "stdio" or entry.auth_mode == "none":
+        return "local" if credentials_configured(entry, config) else None
     cfg = config or Config.load()
     if _cfg_secret(cfg, f"mcp.{entry.id}_access_token", None):
         return "oauth"

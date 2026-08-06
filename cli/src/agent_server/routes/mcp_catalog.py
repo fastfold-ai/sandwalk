@@ -38,10 +38,24 @@ def register_mcp_catalog_routes(app: FastAPI, deps: AppDeps) -> None:
         response_model=McpServer,
         status_code=201,
     )
-    async def install_mcp_catalog(catalog_id: str) -> McpServer:
-        """Re-add a removed catalog template into the installed MCP list."""
+    async def install_mcp_catalog(
+        catalog_id: str,
+        force: bool = False,
+    ) -> McpServer:
+        """Install a catalog template (PyMOL also creates the managed launcher).
+
+        Pass ``force=true`` to recreate the PyMOL managed venv (reinstall launcher).
+        """
 
         def _install() -> McpServer:
+            from agent.mcp_catalog import get_catalog_entry
+
+            entry = get_catalog_entry(catalog_id)
+            if entry is not None and (
+                entry.transport == "stdio" or entry.auth_mode == "none"
+            ):
+                result = mcp_service.install_featured(catalog_id, force=force)
+                return result["server"]
             server = install_catalog_server(store, catalog_id)
             return enrich_mcp_server(server)
 
@@ -51,6 +65,8 @@ def register_mcp_catalog_routes(app: FastAPI, deps: AppDeps) -> None:
             raise HTTPException(
                 status_code=404, detail="Unknown MCP catalog entry"
             ) from None
+        except RuntimeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
 
     @app.post(
         "/v1/mcp-servers/catalog/{catalog_id}/validate",

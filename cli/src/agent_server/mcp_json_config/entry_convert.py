@@ -83,7 +83,15 @@ def cursor_entry_to_create_kwargs(
         catalog_id = name_s
     entry = get_catalog_entry(catalog_id) if catalog_id else None
     if entry is not None:
-        if not url_s and entry.url:
+        if entry.transport == "stdio":
+            from agent.mcp_catalog import resolve_catalog_command
+
+            transport = "stdio"
+            command_s = command_s or resolve_catalog_command(entry) or entry.command
+            url_s = None
+            if not args and entry.args:
+                args = list(entry.args)
+        elif not url_s and entry.url:
             url_s = entry.url
             transport = entry.transport
             command_s = None

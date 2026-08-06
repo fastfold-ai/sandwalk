@@ -418,7 +418,11 @@ class DeepAgentsRunMixin:
                     progress_callback("turn_complete")
                 except Exception:  # noqa: BLE001
                     pass
-            return self._make_error_result(query, str(e), duration)
+            # Unclassified errors used to only land in the export/store summary
+            # (Agent SDK error: …) with nothing in the owned TUI — always surface.
+            detail = str(e).strip() or e.__class__.__name__
+            self._print_friendly_error("Agent error", detail)
+            return self._make_error_result(query, detail, duration)
         finally:
             if thinking_status is not None:
                 thinking_status.stop()

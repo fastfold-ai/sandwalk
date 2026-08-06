@@ -22,6 +22,7 @@ import {
   authMeta,
   type CatalogStatusPatch,
   formatConnectError,
+  isLocalStdioCatalog,
   McpIcon,
   McpToggle,
   statusBadge,
@@ -65,13 +66,24 @@ export function McpCatalogCard({
 }) {
   const view = withStatusPatch(entry, statusPatch)
   const pending = pendingId === view.id
-  const supportsApiKey = view.authMode !== 'oauth'
-  const supportsOAuth = view.authMode !== 'api_key'
+  const isLocal = isLocalStdioCatalog(view)
+  const supportsApiKey = !isLocal && view.authMode !== 'oauth'
+  const supportsOAuth = !isLocal && view.authMode !== 'api_key'
   const hasBoth = supportsApiKey && supportsOAuth
   const isSetup = view.configured || view.connected || view.enabled
-  const label = isSetup ? 'Reconnect' : 'Connect'
+  const label = isLocal
+    ? isSetup
+      ? 'Open'
+      : 'Set up'
+    : isSetup
+      ? 'Reconnect'
+      : 'Connect'
 
   const primaryConnect = () => {
+    if (isLocal) {
+      onOpenCatalog?.(view)
+      return
+    }
     if (supportsOAuth && view.preferredAuth === 'oauth') {
       onConnectOAuth(view)
       return
@@ -130,7 +142,9 @@ export function McpCatalogCard({
             onToggle={() => {
               if (!view.configured && !view.enabled) {
                 toast.error(
-                  'Connect with OAuth or API key first, then enable.',
+                  isLocal
+                    ? 'Run setup first (install plugin + sandwalk mcp install pymol), then enable.'
+                    : 'Connect with OAuth or API key first, then enable.',
                   { description: view.name },
                 )
                 return
@@ -225,7 +239,18 @@ export function McpCatalogCard({
             {label}
           </Button>
         )}
-        {view.docsUrl ? (
+        {view.setupUrl && isLocal ? (
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-xs"
+            onClick={event => {
+              event.stopPropagation()
+              void openInSystemBrowser(view.setupUrl!)
+            }}
+          >
+            Plugin zip <ExternalLink className="size-3" />
+          </button>
+        ) : view.docsUrl ? (
           <button
             type="button"
             className="text-muted-foreground hover:text-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-xs"

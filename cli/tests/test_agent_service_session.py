@@ -76,8 +76,11 @@ def test_interrupt_and_delete_session(tmp_path: Path, monkeypatch):
     running.done.return_value = False
     running.cancel = MagicMock()
     svc._active_runs[session.id] = running
+    runner = MagicMock()
+    svc._active_runners[session.id] = runner
     store.set_session_status(session.id, "running")
     assert svc.interrupt(session.id) is True
+    runner.request_interrupt.assert_called_once_with(force=True)
     running.cancel.assert_called_once()
     assert store.get_session(session.id).status == "interrupted"
 

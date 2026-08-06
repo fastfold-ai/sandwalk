@@ -70,6 +70,7 @@ def run_cmd(
         set_active_specialist_ref,
     )
 
+    active_specialist = None
     if specialist:
         resolved = resolve_specialist_ref(specialist)
         if resolved is None:
@@ -81,8 +82,7 @@ def run_cmd(
             f"  [dim]Specialist:[/dim] [bold]{resolved.name}[/bold] "
             f"[dim]({resolved.slug})[/dim]"
         )
-        if query:
-            context = apply_specialist_to_context(context, resolved)
+        active_specialist = resolved
     else:
         active = get_active_specialist()
         if active is not None:
@@ -90,8 +90,11 @@ def run_cmd(
                 f"  [dim]Specialist:[/dim] [bold]{active.name}[/bold] "
                 f"[dim]({active.slug})[/dim]"
             )
-            if query:
-                context = apply_specialist_to_context(context, active)
+            active_specialist = active
+
+    # Always inject enabled MCP servers (all when no specialist).
+    if query:
+        context = apply_specialist_to_context(context, active_specialist)
 
     # Determine session resume
     resume_id = None

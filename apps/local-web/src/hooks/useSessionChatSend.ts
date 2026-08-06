@@ -7,7 +7,7 @@ import {
   useCallback,
   useEffect} from 'react'
 
-import { buildSendContent } from '@/lib/chat-actions'
+import { buildSendContent, finalizePendingTools } from '@/lib/chat-actions'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import type { SessionChatState } from '@/lib/sessions'
 
@@ -270,6 +270,8 @@ export function useSessionChatSend({
   const handleStop = useCallback(async () => {
     if (!sessionId) return
     // Optimistic clear — do not wait for SSE / live worker (orphaned runs).
+    // Clearing runActive also tells the stream hook to ignore zombie deltas
+    // from a worker that has not exited yet.
     patchChat(sessionId, prev => ({
       ...prev,
       runActive: false,
@@ -277,7 +279,11 @@ export function useSessionChatSend({
       liveDelta: '',
       pendingApproval: null,
       approvalSubmitting: false,
-      activeBuildPlan: null
+      activeBuildPlan: null,
+      tools: finalizePendingTools(prev.tools, {
+        runId: prev.activeRunId,
+        reason: 'Interrupted'
+      })
     }))
     setSessions(current =>
       current.map(item =>

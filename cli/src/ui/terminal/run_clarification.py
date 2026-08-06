@@ -25,7 +25,8 @@ class _RunClarificationMixin:
         run_context = dict(context)
 
         # Apply (or clear) active CLI specialist each run so /specialist use|clear
-        # takes effect without restarting the session.
+        # takes effect without restarting the session. Always inject enabled MCP
+        # servers (all of them when no specialist — same as local-web).
         try:
             from agent.specialists_manage import (
                 apply_specialist_to_context,
@@ -34,12 +35,10 @@ class _RunClarificationMixin:
 
             run_context.pop("specialist_instructions", None)
             run_context.pop("allowed_skill_names", None)
-            # Drop prior specialist MCP filter; re-apply only when active.
-            if "mcp_servers" in run_context and get_active_specialist() is None:
-                run_context.pop("mcp_servers", None)
-            active = get_active_specialist()
-            if active is not None:
-                run_context = apply_specialist_to_context(run_context, active)
+            run_context.pop("mcp_servers", None)
+            run_context = apply_specialist_to_context(
+                run_context, get_active_specialist()
+            )
         except Exception:  # noqa: BLE001
             pass
 

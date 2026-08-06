@@ -255,6 +255,7 @@ def transcript_style_dict(
         "transcript-user": panel,
         "transcript-user-accent": accent,
         "transcript-system": p["system_fg"],
+        "transcript-error": "#dc2626" if mode == "light" else "#ff5555",
         "transcript-resume": p["resume_fg"],
         "transcript-tool": tool_fg,
         "transcript-tool-ok": "#16a34a" if mode == "light" else "#98c379",

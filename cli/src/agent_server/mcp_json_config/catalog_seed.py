@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent.mcp_catalog import MCP_CATALOG
+from agent.mcp_catalog import MCP_CATALOG, catalog_create_kwargs
 from agent_server.mcp_json_config.catalog_removed import get_removed_catalog_ids
 from agent_server.mcp_service import enrich_mcp_server
 from agent_server.store import AgentStore
@@ -46,16 +46,7 @@ def seed_catalog_defaults(store: AgentStore) -> int:
             continue
         if entry.id in by_catalog:
             continue
-        store.create_mcp_server(
-            name=entry.name,
-            transport=entry.transport,
-            command=None,
-            args=[],
-            url=entry.url,
-            enabled=False,
-            catalog_id=entry.id,
-            description=entry.description,
-        )
+        store.create_mcp_server(**catalog_create_kwargs(entry, enabled=False))
         created += 1
     return created
 

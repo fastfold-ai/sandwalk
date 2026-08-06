@@ -16,7 +16,7 @@ class TextEntry:
     """Plain / markdown-ish text block (user, assistant, system chrome)."""
 
     text: str
-    kind: str = "text"  # text | user | assistant | system | banner
+    kind: str = "text"  # text | user | assistant | system | error | banner
     entry_id: int = field(default_factory=lambda: next(_ids))
 
 

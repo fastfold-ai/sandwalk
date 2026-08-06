@@ -50,12 +50,22 @@ def apply_specialist_to_context(
     *,
     store: AgentStore | None = None,
 ) -> dict[str, Any]:
-    """Mutate/return run context with specialist instructions, skills, and MCPs."""
+    """Mutate/return run context with specialist instructions, skills, and MCPs.
+
+    When *specialist* is None, injects all enabled MCP servers (same as the
+    local-web agent server with no session specialist). When a specialist is
+    set, MCP servers are filtered to that specialist's allowlist.
+    """
     ctx = dict(context or {})
+    from agent_server.mcp_service import McpService
+
+    agent_store = store or _store()
+    servers = McpService(agent_store).resolve_runtime_servers()
+
     if specialist is None:
         ctx.pop("specialist_instructions", None)
         ctx.pop("allowed_skill_names", None)
-        # Leave mcp_servers alone when clearing — caller may have set globals.
+        ctx["mcp_servers"] = servers
         return ctx
 
     instructions = (specialist.instructions or "").strip()
@@ -67,10 +77,7 @@ def apply_specialist_to_context(
     ctx["allowed_skill_names"] = list(specialist.skill_names or [])
 
     from agent_server.default_specialists import filter_mcp_servers_for_specialist
-    from agent_server.mcp_service import McpService
 
-    agent_store = store or _store()
-    servers = McpService(agent_store).resolve_runtime_servers()
     ctx["mcp_servers"] = filter_mcp_servers_for_specialist(
         servers,
         mcp_server_ids=list(specialist.mcp_server_ids or []),

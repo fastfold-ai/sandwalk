@@ -36,7 +36,10 @@ class CatalogMixin:
 
             if enabled:
                 if not configured:
-                    status_message = "Enabled but not authenticated"
+                    if entry.transport == "stdio" or entry.auth_mode == "none":
+                        status_message = "Enabled but launcher not installed"
+                    else:
+                        status_message = "Enabled but not authenticated"
                     tool_count = None
                 elif tool_count is not None and not status_message:
                     connected = True
@@ -56,6 +59,8 @@ class CatalogMixin:
                 if reconnect:
                     status_message = reconnect
                     connected = False
+
+            from agent.mcp_catalog import resolve_catalog_command
 
             out.append(
                 {
@@ -79,6 +84,10 @@ class CatalogMixin:
                     "connected": connected,
                     "tool_count": tool_count if enabled else None,
                     "status_message": status_message,
+                    "command": resolve_catalog_command(entry)
+                    if entry.transport == "stdio"
+                    else None,
+                    "args": list(entry.args or []) if entry.transport == "stdio" else [],
                 }
             )
         return out
@@ -104,15 +113,10 @@ class CatalogMixin:
         )
         if existing:
             return existing
+        from agent.mcp_catalog import catalog_create_kwargs
+
         server = self.store.create_mcp_server(
-            name=entry.name,
-            transport=entry.transport,
-            command=None,
-            args=[],
-            url=entry.url,
-            enabled=enabled,
-            catalog_id=entry.id,
-            description=entry.description,
+            **catalog_create_kwargs(entry, enabled=enabled)
         )
         get_or_export_mcp_json(self.store)
         return server

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Featured **PyMOL** local MCP (plugin **v0.0.1**): Plugin Manager zip
+  (`https://sandwalk.sh/pymol/plugin.zip`), managed launcher under
+  ``~/.sandwalk/pymol-mcp/``, ``sandwalk mcp install pymol`` /
+  ``sandwalk mcp doctor pymol``, and a local-web setup checklist (no OAuth).
+  Helpers live in ``cli/src/agent/mcps/pymol_mcp/``; packaging in
+  ``packaging/pymol-mcp/``. The MCP server is **vendored** under
+  ``cli/src/agent/mcps/pymol_mcp/vendor/agentic-pymol/`` (no GitHub fetch at
+  install); ``sandwalk mcp install pymol --force`` recreates the launcher venv.
 - Interactive ``/skills`` picker (same modal chrome as ``/models``): taller
   searchable list, lean descriptions, and ``on/off · author · version``;
   Enter / click inserts ``skill: <name>`` into compose (keep typing); Space

@@ -31,6 +31,21 @@ class _LifecycleMixin:
         except Exception:  # noqa: BLE001
             logger.debug("HITL broker cancel failed", exc_info=True)
 
+        # Stop the worker thread first — cancelling the asyncio Task alone does
+        # not stop ``asyncio.to_thread``; the agent keeps streaming otherwise.
+        runner = self._active_runners.get(session_id)
+        if runner is not None:
+            request_interrupt = getattr(runner, "request_interrupt", None)
+            if callable(request_interrupt):
+                try:
+                    request_interrupt(force=True)
+                except Exception:  # noqa: BLE001
+                    logger.debug(
+                        "runner.request_interrupt failed",
+                        exc_info=True,
+                        extra={"session_id": session_id},
+                    )
+
         task = self._active_runs.get(session_id)
         cancelled = False
         if task is not None and not task.done():
@@ -46,6 +61,7 @@ class _LifecycleMixin:
 
         # Always clear stuck running status so Stop is reliable even when the
         # worker is gone or CancelledError never surfaces from a hung thread.
+        # Status flip also gates emit_runtime_event so zombie threads go quiet.
         self.store.set_session_status(session_id, "interrupted")
         if not cancelled:
             run_id = self._run_ids.get(session_id)

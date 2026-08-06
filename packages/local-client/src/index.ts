@@ -2229,13 +2229,15 @@ export class LocalAgentClient
 
   installMcpCatalog(
     catalogId: string,
-    signal?: AbortSignal
+    options?: { force?: boolean; signal?: AbortSignal }
   ): Promise<McpServer> {
+    const force = Boolean(options?.force)
+    const qs = force ? '?force=true' : ''
     return this.request<McpServer>(
-      `/mcp-servers/catalog/${encodeURIComponent(catalogId)}/install`,
+      `/mcp-servers/catalog/${encodeURIComponent(catalogId)}/install${qs}`,
       {
         method: 'POST',
-        signal
+        signal: options?.signal
       }
     )
   }

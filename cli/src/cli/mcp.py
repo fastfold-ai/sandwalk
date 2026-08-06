@@ -43,6 +43,44 @@ def mcp_catalog_cmd():
         raise typer.Exit(code=code)
 
 
+@mcp_app.command("install")
+def mcp_install_cmd(
+    catalog_id: str = typer.Argument(
+        ..., help="Catalog id to install (e.g. pymol)"
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Recreate the managed launcher venv (PyMOL reinstall)",
+    ),
+):
+    """Install a featured local MCP (PyMOL launcher) and enable it."""
+    from agent.mcp_manage import handle_mcp_argv
+
+    argv = ["install", catalog_id]
+    if force:
+        argv.append("--force")
+    code = handle_mcp_argv(argv, console)
+    if code:
+        raise typer.Exit(code=code)
+
+
+@mcp_app.command("doctor")
+def mcp_doctor_cmd(
+    catalog_id: str = typer.Argument(
+        "pymol",
+        help="Catalog id to diagnose (default: pymol)",
+    ),
+):
+    """Check launcher/token/probe for a local or remote MCP."""
+    from agent.mcp_manage import handle_mcp_argv
+
+    code = handle_mcp_argv(["doctor", catalog_id], console)
+    if code:
+        raise typer.Exit(code=code)
+
+
 @mcp_app.command("connect")
 def mcp_connect_cmd(
     catalog_id: str = typer.Argument(

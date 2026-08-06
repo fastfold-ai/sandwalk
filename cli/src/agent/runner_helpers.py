@@ -184,6 +184,25 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             "then retry (you can update via `/models` or `sandwalk setup`).",
         )
 
+    # Billing / quota — check before generic context/token phrases ("max_tokens").
+    is_credits = (
+        "requires more credits" in low
+        or "can only afford" in low
+        or "add more credits" in low
+        or "insufficient credits" in low
+        or "insufficient_quota" in low
+        or ("quota" in low and ("exceed" in low or "exceeded" in low))
+        or ("payment" in low and ("required" in low or "failed" in low))
+    )
+    if is_credits:
+        return (
+            "Provider credits / quota",
+            f"{detail}\n"
+            "The model provider rejected the request for billing or quota reasons.\n"
+            "Add credits at the provider (e.g. openrouter.ai/settings/credits),\n"
+            "or lower max output tokens / switch to a cheaper model via `/models`.",
+        )
+
     is_context = (
         "context_length" in low
         or "context length" in low

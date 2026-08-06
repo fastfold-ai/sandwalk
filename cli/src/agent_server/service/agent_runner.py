@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 
 def run_existing_agent(
@@ -17,6 +19,8 @@ def run_existing_agent(
     session_id: str | None = None,
     sandbox_backend: str | None = None,
     allowed_tool_names: list[str] | None = None,
+    on_runner_ready: Callable[[Any], None] | None = None,
+    on_runner_done: Callable[[], None] | None = None,
 ) -> str:
     """Temporary adapter until AgentRunner is split into AgentRuntime."""
     from agent.config import Config
@@ -42,20 +46,28 @@ def run_existing_agent(
             trajectory.add_turn(pending_user, message.content)
             pending_user = None
     runner = AgentRunner(session, trajectory=trajectory, headless=True)
-    context: dict = {"workspace_path": workspace_path} if workspace_path else {}
-    if session_id:
-        context["session_id"] = session_id
-    effective_backend = effective_session_sandbox_backend(sandbox_backend, config=config)
-    context["sandbox_backend"] = effective_backend
-    if mcp_servers:
-        context["mcp_servers"] = mcp_servers
-    if project_context:
-        context["project_context"] = project_context
-    if specialist_instructions:
-        context["specialist_instructions"] = specialist_instructions
-    if allowed_skill_names is not None:
-        context["allowed_skill_names"] = allowed_skill_names
-    if allowed_tool_names is not None:
-        context["allowed_tool_names"] = allowed_tool_names
-    result = runner.run(content, context, progress_callback=progress_callback)
-    return result.summary or "Done."
+    if on_runner_ready is not None:
+        on_runner_ready(runner)
+    try:
+        context: dict = {"workspace_path": workspace_path} if workspace_path else {}
+        if session_id:
+            context["session_id"] = session_id
+        effective_backend = effective_session_sandbox_backend(
+            sandbox_backend, config=config
+        )
+        context["sandbox_backend"] = effective_backend
+        if mcp_servers:
+            context["mcp_servers"] = mcp_servers
+        if project_context:
+            context["project_context"] = project_context
+        if specialist_instructions:
+            context["specialist_instructions"] = specialist_instructions
+        if allowed_skill_names is not None:
+            context["allowed_skill_names"] = allowed_skill_names
+        if allowed_tool_names is not None:
+            context["allowed_tool_names"] = allowed_tool_names
+        result = runner.run(content, context, progress_callback=progress_callback)
+        return result.summary or "Done."
+    finally:
+        if on_runner_done is not None:
+            on_runner_done()

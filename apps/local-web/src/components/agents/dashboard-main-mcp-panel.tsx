@@ -98,6 +98,19 @@ export function DashboardMainMcpPanel({
           await refreshMcp()
           await loadIntegrations()
         }}
+        onInstallLocal={
+          mcpCatalogDetailId &&
+          mcpDetailCatalogEntry?.transport === 'stdio' &&
+          client.installMcpCatalog
+            ? async (opts?: { force?: boolean }) => {
+                await client.installMcpCatalog!(mcpCatalogDetailId, {
+                  force: Boolean(opts?.force)
+                })
+                await refreshMcp()
+                await loadIntegrations()
+              }
+            : undefined
+        }
       />
     )
   }

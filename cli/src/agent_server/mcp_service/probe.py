@@ -1,13 +1,110 @@
-"""MCP initialize + tools/list smoke test over HTTP."""
+"""MCP initialize + tools/list smoke test over HTTP or stdio."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import urllib.error
 import urllib.request
 from typing import Any
 
 from agent_server.mcp_service.custom_headers import ensure_mcp_http_headers
+
+
+def probe_stdio_mcp_server(
+    *,
+    command: str,
+    args: list[str] | None = None,
+    timeout: float = 45.0,
+) -> dict[str, Any]:
+    """List tools from a local stdio MCP server via MultiServerMCPClient."""
+    empty = {
+        "ok": False,
+        "toolCount": 0,
+        "message": "",
+        "tools": [],
+        "toolDetails": [],
+    }
+    cmd = str(command or "").strip()
+    if not cmd:
+        return {**empty, "message": "stdio MCP requires a command"}
+
+    async def _run() -> list[Any]:
+        from agent.deepagents_runtime.mcp_tools import ensure_quiet_stdio_mcp_errlog
+        from langchain_mcp_adapters.client import MultiServerMCPClient
+
+        # Child MCP servers log to stderr; keep probes from painting the TTY.
+        ensure_quiet_stdio_mcp_errlog()
+        client = MultiServerMCPClient(
+            {
+                "probe": {
+                    "transport": "stdio",
+                    "command": cmd,
+                    "args": [str(a) for a in (args or [])],
+                }
+            }
+        )
+        return list(await asyncio.wait_for(client.get_tools(), timeout=timeout))
+
+    try:
+        tools = asyncio.run(_run())
+    except Exception as exc:  # noqa: BLE001
+        detail = _format_stdio_probe_error(exc)
+        return {**empty, "message": f"stdio probe failed: {detail}"}
+
+    details: list[dict[str, Any]] = []
+    names: list[str] = []
+    for tool in tools:
+        name = str(getattr(tool, "name", "") or "").strip()
+        if not name:
+            continue
+        names.append(name)
+        description = getattr(tool, "description", None)
+        schema = getattr(tool, "args_schema", None)
+        if schema is not None and hasattr(schema, "model_json_schema"):
+            try:
+                schema = schema.model_json_schema()
+            except Exception:  # noqa: BLE001
+                schema = None
+        details.append(
+            {
+                "name": name,
+                "title": None,
+                "description": str(description).strip() if description else None,
+                "inputSchema": schema if isinstance(schema, dict) else None,
+            }
+        )
+    return {
+        "ok": True,
+        "toolCount": len(details),
+        "message": f"Connected — {len(details)} tools available",
+        "tools": names,
+        "toolDetails": details,
+    }
+
+
+def _format_stdio_probe_error(exc: BaseException) -> str:
+    """Unwrap ExceptionGroup / TaskGroup noise to the root cause."""
+    parts: list[str] = []
+    stack: list[BaseException] = [exc]
+    seen: set[int] = set()
+    while stack:
+        cur = stack.pop()
+        if id(cur) in seen:
+            continue
+        seen.add(id(cur))
+        # ExceptionGroup / BaseExceptionGroup (3.11+)
+        nested = getattr(cur, "exceptions", None)
+        if isinstance(nested, tuple):
+            stack.extend(list(nested))
+            continue
+        text = str(cur).strip() or type(cur).__name__
+        if text and text not in parts:
+            parts.append(text)
+    if not parts:
+        return str(exc)
+    # Prefer the deepest / most specific message when TaskGroup wraps ImportError.
+    return parts[-1] if len(parts) == 1 else " → ".join(parts[-3:])
 
 
 def parse_sse_or_json(raw: str) -> list[dict[str, Any]]:

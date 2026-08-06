@@ -125,6 +125,18 @@ class TestClassifyLlmError:
         assert "something odd happened" in body
         assert "llm.model" in body
 
+    def test_openrouter_credits_exhausted(self):
+        title, body = _classify_llm_error(
+            _Err(
+                "This request requires more credits, or fewer max_tokens. "
+                "You requested up to 65536 tokens, but can only afford 19464. "
+                "To increase, visit https://openrouter.ai/settings/credits"
+            )
+        )
+        assert title == "Provider credits / quota"
+        assert "credits" in body.lower()
+        assert "openrouter" in body.lower() or "max output" in body.lower()
+
     def test_context_length_exceeded(self):
         title, body = _classify_llm_error(
             _OpenAIStyleErr("Error code: 400 - context_length_exceeded")
@@ -313,6 +325,7 @@ class TestPrintFriendlyError:
         assert "Rate limited" in joined
         assert "429" in joined
         assert "During task with name" not in joined
+        assert any(getattr(e, "kind", None) == "error" for e in store.entries)
         console.print.assert_not_called()
 
     def test_no_transcript_uses_panel(self):

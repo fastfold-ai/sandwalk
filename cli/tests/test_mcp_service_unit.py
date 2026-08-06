@@ -62,6 +62,7 @@ def test_paperclip_catalog_entry_featured_over_linear():
     assert tavily.api_key_header == "Authorization"
     assert tavily.api_key_header_prefix == "Bearer "
     assert {e.id for e in MCP_CATALOG} >= {
+        "pymol",
         "tamarind",
         "latch",
         "neurosnap",

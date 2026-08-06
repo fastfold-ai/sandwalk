@@ -102,3 +102,5 @@ class AgentService(
         self.store = store
         self._active_runs: dict[str, asyncio.Task[None]] = {}
         self._run_ids: dict[str, str] = {}
+        # Live AgentRunner instances (worker threads) for real Stop/interrupt.
+        self._active_runners: dict[str, object] = {}

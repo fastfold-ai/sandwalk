@@ -28,6 +28,14 @@ class _RunPipelineMixin:
             history = self.store.list_messages(session_id)
             run_context = build_run_context(self.store, session_id)
             run_started_at = time.monotonic()
+
+            def _on_runner_ready(runner: object) -> None:
+                self._active_runners[session_id] = runner
+
+            def _on_runner_done() -> None:
+                if self._active_runners.get(session_id) is not None:
+                    self._active_runners.pop(session_id, None)
+
             summary = await asyncio.to_thread(
                 run_existing_agent,
                 content,
@@ -41,6 +49,8 @@ class _RunPipelineMixin:
                 session_id,
                 run_context.sandbox_backend,
                 run_context.allowed_tool_names,
+                _on_runner_ready,
+                _on_runner_done,
             )
             agent_done_at = time.monotonic()
             last_stream_at = getattr(emit_runtime_event, "last_stream_at", None)

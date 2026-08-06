@@ -141,8 +141,10 @@ class UsageUIMixin:
 
         if transcript is not None:
             try:
-                transcript.append_text("", kind="system")
-                transcript.append_text(plain, kind="system")
+                # Use kind=error (red) — dim system chrome made fatal failures
+                # easy to miss after a long tool trace.
+                transcript.append_text("", kind="error")
+                transcript.append_text(plain, kind="error")
             except Exception:  # noqa: BLE001
                 if console is not None:
                     console.print(f"\n[red]{plain}[/red]")

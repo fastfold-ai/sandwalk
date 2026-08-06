@@ -6,7 +6,9 @@ import {
   Loader2,
   Plug,
   RefreshCw,
-  Unplug
+  RotateCcw,
+  Unplug,
+  Wrench
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -25,10 +27,17 @@ import type { McpDetailViewState } from './use-mcp-detail-view'
 
 export function McpDetailHeaderBar({
   state,
-  onBack
+  onBack,
+  onOpenSetup,
+  onReinstallLocal,
+  reinstallPending
 }: {
   state: McpDetailViewState
   onBack: () => void
+  onOpenSetup?: () => void
+  /** Recreate the managed local launcher venv (PyMOL). */
+  onReinstallLocal?: () => Promise<void>
+  reinstallPending?: boolean
 }) {
   const navigate = useNavigate()
   const {
@@ -46,7 +55,8 @@ export function McpDetailHeaderBar({
     loading,
     refreshing,
     loadTools,
-    docsUrl
+    docsUrl,
+    isLocalStdio
   } = state
 
   return (
@@ -158,6 +168,35 @@ export function McpDetailHeaderBar({
           )}
           Refresh tools
         </Button>
+        {isLocalStdio && onOpenSetup ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={onOpenSetup}
+          >
+            <Wrench className="size-3.5" />
+            {configured ? 'Setup' : 'Install'}
+          </Button>
+        ) : null}
+        {isLocalStdio && configured && onReinstallLocal ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-xs"
+            disabled={Boolean(reinstallPending) || loading || refreshing}
+            onClick={() => void onReinstallLocal()}
+          >
+            {reinstallPending ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="size-3.5" />
+            )}
+            Reinstall
+          </Button>
+        ) : null}
         {docsUrl ? (
           <Button
             type="button"

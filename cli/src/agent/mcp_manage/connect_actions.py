@@ -9,9 +9,10 @@ from agent.mcp_catalog import MCP_CATALOG, get_catalog_entry
 
 def handle_catalog(args: list[str], console: Console, *, service) -> int:
     for row in service.catalog_statuses():
+        endpoint = row.get("url") or row.get("command") or ""
         console.print(
             f"  [cyan]{row['id']}[/cyan]  {row['name']}  "
-            f"[dim]{row['auth_mode']}[/dim]  {row['url']}"
+            f"[dim]{row['auth_mode']}[/dim]  {endpoint}"
         )
     return 0
 
@@ -28,6 +29,12 @@ def handle_connect(args: list[str], console: Console, *, service) -> int:
             "  [dim]Available:[/dim] " + ", ".join(e.id for e in MCP_CATALOG)
         )
         return 1
+    if entry.transport == "stdio" or entry.auth_mode == "none":
+        console.print(
+            f"  [yellow]{entry.name}[/yellow] is a local MCP — "
+            f"use: [cyan]mcp install {entry.id}[/cyan]"
+        )
+        return 2
     api_key: str | None = None
     if "--api-key" in args:
         idx = args.index("--api-key")

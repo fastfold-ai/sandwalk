@@ -79,8 +79,20 @@ export function McpDetailInfoAside({ state }: { state: McpDetailViewState }) {
               <div className="text-muted-foreground flex items-center gap-1.5">
                 <span className="text-foreground/90 font-medium">Auth:</span>
                 <span className="truncate">
-                  {catalogEntry.authMethod === 'oauth' ? 'OAuth' : 'API key'}
+                  {catalogEntry.authMethod === 'oauth'
+                    ? 'OAuth'
+                    : catalogEntry.authMethod === 'local'
+                      ? 'Local token'
+                      : 'API key'}
                 </span>
+              </div>
+            ) : null}
+            {kind === 'catalog' && catalogEntry?.setupUrl ? (
+              <div className="text-muted-foreground flex items-start gap-1.5">
+                <span className="text-foreground/90 shrink-0 font-medium">
+                  Plugin:
+                </span>
+                <span className="break-all">{catalogEntry.setupUrl}</span>
               </div>
             ) : null}
           </div>

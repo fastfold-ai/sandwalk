@@ -9,6 +9,7 @@ from agent_server.mcp_service.service_catalog import CatalogMixin
 from agent_server.mcp_service.service_credentials import CredentialsMixin
 from agent_server.mcp_service.service_custom_auth import CustomAuthMixin
 from agent_server.mcp_service.service_enable import EnableMixin
+from agent_server.mcp_service.service_install import InstallMixin
 from agent_server.mcp_service.service_oauth_complete import OAuthCompleteMixin
 from agent_server.mcp_service.service_oauth_start import OAuthStartMixin
 from agent_server.mcp_service.service_runtime import RuntimeMixin
@@ -21,6 +22,7 @@ class McpService(
     CatalogMixin,
     CredentialsMixin,
     EnableMixin,
+    InstallMixin,
     ValidateMixin,
     OAuthStartMixin,
     CustomAuthMixin,

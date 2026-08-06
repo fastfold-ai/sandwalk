@@ -114,16 +114,9 @@ def install_catalog_server(store: AgentStore, catalog_id: str):
     if existing is not None:
         get_or_export_mcp_json(store)
         return existing
-    server = store.create_mcp_server(
-        name=entry.name,
-        transport=entry.transport,
-        command=None,
-        args=[],
-        url=entry.url,
-        enabled=False,
-        catalog_id=entry.id,
-        description=entry.description,
-    )
+    from agent.mcp_catalog import catalog_create_kwargs
+
+    server = store.create_mcp_server(**catalog_create_kwargs(entry, enabled=False))
     get_or_export_mcp_json(store)
     return server
 

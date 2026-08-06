@@ -11,7 +11,7 @@ class McpCatalogEntryStatus(ApiModel):
     id: str
     name: str
     description: str
-    url: str
+    url: str | None = None
     transport: Literal["stdio", "sse", "streamable_http"]
     auth_mode: str
     preferred_auth: str
@@ -28,6 +28,8 @@ class McpCatalogEntryStatus(ApiModel):
     connected: bool = False
     tool_count: int | None = None
     status_message: str | None = None
+    command: str | None = None
+    args: list[str] = Field(default_factory=list)
 
 
 class McpCatalogList(ApiModel):

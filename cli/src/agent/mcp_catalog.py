@@ -1,12 +1,13 @@
-"""Suggested remote MCP server catalog (defaults off until Connect)."""
+"""Suggested MCP server catalog (defaults off until Connect / Enable)."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 AuthPreference = Literal["oauth", "api_key"]
-AuthMode = Literal["oauth", "api_key", "api_key_or_oauth"]
+AuthMode = Literal["oauth", "api_key", "api_key_or_oauth", "none"]
+Transport = Literal["streamable_http", "sse", "stdio"]
 
 
 @dataclass(frozen=True)
@@ -14,8 +15,8 @@ class McpCatalogEntry:
     id: str
     name: str
     description: str
-    url: str
-    transport: Literal["streamable_http", "sse"] = "streamable_http"
+    url: str | None = None
+    transport: Transport = "streamable_http"
     auth_mode: AuthMode = "api_key"
     preferred_auth: AuthPreference = "api_key"
     # API key → config.json / Integrations (/keys)
@@ -28,9 +29,36 @@ class McpCatalogEntry:
     integration_key: str | None = None  # Integrations provider key
     # Shown in Featured / onboarding MCP grids. Non-featured stay in the full list.
     featured: bool = True
+    # Local stdio catalog entries (e.g. PyMOL). Resolved at seed/install time.
+    command: str | None = None
+    args: list[str] = field(default_factory=list)
+
+
+def _pymol_command() -> str:
+    from agent.mcps.pymol_mcp import launcher_path
+
+    return str(launcher_path())
 
 
 MCP_CATALOG: list[McpCatalogEntry] = [
+    McpCatalogEntry(
+        id="pymol",
+        name="PyMOL",
+        description=(
+            "Control a live commercial or open-source PyMOL session — "
+            "structures, selections, alignments, and renders via agentic-pymol."
+        ),
+        url=None,
+        transport="stdio",
+        auth_mode="none",
+        preferred_auth="api_key",
+        docs_url=None,
+        setup_url="https://sandwalk.sh/pymol/plugin.zip",
+        featured=True,
+        # command resolved dynamically in catalog_create_kwargs / catalog_as_dicts
+        command=None,
+        args=[],
+    ),
     McpCatalogEntry(
         id="tamarind",
         name="Tamarind Bio",
@@ -152,23 +180,62 @@ def get_catalog_entry(catalog_id: str) -> McpCatalogEntry | None:
     return _BY_ID.get(catalog_id)
 
 
-def catalog_as_dicts() -> list[dict[str, Any]]:
-    return [
-        {
-            "id": e.id,
-            "name": e.name,
-            "description": e.description,
-            "url": e.url,
-            "transport": e.transport,
-            "authMode": e.auth_mode,
-            "preferredAuth": e.preferred_auth,
-            "apiKeyEnvVar": e.api_key_env_var,
-            "apiKeyHeader": e.api_key_header,
-            "docsUrl": e.docs_url,
-            "setupUrl": e.setup_url,
-            "integrationKey": e.integration_key,
-            "featured": e.featured,
-            "defaultEnabled": False,
+def resolve_catalog_command(entry: McpCatalogEntry) -> str | None:
+    """Resolve stdio command for a catalog entry (may be dynamic)."""
+    if entry.transport != "stdio":
+        return entry.command
+    if entry.id == "pymol":
+        return _pymol_command()
+    return entry.command
+
+
+def catalog_create_kwargs(entry: McpCatalogEntry, *, enabled: bool = False) -> dict[str, Any]:
+    """kwargs for store.create_mcp_server from a catalog entry."""
+    if entry.transport == "stdio":
+        return {
+            "name": entry.name,
+            "transport": "stdio",
+            "command": resolve_catalog_command(entry),
+            "args": list(entry.args or []),
+            "url": None,
+            "enabled": enabled,
+            "catalog_id": entry.id,
+            "description": entry.description,
         }
-        for e in MCP_CATALOG
-    ]
+    return {
+        "name": entry.name,
+        "transport": entry.transport,
+        "command": None,
+        "args": [],
+        "url": entry.url,
+        "enabled": enabled,
+        "catalog_id": entry.id,
+        "description": entry.description,
+    }
+
+
+def catalog_as_dicts() -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for e in MCP_CATALOG:
+        command = resolve_catalog_command(e) if e.transport == "stdio" else e.command
+        out.append(
+            {
+                "id": e.id,
+                "name": e.name,
+                "description": e.description,
+                "url": e.url,
+                "transport": e.transport,
+                "authMode": e.auth_mode,
+                "preferredAuth": e.preferred_auth,
+                "apiKeyEnvVar": e.api_key_env_var,
+                "apiKeyHeader": e.api_key_header,
+                "docsUrl": e.docs_url,
+                "setupUrl": e.setup_url,
+                "integrationKey": e.integration_key,
+                "featured": e.featured,
+                "defaultEnabled": False,
+                "command": command,
+                "args": list(e.args or []),
+            }
+        )
+    return out

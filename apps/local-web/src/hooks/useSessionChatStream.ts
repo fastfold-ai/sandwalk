@@ -234,6 +234,23 @@ export function useSessionChatStream({
                 afterSequenceRef.current.set(id, event.sequence)
               }
             }
+            // After Stop the UI clears runActive immediately, but a zombie
+            // worker can keep emitting. Drop live stream/tool noise so the
+            // transcript does not jump back into a running state.
+            const chat = chatBySessionIdRef.current[id]
+            const zombieLiveEvent =
+              !chat?.runActive &&
+              (event.type === 'assistant.delta' ||
+                event.type === 'tool.started' ||
+                event.type === 'tool.completed' ||
+                event.type === 'todos.updated' ||
+                event.type === 'plan.created' ||
+                event.type === 'run.progress' ||
+                event.type === 'run.usage')
+            if (zombieLiveEvent) {
+              dropDeltaBuffer(id)
+              return
+            }
             if (event.type === 'assistant.delta') {
               lastDeltaAtRef.current.set(id, performance.now())
               queueDelta(id, event.payload.delta)

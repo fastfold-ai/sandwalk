@@ -6,6 +6,7 @@ from rich.console import Console
 
 from .connect_actions import handle_catalog, handle_connect, handle_disconnect
 from .crud_actions import handle_add, handle_remove
+from .install_actions import handle_doctor, handle_install
 from .resolve import _service, _store
 from .status import print_mcp_status
 from .toggle_actions import handle_enable_disable, handle_validate
@@ -15,6 +16,8 @@ _HELP_TEXT = """
 
   mcp / mcp list              Status (catalog + registered)
   mcp catalog                 Suggested cloud defaults
+  mcp install pymol           Managed local PyMOL MCP launcher + enable
+  mcp doctor [pymol]          Check launcher / token / probe
   mcp connect <id> [--api-key KEY]
   mcp disconnect <id>
   mcp enable|disable <id>
@@ -24,7 +27,7 @@ _HELP_TEXT = """
   mcp remove <id|name>
 
 Uses langchain-mcp-adapters MultiServerMCPClient (stdio / sse / streamable_http + headers).
-Suggested servers: tamarind, latch, neurosnap, paperclip, linear
+Suggested servers: pymol, tamarind, latch, neurosnap, paperclip, linear
 """
 
 
@@ -44,6 +47,10 @@ def handle_mcp_argv(args: list[str], console: Console) -> int:
 
     if action == "catalog":
         return handle_catalog(args, console, service=service)
+    if action == "install":
+        return handle_install(args, console, store=store, service=service)
+    if action == "doctor":
+        return handle_doctor(args, console, store=store, service=service)
     if action == "connect":
         return handle_connect(args, console, service=service)
     if action == "disconnect":

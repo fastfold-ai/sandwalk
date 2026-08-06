@@ -61,7 +61,11 @@ from agent_server.mcp_service.oauth_http import (
     _resource_metadata_url_from_www_authenticate,
 )
 from agent_server.mcp_service.oauth_state import _oauth_lock, _oauth_states
-from agent_server.mcp_service.probe import parse_sse_or_json, probe_mcp_server
+from agent_server.mcp_service.probe import (
+    parse_sse_or_json,
+    probe_mcp_server,
+    probe_stdio_mcp_server,
+)
 
 __all__ = [
     "MCP_HTTP_USER_AGENT",
@@ -84,6 +88,7 @@ __all__ = [
     "oauth_reconnect_required",
     "parse_sse_or_json",
     "probe_mcp_server",
+    "probe_stdio_mcp_server",
     "read_status_message",
     "read_tool_count",
     "resolve_auth_headers",

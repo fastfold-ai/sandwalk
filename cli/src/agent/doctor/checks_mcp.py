@@ -50,6 +50,22 @@ def _check_mcp_servers(cfg: Config) -> list[DoctorCheck]:
     for entry in MCP_CATALOG:
         check_name = f"mcp_{entry.id}"
         server = enabled.get(entry.id)
+        if entry.id == "pymol":
+            from agent.mcps.pymol_mcp import pymol_doctor_checks
+
+            for row in pymol_doctor_checks():
+                checks.append(
+                    DoctorCheck(
+                        name=row["name"],
+                        status=row["status"],  # type: ignore[arg-type]
+                        detail=row["detail"],
+                        category="mcp",
+                        fix=row.get("fix"),
+                    )
+                )
+            if server is None:
+                continue
+
         if server is None:
             # Suggested default off — skip unless credentials exist (stale/misconfig)
             if credentials_configured(entry, cfg):
@@ -60,6 +76,62 @@ def _check_mcp_servers(cfg: Config) -> list[DoctorCheck]:
                         detail=f"{entry.name} credentials saved but MCP is disabled",
                         category="mcp",
                         fix="Enable on Dashboard → MCP, or Connect again",
+                    )
+                )
+            continue
+
+        if entry.transport == "stdio":
+            from agent.mcp_catalog import resolve_catalog_command
+            from agent_server.mcp_service import probe_stdio_mcp_server
+
+            if not credentials_configured(entry, cfg):
+                checks.append(
+                    DoctorCheck(
+                        name=check_name,
+                        status="error",
+                        detail=f"{entry.name} is enabled but launcher is missing",
+                        category="mcp",
+                        fix="Run: sandwalk mcp install pymol",
+                    )
+                )
+                continue
+            result = probe_stdio_mcp_server(
+                command=resolve_catalog_command(entry) or "",
+                args=list(entry.args or []),
+                timeout=25.0,
+            )
+            if result["ok"]:
+                try:
+                    from agent_server.mcp_service import save_tool_count
+
+                    save_tool_count(entry.id, int(result.get("toolCount") or 0))
+                except Exception:  # noqa: BLE001
+                    pass
+                checks.append(
+                    DoctorCheck(
+                        name=check_name,
+                        status="ok",
+                        detail=f"{entry.name}: {result['toolCount']} tools",
+                        category="mcp",
+                    )
+                )
+            else:
+                try:
+                    from agent_server.mcp_service import clear_tool_count, save_status_message
+
+                    clear_tool_count(entry.id)
+                    save_status_message(
+                        entry.id, str(result.get("message") or "Connection failed")
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+                checks.append(
+                    DoctorCheck(
+                        name=check_name,
+                        status="error",
+                        detail=f"{entry.name}: {result['message']}",
+                        category="mcp",
+                        fix="In PyMOL: Start Listening, then retry",
                     )
                 )
             continue
@@ -77,7 +149,7 @@ def _check_mcp_servers(cfg: Config) -> list[DoctorCheck]:
             )
             continue
 
-        result = probe_mcp_server(url=entry.url, headers=headers, timeout=25.0)
+        result = probe_mcp_server(url=entry.url or "", headers=headers, timeout=25.0)
         # Neurosnap accepts Bearer or X-API-KEY — retry alternate if primary fails.
         if not result["ok"] and entry.id == "neurosnap":
             from agent_server.mcp_service import _cfg_secret

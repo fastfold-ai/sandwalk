@@ -71,15 +71,23 @@ export function useMcpDetailView({
       : server?.transport || null
   const endpoint =
     kind === 'catalog'
-      ? catalogEntry?.url || null
+      ? catalogEntry?.transport === 'stdio'
+        ? catalogEntry?.command || null
+        : catalogEntry?.url || null
       : server?.url || server?.command || null
 
+  const isLocalStdio =
+    kind === 'catalog' &&
+    Boolean(
+      catalogEntry &&
+        (catalogEntry.transport === 'stdio' || catalogEntry.authMode === 'none')
+    )
   const supportsApiKey =
-    kind === 'catalog' && catalogEntry
+    kind === 'catalog' && catalogEntry && !isLocalStdio
       ? catalogEntry.authMode !== 'oauth'
       : false
   const supportsOAuth =
-    kind === 'catalog' && catalogEntry
+    kind === 'catalog' && catalogEntry && !isLocalStdio
       ? catalogEntry.authMode !== 'api_key'
       : false
   const hasBothAuth = supportsApiKey && supportsOAuth
@@ -200,14 +208,20 @@ export function useMcpDetailView({
     setError
   })
 
-  const showCatalogActions = kind === 'catalog' && Boolean(onConnectCatalog)
+  const showCatalogActions =
+    kind === 'catalog' && Boolean(onConnectCatalog) && !isLocalStdio
 
   const toggleEnabled = () => {
     if (!onToggleEnabled) return
     if (kind === 'catalog' && !configured && !enabled) {
-      toast.error('Connect with OAuth or API key first, then enable.', {
-        description: title
-      })
+      toast.error(
+        isLocalStdio
+          ? 'Install the launcher first (sandwalk mcp install pymol), then enable.'
+          : 'Connect with OAuth or API key first, then enable.',
+        {
+          description: title
+        }
+      )
       return
     }
     setTogglePending(true)
@@ -250,6 +264,7 @@ export function useMcpDetailView({
     filteredTools,
     missingDescriptions,
     showCatalogActions,
+    isLocalStdio,
     kind,
     catalogEntry,
     hasToggle: Boolean(onToggleEnabled),

@@ -85,12 +85,21 @@ def merge_dirty(
 
 def atomic_write_config(config_file: Path, backup_file: Path, payload: dict) -> None:
     """Atomically write ``payload`` to ``config_file`` and refresh the backup copy."""
-    tmp = config_file.with_suffix(".json.tmp")
-    with open(tmp, "w") as f:
-        json.dump(payload, f, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, config_file)
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    # Unique tmp name avoids races when two writers use the same .json.tmp.
+    tmp = config_file.with_name(f"{config_file.name}.{os.getpid()}.tmp")
+    try:
+        with open(tmp, "w") as f:
+            json.dump(payload, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, config_file)
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
     try:
         with open(backup_file, "w") as f:

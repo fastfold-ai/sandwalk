@@ -371,6 +371,7 @@ def entry_rows(
         mcp_chips = find_mcp_chips(raw)
         style = {
             "system": "class:transcript-system",
+            "error": "class:transcript-error",
         }.get(entry.kind, "class:transcript-text")
         out: list[tuple[Entry, int, StyleAndTextTuples]] = []
         use_chips = (

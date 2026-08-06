@@ -22,10 +22,16 @@ def handle_enable_disable(action: str, args: list[str], console: Console, *, sto
         from agent_server.mcp_service import credentials_configured
 
         if not credentials_configured(entry):
-            console.print(
-                f"  [red]{entry.name} is not connected.[/red] "
-                f"Run: mcp connect {entry.id}"
-            )
+            if entry.transport == "stdio" or entry.auth_mode == "none":
+                console.print(
+                    f"  [red]{entry.name} launcher is not installed.[/red] "
+                    f"Run: mcp install {entry.id}"
+                )
+            else:
+                console.print(
+                    f"  [red]{entry.name} is not connected.[/red] "
+                    f"Run: mcp connect {entry.id}"
+                )
             return 1
     store.update_mcp_server(server.id, enabled=enabled)
     console.print(

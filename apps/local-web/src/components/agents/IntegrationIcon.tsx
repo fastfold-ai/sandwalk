@@ -31,6 +31,7 @@ export const INTEGRATION_ICONS: Record<
   tavily: { src: '/tavily-color.png' },
   slack: { src: '/integrations/slack.png' },
   'skills-sh': { src: '/integrations/vercel.png', invertInDark: true },
+  pymol: { src: '/integrations/pymol.png' },
   tamarind: { src: '/integrations/tamarind.png' },
   latch: { src: '/integrations/latch.png' },
   neurosnap: { src: '/integrations/neurosnap.png' },

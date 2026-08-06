@@ -35,6 +35,13 @@ class EnableMixin:
             raise KeyError(catalog_id)
         if enabled:
             if not credentials_configured(entry):
+                if entry.transport == "stdio" or entry.auth_mode == "none":
+                    raise ValueError(
+                        f"{entry.name} launcher is not installed — "
+                        "run: sandwalk mcp install pymol"
+                        if entry.id == "pymol"
+                        else f"{entry.name} is not ready — install the local MCP command first"
+                    )
                 raise ValueError(
                     f"{entry.name} is not configured — Connect with OAuth or API key first"
                 )

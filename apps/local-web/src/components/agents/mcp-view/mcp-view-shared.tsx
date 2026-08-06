@@ -25,6 +25,7 @@ export function headersFromRows(rows: HeaderRow[]): Record<string, string> | nul
 }
 
 export const MCP_ICONS: Record<string, { src: string; invertInDark?: boolean }> = {
+  pymol: { src: '/integrations/pymol.png' },
   tamarind: { src: '/integrations/tamarind.png' },
   latch: { src: '/integrations/latch.png' },
   neurosnap: { src: '/integrations/neurosnap.png' },
@@ -153,7 +154,14 @@ export function formatConnectError(err: unknown): string {
   return raw.replace(/^FastFold Agent API \d+:\s*/, '').trim() || raw
 }
 
+export function isLocalStdioCatalog(entry: McpCatalogEntry) {
+  return entry.transport === 'stdio' || entry.authMode === 'none'
+}
+
 export function authMeta(entry: McpCatalogEntry) {
+  if (isLocalStdioCatalog(entry)) {
+    return <span className="text-muted-foreground text-xs">Local</span>
+  }
   const keysHref =
     entry.integrationKey && entry.id
       ? `/dashboard/mcp/catalog/${encodeURIComponent(entry.id)}`

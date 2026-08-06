@@ -1102,9 +1102,9 @@ export type McpCatalogEntry = {
   id: string
   name: string
   description: string
-  url: string
+  url: string | null
   transport: 'stdio' | 'sse' | 'streamable_http'
-  authMode: 'oauth' | 'api_key' | 'api_key_or_oauth'
+  authMode: 'oauth' | 'api_key' | 'api_key_or_oauth' | 'none'
   preferredAuth: 'oauth' | 'api_key'
   apiKeyEnvVar: string | null
   docsUrl: string | null
@@ -1114,12 +1114,14 @@ export type McpCatalogEntry = {
   featured?: boolean
   defaultEnabled: boolean
   configured: boolean
-  authMethod: 'oauth' | 'api_key' | null
+  authMethod: 'oauth' | 'api_key' | 'local' | null
   enabled: boolean
   serverId: string | null
   connected: boolean
   toolCount?: number | null
   statusMessage?: string | null
+  command?: string | null
+  args?: string[]
 }
 
 export type McpToolDetail = {
@@ -1177,7 +1179,7 @@ export interface McpProvider {
   /** Re-add a removed catalog template to the installed list. */
   installMcpCatalog?(
     catalogId: string,
-    signal?: AbortSignal
+    options?: { force?: boolean; signal?: AbortSignal }
   ): Promise<McpServer>
   connectMcpCatalog(
     catalogId: string,

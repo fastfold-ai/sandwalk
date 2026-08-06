@@ -5,8 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 from agent.config import Config
-from agent.mcp_catalog import get_catalog_entry
-from agent_server.mcp_service.auth import oauth_reconnect_required, resolve_auth_headers
+from agent.mcp_catalog import get_catalog_entry, resolve_catalog_command
+from agent_server.mcp_service.auth import (
+    credentials_configured,
+    oauth_reconnect_required,
+    resolve_auth_headers,
+)
 from agent_server.mcp_service.custom_server import (
     custom_tool_count_id,
     resolve_custom_server_headers,
@@ -27,6 +31,40 @@ class ValidateMixin:
             entry = get_catalog_entry(catalog_id)
             if entry is None:
                 raise KeyError(catalog_id)
+            if entry.transport == "stdio":
+                if not credentials_configured(entry, cfg):
+                    return {
+                        "ok": False,
+                        "toolCount": 0,
+                        "message": (
+                            "Launcher not installed — run sandwalk mcp install pymol "
+                            "or in PyMOL: sandwalk-pymol setup"
+                            if entry.id == "pymol"
+                            else "stdio command not ready"
+                        ),
+                        "tools": [],
+                        "toolDetails": [],
+                    }
+                command = resolve_catalog_command(entry)
+                result = _mcp_service.probe_stdio_mcp_server(
+                    command=command or "",
+                    args=list(entry.args or []),
+                ) or {
+                    "ok": False,
+                    "toolCount": 0,
+                    "message": "stdio probe failed",
+                    "tools": [],
+                    "toolDetails": [],
+                }
+                if result.get("ok"):
+                    save_tool_count(catalog_id, int(result.get("toolCount") or 0))
+                else:
+                    clear_tool_count(catalog_id)
+                    save_status_message(
+                        catalog_id, str(result.get("message") or "stdio probe failed")
+                    )
+                return result
+
             headers = resolve_auth_headers(entry, cfg)
             if not headers:
                 return {
@@ -46,7 +84,7 @@ class ValidateMixin:
                     "tools": [],
                     "toolDetails": [],
                 }
-            return _mcp_service.probe_mcp_server(url=entry.url, headers=headers)
+            return _mcp_service.probe_mcp_server(url=entry.url or "", headers=headers)
 
         if server_id:
             server = next(
@@ -55,6 +93,30 @@ class ValidateMixin:
             )
             if server is None:
                 raise KeyError(server_id)
+            if server.transport == "stdio" or (server.command and not server.url):
+                command = str(server.command or "").strip()
+                if getattr(server, "catalog_id", None):
+                    entry = get_catalog_entry(server.catalog_id)
+                    if entry and entry.transport == "stdio":
+                        command = resolve_catalog_command(entry) or command
+                result = _mcp_service.probe_stdio_mcp_server(
+                    command=command,
+                    args=list(server.args or []),
+                ) or {
+                    "ok": False,
+                    "toolCount": 0,
+                    "message": "stdio probe failed",
+                    "tools": [],
+                    "toolDetails": [],
+                }
+                if not getattr(server, "catalog_id", None):
+                    count_id = custom_tool_count_id(server_id)
+                    if result.get("ok"):
+                        save_tool_count(count_id, int(result.get("toolCount") or 0))
+                    else:
+                        clear_tool_count(count_id)
+                return result
+
             headers: dict[str, str] | None = None
             if getattr(server, "catalog_id", None):
                 entry = get_catalog_entry(server.catalog_id)

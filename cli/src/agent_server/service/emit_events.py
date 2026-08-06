@@ -94,6 +94,14 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
         event_type = _EVENT_TYPES.get(event)
         if event_type is None:
             return
+        # After Stop, status flips to interrupted/idle/error. Drop zombie
+        # emissions from a still-running worker thread so the UI stays quiet.
+        session = store.get_session(session_id)
+        if session is not None and session.status not in {
+            "running",
+            "awaiting_approval",
+        }:
+            return
         if event == "stream":
             # Perf probe: run pipeline reports tail latency after last token.
             import time
