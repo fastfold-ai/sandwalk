@@ -5,7 +5,8 @@ export type McpOAuthWatch = {
   dispose: () => void
 }
 
-type ReturnHandler = () => void | Promise<void>
+/** Return `true` when OAuth is complete so polling stops. */
+type ReturnHandler = () => boolean | void | Promise<boolean | void>
 
 const POLL_MS = 2000
 const FOCUS_DELAY_MS = 400
@@ -27,6 +28,9 @@ function startReturnWatch(onReturn: ReturnHandler): () => void {
     if (disposed || inflight) return
     inflight = true
     void Promise.resolve(onReturn())
+      .then(done => {
+        if (done === true) dispose()
+      })
       .catch(() => {
         /* refresh errors are non-fatal while waiting */
       })

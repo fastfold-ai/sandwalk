@@ -75,6 +75,25 @@ describe('openMcpOAuthBrowser', () => {
     vi.useRealTimers()
   })
 
+  it('stops watching when onReturn reports done', async () => {
+    vi.useFakeTimers()
+    vi.mocked(isTauri).mockReturnValue(true)
+    const onReturn = vi
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+
+    await openMcpOAuthBrowser('https://example.com/oauth', onReturn)
+    expect(onReturn).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(onReturn).toHaveBeenCalledTimes(2)
+
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(onReturn).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
+  })
+
   it('keeps a named popup in the web app and still watches for return', async () => {
     vi.useFakeTimers()
     vi.mocked(isTauri).mockReturnValue(false)

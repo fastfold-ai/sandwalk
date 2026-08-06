@@ -142,9 +142,7 @@ export function useComposerDraftState({
         draft,
         slash,
         atMention,
-        setLocalDraft,
         commitDraft,
-        emittedDraftRef,
         pendingCaretRef,
         applyComposerCaret
       }),
@@ -154,7 +152,6 @@ export function useComposerDraftState({
       commitDraft,
       draft,
       pendingCaretRef,
-      setLocalDraft,
       slash
     ]
   )

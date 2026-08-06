@@ -28,18 +28,14 @@ export function createChipInserters({
   draft,
   slash,
   atMention,
-  setLocalDraft,
   commitDraft,
-  emittedDraftRef,
   pendingCaretRef,
   applyComposerCaret
 }: {
   draft: string
   slash: { start: number; end: number } | null
   atMention: { start: number; end: number } | null
-  setLocalDraft: (value: string) => void
   commitDraft: (value: string) => void
-  emittedDraftRef: MutableRefObject<string>
   pendingCaretRef: MutableRefObject<number | null>
   applyComposerCaret: (caret: number) => boolean
 }) {
@@ -64,9 +60,10 @@ export function createChipInserters({
     )
     const caret = caretAfterInsertedToken(nextValue, token)
     pendingCaretRef.current = caret
+    // Commit to session composer — local-only updates leave parent value '' and
+    // get wiped on the next parent re-render (e.g. MCP refresh).
     flushSync(() => {
-      emittedDraftRef.current = nextValue
-      setLocalDraft(nextValue)
+      commitDraft(nextValue)
     })
     focusAfterChipInsert(caret)
   }
@@ -82,8 +79,7 @@ export function createChipInserters({
     const caret = caretAfterInsertedToken(nextValue, token)
     pendingCaretRef.current = caret
     flushSync(() => {
-      emittedDraftRef.current = nextValue
-      setLocalDraft(nextValue)
+      commitDraft(nextValue)
     })
     focusAfterChipInsert(caret)
   }
@@ -99,8 +95,7 @@ export function createChipInserters({
     const caret = caretAfterInsertedToken(nextValue, token)
     pendingCaretRef.current = caret
     flushSync(() => {
-      emittedDraftRef.current = nextValue
-      setLocalDraft(nextValue)
+      commitDraft(nextValue)
     })
     focusAfterChipInsert(caret)
   }
@@ -149,8 +144,7 @@ export function createChipInserters({
       caretAfterInsertedToken(nextValue, token) + spacedPrompt.length
     pendingCaretRef.current = caret
     flushSync(() => {
-      emittedDraftRef.current = nextValue
-      setLocalDraft(nextValue)
+      commitDraft(nextValue)
     })
     focusAfterChipInsert(caret)
   }

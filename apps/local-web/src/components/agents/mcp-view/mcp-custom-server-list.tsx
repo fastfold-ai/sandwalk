@@ -143,6 +143,9 @@ export function McpCustomServerList({
         setWaitingCatalogId(server.catalogId || null)
         await openMcpOAuthBrowser(result.authorizeUrl, async () => {
           await onRefresh?.()
+          // Detail/list effects also dispose when catalog shows connected;
+          // return false so polling continues until then or postMessage.
+          return false
         })
         toast.message('Complete sign-in in your browser…', {
           description: server.name

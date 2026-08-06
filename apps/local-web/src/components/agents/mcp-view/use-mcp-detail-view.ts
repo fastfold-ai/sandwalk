@@ -149,9 +149,11 @@ export function useMcpDetailView({
       if (!next.ok) {
         setError(next.message || 'Unable to load MCP tools')
       }
+      return next
     } catch (err) {
       setResult(null)
       setError(err instanceof Error ? err.message : String(err))
+      return null
     } finally {
       setLoading(false)
       setRefreshing(false)

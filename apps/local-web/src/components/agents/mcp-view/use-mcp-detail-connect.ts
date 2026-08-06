@@ -5,7 +5,10 @@ import type {
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 
-import { openMcpOAuthBrowser } from './mcp-oauth-browser'
+import {
+  disposeMcpOAuthWatch,
+  openMcpOAuthBrowser
+} from './mcp-oauth-browser'
 import { formatConnectError } from './mcp-view-shared'
 
 type McpDetailConnectInput = {
@@ -18,7 +21,9 @@ type McpDetailConnectInput = {
   }) => Promise<ConnectMcpResult>
   onDisconnectCatalog?: () => Promise<ConnectMcpResult | void>
   onRefreshMeta?: () => Promise<void>
-  loadTools: (isRefresh?: boolean) => Promise<void>
+  loadTools: (
+    isRefresh?: boolean
+  ) => Promise<{ ok: boolean; toolCount?: number; message?: string } | null>
   setConnectPending: (value: boolean) => void
   setDisconnectPending: (value: boolean) => void
   setShowApiKey: (value: boolean) => void
@@ -50,7 +55,15 @@ export function useMcpDetailConnect({
       if (connectResult.authorizeUrl) {
         await openMcpOAuthBrowser(connectResult.authorizeUrl, async () => {
           await onRefreshMeta?.()
-          await loadTools(true)
+          const next = await loadTools(true)
+          if (!next?.ok) return false
+          disposeMcpOAuthWatch()
+          toast.dismiss()
+          toast.success(
+            next.message || `Connected · ${next.toolCount ?? 0} tools`,
+            { description: catalogEntry.name }
+          )
+          return true
         })
         toast.message('Complete sign-in in your browser…', {
           description: catalogEntry.name
