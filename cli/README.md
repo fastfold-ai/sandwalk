@@ -91,9 +91,12 @@ Compute/image keys: `sandbox.compute_type`, `sandbox.gpu_class`, `sandbox.cpu_co
 
 ### Models (`/models`)
 
-Bare `/models` opens a searchable picker of **enabled** catalog models (same list as Dashboard → Models). Pick a cloud or local entry to switch the active session model. Use `ctrl+f` to pin favorites.
+Bare `/models` opens a searchable picker of **all** catalog models (same list as Dashboard → Models), including disabled ones. Pick an enabled cloud or local entry to switch the active session model.
 
-- Hidden / disabled models are omitted (toggle them in the Web UI Models view).
+- `space` — enable / disable the highlighted model (same as the Dashboard toggle)
+- `ctrl+f` — pin favorites
+- `enter` — switch to the highlighted model (must be enabled)
+- Disabled rows show `○` and stay dim until enabled
 - Status bar shows the active model id; `/usage` shows tokens for the session.
 - Cloud context windows are curated in `agent/model_catalog/context_windows.py` (e.g. 1M for modern Claude / GPT-5.6 / Gemini / Kimi K3).
 - Local Ollama: context from `/api/tags`, with `/api/show` fallback when tags omit it.

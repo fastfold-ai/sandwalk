@@ -53,6 +53,22 @@ def test_qwen_cloud_context_windows():
     assert context_window_for_model("qwen-plus") == 1_000_000
 
 
+def test_openrouter_vendor_prefixed_ids():
+    # OpenRouter uses vendor/slug; windows match native / Qwen Cloud docs.
+    # https://openrouter.ai/qwen/qwen3.7-max
+    # https://openrouter.ai/deepseek/deepseek-v4-flash
+    assert context_window_for_model("qwen/qwen3.7-flash") == 1_000_000
+    assert context_window_for_model("qwen/qwen3.7-max") == 1_000_000
+    assert context_window_for_model("qwen/qwen3.7-plus") == 1_000_000
+    assert context_window_for_model("qwen/qwen3-max") == 256_000
+    assert context_window_for_model("deepseek/deepseek-v4-flash") == 1_000_000
+    assert context_window_for_model("deepseek/deepseek-v4-flash-0731") == 1_000_000
+    assert context_window_for_model("deepseek/deepseek-v4-pro") == 1_000_000
+    assert context_window_for_model("moonshotai/kimi-k3") == 1_000_000
+    assert context_window_for_model("anthropic/claude-opus-5") == 1_000_000
+
+
 def test_unknown_model_returns_none():
     assert context_window_for_model("mystery-model") is None
     assert context_window_for_model("") is None
+    assert context_window_for_model("acme/mystery-model") is None

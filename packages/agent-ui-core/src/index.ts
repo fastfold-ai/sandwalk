@@ -686,6 +686,11 @@ export interface IntegrationProvider {
     key: string,
     signal?: AbortSignal
   ): Promise<{ ok: boolean; message: string }>
+  /** Fetch the stored secret for local reveal/copy (user opt-in). */
+  revealIntegrationSecret(
+    key: string,
+    signal?: AbortSignal
+  ): Promise<{ configured: boolean; envVar: string; value: string }>
 }
 
 export type RuntimeSettings = {

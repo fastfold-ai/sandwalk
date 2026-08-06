@@ -111,7 +111,7 @@ def test_gateway_providers_use_model_family_modalities():
     # OpenCode / OpenRouter host vendor families under one provider label.
     assert model_supports_image_inputs("opencode", "kimi-k3") is True
     assert model_supports_video_inputs("opencode", "kimi-k3") is True
-    assert model_supports_image_inputs("opencode", "kimi-k2.7-code") is False
+    assert model_supports_image_inputs("opencode", "kimi-k2.7-code") is True
     assert model_supports_image_inputs("opencode", "claude-sonnet-4-5") is True
     assert model_supports_pdf_inputs("opencode", "claude-sonnet-4-5") is True
     assert model_supports_image_inputs("opencode", "gpt-5.4") is True
@@ -122,6 +122,51 @@ def test_gateway_providers_use_model_family_modalities():
     assert model_supports_pdf_inputs(
         "openrouter", "anthropic/claude-sonnet-5"
     ) is True
+
+
+def test_deepseek_v4_is_text_only():
+    # OpenRouter architecture + DeepSeek API docs: text→text, no image blocks.
+    for mid in (
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "deepseek-v4-flash-0731",
+        "deepseek/deepseek-v4-pro",
+        "deepseek/deepseek-v4-flash-0731",
+    ):
+        assert model_supports_image_inputs("deepseek", mid) is False
+        assert model_supports_image_inputs("openrouter", mid) is False
+        assert model_supports_image_inputs("qwen", mid) is False
+
+
+def test_openrouter_vision_catalog_rows():
+    assert model_supports_image_inputs(
+        "openrouter", "qwen/qwen3.7-flash"
+    ) is True
+    assert model_supports_video_inputs(
+        "openrouter", "qwen/qwen3.7-flash"
+    ) is True
+    assert model_supports_image_inputs(
+        "openrouter", "qwen/qwen3.7-max"
+    ) is False
+    assert model_supports_image_inputs(
+        "openrouter", "qwen/qwen3.7-plus"
+    ) is True
+    assert model_supports_video_inputs(
+        "openrouter", "qwen/qwen3.7-plus"
+    ) is False
+    assert model_supports_image_inputs(
+        "openrouter", "mistralai/mistral-large-2512"
+    ) is True
+    assert model_supports_image_inputs(
+        "openrouter", "meta/muse-spark-1.1"
+    ) is True
+    assert model_supports_image_inputs(
+        "openrouter", "xiaomi/mimo-v2.5"
+    ) is True
+    # Text-only Nemotron Ultra free tier must not inherit local VL heuristics.
+    assert model_supports_image_inputs(
+        "openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free"
+    ) is False
 
 
 def test_gemini_full_multimodal():

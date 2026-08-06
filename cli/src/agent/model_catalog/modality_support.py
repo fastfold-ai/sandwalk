@@ -37,7 +37,10 @@ _LOCAL_IMAGE_MARKERS = (
     "gemma4",
     "gemma-4",
     "nemotron3",
-    "nemotron-3",
+    # Prefer specific local tags — bare ``nemotron-3`` also matches text-only
+    # OpenRouter ``nvidia/nemotron-3-ultra-…`` rows.
+    "nemotron-3-nano",
+    "nemotron-3-super",
     "llava",
     "bakllava",
     "moondream",
@@ -144,10 +147,8 @@ def _xai_multimodal(model_id: str) -> set[ModalityKind]:
 
 def _moonshot_multimodal(model_id: str) -> set[ModalityKind]:
     value = model_id.lower()
-    # Coding-focused K2.7 variants are text-only in the catalog.
-    if value.startswith("kimi-k2.7-code"):
-        return set()
-    # K3 / K2.6 / K2.5 support vision (and K2.5 video per LangChain docs).
+    # K3 / K2.x support vision (OpenRouter lists image on K2.7 Code too).
+    # K2.5 / K3 also take video per LangChain / Moonshot docs.
     if value.startswith("kimi-k3") or value.startswith("kimi-k2."):
         kinds: set[ModalityKind] = {"image"}
         if value.startswith("kimi-k2.5") or value.startswith("kimi-k3"):
@@ -172,19 +173,45 @@ def _together_multimodal(model_id: str) -> set[ModalityKind]:
     return set()
 
 
+def _mistral_multimodal(model_id: str) -> set[ModalityKind]:
+    """Mistral vision families (Pixtral + Large image/PDF on OpenRouter)."""
+    value = model_id.lower()
+    if "pixtral" in value or "mistral-large" in value:
+        return {"image", "file"}
+    return set()
+
+
+def _meta_multimodal(model_id: str) -> set[ModalityKind]:
+    """Meta Muse Spark (OpenRouter: text+image+file+audio+video)."""
+    value = model_id.lower()
+    if "muse-spark" in value:
+        return {"image", "file", "audio", "video"}
+    return set()
+
+
+def _xiaomi_multimodal(model_id: str) -> set[ModalityKind]:
+    """Xiaomi MiMo V2.x multimodal (OpenRouter input modalities)."""
+    value = model_id.lower()
+    if "mimo-v2" in value or value.startswith("mimo-"):
+        return {"image", "audio", "video"}
+    return set()
+
+
 def _qwen_multimodal(model_id: str) -> set[ModalityKind]:
     """Qwen Cloud marketplace Visual models (qwencloud.com/models)."""
     value = model_id.lower()
-    # Native vision-language Qwen ids (image + video). Third-party resale
-    # models on the same endpoint (DeepSeek / GLM) stay text-only.
+    # Native vision-language Qwen ids. Third-party resale models on the same
+    # endpoint (DeepSeek / GLM) stay text-only — DeepSeek V4 is text→text on
+    # OpenRouter and api-docs.deepseek.com (image blocks unsupported).
+    # Flash / 3.8: image+video. Plus: image (OpenRouter; video optional).
     if (
         value.startswith("qwen3.8")
-        or value.startswith("qwen3.7-plus")
         or value.startswith("qwen3.7-flash")
         or value.startswith("qwen3.6-flash")
-        or value.startswith("qwen3.6-plus")
     ):
         return {"image", "video"}
+    if value.startswith("qwen3.7-plus") or value.startswith("qwen3.6-plus"):
+        return {"image"}
     return set()
 
 
@@ -254,6 +281,9 @@ def _gateway_multimodal(model_id: str) -> set[ModalityKind]:
         kinds |= _xai_multimodal(candidate)
         kinds |= _moonshot_multimodal(candidate)
         kinds |= _together_multimodal(candidate)
+        kinds |= _mistral_multimodal(candidate)
+        kinds |= _meta_multimodal(candidate)
+        kinds |= _xiaomi_multimodal(candidate)
         kinds |= _qwen_multimodal(candidate)
         kinds |= _local_multimodal(candidate)
     return kinds
@@ -293,12 +323,14 @@ def allowlist_modalities(
         return _moonshot_multimodal(value)
     if provider_norm == "together":
         return _together_multimodal(value)
+    if provider_norm == "mistral":
+        return _mistral_multimodal(value)
     if provider_norm == "qwen":
         return _qwen_multimodal(value)
-    # DeepSeek / MiniMax / Mistral curated text flagships — no native
-    # image/PDF/audio/video injection (vision variants exist elsewhere, e.g.
-    # Pixtral, but are not in our curated picker lists).
-    if provider_norm in {"deepseek", "minimax", "mistral"}:
+    # DeepSeek / MiniMax curated text flagships — no native image injection.
+    # DeepSeek V4 (Pro/Flash) is text-only on api.deepseek.com and OpenRouter
+    # (``input_modalities: ["text"]``; Anthropic-compat marks image unsupported).
+    if provider_norm in {"deepseek", "minimax"}:
         return set()
     return set()
 

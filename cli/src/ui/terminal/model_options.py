@@ -10,6 +10,7 @@ from .model_ids import AVAILABLE_MODELS
 _CLOUD_PROVIDER_LABELS = {
     "anthropic": "Anthropic",
     "openai": "OpenAI",
+    "local": "Local",
 }
 
 
@@ -39,8 +40,9 @@ def provider_display_label(provider: str, *, fallback: str | None = None) -> str
 def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
     """Return ``(options, discovery_warnings)`` for the model picker.
 
-    Each option dict has: provider, model_id, display, desc, profile_id,
-    and optional backend / provider_label.
+    Includes **all** catalog models (enabled and disabled), matching the
+    Dashboard Models page. Each option dict has: provider, model_id, display,
+    desc, profile_id, enabled, and optional backend / provider_label.
     """
     from agent.config import Config
 
@@ -48,21 +50,14 @@ def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
     models_with_provider: list[dict] = []
     profile_discovery_warnings: list[str] = []
 
-    hidden_models: set[str] = set()
-    if isinstance(cfg, Config):
-        try:
-            hidden_models = set(cfg.hidden_models())
-        except Exception:  # noqa: BLE001
-            hidden_models = set()
+    def _enabled(model_id: str, provider: str) -> bool:
+        if isinstance(cfg, Config):
+            return not cfg.is_model_hidden(model_id, provider)
+        return True
 
     for prov, models in AVAILABLE_MODELS.items():
         for model_id, display, desc in models:
             if model_id == "__custom_openai_compatible__":
-                continue
-            if isinstance(cfg, Config):
-                if cfg.is_model_hidden(model_id, prov):
-                    continue
-            elif model_id in hidden_models:
                 continue
             models_with_provider.append(
                 {
@@ -71,6 +66,7 @@ def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
                     "display": display,
                     "desc": desc,
                     "profile_id": None,
+                    "enabled": _enabled(model_id, prov),
                     "provider_label": provider_display_label(prov),
                 }
             )
@@ -91,6 +87,30 @@ def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
             )
             for item in models_with_provider
         }
+
+        # Custom models (Dashboard → Add Custom Model).
+        for entry in cfg.custom_models():
+            model_id = str(entry.get("id") or "").strip()
+            prov = str(entry.get("provider") or "").strip().lower()
+            if not model_id or not prov:
+                continue
+            key = (prov, model_id, "")
+            if key in existing_keys:
+                continue
+            existing_keys.add(key)
+            label = str(entry.get("label") or model_id).strip() or model_id
+            models_with_provider.append(
+                {
+                    "provider": prov,
+                    "model_id": model_id,
+                    "display": label,
+                    "desc": f"Custom {provider_display_label(prov)} model",
+                    "profile_id": None,
+                    "enabled": _enabled(model_id, prov),
+                    "provider_label": provider_display_label(prov),
+                }
+            )
+
         for prov, meta in OPENAI_COMPATIBLE_PROVIDERS.items():
             if str(meta.get("discover_models") or "").strip().lower() not in {
                 "1",
@@ -119,7 +139,7 @@ def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
                 if prov == "opencode" and not opencode_model_is_supported(model_id):
                     continue
                 key = (prov, model_id, "")
-                if key in existing_keys or cfg.is_model_hidden(model_id, prov):
+                if key in existing_keys:
                     continue
                 existing_keys.add(key)
                 models_with_provider.append(
@@ -129,6 +149,7 @@ def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
                         "display": format_discovered_model_label(model_id),
                         "desc": f"{label} (discovered)",
                         "profile_id": None,
+                        "enabled": _enabled(model_id, prov),
                         "provider_label": provider_display_label(
                             prov, fallback=label
                         ),
@@ -175,7 +196,7 @@ def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
                     profile_discovery_warnings.append(
                         f"{profile_label} ({backend_label}): no models discovered"
                     )
-            if not discovered_models and profile_id == cfg.active_openai_profile_id():
+                # Match UI: always fall back to the profile default model.
                 fallback_model = str(profile.get("default_model") or "").strip()
                 if fallback_model:
                     discovered_models = [fallback_model]
@@ -188,7 +209,8 @@ def collect_model_options(terminal: Any) -> tuple[list[dict], list[str]]:
                         "desc": f"{backend} profile model",
                         "profile_id": profile_id,
                         "backend": backend,
-                        "provider_label": profile_label,
+                        "enabled": _enabled(discovered_model, "local"),
+                        "provider_label": "Local",
                     }
                 )
 

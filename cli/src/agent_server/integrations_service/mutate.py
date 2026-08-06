@@ -202,6 +202,20 @@ class MutateMixin:
                 return env_value
         return ""
 
+    def reveal_secret(self, key: str):
+        """Return the raw stored secret for local UI reveal/copy."""
+        from agent_server.models import IntegrationSecretResponse
+
+        provider = self.get(key)
+        if provider is None:
+            raise KeyError(key)
+        value = self._secret_value(key)
+        return IntegrationSecretResponse(
+            configured=bool(value),
+            env_var=provider.env_var,
+            value=value,
+        )
+
     def validate(self, key: str) -> ValidateIntegrationResponse:
         """Live-check credentials. LLM keys hit GET /models."""
         provider = self.get(key)

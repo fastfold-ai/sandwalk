@@ -33,6 +33,7 @@ def test_new_providers_catalog_and_lookup():
     assert {
         "qwen3.8-max",
         "qwen3.7-plus",
+        "qwen3.7-flash",
         "qwen3.6-flash",
         "deepseek-v4-flash-0731",
         "deepseek-v4-pro",
@@ -41,6 +42,13 @@ def test_new_providers_catalog_and_lookup():
     } <= qwen_ids
     assert "zai-org/GLM-5.2" in {row[0] for row in AVAILABLE_MODELS["together"]}
     assert "moonshotai/Kimi-K2.7-Code" in {row[0] for row in AVAILABLE_MODELS["together"]}
+
+    # OpenRouter / Qwen Flash revisions stay dated so 0423 ≠ 0731 in the UI.
+    openrouter = {row[0]: row[1] for row in AVAILABLE_MODELS["openrouter"]}
+    assert openrouter["deepseek/deepseek-v4-flash"] == "DeepSeek V4 Flash 0423"
+    assert openrouter["deepseek/deepseek-v4-flash-0731"] == "DeepSeek V4 Flash 0731"
+    qwen_labels = {row[0]: row[1] for row in AVAILABLE_MODELS["qwen"]}
+    assert qwen_labels["deepseek-v4-flash-0731"] == "DeepSeek V4 Flash 0731"
 
     assert catalog_provider_for_model("deepseek-v4-flash") == "deepseek"
     assert catalog_provider_for_model("deepseek-v4-flash-0731") == "qwen"
@@ -58,7 +66,6 @@ def test_new_providers_are_text_only_in_curated_matrix():
         ("deepseek", "deepseek-v4-flash"),
         ("deepseek", "deepseek-v4-pro"),
         ("minimax", "MiniMax-M2.5"),
-        ("mistral", "mistral-large-latest"),
         ("mistral", "mistral-small-latest"),
         ("qwen", "qwen3.7-max"),
         ("qwen", "qwen3-max"),
@@ -72,13 +79,17 @@ def test_new_providers_are_text_only_in_curated_matrix():
         assert model_supports_image_inputs(provider, model_id) is False
         assert model_supports_pdf_inputs(provider, model_id) is False
         assert model_supports_video_inputs(provider, model_id) is False
+    # Mistral Large accepts image/PDF (OpenRouter + native vision matrix).
+    assert model_supports_image_inputs("mistral", "mistral-large-latest") is True
 
 
 def test_qwen_visual_models_support_image_and_video_inputs():
     assert model_supports_image_inputs("qwen", "qwen3.8-max") is True
     assert model_supports_video_inputs("qwen", "qwen3.8-max") is True
     assert model_supports_image_inputs("qwen", "qwen3.7-plus") is True
-    assert model_supports_video_inputs("qwen", "qwen3.7-plus") is True
+    assert model_supports_video_inputs("qwen", "qwen3.7-plus") is False
+    assert model_supports_image_inputs("qwen", "qwen3.7-flash") is True
+    assert model_supports_video_inputs("qwen", "qwen3.7-flash") is True
     assert model_supports_image_inputs("qwen", "qwen3.6-flash") is True
     assert model_supports_video_inputs("qwen", "qwen3.6-flash") is True
     assert model_supports_pdf_inputs("qwen", "qwen3.8-max") is False

@@ -44,6 +44,21 @@ def test_build_model_rows_favorites_and_recent_first():
     next_headers = [t for t in recent_block if t in {"OpenAI", "Anthropic", "Favorites"}]
     recent_models = recent_block[: recent_block.index(next_headers[0])] if next_headers else recent_block
     assert all("claude-b" not in t for t in recent_models)
+    # Favorites/Recent are shortcuts — models still appear under providers.
+    def _section_model_titles(header: str) -> list[str]:
+        idx = titles.index(header)
+        out: list[str] = []
+        for row in rows[idx + 1 :]:
+            if row.kind == "header":
+                break
+            if row.kind == "model":
+                out.append(row.title)
+        return out
+
+    assert any("claude-b" in t for t in _section_model_titles("Anthropic"))
+    openai_models = _section_model_titles("OpenAI")
+    assert any("gpt-a" in t for t in openai_models)
+    assert any("gpt-c" in t for t in openai_models)
 
 
 def test_build_model_rows_search_filters():
@@ -149,3 +164,112 @@ def test_build_model_rows_includes_context_and_effort():
     assert model_rows[0].context  # gpt-5.6 → ~1.05M
     assert "M" in model_rows[0].context
     assert model_rows[0].effort  # supports effort → Medium
+
+
+def test_collect_model_options_includes_hidden_deepseek():
+    from agent.config import Config
+    from ui.terminal.model_options import collect_model_options
+
+    class _Term:
+        session = type(
+            "S",
+            (),
+            {
+                "config": Config(
+                    {
+                        "llm.hidden_models": [
+                            "deepseek:deepseek-v4-flash",
+                            "deepseek:deepseek-v4-pro",
+                        ],
+                        "llm.openai_profiles": {},
+                    }
+                )
+            },
+        )()
+
+    options, _warnings = collect_model_options(_Term())
+    deepseek = [o for o in options if o.get("provider") == "deepseek"]
+    assert deepseek
+    assert all(o.get("enabled") is False for o in deepseek)
+    providers = {o.get("provider") for o in options}
+    assert "deepseek" in providers
+    assert "minimax" in providers
+    assert "mistral" in providers
+    assert "qwen" in providers
+    assert "together" in providers
+
+
+def test_collect_model_options_local_fallback_when_discovery_empty(tmp_path, monkeypatch):
+    from agent.config import Config
+    from ui.terminal.model_options import collect_model_options
+
+    cfg = Config(
+        {
+            "llm.hidden_models": [],
+            "llm.openai_profiles": {
+                "ollama_home": {
+                    "label": "Ollama",
+                    "backend": "ollama",
+                    "base_url": "http://127.0.0.1:11434/v1",
+                    "default_model": "llama3.2",
+                }
+            },
+        }
+    )
+
+    class _Term:
+        session = type("S", (), {"config": cfg})()
+
+        def _fetch_compatible_models(self, *a, **k):
+            return []
+
+        def _compatible_backend_display_name(self, backend):
+            return backend
+
+        def _probe_compatible_profile(self, **k):
+            return {"error": "connection refused"}
+
+    options, warnings = collect_model_options(_Term())
+    local = [o for o in options if o.get("provider") == "local"]
+    assert local
+    assert local[0]["model_id"] == "llama3.2"
+    assert local[0]["provider_label"] == "Local"
+    assert any("connection refused" in w for w in warnings)
+
+
+def test_build_model_rows_marks_disabled():
+    opts = [
+        {
+            **_opt("deepseek", "deepseek-v4-flash", display="DeepSeek V4 Flash", label="DeepSeek"),
+            "enabled": False,
+        }
+    ]
+    rows = build_model_rows(opts, favorite_keys=[], recent_keys=[])
+    model_rows = [r for r in rows if r.kind == "model"]
+    assert model_rows[0].enabled is False
+    headers = [r.title for r in rows if r.kind == "header"]
+    assert "DeepSeek" in headers
+
+
+def test_favorite_row_keeps_provider_meta():
+    opts = [
+        _opt("moonshot", "kimi-k3", display="Kimi K3", label="Kimi"),
+        _opt("openrouter", "moonshotai/kimi-k3", display="Kimi K3", label="OpenRouter"),
+    ]
+    rows = build_model_rows(
+        opts,
+        favorite_keys=["moonshot:kimi-k3", "openrouter:moonshotai/kimi-k3"],
+        recent_keys=[],
+    )
+    # Only the Favorites section (provider sections also keep the same rows).
+    fav_start = next(i for i, r in enumerate(rows) if r.title == "Favorites")
+    favs = []
+    for row in rows[fav_start + 1 :]:
+        if row.kind == "header":
+            break
+        if row.kind == "model":
+            favs.append(row)
+    assert len(favs) == 2
+    metas = {r.meta for r in favs}
+    assert "Kimi" in metas
+    assert "OpenRouter" in metas

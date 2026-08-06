@@ -373,7 +373,16 @@ def test_format_discovered_model_label():
     )
 
     assert format_discovered_model_label("kimi-k2.7-code") == "Kimi K2.7 Code"
-    assert format_discovered_model_label("deepseek-v4-flash") == "Deepseek V4 Flash"
+    assert format_discovered_model_label("deepseek-v4-flash") == "DeepSeek V4 Flash"
+    assert (
+        format_discovered_model_label("deepseek/deepseek-v4-flash")
+        == "DeepSeek V4 Flash 0423"
+    )
+    assert (
+        format_discovered_model_label("deepseek/deepseek-v4-flash-0731")
+        == "DeepSeek V4 Flash 0731"
+    )
+    assert format_discovered_model_label("deepseek-v4-flash-0731") == "DeepSeek V4 Flash 0731"
     assert format_discovered_model_label("gpt-5.1") == "GPT 5.1"
     assert format_discovered_model_label("gpt-5.6-luna") == "GPT 5.6 Luna"
     assert format_discovered_model_label("glm-5") == "GLM 5"

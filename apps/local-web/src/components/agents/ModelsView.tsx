@@ -44,6 +44,7 @@ export function ModelsView({
   onSaveProviderKey,
   onClearProviderKey,
   onTestProviderKey,
+  onRevealStoredSecret,
   embedded = false
 }: {
   integrations: IntegrationSummary[]
@@ -92,6 +93,8 @@ export function ModelsView({
   onTestProviderKey: (
     key: string
   ) => Promise<{ ok: boolean; message: string }>
+  /** Load a saved API key for show/copy in the key modal. */
+  onRevealStoredSecret: (key: string) => Promise<string>
   /** Compact chrome for setup wizard embedding. */
   embedded?: boolean
 }) {
@@ -220,6 +223,7 @@ export function ModelsView({
           onRevealedKeyChange={(key, revealed) =>
             state.setRevealedKeys(prev => ({ ...prev, [key]: revealed }))
           }
+          onRevealStoredSecret={onRevealStoredSecret}
           onSaveProviderKey={integration => state.saveProviderKey(integration)}
           onClearProviderKey={integration =>
             state.clearProviderKey(integration)

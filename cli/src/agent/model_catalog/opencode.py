@@ -33,17 +33,53 @@ def opencode_model_is_supported(model_id: str | None) -> bool:
     return value not in OPENCODE_UNSUPPORTED_MODELS
 
 
+def _deepseek_flash_display_label(model_id: str) -> str | None:
+    """Dated Flash labels when the slug encodes 0423 / 0731 / latest.
+
+    OpenRouter's undated ``deepseek/deepseek-v4-flash`` is the Apr 2026
+    preview (0423). Bare ``deepseek-v4-flash`` (native DeepSeek / OpenCode)
+    is left unlabeled here so it stays "DeepSeek V4 Flash".
+    """
+    raw = str(model_id or "").strip().lower()
+    if raw.startswith("~"):
+        raw = raw[1:]
+    slug = raw.rsplit("/", 1)[-1]
+    if slug in {
+        "deepseek-v4-flash-0731",
+        "deepseek-v4-flash-20260731",
+    }:
+        return "DeepSeek V4 Flash 0731"
+    if slug in {
+        "deepseek-v4-flash-0423",
+        "deepseek-v4-flash-20260423",
+    }:
+        return "DeepSeek V4 Flash 0423"
+    if slug == "deepseek-v4-flash-latest":
+        return "DeepSeek V4 Flash Latest"
+    # OpenRouter vendor path: undated flash slug == 0423 preview.
+    if slug == "deepseek-v4-flash" and raw.startswith("deepseek/"):
+        return "DeepSeek V4 Flash 0423"
+    return None
+
+
 def format_discovered_model_label(model_id: str) -> str:
     """Turn a raw model id like ``kimi-k2.7-code`` into ``Kimi K2.7 Code``.
 
     Known product acronyms (``gpt``, ``glm``, …) stay fully uppercase.
+    DeepSeek V4 Flash revisions keep the 0423 / 0731 date so OpenRouter and
+    Qwen Cloud rows do not collapse to the same display name.
     """
     raw = str(model_id or "").strip()
     if not raw:
         return raw
+    dated = _deepseek_flash_display_label(raw)
+    if dated is not None:
+        return dated
+    # OpenRouter / Together style ``vendor/model`` → label the model slug only.
+    slug = raw.rsplit("/", 1)[-1]
     # Tokens that should stay ALL CAPS in UI labels (GPT 5.1, GLM 5, …).
     acronyms = {"gpt", "glm", "aws", "api", "llm", "ml"}
-    parts = raw.replace("_", "-").split("-")
+    parts = slug.replace("_", "-").split("-")
     out: list[str] = []
     for part in parts:
         if not part:
@@ -54,7 +90,11 @@ def format_discovered_model_label(model_id: str) -> str:
             continue
         # Keep version-like tokens readable (k2.7 -> K2.7, v4 -> V4).
         out.append(part[:1].upper() + part[1:])
-    return " ".join(out) or raw
+    # Prefer the DeepSeek brand casing when the slug starts with deepseek.
+    label = " ".join(out) or raw
+    if label.lower().startswith("deepseek "):
+        return "DeepSeek " + label[len("Deepseek ") :]
+    return label
 
 
 def opencode_model_uses_anthropic(model_id: str) -> bool:

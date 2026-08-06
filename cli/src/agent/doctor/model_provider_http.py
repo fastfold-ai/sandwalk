@@ -60,6 +60,7 @@ _PROBE_MODELS = {
 # Models vary by Qwen plan; try a few cheap/common ids per endpoint.
 _QWEN_PROBE_MODELS = (
     "qwen3.7-plus",
+    "qwen3.7-flash",
     "qwen3.6-plus",
     "qwen3.5-plus",
     "qwen3-max",

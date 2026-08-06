@@ -1,6 +1,7 @@
-"""In-app /models modal: search, favorites (Ctrl+F), arrows, Esc cancel.
+"""In-app /models modal: search, favorites, enable (Space), arrows, Esc.
 
 Centered Float over the live transcript (same chrome as /themes).
+Lists all catalog models (including disabled) to match Dashboard → Models.
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ class _ModelRow:
     effort: str = ""  # e.g. "Medium", "Low · Fast"
     meta: str = ""  # right-aligned fallback (provider) when no effort
     favorite: bool = False
+    enabled: bool = True
 
 
 @dataclass
@@ -164,18 +166,13 @@ def build_model_rows(
     recent_only = [k for k in recent_keys if k not in fav_set]
     add_section("Recent", recent_only)
 
-    shown = set(favorite_keys) | set(recent_only)
-    # Remaining grouped by canonical provider label (case-insensitive merge).
+    # Provider sections list every matched model — Favorites/Recent are
+    # shortcuts only and must not remove entries from the catalog.
     from ui.terminal.model_options import provider_display_label
 
-    rest = [
-        opt
-        for opt in matched
-        if option_pref_key(opt) not in shown
-    ]
     groups: dict[str, list[dict]] = {}
     group_titles: dict[str, str] = {}
-    for opt in rest:
+    for opt in matched:
         raw = str(opt.get("provider_label") or opt.get("provider") or "Models")
         title = provider_display_label(
             str(opt.get("provider") or ""), fallback=raw
@@ -229,6 +226,7 @@ def _row_for_option(
         effort=effort,
         meta=meta,
         favorite=favorite,
+        enabled=bool(opt.get("enabled", True)),
     )
 
 
@@ -280,6 +278,8 @@ def models_modal_style_extras(colors: dict[str, str]) -> dict[str, str]:
     out["models-context-selected"] = out.get(
         "models-row-selected", f"bg:{accent} bold"
     )
+    # Disabled catalog rows (space to enable) — muted like skills ○.
+    out["models-row-disabled"] = f"bg:{panel} {muted}"
     return out
 
 
@@ -360,6 +360,7 @@ class ModelsModalHost:
                         return [("class:models-section", f"{label}{pad}")]
                     selected = abs_i == st.index
                     opt = row.option or {}
+                    enabled = bool(getattr(row, "enabled", True))
                     is_current = is_current_option(
                         opt,
                         current_model=st.current_model,
@@ -367,14 +368,17 @@ class ModelsModalHost:
                         active_profile_id=st.active_profile_id,
                         active_backend=st.active_backend,
                     )
-                    style = (
-                        "class:models-row-selected"
-                        if selected
-                        else "class:models-row"
-                    )
-                    # One-char gutter column so ★ / ● / blank align with titles.
+                    if selected:
+                        style = "class:models-row-selected"
+                    elif not enabled:
+                        style = "class:models-row-disabled"
+                    else:
+                        style = "class:models-row"
+                    # One-char gutter: ★ favorite · ● current · ○ disabled · blank.
                     if row.favorite:
                         gutter = "★"
+                    elif not enabled:
+                        gutter = "○"
                     elif is_current:
                         gutter = "●"
                     else:
@@ -382,10 +386,21 @@ class ModelsModalHost:
                     gutter_style = (
                         "class:models-row-selected"
                         if selected
-                        else "class:models-row-current"
+                        else (
+                            "class:models-row-disabled"
+                            if not enabled
+                            else "class:models-row-current"
+                        )
                     )
-                    # Warp-like: name + context on left, effort (or provider) right.
-                    right_label = row.effort or row.meta
+                    # Warp-like: name + context on left; effort/provider on right.
+                    # Favorites always keep the provider so ★ rows stay unambiguous
+                    # when the same display name exists under multiple providers.
+                    if row.favorite and row.meta and row.effort:
+                        right_label = f"{row.meta} · {row.effort}"
+                    elif row.favorite and row.meta:
+                        right_label = row.meta
+                    else:
+                        right_label = row.effort or row.meta
                     right_style = (
                         "class:models-meta-selected"
                         if selected
@@ -522,7 +537,7 @@ class ModelsModalHost:
                         lambda: [
                             (
                                 "class:models-hint",
-                                "↑/↓ select · enter confirm · ctrl+f favorite",
+                                "↑/↓ · enter confirm · space enable · ctrl+f favorite",
                             )
                         ]
                     ),
@@ -604,6 +619,11 @@ class ModelsModalHost:
         @self.key_bindings.add("enter", filter=self.is_open, eager=True)
         def _enter(_event):
             host.confirm()
+
+        @self.key_bindings.add("space", filter=self.is_open, eager=True)
+        @self.key_bindings.add("c-space", filter=self.is_open, eager=True)
+        def _space(_event):
+            host.toggle_enabled()
 
         @self.key_bindings.add("c-f", filter=self.is_open, eager=True)
         def _fav(_event):
@@ -797,9 +817,46 @@ class ModelsModalHost:
         self._rebuild_rows(keep_key=option_pref_key(opt))
         self._invalidate()
 
+    def toggle_enabled(self) -> None:
+        """Toggle enable/disable for the highlighted model (stay open)."""
+        from agent.config import Config
+
+        opt = self._current_option()
+        if not self.state.open or not opt:
+            return
+        cfg = self._cfg()
+        if not isinstance(cfg, Config):
+            return
+        model_id = str(opt.get("model_id") or "").strip()
+        provider = str(opt.get("provider") or "").strip().lower()
+        if not model_id:
+            return
+        new_enabled = not bool(opt.get("enabled", True))
+        # Prefer provider-scoped keys (same as Dashboard PATCH /v1/models).
+        hide_key = (
+            cfg.provider_model_key(provider, model_id) if provider else model_id
+        )
+        cfg.set_model_hidden(hide_key, hidden=not new_enabled)
+        if provider and new_enabled and model_id in set(cfg.hidden_models()):
+            cfg.set_model_hidden(model_id, hidden=False)
+        try:
+            cfg.save()
+        except Exception:  # noqa: BLE001
+            pass
+        self.terminal.session.config = cfg
+        for item in self.state.options:
+            mid = str(item.get("model_id") or "")
+            prov = str(item.get("provider") or "")
+            item["enabled"] = not cfg.is_model_hidden(mid, prov)
+        self._rebuild_rows(keep_key=option_pref_key(opt))
+        self._invalidate()
+
     def confirm(self) -> None:
         opt = self._current_option()
         if not self.state.open or not opt:
+            return
+        if not bool(opt.get("enabled", True)):
+            # Keep open — space enables; do not silently switch to a hidden model.
             return
         apply = getattr(self.terminal, "_apply_model_selection", None)
         self.state.open = False

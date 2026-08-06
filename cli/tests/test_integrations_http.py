@@ -99,6 +99,13 @@ def test_integrations_http_crud(tmp_path: Path, monkeypatch):
         assert body["ok"] is True
         assert "API key works" in body["message"]
 
+        revealed = client.get("/v1/integrations/anthropic/secret")
+        assert revealed.status_code == 200
+        secret_body = revealed.json()
+        assert secret_body["configured"] is True
+        assert secret_body["value"] == "sk-ant-api03-validkey"
+        assert secret_body["envVar"]
+
         removed = client.delete("/v1/integrations/anthropic")
         assert removed.status_code == 200
         assert removed.json()["configured"] is False

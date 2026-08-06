@@ -255,6 +255,10 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
           await loadModelOptions()
         }}
         onTestProviderKey={key => client.validateIntegration(key)}
+        onRevealStoredSecret={async key => {
+          const revealed = await client.revealIntegrationSecret(key)
+          return revealed.value
+        }}
       />
     )
   }

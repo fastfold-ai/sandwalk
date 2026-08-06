@@ -120,6 +120,7 @@ class _SwitchModelMixin:
                 active_profile_id=active_profile_id,
                 active_backend=active_backend,
             )
+            enabled = bool(option.get("enabled", True))
             marker = " [green]*[/green]" if is_current else "  "
             if profile_id:
                 provider_hint = self._compatible_backend_display_name(backend)
@@ -134,15 +135,21 @@ class _SwitchModelMixin:
                 profile_id=profile_id,
             ):
                 fav = "★ "
+            off = "○ " if not enabled else ""
             ctx = _context_label_for_option(option)
             effort = _effort_label_for_option(
                 option, cfg if isinstance(cfg, Config) else None
             )
-            ctx_bit = f" [dim]{ctx}[/dim]" if ctx else ""
+            ctx_bit = f" {ctx}" if ctx else ""
             right = effort or provider_hint
-            self.console.print(
-                f"  {marker} [{i}] {fav}{display}{ctx_bit} [dim]{right}[/dim]"
-            )
+            body = f"{off}{fav}{display}{ctx_bit} {right}".rstrip()
+            if enabled:
+                self.console.print(
+                    f"  {marker} [{i}] {off}{fav}{display}"
+                    f"[dim]{ctx_bit}[/dim] [dim]{right}[/dim]"
+                )
+            else:
+                self.console.print(f"  {marker} [{i}] [dim]{body}[/dim]")
 
         if profile_discovery_warnings:
             self.console.print(
@@ -181,4 +188,11 @@ class _SwitchModelMixin:
             self.console.print("  [dim]Cancelled.[/dim]")
             return
 
-        self._apply_model_selection(models_with_provider[int(choice) - 1])
+        selected = models_with_provider[int(choice) - 1]
+        if not bool(selected.get("enabled", True)):
+            self.console.print(
+                "  [yellow]That model is disabled.[/yellow] "
+                "Enable it in the /models modal (space) or Dashboard → Models."
+            )
+            return
+        self._apply_model_selection(selected)

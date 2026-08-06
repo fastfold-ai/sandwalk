@@ -3,12 +3,14 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   Eye,
   EyeOff,
   Loader2,
   Trash2
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
 import { Button } from '@/components/ui/button'
@@ -20,6 +22,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { copyText } from '@/lib/clipboard'
 import { openInSystemBrowser } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
@@ -76,6 +79,7 @@ export function ModelsApiKeysSection({
   onKeyDraftChange,
   onEndpointDraftChange,
   onRevealedKeyChange,
+  onRevealStoredSecret,
   onSaveProviderKey,
   onClearProviderKey,
   onTestProviderKey
@@ -90,6 +94,8 @@ export function ModelsApiKeysSection({
   onKeyDraftChange: (key: string, value: string) => void
   onEndpointDraftChange: (key: string, value: string) => void
   onRevealedKeyChange: (key: string, revealed: boolean) => void
+  /** Load the saved secret into the draft for show/copy. */
+  onRevealStoredSecret: (key: string) => Promise<string>
   onSaveProviderKey: (
     integration: IntegrationSummary
   ) => Promise<{ ok: boolean; message: string } | void> | void
@@ -100,8 +106,9 @@ export function ModelsApiKeysSection({
 }) {
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<
-    'test' | 'save' | 'remove' | null
+    'test' | 'save' | 'remove' | 'reveal' | 'copy' | null
   >(null)
+  const [copied, setCopied] = useState(false)
   const [testResult, setTestResult] = useState<{
     ok: boolean
     message: string
@@ -116,7 +123,71 @@ export function ModelsApiKeysSection({
   useEffect(() => {
     setTestResult(null)
     setPendingAction(null)
+    setCopied(false)
   }, [activeKey])
+
+  const toggleReveal = async () => {
+    if (!activeIntegration) return
+    const key = activeIntegration.key
+    const showing = Boolean(revealedKeys[key])
+    if (showing) {
+      onRevealedKeyChange(key, false)
+      return
+    }
+    // Load stored secret when draft is empty so Show reveals the real key.
+    if (activeIntegration.configured && !(keyDrafts[key] || '').trim()) {
+      setPendingAction('reveal')
+      try {
+        const value = await onRevealStoredSecret(key)
+        if (value) onKeyDraftChange(key, value)
+        onRevealedKeyChange(key, true)
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Unable to reveal saved key'
+        )
+      } finally {
+        setPendingAction(null)
+      }
+      return
+    }
+    onRevealedKeyChange(key, true)
+  }
+
+  const copySecret = async () => {
+    if (!activeIntegration) return
+    const key = activeIntegration.key
+    let value = (keyDrafts[key] || '').trim()
+    if (!value && activeIntegration.configured) {
+      setPendingAction('copy')
+      try {
+        value = (await onRevealStoredSecret(key)).trim()
+        if (value) {
+          onKeyDraftChange(key, value)
+          onRevealedKeyChange(key, true)
+        }
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Unable to copy saved key'
+        )
+        setPendingAction(null)
+        return
+      } finally {
+        setPendingAction(null)
+      }
+    }
+    if (!value) {
+      toast.error('No API key to copy')
+      return
+    }
+    const ok = await copyText(value)
+    if (ok) {
+      setCopied(true)
+      toast.success('API key copied')
+      window.setTimeout(() => setCopied(false), 1500)
+    } else {
+      toast.error('Could not copy — select the key manually')
+    }
+  }
 
   useEffect(() => {
     if (!activeIntegration || activeIntegration.key !== 'qwen') return
@@ -325,7 +396,7 @@ export function ModelsApiKeysSection({
                         : activeCopy?.placeholderUnset ||
                           `Enter your ${activeIntegration.name} API Key`
                     }
-                    className="bg-muted/40 pr-9 font-mono text-sm"
+                    className="bg-muted/40 pr-16 font-mono text-sm"
                     onKeyDown={event => {
                       if (event.key === 'Enter') {
                         event.preventDefault()
@@ -333,27 +404,48 @@ export function ModelsApiKeysSection({
                       }
                     }}
                   />
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
-                    aria-label={
-                      revealedKeys[activeIntegration.key]
-                        ? 'Hide API key'
-                        : 'Show API key'
-                    }
-                    onClick={() =>
-                      onRevealedKeyChange(
-                        activeIntegration.key,
-                        !revealedKeys[activeIntegration.key]
-                      )
-                    }
-                  >
-                    {revealedKeys[activeIntegration.key] ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                  </button>
+                  <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-md"
+                      aria-label="Copy API key"
+                      title="Copy API key"
+                      disabled={busy}
+                      onClick={() => void copySecret()}
+                    >
+                      {pendingAction === 'copy' ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : copied ? (
+                        <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <Copy className="size-4" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-md"
+                      aria-label={
+                        revealedKeys[activeIntegration.key]
+                          ? 'Hide API key'
+                          : 'Show API key'
+                      }
+                      title={
+                        revealedKeys[activeIntegration.key]
+                          ? 'Hide API key'
+                          : 'Show API key'
+                      }
+                      disabled={busy}
+                      onClick={() => void toggleReveal()}
+                    >
+                      {pendingAction === 'reveal' ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : revealedKeys[activeIntegration.key] ? (
+                        <EyeOff className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {activeIntegration.key === 'qwen' ? (

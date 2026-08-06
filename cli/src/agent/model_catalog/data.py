@@ -99,7 +99,7 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
         (
             "deepseek-v4-flash",
             "DeepSeek V4 Flash",
-            "Fast DeepSeek model for everyday agent work",
+            "Native DeepSeek API Flash endpoint (current revision)",
         ),
         (
             "deepseek-v4-pro",
@@ -135,7 +135,7 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
         (
             "qwen3.7-plus",
             "Qwen3.7 Plus",
-            "Qwen Cloud balanced model (1M context, image/video + tools)",
+            "Qwen Cloud balanced model (1M context, image + tools)",
         ),
         (
             "qwen3.7-max",
@@ -143,14 +143,20 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
             "Qwen Cloud Qwen3.7 series max (1M context, text)",
         ),
         (
+            "qwen3.7-flash",
+            "Qwen3.7 Flash",
+            # https://www.qwencloud.com/models/qwen3.7-flash
+            "Qwen Cloud VL Flash (1M context, image/video; marketplace)",
+        ),
+        (
             "qwen3.6-flash",
             "Qwen3.6 Flash",
-            "Qwen Cloud vision-language Flash (1M context, image/video)",
+            "Qwen Cloud previous vision-language Flash (1M context, image/video)",
         ),
         (
             "deepseek-v4-flash-0731",
-            "DeepSeek V4 Flash",
-            "DeepSeek V4 Flash via Qwen Cloud (1M context)",
+            "DeepSeek V4 Flash 0731",
+            "DeepSeek V4 Flash Jul 2026 revision via Qwen Cloud (1M context)",
         ),
         (
             "deepseek-v4-pro",
@@ -243,7 +249,12 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
         (
             "deepseek/deepseek-v4-pro",
             "DeepSeek V4 Pro",
-            "DeepSeek flagship via OpenRouter",
+            "DeepSeek flagship via OpenRouter (text-only, 1M)",
+        ),
+        (
+            "deepseek/deepseek-v4-flash-0731",
+            "DeepSeek V4 Flash 0731",
+            "DeepSeek V4 Flash Jul 2026 via OpenRouter (text-only, 1M)",
         ),
         (
             "thinkingmachines/inkling",
@@ -323,8 +334,8 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
         ),
         (
             "deepseek/deepseek-v4-flash",
-            "DeepSeek V4 Flash",
-            "DeepSeek V4 Flash via OpenRouter",
+            "DeepSeek V4 Flash 0423",
+            "DeepSeek V4 Flash Apr 2026 preview via OpenRouter (text-only, 1M)",
         ),
         (
             "deepseek/deepseek-chat-v3.1",
@@ -377,7 +388,7 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
 # Bump when the default-enabled set changes so existing configs get migrated once.
 # Also bump when curated OpenRouter models become default-enabled so prior
 # discovery-seeded hides are cleared (see Config._migrate_catalog_defaults).
-CATALOG_DEFAULTS_VERSION = 7
+CATALOG_DEFAULTS_VERSION = 9
 
 # Models present in the catalog but hidden by default. Users can re-enable them
 # from Dashboard → Models; toggling simply removes them from the hidden list.

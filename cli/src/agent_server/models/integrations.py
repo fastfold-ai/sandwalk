@@ -67,6 +67,14 @@ class ValidateIntegrationResponse(ApiModel):
     message: str
 
 
+class IntegrationSecretResponse(ApiModel):
+    """Raw stored secret for local reveal/copy (user opt-in)."""
+
+    configured: bool
+    env_var: str
+    value: str
+
+
 class FastfoldOneClickStart(ApiModel):
     """Browser URL for the FastFold Cloud allow page."""
 

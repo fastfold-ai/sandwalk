@@ -1865,6 +1865,17 @@ export class LocalAgentClient
     )
   }
 
+  /** Fetch the stored secret for local reveal/copy (user opt-in). */
+  revealIntegrationSecret(
+    key: string,
+    signal?: AbortSignal
+  ): Promise<{ configured: boolean; envVar: string; value: string }> {
+    return this.request<{ configured: boolean; envVar: string; value: string }>(
+      `/integrations/${encodeURIComponent(key)}/secret`,
+      { signal }
+    )
+  }
+
   getRuntimeSettings(signal?: AbortSignal): Promise<RuntimeSettings> {
     return this.request<RuntimeSettings>('/settings/runtime', { signal })
   }

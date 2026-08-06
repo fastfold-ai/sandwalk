@@ -12,6 +12,8 @@ Update these values when providers revise their published limits:
 - xAI:       https://docs.x.ai/docs/models
 - Moonshot:  https://platform.kimi.ai/docs/models
 - Qwen:      https://docs.qwencloud.com/developer-guides/getting-started/text-generation-models
+- OpenRouter: https://openrouter.ai/models (same underlying windows; ids are
+  ``vendor/slug``, e.g. ``qwen/qwen3.7-max``, ``deepseek/deepseek-v4-pro``)
 
 As of July 2026:
 - Anthropic 1M context is GA (default, no beta header) on Opus 5, Fable 5,
@@ -20,6 +22,7 @@ As of July 2026:
 - OpenAI GPT-5.6 (Sol/Terra/Luna) has a 1.05M window; earlier GPT-5.x are 400k.
 - Qwen3.8 / Qwen3.7 / most Qwen3.5–3.6 Plus/Flash flagships are 1M; legacy
   ``qwen3-max`` is 256k (see QwenCloud text-generation models table).
+- DeepSeek V4 Flash/Pro (native, Qwen Cloud, and OpenRouter) are 1M.
 """
 
 from __future__ import annotations
@@ -93,18 +96,33 @@ _PREFIX_CONTEXT_WINDOWS: list[tuple[str, int]] = [
 
 
 def context_window_for_model(model_id: str) -> int | None:
-    """Best-known context window for a catalog model id, or None if unknown."""
+    """Best-known context window for a catalog model id, or None if unknown.
+
+    OpenRouter and similar catalogs use ``vendor/slug`` ids
+    (``qwen/qwen3.7-max``). After an exact full-id miss we also match the
+    bare slug so the same Qwen/DeepSeek prefix table covers both native and
+    OpenRouter listings.
+    """
     normalized = str(model_id or "").strip()
     if not normalized:
         return None
-    exact = _EXACT_CONTEXT_WINDOWS.get(normalized)
-    if exact is not None:
-        return exact
     lowered = normalized.lower()
+    for key in (normalized, lowered):
+        exact = _EXACT_CONTEXT_WINDOWS.get(key)
+        if exact is not None:
+            return exact
+    # ``qwen/qwen3.7-max`` → also try ``qwen3.7-max``.
+    bare = lowered.rsplit("/", 1)[-1]
+    if bare != lowered:
+        exact = _EXACT_CONTEXT_WINDOWS.get(bare)
+        if exact is not None:
+            return exact
+    candidates = (lowered,) if bare == lowered else (lowered, bare)
     best: int | None = None
     best_len = -1
-    for prefix, window in _PREFIX_CONTEXT_WINDOWS:
-        if lowered.startswith(prefix) and len(prefix) > best_len:
-            best = window
-            best_len = len(prefix)
+    for candidate in candidates:
+        for prefix, window in _PREFIX_CONTEXT_WINDOWS:
+            if candidate.startswith(prefix) and len(prefix) > best_len:
+                best = window
+                best_len = len(prefix)
     return best

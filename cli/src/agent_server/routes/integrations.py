@@ -13,6 +13,7 @@ from agent_server.models import (
     FastfoldOneClickStart,
     IntegrationList,
     IntegrationProvider,
+    IntegrationSecretResponse,
     IntegrationSetupRequest,
     IntegrationSetupResponse,
     UpdateIntegrationRequest,
@@ -39,6 +40,21 @@ def register_integration_routes(app: FastAPI, deps: AppDeps) -> None:
         if provider is None:
             raise HTTPException(status_code=404, detail="Integration not found.")
         return provider
+
+    @app.get(
+        "/v1/integrations/{integration_key}/secret",
+        response_model=IntegrationSecretResponse,
+    )
+    async def reveal_integration_secret(
+        integration_key: str,
+    ) -> IntegrationSecretResponse:
+        """Return the stored secret for local reveal/copy (user opt-in)."""
+        try:
+            return await asyncio.to_thread(
+                integrations_service.reveal_secret, integration_key
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Integration not found.") from exc
 
     @app.put("/v1/integrations/{integration_key}", response_model=IntegrationProvider)
     async def update_integration(
