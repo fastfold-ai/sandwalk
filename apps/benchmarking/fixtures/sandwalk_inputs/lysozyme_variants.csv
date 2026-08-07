@@ -1,0 +1,6 @@
+variant_id,mutation,expression_level,notes
+WT,,1.00,wild type HEWL reference
+V1,W62Y,0.82,active-site adjacent
+V2,D52N,0.15,catalytic residue
+V3,N37D,0.91,surface charge
+V4,R45K,0.88,conservative swap

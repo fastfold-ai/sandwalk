@@ -22,7 +22,6 @@ type UseSessionChatStreamArgs = {
   sessionId: string | null
   sessionIdRef: MutableRefObject<string | null>
   sessions: AgentSession[]
-  runningSessionIdsKey: string
   chatBySessionIdRef: MutableRefObject<Record<string, SessionChatState>>
   patchChat: (
     id: string,
@@ -59,7 +58,6 @@ export function useSessionChatStream({
   sessionId,
   sessionIdRef,
   sessions,
-  runningSessionIdsKey,
   chatBySessionIdRef,
   patchChat,
   setSessions,
@@ -197,16 +195,18 @@ export function useSessionChatStream({
       return
     }
 
-    // Only stream the active session + any currently running sessions.
-    // An SSE per open tab exhausts the browser's ~6 HTTP/1.1 connections/host,
-    // which leaves file content fetches stuck in (pending).
+    // Token SSE for the *visible* session only.
+    //
+    // Streaming every running session opens one EventSource each and exhausts
+    // the browser's ~6 HTTP/1.1 connections/host — UI freezes (black splash on
+    // transparent Tauri) while /v1/sessions still answers fine. Background
+    // runs keep going on the server; status comes from the sessions revision
+    // poll. Opening a chat attaches SSE and catches up via afterSequence +
+    // message history.
     // Draft /agents/new has no API session — never open a stream for it.
     const wanted = new Set<string>()
     if (sessionId && !isDraftAgentSessionId(sessionId)) {
       wanted.add(sessionId)
-    }
-    for (const id of runningSessionIdsKey.split(',').filter(Boolean)) {
-      if (!isDraftAgentSessionId(id)) wanted.add(id)
     }
 
     for (const [id, controller] of [...streamControllersRef.current]) {
@@ -400,5 +400,5 @@ export function useSessionChatStream({
           }
         })
     }
-  }, [client, health, patchChat, runningSessionIdsKey, sessionId])
+  }, [client, health, patchChat, sessionId])
 }

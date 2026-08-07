@@ -51,6 +51,7 @@ dependencies = [
     "langchain-modal>=0.0.1",
     "modal>=0.73",
     "langchain-openrouter>=0.2.7",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

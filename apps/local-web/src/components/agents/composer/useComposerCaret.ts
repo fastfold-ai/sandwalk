@@ -11,6 +11,41 @@ import {
   parseComposerParts
 } from '@/components/agents/composer-parts'
 
+/** True when focus is on a control outside the draft (picker, menus, etc.). */
+export function focusIsOutsideComposerDraft(
+  node: Element | null,
+  isComposerInput: (node: Element | null) => boolean
+): boolean {
+  if (!node || node === document.body || node === document.documentElement) {
+    return false
+  }
+  if (isComposerInput(node)) return false
+  if (
+    node.closest(
+      [
+        '[data-radix-popper-content-wrapper]',
+        '[data-radix-menu-content]',
+        '[data-radix-dropdown-menu-content]',
+        '[data-radix-select-content]',
+        '[data-radix-popover-content]',
+        '[role="dialog"]',
+        '[role="listbox"]',
+        '[role="menu"]'
+      ].join(',')
+    )
+  ) {
+    return true
+  }
+  return (
+    node instanceof HTMLButtonElement ||
+    node instanceof HTMLInputElement ||
+    node instanceof HTMLTextAreaElement ||
+    node instanceof HTMLSelectElement ||
+    node instanceof HTMLAnchorElement ||
+    (node instanceof HTMLElement && node.isContentEditable)
+  )
+}
+
 export function useComposerCaret({
   draft,
   draftRef,
@@ -119,17 +154,28 @@ export function useComposerCaret({
     pendingCaretRef.current = draftRef.current.length
     let cancelled = false
 
+    const markDone = () => {
+      autoFocusedKeyRef.current = key
+      pendingCaretRef.current = null
+    }
+
     const tryFocus = () => {
       if (cancelled) return true
       if (isComposerInput(document.activeElement)) {
-        autoFocusedKeyRef.current = key
-        pendingCaretRef.current = null
+        markDone()
+        return true
+      }
+      // Opening the model picker (or any menu) moves focus out of the draft.
+      // Keep retrying would steal focus back and close the Radix popover.
+      if (
+        focusIsOutsideComposerDraft(document.activeElement, isComposerInput)
+      ) {
+        markDone()
         return true
       }
       if (!applyComposerCaret(draftRef.current.length)) return false
       if (!isComposerInput(document.activeElement)) return false
-      autoFocusedKeyRef.current = key
-      pendingCaretRef.current = null
+      markDone()
       return true
     }
 
@@ -150,23 +196,10 @@ export function useComposerCaret({
       }, ms)
     )
 
-    const onFocusIn = (event: FocusEvent) => {
-      if (cancelled || autoFocusedKeyRef.current === key) return
-      const target = event.target
-      if (
-        target instanceof Element &&
-        target.closest('[data-radix-scroll-area-viewport]')
-      ) {
-        tryFocus()
-      }
-    }
-    document.addEventListener('focusin', onFocusIn)
-
     return () => {
       cancelled = true
       window.cancelAnimationFrame(frame)
       for (const timer of timers) window.clearTimeout(timer)
-      document.removeEventListener('focusin', onFocusIn)
     }
   }, [applyComposerCaret, autoFocus, draftRef, focusKey, isComposerInput])
 

@@ -89,6 +89,58 @@ export type LocalAgentClientOptions = {
   apiKey?: string
 }
 
+export type BenchSuiteCard = {
+  id: string
+  title: string
+  description?: string
+  lane: 'intelligence' | 'skills'
+  runner: 'completion' | 'agent'
+  packId?: string | null
+  matrix?: string | null
+  questionCount: number
+  sampleSizes: number[]
+  defaultSampleSize?: number | null
+  available: boolean
+  unavailableReason?: string | null
+  author?: string | null
+  authorAvatar?: string | null
+  codeExec?: boolean
+}
+
+export type BenchProgress = {
+  type?: string
+  phase?: string
+  modelId?: string
+  benchmark?: string
+  message?: string
+  current?: number
+  total?: number
+  benchCurrent?: number
+  benchTotal?: number
+}
+
+export type BenchActiveStatus = {
+  running: boolean
+  phase: string
+  currentModel?: string | null
+  currentRunId?: string | null
+  lastProgress?: BenchProgress | null
+  queue: Array<{ runId: string; modelId: string; suites: string[] }>
+}
+
+export type BenchResultSummary = {
+  runId: string
+  modelId: string
+  benchmark: string
+  accuracy: number
+  correct: number
+  total: number
+  timeS: number
+  thinkingUsed?: boolean
+  projectId?: string | null
+  createdAt?: string | null
+}
+
 export class LocalAgentClient
   implements
     AgentClient,
@@ -234,6 +286,87 @@ export class LocalAgentClient
       method: 'POST',
       signal
     })
+  }
+
+  async listBenchSuites(signal?: AbortSignal): Promise<BenchSuiteCard[]> {
+    const result = await this.request<{ data: BenchSuiteCard[] }>('/bench/packs', {
+      signal
+    })
+    return result.data
+  }
+
+  spawnBench(
+    input: {
+      suites: Array<{ suiteId: string; sampleSize?: number | null }>
+      model?: string | null
+      models?: string[]
+      provider?: string | null
+      projectName?: string | null
+      specialistId?: string | null
+      thinking?: boolean
+      dryRun?: boolean
+    },
+    signal?: AbortSignal
+  ): Promise<{ runIds: string[]; queued: number }> {
+    return this.request('/bench/spawn', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+      signal
+    })
+  }
+
+  getBenchActive(signal?: AbortSignal): Promise<BenchActiveStatus> {
+    return this.request<BenchActiveStatus>('/bench/runs/active', { signal })
+  }
+
+  async listBenchResults(signal?: AbortSignal): Promise<BenchResultSummary[]> {
+    const result = await this.request<{ data: BenchResultSummary[] }>(
+      '/bench/runs',
+      { signal }
+    )
+    return result.data
+  }
+
+  getBenchResult(
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<Record<string, unknown>> {
+    return this.request(`/bench/runs/${encodeURIComponent(runId)}`, { signal })
+  }
+
+  cancelBenchRun(runId: string, signal?: AbortSignal): Promise<{ ok: boolean }> {
+    return this.request(`/bench/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: 'POST',
+      signal
+    })
+  }
+
+  resetBenchResults(signal?: AbortSignal): Promise<{ ok: boolean; cleared: number }> {
+    return this.request('/bench/results/reset', { method: 'POST', signal })
+  }
+
+  async downloadBenchExport(
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<{ blob: Blob; filename: string }> {
+    const res = await fetch(
+      `${this.baseUrl}/v1/bench/runs/${encodeURIComponent(runId)}/export`,
+      {
+        credentials: 'include',
+        headers: this.apiKey
+          ? { Authorization: `Bearer ${this.apiKey}` }
+          : undefined,
+        signal
+      }
+    )
+    if (!res.ok) {
+      throw new Error(`Export failed (${res.status})`)
+    }
+    const blob = await res.blob()
+    const cd = res.headers.get('content-disposition') || ''
+    const match = /filename="?([^"]+)"?/i.exec(cd)
+    return { blob, filename: match?.[1] || `${runId}.json` }
   }
 
   runDoctor(

@@ -60,6 +60,7 @@ export type AppShellMainProps = {
   isDashboardData: boolean
   isDashboardTools: boolean
   isDashboardDoctor: boolean
+  isDashboardBench: boolean
   isDashboardStorage: boolean
   isDashboardEnvironment: boolean
   isSkills: boolean
@@ -217,6 +218,7 @@ export function isDashboardMainView(props: AppShellMainProps) {
     props.isDashboardData ||
     props.isDashboardTools ||
     props.isDashboardDoctor ||
+    props.isDashboardBench ||
     props.isDashboardStorage ||
     props.isDashboardEnvironment ||
     props.isSkills ||

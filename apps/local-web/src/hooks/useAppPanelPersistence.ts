@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 
 import {
@@ -68,7 +68,9 @@ export function useAppPanelPersistence({
     }
   }, [sidebarCollapsed, sidebarPanelRef])
 
-  useEffect(() => {
+  // Layout phase so autoSave restore cannot flash the Files panel open on
+  // New Agent before React state (collapsed) wins.
+  useLayoutEffect(() => {
     const panel = filesPanelRef.current
     if (!panel) return
     if (filesPanelCollapsed) {

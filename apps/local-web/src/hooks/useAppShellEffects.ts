@@ -35,6 +35,7 @@ type UseAppShellEffectsArgs = {
   isDashboardModels: boolean
   isDashboardTools: boolean
   isDashboardDoctor: boolean
+  isDashboardBench: boolean
   isDashboardStorage: boolean
   isDashboardEnvironment: boolean
   isSkills: boolean
@@ -93,6 +94,7 @@ export function useAppShellEffects(args: UseAppShellEffectsArgs) {
     isDashboardModels: args.isDashboardModels,
     isDashboardTools: args.isDashboardTools,
     isDashboardDoctor: args.isDashboardDoctor,
+    isDashboardBench: args.isDashboardBench,
     isDashboardStorage: args.isDashboardStorage,
     isDashboardEnvironment: args.isDashboardEnvironment,
     isSkills: args.isSkills,

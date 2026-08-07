@@ -29,6 +29,8 @@ def test_new_providers_catalog_and_lookup():
     } <= {row[0] for row in AVAILABLE_MODELS["deepseek"]}
     assert {row[0] for row in AVAILABLE_MODELS["minimax"]} == {"MiniMax-M2.5"}
     assert "mistral-large-latest" in {row[0] for row in AVAILABLE_MODELS["mistral"]}
+    from agent.model_catalog import DEFAULT_DISABLED_MODELS
+
     qwen_ids = {row[0] for row in AVAILABLE_MODELS["qwen"]}
     assert {
         "qwen3.8-max",
@@ -40,6 +42,13 @@ def test_new_providers_catalog_and_lookup():
         "glm-5.2",
         "qwen3-max",
     } <= qwen_ids
+    # Only OpenRouter Flash is default-hidden; Plus/Max stay available.
+    assert "qwen/qwen3.7-flash" in DEFAULT_DISABLED_MODELS
+    assert "qwen/qwen3.7-plus" not in DEFAULT_DISABLED_MODELS
+    assert "qwen/qwen3.7-max" not in DEFAULT_DISABLED_MODELS
+    assert "qwen/qwen3-max" not in DEFAULT_DISABLED_MODELS
+    assert "qwen3.7-max" not in DEFAULT_DISABLED_MODELS
+    assert "qwen3.7-flash" not in DEFAULT_DISABLED_MODELS
     assert "zai-org/GLM-5.2" in {row[0] for row in AVAILABLE_MODELS["together"]}
     assert "moonshotai/Kimi-K2.7-Code" in {row[0] for row in AVAILABLE_MODELS["together"]}
 

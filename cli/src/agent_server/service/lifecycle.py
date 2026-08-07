@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 import uuid
 
@@ -140,18 +141,42 @@ class _LifecycleMixin:
             payload={"messageId": user_message.id},
         )
 
-        task = asyncio.create_task(
-            self._execute_run(
-                session_id=session_id,
-                run_id=run_id,
-                content=text,
-                workspace_path=session.workspace_path,
-            ),
-            name=f"fastfold-run-{run_id}",
-        )
-        self._active_runs[session_id] = task
-        self._run_ids[session_id] = run_id
-        task.add_done_callback(lambda done: self._clear_run(session_id, done))
+        # Bench / Slack worker threads have no running loop — schedule onto
+        # the uvicorn loop bound at app startup (sandbox_event_bus).
+        def _start_task() -> None:
+            task = asyncio.create_task(
+                self._execute_run(
+                    session_id=session_id,
+                    run_id=run_id,
+                    content=text,
+                    workspace_path=session.workspace_path,
+                ),
+                name=f"fastfold-run-{run_id}",
+            )
+            self._active_runs[session_id] = task
+            self._run_ids[session_id] = run_id
+            task.add_done_callback(lambda done: self._clear_run(session_id, done))
+
+        try:
+            asyncio.get_running_loop()
+            _start_task()
+        except RuntimeError:
+            from agent_server.sandbox_events import sandbox_event_bus
+
+            loop = getattr(sandbox_event_bus, "_loop", None)
+            if loop is None or not loop.is_running():
+                raise RuntimeError("no running event loop") from None
+            done: concurrent.futures.Future[None] = concurrent.futures.Future()
+
+            def _on_loop() -> None:
+                try:
+                    _start_task()
+                    done.set_result(None)
+                except Exception as exc:  # noqa: BLE001
+                    done.set_exception(exc)
+
+            loop.call_soon_threadsafe(_on_loop)
+            done.result(timeout=30)
         return StartRunResponse(run_id=run_id)
 
     def _clear_run(self, session_id: str, task: asyncio.Task[None]) -> None:

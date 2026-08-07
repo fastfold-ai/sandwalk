@@ -7,6 +7,7 @@ import {
   AgentSecurityView,
   AppearanceView,
   DataView,
+  BenchView,
   DoctorView,
   EnvironmentView,
   GeneralView,
@@ -40,6 +41,7 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     isDashboardTools,
     isDashboardData,
     isDashboardDoctor,
+    isDashboardBench,
     isDashboardStorage,
     isDashboardEnvironment,
     setRuntimeSettings,
@@ -304,6 +306,16 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         onDownloadDiagnostics={(uiDiagnostics, signal) =>
           client.downloadDiagnostics(uiDiagnostics, signal)
         }
+      />
+    )
+  }
+
+  if (isDashboardBench) {
+    return (
+      <BenchView
+        client={client}
+        runtimeSettings={runtimeSettings}
+        setRuntimeSettings={setRuntimeSettings}
       />
     )
   }

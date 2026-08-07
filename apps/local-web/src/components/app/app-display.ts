@@ -4,7 +4,7 @@ import { slugifyIntegrationRoute } from '@/components/agents/dashboard-main-view
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { groupSessions } from '@/lib/sessions'
 
-const CONCURRENT_RUN_SOFT_LIMIT = 3
+const CONCURRENT_RUN_SOFT_LIMIT = 8
 
 export { CONCURRENT_RUN_SOFT_LIMIT }
 
@@ -58,6 +58,7 @@ export function resolveActiveTitle(input: {
   isDashboardData: boolean
   isDashboardTools: boolean
   isDashboardDoctor: boolean
+  isDashboardBench: boolean
   isDashboardStorage: boolean
   isDashboardEnvironment: boolean
   isSkills: boolean
@@ -84,6 +85,7 @@ export function resolveActiveTitle(input: {
   if (input.isDashboardData) return 'Datasets'
   if (input.isDashboardTools) return 'Tools'
   if (input.isDashboardDoctor) return 'Doctor'
+  if (input.isDashboardBench) return 'Bench'
   if (input.isDashboardStorage) return 'Storage'
   if (input.isDashboardEnvironment) return 'Environment'
   if (input.isSkills) return 'Skills'

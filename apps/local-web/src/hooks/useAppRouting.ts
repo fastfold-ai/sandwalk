@@ -95,6 +95,7 @@ export function useAppRouting(location: Location) {
   const isDashboardData = dashboardSection === 'datasets'
   const isDashboardTools = dashboardSection === 'tools'
   const isDashboardDoctor = dashboardSection === 'doctor'
+  const isDashboardBench = dashboardSection === 'bench'
   const isDashboardStorage = dashboardSection === 'storage'
   const isDashboardEnvironment = dashboardSection === 'environment'
   const isDashboardMcp = dashboardSection === 'mcp'
@@ -134,6 +135,7 @@ export function useAppRouting(location: Location) {
     if (isLibrary || isSites || isProjectHome) return 'home'
     if (isDashboardOverview) return 'overview'
     if (isDashboardDoctor) return 'doctor'
+    if (isDashboardBench) return 'settings'
     if (
       isDashboardStatus ||
       isDashboardGeneral ||
@@ -209,6 +211,7 @@ export function useAppRouting(location: Location) {
     isDashboardData,
     isDashboardTools,
     isDashboardDoctor,
+    isDashboardBench,
     isDashboardStorage,
     isDashboardEnvironment,
     isDashboardMcp,

@@ -1,0 +1,394 @@
+# Sandwalk skills + MCP coverage pack (benign targets only).
+# YAML = question bank + matrices. JSON manifests = per-run session/run IDs.
+#
+# Inputs: configs/benchmarks/inputs/  (copy into session workspace as inputs/)
+#
+# Coverage goal: every Featured skill + every MCP except Linear and Lucid.
+
+pack: skills-mcp-bakeoff
+version: "3.0"
+description: >
+  Featured skills and MCP workflows.
+
+inputs_dir: ../fixtures/sandwalk_inputs
+# Relative to packs/
+
+# ---------------------------------------------------------------------------
+# Prompt framing (prepended / appended by seeder)
+# ---------------------------------------------------------------------------
+
+# Agent messages = question prompt only (no harness / autonomy manifesto).
+prompt_prefix: ''
+prompt_suffix_template: ''
+
+# Session titles: "{title} · {model_short}" — no [bakeoffN] prefix.
+title_template: "{title} · {model_short}"
+
+safety:
+  allowed_targets:
+    - lysozyme (UniProt P00698)
+    - ubiquitin (sequence / PDB 1UBQ)
+    - insulin A-chain
+    - GFP / avGFP (UniProt P42212)
+    - hemoglobin alpha (UniProt P69905)
+    - poly-GS / short benign IDP
+    - T4 lysozyme-class textbook MD systems
+  avoid:
+    - pathogens
+    - viruses
+    - toxins
+    - dual-use / gain-of-function language
+    - pathogen spike/RBD epitopes
+  ignored_mcps:
+    - linear
+    - lucid
+  note: >
+    OpenRouter/OpenAI may return HTTP 400 biological-risk flags on pathogen
+    wording; keep targets on the allowed list.
+
+models:
+  kimi-k3: moonshotai/kimi-k3
+  qwen-max: qwen/qwen3.7-max
+  luna-pro: openai/gpt-5.6-luna-pro
+  deepseek-pro: deepseek/deepseek-v4-pro
+  deepseek-flash: deepseek/deepseek-v4-flash-0731
+  muse-spark: meta/muse-spark-1.2
+
+# Explicit coverage checklist (must all appear in ≥1 question).
+coverage:
+  skills:
+    - boltz
+    - convert-documents-to-markdown
+    - diagrams_mermaid
+    - fold
+    - md_openmm_calvados
+    - md_openmmdl
+    - protein_design_boltzgen
+    - sites-building
+    - sites-hosting
+    - skill-creator
+    - skill-find
+    - slack_report
+  mcps:
+    - exa
+    - huggingface
+    - latch
+    - neurosnap
+    - paperclip
+    - pymol
+    - raymol
+    - tamarind
+    - tavily
+
+questions:
+  # B01 — documents + diagram + search
+  - id: B01
+    title: "Docs convert + Mermaid + Exa"
+    focus: convert office docs, diagram, web search
+    skills:
+      - convert-documents-to-markdown
+      - diagrams_mermaid
+    mcps:
+      - exa
+      - tavily
+    inputs:
+      - inputs/ubiquitin_brief.pdf
+      - inputs/fold_pipeline_overview.pptx
+      - inputs/lysozyme_variants.csv
+    target: fixture docs in inputs/
+    default_model: kimi-k3
+    eval_mode: checklist
+    prompt: |
+      Convert the workspace fixtures and turn them into a short research brief.
+
+      1. Use convert-documents-to-markdown on ALL of:
+         - inputs/ubiquitin_brief.pdf
+         - inputs/fold_pipeline_overview.pptx
+         - inputs/lysozyme_variants.csv
+         Save markdown outputs under the workspace (e.g. outputs/docs/).
+      2. Use Exa and/or Tavily for 1–2 methods/structure notes on ubiquitin or lysozyme (benign textbook proteins only).
+      3. Use diagrams_mermaid to produce a flowchart: docs → convert → lit skim → summary.
+      4. Write outputs/brief.md combining converted tables/text + lit bullets + diagram reference.
+
+  # B02 — fold + dual viz
+  - id: B02
+    title: "Fold + PyMOL + RayMol ubiquitin"
+    focus: FastFold fold + local structure viewers
+    skills:
+      - fold
+    mcps:
+      - pymol
+      - raymol
+    inputs: []
+    target: human ubiquitin sequence
+    default_model: qwen-max
+    eval_mode: checklist
+    prompt: |
+      Fold ubiquitin and open it in both local viewers.
+
+      1. Use the fold skill on:
+         MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG
+         Prefer a fast/cheap model if the skill allows.
+      2. Wait/poll until complete; download CIF/PDB into the workspace.
+      3. Open in PyMOL MCP (cartoon, color by secondary structure).
+      4. Open the same file in RayMol MCP and confirm render.
+      5. Report job id + which viewer tools worked/failed.
+
+  # B03 — boltz + cloud bio MCPs
+  - id: B03
+    title: "Boltz + Tamarind + Neurosnap"
+    focus: Boltz API skill + structure/cloud MCPs
+    skills:
+      - boltz
+      - skill-find
+    mcps:
+      - tamarind
+      - neurosnap
+    inputs: []
+    target: short benign peptide / insulin A-chain class
+    default_model: luna-pro
+    eval_mode: checklist
+    prompt: |
+      Exercise the boltz skill plus two cloud bio MCPs on a benign peptide.
+
+      1. Use skill-find to confirm boltz is available, then use boltz for the smallest viable benign structure/affinity-style workflow it supports (e.g. insulin A-chain GIVEQCCTSICSLYQLENYCN or another allowed benign peptide). Keep defaults minimal.
+      2. Use Tamarind Bio MCP: list/search tools, then 1–2 real calls relevant to structure/protein analysis.
+      3. Use Neurosnap MCP similarly (list tools, then 1 real call if auth allows).
+      4. Wait for any submitted jobs; report IDs/status. If an MCP needs reconnect, say so after trying — do not ask the user mid-run.
+
+  # B04 — BoltzGen design + HF
+  - id: B04
+    title: "BoltzGen GFP + Hugging Face"
+    focus: protein design + model-card lookup
+    skills:
+      - protein_design_boltzgen
+      - skill-find
+    mcps:
+      - huggingface
+    inputs: []
+    target: GFP binder (tiny)
+    default_model: deepseek-pro
+    eval_mode: checklist
+    prompt: |
+      Tiny benign binder design + HF enrichment.
+
+      1. skill-find → confirm protein_design_boltzgen.
+      2. protein_design_boltzgen: minimal binder campaign against GFP / avGFP-like only (no pathogens).
+      3. Hugging Face MCP: find one model card or dataset about protein structure/design methods.
+      4. Wait/poll design jobs; report IDs, status, go/no-go.
+
+  # B05 — CALVADOS + Exa
+  - id: B05
+    title: "CALVADOS IDP + Exa"
+    focus: coarse-grained MD
+    skills:
+      - md_openmm_calvados
+    mcps:
+      - exa
+    inputs: []
+    target: poly-GS / short benign IDP
+    default_model: deepseek-flash
+    eval_mode: checklist
+    prompt: |
+      Submit a minimal CALVADOS run on a benign disordered peptide.
+
+      1. Exa: cite one CALVADOS / coarse-grained IDP methods paper.
+      2. md_openmm_calvados: submit poly-GS (or similar short benign linker) with minimal/default params.
+      3. Wait/poll to completion or hard failure; report workflow id + timeline + errors.
+
+  # B06 — OpenMMDL + Tavily
+  - id: B06
+    title: "OpenMMDL + Tavily"
+    focus: OpenMMDL MD workflow
+    skills:
+      - md_openmmdl
+    mcps:
+      - tavily
+    inputs: []
+    target: T4 lysozyme-class benign textbook system
+    default_model: muse-spark
+    eval_mode: checklist
+    prompt: |
+      Minimal OpenMMDL workflow on a benign textbook system.
+
+      1. Tavily: find a short OpenMM / ligand-MD note for a non-pathogen protein (e.g. T4 lysozyme + ligand).
+      2. md_openmmdl: smallest viable benign setup the skill supports.
+      3. Wait/poll; report job/workflow id and errors honestly.
+
+  # B07 — Latch + Paperclip + convert
+  - id: B07
+    title: "Latch + Paperclip + CSV convert"
+    focus: Latch workflows + docs MCP + CSV
+    skills:
+      - convert-documents-to-markdown
+    mcps:
+      - latch
+      - paperclip
+    inputs:
+      - inputs/lysozyme_variants.csv
+    target: inputs/lysozyme_variants.csv
+    default_model: kimi-k3
+    eval_mode: checklist
+    prompt: |
+      Ops + bio platform MCPs with a CSV fixture.
+
+      1. convert-documents-to-markdown on inputs/lysozyme_variants.csv → save markdown in workspace.
+      2. Latch Bio MCP: list tools / probe connectivity; run 1 real read-only or listing call if auth allows. If OAuth is expired, record the exact error after trying (do not pause for the user).
+      3. Paperclip MCP: one real list/search action; quote the tool result.
+      4. Write outputs/latch_paperclip_notes.md with what worked.
+
+  # B08 — sites build + host + mermaid
+  - id: B08
+    title: "Sites build + host + Mermaid"
+    focus: static site skills
+    skills:
+      - sites-building
+      - sites-hosting
+      - diagrams_mermaid
+    mcps: []
+    inputs:
+      - inputs/ubiquitin_brief.pdf
+    target: small static site about ubiquitin fold summary
+    default_model: qwen-max
+    eval_mode: checklist
+    prompt: |
+      Build a tiny static site from bakeoff content, then package/publish via hosting skill.
+
+      1. Create a short one-page site (benign): “Ubiquitin fold demo” with a paragraph summary (you may skim inputs/ubiquitin_brief.pdf if useful).
+      2. Use diagrams_mermaid for one SVG/mermaid diagram embedded or linked from the page.
+      3. sites-building: build, preview/validate, produce a dist/ (or skill-equivalent) ready for hosting.
+      4. sites-hosting: package and publish if the skill can do so non-interactively; if publish needs external secrets that are missing, finish packaging and report the blocker — do not ask the user mid-run.
+      5. Record local paths + any published URL.
+
+  # B09 — skill-creator + skill-find + HF
+  - id: B09
+    title: "Skill-find + skill-creator + HF"
+    focus: skill discovery and authoring
+    skills:
+      - skill-find
+      - skill-creator
+    mcps:
+      - huggingface
+    inputs: []
+    target: draft a tiny benign helper skill
+    default_model: luna-pro
+    eval_mode: checklist
+    prompt: |
+      Discover and draft a tiny skill (do not wait for user approval).
+
+      1. skill-find: search/list skills related to fold or structure; note 2–3 hits.
+      2. Hugging Face MCP: find one protein-structure model card to cite in the skill draft.
+      3. skill-creator: create a draft skill (name like `benign_structure_notes`) that tells an agent how to summarize a short peptide fold job + cite one HF model card. Keep it local/draft; do not publish a catalog release unless the skill flow does that automatically.
+      4. Save skill path(s) and a short README of what you created.
+
+  # B10 — PDB viz + Slack report
+  - id: B10
+    title: "1UBQ PyMOL RayMol + Slack"
+    focus: classic PDB viz + reporting
+    skills:
+      - slack_report
+      - diagrams_mermaid
+    mcps:
+      - pymol
+      - raymol
+      - exa
+    inputs: []
+    target: PDB 1UBQ
+    default_model: deepseek-flash
+    eval_mode: checklist
+    prompt: |
+      Visualize ubiquitin 1UBQ and share a status report.
+
+      1. Obtain PDB 1UBQ into the workspace (any allowed fetch path).
+      2. PyMOL MCP: cartoon + sensible coloring (optional sticks on core hydrophobics).
+      3. RayMol MCP: load/confirm render.
+      4. Exa: one sentence of methods context on 1UBQ / ubiquitin as a model system.
+      5. diagrams_mermaid: tiny flowchart of fetch → viz → report.
+      6. Write outputs/1ubq_status.md, then slack_report it if Slack credentials work; otherwise leave the markdown and report the Slack blocker.
+
+  # B11 — Neurosnap + Tamarind + fold (second fold path)
+  - id: B11
+    title: "Insulin fold + Neurosnap + Tamarind"
+    focus: fold + alternate cloud bio MCPs
+    skills:
+      - fold
+    mcps:
+      - neurosnap
+      - tamarind
+    inputs: []
+    target: insulin A-chain
+    default_model: deepseek-pro
+    eval_mode: checklist
+    prompt: |
+      Fold insulin A-chain and cross-check with cloud bio MCPs.
+
+      1. fold skill: GIVEQCCTSICSLYQLENYCN (fast/cheap if available); wait/poll; download structure.
+      2. Neurosnap MCP: 1–2 real calls that help inspect or enrich the structure/job (list tools first).
+      3. Tamarind Bio MCP: 1 real complementary call.
+      4. Summarize job id + MCP outputs; no invented success.
+
+  # B12 — Latch + Tavily + slack (ops/bio hybrid)
+  - id: B12
+    title: "Latch + Tavily + Slack report"
+    focus: Latch connectivity + search + report
+    skills:
+      - slack_report
+    mcps:
+      - latch
+      - tavily
+      - paperclip
+    inputs:
+      - inputs/fold_pipeline_overview.pptx
+    target: bakeoff status note
+    default_model: muse-spark
+    eval_mode: checklist
+    prompt: |
+      Produce an autonomous status note across Latch, search, and Slack.
+
+      1. Tavily: 2 bullets on recent FastFold / protein-folding platform news or docs (benign/methods).
+      2. Latch Bio MCP: probe/list; one real call if possible.
+      3. Paperclip MCP: one list/search call.
+      4. Write outputs/platform_status.md (include whether Latch auth worked).
+      5. slack_report the markdown if possible; else report blocker.
+
+# ---------------------------------------------------------------------------
+# Matrices
+# ---------------------------------------------------------------------------
+matrices:
+  # Full coverage pack — one agent per question (12).
+  full-coverage:
+    mode: pairs
+    spawn: agent_server
+    provider: openrouter
+    copy_inputs: true
+    pairs:
+      - { question: B01, model: kimi-k3 }
+      - { question: B02, model: qwen-max }
+      - { question: B03, model: luna-pro }
+      - { question: B04, model: deepseek-pro }
+      - { question: B05, model: deepseek-flash }
+      - { question: B06, model: muse-spark }
+      - { question: B07, model: kimi-k3 }
+      - { question: B08, model: qwen-max }
+      - { question: B09, model: luna-pro }
+      - { question: B10, model: deepseek-flash }
+      - { question: B11, model: deepseek-pro }
+      - { question: B12, model: muse-spark }
+
+  # Same 12 questions, one model.
+  full-coverage-same-model:
+    mode: product
+    spawn: agent_server
+    provider: openrouter
+    copy_inputs: true
+    questions: [B01, B02, B03, B04, B05, B06, B07, B08, B09, B10, B11, B12]
+    models: [luna-pro]
+
+  # Fold+viz question across OpenRouter favorites.
+  B02-models:
+    mode: product
+    spawn: agent_server
+    provider: openrouter
+    copy_inputs: false
+    questions: [B02]
+    models: [kimi-k3, qwen-max, luna-pro, deepseek-pro, deepseek-flash]

@@ -53,6 +53,7 @@ export function buildDashboardMainViewsProps(
     isDashboardData: props.isDashboardData,
     isDashboardTools: props.isDashboardTools,
     isDashboardDoctor: props.isDashboardDoctor,
+    isDashboardBench: props.isDashboardBench,
     isDashboardStorage: props.isDashboardStorage,
     isDashboardEnvironment: props.isDashboardEnvironment,
     isSkills: props.isSkills,

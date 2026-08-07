@@ -15,6 +15,7 @@ type DocumentTitleArgs = {
   isDashboardModels: boolean
   isDashboardTools: boolean
   isDashboardDoctor: boolean
+  isDashboardBench: boolean
   isDashboardStorage: boolean
   isDashboardEnvironment: boolean
   isSkills: boolean
@@ -79,6 +80,15 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     }
     if (args.isDashboardDoctor) {
       document.title = `Doctor · ${base}`
+      return
+    }
+    if (args.isDashboardBench) {
+      const benchRun = window.location.pathname.match(
+        /^\/dashboard\/bench\/([^/]+)/
+      )?.[1]
+      document.title = benchRun
+        ? `Bench result · ${base}`
+        : `Bench · ${base}`
       return
     }
     if (args.isDashboardStorage) {
@@ -150,6 +160,7 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     args.activeIntegration,
     args.activeProject,
     args.isDashboardDoctor,
+    args.isDashboardBench,
     args.isDashboardStorage,
     args.isDashboardEnvironment,
     args.isDashboardAgentSandbox,

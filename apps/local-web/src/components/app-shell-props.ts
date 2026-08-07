@@ -104,6 +104,7 @@ export type AppShellProps = {
   isDashboardData: boolean
   isDashboardTools: boolean
   isDashboardDoctor: boolean
+  isDashboardBench: boolean
   isDashboardStorage: boolean
   isDashboardEnvironment: boolean
   isSkills: boolean
@@ -152,6 +153,7 @@ export type AppShellProps = {
   loadSpecialists: DashboardMainViewsProps['loadSpecialists']
   loadModelOptions: DashboardMainViewsProps['loadModelOptions']
   loadSessions: DashboardMainViewsProps['loadSessions']
+  loadProjects: () => void | Promise<void>
   loadSessionPreviews: DashboardMainViewsProps['loadSessionPreviews']
   loadServerStatus: DashboardMainViewsProps['loadServerStatus']
   loadAccountForUi: DashboardMainViewsProps['loadAccountForUi']

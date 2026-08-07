@@ -393,7 +393,7 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
 # Bump when the default-enabled set changes so existing configs get migrated once.
 # Also bump when curated OpenRouter models become default-enabled so prior
 # discovery-seeded hides are cleared (see Config._migrate_catalog_defaults).
-CATALOG_DEFAULTS_VERSION = 10
+CATALOG_DEFAULTS_VERSION = 12
 
 # Models present in the catalog but hidden by default. Users can re-enable them
 # from Dashboard → Models; toggling simply removes them from the hidden list.
@@ -424,9 +424,8 @@ DEFAULT_DISABLED_MODELS: frozenset[str] = frozenset(
         "deepseek/deepseek-chat-v3.1",
         "thinkingmachines/inkling-small",
         "meta/muse-spark-1.1",
-        "qwen/qwen3.7-plus",
-        "qwen/qwen3.7-max",
-        "qwen/qwen3-max",
+        # Only Flash: OpenRouter → Alibaba returns model_not_found. Plus/Max stay on.
+        "qwen/qwen3.7-flash",
         "moonshotai/kimi-k2.7-code",
         "moonshotai/kimi-k2",
         "nvidia/nemotron-3-ultra-550b-a55b:free",

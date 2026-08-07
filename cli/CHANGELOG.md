@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Hide only OpenRouter ``qwen/qwen3.7-flash`` by default (Alibaba upstream
+  ``model_not_found``). OpenRouter ``qwen/qwen3.7-plus``, ``qwen/qwen3.7-max``,
+  and ``qwen/qwen3-max`` stay enabled; catalog defaults v12 unhides them if a
+  prior migration re-seeded them off.
+
 ### Fixed
 
 - MCP OAuth Connect no longer sticks on “Waiting for callback…” in the desktop

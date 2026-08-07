@@ -1,0 +1,92 @@
+[
+  {
+    "n": 1,
+    "title": "01 Exa+AFDB lysozyme \u00b7 kimi-k3",
+    "model": "openrouter:moonshotai/kimi-k3",
+    "sessionId": "0fbe591c-7164-4b2e-8b50-565d78ba5dcd",
+    "runId": "c1064251-04b5-43a5-bb94-b9d6802f23ae",
+    "status": "running",
+    "workspace": "/Users/juliocesar/.sandwalk/workspaces/0fbe591c-7164-4b2e-8b50-565d78ba5dcd"
+  },
+  {
+    "n": 2,
+    "title": "02 Fold+PyMOL ubiquitin \u00b7 qwen-max",
+    "model": "openrouter:qwen/qwen3.7-max",
+    "sessionId": "cc967cb0-0392-42da-a61f-11d9a8857260",
+    "runId": "e11de927-dd71-4879-92f4-e99f7caabfe1",
+    "status": "running",
+    "workspace": "/Users/juliocesar/.sandwalk/workspaces/cc967cb0-0392-42da-a61f-11d9a8857260"
+  },
+  {
+    "n": 3,
+    "title": "03 Fold+RayMol insulinA \u00b7 luna-pro",
+    "model": "openrouter:openai/gpt-5.6-luna-pro",
+    "sessionId": "c227138f-7a16-49ac-8699-1780b9098d4a",
+    "runId": "348c79e2-e4fb-4878-91f8-2d16c759c3bc",
+    "status": "running",
+    "workspace": "/Users/juliocesar/.sandwalk/workspaces/c227138f-7a16-49ac-8699-1780b9098d4a"
+  },
+  {
+    "n": 4,
+    "title": "04 BoltzGen GFP binder \u00b7 deepseek-pro",
+    "model": "openrouter:deepseek/deepseek-v4-pro",
+    "sessionId": "3423748d-8363-4373-9463-9cae18558a15",
+    "runId": "b6eeb99b-94bf-4ecf-ae05-77bc1359c685",
+    "status": "running",
+    "workspace": "/Users/juliocesar/.sandwalk/workspaces/3423748d-8363-4373-9463-9cae18558a15"
+  },
+  {
+    "n": 5,
+    "title": "05 CALVADOS IDP \u00b7 deepseek-flash",
+    "model": "openrouter:deepseek/deepseek-v4-flash-0731",
+    "sessionId": "e1a6fcde-f5db-4ce5-9941-03d6ae89773f",
+    "runId": "0af07d81-1cf1-4998-b0ce-ff20353fd53c",
+    "status": "running",
+    "workspace": "/Users/juliocesar/.sandwalk/workspaces/e1a6fcde-f5db-4ce5-9941-03d6ae89773f"
+  },
+  {
+    "n": 6,
+    "title": "06 OpenMMDL + Exa \u00b7 muse-spark",
+    "model": "openrouter:meta/muse-spark-1.2",
+    "sessionId": "6c307a2d-7a47-4a3d-857b-c54f5f2666fa",
+    "runId": "c90cb4ff-a8f2-4371-b761-b70c529a1a35",
+    "status": "running",
+    "workspace": "/Users/juliocesar/.sandwalk/workspaces/6c307a2d-7a47-4a3d-857b-c54f5f2666fa"
+  },
+  {
+    "n": 7,
+    "title": "07 Tamarind+HF hemoglobin \u00b7 kimi-k3",
+    "model": "openrouter:moonshotai/kimi-k3",
+    "sessionId": "5b12dd42-02c3-4306-bbe4-923e8e089557",
+    "runId": "47be577a-718d-4bba-b5c0-69152f54a9fc",
+    "status": "running",
+    "workspace": "/Users/juliocesar/.sandwalk/workspaces/5b12dd42-02c3-4306-bbe4-923e8e089557"
+  },
+  {
+    "n": 8,
+    "title": "08 PyMOL+RayMol PDB 1UBQ \u00b7 qwen-max",
+    "model": "openrouter:qwen/qwen3.7-max",
+    "sessionId": "3e7a7780-076e-4881-8200-7eaa41b6a72e",
+    "runId": "09f0bfd1-f460-45e5-8644-673d9dad2bb1",
+    "status": "running",
+    "workspace": "/Users/juliocesar/.sandwalk/workspaces/3e7a7780-076e-4881-8200-7eaa41b6a72e"
+  },
+  {
+    "n": 9,
+    "title": "09 Tavily+Mermaid+AFDB GFP \u00b7 luna-pro",
+    "model": "openrouter:openai/gpt-5.6-luna-pro",
+    "sessionId": "b528bb7f-55ca-432c-8fbd-2ee498c5c8a7",
+    "runId": "6ae5140d-8bf1-4482-8e80-ff12735233d7",
+    "status": "running",
+    "workspace": "/Users/juliocesar/.sandwalk/workspaces/b528bb7f-55ca-432c-8fbd-2ee498c5c8a7"
+  },
+  {
+    "n": 10,
+    "title": "10 Linear+Paperclip+Slack \u00b7 deepseek-flash",
+    "model": "openrouter:deepseek/deepseek-v4-flash-0731",
+    "sessionId": "13e1d06c-0863-4937-a834-7042f55c4dbb",
+    "runId": "76d1d218-ac04-4085-917b-484e46611b77",
+    "status": "running",
+    "workspace": "/Users/juliocesar/.sandwalk/workspaces/13e1d06c-0863-4937-a834-7042f55c4dbb"
+  }
+]

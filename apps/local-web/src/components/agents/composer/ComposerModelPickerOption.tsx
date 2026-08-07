@@ -16,6 +16,8 @@ export function ComposerModelPickerOption({
   modelOptions,
   runtimeSettings,
   favorite = false,
+  active = false,
+  optionKey,
   effortMenuOpen,
   onEffortMenuOpenChange,
   onModelSelect,
@@ -28,6 +30,9 @@ export function ComposerModelPickerOption({
   modelOptions: ComposerModelOption[]
   runtimeSettings: RuntimeSettings | null
   favorite?: boolean
+  /** Keyboard / hover highlight (not the committed selection). */
+  active?: boolean
+  optionKey: string
   effortMenuOpen: boolean
   onEffortMenuOpenChange: (open: boolean) => void
   onModelSelect: (
@@ -80,9 +85,11 @@ export function ComposerModelPickerOption({
   return (
     <div
       data-composer-model-selected={isSelected ? 'true' : undefined}
+      data-composer-model-option={optionKey}
+      data-active={active ? 'true' : undefined}
       className={cn(
         'hover:bg-muted group relative flex w-full items-center gap-2 px-3 py-1.5 text-sm',
-        isSelected && 'bg-muted'
+        (isSelected || active) && 'bg-muted'
       )}
     >
       <button
@@ -130,7 +137,7 @@ export function ComposerModelPickerOption({
               'rounded-sm p-0.5',
               favorite
                 ? 'text-muted-foreground'
-                : 'text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                : 'text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 group-data-[active=true]:opacity-100 focus-visible:opacity-100'
             )}
             onClick={event => {
               event.preventDefault()
@@ -156,13 +163,13 @@ export function ComposerModelPickerOption({
             />
           ) : (
             <>
-              <span className="text-muted-foreground pointer-events-none text-xs whitespace-nowrap group-hover:hidden">
+              <span className="text-muted-foreground pointer-events-none text-xs whitespace-nowrap group-hover:hidden group-data-[active=true]:hidden">
                 {optionEffortLabel}
               </span>
               {onReasoningSettingsChange ? (
                 <button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground hidden text-xs font-medium group-hover:inline"
+                  className="text-muted-foreground hover:text-foreground hidden text-xs font-medium group-hover:inline group-data-[active=true]:inline"
                   onClick={event => {
                     event.preventDefault()
                     event.stopPropagation()

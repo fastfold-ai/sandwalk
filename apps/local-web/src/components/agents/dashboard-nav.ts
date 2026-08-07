@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Sparkles,
   Stethoscope,
+  Target,
   Wrench
 } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -129,6 +130,12 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
   {
     label: 'Workspace',
     items: [
+      {
+        id: 'bench',
+        label: 'Bench',
+        path: '/dashboard/bench',
+        icon: Target
+      },
       {
         id: 'doctor',
         label: 'Doctor',

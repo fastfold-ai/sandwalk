@@ -41,3 +41,6 @@ DerivedData/
 .idea/
 *.swp
 .claude/worktrees/
+
+# sandwalk-bench HF cache
+apps/benchmarking/.cache/

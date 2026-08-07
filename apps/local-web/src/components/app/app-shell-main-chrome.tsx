@@ -16,9 +16,9 @@ export function ConnectionLimitBanner({
       <div className="min-w-0 flex-1">
         <p className="font-medium">{runningCount} agents running at once</p>
         <p className="text-muted-foreground mt-0.5">
-          Browsers allow about 6 live connections to the local API. With this
-          many concurrent runs, opening files or switching chats can stall.
-          Prefer finishing some runs before starting more.
+          Live token streaming stays on the open chat; background runs update
+          via status polling. Machine load (CPU/RAM/API) is the real limit —
+          finish or pause heavy runs if the app feels slow.
         </p>
       </div>
       <Button

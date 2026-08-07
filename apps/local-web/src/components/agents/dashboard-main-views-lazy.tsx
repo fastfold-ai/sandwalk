@@ -41,6 +41,9 @@ export const DashboardOverviewView = lazy(() =>
 export const DoctorView = lazy(() =>
   import('@/components/agents/DoctorView').then(m => ({ default: m.DoctorView }))
 )
+export const BenchView = lazy(() =>
+  import('@/components/agents/BenchView').then(m => ({ default: m.BenchView }))
+)
 export const EnvironmentView = lazy(() =>
   import('@/components/agents/EnvironmentView').then(m => ({
     default: m.EnvironmentView

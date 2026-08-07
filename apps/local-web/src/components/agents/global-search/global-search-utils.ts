@@ -15,6 +15,7 @@ import {
   Settings2,
   Sparkles,
   Stethoscope,
+  Target,
   Wrench
 } from 'lucide-react'
 
@@ -154,6 +155,13 @@ export const DASHBOARD_COMMANDS = [
     path: '/dashboard/tools',
     value: 'command tools registry enable disable',
     icon: Wrench
+  },
+  {
+    id: 'bench',
+    label: 'Bench',
+    path: '/dashboard/bench',
+    value: 'command bench evaluate mmlu bixbench',
+    icon: Target
   },
   {
     id: 'doctor',

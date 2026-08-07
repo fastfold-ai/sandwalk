@@ -56,9 +56,10 @@ export function useAppUiState() {
   })
   const [filesPanelCollapsed, setFilesPanelCollapsed] = useState(() => {
     try {
-      return localStorage.getItem(FILES_PANEL_COLLAPSED_STORAGE_KEY) === '1'
+      // Default closed; only reopen when the user explicitly left it open.
+      return localStorage.getItem(FILES_PANEL_COLLAPSED_STORAGE_KEY) !== '0'
     } catch {
-      return false
+      return true
     }
   })
   const [threadMenuOpenId, setThreadMenuOpenId] = useState<string | null>(null)

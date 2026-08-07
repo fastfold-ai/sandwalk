@@ -10,7 +10,7 @@ import type {
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
 import { buildConversationTimeline } from '@/components/agents/transcript'
@@ -23,8 +23,13 @@ import { useSessionChatSend } from '@/hooks/useSessionChatSend'
 import { useSessionChatState } from '@/hooks/useSessionChatState'
 import { useSessionChatStream } from '@/hooks/useSessionChatStream'
 import { useSessionSandbox } from '@/hooks/useSessionSandbox'
+import {
+  notifyApprovalRequired,
+  notifyRunCompleted
+} from '@/lib/browser-notifications'
 import { finalizePendingTools } from '@/lib/chat-actions'
 import type { ComposerModelOption } from '@/lib/composer-models'
+import { markSessionAttention } from '@/lib/session-attention'
 import type { SessionChatState } from '@/lib/sessions'
 
 type SessionLayerArgs = {
@@ -87,13 +92,6 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
   args.setChatBySessionIdRef.current = chat.setChatBySessionId
 
   const runningCount = computeRunningCount(args.sessions)
-  const runningSessionIdsKey = args.sessions
-    .filter(
-      item => item.status === 'running' || item.status === 'awaiting_approval'
-    )
-    .map(item => item.id)
-    .sort()
-    .join(',')
 
   useSessionChatStream({
     client: args.client,
@@ -101,7 +99,6 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     sessionId: args.sessionId,
     sessionIdRef: args.sessionIdRef,
     sessions: args.sessions,
-    runningSessionIdsKey,
     chatBySessionIdRef: chat.chatBySessionIdRef,
     patchChat: chat.patchChat,
     setSessions: args.setSessions,
@@ -110,6 +107,43 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     loadSessionsRef: args.loadSessionsRef,
     loadSkillsRef: args.loadSkillsRef
   })
+
+  // Background runs have no token SSE — surface completions / approvals from
+  // the sessions revision poll so the sidebar badge + OS notify still work.
+  const prevSessionStatusRef = useRef<Map<string, AgentSession['status']>>(
+    new Map()
+  )
+  useEffect(() => {
+    const prev = prevSessionStatusRef.current
+    const next = new Map<string, AgentSession['status']>()
+    for (const item of args.sessions) {
+      next.set(item.id, item.status)
+      const before = prev.get(item.id)
+      if (!before || before === item.status) continue
+      // Active chat still gets these from its SSE stream.
+      if (args.sessionIdRef.current === item.id) continue
+      if (item.status === 'awaiting_approval') {
+        markSessionAttention(item.id)
+        notifyApprovalRequired({
+          sessionId: item.id,
+          sessionTitle: item.title
+        })
+        continue
+      }
+      const wasBusy =
+        before === 'running' || before === 'awaiting_approval'
+      if (!wasBusy) continue
+      if (item.status === 'idle' || item.status === 'error') {
+        markSessionAttention(item.id)
+        notifyRunCompleted({
+          sessionId: item.id,
+          sessionTitle: item.title,
+          ok: item.status === 'idle'
+        })
+      }
+    }
+    prevSessionStatusRef.current = next
+  }, [args.sessionIdRef, args.sessions])
 
   const actions = useSessionActions({
     client: args.client,
@@ -348,7 +382,6 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     builtPlanPaths,
     submitApprovals,
     runningCount,
-    runningSessionIdsKey,
     concurrentRunSoftLimit: CONCURRENT_RUN_SOFT_LIMIT
   }
 }

@@ -29,6 +29,7 @@ SUBCOMMANDS = {
     "report",
     "case-study",
     "bench",
+    "eval",
     "agent",
     "fork",
     "run",  # legacy explicit runner command

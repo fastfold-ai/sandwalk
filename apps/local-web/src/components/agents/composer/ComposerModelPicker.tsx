@@ -3,6 +3,10 @@ import { ChevronDown, Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { ComposerModelPickerOption } from '@/components/agents/composer/ComposerModelPickerOption'
+import {
+  composerModelOptionKey,
+  useComposerModelPickerNav
+} from '@/components/agents/composer/useComposerModelPickerNav'
 import { Input } from '@/components/ui/input'
 import {
   Popover,
@@ -27,7 +31,9 @@ export function ComposerModelPicker({
   onReasoningSettingsChange,
   onAddModels,
   onLoadModelPreferences,
-  onToggleModelFavorite
+  onToggleModelFavorite,
+  onFocusComposer,
+  triggerLabel
 }: {
   modelOptions: ComposerModelOption[]
   runtimeSettings: RuntimeSettings | null
@@ -48,6 +54,10 @@ export function ComposerModelPicker({
     favorite: boolean
     favorites: string[]
   }>
+  /** Return focus to the chat draft after a model is chosen. */
+  onFocusComposer?: () => void
+  /** Override the trigger label (e.g. Bench “Compare”). */
+  triggerLabel?: string
 }) {
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
@@ -102,6 +112,14 @@ export function ComposerModelPicker({
     [preferences.favorites]
   )
 
+  const nav = useComposerModelPickerNav({
+    open: modelPickerOpen,
+    search: modelSearch,
+    sections,
+    selected: selectedModel,
+    effortMenuOpen
+  })
+
   useEffect(() => {
     if (!modelPickerOpen || !onLoadModelPreferences) return
     let cancelled = false
@@ -117,29 +135,23 @@ export function ComposerModelPicker({
     }
   }, [modelPickerOpen, onLoadModelPreferences])
 
-  useEffect(() => {
-    if (!modelPickerOpen || modelSearch.trim()) return
-    // Wait for Popover + ScrollArea to mount, then center the active model.
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      if (cancelled) return
-      const selected = document.querySelector(
-        '[data-composer-model-selected="true"]'
-      )
-      selected?.scrollIntoView({ block: 'center', inline: 'nearest' })
-    }, 0)
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [
-    modelPickerOpen,
-    modelSearch,
-    selectedModel.model,
-    selectedModel.provider,
-    selectedModel.profileId,
-    sections
-  ])
+  const closePicker = () => {
+    setModelPickerOpen(false)
+    setModelSearch('')
+    setEffortMenuOpen(false)
+  }
+
+  const focusComposerSoon = () => {
+    window.requestAnimationFrame(() => {
+      onFocusComposer?.()
+    })
+  }
+
+  const selectModelAndClose = (option: ComposerModelOption) => {
+    void onModelSelect(option.provider, option.model, option.profileId)
+    closePicker()
+    focusComposerSoon()
+  }
 
   return (
     <Popover
@@ -159,14 +171,14 @@ export function ComposerModelPicker({
           className="text-muted-foreground hover:text-foreground inline-flex min-w-0 max-w-[min(100%,20rem)] items-center gap-1 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
         >
           <span className="min-w-0 truncate font-medium">
-            {selectedModel.label}
+            {triggerLabel || selectedModel.label}
           </span>
-          {contextBadge ? (
+          {!triggerLabel && contextBadge ? (
             <span className="text-muted-foreground shrink-0 text-[11px]">
               {contextBadge}
             </span>
           ) : null}
-          {reasoningBadge ? (
+          {!triggerLabel && reasoningBadge ? (
             <span className="text-muted-foreground shrink-0 text-[11px]">
               {reasoningBadge}
             </span>
@@ -194,6 +206,9 @@ export function ComposerModelPicker({
             <Input
               value={modelSearch}
               onChange={event => setModelSearch(event.target.value)}
+              onKeyDown={event => {
+                nav.onSearchKeyDown(event, selectModelAndClose)
+              }}
               placeholder="Search models"
               className="h-7 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
               autoFocus
@@ -217,36 +232,47 @@ export function ComposerModelPicker({
                         {section.title}
                       </div>
                     ) : null}
-                    {section.options.map(option => (
-                      <ComposerModelPickerOption
-                        key={`${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`}
-                        option={option}
-                        modelOptions={modelOptions}
-                        runtimeSettings={runtimeSettings}
-                        favorite={favoriteSet.has(composerModelPrefKey(option))}
-                        effortMenuOpen={effortMenuOpen}
-                        onEffortMenuOpenChange={setEffortMenuOpen}
-                        onModelSelect={onModelSelect}
-                        onReasoningSettingsChange={onReasoningSettingsChange}
-                        onModelSearchClear={() => setModelSearch('')}
-                        onClosePicker={() => {
-                          setModelPickerOpen(false)
-                          setModelSearch('')
-                          setEffortMenuOpen(false)
-                        }}
-                        onToggleFavorite={
-                          onToggleModelFavorite
-                            ? async () => {
-                                const result = await onToggleModelFavorite(option)
-                                setPreferences(prev => ({
-                                  ...prev,
-                                  favorites: result.favorites
-                                }))
-                              }
-                            : undefined
-                        }
-                      />
-                    ))}
+                    {section.options.map(option => {
+                      const optionKey = composerModelOptionKey(option)
+                      return (
+                        <div
+                          key={optionKey}
+                          onMouseEnter={() => nav.setActiveKey(optionKey)}
+                        >
+                          <ComposerModelPickerOption
+                            option={option}
+                            optionKey={optionKey}
+                            modelOptions={modelOptions}
+                            runtimeSettings={runtimeSettings}
+                            favorite={favoriteSet.has(
+                              composerModelPrefKey(option)
+                            )}
+                            active={nav.activeKey === optionKey}
+                            effortMenuOpen={effortMenuOpen}
+                            onEffortMenuOpenChange={setEffortMenuOpen}
+                            onModelSelect={onModelSelect}
+                            onReasoningSettingsChange={onReasoningSettingsChange}
+                            onModelSearchClear={() => setModelSearch('')}
+                            onClosePicker={() => {
+                              closePicker()
+                              focusComposerSoon()
+                            }}
+                            onToggleFavorite={
+                              onToggleModelFavorite
+                                ? async () => {
+                                    const result =
+                                      await onToggleModelFavorite(option)
+                                    setPreferences(prev => ({
+                                      ...prev,
+                                      favorites: result.favorites
+                                    }))
+                                  }
+                                : undefined
+                            }
+                          />
+                        </div>
+                      )
+                    })}
                   </div>
                 ))
               )}
@@ -258,9 +284,7 @@ export function ComposerModelPicker({
                 type="button"
                 className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
                 onClick={() => {
-                  setModelPickerOpen(false)
-                  setModelSearch('')
-                  setEffortMenuOpen(false)
+                  closePicker()
                   onAddModels()
                 }}
               >

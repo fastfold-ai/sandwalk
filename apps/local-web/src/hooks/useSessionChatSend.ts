@@ -11,10 +11,9 @@ import { buildSendContent, finalizePendingTools } from '@/lib/chat-actions'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import type { SessionChatState } from '@/lib/sessions'
 
-/** Soft warn: live SSE streams start crowding the browser's ~6 conn/host limit. */
-const CONCURRENT_RUN_SOFT_LIMIT = 3
-/** Hard confirm: starting another run is likely to stall files/chat. */
-const CONCURRENT_RUN_HARD_LIMIT = 5
+/** Soft banner only — token SSE is visible-session-only, so many concurrent
+ * server runs no longer exhaust browser connections. */
+const CONCURRENT_RUN_SOFT_LIMIT = 8
 
 type UseSessionChatSendArgs = {
   client: LocalAgentClient
@@ -81,16 +80,11 @@ export function useSessionChatSend({
     const targetSessionId = await ensureAgentSession()
     if (!targetSessionId || isDraftAgentSessionId(targetSessionId)) return
     const othersRunning = sessions.filter(
-      item => item.status === 'running' && item.id !== targetSessionId
+      item =>
+        (item.status === 'running' || item.status === 'awaiting_approval') &&
+        item.id !== targetSessionId
     ).length
-    if (othersRunning + 1 >= CONCURRENT_RUN_HARD_LIMIT) {
-      const proceed = window.confirm(
-        `You already have ${othersRunning} agent${
-          othersRunning === 1 ? '' : 's'
-        } running. Browsers allow about 6 live connections to the local API, so files and chat can freeze with this many concurrent runs.\n\nStart another run anyway?`
-      )
-      if (!proceed) return
-    } else if (othersRunning + 1 >= CONCURRENT_RUN_SOFT_LIMIT) {
+    if (othersRunning + 1 >= CONCURRENT_RUN_SOFT_LIMIT) {
       setConnectionLimitDismissed(false)
     }
     const previousComposer = composerText

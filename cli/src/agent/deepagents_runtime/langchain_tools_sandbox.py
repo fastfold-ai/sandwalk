@@ -67,6 +67,9 @@ def attach_sandbox_tools(
 
         if importlib.util.find_spec("rpy2.robjects") is None:
             raise ImportError("rpy2 unavailable")
+        # find_spec succeeds even when R_HOME is missing — probe a real import.
+        import rpy2.robjects  # noqa: F401
+
         rr_handler = _make_run_r_handler(code_trace_buffer)
         display_name_map["run_r"] = "run_r"
         used_names.add("run_r")
@@ -82,7 +85,7 @@ def attach_sandbox_tools(
                 strip_none=False,
             )
         )
-    except ImportError:
-        logger.info("rpy2 not available — run_r tool disabled")
+    except Exception as exc:
+        logger.info("rpy2 not available — run_r tool disabled (%s)", exc)
 
     return sandbox

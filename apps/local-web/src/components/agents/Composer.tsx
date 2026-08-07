@@ -352,6 +352,7 @@ export function Composer({
                 onAddModels={onAddModels}
                 onLoadModelPreferences={onLoadModelPreferences}
                 onToggleModelFavorite={onToggleModelFavorite}
+                onFocusComposer={draftState.focusActiveComposerInput}
                 onSandboxBackendSelect={onSandboxBackendSelect}
                 onSandboxComputeChange={onSandboxComputeChange}
                 onSandboxStart={onSandboxStart}

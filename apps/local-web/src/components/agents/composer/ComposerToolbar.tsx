@@ -53,6 +53,7 @@ export function ComposerToolbar({
   onAddModels,
   onLoadModelPreferences,
   onToggleModelFavorite,
+  onFocusComposer,
   onSandboxBackendSelect,
   onSandboxComputeChange,
   onSandboxStart,
@@ -100,6 +101,7 @@ export function ComposerToolbar({
     favorite: boolean
     favorites: string[]
   }>
+  onFocusComposer?: () => void
   onSandboxBackendSelect?: (
     backend: 'builtin' | 'modal'
   ) => void | Promise<void>
@@ -153,6 +155,7 @@ export function ComposerToolbar({
           onAddModels={onAddModels}
           onLoadModelPreferences={onLoadModelPreferences}
           onToggleModelFavorite={onToggleModelFavorite}
+          onFocusComposer={onFocusComposer}
         />
         {onSpecialistSelect ? (
           <ComposerSpecialistPicker

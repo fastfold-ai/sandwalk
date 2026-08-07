@@ -201,6 +201,8 @@ def create_app(
         backend_id=backend_id,
         cli_api_key=api_key,
     )
+    # Headless CLI (`sandwalk eval`) and tests can reuse the same wiring.
+    app.state.deps = deps
 
     app.add_middleware(
         TrustedHostMiddleware,

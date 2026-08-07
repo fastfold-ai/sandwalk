@@ -30,8 +30,10 @@ import type { useAppBootstrapLoaders } from './useAppBootstrapLoaders'
 
 type LoaderBundle = ReturnType<typeof useAppBootstrapLoaders>
 
-/** Revision poll cadence. Full /sessions only runs when the watermark moves. */
-const SESSION_LIST_REFRESH_MS = 30_000
+/** Revision poll cadence. Full /sessions only runs when the watermark moves.
+ * Keep this snappy so background runs (no per-session SSE) still update
+ * sidebar status / awaiting_approval without flooding the API. */
+const SESSION_LIST_REFRESH_MS = 2_000
 
 type UseAppBootstrapConnectArgs = {
   client: LocalAgentClient

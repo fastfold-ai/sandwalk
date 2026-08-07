@@ -47,6 +47,7 @@ type AgentSessionSidebarProps = {
   onSelectProject: (projectId: string) => void
   onOpenProjectSettings: () => void
   onNewProject: () => void
+  onRefreshProjects?: () => void | Promise<void>
   onOpenGlobalSearch: () => void
   onCreateSession: () => void
   onClearSessionSelection: () => void
@@ -92,6 +93,7 @@ export function AgentSessionSidebar({
   onSelectProject,
   onOpenProjectSettings,
   onNewProject,
+  onRefreshProjects,
   onOpenGlobalSearch,
   onCreateSession,
   onClearSessionSelection,
@@ -140,6 +142,7 @@ export function AgentSessionSidebar({
             onSelectProject={onSelectProject}
             onOpenSettings={onOpenProjectSettings}
             onNewProject={onNewProject}
+            onRefresh={onRefreshProjects}
           />
           <DesktopDragRegion className="min-h-8 min-w-0 flex-1 self-stretch" />
           <TooltipProvider delayDuration={200}>

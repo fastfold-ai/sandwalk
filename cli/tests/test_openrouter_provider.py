@@ -66,6 +66,10 @@ def test_openrouter_catalog_and_lookup():
     assert "meta/muse-spark-1.1" in DEFAULT_DISABLED_MODELS
     assert "thinkingmachines/inkling-small" in DEFAULT_DISABLED_MODELS
     assert "nvidia/nemotron-3-ultra-550b-a55b:free" in DEFAULT_DISABLED_MODELS
+    assert "qwen/qwen3.7-flash" in DEFAULT_DISABLED_MODELS
+    assert "qwen/qwen3.7-plus" not in DEFAULT_DISABLED_MODELS
+    assert "qwen/qwen3.7-max" not in DEFAULT_DISABLED_MODELS
+    assert "qwen/qwen3-max" not in DEFAULT_DISABLED_MODELS
 
 
 def test_openrouter_attribution_headers():

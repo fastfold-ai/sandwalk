@@ -56,6 +56,7 @@ export type AppShellSidebarProps = {
   setGlobalSearchOpen: (
     value: boolean | ((current: boolean) => boolean)
   ) => void
+  loadProjects: () => void | Promise<void>
   createSession: CreateDraftSession
   clearSessionSelection: () => void
   batchArchiveSelected: () => void | Promise<void>
@@ -123,6 +124,7 @@ export function AppShellSidebar({
   setProjectSettingsOpen,
   setNewProjectOpen,
   setGlobalSearchOpen,
+  loadProjects,
   createSession,
   clearSessionSelection,
   batchArchiveSelected,
@@ -211,6 +213,7 @@ export function AppShellSidebar({
             onSelectProject={selectProjectScope}
             onOpenProjectSettings={() => setProjectSettingsOpen(true)}
             onNewProject={() => setNewProjectOpen(true)}
+            onRefreshProjects={loadProjects}
             onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
             onCreateSession={() => createSession(activeProjectId)}
             onClearSessionSelection={clearSessionSelection}

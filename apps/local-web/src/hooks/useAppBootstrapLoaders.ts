@@ -108,7 +108,8 @@ export function useAppBootstrapLoaders({
         for (const item of nextSessions) {
           const prev = next[item.id]
           if (!prev) continue
-          const shouldRun = item.status === 'running'
+          const shouldRun =
+            item.status === 'running' || item.status === 'awaiting_approval'
           if (prev.runActive === shouldRun) continue
           next[item.id] = { ...prev, runActive: shouldRun }
           changed = true

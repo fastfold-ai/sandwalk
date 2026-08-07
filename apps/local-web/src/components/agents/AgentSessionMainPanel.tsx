@@ -12,6 +12,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState
 } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
@@ -212,10 +213,20 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     setDraftWorkspaceSessionId(null)
   }, [activeProjectId, isDraft, setDraftWorkspaceSessionId])
 
+  const prevSessionIdRef = useRef<string | null>(null)
   useLayoutEffect(() => {
     setPanelView(requestedSiteId ? 'preview' : 'files')
-    if (requestedSiteId) setFilesPanelCollapsed(false)
-  }, [requestedSiteId, sessionId, setFilesPanelCollapsed])
+    if (requestedSiteId) {
+      setFilesPanelCollapsed(false)
+    } else if (
+      isDraft &&
+      prevSessionIdRef.current !== sessionId
+    ) {
+      // Entering New Agent (or first paint on draft): Files closed.
+      setFilesPanelCollapsed(true)
+    }
+    prevSessionIdRef.current = sessionId
+  }, [isDraft, requestedSiteId, sessionId, setFilesPanelCollapsed])
 
   const ensureAgentSession = agentComposerSlotProps.ensureAgentSession
   const setWorkspaceVersion = agentComposerSlotProps.setWorkspaceVersion
@@ -254,7 +265,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   return (
     <ResizablePanelGroup
       direction="horizontal"
-      autoSaveId={SESSION_PANELS_AUTO_SAVE_ID}
+      // Draft chats must not restore a previous session's open Files layout.
+      autoSaveId={isDraft ? undefined : SESSION_PANELS_AUTO_SAVE_ID}
       className="min-h-0 flex-1"
     >
       <ResizablePanel

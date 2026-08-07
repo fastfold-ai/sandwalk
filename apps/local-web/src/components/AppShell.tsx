@@ -55,6 +55,7 @@ export function AppShell(props: AppShellProps) {
           setProjectSettingsOpen={props.setProjectSettingsOpen}
           setNewProjectOpen={props.setNewProjectOpen}
           setGlobalSearchOpen={props.setGlobalSearchOpen}
+          loadProjects={props.loadProjects}
           createSession={props.createSession}
           clearSessionSelection={props.clearSessionSelection}
           batchArchiveSelected={props.batchArchiveSelected}
@@ -109,6 +110,7 @@ export function AppShell(props: AppShellProps) {
           isDashboardData={props.isDashboardData}
           isDashboardTools={props.isDashboardTools}
           isDashboardDoctor={props.isDashboardDoctor}
+          isDashboardBench={props.isDashboardBench}
           isDashboardStorage={props.isDashboardStorage}
           isDashboardEnvironment={props.isDashboardEnvironment}
           isSkills={props.isSkills}
