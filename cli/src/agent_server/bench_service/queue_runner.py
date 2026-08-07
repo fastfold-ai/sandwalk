@@ -231,6 +231,7 @@ def _run_job(deps: AppDeps, job: BenchJob) -> None:
             sample_size=int(sample) if sample else None,
             project_name=job.project_name,
             specialist_id=job.specialist_id,
+            thinking=job.thinking,
             run_id=pinned,
             on_progress=lambda p, idx=s_idx: _emit({**p, "current": idx, "total": suite_total}),
             cancel_check=_cancelled,

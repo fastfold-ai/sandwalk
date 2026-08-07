@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 from agent_server.app_deps import AppDeps
 from agent_server.bench_service.bootstrap import ensure_sandwalk_bench_importable
+from agent_server.bench_service.environment import capture_bench_environment
 from agent_server.bench_service.grade import build_result, extract_answer, grade_row
 from agent_server.bench_service.judge import (
     collect_tool_names_from_events,
@@ -34,6 +35,7 @@ def run_agent_suite(
     sample_size: int | None,
     project_name: str | None,
     specialist_id: str | None = None,
+    thinking: bool = False,
     run_id: str | None = None,
     on_progress: Callable[[dict[str, Any]], None] | None = None,
     cancel_check: Callable[[], bool] | None = None,
@@ -82,6 +84,19 @@ def run_agent_suite(
     orig = (settings.provider, settings.model)
     use_provider = provider or str(getattr(cells[0], "provider", None) or settings.provider)
     use_model = model_id or cells[0].model_id
+
+    # Snapshot before mutating runtime settings / creating sessions.
+    environment = capture_bench_environment(
+        deps,
+        model_id=use_model,
+        provider=use_provider,
+        specialist_id=specialist_id,
+        thinking=thinking,
+        suite_id=suite_id,
+        sample_size=sample_size,
+        pack_id=pack_id,
+        matrix=matrix,
+    )
 
     name = project_name or default_project_name(pack.id, matrix or suite_id)
     desc = build_project_description(pack=pack, matrix_name=matrix or suite_id, cells=cells)
@@ -182,7 +197,9 @@ def run_agent_suite(
         benchmark=benchmark,
         questions=question_rows,
         time_s=time.time() - start,
+        thinking_used=thinking,
         project_id=project.id,
+        environment=environment,
     )
     save_result(result)
     return result

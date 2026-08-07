@@ -4,7 +4,14 @@ import type {
   AgentSession,
   BackendHealth
 } from '@sandwalk/agent-ui-core'
-import { Globe2, LayoutDashboard, LibraryBig, Search, Send } from 'lucide-react'
+import {
+  Globe2,
+  Home,
+  LayoutDashboard,
+  LibraryBig,
+  Search,
+  Send
+} from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 import { type NavigateFunction, useLocation } from 'react-router-dom'
 
@@ -121,6 +128,9 @@ export function AgentSessionSidebar({
     location.pathname.startsWith('/library/')
   const isSites =
     location.pathname === '/sites' || location.pathname.startsWith('/sites/')
+  const isProjectHome =
+    Boolean(activeProjectId) &&
+    location.pathname === `/projects/${activeProjectId}`
   return (
     <>
       <div className="sandwalk-sidebar-chrome shrink-0 px-3 pb-2 pt-0.5">
@@ -162,6 +172,21 @@ export function AgentSessionSidebar({
             </Tooltip>
           </TooltipProvider>
         </div>
+        {activeProjectId ? (
+          <button
+            type="button"
+            className={cn(
+              'mb-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px]',
+              isProjectHome
+                ? 'bg-sidebar-accent/55 text-foreground'
+                : 'text-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground'
+            )}
+            onClick={() => navigate(`/projects/${activeProjectId}`)}
+          >
+            <Home className="size-3.5" />
+            Project Home
+          </button>
+        ) : null}
         <button
           type="button"
           className="text-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-[13px]"

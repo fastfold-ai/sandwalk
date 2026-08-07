@@ -41,14 +41,27 @@ def run_mmlu(
     from agent_server.models import UpdateRuntimeSettingsRequest
     from agent_server.settings_service import SettingsService
 
+    from agent_server.bench_service.environment import capture_bench_environment
+
     run_id = new_run_id()
     items = load_mmlu_items(sample_size)
     settings = SettingsService.get()
     orig = (settings.provider, settings.model)
+    use_model = model_id or orig[1]
+    use_provider = provider or settings.provider
+    environment = capture_bench_environment(
+        None,
+        model_id=use_model,
+        provider=use_provider,
+        thinking=thinking,
+        suite_id="mmlu",
+        sample_size=sample_size,
+        pack_id="mmlu",
+    )
     if model_id:
         SettingsService.update(
             UpdateRuntimeSettingsRequest(
-                provider=provider or settings.provider,
+                provider=use_provider,
                 model=model_id,
             )
         )
@@ -108,11 +121,12 @@ def run_mmlu(
 
     result = build_result(
         run_id=run_id,
-        model_id=model_id or orig[1],
+        model_id=use_model,
         benchmark="mmlu",
         questions=questions,
         time_s=time.time() - start,
         thinking_used=thinking,
+        environment=environment,
     )
     save_result(result)
     return result

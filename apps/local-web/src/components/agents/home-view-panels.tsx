@@ -1,5 +1,18 @@
+import type {
+  BenchResultSummary,
+  LocalAgentClient
+} from '@sandwalk/agent-local-client'
 import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
-import { MoreHorizontal, Pin, Plus, Trash2 } from 'lucide-react'
+import {
+  ExternalLink,
+  MoreHorizontal,
+  Pin,
+  Plus,
+  Target,
+  Trash2
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ProjectMark } from '@/components/agents/ProjectMark'
@@ -11,6 +24,7 @@ import {
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { relativeTime } from '@/lib/sessions'
+import { cn } from '@/lib/utils'
 
 export function HomeEmptySessions({
   onCreateSession,
@@ -84,39 +98,144 @@ export function HomeProjectSessions({
   )
 }
 
+function HomeProjectBenchLinks({
+  client,
+  projectId
+}: {
+  client: LocalAgentClient
+  projectId: string
+}) {
+  const navigate = useNavigate()
+  const [rows, setRows] = useState<BenchResultSummary[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoaded(false)
+    void client
+      .listBenchResults()
+      .then(items => {
+        if (cancelled) return
+        setRows(items.filter(item => item.projectId === projectId))
+      })
+      .catch(() => {
+        if (!cancelled) setRows([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [client, projectId])
+
+  if (!loaded || rows.length === 0) return null
+
+  return (
+    <section className="mb-8">
+      <h3 className="mb-3 text-sm font-medium">Bench results</h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {rows.map(row => {
+          const pct = Math.round((row.accuracy || 0) * 1000) / 10
+          return (
+            <button
+              key={row.runId}
+              type="button"
+              className="bg-card sandwalk-surface-shadow hover:bg-muted/40 flex min-h-[6.5rem] flex-col rounded-xl p-4 text-left transition-colors"
+              onClick={() =>
+                navigate(`/dashboard/bench/${encodeURIComponent(row.runId)}`)
+              }
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <span
+                    className={cn(
+                      'flex size-8 shrink-0 items-center justify-center rounded-md',
+                      pct >= 70
+                        ? 'bg-emerald-500/15 text-emerald-600'
+                        : pct >= 40
+                          ? 'bg-amber-500/15 text-amber-600'
+                          : 'bg-red-500/15 text-red-600'
+                    )}
+                  >
+                    <Target className="size-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {row.benchmark}
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                      {row.modelId}
+                    </p>
+                  </div>
+                </div>
+                <p
+                  className={cn(
+                    'text-lg font-semibold tabular-nums',
+                    pct >= 70
+                      ? 'text-emerald-600'
+                      : pct >= 40
+                        ? 'text-amber-600'
+                        : 'text-red-600'
+                  )}
+                >
+                  {pct.toFixed(1)}%
+                </p>
+              </div>
+              <div className="text-muted-foreground mt-auto flex items-center justify-between gap-2 pt-3 text-xs">
+                <span className="tabular-nums">
+                  {row.correct}/{row.total}
+                  {row.timeS ? ` · ${row.timeS}s` : ''}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  Open result
+                  <ExternalLink className="size-3" />
+                </span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 export function HomeProjectView({
   project,
   sessions,
   previews,
+  client,
   onCreateSession,
   onOpenSession
 }: {
   project: AgentProject
   sessions: AgentSession[]
   previews: Record<string, string>
+  client: LocalAgentClient
   onCreateSession: (projectId: string | null) => void
   onOpenSession: (id: string) => void
 }) {
+  const description =
+    project.description?.trim() ||
+    'Pick up where you left off or start something new.'
+  const isDenseMeta =
+    description.includes('\n') ||
+    /sandwalk-bench|matrix:|sessions:/i.test(description)
+
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-5xl px-6 pt-3 pb-8 md:px-10">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <ProjectMark
-              icon={project.icon}
-              color={project.color}
-              className="mt-0.5 size-9"
-              iconClassName="size-4"
-            />
-            <div className="min-w-0">
+      <div className="mx-auto w-full max-w-6xl px-6 pt-8 pb-8 md:px-10">
+        <div className="mb-8 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <ProjectMark
+                icon={project.icon}
+                color={project.color}
+                className="size-9 shrink-0"
+                iconClassName="size-4"
+              />
               <h2 className="truncate text-xl font-semibold">{project.name}</h2>
-              <p className="text-muted-foreground mt-1 text-sm">
-                {project.description ||
-                  'Pick up where you left off or start something new.'}
-              </p>
             </div>
-          </div>
-          {sessions.length > 0 ? (
             <Button
               variant="ghost"
               size="sm"
@@ -125,8 +244,18 @@ export function HomeProjectView({
               <Plus className="size-3.5" />
               New Agent
             </Button>
-          ) : null}
+          </div>
+          {isDenseMeta ? (
+            <pre className="bg-muted/35 text-muted-foreground max-w-3xl overflow-x-auto rounded-xl px-4 py-3 font-sans text-xs leading-relaxed whitespace-pre-wrap">
+              {description}
+            </pre>
+          ) : (
+            <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
+              {description}
+            </p>
+          )}
         </div>
+        <HomeProjectBenchLinks client={client} projectId={project.id} />
         <section>
           <h3 className="mb-3 text-sm font-medium">Recent sessions</h3>
           <HomeProjectSessions

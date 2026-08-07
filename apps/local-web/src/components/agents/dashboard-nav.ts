@@ -132,7 +132,7 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
     items: [
       {
         id: 'bench',
-        label: 'Bench',
+        label: 'Benchmarking',
         path: '/dashboard/bench',
         icon: Target
       },

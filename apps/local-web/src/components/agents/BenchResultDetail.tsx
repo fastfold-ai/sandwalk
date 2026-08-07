@@ -74,6 +74,293 @@ function categoryScores(
   return Object.entries(raw).sort((a, b) => a[0].localeCompare(b[0]))
 }
 
+type BenchEnvironment = {
+  captured_at?: string
+  started_at?: string
+  sandwalk_version?: string
+  python_version?: string
+  python_implementation?: string
+  platform?: string
+  arch?: string
+  os_version?: string
+  packages?: Record<string, string>
+  model?: {
+    provider?: string | null
+    model_id?: string | null
+    specialist_id?: string | null
+    thinking?: boolean
+  }
+  runtime?: Record<string, unknown>
+  sandbox?: Record<string, unknown>
+  skills?: Array<{
+    name?: string
+    version?: string | null
+    source?: string
+    enabled?: boolean
+    commit?: string | null
+  }>
+  mcp_servers?: Array<{
+    id?: string
+    name?: string
+    transport?: string
+    catalog_id?: string | null
+    enabled?: boolean
+  }>
+  suite?: {
+    suite_id?: string | null
+    sample_size?: number | null
+    pack_id?: string | null
+    matrix?: string | null
+  }
+  error?: string
+}
+
+function asEnvironment(
+  detail: Record<string, unknown> | null
+): BenchEnvironment | null {
+  const raw = detail?.environment
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  return raw as BenchEnvironment
+}
+
+function formatStartedAt(value: string | undefined | null) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 items-baseline justify-between gap-3 text-sm">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="truncate text-right font-medium">{value}</span>
+    </div>
+  )
+}
+
+function BenchEnvironmentPanel({ env }: { env: BenchEnvironment }) {
+  const [open, setOpen] = useState(false)
+  const skills = env.skills || []
+  const mcps = env.mcp_servers || []
+  const packages = Object.entries(env.packages || {})
+  const enabledSkills = skills.filter(s => s.enabled !== false)
+  const enabledMcps = mcps.filter(m => m.enabled !== false)
+  const started =
+    formatStartedAt(env.started_at || env.captured_at) ||
+    env.started_at ||
+    env.captured_at
+  const platformLabel = [env.platform, env.arch].filter(Boolean).join(' ')
+  const runtime = env.runtime || {}
+  const sandbox = env.sandbox || {}
+  const model = env.model || {}
+
+  return (
+    <section className="border-border/60 rounded-lg border">
+      <button
+        type="button"
+        className="hover:bg-muted/30 flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors"
+        onClick={() => setOpen(current => !current)}
+      >
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold">Environment</h2>
+          <p className="text-muted-foreground mt-0.5 truncate text-xs">
+            {[
+              started ? `Started ${started}` : null,
+              env.sandwalk_version ? `sandwalk ${env.sandwalk_version}` : null,
+              env.python_version ? `Python ${env.python_version}` : null,
+              model.provider || null,
+              runtime.tool_mode ? `tool_mode=${String(runtime.tool_mode)}` : null,
+              sandbox.backend ? `sandbox=${String(sandbox.backend)}` : null,
+              `${enabledSkills.length} skills`,
+              `${enabledMcps.length} MCPs`
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </div>
+        {open ? (
+          <ChevronDown className="text-muted-foreground size-4 shrink-0" />
+        ) : (
+          <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+        )}
+      </button>
+      {open ? (
+        <div className="border-border/60 space-y-4 border-t px-4 py-4">
+          {env.error ? (
+            <p className="text-destructive text-xs">{env.error}</p>
+          ) : null}
+          <div className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+            {started ? <MetaRow label="Started" value={started} /> : null}
+            {env.sandwalk_version ? (
+              <MetaRow label="Sandwalk" value={env.sandwalk_version} />
+            ) : null}
+            {env.python_version ? (
+              <MetaRow
+                label="Python"
+                value={[env.python_implementation, env.python_version]
+                  .filter(Boolean)
+                  .join(' ')}
+              />
+            ) : null}
+            {platformLabel ? (
+              <MetaRow
+                label="Platform"
+                value={[platformLabel, env.os_version].filter(Boolean).join(' · ')}
+              />
+            ) : null}
+            {model.provider || model.model_id ? (
+              <MetaRow
+                label="Model"
+                value={[model.provider, model.model_id].filter(Boolean).join(' / ')}
+              />
+            ) : null}
+            {model.specialist_id ? (
+              <MetaRow label="Specialist" value={String(model.specialist_id)} />
+            ) : null}
+            {typeof model.thinking === 'boolean' ? (
+              <MetaRow label="Thinking" value={model.thinking ? 'on' : 'off'} />
+            ) : null}
+            {runtime.tool_mode != null ? (
+              <MetaRow label="Tool mode" value={String(runtime.tool_mode)} />
+            ) : null}
+            {runtime.knowledge_level != null ? (
+              <MetaRow
+                label="Knowledge"
+                value={String(runtime.knowledge_level)}
+              />
+            ) : null}
+            {runtime.reasoning_effort != null ? (
+              <MetaRow
+                label="Reasoning"
+                value={String(runtime.reasoning_effort)}
+              />
+            ) : null}
+            {runtime.file_access != null ? (
+              <MetaRow label="File access" value={String(runtime.file_access)} />
+            ) : null}
+            {runtime.max_sdk_turns != null ? (
+              <MetaRow
+                label="Max turns"
+                value={String(runtime.max_sdk_turns)}
+              />
+            ) : null}
+            {sandbox.backend != null ? (
+              <MetaRow
+                label="Sandbox"
+                value={[sandbox.backend, sandbox.compute_type]
+                  .filter(Boolean)
+                  .join(' / ')}
+              />
+            ) : null}
+            {env.suite?.suite_id ? (
+              <MetaRow
+                label="Suite"
+                value={[
+                  env.suite.suite_id,
+                  env.suite.sample_size != null
+                    ? `n=${env.suite.sample_size}`
+                    : null
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              />
+            ) : null}
+          </div>
+
+          {packages.length ? (
+            <div>
+              <h3 className="mb-2 text-xs font-medium tracking-wide uppercase">
+                Packages
+              </h3>
+              <div className="grid gap-1 sm:grid-cols-2">
+                {packages.map(([name, version]) => (
+                  <div
+                    key={name}
+                    className="text-muted-foreground flex justify-between gap-2 font-mono text-[11px]"
+                  >
+                    <span className="truncate">{name}</span>
+                    <span className="shrink-0 tabular-nums">{version}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {skills.length ? (
+            <div>
+              <h3 className="mb-2 text-xs font-medium tracking-wide uppercase">
+                Skills · {enabledSkills.length} enabled / {skills.length}
+              </h3>
+              <div className="max-h-40 space-y-1 overflow-y-auto">
+                {skills.map(skill => (
+                  <div
+                    key={`${skill.name}-${skill.source}`}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
+                    <span
+                      className={cn(
+                        'truncate',
+                        skill.enabled === false && 'text-muted-foreground line-through'
+                      )}
+                    >
+                      {skill.name}
+                      {skill.version ? (
+                        <span className="text-muted-foreground">
+                          {' '}
+                          {skill.version}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="text-muted-foreground shrink-0">
+                      {skill.source || '—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {mcps.length ? (
+            <div>
+              <h3 className="mb-2 text-xs font-medium tracking-wide uppercase">
+                MCPs · {enabledMcps.length} enabled / {mcps.length}
+              </h3>
+              <div className="max-h-40 space-y-1 overflow-y-auto">
+                {mcps.map(server => (
+                  <div
+                    key={server.id || server.name}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
+                    <span
+                      className={cn(
+                        'truncate',
+                        server.enabled === false &&
+                          'text-muted-foreground line-through'
+                      )}
+                    >
+                      {server.name}
+                    </span>
+                    <span className="text-muted-foreground shrink-0">
+                      {server.transport || '—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 export function BenchResultDetail({
   client,
   runId
@@ -113,6 +400,7 @@ export function BenchResultDetail({
 
   const questions = useMemo(() => asQuestions(detail), [detail])
   const categories = useMemo(() => categoryScores(detail), [detail])
+  const environment = useMemo(() => asEnvironment(detail), [detail])
   const filtered = useMemo(() => {
     if (filter === 'pass') return questions.filter(q => q.correct)
     if (filter === 'fail') return questions.filter(q => !q.correct)
@@ -129,10 +417,16 @@ export function BenchResultDetail({
   const projectId = (detail?.project_id || detail?.projectId || null) as
     | string
     | null
+  const startedLabel = formatStartedAt(
+    environment?.started_at ||
+      environment?.captured_at ||
+      (detail?.created_at as string | undefined) ||
+      (detail?.createdAt as string | undefined)
+  )
 
   useEffect(() => {
     if (!detail) return
-    document.title = `${benchmark} · Bench · Sandwalk`
+    document.title = `${benchmark} · Benchmarking · Sandwalk`
   }, [benchmark, detail])
 
   const goBack = () => navigate('/dashboard/bench')
@@ -229,6 +523,7 @@ export function BenchResultDetail({
                     <p className="text-muted-foreground mt-1 text-sm">
                       {modelId}
                       {timeS ? ` · ${timeS}s` : ''}
+                      {startedLabel ? ` · ${startedLabel}` : ''}
                       {detail.thinking_used || detail.thinkingUsed
                         ? ' · thinking'
                         : ''}
@@ -252,6 +547,8 @@ export function BenchResultDetail({
                   </p>
                 </div>
               </header>
+
+              {environment ? <BenchEnvironmentPanel env={environment} /> : null}
 
               {categories.length ? (
                 <section className="space-y-2">

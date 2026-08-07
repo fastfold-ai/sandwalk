@@ -87,8 +87,8 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
         /^\/dashboard\/bench\/([^/]+)/
       )?.[1]
       document.title = benchRun
-        ? `Bench result · ${base}`
-        : `Bench · ${base}`
+        ? `Benchmarking result · ${base}`
+        : `Benchmarking · ${base}`
       return
     }
     if (args.isDashboardStorage) {

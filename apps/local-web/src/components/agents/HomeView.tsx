@@ -1,6 +1,8 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import { Plus } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
+import { useParams } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -14,6 +16,7 @@ import {
 } from './home-view-panels'
 
 export function HomeView({
+  client,
   projects,
   sessions,
   previews,
@@ -27,6 +30,7 @@ export function HomeView({
   onTogglePinProject,
   onDeleteProject
 }: {
+  client: LocalAgentClient
   projects: AgentProject[]
   sessions: AgentSession[]
   previews: Record<string, string>
@@ -43,22 +47,25 @@ export function HomeView({
   onTogglePinProject: (project: AgentProject) => void
   onDeleteProject: (project: AgentProject) => void
 }) {
+  const params = useParams()
   const hour = new Date().getHours()
   const greeting =
     hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const pagePad = 'mx-auto w-full px-6 pt-8 pb-8 md:px-10'
+  // Prefer the /projects/:projectId route so Project Home always matches the URL.
+  const scopedProjectId = params.projectId || activeProjectId
   const activeProject =
-    projects.find(project => project.id === activeProjectId) || null
+    projects.find(project => project.id === scopedProjectId) || null
   const recent = useMemo(
     () =>
       sessions
         .filter(
           item =>
             item.organizeLabel !== 'archive' &&
-            (!activeProjectId || item.projectId === activeProjectId)
+            (!scopedProjectId || item.projectId === scopedProjectId)
         )
-        .slice(0, activeProjectId ? 20 : 8),
-    [activeProjectId, sessions]
+        .slice(0, scopedProjectId ? 20 : 8),
+    [scopedProjectId, sessions]
   )
   const recentIdsKey = recent.map(item => item.id).join(',')
 
@@ -81,6 +88,7 @@ export function HomeView({
   if (activeProject) {
     return (
       <HomeProjectView
+        client={client}
         project={activeProject}
         sessions={recent}
         previews={previews}

@@ -383,7 +383,7 @@ export function BenchView({
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-semibold">Bench</h2>
+            <h2 className="text-2xl font-semibold">Benchmarking</h2>
             <p className="text-muted-foreground mt-1 text-sm">
               Run suites through Sandwalk agent sessions — model, specialist,
               then results. Queue more while a run is in progress.

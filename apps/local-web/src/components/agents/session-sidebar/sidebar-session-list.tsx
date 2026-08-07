@@ -11,6 +11,7 @@ import {
   type MouseEvent,
   type SetStateAction,
   useEffect,
+  useMemo,
   useRef,
   useState
 } from 'react'
@@ -34,6 +35,9 @@ import { cn } from '@/lib/utils'
 /** Same Blue pastel as the tab color tag — marks unread notification sessions. */
 const UNREAD_DOT_COLOR =
   TAB_INLINE_COLORS.find(item => item.name === 'Blue')?.value ?? '#8BB8F5'
+
+/** Initial rows per sidebar section; "Load more" reveals the next page. */
+const SECTION_PAGE_SIZE = 40
 
 type SessionSection = ReturnType<typeof groupSessions>[number]
 
@@ -72,7 +76,6 @@ export function SidebarSessionList({
   collapsedSidebarSections,
   sessionId,
   chatBySessionId,
-  orderedVisibleSessionIds,
   selectedSessionIds,
   threadMenuOpenId,
   projects,
@@ -92,6 +95,9 @@ export function SidebarSessionList({
 }: SidebarSessionListProps) {
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
+  const [visibleBySection, setVisibleBySection] = useState<
+    Record<string, number>
+  >({})
   const { tabColors, setTabColor } = useSessionTabColors()
   const attentionIds = useSessionAttentionIds()
   const previousScopeRef = useRef(scopeKey)
@@ -104,6 +110,7 @@ export function SidebarSessionList({
     // Soft cross-fade when the project scope filter changes.
     let cancelled = false
     setListOpacity(0)
+    setVisibleBySection({})
     const timer = window.setTimeout(() => {
       if (cancelled) return
       setDisplayedSections(sectionsRef.current)
@@ -123,6 +130,35 @@ export function SidebarSessionList({
     setDisplayedSections(sections)
   }, [sections, listOpacity])
 
+  // Keep the active session in view even if it sits past the first page.
+  useEffect(() => {
+    if (!sessionId) return
+    setVisibleBySection(current => {
+      let next: Record<string, number> | null = null
+      for (const section of displayedSections) {
+        const index = section.items.findIndex(item => item.id === sessionId)
+        if (index < 0) continue
+        const needed =
+          Math.ceil((index + 1) / SECTION_PAGE_SIZE) * SECTION_PAGE_SIZE
+        const shown = current[section.id] ?? SECTION_PAGE_SIZE
+        if (shown >= needed) continue
+        if (!next) next = { ...current }
+        next[section.id] = needed
+      }
+      return next ?? current
+    })
+  }, [displayedSections, sessionId])
+
+  const orderedRenderedSessionIds = useMemo(() => {
+    const ids: string[] = []
+    for (const section of displayedSections) {
+      if (collapsedSidebarSections[section.id]) continue
+      const limit = visibleBySection[section.id] ?? SECTION_PAGE_SIZE
+      for (const item of section.items.slice(0, limit)) ids.push(item.id)
+    }
+    return ids
+  }, [collapsedSidebarSections, displayedSections, visibleBySection])
+
   return (
     <ScrollArea className="flex-1">
       <div
@@ -136,6 +172,9 @@ export function SidebarSessionList({
         ) : (
           displayedSections.map(section => {
             const collapsed = Boolean(collapsedSidebarSections[section.id])
+            const limit = visibleBySection[section.id] ?? SECTION_PAGE_SIZE
+            const visibleItems = section.items.slice(0, limit)
+            const remaining = Math.max(0, section.items.length - visibleItems.length)
             return (
               <div key={section.id} className="space-y-1">
                 <button
@@ -164,7 +203,7 @@ export function SidebarSessionList({
                 </button>
                 {!collapsed ? (
                   <ul className="space-y-0.5">
-                    {section.items.map(item => {
+                    {visibleItems.map(item => {
                       const isSelected = selectedSessionIds.has(item.id)
                       const tabColor = tabColors[item.id]
                       return (
@@ -188,7 +227,7 @@ export function SidebarSessionList({
                                 if (event.shiftKey) {
                                   event.preventDefault()
                                   selectSessionRange(
-                                    orderedVisibleSessionIds,
+                                    orderedRenderedSessionIds,
                                     item.id
                                   )
                                   return
@@ -363,6 +402,26 @@ export function SidebarSessionList({
                         </li>
                       )
                     })}
+                    {remaining > 0 ? (
+                      <li>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground w-full rounded-lg px-2 py-1.5 text-left text-[12px]"
+                          onClick={() =>
+                            setVisibleBySection(current => ({
+                              ...current,
+                              [section.id]: limit + SECTION_PAGE_SIZE
+                            }))
+                          }
+                        >
+                          Load more
+                          <span className="text-muted-foreground/70">
+                            {' '}
+                            · {remaining} remaining
+                          </span>
+                        </button>
+                      </li>
+                    ) : null}
                   </ul>
                 ) : null}
               </div>

@@ -75,6 +75,7 @@ export function DashboardMainSpecialistsPanel({
 }
 
 export function DashboardMainHomePanel({
+  client,
   navigate,
   projects,
   sessions,
@@ -89,6 +90,7 @@ export function DashboardMainHomePanel({
   deleteProject
 }: Pick<
   DashboardMainViewsProps,
+  | 'client'
   | 'navigate'
   | 'projects'
   | 'sessions'
@@ -104,6 +106,7 @@ export function DashboardMainHomePanel({
 >) {
   return (
     <HomeView
+      client={client}
       projects={projects}
       sessions={sessions}
       previews={sessionPreviews}

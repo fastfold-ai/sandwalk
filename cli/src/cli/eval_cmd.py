@@ -401,6 +401,9 @@ def _run_local(payload: dict[str, Any]) -> list[dict[str, Any]]:
         model=payload.get("model"),
         models=list(payload.get("models") or []),
         specialist_id=payload.get("specialist_id"),
+        thinking=bool(payload.get("thinking")),
+        provider=payload.get("provider"),
+        project_name=payload.get("project_name"),
     )
 
     try:
@@ -466,6 +469,7 @@ def _run_local(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     sample_size=suite.sample_size,
                     project_name=req.project_name,
                     specialist_id=req.specialist_id,
+                    thinking=bool(req.thinking),
                     on_progress=_progress,
                 )
                 finished.append(row)

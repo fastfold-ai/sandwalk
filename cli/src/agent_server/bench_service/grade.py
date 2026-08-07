@@ -125,6 +125,7 @@ def build_result(
     time_s: float,
     thinking_used: bool = False,
     project_id: str | None = None,
+    environment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     correct = sum(1 for q in questions if q.get("correct"))
     total = len(questions)
@@ -135,7 +136,7 @@ def build_result(
         buckets.setdefault(cat, []).append(bool(q.get("correct")))
     for cat, flags in buckets.items():
         category_scores[cat] = (sum(flags) / len(flags)) if flags else 0.0
-    return {
+    result: dict[str, Any] = {
         "run_id": run_id,
         "model_id": model_id,
         "benchmark": benchmark,
@@ -148,6 +149,9 @@ def build_result(
         "questions": questions,
         "project_id": project_id,
     }
+    if environment is not None:
+        result["environment"] = environment
+    return result
 
 
 def _norm(s: str) -> str:

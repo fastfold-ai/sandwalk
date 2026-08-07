@@ -79,6 +79,7 @@ def test_build_result_shape():
         time_s=12.34,
         thinking_used=True,
         project_id="proj-1",
+        environment={"sandwalk_version": "0.0.1", "python_version": "3.12.0"},
     )
     assert result["run_id"] == "run-1"
     assert result["model_id"] == "test-model"
@@ -92,6 +93,33 @@ def test_build_result_shape():
     assert result["category_scores"]["anatomy"] == 0.5
     assert result["category_scores"]["biology"] == 1.0
     assert len(result["questions"]) == 3
+    assert result["environment"]["sandwalk_version"] == "0.0.1"
+
+
+def test_capture_bench_environment_shape():
+    from agent_server.bench_service.environment import capture_bench_environment
+
+    env = capture_bench_environment(
+        None,
+        model_id="openrouter/deepseek/deepseek-v4-flash-0731",
+        provider="openrouter",
+        thinking=True,
+        suite_id="arc-challenge",
+        sample_size=10,
+        pack_id="arc-challenge",
+    )
+    assert env["model"]["model_id"] == "openrouter/deepseek/deepseek-v4-flash-0731"
+    assert env["model"]["provider"] == "openrouter"
+    assert env["model"]["thinking"] is True
+    assert env["suite"]["suite_id"] == "arc-challenge"
+    assert env["suite"]["sample_size"] == 10
+    assert isinstance(env["sandwalk_version"], str) and env["sandwalk_version"]
+    assert isinstance(env["python_version"], str) and env["python_version"]
+    assert isinstance(env["packages"], dict)
+    assert isinstance(env["skills"], list)
+    assert env["mcp_servers"] == []
+    assert "started_at" in env
+    assert "captured_at" in env
 
 
 def test_list_suite_cards_includes_mmlu_and_packs():
