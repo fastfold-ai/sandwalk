@@ -223,7 +223,14 @@ def create_app(
         ),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["authorization", "content-type", "last-event-id", "x-api-key", "cookie"],
+        allow_headers=[
+            "authorization",
+            "content-type",
+            "last-event-id",
+            "x-api-key",
+            "cookie",
+            "x-sandwalk-client",
+        ],
     )
 
     register_all_routes(app, deps)

@@ -266,12 +266,14 @@ def eval_run(
         "model": model,
         "models": list(models or []),
         "specialistId": specialist,
+        "clientSurface": "cli",
     }
     local_payload = {
         "suites": [{"suite_id": s, "sample_size": sample} for s in suite],
         "model": model,
         "models": list(models or []),
         "specialist_id": specialist,
+        "client_surface": "cli",
     }
 
     base = _base_url(base_url)
@@ -404,6 +406,7 @@ def _run_local(payload: dict[str, Any]) -> list[dict[str, Any]]:
         thinking=bool(payload.get("thinking")),
         provider=payload.get("provider"),
         project_name=payload.get("project_name"),
+        client_surface=payload.get("client_surface") or "cli",
     )
 
     try:
@@ -470,6 +473,7 @@ def _run_local(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     project_name=req.project_name,
                     specialist_id=req.specialist_id,
                     thinking=bool(req.thinking),
+                    client_surface=req.client_surface or "cli",
                     on_progress=_progress,
                 )
                 finished.append(row)

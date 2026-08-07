@@ -6,6 +6,7 @@ import type {
   AgentModel,
   AgentProject,
   AgentSession,
+  UsageOverview,
   LibraryItem,
   LibraryItemList,
   LibraryKind,
@@ -141,6 +142,121 @@ export type BenchResultSummary = {
   createdAt?: string | null
 }
 
+function num(raw: Record<string, unknown>, camel: string, snake: string): number {
+  const value = raw[camel] ?? raw[snake]
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
+function normalizeUsageOverview(raw: Record<string, unknown>): UsageOverview {
+  const daysRaw = raw.days
+  const modelsRaw = raw.topModels ?? raw.top_models
+  const days = Array.isArray(daysRaw)
+    ? daysRaw.flatMap(item => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return []
+        const row = item as Record<string, unknown>
+        return [
+          {
+            day: String(row.day || ''),
+            tokens: num(row, 'tokens', 'tokens'),
+            inputTokens: num(row, 'inputTokens', 'input_tokens'),
+            outputTokens: num(row, 'outputTokens', 'output_tokens'),
+            cacheReadTokens: num(row, 'cacheReadTokens', 'cache_read_tokens'),
+            cliTokens: num(row, 'cliTokens', 'cli_tokens'),
+            uiTokens: num(row, 'uiTokens', 'ui_tokens'),
+            slackTokens: num(row, 'slackTokens', 'slack_tokens'),
+            unknownTokens: num(row, 'unknownTokens', 'unknown_tokens'),
+            runs: num(row, 'runs', 'runs')
+          }
+        ]
+      })
+    : []
+  const topModels = Array.isArray(modelsRaw)
+    ? modelsRaw.flatMap(item => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return []
+        const row = item as Record<string, unknown>
+        return [
+          {
+            modelId: String(row.modelId ?? row.model_id ?? 'unknown'),
+            provider: String(row.provider ?? 'unknown'),
+            tokens: num(row, 'tokens', 'tokens'),
+            inputTokens: num(row, 'inputTokens', 'input_tokens'),
+            outputTokens: num(row, 'outputTokens', 'output_tokens'),
+            runs: num(row, 'runs', 'runs'),
+            messages: num(row, 'messages', 'messages')
+          }
+        ]
+      })
+    : []
+  const modelDaysRaw = raw.modelDays ?? raw.model_days
+  const modelDays = Array.isArray(modelDaysRaw)
+    ? modelDaysRaw.flatMap(item => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return []
+        const row = item as Record<string, unknown>
+        return [
+          {
+            day: String(row.day || ''),
+            modelId: String(row.modelId ?? row.model_id ?? 'Other'),
+            provider: String(row.provider ?? 'unknown'),
+            tokens: num(row, 'tokens', 'tokens')
+          }
+        ]
+      })
+    : []
+  const chartModelsRaw = raw.chartModels ?? raw.chart_models
+  const chartModels = Array.isArray(chartModelsRaw)
+    ? chartModelsRaw.flatMap(item => {
+        if (typeof item === 'string' && item) {
+          return [{ modelId: item, provider: 'unknown' }]
+        }
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return []
+        const row = item as Record<string, unknown>
+        const modelId = String(row.modelId ?? row.model_id ?? '').trim()
+        if (!modelId) return []
+        return [
+          {
+            modelId,
+            provider: String(row.provider ?? 'unknown')
+          }
+        ]
+      })
+    : []
+  return {
+    lifetimeTokens: num(raw, 'lifetimeTokens', 'lifetime_tokens'),
+    inputTokens: num(raw, 'inputTokens', 'input_tokens'),
+    outputTokens: num(raw, 'outputTokens', 'output_tokens'),
+    cacheReadTokens: num(raw, 'cacheReadTokens', 'cache_read_tokens'),
+    peakDayTokens: num(raw, 'peakDayTokens', 'peak_day_tokens'),
+    peakDay:
+      typeof (raw.peakDay ?? raw.peak_day) === 'string'
+        ? String(raw.peakDay ?? raw.peak_day)
+        : null,
+    modelsUsed: num(raw, 'modelsUsed', 'models_used'),
+    runs: num(raw, 'runs', 'runs'),
+    sessions: num(raw, 'sessions', 'sessions'),
+    messages: num(raw, 'messages', 'messages'),
+    avgTokensPerSession: num(raw, 'avgTokensPerSession', 'avg_tokens_per_session'),
+    longestAgentSeconds: num(
+      raw,
+      'longestAgentSeconds',
+      'longest_agent_seconds'
+    ),
+    longestStreakDays: num(raw, 'longestStreakDays', 'longest_streak_days'),
+    currentStreakDays: num(raw, 'currentStreakDays', 'current_streak_days'),
+    cliTokens: num(raw, 'cliTokens', 'cli_tokens'),
+    uiTokens: num(raw, 'uiTokens', 'ui_tokens'),
+    slackTokens: num(raw, 'slackTokens', 'slack_tokens'),
+    unknownTokens: num(raw, 'unknownTokens', 'unknown_tokens'),
+    cliShare: num(raw, 'cliShare', 'cli_share'),
+    uiShare: num(raw, 'uiShare', 'ui_share'),
+    days,
+    topModels,
+    modelDays,
+    chartModels,
+    backfilled: Boolean(raw.backfilled)
+  }
+}
+
 export class LocalAgentClient
   implements
     AgentClient,
@@ -163,6 +279,7 @@ export class LocalAgentClient
   private headers(extra?: HeadersInit): Headers {
     const headers = new Headers(extra)
     headers.set('accept', 'application/json')
+    headers.set('x-sandwalk-client', 'ui')
     if (this.apiKey) headers.set('authorization', `Bearer ${this.apiKey}`)
     return headers
   }
@@ -305,13 +422,17 @@ export class LocalAgentClient
       specialistId?: string | null
       thinking?: boolean
       dryRun?: boolean
+      clientSurface?: 'cli' | 'ui'
     },
     signal?: AbortSignal
   ): Promise<{ runIds: string[]; queued: number }> {
     return this.request('/bench/spawn', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        ...input,
+        clientSurface: input.clientSurface ?? 'ui'
+      }),
       signal
     })
   }
@@ -1222,6 +1343,7 @@ export class LocalAgentClient
       projectId?: string | null
       specialistId?: string | null
       sandboxBackend?: 'builtin' | 'modal' | null
+      clientSurface?: 'cli' | 'ui' | 'slack' | 'unknown'
     },
     signal?: AbortSignal
   ): Promise<AgentSession> {
@@ -1232,11 +1354,19 @@ export class LocalAgentClient
         workspace_path: input.workspacePath,
         project_id: input.projectId,
         specialist_id: input.specialistId,
-        sandbox_backend: input.sandboxBackend
+        sandbox_backend: input.sandboxBackend,
+        client_surface: input.clientSurface ?? 'ui'
       }),
       headers: { 'content-type': 'application/json' },
       signal
     })
+  }
+
+  async getUsageOverview(signal?: AbortSignal): Promise<UsageOverview> {
+    const raw = await this.request<Record<string, unknown>>('/usage/overview', {
+      signal
+    })
+    return normalizeUsageOverview(raw)
   }
 
   updateSession(

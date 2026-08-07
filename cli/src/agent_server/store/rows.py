@@ -44,6 +44,10 @@ def session_from_row(row: sqlite3.Row) -> AgentSession:
     origin = str(raw_origin or "").strip().lower() or None
     if origin not in {"slack", None}:
         origin = None
+    raw_surface = row["client_surface"] if "client_surface" in keys else "unknown"
+    surface = str(raw_surface or "unknown").strip().lower()
+    if surface not in {"cli", "ui", "slack", "unknown"}:
+        surface = "slack" if origin == "slack" else "unknown"
     return AgentSession(
         id=row["id"],
         title=row["title"],
@@ -56,6 +60,7 @@ def session_from_row(row: sqlite3.Row) -> AgentSession:
         workspace_path=row["workspace_path"],
         source=origin,  # type: ignore[arg-type]
         source_label=(row["source_label"] if "source_label" in keys else None),
+        client_surface=surface,  # type: ignore[arg-type]
         last_message_at=(
             datetime.fromisoformat(row["last_message_at"])
             if row["last_message_at"]

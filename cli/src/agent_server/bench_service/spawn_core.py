@@ -36,6 +36,7 @@ def run_agent_suite(
     project_name: str | None,
     specialist_id: str | None = None,
     thinking: bool = False,
+    client_surface: str = "ui",
     run_id: str | None = None,
     on_progress: Callable[[dict[str, Any]], None] | None = None,
     cancel_check: Callable[[], bool] | None = None,
@@ -140,6 +141,7 @@ def run_agent_suite(
                 workspace_path=None,
                 project_id=project.id,
                 specialist_id=specialist_id,
+                client_surface=client_surface,
             )
             session = deps.service.ensure_workspace(session.id)
             ws = Path(session.workspace_path or "")

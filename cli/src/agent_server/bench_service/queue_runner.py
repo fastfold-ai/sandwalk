@@ -31,6 +31,7 @@ class BenchJob:
     thinking: bool = False
     project_name: str | None = None
     specialist_id: str | None = None
+    client_surface: str = "ui"
 
 
 @dataclass
@@ -118,6 +119,7 @@ def enqueue(deps: AppDeps, req: BenchSpawnRequest) -> list[str]:
                 thinking=req.thinking,
                 project_name=req.project_name,
                 specialist_id=req.specialist_id,
+                client_surface=req.client_surface or "ui",
             )
             _state.queue.append(job)
             run_ids.append(job.run_id)
@@ -232,6 +234,7 @@ def _run_job(deps: AppDeps, job: BenchJob) -> None:
             project_name=job.project_name,
             specialist_id=job.specialist_id,
             thinking=job.thinking,
+            client_surface=job.client_surface,
             run_id=pinned,
             on_progress=lambda p, idx=s_idx: _emit({**p, "current": idx, "total": suite_total}),
             cancel_check=_cancelled,

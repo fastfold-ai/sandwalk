@@ -85,7 +85,7 @@ export function resolveActiveTitle(input: {
   if (input.isDashboardData) return 'Datasets'
   if (input.isDashboardTools) return 'Tools'
   if (input.isDashboardDoctor) return 'Doctor'
-  if (input.isDashboardBench) return 'Bench'
+  if (input.isDashboardBench) return 'Benchmarking'
   if (input.isDashboardStorage) return 'Storage'
   if (input.isDashboardEnvironment) return 'Environment'
   if (input.isSkills) return 'Skills'

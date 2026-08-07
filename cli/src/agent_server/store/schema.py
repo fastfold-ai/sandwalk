@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     status TEXT NOT NULL,
     organize_label TEXT,
     workspace_path TEXT,
+    client_surface TEXT NOT NULL DEFAULT 'unknown',
     last_message_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -211,6 +212,29 @@ CREATE TABLE IF NOT EXISTS session_connector_mutes (
     muted INTEGER NOT NULL DEFAULT 1,
     updated_at TEXT NOT NULL,
     PRIMARY KEY (session_id, connector)
+);
+
+CREATE TABLE IF NOT EXISTS usage_runs (
+    run_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    surface TEXT NOT NULL DEFAULT 'unknown',
+    model_id TEXT,
+    provider TEXT,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS usage_runs_day ON usage_runs(day);
+CREATE INDEX IF NOT EXISTS usage_runs_surface_day ON usage_runs(surface, day);
+CREATE INDEX IF NOT EXISTS usage_runs_model_day ON usage_runs(model_id, day);
+
+CREATE TABLE IF NOT EXISTS usage_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 """
 

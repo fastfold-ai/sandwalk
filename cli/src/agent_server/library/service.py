@@ -353,6 +353,7 @@ class LibraryService:
             title=title or "Library chat",
             workspace_path=None,
             project_id=project_id,
+            client_surface="ui",
         )
         session = self.agent_service.ensure_workspace(session.id)
         if not session.workspace_path:

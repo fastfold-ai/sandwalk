@@ -47,6 +47,7 @@ class SessionCreateMixin:
         sandbox_backend: str | None = None,
         source: str | None = None,
         source_label: str | None = None,
+        client_surface: str | None = None,
     ) -> AgentSession:
         return self.ensure_session(
             str(uuid.uuid4()),
@@ -57,6 +58,7 @@ class SessionCreateMixin:
             sandbox_backend=sandbox_backend,
             source=source,
             source_label=source_label,
+            client_surface=client_surface,
         )
 
     def ensure_session(
@@ -70,6 +72,7 @@ class SessionCreateMixin:
         sandbox_backend: str | None = None,
         source: str | None = None,
         source_label: str | None = None,
+        client_surface: str | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> AgentSession:
@@ -110,6 +113,13 @@ class SessionCreateMixin:
         if normalized_source is not None and normalized_source != "slack":
             raise ValueError("source must be 'slack'")
 
+        from agent_server.store.usage import normalize_surface
+
+        if normalized_source == "slack":
+            surface = "slack"
+        else:
+            surface = normalize_surface(client_surface)
+
         now = utc_now()
         created = created_at or now
         updated = updated_at or created
@@ -126,6 +136,7 @@ class SessionCreateMixin:
             workspace_path=workspace_path,
             source=normalized_source,  # type: ignore[arg-type]
             source_label=(source_label or "").strip() or None,
+            client_surface=surface,  # type: ignore[arg-type]
             last_message_at=None,
             created_at=created,
             updated_at=updated,
@@ -136,9 +147,10 @@ class SessionCreateMixin:
                 INSERT INTO sessions(
                     id, title, title_source, status, organize_label, project_id,
                     specialist_id, sandbox_backend, workspace_path, source,
-                    source_label, last_message_at, created_at, updated_at
+                    source_label, client_surface, last_message_at, created_at,
+                    updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session.id,
@@ -152,6 +164,7 @@ class SessionCreateMixin:
                     session.workspace_path,
                     session.source,
                     session.source_label,
+                    session.client_surface,
                     None,
                     session.created_at.isoformat(),
                     session.updated_at.isoformat(),

@@ -21,6 +21,9 @@ TitleSource = Literal["pending", "auto", "user"]
 # Connector that spawned the session; None means it started locally.
 SessionSource = Literal["slack"]
 
+# Product surface for usage attribution (independent of Slack `source`).
+ClientSurface = Literal["cli", "ui", "slack", "unknown"]
+
 
 class AgentSession(ApiModel):
     id: str
@@ -35,6 +38,7 @@ class AgentSession(ApiModel):
     source: SessionSource | None = None
     # Human-readable origin, e.g. "#dev-ops · Acme" — shown next to the source icon.
     source_label: str | None = None
+    client_surface: ClientSurface = "unknown"
     last_message_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
@@ -46,6 +50,7 @@ class CreateSessionRequest(ApiModel):
     project_id: str | None = None
     specialist_id: str | None = None
     sandbox_backend: SandboxBackendChoice | None = None
+    client_surface: ClientSurface | None = None
 
 
 class UpdateSessionRequest(ApiModel):

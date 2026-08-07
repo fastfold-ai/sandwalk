@@ -355,6 +355,73 @@ export type SessionTitleSource = 'pending' | 'auto' | 'user'
 
 export type SessionSource = 'slack'
 
+export type ClientSurface = 'cli' | 'ui' | 'slack' | 'unknown'
+
+export type UsageDayPoint = {
+  day: string
+  tokens: number
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cliTokens: number
+  uiTokens: number
+  slackTokens: number
+  unknownTokens: number
+  runs: number
+}
+
+export type UsageModelRow = {
+  modelId: string
+  provider: string
+  tokens: number
+  inputTokens: number
+  outputTokens: number
+  runs: number
+  messages: number
+}
+
+export type UsageChartModel = {
+  modelId: string
+  provider: string
+}
+
+export type UsageModelDayPoint = {
+  day: string
+  modelId: string
+  provider: string
+  tokens: number
+}
+
+export type UsageOverview = {
+  lifetimeTokens: number
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  peakDayTokens: number
+  peakDay: string | null
+  modelsUsed: number
+  runs: number
+  sessions: number
+  messages: number
+  avgTokensPerSession: number
+  longestAgentSeconds: number
+  longestStreakDays: number
+  currentStreakDays: number
+  cliTokens: number
+  uiTokens: number
+  slackTokens: number
+  unknownTokens: number
+  cliShare: number
+  uiShare: number
+  days: UsageDayPoint[]
+  topModels: UsageModelRow[]
+  /** Last-30-day stacked chart series (day × model). */
+  modelDays: UsageModelDayPoint[]
+  /** Stable model order for chart colors. */
+  chartModels: UsageChartModel[]
+  backfilled: boolean
+}
+
 /** relay = inbound via FastFold Cloud; socket = inbound via Slack Socket Mode. */
 export type SlackMode = 'relay' | 'socket'
 
@@ -463,6 +530,8 @@ export type AgentSession = {
   source?: SessionSource | null
   /** Human-readable origin, e.g. "#dev-ops · Acme". */
   sourceLabel?: string | null
+  /** Product surface for usage attribution. */
+  clientSurface?: ClientSurface
   lastMessageAt: string | null
   createdAt: string
   updatedAt: string
@@ -1668,9 +1737,11 @@ export interface AgentClient {
       projectId?: string | null
       specialistId?: string | null
       sandboxBackend?: 'builtin' | 'modal' | null
+      clientSurface?: ClientSurface
     },
     signal?: AbortSignal
   ): Promise<AgentSession>
+  getUsageOverview?(signal?: AbortSignal): Promise<UsageOverview>
   updateSession(
     sessionId: string,
     input: {

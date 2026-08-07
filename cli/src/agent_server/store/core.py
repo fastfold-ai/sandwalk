@@ -15,6 +15,7 @@ from agent_server.store.sessions import SessionCreateMixin
 from agent_server.store.sites import SiteMixin
 from agent_server.store.specialist_updates import SpecialistUpdateMixin
 from agent_server.store.specialists import SpecialistMixin
+from agent_server.store.usage import UsageMixin
 
 
 class AgentStore(
@@ -30,6 +31,7 @@ class AgentStore(
     LibraryMixin,
     SiteMixin,
     ConnectorMixin,
+    UsageMixin,
     AgentStoreBase,
 ):
     """Small durable store shared by CLI and web transports.

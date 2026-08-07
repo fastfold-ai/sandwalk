@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, type ReactNode } from 'react'
 
 import {
   Tooltip,
@@ -24,16 +24,32 @@ export function HeatmapStat({ label, value }: { label: string; value: string }) 
   )
 }
 
+function defaultTooltip(cell: DayCell): ReactNode {
+  return (
+    <>
+      <p className="font-medium">{formatLongDate(cell.date)}</p>
+      <p className="mt-0.5 text-emerald-400 dark:text-emerald-700">
+        {cell.count.toLocaleString()}{' '}
+        {cell.count === 1 ? 'session' : 'sessions'}
+      </p>
+    </>
+  )
+}
+
 export function SessionActivityHeatmapGrid({
   weeks,
   monthLabels,
   hovered,
-  onHover
+  onHover,
+  ariaLabelForCell,
+  renderTooltip
 }: {
   weeks: DayCell[][]
   monthLabels: Array<{ label: string; weekIndex: number }>
   hovered: string | null
   onHover: (key: string | null) => void
+  ariaLabelForCell?: (cell: DayCell) => string
+  renderTooltip?: (cell: DayCell) => ReactNode
 }) {
   const columns = `1.25rem repeat(${weeks.length}, minmax(0, 1fr))`
 
@@ -77,7 +93,10 @@ export function SessionActivityHeatmapGrid({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        aria-label={`${cell.count} sessions on ${formatLongDate(cell.date)}`}
+                        aria-label={
+                          ariaLabelForCell?.(cell) ||
+                          `${cell.count} sessions on ${formatLongDate(cell.date)}`
+                        }
                         className={cn(
                           'aspect-square w-full rounded-[2px] transition-opacity',
                           LEVEL_CLASS[cell.level],
@@ -93,13 +112,7 @@ export function SessionActivityHeatmapGrid({
                       side="top"
                       className="bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900"
                     >
-                      <p className="font-medium">
-                        {formatLongDate(cell.date)}
-                      </p>
-                      <p className="mt-0.5 text-emerald-400 dark:text-emerald-700">
-                        {cell.count.toLocaleString()}{' '}
-                        {cell.count === 1 ? 'session' : 'sessions'}
-                      </p>
+                      {renderTooltip?.(cell) ?? defaultTooltip(cell)}
                     </TooltipContent>
                   </Tooltip>
                 )

@@ -40,6 +40,7 @@ class _SessionCrudMixin:
         sandbox_backend: str | None = None,
         source: str | None = None,
         source_label: str | None = None,
+        client_surface: str | None = None,
     ) -> AgentSession:
         from agent_server import service
 
@@ -57,6 +58,7 @@ class _SessionCrudMixin:
             sandbox_backend=sandbox_backend,
             source=source,
             source_label=source_label,
+            client_surface=client_surface,
         )
         if normalized_workspace is None:
             workspace = service.default_workspace_path(session.id)

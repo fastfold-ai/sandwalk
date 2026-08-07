@@ -51,7 +51,7 @@ export function DashboardMainOverviewPanel({
   | 'loadSessions'
 >) {
   return (
-    <DashboardOverviewView sessions={sessions}>
+    <DashboardOverviewView sessions={sessions} client={client}>
       <SkillsView
         featuredOnly
         mode="list"

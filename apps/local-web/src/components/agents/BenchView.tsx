@@ -8,6 +8,7 @@ import type { RuntimeSettings, Specialist } from '@sandwalk/agent-ui-core'
 
 import {
   Check,
+  Columns2,
   Copy,
   Download,
   Gauge,
@@ -21,6 +22,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
+import { BenchCompareView } from '@/components/agents/BenchCompareView'
 import { BenchResultDetail } from '@/components/agents/BenchResultDetail'
 import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelPicker'
 import { ComposerSpecialistPicker } from '@/components/agents/composer/ComposerSpecialistPicker'
@@ -51,7 +53,10 @@ export function BenchView({
 }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const detailMatch = matchPath('/dashboard/bench/:runId', location.pathname)
+  const isComparePath = location.pathname === '/dashboard/bench/compare'
+  const detailMatch = isComparePath
+    ? null
+    : matchPath('/dashboard/bench/:runId', location.pathname)
   const detailRunId = detailMatch?.params.runId || null
   const [tab, setTab] = useState<Tab>('new')
   const [suites, setSuites] = useState<BenchSuiteCard[]>([])
@@ -62,6 +67,7 @@ export function BenchView({
   const [specialistId, setSpecialistId] = useState<string | null>(null)
   const [active, setActive] = useState<BenchActiveStatus | null>(null)
   const [results, setResults] = useState<BenchResultSummary[]>([])
+  const [compareSelection, setCompareSelection] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [spawning, setSpawning] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -69,15 +75,16 @@ export function BenchView({
     () => new Set()
   )
   const wasBusyRef = useRef(false)
-  const prevDetailRunId = useRef<string | null>(null)
+  const prevOverlayRef = useRef(false)
 
-  // After leaving a result detail URL, show the Results tab.
+  // After leaving a result detail / compare URL, show the Results tab.
   useEffect(() => {
-    if (prevDetailRunId.current && !detailRunId) {
+    const overlay = Boolean(detailRunId) || isComparePath
+    if (prevOverlayRef.current && !overlay) {
       setTab('results')
     }
-    prevDetailRunId.current = detailRunId
-  }, [detailRunId])
+    prevOverlayRef.current = overlay
+  }, [detailRunId, isComparePath])
 
   const loadCatalog = useCallback(async () => {
     try {
@@ -333,8 +340,32 @@ export function BenchView({
     .filter(Boolean)
     .join(' · ')
 
+  if (isComparePath) {
+    return <BenchCompareView client={client} />
+  }
+
   if (detailRunId) {
     return <BenchResultDetail client={client} runId={detailRunId} />
+  }
+
+  const toggleCompareSelection = (runId: string) => {
+    setCompareSelection(current => {
+      if (current.includes(runId)) {
+        return current.filter(id => id !== runId)
+      }
+      if (current.length >= 2) {
+        return [current[1], runId]
+      }
+      return [...current, runId]
+    })
+  }
+
+  const openCompare = () => {
+    if (compareSelection.length !== 2) return
+    const [a, b] = compareSelection
+    navigate(
+      `/dashboard/bench/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
+    )
   }
 
   const suiteAvatar = (card: BenchSuiteCard) => {
@@ -579,64 +610,124 @@ export function BenchView({
         {tab === 'results' ? (
           <section className="space-y-3">
             {progressCard}
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-muted-foreground text-sm">
                 {results.length
                   ? `${results.length} run${results.length === 1 ? '' : 's'}`
                   : busy
                     ? 'Waiting for the first finished run…'
                     : 'No runs yet'}
+                {compareSelection.length ? (
+                  <span>
+                    {' '}
+                    · {compareSelection.length}/2 selected for compare
+                  </span>
+                ) : results.length >= 2 ? (
+                  <span> · select 2 to compare</span>
+                ) : null}
               </p>
-              {results.length ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {compareSelection.length ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCompareSelection([])}
+                  >
+                    Clear selection
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
-                  onClick={() => void client.resetBenchResults().then(loadStatus)}
+                  disabled={compareSelection.length !== 2}
+                  onClick={openCompare}
                 >
-                  <Trash2 className="size-3.5" />
-                  Clear
+                  <Columns2 className="size-3.5" />
+                  Compare
+                  {compareSelection.length === 2 ? '' : ` · ${compareSelection.length}/2`}
                 </Button>
-              ) : null}
+                {results.length ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      void client.resetBenchResults().then(loadStatus)
+                    }
+                  >
+                    <Trash2 className="size-3.5" />
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
             </div>
             <div className="space-y-2">
               {results.map(r => {
                 const pct = Math.round((r.accuracy || 0) * 1000) / 10
+                const picked = compareSelection.includes(r.runId)
                 return (
                   <div
                     key={r.runId}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setTab('results')
-                      navigate(`/dashboard/bench/${encodeURIComponent(r.runId)}`)
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        setTab('results')
-                        navigate(
-                          `/dashboard/bench/${encodeURIComponent(r.runId)}`
-                        )
-                      }
-                    }}
-                    className="border-border/70 hover:bg-muted/30 cursor-pointer rounded-md border px-3 py-3 transition-colors"
+                    className={cn(
+                      'group border-border/70 rounded-md border px-3 py-3 transition-colors',
+                      picked
+                        ? 'border-primary/35 bg-primary/[0.04]'
+                        : 'hover:bg-muted/30'
+                    )}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-2.5">
-                        <div
-                          className={cn(
-                            'flex size-8 shrink-0 items-center justify-center rounded-md',
-                            pct >= 70
-                              ? 'bg-emerald-500/15 text-emerald-600'
-                              : pct >= 40
-                                ? 'bg-amber-500/15 text-amber-600'
-                                : 'bg-red-500/15 text-red-600'
-                          )}
+                        <button
+                          type="button"
+                          aria-label={
+                            picked
+                              ? 'Deselect for compare'
+                              : 'Select for compare'
+                          }
+                          aria-pressed={picked}
+                          title={picked ? 'Selected for compare' : 'Select to compare'}
+                          className="relative size-8 shrink-0"
+                          onClick={() => toggleCompareSelection(r.runId)}
                         >
-                          <Target className="size-3.5" />
-                        </div>
-                        <div className="min-w-0">
+                          <span
+                            className={cn(
+                              'flex size-8 items-center justify-center rounded-md transition-opacity',
+                              pct >= 70
+                                ? 'bg-emerald-500/15 text-emerald-600'
+                                : pct >= 40
+                                  ? 'bg-amber-500/15 text-amber-600'
+                                  : 'bg-red-500/15 text-red-600',
+                              picked
+                                ? 'opacity-30'
+                                : 'group-hover:opacity-30'
+                            )}
+                          >
+                            <Target className="size-3.5" />
+                          </span>
+                          <span
+                            className={cn(
+                              'absolute inset-0 m-auto flex size-4 items-center justify-center rounded-full border shadow-sm transition-opacity',
+                              picked
+                                ? 'border-primary bg-primary text-primary-foreground opacity-100'
+                                : 'border-border/80 bg-background/95 text-muted-foreground opacity-0 group-hover:opacity-100'
+                            )}
+                          >
+                            {picked ? (
+                              <Check className="size-2.5" strokeWidth={3} />
+                            ) : null}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 text-left"
+                          onClick={() => {
+                            setTab('results')
+                            navigate(
+                              `/dashboard/bench/${encodeURIComponent(r.runId)}`
+                            )
+                          }}
+                        >
                           <div className="flex flex-wrap items-center gap-1.5">
                             <h4 className="text-sm font-semibold">
                               {r.benchmark}
@@ -649,7 +740,7 @@ export function BenchView({
                             {r.correct}/{r.total} · {r.timeS}s
                             {r.thinkingUsed ? ' · thinking' : ''}
                           </p>
-                        </div>
+                        </button>
                       </div>
                       <p
                         className={cn(
@@ -664,11 +755,7 @@ export function BenchView({
                         {pct.toFixed(1)}%
                       </p>
                     </div>
-                    <div
-                      className="mt-2 flex flex-wrap gap-3 text-xs"
-                      onClick={e => e.stopPropagation()}
-                      onKeyDown={e => e.stopPropagation()}
-                    >
+                    <div className="mt-2 flex flex-wrap gap-3 text-xs">
                       <button
                         type="button"
                         className="text-muted-foreground hover:text-foreground"

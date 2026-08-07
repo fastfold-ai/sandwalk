@@ -30,7 +30,9 @@ class LoopRunMixin:
                     or query.strip()[:80]
                     or "New research session"
                 )
-                self.store.ensure_session(session_id, title=title)
+                self.store.ensure_session(
+                    session_id, title=title, client_surface="cli"
+                )
                 user_message = self.store.add_message(
                     session_id=session_id,
                     role="user",

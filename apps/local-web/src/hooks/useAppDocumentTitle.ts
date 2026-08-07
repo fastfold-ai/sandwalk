@@ -83,9 +83,12 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
       return
     }
     if (args.isDashboardBench) {
-      const benchRun = window.location.pathname.match(
-        /^\/dashboard\/bench\/([^/]+)/
-      )?.[1]
+      const path = window.location.pathname
+      if (path === '/dashboard/bench/compare') {
+        document.title = `Compare · Benchmarking · ${base}`
+        return
+      }
+      const benchRun = path.match(/^\/dashboard\/bench\/([^/]+)/)?.[1]
       document.title = benchRun
         ? `Benchmarking result · ${base}`
         : `Benchmarking · ${base}`

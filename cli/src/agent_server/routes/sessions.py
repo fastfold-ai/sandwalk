@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 
 from agent_server.app_deps import AppDeps
 from agent_server.models import (
@@ -22,6 +22,7 @@ from agent_server.models import (
     UpdateSessionRequest,
 )
 from agent_server.service import SessionBusyError
+from agent_server.usage_service.parse import resolve_client_surface
 
 
 def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
@@ -52,7 +53,14 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
         )
 
     @app.post("/v1/sessions", response_model=AgentSession, status_code=201)
-    async def create_session(payload: CreateSessionRequest) -> AgentSession:
+    async def create_session(
+        payload: CreateSessionRequest,
+        x_sandwalk_client: str | None = Header(default=None, alias="X-Sandwalk-Client"),
+    ) -> AgentSession:
+        surface = resolve_client_surface(
+            body=payload.client_surface,
+            header=x_sandwalk_client,
+        )
         try:
             return await asyncio.to_thread(
                 service.create_session,
@@ -61,6 +69,7 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
                 project_id=payload.project_id,
                 specialist_id=payload.specialist_id,
                 sandbox_backend=payload.sandbox_backend,
+                client_surface=surface,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

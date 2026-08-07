@@ -45,6 +45,8 @@ class BenchSpawnRequest(ApiModel):
     specialist_id: str | None = None
     thinking: bool = False
     dry_run: bool = False
+    # Dashboard Bench defaults to ui; `sandwalk eval` should send cli.
+    client_surface: Literal["cli", "ui"] = "ui"
 
 
 class BenchSpawnResponse(ApiModel):

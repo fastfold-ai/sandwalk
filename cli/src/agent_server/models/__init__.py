@@ -30,7 +30,15 @@ from agent_server.models.mcp_servers import CreateMcpServerRequest, McpServer, M
 from agent_server.models.model_profiles import DeleteModelProfileResponse, DiscoverModelEndpointRequest, ModelProfile, ModelProfileList, ModelProfileProbeResult, ModelProfileSecretResponse, UpsertModelProfileRequest
 from agent_server.models.models_catalog import AgentModel, AgentModelList, CreateAgentModelRequest, ModelPreferences, ToggleModelFavoriteRequest, ToggleModelFavoriteResponse, UpdateAgentModelRequest
 from agent_server.models.projects import AgentProject, CreateProjectRequest, DeleteProjectResponse, ProjectList, UpdateProjectRequest
-from agent_server.models.sessions import AgentSession, AutoTitleSessionRequest, CompactSessionRequest, CompactSessionResponse, CreateSessionRequest, DeleteSessionResponse, HitlDecision, InterruptRunResponse, OrganizeLabel, SandboxBackendChoice, SessionList, SessionRevision, SessionSandboxStatus, SessionSource, SessionStatus, SubmitApprovalsRequest, SubmitApprovalsResponse, TitleSource, UpdateSessionRequest
+from agent_server.models.sessions import AgentSession, AutoTitleSessionRequest, ClientSurface, CompactSessionRequest, CompactSessionResponse, CreateSessionRequest, DeleteSessionResponse, HitlDecision, InterruptRunResponse, OrganizeLabel, SandboxBackendChoice, SessionList, SessionRevision, SessionSandboxStatus, SessionSource, SessionStatus, SubmitApprovalsRequest, SubmitApprovalsResponse, TitleSource, UpdateSessionRequest
+from agent_server.models.usage import (
+    UsageBackfillResponse,
+    UsageChartModel,
+    UsageDayPoint,
+    UsageModelDayPoint,
+    UsageModelRow,
+    UsageOverview,
+)
 from agent_server.models.sessions_messages import AgentMessage, EventEnvelope, EventList, MessageFeedbackRequest, MessageFeedbackResponse, MessageList, MessageRole, MessageSource, SendMessageRequest, StartRunResponse
 from agent_server.models.sessions_pty import CreatePtyRequest, PtySessionInfo, PtySessionList, UpdatePtyRequest
 from agent_server.models.sessions_workspace import CreateWorkspaceFolderRequest, MoveWorkspaceFileRequest, WorkspaceFile, WorkspaceFileContent, WorkspaceFileList, WorkspaceMutationResponse, WriteWorkspaceFileRequest

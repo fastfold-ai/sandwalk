@@ -49,6 +49,19 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE sessions ADD COLUMN source TEXT")
     if "source_label" not in columns:
         connection.execute("ALTER TABLE sessions ADD COLUMN source_label TEXT")
+    # Product surface for Overview usage (cli / ui / slack / unknown).
+    if "client_surface" not in columns:
+        connection.execute(
+            "ALTER TABLE sessions ADD COLUMN client_surface TEXT NOT NULL DEFAULT 'unknown'"
+        )
+        # Slack-originated sessions are already tagged via `source`.
+        connection.execute(
+            """
+            UPDATE sessions
+            SET client_surface = 'slack'
+            WHERE lower(coalesce(source, '')) = 'slack'
+            """
+        )
     if "title_source" not in columns:
         connection.execute(
             "ALTER TABLE sessions ADD COLUMN title_source TEXT NOT NULL DEFAULT 'pending'"
@@ -177,3 +190,35 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
         connection.execute(
             "ALTER TABLE projects ADD COLUMN color TEXT NOT NULL DEFAULT 'neutral'"
         )
+
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS usage_runs (
+            run_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            day TEXT NOT NULL,
+            surface TEXT NOT NULL DEFAULT 'unknown',
+            model_id TEXT,
+            provider TEXT,
+            input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0,
+            cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+            cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS usage_runs_day ON usage_runs(day);
+        CREATE INDEX IF NOT EXISTS usage_runs_surface_day
+            ON usage_runs(surface, day);
+        CREATE INDEX IF NOT EXISTS usage_runs_model_day
+            ON usage_runs(model_id, day);
+        CREATE TABLE IF NOT EXISTS usage_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        """
+    )
+    usage_columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(usage_runs)").fetchall()
+    }
+    if "provider" not in usage_columns:
+        connection.execute("ALTER TABLE usage_runs ADD COLUMN provider TEXT")

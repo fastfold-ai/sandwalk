@@ -57,22 +57,75 @@ class LoopProgressMixin:
                 "toolCallId": str(payload.get("tool_call_id") or ""),
             }
         elif event == "usage":
+            from agent_server.usage_service.parse import (
+                active_model_id,
+                active_provider,
+                parse_usage_tokens,
+            )
+
+            tokens = parse_usage_tokens(payload)
+            model_id = active_model_id()
+            provider = active_provider()
             event_payload = {
-                "inputTokens": payload.get("input_tokens"),
-                "outputTokens": payload.get("output_tokens"),
-                "cacheReadInputTokens": payload.get("cache_read_input_tokens"),
+                "inputTokens": tokens["input_tokens"],
+                "outputTokens": tokens["output_tokens"],
+                "cacheReadInputTokens": tokens["cache_read_tokens"],
+                "cacheCreationInputTokens": tokens["cache_creation_tokens"],
+                "input_tokens": tokens["input_tokens"],
+                "output_tokens": tokens["output_tokens"],
+                "cache_read_input_tokens": tokens["cache_read_tokens"],
+                "cache_creation_input_tokens": tokens["cache_creation_tokens"],
             }
+            if model_id:
+                event_payload["modelId"] = model_id
+                event_payload["model_id"] = model_id
+            if provider:
+                event_payload["provider"] = provider
         else:
             event_payload = {
                 "text": str(payload.get("text") or payload.get("activity") or "")
             }
         try:
-            self.store.append_event(
+            stored = self.store.append_event(
                 session_id=session_id,
                 run_id=run_id,
                 event_type=event_type,
                 payload=event_payload,
             )
+            if event == "usage":
+                from agent_server.usage_service.parse import (
+                    day_key_from_timestamp,
+                    parse_usage_tokens,
+                    surface_for_session,
+                )
+
+                tokens = parse_usage_tokens(event_payload)
+                model_id = (
+                    str(
+                        event_payload.get("model_id")
+                        or event_payload.get("modelId")
+                        or ""
+                    ).strip()
+                    or None
+                )
+                provider = (
+                    str(event_payload.get("provider") or "").strip().lower() or None
+                )
+                session = self.store.get_session(session_id)
+                self.store.upsert_usage_run(
+                    run_id=run_id,
+                    session_id=session_id,
+                    day=day_key_from_timestamp(
+                        getattr(stored, "timestamp", None)
+                    ),
+                    surface=surface_for_session(session),
+                    model_id=model_id,
+                    provider=provider,
+                    input_tokens=tokens["input_tokens"],
+                    output_tokens=tokens["output_tokens"],
+                    cache_read_tokens=tokens["cache_read_tokens"],
+                    cache_creation_tokens=tokens["cache_creation_tokens"],
+                )
             if event == "tool_start":
                 from agent_server.service.plan_events import (
                     plan_created_payload_from_tool_call,

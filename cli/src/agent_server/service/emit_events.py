@@ -6,6 +6,13 @@ from typing import Any
 
 from agent_server.service.plan_events import plan_created_payload_from_tool_call
 from agent_server.store import AgentStore
+from agent_server.usage_service.parse import (
+    active_model_id,
+    active_provider,
+    day_key_from_timestamp,
+    parse_usage_tokens,
+    surface_for_session,
+)
 
 _EVENT_TYPES = {
     "stream": "assistant.delta",
@@ -63,6 +70,36 @@ def _event_payload(event: str, payload: dict[str, Any]) -> dict[str, Any]:
             "interruptId": str(payload.get("interrupt_id") or ""),
             "decisions": list(payload.get("decisions") or []),
         }
+    if event == "usage":
+        tokens = parse_usage_tokens(payload)
+        model_id = active_model_id()
+        provider = active_provider()
+        out = {
+            "input_tokens": tokens["input_tokens"],
+            "output_tokens": tokens["output_tokens"],
+            "cache_read_input_tokens": tokens["cache_read_tokens"],
+            "cache_creation_input_tokens": tokens["cache_creation_tokens"],
+            "inputTokens": tokens["input_tokens"],
+            "outputTokens": tokens["output_tokens"],
+            "cacheReadInputTokens": tokens["cache_read_tokens"],
+            "cacheCreationInputTokens": tokens["cache_creation_tokens"],
+        }
+        if model_id:
+            out["model_id"] = model_id
+            out["modelId"] = model_id
+        if provider:
+            out["provider"] = provider
+        for key in (
+            "tokens_per_second",
+            "prompt_tokens_per_second",
+            "prompt_eval_seconds",
+            "generation_seconds",
+            "time_to_first_token",
+            "estimated",
+        ):
+            if key in payload and payload[key] is not None:
+                out[key] = payload[key]
+        return out
     return dict(payload)
 
 
@@ -114,12 +151,37 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
             store.set_session_status(session_id, "awaiting_approval")
         elif event == "approval_resolved":
             store.set_session_status(session_id, "running")
-        store.append_event(
+        stored = store.append_event(
             session_id=session_id,
             run_id=run_id,
             event_type=event_type,
             payload=event_payload,
         )
+        if event == "usage":
+            tokens = parse_usage_tokens(event_payload)
+            model_id = (
+                str(event_payload.get("model_id") or event_payload.get("modelId") or "")
+                .strip()
+                or None
+            )
+            provider = (
+                str(event_payload.get("provider") or "").strip().lower() or None
+            )
+            day = day_key_from_timestamp(
+                getattr(stored, "timestamp", None) if stored is not None else None
+            )
+            store.upsert_usage_run(
+                run_id=run_id,
+                session_id=session_id,
+                day=day,
+                surface=surface_for_session(session),
+                model_id=model_id,
+                provider=provider,
+                input_tokens=tokens["input_tokens"],
+                output_tokens=tokens["output_tokens"],
+                cache_read_tokens=tokens["cache_read_tokens"],
+                cache_creation_tokens=tokens["cache_creation_tokens"],
+            )
         if event == "tool_start" and event_payload.get("name") == "write_todos":
             todos = _todos_from_write_todos_call(event_payload)
             if todos is not None:

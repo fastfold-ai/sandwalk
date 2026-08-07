@@ -15,9 +15,11 @@ class LoopStateMixin:
             return
         title = (self.trajectory.title or "").strip()
         if title:
-            self.store.ensure_session(session_id, title=title)
+            self.store.ensure_session(
+                session_id, title=title, client_surface="cli"
+            )
         else:
-            self.store.ensure_session(session_id)
+            self.store.ensure_session(session_id, client_surface="cli")
         # Always materialize a session workspace so CLI shell/skills get
         # SANDWALK_SESSION_WORKSPACE (same path the local UI file tree uses).
         try:
@@ -60,7 +62,7 @@ class LoopStateMixin:
         if not session_id:
             return
         title = (self.trajectory.title or "").strip() or query.strip()[:80] or "New research session"
-        self.store.ensure_session(session_id, title=title)
+        self.store.ensure_session(session_id, title=title, client_surface="cli")
         if self.trajectory.title:
             self.store.update_session(session_id, title=self.trajectory.title)
         now = datetime.now(UTC)
