@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import shutil
+from pathlib import Path
 from typing import Any
 
 from agent.config import Config
@@ -20,6 +23,34 @@ from agent_server.mcp_service.health_cache import (
     save_status_message,
     save_tool_count,
 )
+
+
+def _stdio_command_on_disk(command: str | None) -> bool:
+    """True when an stdio command is spawnable (absolute path present, or on PATH)."""
+    cmd = str(command or "").strip()
+    if not cmd:
+        return False
+    if os.sep in cmd:
+        return Path(cmd).expanduser().is_file()
+    return shutil.which(cmd) is not None
+
+
+def _missing_command_message(catalog_id: str, command: str | None) -> str:
+    """Actionable message for an stdio command that is not on disk."""
+    if catalog_id == "raymol":
+        return (
+            "RayMol not found at "
+            f"{command or 'the configured path'}. Open RayMol (install it from "
+            "raymol.io if needed), enable MCP in its toolbar, then re-run Install. "
+            "If you run RayMol from the DMG, drag it to Applications first so the "
+            "path stays valid."
+        )
+    if catalog_id == "pymol":
+        return (
+            f"PyMOL launcher not found at {command or 'the configured path'}. "
+            "Re-run: sandwalk mcp install pymol"
+        )
+    return f"Command not found: {command or '(empty)'}"
 
 
 class ValidateMixin:
@@ -53,6 +84,20 @@ class ValidateMixin:
                         "toolDetails": [],
                     }
                 command = resolve_catalog_command(entry)
+                if not _stdio_command_on_disk(command):
+                    # A stale handoff can mark RayMol "ready" after its app is gone
+                    # (quit, deleted, or DMG ejected). Spawning would only raise
+                    # ENOENT, so explain what to do instead.
+                    message = _missing_command_message(entry.id, command)
+                    save_status_message(catalog_id, message)
+                    clear_tool_count(catalog_id)
+                    return {
+                        "ok": False,
+                        "toolCount": 0,
+                        "message": message,
+                        "tools": [],
+                        "toolDetails": [],
+                    }
                 result = _mcp_service.probe_stdio_mcp_server(
                     command=command or "",
                     args=list(entry.args or []),
@@ -114,10 +159,27 @@ class ValidateMixin:
                 raise KeyError(server_id)
             if server.transport == "stdio" or (server.command and not server.url):
                 command = str(server.command or "").strip()
-                if getattr(server, "catalog_id", None):
+                catalog_id_for_server = getattr(server, "catalog_id", None)
+                if catalog_id_for_server:
                     entry = get_catalog_entry(server.catalog_id)
                     if entry and entry.transport == "stdio":
                         command = resolve_catalog_command(entry) or command
+                if not _stdio_command_on_disk(command):
+                    message = _missing_command_message(
+                        str(catalog_id_for_server or ""), command
+                    )
+                    if catalog_id_for_server:
+                        save_status_message(str(catalog_id_for_server), message)
+                        clear_tool_count(str(catalog_id_for_server))
+                    else:
+                        clear_tool_count(custom_tool_count_id(server_id))
+                    return {
+                        "ok": False,
+                        "toolCount": 0,
+                        "message": message,
+                        "tools": [],
+                        "toolDetails": [],
+                    }
                 result = _mcp_service.probe_stdio_mcp_server(
                     command=command,
                     args=list(server.args or []),

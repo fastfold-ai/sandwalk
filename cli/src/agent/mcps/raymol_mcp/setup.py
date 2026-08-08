@@ -12,6 +12,7 @@ from agent.mcps.raymol_mcp.paths import (
     handoff_ready,
     launcher_path,
     launcher_ready,
+    on_removable_volume,
 )
 
 
@@ -42,14 +43,26 @@ def ensure_launcher(*, force: bool = False) -> tuple[bool, str]:
                 config.save()
         except Exception:  # noqa: BLE001 — never block install on config write
             pass
-        return True, f"RayMol bridge ready: {binary} --mcp-bridge"
+        message = f"RayMol bridge ready: {binary} --mcp-bridge"
+        if on_removable_volume(binary):
+            message += (
+                " (running from a mounted volume — drag RayMol.app to "
+                "/Applications so the bridge keeps working after eject)"
+            )
+        return True, message
     if handoff_ready():
-        # MCP is already enabled in a running RayMol (mcp.json present).
-        path = launcher_path()
+        # MCP handoff exists but no binary: RayMol wrote mcp.json and then went
+        # away (quit and deleted, or DMG ejected). Reporting ready here would only
+        # defer the failure to an ENOENT when the bridge is spawned.
+        _clear_stale_binary_config()
         return (
-            True,
-            f"RayMol MCP handoff found; bridge command: {path} --mcp-bridge",
+            False,
+            "RayMol MCP handoff found but the RayMol app is missing. Reopen RayMol "
+            "(install from https://raymol.io/ if needed) and re-run: "
+            "sandwalk mcp install raymol. If you launched RayMol from its DMG, "
+            "drag RayMol.app to /Applications first.",
         )
+    _clear_stale_binary_config()
     checked = [
         str(DEFAULT_APP_BINARY),
         str(
@@ -61,7 +74,10 @@ def ensure_launcher(*, force: bool = False) -> tuple[bool, str]:
             / "RayMol"
         ),
         "PATH (RayMol)",
+        "running RayMol process",
         "mdfind io.raymol.RayMol",
+        "/Volumes/*/RayMol.app",
+        "Homebrew Caskroom",
         f"handoff {HANDOFF_PATH}",
     ]
     return (
@@ -74,25 +90,47 @@ def ensure_launcher(*, force: bool = False) -> tuple[bool, str]:
     )
 
 
+def _clear_stale_binary_config() -> None:
+    """Drop ``mcp.raymol_binary`` when it points at a path that no longer exists."""
+    try:
+        from agent.config import Config
+
+        config = Config.load()
+        raw = str(config.get("mcp.raymol_binary") or "").strip()
+        if raw and not Path(raw).expanduser().is_file():
+            config.set("mcp.raymol_binary", "")
+            config.save()
+    except Exception:  # noqa: BLE001 — best-effort cleanup
+        pass
+
+
 def raymol_doctor_checks() -> list[dict[str, str]]:
     """Return structured doctor rows for RayMol MCP."""
     rows: list[dict[str, str]] = []
     binary = find_raymol_binary()
     if binary is not None:
+        detail = f"RayMol binary: {binary}"
+        if on_removable_volume(binary):
+            detail += " (mounted volume — copy to /Applications to survive eject)"
         rows.append(
             {
                 "name": "raymol_app",
-                "status": "ok",
-                "detail": f"RayMol binary: {binary}",
+                "status": "warn" if on_removable_volume(binary) else "ok",
+                "detail": detail,
             }
         )
-    elif launcher_ready():
+    elif handoff_ready():
         rows.append(
             {
                 "name": "raymol_app",
-                "status": "ok",
+                "status": "error",
                 "detail": (
-                    f"RayMol bridge ready via handoff; command: {launcher_path()}"
+                    "MCP handoff present but the RayMol app is missing — the bridge "
+                    "cannot be spawned"
+                ),
+                "fix": (
+                    "Reopen RayMol (drag it to /Applications if you ran it from the "
+                    f"DMG), or install from {SETUP_URL}"
                 ),
             }
         )

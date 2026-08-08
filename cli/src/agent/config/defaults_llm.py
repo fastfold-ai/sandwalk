@@ -90,6 +90,7 @@ DEFAULTS_LLM = {
     "mcp.huggingface_status_message": None,
     "mcp.tavily_status_message": None,
     "mcp.pymol_status_message": None,
+    "mcp.raymol_status_message": None,
     "mcp.tamarind_access_token": None,
     "mcp.tamarind_refresh_token": None,
     "mcp.tamarind_token_expires_at": None,

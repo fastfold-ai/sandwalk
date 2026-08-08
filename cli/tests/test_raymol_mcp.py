@@ -124,7 +124,6 @@ def test_raymol_credentials_require_binary(tmp_path: Path, monkeypatch):
     assert str(fake) in message
     assert "--mcp-bridge" in message
 
-
 def test_raymol_doctor_warns_without_handoff(tmp_path: Path, monkeypatch):
     _cfg(tmp_path, monkeypatch)
     fake = tmp_path / "RayMol"
@@ -178,7 +177,9 @@ def test_find_raymol_binary_accepts_non_executable_name(tmp_path: Path, monkeypa
     assert found.name == "RayMol"
 
 
-def test_ensure_launcher_accepts_handoff_without_binary(tmp_path: Path, monkeypatch):
+def test_ensure_launcher_rejects_handoff_without_binary(tmp_path: Path, monkeypatch):
+    """A handoff can outlive its app; the stdio bridge still needs the binary."""
+    _cfg(tmp_path, monkeypatch)
     handoff = tmp_path / "mcp.json"
     handoff.write_text('{"port": 51737, "token": "t"}\n', encoding="utf-8")
     monkeypatch.setattr(
@@ -193,12 +194,35 @@ def test_ensure_launcher_accepts_handoff_without_binary(tmp_path: Path, monkeypa
         "agent.mcps.raymol_mcp.setup.handoff_ready", lambda: True
     )
     ok, message = ensure_launcher()
-    assert ok is True
-    assert "handoff" in message.lower()
+    assert ok is False
+    assert "missing" in message.lower()
+    assert "raymol" in message.lower()
 
 
-def test_launcher_ready_matches_handoff_for_enable(tmp_path: Path, monkeypatch):
-    """Install can succeed via handoff; Enable must then see configured=true."""
+def test_ensure_launcher_clears_stale_binary_config(tmp_path: Path, monkeypatch):
+    """A deleted app must not leave mcp.raymol_binary pointing at a dead path."""
+    _cfg(tmp_path, monkeypatch)
+    config = Config.load()
+    config.set("mcp.raymol_binary", str(tmp_path / "gone" / "RayMol"))
+    config.save()
+
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.setup.find_raymol_binary", lambda: None
+    )
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.setup.launcher_path",
+        lambda: tmp_path / "missing-RayMol",
+    )
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.setup.handoff_ready", lambda: False
+    )
+    ok, _message = ensure_launcher()
+    assert ok is False
+    assert not str(Config.load().get("mcp.raymol_binary") or "").strip()
+
+
+def test_launcher_ready_requires_binary_not_just_handoff(tmp_path: Path, monkeypatch):
+    """Install and Enable must agree: handoff alone is not spawnable."""
     from agent.mcps.raymol_mcp.paths import launcher_ready as ready
 
     monkeypatch.setattr(
@@ -211,4 +235,127 @@ def test_launcher_ready_matches_handoff_for_enable(tmp_path: Path, monkeypatch):
     handoff = tmp_path / "mcp.json"
     handoff.write_text('{"port": 1, "token": "t"}\n', encoding="utf-8")
     monkeypatch.setattr("agent.mcps.raymol_mcp.paths.HANDOFF_PATH", handoff)
-    assert ready() is True
+    assert ready() is False
+
+
+def test_find_raymol_binary_uses_running_process(tmp_path: Path, monkeypatch):
+    """RayMol opened from its DMG is only visible via the process table."""
+    volume = tmp_path / "Volumes" / "RayMol" / "RayMol.app" / "Contents" / "MacOS"
+    volume.mkdir(parents=True)
+    binary = volume / "RayMol"
+    binary.write_text("#!/bin/sh\n", encoding="utf-8")
+    binary.chmod(0o755)
+
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths._config_override", lambda: None
+    )
+    monkeypatch.setattr("agent.mcps.raymol_mcp.paths.shutil.which", lambda _n: None)
+    monkeypatch.setattr("agent.mcps.raymol_mcp.paths._candidate_apps", lambda: [])
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.running_binaries", lambda: [binary]
+    )
+    from agent.mcps.raymol_mcp.paths import find_raymol_binary
+
+    assert find_raymol_binary() == binary
+
+
+def test_find_raymol_binary_ignores_stale_default(tmp_path: Path, monkeypatch):
+    """Never hand callers a path that does not exist — they exec it."""
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths._config_override", lambda: None
+    )
+    monkeypatch.setattr("agent.mcps.raymol_mcp.paths.shutil.which", lambda _n: None)
+    monkeypatch.setattr("agent.mcps.raymol_mcp.paths._candidate_apps", lambda: [])
+    monkeypatch.setattr("agent.mcps.raymol_mcp.paths.running_binaries", lambda: [])
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.DEFAULT_APP_BINARY",
+        tmp_path / "nope" / "RayMol",
+    )
+    from agent.mcps.raymol_mcp.paths import bridge_command, find_raymol_binary
+
+    assert find_raymol_binary() is None
+    assert bridge_command() is None
+
+
+def test_permanent_install_beats_mounted_volume(tmp_path: Path, monkeypatch):
+    """A DMG copy disappears on eject, so /Applications must win even while it runs."""
+
+    def _make(root: Path) -> Path:
+        macos = root / "RayMol.app" / "Contents" / "MacOS"
+        macos.mkdir(parents=True)
+        binary = macos / "RayMol"
+        binary.write_text("#!/bin/sh\n", encoding="utf-8")
+        binary.chmod(0o755)
+        return binary
+
+    removable = _make(tmp_path / "Volumes" / "RayMol")
+    permanent = _make(tmp_path / "Applications")
+
+    # Simulate /Volumes without touching the real filesystem.
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.on_removable_volume",
+        lambda p: "Volumes" in str(p),
+    )
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths._config_override", lambda: removable
+    )
+    monkeypatch.setattr("agent.mcps.raymol_mcp.paths.shutil.which", lambda _n: None)
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.running_binaries", lambda: [removable]
+    )
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths._candidate_apps",
+        lambda: [permanent.parent.parent.parent],
+    )
+    from agent.mcps.raymol_mcp.paths import find_raymol_binary
+
+    assert find_raymol_binary() == permanent
+
+
+def test_mounted_volume_used_when_only_option(tmp_path: Path, monkeypatch):
+    """Running from the DMG still works — it is just the last resort."""
+    macos = tmp_path / "Volumes" / "RayMol" / "RayMol.app" / "Contents" / "MacOS"
+    macos.mkdir(parents=True)
+    binary = macos / "RayMol"
+    binary.write_text("#!/bin/sh\n", encoding="utf-8")
+    binary.chmod(0o755)
+
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.on_removable_volume",
+        lambda p: "Volumes" in str(p),
+    )
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths._config_override", lambda: None
+    )
+    monkeypatch.setattr("agent.mcps.raymol_mcp.paths.shutil.which", lambda _n: None)
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.running_binaries", lambda: [binary]
+    )
+    monkeypatch.setattr("agent.mcps.raymol_mcp.paths._candidate_apps", lambda: [])
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.DEFAULT_APP_BINARY", tmp_path / "nope" / "RayMol"
+    )
+    from agent.mcps.raymol_mcp.paths import find_raymol_binary
+
+    assert find_raymol_binary() == binary
+
+
+def test_running_binaries_parses_ps_output(monkeypatch):
+    import subprocess as sp
+
+    class _Proc:
+        stdout = (
+            "/usr/libexec/secinitd\n"
+            "/Volumes/RayMol/RayMol.app/Contents/MacOS/RayMol\n"
+            "/Applications/Safari.app/Contents/MacOS/Safari\n"
+        )
+
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.subprocess.run",
+        lambda *a, **k: _Proc(),
+    )
+    _ = sp
+    from agent.mcps.raymol_mcp.paths import running_binaries as running
+
+    found = running()
+    assert found == [Path("/Volumes/RayMol/RayMol.app/Contents/MacOS/RayMol")]

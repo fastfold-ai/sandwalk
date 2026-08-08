@@ -25,6 +25,10 @@ for the bridge to use.
    Use the **direct-download / Homebrew** builds. Mac App Store builds omit MCP
    (App Store sandboxing).
 
+   **Drag RayMol.app to `/Applications`.** Sandwalk can find and use RayMol while
+   it runs straight from the mounted DMG, but that path disappears on eject and
+   the bridge breaks. Install and doctor warn when RayMol is on a mounted volume.
+
 2. **Enable MCP in RayMol**  
    Open RayMol → toolbar **RayMol MCP** → toggle **Enable MCP server**.
 
@@ -45,6 +49,20 @@ for the bridge to use.
 5. **Enable** the RayMol MCP in Sandwalk (toggle). Keep RayMol open with MCP
    enabled (and access Allowed) while the agent runs.
 
+## How Sandwalk finds RayMol
+
+In order, first match wins, and every candidate must exist on disk:
+
+1. `mcp.raymol_binary` in config (written by Install; ignored when stale)
+2. A **running** RayMol, read from the process table — covers a DMG or any
+   non-standard location, which Spotlight does not index
+3. `RayMol` on `PATH`
+4. App bundles: `/Applications`, `~/Applications`, Spotlight (bundle id then
+   name), Homebrew Caskroom, and `/Volumes/*/RayMol.app`
+
+A copy under `/Volumes` is only used as a last resort, so a real install in
+`/Applications` always wins even while the DMG copy is the one running.
+
 ## Doctor
 
 ```bash
@@ -57,9 +75,18 @@ Checks: RayMol binary present, MCP handoff file (`mcp.json`), and a live probe.
 
 **App not found** — Install from raymol.io (DMG/Homebrew), not the Mac App Store.
 
+**`No such file or directory: '/Applications/RayMol.app/...'`** — Sandwalk had a
+path for RayMol that no longer exists. Usually RayMol was run from the DMG (then
+ejected), moved, or deleted. Reopen RayMol from `/Applications` and re-run
+Install; Sandwalk clears the stale path automatically.
+
 **Probe fails / no tools** — Enable MCP in the RayMol toolbar first so
 `~/Library/Application Support/RayMol/mcp.json` exists, then click **Allow**
 when RayMol asks to grant MCP access.
+
+**"handoff found but the RayMol app is missing"** — `mcp.json` outlives the app
+that wrote it. RayMol is not running from the recorded location; reopen it (from
+`/Applications`) and re-run Install.
 
 **Mac App Store** — Same app without MCP. Switch to the direct or Homebrew build
 for AI control.
