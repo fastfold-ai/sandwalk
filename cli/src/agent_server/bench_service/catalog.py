@@ -18,6 +18,7 @@ from agent_server.bench_service.dataset_install import (
     INSTALLABLE_SUITE_IDS,
     hf_token_configured,
 )
+from agent_server.bench_service.install_jobs import install_error, is_installing
 from agent_server.bench_service.mcq_suites import (
     MCQ_SUITES,
     catalog_sample_sizes,
@@ -73,6 +74,21 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
         n = coding_count(suite.id)
         ok = coding_available(suite.id)
         installable = suite.id in INSTALLABLE_SUITE_IDS
+        installing = is_installing(suite.id)
+        err = install_error(suite.id)
+        if ok:
+            reason = None
+        elif installing:
+            reason = f"Downloading {suite.title} in the background…"
+        elif err:
+            reason = err
+        elif installable:
+            reason = f"{suite.title} dataset missing. Click Install to download it."
+        else:
+            reason = (
+                f"{suite.title} dataset missing. Place "
+                f"{suite.full_fixture} under apps/benchmarking/.cache/mcq/"
+            )
         cards.append(
             BenchSuiteCard(
                 id=suite.id,
@@ -84,26 +100,25 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
                 sample_sizes=coding_sample_sizes(suite),
                 default_sample_size=suite.default_sample_size,
                 available=ok,
-                unavailable_reason=None
-                if ok
-                else (
-                    f"{suite.title} dataset missing. Click Install to download it."
-                    if installable
-                    else (
-                        f"{suite.title} dataset missing. Place "
-                        f"{suite.full_fixture} under apps/benchmarking/.cache/mcq/"
-                    )
-                ),
+                unavailable_reason=reason,
                 author=suite.author,
                 author_avatar=suite.author_avatar,
                 code_exec=True,
                 installable=installable,
+                installing=installing,
+                install_error=err,
             )
         )
 
     bix_ok = _bix50_available()
+    bix_installing = is_installing("bixbench-verified-50")
+    bix_err = install_error("bixbench-verified-50")
     if bix_ok:
         bix_reason = None
+    elif bix_installing:
+        bix_reason = "Downloading BixBench-Verified-50 in the background…"
+    elif bix_err:
+        bix_reason = bix_err
     elif not hf_ready:
         bix_reason = (
             "Hugging Face token required. Set it under Integrations → Hugging Face, "
@@ -132,6 +147,8 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
             installable=True,
             requires_hf_token=True,
             hf_token_configured=hf_ready,
+            installing=bix_installing,
+            install_error=bix_err,
         ),
     )
 

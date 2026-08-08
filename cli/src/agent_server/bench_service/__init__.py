@@ -2,6 +2,7 @@
 
 from agent_server.bench_service.catalog import list_suite_cards
 from agent_server.bench_service.dataset_install import install_suite
+from agent_server.bench_service.install_jobs import start_install
 from agent_server.bench_service.queue_runner import (
     cancel_current,
     enqueue,
@@ -18,6 +19,7 @@ from agent_server.bench_service.results_store import (
 __all__ = [
     "list_suite_cards",
     "install_suite",
+    "start_install",
     "enqueue",
     "get_active_status",
     "cancel_current",

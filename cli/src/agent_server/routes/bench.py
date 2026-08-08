@@ -16,10 +16,10 @@ from agent_server.bench_service import (
     export_path,
     get_active_status,
     get_result,
-    install_suite,
     list_results,
     list_suite_cards,
     remove_queued,
+    start_install,
 )
 from agent_server.bench_service.dataset_install import BenchInstallError
 from agent_server.models.bench import (
@@ -49,8 +49,10 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
         response_model=BenchInstallResponse,
     )
     async def bench_pack_install(suite_id: str) -> BenchInstallResponse:
+        # Start a daemon thread and return immediately so leaving the page
+        # does not cancel the download.
         try:
-            return await asyncio.to_thread(install_suite, suite_id)
+            return await asyncio.to_thread(start_install, suite_id)
         except BenchInstallError as exc:
             raise HTTPException(
                 status_code=exc.status_code,

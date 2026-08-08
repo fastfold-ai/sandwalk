@@ -86,6 +86,41 @@ def _probe_vercel_skills_token(token: str) -> tuple[bool, str]:
     return False, f"skills.sh returned HTTP {response.status_code}."
 
 
+def _probe_huggingface_token(token: str) -> tuple[bool, str]:
+    """Validate an HF token via Hub whoami (live auth check)."""
+    try:
+        response = httpx.get(
+            "https://huggingface.co/api/whoami-v2",
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {token}",
+                "User-Agent": _PROBE_USER_AGENT,
+            },
+            timeout=15.0,
+            follow_redirects=True,
+        )
+    except Exception as exc:
+        return False, f"Couldn't reach Hugging Face ({exc.__class__.__name__})."
+
+    if response.status_code < 300:
+        name = ""
+        try:
+            payload = response.json()
+            name = str(
+                (payload or {}).get("name")
+                or (payload or {}).get("fullname")
+                or ""
+            ).strip()
+        except Exception:
+            name = ""
+        if name:
+            return True, f"Hugging Face token works ({name})."
+        return True, "Hugging Face token works."
+    if response.status_code in (401, 403):
+        return False, "Invalid Hugging Face token."
+    return False, f"Hugging Face returned HTTP {response.status_code}."
+
+
 class MutateMixin:
     def update(self, key: str, values: dict[str, str]) -> IntegrationProvider:
         entries = self._providers.get(key)
@@ -270,6 +305,15 @@ class MutateMixin:
 
         if key == "skills-sh":
             ok, message = _probe_vercel_skills_token(self._secret_value(key))
+            return ValidateIntegrationResponse(
+                ok=ok,
+                configured=True,
+                source=provider.source,
+                message=message,
+            )
+
+        if key == "huggingface":
+            ok, message = _probe_huggingface_token(self._secret_value(key))
             return ValidateIntegrationResponse(
                 ok=ok,
                 configured=True,

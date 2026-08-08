@@ -70,7 +70,9 @@ export function BenchView({
   const [compareSelection, setCompareSelection] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [spawning, setSpawning] = useState(false)
-  const [installingId, setInstallingId] = useState<string | null>(null)
+  const [startingInstallId, setStartingInstallId] = useState<string | null>(
+    null
+  )
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [brokenAvatars, setBrokenAvatars] = useState<Set<string>>(
     () => new Set()
@@ -137,6 +139,7 @@ export function BenchView({
   }, [loadCatalog, loadStatus])
 
   const busy = Boolean(active?.running || (active?.queue?.length ?? 0) > 0)
+  const installsInFlight = suites.some(card => card.installing)
 
   useEffect(() => {
     if (!busy) return
@@ -145,6 +148,15 @@ export function BenchView({
     }, 1500)
     return () => window.clearInterval(timer)
   }, [busy, loadStatus])
+
+  // Poll catalog while a background dataset install is running (survives navigation).
+  useEffect(() => {
+    if (!installsInFlight) return
+    const timer = window.setInterval(() => {
+      void loadCatalog()
+    }, 1500)
+    return () => window.clearInterval(timer)
+  }, [installsInFlight, loadCatalog])
 
   // When a run finishes, refresh Results (stay on whatever tab the user chose).
   useEffect(() => {
@@ -198,12 +210,13 @@ export function BenchView({
       navigate('/dashboard/integrations/huggingface')
       return
     }
-    setInstallingId(card.id)
+    if (card.installing || startingInstallId === card.id) return
+    setStartingInstallId(card.id)
     setError(null)
     try {
+      // Server starts a daemon thread and returns immediately.
       await client.installBenchSuite(card.id)
       await loadCatalog()
-      setError(null)
     } catch (err) {
       const message =
         err instanceof Error ? err.message : `Unable to install ${card.title}`
@@ -219,7 +232,7 @@ export function BenchView({
         setError(message)
       }
     } finally {
-      setInstallingId(null)
+      setStartingInstallId(null)
     }
   }
 
@@ -538,7 +551,8 @@ export function BenchView({
                     : card.defaultSampleSize
                       ? [card.defaultSampleSize]
                       : []
-                const installing = installingId === card.id
+                const installing =
+                  Boolean(card.installing) || startingInstallId === card.id
                 return (
                   <div
                     key={card.id}
@@ -709,7 +723,9 @@ export function BenchView({
                               type="button"
                               size="sm"
                               variant="outline"
-                              disabled={Boolean(installingId)}
+                              disabled={
+                                installing || Boolean(startingInstallId)
+                              }
                               onClick={() => void installSuite(card)}
                             >
                               {installing ? (

@@ -28,6 +28,8 @@ class BenchSuiteCard(ApiModel):
     installable: bool = False
     requires_hf_token: bool = False
     hf_token_configured: bool = False
+    installing: bool = False
+    install_error: str | None = None
     required_skills: list[str] = Field(default_factory=list)
     required_mcps: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
@@ -44,6 +46,7 @@ class BenchInstallResponse(ApiModel):
     path: str | None = None
     summary: str = ""
     needs_hf_token: bool = False
+    status: Literal["installing", "done", "error"] = "done"
 
 
 class BenchSuiteRef(ApiModel):

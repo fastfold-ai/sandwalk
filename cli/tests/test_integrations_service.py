@@ -284,6 +284,44 @@ def test_validate_boltz_calls_auth_endpoint(
 
 
 @pytest.mark.parametrize(
+    ("status_code", "payload", "ok", "message"),
+    [
+        (200, {"name": "jc"}, True, "Hugging Face token works (jc)."),
+        (401, {}, False, "Invalid Hugging Face token."),
+    ],
+)
+def test_validate_huggingface_calls_whoami(
+    monkeypatch, status_code: int, payload: dict, ok: bool, message: str
+):
+    monkeypatch.setenv("HF_TOKEN", "hf_test_token")
+    response = MagicMock(status_code=status_code)
+    response.json.return_value = payload
+    request = MagicMock(return_value=response)
+    monkeypatch.setattr(
+        "agent_server.integrations_service.mutate.httpx.get",
+        request,
+    )
+
+    result = IntegrationsService().validate("huggingface")
+
+    assert result.ok is ok
+    assert result.message == message
+    request.assert_called_once_with(
+        "https://huggingface.co/api/whoami-v2",
+        headers={
+            "Accept": "application/json",
+            "Authorization": "Bearer hf_test_token",
+            "User-Agent": (
+                "Mozilla/5.0 (compatible; Sandwalk/1.0; "
+                "+https://github.com/fastfold-ai/sandwalk)"
+            ),
+        },
+        timeout=15.0,
+        follow_redirects=True,
+    )
+
+
+@pytest.mark.parametrize(
     ("status_code", "ok", "message"),
     [
         (200, True, "Fastfold Cloud API key works."),

@@ -109,6 +109,8 @@ export type BenchSuiteCard = {
   installable?: boolean
   requiresHfToken?: boolean
   hfTokenConfigured?: boolean
+  installing?: boolean
+  installError?: string | null
   requiredSkills?: string[]
   requiredMcps?: string[]
   missingSkills?: string[]
@@ -121,6 +123,7 @@ export type BenchInstallResult = {
   path?: string | null
   summary?: string
   needsHfToken?: boolean
+  status?: 'installing' | 'done' | 'error'
 }
 
 export type BenchProgress = {
