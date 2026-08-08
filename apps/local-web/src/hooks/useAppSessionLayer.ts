@@ -295,6 +295,11 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     restartSessionSandbox: sandbox.restartSessionSandbox,
     refreshSessionSandbox: sandbox.refreshSessionSandbox,
     setRuntimeSettings: args.setRuntimeSettings,
+    onSessionUpdated: updated => {
+      args.setSessions(current =>
+        current.map(item => (item.id === updated.id ? updated : item))
+      )
+    },
     loadModelOptions: args.loadModelOptions
   })
 

@@ -22,11 +22,14 @@ const ONE_CLICK_POLL_MS = 2000
 export function FastfoldAddControls({
   client,
   configured,
-  onImported
+  onImported,
+  placement = 'portal'
 }: {
   client: LocalAgentClient
   configured: boolean
   onImported: () => void | Promise<void>
+  /** portal = Integrations header slot; inline = render button in place (onboarding). */
+  placement?: 'portal' | 'inline'
 }) {
   const [headerSlot, setHeaderSlot] = useState<Element | null>(null)
   const [open, setOpen] = useState(false)
@@ -36,8 +39,12 @@ export function FastfoldAddControls({
   const cancelledRef = useRef(false)
 
   useEffect(() => {
+    if (placement !== 'portal') {
+      setHeaderSlot(null)
+      return
+    }
     setHeaderSlot(document.getElementById(FASTFOLD_ADD_HEADER_SLOT_ID))
-  }, [])
+  }, [placement])
 
   useEffect(() => {
     if (open) return
@@ -119,7 +126,10 @@ export function FastfoldAddControls({
 
   return (
     <>
-      {headerSlot != null ? createPortal(addButton, headerSlot) : null}
+      {placement === 'inline' ? addButton : null}
+      {placement === 'portal' && headerSlot != null
+        ? createPortal(addButton, headerSlot)
+        : null}
       <Dialog
         open={open}
         onOpenChange={next => {

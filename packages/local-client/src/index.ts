@@ -1376,6 +1376,9 @@ export class LocalAgentClient
       specialistId?: string | null
       sandboxBackend?: 'builtin' | 'modal' | null
       clientSurface?: 'cli' | 'ui' | 'slack' | 'unknown'
+      provider?: string | null
+      model?: string | null
+      openaiProfileId?: string | null
     },
     signal?: AbortSignal
   ): Promise<AgentSession> {
@@ -1387,7 +1390,10 @@ export class LocalAgentClient
         project_id: input.projectId,
         specialist_id: input.specialistId,
         sandbox_backend: input.sandboxBackend,
-        client_surface: input.clientSurface ?? 'ui'
+        client_surface: input.clientSurface ?? 'ui',
+        provider: input.provider,
+        model: input.model,
+        openai_profile_id: input.openaiProfileId
       }),
       headers: { 'content-type': 'application/json' },
       signal
@@ -1409,6 +1415,10 @@ export class LocalAgentClient
       projectId?: string | null
       specialistId?: string | null
       sandboxBackend?: 'builtin' | 'modal' | null
+      provider?: string | null
+      model?: string | null
+      openaiProfileId?: string | null
+      clearLlm?: boolean
     },
     signal?: AbortSignal
   ): Promise<AgentSession> {
@@ -1425,7 +1435,14 @@ export class LocalAgentClient
           specialist_id: input.specialistId ?? undefined,
           clear_specialist_id: input.specialistId === null,
           sandbox_backend: input.sandboxBackend ?? undefined,
-          clear_sandbox_backend: input.sandboxBackend === null
+          clear_sandbox_backend: input.sandboxBackend === null,
+          provider: input.provider === undefined ? undefined : input.provider,
+          model: input.model === undefined ? undefined : input.model,
+          openai_profile_id:
+            input.openaiProfileId === undefined
+              ? undefined
+              : input.openaiProfileId,
+          clear_llm: input.clearLlm === true
         }),
         headers: { 'content-type': 'application/json' },
         signal

@@ -6,6 +6,7 @@ import type {
 import { Check, CircleCheck, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
+import { FastfoldAddControls } from '@/components/agents/integrations-view/fastfold/FastfoldAddControls'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,7 +36,8 @@ export function OnboardingIntegrationDetail({
   onValueChange,
   onToggleSecret,
   onTestKey,
-  onSave
+  onSave,
+  onFastfoldImported
 }: {
   client: LocalAgentClient
   selected: IntegrationSummary
@@ -55,7 +57,9 @@ export function OnboardingIntegrationDetail({
   onToggleSecret: (envVar: string) => void
   onTestKey: () => void
   onSave: () => void
+  onFastfoldImported?: () => void | Promise<void>
 }) {
+  const isFastfold = selected.key === 'fastfold-cloud'
   return (
     <section className="space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -63,7 +67,12 @@ export function OnboardingIntegrationDetail({
           <IntegrationIcon integration={selected} size="lg" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">{selected.name}</p>
-            {isVercel ? (
+            {isFastfold ? (
+              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                One-click login opens Fastfold Cloud so you can Allow Sandwalk
+                and import an API key automatically. Or paste a key below.
+              </p>
+            ) : isVercel ? (
               <div className="text-muted-foreground mt-1 space-y-1 text-xs leading-relaxed">
                 <p>Use this for Skills.sh catalog search authentication.</p>
                 <ol className="list-inside list-decimal space-y-0.5">
@@ -116,7 +125,18 @@ export function OnboardingIntegrationDetail({
             )}
           </div>
         </div>
-        {isVercel ? (
+        {isFastfold ? (
+          <div className="shrink-0">
+            <FastfoldAddControls
+              client={client}
+              configured={selected.configured}
+              placement="inline"
+              onImported={async () => {
+                await onFastfoldImported?.()
+              }}
+            />
+          </div>
+        ) : isVercel ? (
           <Button
             type="button"
             variant="secondary"

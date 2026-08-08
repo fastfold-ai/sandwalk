@@ -525,6 +525,10 @@ export type AgentSession = {
   projectId: string | null
   specialistId: string | null
   sandboxBackend?: 'builtin' | 'modal' | null
+  /** Per-chat model; null/undefined falls back to global runtime settings. */
+  provider?: string | null
+  model?: string | null
+  openaiProfileId?: string | null
   workspacePath: string | null
   /** Connector that spawned the session; null when it started locally. */
   source?: SessionSource | null

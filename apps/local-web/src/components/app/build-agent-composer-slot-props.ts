@@ -57,6 +57,7 @@ type UseAgentComposerSlotPropsInput = {
   restartSessionSandbox: AgentComposerSlotProps['restartSessionSandbox']
   refreshSessionSandbox: AgentComposerSlotProps['refreshSessionSandbox']
   setRuntimeSettings: AgentComposerSlotProps['setRuntimeSettings']
+  onSessionUpdated?: AgentComposerSlotProps['onSessionUpdated']
   loadModelOptions: AgentComposerSlotProps['loadModelOptions']
 }
 
@@ -110,6 +111,7 @@ export function buildAgentComposerSlotProps(
     restartSessionSandbox: input.restartSessionSandbox,
     refreshSessionSandbox: input.refreshSessionSandbox,
     setRuntimeSettings: input.setRuntimeSettings,
+    onSessionUpdated: input.onSessionUpdated,
     loadModelOptions: input.loadModelOptions
   }
 }

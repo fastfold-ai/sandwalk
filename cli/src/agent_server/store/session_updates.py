@@ -21,6 +21,10 @@ class SessionUpdateMixin:
         update_specialist_id: bool = False,
         sandbox_backend: str | None = None,
         update_sandbox_backend: bool = False,
+        provider: str | None = None,
+        model: str | None = None,
+        openai_profile_id: str | None = None,
+        update_llm: bool = False,
     ) -> AgentSession | None:
         current = self.get_session(session_id)
         if current is None:
@@ -56,13 +60,31 @@ class SessionUpdateMixin:
                 next_sandbox_backend = require_sandbox_backend(sandbox_backend)
             else:
                 next_sandbox_backend = None
+        next_provider = current.provider
+        next_model = current.model
+        next_profile = current.openai_profile_id
+        if update_llm:
+            # Explicit None from clear_llm wipes all three; otherwise patch only
+            # the fields the caller provided (None means leave unchanged).
+            if provider is None and model is None and openai_profile_id is None:
+                next_provider = None
+                next_model = None
+                next_profile = None
+            else:
+                if provider is not None:
+                    next_provider = provider.strip() or None
+                if model is not None:
+                    next_model = model.strip() or None
+                if openai_profile_id is not None:
+                    next_profile = openai_profile_id.strip() or None
         now = utc_now()
         with self._write_lock, self._connect() as connection:
             connection.execute(
                 """
                 UPDATE sessions
                 SET title = ?, title_source = ?, organize_label = ?, project_id = ?,
-                    specialist_id = ?, sandbox_backend = ?, updated_at = ?
+                    specialist_id = ?, sandbox_backend = ?, provider = ?, model = ?,
+                    openai_profile_id = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -72,6 +94,9 @@ class SessionUpdateMixin:
                     next_project_id,
                     next_specialist_id,
                     next_sandbox_backend,
+                    next_provider,
+                    next_model,
+                    next_profile,
                     now.isoformat(),
                     session_id,
                 ),

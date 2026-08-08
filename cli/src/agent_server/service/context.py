@@ -15,6 +15,9 @@ class RunContext:
     allowed_skill_names: list[str] | None
     allowed_tool_names: list[str] | None
     sandbox_backend: str | None
+    provider: str | None = None
+    model: str | None = None
+    openai_profile_id: str | None = None
 
 
 def build_run_context(store: AgentStore, session_id: str) -> RunContext:
@@ -52,4 +55,7 @@ def build_run_context(store: AgentStore, session_id: str) -> RunContext:
         allowed_skill_names=allowed_skill_names,
         allowed_tool_names=allowed_tool_names,
         sandbox_backend=current.sandbox_backend if current else None,
+        provider=current.provider if current else None,
+        model=current.model if current else None,
+        openai_profile_id=current.openai_profile_id if current else None,
     )

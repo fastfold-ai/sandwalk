@@ -48,6 +48,9 @@ class SessionCreateMixin:
         source: str | None = None,
         source_label: str | None = None,
         client_surface: str | None = None,
+        provider: str | None = None,
+        model: str | None = None,
+        openai_profile_id: str | None = None,
     ) -> AgentSession:
         return self.ensure_session(
             str(uuid.uuid4()),
@@ -59,6 +62,9 @@ class SessionCreateMixin:
             source=source,
             source_label=source_label,
             client_surface=client_surface,
+            provider=provider,
+            model=model,
+            openai_profile_id=openai_profile_id,
         )
 
     def ensure_session(
@@ -73,6 +79,9 @@ class SessionCreateMixin:
         source: str | None = None,
         source_label: str | None = None,
         client_surface: str | None = None,
+        provider: str | None = None,
+        model: str | None = None,
+        openai_profile_id: str | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> AgentSession:
@@ -124,6 +133,18 @@ class SessionCreateMixin:
         created = created_at or now
         updated = updated_at or created
         resolved_title = (title or DEFAULT_SESSION_TITLE).strip() or DEFAULT_SESSION_TITLE
+        resolved_provider = (provider or "").strip() or None
+        resolved_model = (model or "").strip() or None
+        resolved_profile = (openai_profile_id or "").strip() or None
+        if resolved_provider is None and resolved_model is None:
+            from agent.config import Config
+
+            config = Config.load()
+            resolved_provider = str(config.get("llm.provider") or "").strip() or None
+            resolved_model = str(config.get("llm.model") or "").strip() or None
+            resolved_profile = (
+                str(config.get("llm.openai_active_profile") or "").strip() or None
+            )
         session = AgentSession(
             id=normalized_id,
             title=resolved_title,
@@ -133,6 +154,9 @@ class SessionCreateMixin:
             project_id=project_id,
             specialist_id=specialist_id,
             sandbox_backend=normalized_backend,
+            provider=resolved_provider,
+            model=resolved_model,
+            openai_profile_id=resolved_profile,
             workspace_path=workspace_path,
             source=normalized_source,  # type: ignore[arg-type]
             source_label=(source_label or "").strip() or None,
@@ -146,11 +170,11 @@ class SessionCreateMixin:
                 """
                 INSERT INTO sessions(
                     id, title, title_source, status, organize_label, project_id,
-                    specialist_id, sandbox_backend, workspace_path, source,
-                    source_label, client_surface, last_message_at, created_at,
-                    updated_at
+                    specialist_id, sandbox_backend, provider, model,
+                    openai_profile_id, workspace_path, source, source_label,
+                    client_surface, last_message_at, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session.id,
@@ -161,6 +185,9 @@ class SessionCreateMixin:
                     session.project_id,
                     session.specialist_id,
                     session.sandbox_backend,
+                    session.provider,
+                    session.model,
+                    session.openai_profile_id,
                     session.workspace_path,
                     session.source,
                     session.source_label,

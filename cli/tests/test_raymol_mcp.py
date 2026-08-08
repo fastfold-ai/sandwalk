@@ -86,6 +86,13 @@ def test_raymol_credentials_require_binary(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
         "agent.mcps.raymol_mcp.setup.find_raymol_binary", lambda: None
     )
+    missing = tmp_path / "missing-RayMol"
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.setup.launcher_path", lambda: missing
+    )
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.setup.handoff_ready", lambda: False
+    )
     assert not launcher_ready()
     assert not credentials_configured(entry)
     ok, message = ensure_launcher()
@@ -138,3 +145,44 @@ def test_raymol_doctor_warns_without_handoff(tmp_path: Path, monkeypatch):
 def test_launcher_path_fallback_default():
     path = launcher_path()
     assert path.name == "RayMol" or "RayMol" in str(path)
+
+
+def test_find_raymol_binary_accepts_non_executable_name(tmp_path: Path, monkeypatch):
+    """Some hosts report os.access(X_OK)=False even for a present app binary."""
+    app = tmp_path / "RayMol.app" / "Contents" / "MacOS"
+    app.mkdir(parents=True)
+    binary = app / "RayMol"
+    binary.write_text("#!/bin/sh\n", encoding="utf-8")
+    # Intentionally leave without +x — discovery should still accept by name.
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths._candidate_apps",
+        lambda: [tmp_path / "RayMol.app"],
+    )
+    monkeypatch.setattr("agent.mcps.raymol_mcp.paths.shutil.which", lambda _name: None)
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths._config_override", lambda: None
+    )
+    from agent.mcps.raymol_mcp.paths import find_raymol_binary
+
+    found = find_raymol_binary()
+    assert found is not None
+    assert found.name == "RayMol"
+
+
+def test_ensure_launcher_accepts_handoff_without_binary(tmp_path: Path, monkeypatch):
+    handoff = tmp_path / "mcp.json"
+    handoff.write_text('{"port": 51737, "token": "t"}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.setup.find_raymol_binary", lambda: None
+    )
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.setup.launcher_path",
+        lambda: tmp_path / "missing-RayMol",
+    )
+    monkeypatch.setattr("agent.mcps.raymol_mcp.setup.HANDOFF_PATH", handoff)
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.setup.handoff_ready", lambda: True
+    )
+    ok, message = ensure_launcher()
+    assert ok is True
+    assert "handoff" in message.lower()

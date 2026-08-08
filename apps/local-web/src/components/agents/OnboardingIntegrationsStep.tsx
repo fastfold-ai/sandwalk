@@ -58,6 +58,10 @@ export function OnboardingIntegrationsStep({
           }
           onTestKey={() => void integrations.testKey()}
           onSave={() => void integrations.save()}
+          onFastfoldImported={async () => {
+            await integrations.refresh()
+            integrations.setNotice('Fastfold AI Cloud connected.')
+          }}
         />
       ) : null}
 

@@ -242,6 +242,8 @@ export function useOnboardingIntegrations(client: LocalAgentClient) {
     setTerminalOpen,
     setValues,
     setShowSecrets,
+    setNotice,
+    refresh,
     save,
     testKey
   }

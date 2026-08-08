@@ -41,6 +41,9 @@ class _SessionCrudMixin:
         source: str | None = None,
         source_label: str | None = None,
         client_surface: str | None = None,
+        provider: str | None = None,
+        model: str | None = None,
+        openai_profile_id: str | None = None,
     ) -> AgentSession:
         from agent_server import service
 
@@ -59,6 +62,9 @@ class _SessionCrudMixin:
             source=source,
             source_label=source_label,
             client_surface=client_surface,
+            provider=provider,
+            model=model,
+            openai_profile_id=openai_profile_id,
         )
         if normalized_workspace is None:
             workspace = service.default_workspace_path(session.id)
@@ -86,6 +92,10 @@ class _SessionCrudMixin:
         update_specialist_id: bool = False,
         sandbox_backend: str | None = None,
         update_sandbox_backend: bool = False,
+        provider: str | None = None,
+        model: str | None = None,
+        openai_profile_id: str | None = None,
+        update_llm: bool = False,
     ) -> AgentSession:
         if update_sandbox_backend and sandbox_backend == "modal":
             from agent_server.sandbox_settings_service import SandboxSettingsService
@@ -107,6 +117,10 @@ class _SessionCrudMixin:
             update_specialist_id=update_specialist_id,
             sandbox_backend=sandbox_backend,
             update_sandbox_backend=update_sandbox_backend,
+            provider=provider,
+            model=model,
+            openai_profile_id=openai_profile_id,
+            update_llm=update_llm,
         )
         if session is None:
             raise KeyError(session_id)

@@ -48,6 +48,9 @@ def session_from_row(row: sqlite3.Row) -> AgentSession:
     surface = str(raw_surface or "unknown").strip().lower()
     if surface not in {"cli", "ui", "slack", "unknown"}:
         surface = "slack" if origin == "slack" else "unknown"
+    raw_provider = row["provider"] if "provider" in keys else None
+    raw_model = row["model"] if "model" in keys else None
+    raw_profile = row["openai_profile_id"] if "openai_profile_id" in keys else None
     return AgentSession(
         id=row["id"],
         title=row["title"],
@@ -57,6 +60,9 @@ def session_from_row(row: sqlite3.Row) -> AgentSession:
         project_id=row["project_id"] if "project_id" in keys else None,
         specialist_id=row["specialist_id"] if "specialist_id" in keys else None,
         sandbox_backend=sandbox_backend,
+        provider=(str(raw_provider).strip() or None) if raw_provider else None,
+        model=(str(raw_model).strip() or None) if raw_model else None,
+        openai_profile_id=(str(raw_profile).strip() or None) if raw_profile else None,
         workspace_path=row["workspace_path"],
         source=origin,  # type: ignore[arg-type]
         source_label=(row["source_label"] if "source_label" in keys else None),

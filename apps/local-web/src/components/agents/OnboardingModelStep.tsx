@@ -1,14 +1,24 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
+import type {
+  IntegrationSummary,
+  RuntimeSettings
+} from '@sandwalk/agent-ui-core'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import {
+  type ComposerModelOption,
+  toComposerModelOptions
+} from '@/lib/composer-models'
+
 import { OnboardingModelCloudPanel } from './onboarding/onboarding-model-cloud-panel'
+import { OnboardingModelDefaultPicker } from './onboarding/onboarding-model-default-picker'
 import { OnboardingModelLocalPanel } from './onboarding/onboarding-model-local-panel'
 import {
   LLM_API_KEY_ORDER,
   type OnboardingBackendValue,
   OnboardingChip,
-  PROFILE_BACKENDS} from './onboarding/onboarding-model-shared'
+  PROFILE_BACKENDS
+} from './onboarding/onboarding-model-shared'
 
 type Mode = 'cloud' | 'local'
 
@@ -26,6 +36,16 @@ export function OnboardingModelStep({
   const [showCloudKey, setShowCloudKey] = useState(false)
   const [cloudBusy, setCloudBusy] = useState(false)
   const [cloudSaved, setCloudSaved] = useState(false)
+
+  const [providerModelOptions, setProviderModelOptions] = useState<
+    ComposerModelOption[]
+  >([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+  const [runtimeSettings, setRuntimeSettings] =
+    useState<RuntimeSettings | null>(null)
+  const [defaultBusy, setDefaultBusy] = useState(false)
+  const [defaultSaved, setDefaultSaved] = useState(false)
+  const [showDefaultPicker, setShowDefaultPicker] = useState(false)
 
   const [localBackend, setLocalBackend] = useState<OnboardingBackendValue>('ollama')
   const [localUrl, setLocalUrl] = useState<string>(PROFILE_BACKENDS[0]!.baseUrl)
@@ -76,6 +96,67 @@ export function OnboardingModelStep({
     void refreshIntegrations()
   }, [refreshIntegrations])
 
+  const loadProviderModels = useCallback(
+    async (providerKey: string) => {
+      setModelsLoading(true)
+      try {
+        const [models, runtime] = await Promise.all([
+          client.listModels({
+            enabledOnly: true,
+            discover: true
+          }),
+          client.getRuntimeSettings().catch(() => null)
+        ])
+        // Composer picker, but only the just-verified provider — never the
+        // full catalog of providers that still have no API key.
+        const filtered = toComposerModelOptions(
+          models.filter(
+            item =>
+              item.source === 'cloud' &&
+              String(item.provider || '')
+                .trim()
+                .toLowerCase() === providerKey.toLowerCase()
+          )
+        )
+        setProviderModelOptions(filtered)
+        if (runtime) {
+          const nextModel =
+            filtered.find(item => item.model === runtime.model)?.model ||
+            filtered[0]?.model ||
+            runtime.model
+          setRuntimeSettings({
+            ...runtime,
+            provider: providerKey,
+            model: nextModel
+          })
+        } else if (filtered[0]) {
+          setRuntimeSettings({
+            provider: providerKey,
+            model: filtered[0].model,
+            openaiBaseUrl: null,
+            agentProfile: 'default',
+            toolMode: 'default',
+            recursionLimit: 100_000,
+            maxSdkTurns: 500,
+            groupToolTraces: true,
+            toolTraceDetailLimit: 0,
+            backgroundWatchTimeoutS: 7200,
+            interruptDrainTimeoutS: 10,
+            parallelMaxThreads: 5,
+            toolHealthEnabled: true,
+            toolHealthFailThreshold: 2,
+            toolHealthSuppressSeconds: 900
+          })
+        }
+      } catch {
+        setProviderModelOptions([])
+      } finally {
+        setModelsLoading(false)
+      }
+    },
+    [client]
+  )
+
   const pickBackend = (value: OnboardingBackendValue) => {
     const next = PROFILE_BACKENDS.find(item => item.value === value)
     if (!next) return
@@ -98,28 +179,70 @@ export function OnboardingModelStep({
       selectedIntegration.fields.find(field => field.isSecret)?.envVar ||
       selectedIntegration.envVar
     const value = cloudKey.trim()
-    if (!value) {
+    if (!value && !selectedIntegration.configured) {
       setError(`Paste a ${selectedIntegration.name} API key.`)
       return
     }
     setError(null)
     setNotice(null)
     setCloudBusy(true)
+    setShowDefaultPicker(false)
+    setDefaultSaved(false)
     try {
-      await client.updateIntegration(selectedIntegration.key, {
-        [envVar]: value
-      })
+      if (value) {
+        await client.updateIntegration(selectedIntegration.key, {
+          [envVar]: value
+        })
+        setCloudKey('')
+      }
+      const result = await client.validateIntegration(selectedIntegration.key)
+      if (!result.ok) {
+        setCloudSaved(false)
+        setError(
+          result.message ||
+            `${selectedIntegration.name} key did not work. Check the key and try again.`
+        )
+        return
+      }
       await client.updateRuntimeSettings({
         provider: selectedIntegration.key
       })
-      setCloudKey('')
       setCloudSaved(true)
-      setNotice(`${selectedIntegration.name} connected.`)
+      setNotice(`${selectedIntegration.name} key verified.`)
       await refreshIntegrations()
+      setShowDefaultPicker(true)
+      await loadProviderModels(selectedIntegration.key)
     } catch (err) {
+      setCloudSaved(false)
       setError(err instanceof Error ? err.message : 'Could not save API key.')
     } finally {
       setCloudBusy(false)
+    }
+  }
+
+  const selectDefaultModel = async (
+    provider: string,
+    model: string,
+    _profileId?: string | null
+  ) => {
+    setDefaultBusy(true)
+    setError(null)
+    try {
+      const next = await client.updateRuntimeSettings({
+        provider,
+        model
+      })
+      setRuntimeSettings(next)
+      setDefaultSaved(true)
+      setNotice(
+        `Default model set to ${model}. You can change this anytime.`
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not set default model.'
+      )
+    } finally {
+      setDefaultBusy(false)
     }
   }
 
@@ -174,9 +297,16 @@ export function OnboardingModelStep({
         setActive: true,
         setDefault: true
       })
-      await client.updateRuntimeSettings({ provider: 'openai' })
+      await client.updateRuntimeSettings({
+        provider: 'openai',
+        ...(selectedModel ? { model: selectedModel } : {})
+      })
       setLocalSaved(true)
-      setNotice(`${selectedBackend.label} profile saved.`)
+      setNotice(
+        `${selectedBackend.label} profile saved${
+          selectedModel ? ` · default ${selectedModel}` : ''
+        }. You can change this anytime.`
+      )
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not save local profile.'
@@ -205,6 +335,7 @@ export function OnboardingModelStep({
             setMode('local')
             setError(null)
             setNotice(null)
+            setShowDefaultPicker(false)
           }}
         >
           Local
@@ -212,30 +343,47 @@ export function OnboardingModelStep({
       </div>
 
       {mode === 'cloud' ? (
-        <OnboardingModelCloudPanel
-          loadingIntegrations={loadingIntegrations}
-          cloudProviders={cloudProviders}
-          selectedCloud={selectedCloud}
-          selectedIntegration={selectedIntegration}
-          cloudKey={cloudKey}
-          showCloudKey={showCloudKey}
-          cloudBusy={cloudBusy}
-          cloudSaved={cloudSaved}
-          onSelectProvider={key => {
-            setSelectedCloud(key)
-            setCloudKey('')
-            setShowCloudKey(false)
-            setCloudSaved(false)
-            setError(null)
-            setNotice(null)
-          }}
-          onCloudKeyChange={value => {
-            setCloudKey(value)
-            setCloudSaved(false)
-          }}
-          onToggleShowKey={() => setShowCloudKey(open => !open)}
-          onSave={() => void saveCloud()}
-        />
+        <>
+          <OnboardingModelCloudPanel
+            loadingIntegrations={loadingIntegrations}
+            cloudProviders={cloudProviders}
+            selectedCloud={selectedCloud}
+            selectedIntegration={selectedIntegration}
+            cloudKey={cloudKey}
+            showCloudKey={showCloudKey}
+            cloudBusy={cloudBusy}
+            cloudSaved={cloudSaved}
+            onSelectProvider={key => {
+              setSelectedCloud(key)
+              setCloudKey('')
+              setShowCloudKey(false)
+              setCloudSaved(false)
+              setShowDefaultPicker(false)
+              setDefaultSaved(false)
+              setProviderModelOptions([])
+              setError(null)
+              setNotice(null)
+            }}
+            onCloudKeyChange={value => {
+              setCloudKey(value)
+              setCloudSaved(false)
+              setShowDefaultPicker(false)
+            }}
+            onToggleShowKey={() => setShowCloudKey(open => !open)}
+            onSave={() => void saveCloud()}
+          />
+          {showDefaultPicker && selectedIntegration ? (
+            <OnboardingModelDefaultPicker
+              providerName={selectedIntegration.name}
+              modelOptions={providerModelOptions}
+              runtimeSettings={runtimeSettings}
+              loading={modelsLoading}
+              saving={defaultBusy}
+              saved={defaultSaved}
+              onModelSelect={selectDefaultModel}
+            />
+          ) : null}
+        </>
       ) : (
         <OnboardingModelLocalPanel
           localBackend={localBackend}

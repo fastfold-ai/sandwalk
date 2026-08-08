@@ -11,7 +11,7 @@ import type {
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -96,6 +96,7 @@ type AgentComposerSlotProps = {
     targetSessionId?: string | null
   ) => Promise<SessionSandboxStatus | null>
   setRuntimeSettings: Dispatch<SetStateAction<RuntimeSettings | null>>
+  onSessionUpdated?: (session: AgentSession) => void
   loadModelOptions: () => Promise<void>
 }
 
@@ -145,9 +146,24 @@ export function AgentComposerSlot({
   restartSessionSandbox,
   refreshSessionSandbox,
   setRuntimeSettings,
+  onSessionUpdated,
   loadModelOptions
 }: AgentComposerSlotProps) {
   const [compactBusy, setCompactBusy] = useState(false)
+  // Existing chats keep their own model; draft/new chats use global defaults.
+  const isDraftSession =
+    !sessionId || isDraftAgentSessionId(sessionId) || !session
+  const composerRuntimeSettings = useMemo(() => {
+    if (!runtimeSettings) return null
+    if (isDraftSession || !session?.model) return runtimeSettings
+    return {
+      ...runtimeSettings,
+      provider: session.provider || runtimeSettings.provider,
+      model: session.model,
+      openaiProfileId:
+        session.openaiProfileId ?? runtimeSettings.openaiProfileId ?? null
+    }
+  }, [isDraftSession, runtimeSettings, session])
   return (
     <>
       <QueuedMessages
@@ -256,7 +272,7 @@ export function AgentComposerSlot({
             mimeType: item.mimeType
           }))
         }}
-        runtimeSettings={runtimeSettings}
+        runtimeSettings={composerRuntimeSettings}
         tokenUsage={tokenUsage}
         compactBusy={compactBusy}
         onCompact={
@@ -321,24 +337,43 @@ export function AgentComposerSlot({
           // catalog, but the runtime still speaks OpenAI-compatible.
           const runtimeProvider =
             provider === 'local' || profileId ? 'openai' : provider
-          setRuntimeSettings(
-            await client.updateRuntimeSettings({
-              provider: runtimeProvider,
-              model
-            })
-          )
+          if (isDraftSession || !sessionId) {
+            setRuntimeSettings(
+              await client.updateRuntimeSettings({
+                provider: runtimeProvider,
+                model
+              })
+            )
+            return
+          }
+          const updated = await client.updateSession(sessionId, {
+            provider: runtimeProvider,
+            model,
+            // Empty string clears a prior local profile on this session.
+            openaiProfileId: profileId || ''
+          })
+          onSessionUpdated?.(updated)
         }}
         onReasoningSettingsChange={async changes => {
           const runtimeProvider =
             changes.provider === 'local' ? 'openai' : changes.provider
+          // Effort prefs stay global; provider/model stay per-session when set.
           setRuntimeSettings(
             await client.updateRuntimeSettings({
-              provider: runtimeProvider,
-              model: changes.model,
+              ...(isDraftSession
+                ? { provider: runtimeProvider, model: changes.model }
+                : {}),
               reasoningEffort: changes.reasoningEffort,
               reasoningFast: changes.reasoningFast
             })
           )
+          if (!isDraftSession && sessionId) {
+            const updated = await client.updateSession(sessionId, {
+              provider: runtimeProvider,
+              model: changes.model
+            })
+            onSessionUpdated?.(updated)
+          }
           await loadModelOptions()
         }}
         onPlanModeChange={async planMode => {

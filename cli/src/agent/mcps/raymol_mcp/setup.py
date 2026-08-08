@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from agent.mcps.raymol_mcp.paths import (
+    DEFAULT_APP_BINARY,
     HANDOFF_PATH,
     SETUP_URL,
     find_raymol_binary,
@@ -20,11 +23,40 @@ def ensure_launcher(*, force: bool = False) -> tuple[bool, str]:
     _ = force
     binary = find_raymol_binary()
     if binary is None:
+        # launcher_path falls back to /Applications/... — accept it when present
+        # even if broader discovery missed (TCC / quarantine edge cases).
+        fallback = launcher_path()
+        if fallback.is_file():
+            binary = fallback
+    if binary is None and handoff_ready():
+        # MCP is already enabled in a running RayMol (mcp.json present).
+        path = launcher_path()
+        return (
+            True,
+            f"RayMol MCP handoff found; bridge command: {path} --mcp-bridge",
+        )
+    if binary is None:
+        checked = [
+            str(DEFAULT_APP_BINARY),
+            str(
+                Path.home()
+                / "Applications"
+                / "RayMol.app"
+                / "Contents"
+                / "MacOS"
+                / "RayMol"
+            ),
+            "PATH (RayMol)",
+            "mdfind io.raymol.RayMol",
+            f"handoff {HANDOFF_PATH}",
+        ]
         return (
             False,
             "RayMol app not found. Install from https://raymol.io/ "
             "(direct DMG or Homebrew — Mac App Store builds omit MCP), "
-            "then re-run: sandwalk mcp install raymol",
+            "then re-run: sandwalk mcp install raymol. "
+            f"Checked: {', '.join(checked)}. "
+            "Or set mcp.raymol_binary to the RayMol executable path.",
         )
     return True, f"RayMol bridge ready: {binary} --mcp-bridge"
 

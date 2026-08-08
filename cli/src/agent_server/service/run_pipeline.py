@@ -51,6 +51,9 @@ class _RunPipelineMixin:
                 run_context.allowed_tool_names,
                 _on_runner_ready,
                 _on_runner_done,
+                run_context.provider,
+                run_context.model,
+                run_context.openai_profile_id,
             )
             agent_done_at = time.monotonic()
             last_stream_at = getattr(emit_runtime_event, "last_stream_at", None)

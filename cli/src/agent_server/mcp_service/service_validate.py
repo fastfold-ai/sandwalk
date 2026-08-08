@@ -33,15 +33,22 @@ class ValidateMixin:
                 raise KeyError(catalog_id)
             if entry.transport == "stdio":
                 if not credentials_configured(entry, cfg):
+                    if entry.id == "pymol":
+                        not_ready = (
+                            "Launcher not installed — run sandwalk mcp install pymol "
+                            "or in PyMOL: sandwalk-pymol setup"
+                        )
+                    elif entry.id == "raymol":
+                        not_ready = (
+                            "RayMol bridge not ready — install RayMol from raymol.io, "
+                            "then run sandwalk mcp install raymol"
+                        )
+                    else:
+                        not_ready = "stdio command not ready"
                     return {
                         "ok": False,
                         "toolCount": 0,
-                        "message": (
-                            "Launcher not installed — run sandwalk mcp install pymol "
-                            "or in PyMOL: sandwalk-pymol setup"
-                            if entry.id == "pymol"
-                            else "stdio command not ready"
-                        ),
+                        "message": not_ready,
                         "tools": [],
                         "toolDetails": [],
                     }

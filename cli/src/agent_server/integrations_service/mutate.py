@@ -272,11 +272,24 @@ class MutateMixin:
                 label=provider.name,
             )
             # Persist discovered host only when the user left endpoint on Auto.
-            if key == "qwen" and result.base_url:
+            # On a good probe, clear scoped auto-hides so Models / onboarding
+            # only show this provider's enabled catalog (not every cloud row).
+            if result.ok or (key == "qwen" and result.base_url):
                 with self._lock:
                     config = Config.load()
-                    if not str(config.get("llm.qwen_base_url") or "").strip():
-                        config.set("llm.qwen_base_url", result.base_url)
+                    dirty = False
+                    if key == "qwen" and result.base_url:
+                        if not str(config.get("llm.qwen_base_url") or "").strip():
+                            config.set("llm.qwen_base_url", result.base_url)
+                            dirty = True
+                    if result.ok:
+                        from agent_server.models_service.mutate import (
+                            enable_models_for_provider,
+                        )
+
+                        if enable_models_for_provider(config, key):
+                            dirty = True
+                    if dirty:
                         config.save()
             return ValidateIntegrationResponse(
                 ok=result.ok,

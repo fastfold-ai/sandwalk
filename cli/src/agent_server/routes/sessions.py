@@ -70,6 +70,9 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
                 specialist_id=payload.specialist_id,
                 sandbox_backend=payload.sandbox_backend,
                 client_surface=surface,
+                provider=payload.provider,
+                model=payload.model,
+                openai_profile_id=payload.openai_profile_id,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -94,6 +97,12 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
         update_sandbox = (
             payload.sandbox_backend is not None or payload.clear_sandbox_backend
         )
+        update_llm = (
+            payload.clear_llm
+            or payload.provider is not None
+            or payload.model is not None
+            or payload.openai_profile_id is not None
+        )
         try:
             return await asyncio.to_thread(
                 service.update_session,
@@ -111,6 +120,12 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
                 if payload.clear_sandbox_backend
                 else payload.sandbox_backend,
                 update_sandbox_backend=update_sandbox,
+                provider=None if payload.clear_llm else payload.provider,
+                model=None if payload.clear_llm else payload.model,
+                openai_profile_id=None
+                if payload.clear_llm
+                else payload.openai_profile_id,
+                update_llm=update_llm,
             )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Session not found.") from exc

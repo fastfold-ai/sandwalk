@@ -34,6 +34,7 @@ export function OnboardingModelCloudPanel({
   showCloudKey,
   cloudBusy,
   cloudSaved,
+  saveLabel,
   onSelectProvider,
   onCloudKeyChange,
   onToggleShowKey,
@@ -47,11 +48,14 @@ export function OnboardingModelCloudPanel({
   showCloudKey: boolean
   cloudBusy: boolean
   cloudSaved: boolean
+  saveLabel?: string
   onSelectProvider: (key: string) => void
   onCloudKeyChange: (value: string) => void
   onToggleShowKey: () => void
   onSave: () => void
 }) {
+  const canSave =
+    Boolean(cloudKey.trim()) || Boolean(selectedIntegration?.configured)
   return (
     <div className="space-y-3">
       {loadingIntegrations ? (
@@ -147,7 +151,7 @@ export function OnboardingModelCloudPanel({
             )}
             <Button
               type="button"
-              disabled={cloudBusy || !cloudKey.trim()}
+              disabled={cloudBusy || !canSave}
               onClick={() => onSave()}
             >
               {cloudBusy ? (
@@ -155,7 +159,14 @@ export function OnboardingModelCloudPanel({
               ) : cloudSaved ? (
                 <Check className="size-4" />
               ) : null}
-              {cloudSaved ? 'Saved' : 'Save & use'}
+              {cloudSaved
+                ? 'Verified'
+                : saveLabel ||
+                  (cloudKey.trim()
+                    ? 'Save & verify'
+                    : selectedIntegration?.configured
+                      ? 'Verify & continue'
+                      : 'Save & verify')}
             </Button>
           </div>
         </div>

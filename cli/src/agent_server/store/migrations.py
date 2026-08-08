@@ -62,6 +62,13 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
             WHERE lower(coalesce(source, '')) = 'slack'
             """
         )
+    # Per-chat model selection (global llm.* only seeds new sessions).
+    if "provider" not in columns:
+        connection.execute("ALTER TABLE sessions ADD COLUMN provider TEXT")
+    if "model" not in columns:
+        connection.execute("ALTER TABLE sessions ADD COLUMN model TEXT")
+    if "openai_profile_id" not in columns:
+        connection.execute("ALTER TABLE sessions ADD COLUMN openai_profile_id TEXT")
     if "title_source" not in columns:
         connection.execute(
             "ALTER TABLE sessions ADD COLUMN title_source TEXT NOT NULL DEFAULT 'pending'"

@@ -34,6 +34,10 @@ class AgentSession(ApiModel):
     project_id: str | None = None
     specialist_id: str | None = None
     sandbox_backend: SandboxBackendChoice | None = None
+    # Per-chat model; null means fall back to global runtime settings.
+    provider: str | None = None
+    model: str | None = None
+    openai_profile_id: str | None = None
     workspace_path: str | None = None
     source: SessionSource | None = None
     # Human-readable origin, e.g. "#dev-ops · Acme" — shown next to the source icon.
@@ -51,6 +55,10 @@ class CreateSessionRequest(ApiModel):
     specialist_id: str | None = None
     sandbox_backend: SandboxBackendChoice | None = None
     client_surface: ClientSurface | None = None
+    # Optional override; otherwise create snapshots global llm.* defaults.
+    provider: str | None = None
+    model: str | None = None
+    openai_profile_id: str | None = None
 
 
 class UpdateSessionRequest(ApiModel):
@@ -63,6 +71,10 @@ class UpdateSessionRequest(ApiModel):
     clear_specialist_id: bool = False
     sandbox_backend: SandboxBackendChoice | None = None
     clear_sandbox_backend: bool = False
+    provider: str | None = None
+    model: str | None = None
+    openai_profile_id: str | None = None
+    clear_llm: bool = False
 
 
 class AutoTitleSessionRequest(ApiModel):

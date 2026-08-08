@@ -21,6 +21,9 @@ def run_existing_agent(
     allowed_tool_names: list[str] | None = None,
     on_runner_ready: Callable[[Any], None] | None = None,
     on_runner_done: Callable[[], None] | None = None,
+    provider: str | None = None,
+    model: str | None = None,
+    openai_profile_id: str | None = None,
 ) -> str:
     """Temporary adapter until AgentRunner is split into AgentRuntime."""
     from agent.config import Config
@@ -30,6 +33,21 @@ def run_existing_agent(
     from agent_server.session_sandbox_service import effective_session_sandbox_backend
 
     config = Config.load()
+    # Per-chat model override (in-memory only — never mark dirty / save).
+    session_provider = (provider or "").strip()
+    session_model = (model or "").strip()
+    session_profile = (openai_profile_id or "").strip()
+    if session_provider:
+        config._data["llm.provider"] = session_provider
+    if session_model:
+        config._data["llm.model"] = session_model
+    if session_profile:
+        try:
+            config.set_openai_active_profile(session_profile)
+        except Exception:  # noqa: BLE001
+            pass
+    # Throwaway in-memory config for this run — never persist overrides.
+    config._dirty_keys.clear()
     if workspace_path:
         # Keep sandbox plots/CSVs inside the session workspace so the UI
         # file tree can list agent-generated artifacts for this chat.
