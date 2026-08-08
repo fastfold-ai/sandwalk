@@ -14,12 +14,27 @@ from agent.skills.deps import (
     status_for,
 )
 from agent.skills.deps import anydoc as anydoc_mod
+from agent.skills.deps import modal_research as modal_mod
 
 
 def test_has_runtime_deps_for_anydoc_skill():
     assert has_runtime_deps("convert-documents-to-markdown")
     assert has_runtime_deps("anydoc")
     assert not has_runtime_deps("fold")
+
+
+def test_has_runtime_deps_for_modal_research_skills():
+    for name in (
+        "modal-basic-skills",
+        "modal-gpu-dev",
+        "modal-gpu-experiment",
+        "sub-agents",
+        "modal-research",
+    ):
+        assert has_runtime_deps(name), name
+    adapter = get_adapter("modal_gpu_dev")
+    assert adapter is not None
+    assert adapter.adapter_id == "modal-research"
 
 
 def test_get_adapter_normalizes_underscores():
@@ -81,6 +96,47 @@ def test_install_skips_when_ready(monkeypatch, tmp_path: Path):
 def test_status_for_all_returns_anydoc():
     rows = status_for(None)
     assert any(row.adapter_id == "anydoc" for row in rows)
+    assert any(row.adapter_id == "modal-research" for row in rows)
+
+
+def test_modal_research_doctor_reports_missing_credentials(monkeypatch):
+    monkeypatch.setattr(modal_mod, "_modal_importable", lambda: (True, "ok"))
+    monkeypatch.setattr(modal_mod, "_modal_cli_path", lambda: "/usr/bin/modal")
+    monkeypatch.setattr(
+        "agent.sandbox_probe.tokens.modal_tokens_present",
+        lambda: (False, "Missing MODAL_TOKEN_ID and/or MODAL_TOKEN_SECRET"),
+    )
+
+    status = modal_mod.doctor()
+    assert status.adapter_id == "modal-research"
+    assert status.status == "missing"
+    assert any(
+        c.name == "modal_credentials" and c.status == "missing"
+        for c in status.checks
+    )
+
+
+def test_modal_research_doctor_healthy(monkeypatch):
+    monkeypatch.setattr(modal_mod, "_modal_importable", lambda: (True, "ok"))
+    monkeypatch.setattr(modal_mod, "_modal_cli_path", lambda: "/usr/bin/modal")
+    monkeypatch.setattr(
+        "agent.sandbox_probe.tokens.modal_tokens_present",
+        lambda: (True, "MODAL_TOKEN_ID and MODAL_TOKEN_SECRET are set"),
+    )
+
+    status = modal_mod.doctor()
+    assert status.status == "ok"
+    assert status.command == "modal"
+
+
+def test_modal_research_install_reports_ensure_modal_deps_failure(monkeypatch):
+    monkeypatch.setattr(
+        "agent.sandbox_deps.ensure_modal_deps",
+        lambda auto_install=True: (False, "pip install failed"),
+    )
+    result = modal_mod.install(force=False)
+    assert not result.ok
+    assert "pip install failed" in result.summary
 
 
 def test_service_deps_mixin(monkeypatch):

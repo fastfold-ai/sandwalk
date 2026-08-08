@@ -31,7 +31,24 @@ class _AnyDocAdapter:
         return anydoc.install(force=force)
 
 
-_ADAPTERS: list[SkillDepAdapter] = [_AnyDocAdapter()]
+class _ModalResearchAdapter:
+    adapter_id = "modal-research"
+    skill_names = frozenset(
+        {"modal-basic-skills", "modal-gpu-dev", "modal-gpu-experiment", "sub-agents"}
+    )
+
+    def doctor(self) -> SkillDepStatus:
+        from agent.skills.deps import modal_research
+
+        return modal_research.doctor()
+
+    def install(self, *, force: bool = False) -> SkillDepInstallResult:
+        from agent.skills.deps import modal_research
+
+        return modal_research.install(force=force)
+
+
+_ADAPTERS: list[SkillDepAdapter] = [_AnyDocAdapter(), _ModalResearchAdapter()]
 
 
 def list_adapters() -> list[SkillDepAdapter]:

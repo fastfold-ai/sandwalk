@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from agent.sandbox_backend.filesystem_io import _patch_modal_filesystem_io
@@ -81,6 +82,15 @@ def _create_or_reuse_modal_sandbox_impl(config: Any, *, session_id: str | None):
 
     created = False
     if modal_sandbox is None:
+        # Modal credentials for the *sandbox container's own* env — separate
+        # from the agent-server's env used to authenticate this control-plane
+        # call. Needed so `modal` CLI calls made *inside* the container (e.g.
+        # by the modal-gpu-dev/modal-gpu-experiment skills, or the deepagents
+        # native `execute` tool) can also authenticate.
+        sandbox_env = {
+            "MODAL_TOKEN_ID": os.environ.get("MODAL_TOKEN_ID") or "",
+            "MODAL_TOKEN_SECRET": os.environ.get("MODAL_TOKEN_SECRET") or "",
+        }
         create_kwargs: dict[str, Any] = {
             "app": app,
             "name": name,
@@ -90,6 +100,7 @@ def _create_or_reuse_modal_sandbox_impl(config: Any, *, session_id: str | None):
             "image": image,
             "cpu": cpu,
             "memory": memory_mb,
+            "env": sandbox_env,
         }
         if compute_type == "gpu":
             create_kwargs["gpu"] = sandbox_gpu_class(config)

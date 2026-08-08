@@ -5,7 +5,6 @@ export function integrationManagementPath(
 ): string | null {
   if (integration.category === 'AI Models') return '/dashboard/models'
   if (integration.category === 'MCP') return '/dashboard/mcp'
-  if (integration.key === 'modal') return '/dashboard/agent/sandbox/modal'
   return null
 }
 

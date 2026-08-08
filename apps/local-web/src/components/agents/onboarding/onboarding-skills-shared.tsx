@@ -54,6 +54,30 @@ export const FEATURED_SKILL_CATALOG: Array<{
     description:
       'Convert Word, PowerPoint, Excel, PDF, and more to Markdown (anydoc).',
     source: 'firecrawl/anydoc'
+  },
+  {
+    name: 'modal-basic-skills',
+    description:
+      'Foundational Modal platform knowledge — app structure, CLI, deployment.',
+    source: 'modal-projects/modal-auto-research-skills@modal-basic-skills'
+  },
+  {
+    name: 'modal-gpu-dev',
+    description:
+      'Interactive GPU sandboxes with SSH — launch any GPU, debug, profile.',
+    source: 'modal-projects/modal-auto-research-skills@modal-gpu-dev'
+  },
+  {
+    name: 'modal-gpu-experiment',
+    description:
+      'Training apps on Modal with volumes, secrets, retries, and auto-resume.',
+    source: 'modal-projects/modal-auto-research-skills@modal-gpu-experiment'
+  },
+  {
+    name: 'sub-agents',
+    description:
+      'Parallel agent orchestration — spawn agents, each with its own GPU.',
+    source: 'modal-projects/modal-auto-research-skills@sub-agents'
   }
 ]
 

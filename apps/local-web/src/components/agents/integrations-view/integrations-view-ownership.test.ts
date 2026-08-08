@@ -35,7 +35,7 @@ describe('Integrations UI ownership', () => {
 
     expect(
       integrationsOwnedByIntegrations(entries).map(item => item.key)
-    ).toEqual(['slack'])
+    ).toEqual(['modal', 'slack'])
   })
 
   it('routes hidden entries to their owning settings page', () => {
@@ -50,7 +50,7 @@ describe('Integrations UI ownership', () => {
     )
     expect(
       integrationManagementPath(integration('modal', 'Agent Runtime'))
-    ).toBe('/dashboard/agent/sandbox/modal')
+    ).toBeNull()
     expect(
       integrationManagementPath(integration('slack', 'Communication'))
     ).toBeNull()

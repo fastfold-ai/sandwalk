@@ -11,7 +11,11 @@ const FEATURED_SKILL_NAMES = new Set([
   'md_openmmdl',
   'diagrams_mermaid',
   'slack_report',
-  'convert-documents-to-markdown'
+  'convert-documents-to-markdown',
+  'modal-basic-skills',
+  'modal-gpu-dev',
+  'modal-gpu-experiment',
+  'sub-agents'
 ])
 
 const SKILL_ICON_BY_NAME: Record<
@@ -26,6 +30,10 @@ const SKILL_ICON_BY_NAME: Record<
   'convert-documents-to-markdown': {
     src: '/integrations/firecrawl.png'
   },
+  'modal-basic-skills': { src: '/modal-logo-icon.png' },
+  'modal-gpu-dev': { src: '/modal-logo-icon.png' },
+  'modal-gpu-experiment': { src: '/modal-logo-icon.png' },
+  'sub-agents': { src: '/modal-logo-icon.png' },
   'skill-creator': { src: SANDWALK_MARK, invertInDark: true },
   'skill-find': { src: SANDWALK_MARK, invertInDark: true }
 }
@@ -51,7 +59,8 @@ export function isFeaturedSkill(
     author.includes('firecrawl') ||
     source === 'bundled' ||
     source.includes('fastfold-ai') ||
-    source.includes('firecrawl/anydoc')
+    source.includes('firecrawl/anydoc') ||
+    source.includes('modal-projects/modal-auto-research-skills')
   )
 }
 
