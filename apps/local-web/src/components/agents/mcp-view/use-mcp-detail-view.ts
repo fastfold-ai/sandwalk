@@ -232,9 +232,15 @@ export function useMcpDetailView({
   const toggleEnabled = () => {
     if (!onToggleEnabled) return
     if (kind === 'catalog' && !configured && !enabled) {
+      const localHint =
+        catalogEntry?.id === 'raymol'
+          ? 'Install the RayMol bridge first (Setup → Install bridge, or sandwalk mcp install raymol), then enable.'
+          : catalogEntry?.id === 'pymol'
+            ? 'Install the launcher first (sandwalk mcp install pymol), then enable.'
+            : 'Install the local MCP command first, then enable.'
       toast.error(
         isLocalStdio
-          ? 'Install the launcher first (sandwalk mcp install pymol), then enable.'
+          ? localHint
           : 'Connect with OAuth or API key first, then enable.',
         {
           description: title

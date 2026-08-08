@@ -28,49 +28,72 @@ def ensure_launcher(*, force: bool = False) -> tuple[bool, str]:
         fallback = launcher_path()
         if fallback.is_file():
             binary = fallback
-    if binary is None and handoff_ready():
+    if binary is not None:
+        # Persist so packaged Sandwalk Server can reuse the path later even if
+        # /Applications discovery is flaky under the app's environment.
+        try:
+            from agent.config import Config
+
+            config = Config.load()
+            current = str(config.get("mcp.raymol_binary") or "").strip()
+            resolved = str(binary)
+            if current != resolved:
+                config.set("mcp.raymol_binary", resolved)
+                config.save()
+        except Exception:  # noqa: BLE001 — never block install on config write
+            pass
+        return True, f"RayMol bridge ready: {binary} --mcp-bridge"
+    if handoff_ready():
         # MCP is already enabled in a running RayMol (mcp.json present).
         path = launcher_path()
         return (
             True,
             f"RayMol MCP handoff found; bridge command: {path} --mcp-bridge",
         )
-    if binary is None:
-        checked = [
-            str(DEFAULT_APP_BINARY),
-            str(
-                Path.home()
-                / "Applications"
-                / "RayMol.app"
-                / "Contents"
-                / "MacOS"
-                / "RayMol"
-            ),
-            "PATH (RayMol)",
-            "mdfind io.raymol.RayMol",
-            f"handoff {HANDOFF_PATH}",
-        ]
-        return (
-            False,
-            "RayMol app not found. Install from https://raymol.io/ "
-            "(direct DMG or Homebrew — Mac App Store builds omit MCP), "
-            "then re-run: sandwalk mcp install raymol. "
-            f"Checked: {', '.join(checked)}. "
-            "Or set mcp.raymol_binary to the RayMol executable path.",
-        )
-    return True, f"RayMol bridge ready: {binary} --mcp-bridge"
+    checked = [
+        str(DEFAULT_APP_BINARY),
+        str(
+            Path.home()
+            / "Applications"
+            / "RayMol.app"
+            / "Contents"
+            / "MacOS"
+            / "RayMol"
+        ),
+        "PATH (RayMol)",
+        "mdfind io.raymol.RayMol",
+        f"handoff {HANDOFF_PATH}",
+    ]
+    return (
+        False,
+        "RayMol app not found. Install from https://raymol.io/ "
+        "(direct DMG or Homebrew — Mac App Store builds omit MCP), "
+        "then re-run: sandwalk mcp install raymol. "
+        f"Checked: {', '.join(checked)}. "
+        "Or set mcp.raymol_binary to the RayMol executable path.",
+    )
 
 
 def raymol_doctor_checks() -> list[dict[str, str]]:
     """Return structured doctor rows for RayMol MCP."""
     rows: list[dict[str, str]] = []
     binary = find_raymol_binary()
-    if launcher_ready() and binary is not None:
+    if binary is not None:
         rows.append(
             {
                 "name": "raymol_app",
                 "status": "ok",
                 "detail": f"RayMol binary: {binary}",
+            }
+        )
+    elif launcher_ready():
+        rows.append(
+            {
+                "name": "raymol_app",
+                "status": "ok",
+                "detail": (
+                    f"RayMol bridge ready via handoff; command: {launcher_path()}"
+                ),
             }
         )
     else:

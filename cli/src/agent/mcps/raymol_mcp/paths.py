@@ -150,8 +150,20 @@ def launcher_path() -> Path:
 
 
 def launcher_ready() -> bool:
-    path = find_raymol_binary()
-    return path is not None and path.is_file()
+    """True when Sandwalk can register/use the RayMol bridge.
+
+    Matches ``ensure_launcher``: binary on disk, default app path present, or
+    MCP handoff already written (RayMol has MCP enabled). Install must not
+    report ready while Enable still thinks the bridge is missing.
+    """
+    if find_raymol_binary() is not None:
+        return True
+    try:
+        if DEFAULT_APP_BINARY.is_file():
+            return True
+    except OSError:
+        pass
+    return handoff_ready()
 
 
 def handoff_ready() -> bool:

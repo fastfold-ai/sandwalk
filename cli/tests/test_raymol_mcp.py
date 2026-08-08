@@ -88,7 +88,16 @@ def test_raymol_credentials_require_binary(tmp_path: Path, monkeypatch):
     )
     missing = tmp_path / "missing-RayMol"
     monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.DEFAULT_APP_BINARY", missing
+    )
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.setup.DEFAULT_APP_BINARY", missing
+    )
+    monkeypatch.setattr(
         "agent.mcps.raymol_mcp.setup.launcher_path", lambda: missing
+    )
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.handoff_ready", lambda: False
     )
     monkeypatch.setattr(
         "agent.mcps.raymol_mcp.setup.handoff_ready", lambda: False
@@ -186,3 +195,20 @@ def test_ensure_launcher_accepts_handoff_without_binary(tmp_path: Path, monkeypa
     ok, message = ensure_launcher()
     assert ok is True
     assert "handoff" in message.lower()
+
+
+def test_launcher_ready_matches_handoff_for_enable(tmp_path: Path, monkeypatch):
+    """Install can succeed via handoff; Enable must then see configured=true."""
+    from agent.mcps.raymol_mcp.paths import launcher_ready as ready
+
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.find_raymol_binary", lambda: None
+    )
+    monkeypatch.setattr(
+        "agent.mcps.raymol_mcp.paths.DEFAULT_APP_BINARY",
+        tmp_path / "missing-RayMol",
+    )
+    handoff = tmp_path / "mcp.json"
+    handoff.write_text('{"port": 1, "token": "t"}\n', encoding="utf-8")
+    monkeypatch.setattr("agent.mcps.raymol_mcp.paths.HANDOFF_PATH", handoff)
+    assert ready() is True

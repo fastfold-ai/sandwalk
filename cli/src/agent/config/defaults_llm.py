@@ -79,6 +79,8 @@ DEFAULTS_LLM = {
     "mcp.tavily_tool_count": None,
     "mcp.pymol_tool_count": None,
     "mcp.raymol_tool_count": None,
+    # Absolute path to RayMol --mcp-bridge binary (set by mcp install raymol).
+    "mcp.raymol_binary": None,
     "mcp.tamarind_status_message": None,
     "mcp.neurosnap_status_message": None,
     "mcp.latch_status_message": None,
