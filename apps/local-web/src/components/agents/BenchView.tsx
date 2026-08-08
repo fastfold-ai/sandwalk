@@ -59,6 +59,22 @@ function installPercent(card: BenchSuiteCard): number {
   return 8
 }
 
+function sampleChoicesFor(card: BenchSuiteCard): number[] {
+  const sizes = (card.sampleSizes || []).filter(
+    n => !card.questionCount || n <= card.questionCount
+  )
+  if (sizes.length > 0) return sizes
+  if (card.defaultSampleSize) return [card.defaultSampleSize]
+  return []
+}
+
+/** Prefer the smallest offered sample size for first-time selection. */
+function minSampleSize(card: BenchSuiteCard): number | null {
+  const choices = sampleChoicesFor(card)
+  if (!choices.length) return card.defaultSampleSize ?? null
+  return Math.min(...choices)
+}
+
 export function BenchView({
   client,
   runtimeSettings,
@@ -82,7 +98,12 @@ export function BenchView({
   const detailRunId = detailMatch?.params.runId || null
   const [tab, setTab] = useState<Tab>('new')
   const [suites, setSuites] = useState<BenchSuiteCard[]>([])
-  const [selected, setSelected] = useState<Record<string, number | null>>({})
+  /** Suite ids currently checked for the next run. */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  /** Sample sizes kept across select/deselect so re-check restores the choice. */
+  const [sampleBySuite, setSampleBySuite] = useState<
+    Record<string, number | null>
+  >({})
   const [modelOptions, setModelOptions] = useState<ComposerModelOption[]>([])
   const [compareModels, setCompareModels] = useState<ComposerModelOption[]>([])
   const [specialists, setSpecialists] = useState<Specialist[]>([])
@@ -184,12 +205,12 @@ export function BenchView({
   useEffect(() => {
     if (wasBusyRef.current && !busy) {
       void loadStatus()
-      setSelected({})
+      setSelectedIds(new Set())
     }
     wasBusyRef.current = busy
   }, [busy, loadStatus])
 
-  const selectedCount = Object.keys(selected).length
+  const selectedCount = selectedIds.size
   const primaryModel = runtimeSettings?.model || ''
   const compareQueue = useMemo(
     () =>
@@ -211,16 +232,20 @@ export function BenchView({
       : 0
   const queuedCount = active?.queue?.length ?? 0
 
+  const sampleFor = (card: BenchSuiteCard): number | null =>
+    sampleBySuite[card.id] ?? minSampleSize(card)
+
   const toggleSuite = (card: BenchSuiteCard) => {
     if (!card.available) return
-    setSelected(prev => {
-      const next = { ...prev }
-      if (card.id in next) {
-        delete next[card.id]
-      } else {
-        next[card.id] = card.defaultSampleSize ?? card.sampleSizes[0] ?? null
-      }
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(card.id)) next.delete(card.id)
+      else next.add(card.id)
       return next
+    })
+    setSampleBySuite(samples => {
+      if (card.id in samples) return samples
+      return { ...samples, [card.id]: minSampleSize(card) }
     })
   }
 
@@ -271,10 +296,13 @@ export function BenchView({
     setError(null)
     try {
       await client.spawnBench({
-        suites: Object.keys(selected).map(id => ({
-          suiteId: id,
-          sampleSize: selected[id]
-        })),
+        suites: [...selectedIds].map(id => {
+          const card = suites.find(row => row.id === id)
+          return {
+            suiteId: id,
+            sampleSize: card ? sampleFor(card) : (sampleBySuite[id] ?? null)
+          }
+        }),
         model: primaryModel,
         models: compareQueue.map(option => option.model),
         specialistId
@@ -368,11 +396,7 @@ export function BenchView({
   }
 
   const cliCommandFor = (card: BenchSuiteCard) => {
-    const n =
-      (card.id in selected ? selected[card.id] : null) ??
-      card.defaultSampleSize ??
-      card.sampleSizes[0] ??
-      null
+    const n = sampleFor(card)
     const model = primaryModel || '<model>'
     const parts = [
       'sandwalk eval run',
@@ -549,16 +573,8 @@ export function BenchView({
             ) : null}
             <div className="grid gap-2 sm:grid-cols-2">
               {suites.map(card => {
-                const on = card.id in selected
-                const sizes = (card.sampleSizes || []).filter(
-                  n => !card.questionCount || n <= card.questionCount
-                )
-                const sampleChoices =
-                  sizes.length > 0
-                    ? sizes
-                    : card.defaultSampleSize
-                      ? [card.defaultSampleSize]
-                      : []
+                const on = selectedIds.has(card.id)
+                const sampleChoices = sampleChoicesFor(card)
                 const installing =
                   Boolean(card.installing) || startingInstallId === card.id
                 return (
@@ -656,14 +672,19 @@ export function BenchView({
                           <select
                             className="border-border/70 bg-background max-w-[11rem] rounded-md border px-1.5 py-0.5 text-[11px]"
                             aria-label="Sample size"
-                            value={
-                              selected[card.id] ??
-                              card.defaultSampleSize ??
-                              sampleChoices[0]
-                            }
+                            value={sampleFor(card) ?? sampleChoices[0]}
                             onChange={e => {
                               const n = Number(e.target.value)
-                              setSelected(prev => ({ ...prev, [card.id]: n }))
+                              setSampleBySuite(prev => ({
+                                ...prev,
+                                [card.id]: n
+                              }))
+                              setSelectedIds(prev => {
+                                if (prev.has(card.id)) return prev
+                                const next = new Set(prev)
+                                next.add(card.id)
+                                return next
+                              })
                             }}
                           >
                             {sampleChoices.map(n => (

@@ -136,32 +136,32 @@ def test_list_suite_cards_includes_mmlu_and_packs():
     assert mmlu.runner == "agent"
     assert mmlu.available is True
     assert mmlu.question_count == 14042
-    assert mmlu.default_sample_size == 1000
+    assert mmlu.default_sample_size == 30
     assert 30 in mmlu.sample_sizes
     assert 2000 in mmlu.sample_sizes
     assert mmlu.sample_sizes[-1] == 14042  # Full
     pro = next(c for c in cards if c.id == "mmlu-pro")
     assert pro.available is True
     assert pro.question_count == 12032
-    assert pro.default_sample_size == 300
+    assert pro.default_sample_size == 30
     assert pro.sample_sizes[-1] == 12032
     assert pro.author == "TIGER-Lab"
     arc = next(c for c in cards if c.id == "arc-challenge")
     assert arc.available is True
     assert arc.title == "ARC-C"
     assert arc.question_count == 1172
-    assert arc.default_sample_size == 300
+    assert arc.default_sample_size == 30
     assert arc.sample_sizes == [30, 50, 100, 200, 300, 1172]
     mbpp = next(c for c in cards if c.id == "mbpp")
     assert mbpp.code_exec is True
     assert mbpp.question_count == 500
-    assert mbpp.default_sample_size == 200
+    assert mbpp.default_sample_size == 30
     assert mbpp.sample_sizes[-1] == 500
     assert mbpp.installable is True
     lcb = next(c for c in cards if c.id == "livecodebench")
     assert lcb.code_exec is True
     assert lcb.question_count == 1055
-    assert lcb.default_sample_size == 100
+    assert lcb.default_sample_size == 30
     assert lcb.sample_sizes[-1] == 1055
     assert lcb.installable is True
     # One card per YAML pack (not one per matrix) — UI owns model selection.

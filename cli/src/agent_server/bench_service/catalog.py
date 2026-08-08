@@ -184,6 +184,7 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
             sample_sizes = [n] if n else []
             if n >= 5:
                 sample_sizes = sorted({min(5, n), n})
+            default_sample = min(sample_sizes) if sample_sizes else None
             author, avatar = _PACK_AUTHORS.get(pack.id, (None, None))
             req_skills, req_mcps = required_skills_mcps(pack)
             miss_skills, miss_mcps = missing_pack_requirements(pack, store=store)
@@ -203,7 +204,7 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
                     matrix=matrix_name,
                     question_count=n,
                     sample_sizes=sample_sizes,
-                    default_sample_size=n or None,
+                    default_sample_size=default_sample,
                     available=True,
                     unavailable_reason=reason,
                     author=author,

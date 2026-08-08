@@ -42,7 +42,7 @@ CODING_SUITES: dict[str, CodingSuite] = {
         author_avatar=None,
         subject_label="Python problems",
         full_size=500,
-        default_sample_size=200,
+        default_sample_size=30,
         sample_sizes=(30, 50, 100, 200, 300),
     ),
     "livecodebench": CodingSuite(
@@ -54,7 +54,7 @@ CODING_SUITES: dict[str, CodingSuite] = {
         author_avatar=None,
         subject_label="Code generation",
         full_size=1055,
-        default_sample_size=100,
+        default_sample_size=30,
         sample_sizes=(30, 50, 100, 200, 300),
     ),
 }
