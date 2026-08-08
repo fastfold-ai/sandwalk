@@ -50,6 +50,7 @@ export function McpCustomSection({
   onConnectCatalog,
   onRefresh,
   onInstallCatalog,
+  onRevealStoredSecret,
   onResetFeaturedDefaults
 }: {
   installedServers: McpServer[]
@@ -95,6 +96,7 @@ export function McpCustomSection({
   ) => Promise<ConnectMcpResult>
   onRefresh?: () => Promise<void>
   onInstallCatalog?: (catalogId: string) => void | Promise<void>
+  onRevealStoredSecret?: (integrationKey: string) => Promise<string>
   onResetFeaturedDefaults?: () => void | Promise<void>
 }) {
   const [showAddForm, setShowAddForm] = useState(false)
@@ -113,6 +115,7 @@ export function McpCustomSection({
         onConnectCustom={onConnectCustom}
         onConnectCatalog={onConnectCatalog}
         onRefresh={onRefresh}
+        onRevealStoredSecret={onRevealStoredSecret}
         onAddNew={() => setShowAddForm(true)}
       />
 

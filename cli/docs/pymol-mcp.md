@@ -19,11 +19,15 @@ Credit: based on [Arcadia Science / agentic-pymol](https://github.com/Arcadia-Sc
 
 ## Setup
 
-1. **Install the PyMOL plugin**  
+1. **Install PyMOL** (if needed)  
+   Download from [pymol.org](https://www.pymol.org/). Commercial and
+   open-source builds both work.
+
+2. **Install the PyMOL plugin**  
    In PyMOL → Plugin Manager → Install from URL →  
    `https://sandwalk.sh/pymol/plugin.zip`
 
-2. **Install the managed launcher** (one-time)
+3. **Install the managed launcher** (one-time)
 
    ```bash
    sandwalk mcp install pymol
@@ -37,11 +41,11 @@ Credit: based on [Arcadia Science / agentic-pymol](https://github.com/Arcadia-Sc
 
    Or in PyMOL: `sandwalk-pymol setup` (uses the vendor tree bundled in the zip).
 
-3. **Start Listening** each session  
+4. **Start Listening** each session  
    Plugin menu → Sandwalk PyMOL MCP → Start Listening  
    (token auto-created under `~/.config/pymol-mcp/token`)
 
-4. **Enable** the PyMOL MCP in Sandwalk (toggle or install step above).
+5. **Enable** the PyMOL MCP in Sandwalk (toggle or install step above).
 
 ## Doctor
 

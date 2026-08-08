@@ -8,10 +8,10 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { openInSystemBrowser } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
+import { McpApiKeyInput } from './mcp-api-key-input'
 import {
   authStatusLabel,
   CustomServerIcon,
@@ -39,6 +39,7 @@ export function McpCustomServerList({
   onConnectCustom,
   onConnectCatalog,
   onRefresh,
+  onRevealStoredSecret,
   onAddNew
 }: {
   installedServers: McpServer[]
@@ -58,6 +59,7 @@ export function McpCustomServerList({
     input: { method: 'oauth' | 'api_key'; apiKey?: string }
   ) => Promise<ConnectMcpResult>
   onRefresh?: () => Promise<void>
+  onRevealStoredSecret?: (integrationKey: string) => Promise<string>
   onAddNew?: () => void
 }) {
   const [apiKeyServerId, setApiKeyServerId] = useState<string | null>(null)
@@ -452,16 +454,27 @@ export function McpCustomServerList({
                 className="bg-muted/20 flex flex-wrap items-center gap-2 border-t px-3 py-2.5"
                 onClick={event => event.stopPropagation()}
               >
-                <Input
-                  type="password"
-                  className="max-w-md"
-                  placeholder={
-                    catalogEntry?.apiKeyEnvVar || 'API key or Bearer token'
-                  }
+                <McpApiKeyInput
                   value={apiKeyDraft}
+                  onChange={setApiKeyDraft}
+                  placeholder={
+                    catalogEntry?.configured
+                      ? 'Secret saved. Enter a new key to replace it.'
+                      : catalogEntry?.apiKeyEnvVar || 'API key or Bearer token'
+                  }
                   autoFocus
                   disabled={pending}
-                  onChange={event => setApiKeyDraft(event.target.value)}
+                  hasStoredKey={Boolean(
+                    catalogEntry?.configured &&
+                      catalogEntry.integrationKey &&
+                      onRevealStoredSecret
+                  )}
+                  onRevealStored={
+                    catalogEntry?.integrationKey && onRevealStoredSecret
+                      ? () =>
+                          onRevealStoredSecret(catalogEntry.integrationKey!)
+                      : undefined
+                  }
                   onKeyDown={event => {
                     if (event.key === 'Enter') void connectApiKey(server)
                   }}

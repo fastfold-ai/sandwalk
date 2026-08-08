@@ -10,10 +10,12 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import { openInSystemBrowser } from '@/lib/desktop'
 
 import type { McpDetailViewState } from './use-mcp-detail-view'
 
 const PLUGIN_ZIP = 'https://sandwalk.sh/pymol/plugin.zip'
+const PYMOL_URL = 'https://www.pymol.org/'
 const RAYMOL_URL = 'https://raymol.io/'
 
 type SetupStep = { title: string; body: ReactNode }
@@ -36,6 +38,10 @@ export function McpDetailLocalSetupDialog({
   const setupUrl = entry.setupUrl || (isRaymol ? RAYMOL_URL : PLUGIN_ZIP)
   const [copied, setCopied] = useState(false)
   const [installing, setInstalling] = useState(false)
+
+  const openUrl = () => {
+    void openInSystemBrowser(setupUrl)
+  }
 
   const copyUrl = async () => {
     try {
@@ -111,6 +117,23 @@ export function McpDetailLocalSetupDialog({
 
   const pymolSteps: SetupStep[] = [
     {
+      title: 'Install PyMOL',
+      body: (
+        <p>
+          If you do not already have PyMOL, download it from{' '}
+          <button
+            type="button"
+            className="text-foreground inline-flex items-center gap-1 underline underline-offset-2"
+            onClick={() => void openInSystemBrowser(PYMOL_URL)}
+          >
+            pymol.org
+            <ExternalLink className="size-3" />
+          </button>
+          . Commercial and open-source builds both work.
+        </p>
+      )
+    },
+    {
       title: 'Install the PyMOL plugin',
       body: (
         <>
@@ -171,15 +194,14 @@ export function McpDetailLocalSetupDialog({
         <div className="space-y-2">
           <p>
             Get RayMol from{' '}
-            <a
-              href={RAYMOL_URL}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
               className="text-foreground inline-flex items-center gap-1 underline underline-offset-2"
+              onClick={() => void openInSystemBrowser(RAYMOL_URL)}
             >
               raymol.io
               <ExternalLink className="size-3" />
-            </a>{' '}
+            </button>{' '}
             — use the <strong>direct DMG</strong> or{' '}
             <code className="bg-muted rounded px-1 py-0.5 text-[11px]">
               brew install --cask javierbq/raymol/raymol
@@ -254,9 +276,15 @@ export function McpDetailLocalSetupDialog({
         </DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2">
-          <code className="bg-muted max-w-full truncate rounded px-2 py-1 text-xs">
-            {setupUrl}
-          </code>
+          <button
+            type="button"
+            className="bg-muted text-foreground hover:bg-muted/80 inline-flex max-w-full items-center gap-1.5 truncate rounded px-2 py-1 text-left text-xs underline-offset-2 hover:underline"
+            onClick={openUrl}
+            title="Open in browser"
+          >
+            <code className="truncate">{setupUrl}</code>
+            <ExternalLink className="size-3 shrink-0 opacity-70" />
+          </button>
           <Button
             type="button"
             size="sm"

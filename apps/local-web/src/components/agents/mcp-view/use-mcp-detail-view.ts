@@ -22,6 +22,8 @@ export type McpDetailViewInput = {
   }) => Promise<ConnectMcpResult>
   onDisconnectCatalog?: () => Promise<ConnectMcpResult | void>
   onRefreshMeta?: () => Promise<void>
+  /** Reveal a saved Integrations secret for API-key MCPs (show/copy). */
+  onRevealStoredSecret?: (integrationKey: string) => Promise<string>
 }
 
 export function useMcpDetailView({
@@ -32,7 +34,8 @@ export function useMcpDetailView({
   onToggleEnabled,
   onConnectCatalog,
   onDisconnectCatalog,
-  onRefreshMeta
+  onRefreshMeta,
+  onRevealStoredSecret
 }: McpDetailViewInput) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -215,6 +218,12 @@ export function useMcpDetailView({
   const showCatalogActions =
     kind === 'catalog' && Boolean(onConnectCatalog) && !isLocalStdio
 
+  const integrationKey = catalogEntry?.integrationKey || null
+  const revealStoredApiKey =
+    integrationKey && onRevealStoredSecret
+      ? () => onRevealStoredSecret(integrationKey)
+      : undefined
+
   const toggleEnabled = () => {
     if (!onToggleEnabled) return
     if (kind === 'catalog' && !configured && !enabled) {
@@ -272,6 +281,7 @@ export function useMcpDetailView({
     kind,
     catalogEntry,
     hasToggle: Boolean(onToggleEnabled),
+    revealStoredApiKey,
     loadTools,
     connectOAuth,
     connectApiKey,

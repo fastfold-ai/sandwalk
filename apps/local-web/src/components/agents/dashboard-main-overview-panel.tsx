@@ -136,6 +136,10 @@ export function DashboardMainOverviewPanel({
         catalogLoading={mcpCatalogLoading}
         onShowAll={() => navigate('/dashboard/mcp')}
         onRefresh={refreshMcp}
+        onRevealStoredSecret={async key => {
+          const revealed = await client.revealIntegrationSecret(key)
+          return revealed.value || ''
+        }}
         onConnectCatalog={async (catalogId, input) => {
           const result = await client.connectMcpCatalog(catalogId, input)
           await refreshMcp()

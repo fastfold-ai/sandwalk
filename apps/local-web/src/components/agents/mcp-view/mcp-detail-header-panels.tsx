@@ -20,9 +20,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { openInSystemBrowser } from '@/lib/desktop'
 
+import { McpApiKeyInput } from './mcp-api-key-input'
 import type { McpDetailViewState } from './use-mcp-detail-view'
 
 export function McpDetailHeaderBar({
@@ -224,26 +224,35 @@ export function McpDetailApiKeyBar({ state }: { state: McpDetailViewState }) {
     setApiKeyDraft,
     connectPending,
     connectApiKey,
-    setShowApiKey
+    setShowApiKey,
+    revealStoredApiKey,
+    configured
   } = state
 
   if (!showCatalogActions || !showApiKey || !supportsApiKey) return null
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
-      <Input
-        type="password"
-        className="max-w-md"
-        placeholder={catalogEntry?.apiKeyEnvVar || 'API key'}
+      <McpApiKeyInput
         value={apiKeyDraft}
-        onChange={event => setApiKeyDraft(event.target.value)}
+        onChange={setApiKeyDraft}
+        placeholder={
+          configured
+            ? 'Secret saved. Enter a new key to replace it.'
+            : catalogEntry?.apiKeyEnvVar || 'API key'
+        }
         disabled={connectPending}
+        hasStoredKey={configured && Boolean(revealStoredApiKey)}
+        onRevealStored={revealStoredApiKey}
+        onKeyDown={event => {
+          if (event.key === 'Enter') void connectApiKey()
+        }}
       />
       <Button
         type="button"
         size="sm"
         className="h-8 text-xs"
-        disabled={connectPending}
+        disabled={connectPending || !apiKeyDraft.trim()}
         onClick={() => void connectApiKey()}
       >
         {connectPending ? (

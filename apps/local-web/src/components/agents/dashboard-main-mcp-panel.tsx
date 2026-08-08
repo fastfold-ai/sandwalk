@@ -98,6 +98,10 @@ export function DashboardMainMcpPanel({
           await refreshMcp()
           await loadIntegrations()
         }}
+        onRevealStoredSecret={async key => {
+          const revealed = await client.revealIntegrationSecret(key)
+          return revealed.value || ''
+        }}
         onInstallLocal={
           mcpCatalogDetailId &&
           mcpDetailCatalogEntry?.transport === 'stdio' &&
@@ -120,6 +124,10 @@ export function DashboardMainMcpPanel({
       mcpServers={mcpServers}
       catalog={mcpCatalog}
       catalogLoading={mcpCatalogLoading}
+      onRevealStoredSecret={async key => {
+        const revealed = await client.revealIntegrationSecret(key)
+        return revealed.value || ''
+      }}
       onRefresh={refreshMcp}
       onConnectCatalog={async (catalogId, input) => {
         const result = await client.connectMcpCatalog(catalogId, input)

@@ -29,6 +29,7 @@ export function McpDetailView({
   onConnectCatalog,
   onDisconnectCatalog,
   onRefreshMeta,
+  onRevealStoredSecret,
   onInstallLocal
 }: {
   kind: 'catalog' | 'server'
@@ -43,6 +44,7 @@ export function McpDetailView({
   }) => Promise<ConnectMcpResult>
   onDisconnectCatalog?: () => Promise<ConnectMcpResult | void>
   onRefreshMeta?: () => Promise<void>
+  onRevealStoredSecret?: (integrationKey: string) => Promise<string>
   onInstallLocal?: (opts?: { force?: boolean }) => Promise<void>
 }) {
   const [setupOpen, setSetupOpen] = useState(false)
@@ -55,7 +57,8 @@ export function McpDetailView({
     onToggleEnabled,
     onConnectCatalog,
     onDisconnectCatalog,
-    onRefreshMeta
+    onRefreshMeta,
+    onRevealStoredSecret
   })
 
   const handleInstallLocal = onInstallLocal

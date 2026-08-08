@@ -28,6 +28,7 @@ export function McpFeaturedSection({
   onStatusPatchChange,
   onShowApiKeyChange,
   onApiKeyDraftChange,
+  onRevealStoredSecret
 }: {
   featuredOnly: boolean
   featuredLabel: string
@@ -53,6 +54,7 @@ export function McpFeaturedSection({
   ) => void
   onShowApiKeyChange: (id: string, show: boolean) => void
   onApiKeyDraftChange: (id: string, value: string) => void
+  onRevealStoredSecret?: (integrationKey: string) => Promise<string>
 }) {
   return (
     <section className={featuredOnly ? 'space-y-3' : 'space-y-2'}>
@@ -119,6 +121,7 @@ export function McpFeaturedSection({
               onStatusPatchChange={onStatusPatchChange}
               onShowApiKeyChange={onShowApiKeyChange}
               onApiKeyDraftChange={onApiKeyDraftChange}
+              onRevealStoredSecret={onRevealStoredSecret}
             />
           ))}
         </div>
@@ -142,6 +145,7 @@ export function McpMoreCatalogSection({
   onStatusPatchChange,
   onShowApiKeyChange,
   onApiKeyDraftChange,
+  onRevealStoredSecret
 }: {
   moreCatalog: McpCatalogEntry[]
   statusPatch: Record<string, CatalogStatusPatch>
@@ -161,6 +165,7 @@ export function McpMoreCatalogSection({
   ) => void
   onShowApiKeyChange: (id: string, show: boolean) => void
   onApiKeyDraftChange: (id: string, value: string) => void
+  onRevealStoredSecret?: (integrationKey: string) => Promise<string>
 }) {
   if (moreCatalog.length === 0) return null
 
@@ -187,6 +192,7 @@ export function McpMoreCatalogSection({
             onStatusPatchChange={onStatusPatchChange}
             onShowApiKeyChange={onShowApiKeyChange}
             onApiKeyDraftChange={onApiKeyDraftChange}
+            onRevealStoredSecret={onRevealStoredSecret}
           />
         ))}
       </div>

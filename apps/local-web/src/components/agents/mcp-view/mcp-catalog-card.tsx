@@ -14,10 +14,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { openInSystemBrowser } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
+import { McpApiKeyInput } from './mcp-api-key-input'
 import {
   authMeta,
   type CatalogStatusPatch,
@@ -44,6 +44,7 @@ export function McpCatalogCard({
   onStatusPatchChange,
   onShowApiKeyChange,
   onApiKeyDraftChange,
+  onRevealStoredSecret
 }: {
   entry: McpCatalogEntry
   statusPatch: CatalogStatusPatch | undefined
@@ -63,6 +64,7 @@ export function McpCatalogCard({
   ) => void
   onShowApiKeyChange: (id: string, show: boolean) => void
   onApiKeyDraftChange: (id: string, value: string) => void
+  onRevealStoredSecret?: (integrationKey: string) => Promise<string>
 }) {
   const view = withStatusPatch(entry, statusPatch)
   const pending = pendingId === view.id
@@ -269,13 +271,24 @@ export function McpCatalogCard({
           className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3"
           onClick={event => event.stopPropagation()}
         >
-          <Input
-            type="password"
-            className="max-w-md"
-            placeholder={view.apiKeyEnvVar || 'API key'}
-            autoFocus
+          <McpApiKeyInput
             value={apiKeyDraft}
-            onChange={event => onApiKeyDraftChange(view.id, event.target.value)}
+            onChange={value => onApiKeyDraftChange(view.id, value)}
+            placeholder={
+              view.configured
+                ? 'Secret saved. Enter a new key to replace it.'
+                : view.apiKeyEnvVar || 'API key'
+            }
+            autoFocus
+            disabled={pending}
+            hasStoredKey={
+              Boolean(view.configured && view.integrationKey && onRevealStoredSecret)
+            }
+            onRevealStored={
+              view.integrationKey && onRevealStoredSecret
+                ? () => onRevealStoredSecret(view.integrationKey!)
+                : undefined
+            }
             onKeyDown={event => {
               if (event.key === 'Enter') onConnectApiKey(view)
             }}
