@@ -1685,7 +1685,64 @@ def test_fetch_latest_release_success(monkeypatch):
 
     monkeypatch.setattr("httpx.Client", _Client)
     out = _REAL_FETCH_LATEST_RELEASE("fastfold-ai/skills", timeout_s=0.1)
-    assert out == {"tag": "v1.2.3", "published_at": "2026-06-18T00:00:00Z"}
+    assert out == {
+        "tag": "v1.2.3",
+        "published_at": "2026-06-18T00:00:00Z",
+        "commit": "",
+    }
+
+
+def test_fetch_latest_release_keeps_sha_target_commitish(monkeypatch):
+    """``target_commitish`` is kept only when it looks like a commit sha."""
+
+    payloads = [
+        {
+            "tag_name": "v2.0.0",
+            "published_at": "2026-07-01T00:00:00Z",
+            "target_commitish": "A1B2C3D4E5F6",
+        },
+        {
+            "tag_name": "v2.0.0",
+            "published_at": "2026-07-01T00:00:00Z",
+            # A branch name must not be reported as a commit.
+            "target_commitish": "main",
+        },
+    ]
+
+    class _Resp:
+        status_code = 200
+
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._payload
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            self._payload = payloads[0]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, headers=None):
+            return _Resp(self._payload)
+
+    monkeypatch.setattr("httpx.Client", _Client)
+    out = _REAL_FETCH_LATEST_RELEASE("fastfold-ai/skills", timeout_s=0.1)
+    assert out is not None
+    assert out["commit"] == "a1b2c3d4e5f6"
+
+    payloads.insert(0, payloads.pop(1))
+    out = _REAL_FETCH_LATEST_RELEASE("fastfold-ai/skills", timeout_s=0.1)
+    assert out is not None
+    assert out["commit"] == ""
 
 
 def test_fetch_latest_release_returns_none_on_url_error(monkeypatch):

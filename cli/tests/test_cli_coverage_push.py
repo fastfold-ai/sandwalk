@@ -705,11 +705,34 @@ class TestResolveProviderKeyKeepExisting:
         assert key == "sk-ant-api03-existing-key-value"
         assert "Keeping existing key" in buf.getvalue()
 
-    def test_resolve_provider_key_replaces_invalid_existing_key(self, captured_console, monkeypatch):
+    def test_resolve_provider_key_keeps_any_shaped_existing_key(
+        self, captured_console, monkeypatch
+    ):
+        """Key shape is no longer validated — providers rotate prefixes.
+
+        ``validate_llm_api_key`` is normalize-only (live probes are the source of
+        truth for auth), so an odd-looking stored key still reaches the keep
+        prompt rather than being replaced outright.
+        """
+        console, buf = captured_console
+        monkeypatch.setattr("cli.setup.provider_key.console", console)
+        cfg = Config(data={"llm.anthropic_api_key": "odd-shaped-but-real-key"})
+        monkeypatch.setattr("builtins.input", lambda _: "")
+        key = _resolve_provider_key(cfg, "anthropic")
+        assert key == "odd-shaped-but-real-key"
+        assert "Keeping existing key" in buf.getvalue()
+
+    def test_resolve_provider_key_replaces_when_user_declines(
+        self, captured_console, monkeypatch
+    ):
         console, _ = captured_console
         monkeypatch.setattr("cli.setup.provider_key.console", console)
-        cfg = Config(data={"llm.anthropic_api_key": "bad-key"})
-        monkeypatch.setattr("cli.setup.provider_key._prompt_api_key", lambda: "sk-ant-api03-replacement-key")
+        cfg = Config(data={"llm.anthropic_api_key": "sk-ant-api03-old-key"})
+        monkeypatch.setattr("builtins.input", lambda _: "n")
+        monkeypatch.setattr(
+            "cli.setup.provider_key._prompt_api_key",
+            lambda: "sk-ant-api03-replacement-key",
+        )
         key = _resolve_provider_key(cfg, "anthropic")
         assert key == "sk-ant-api03-replacement-key"
 

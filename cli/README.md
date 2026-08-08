@@ -13,10 +13,13 @@ uv sync --extra all
 
 uv run sandwalk serve
 uv run sandwalk --version
-uv run pytest tests/ -q
+uv run pytest tests/ -q   # needs --extra all (see below)
 ```
 
-`uv sync` already pulls the `dev` group (pytest, ruff, mypy). Use `--extra all` only when you need the optional science stacks.
+`uv sync` already pulls the `dev` group (pytest, ruff, mypy). **Running the full test
+suite needs `--extra all`** — tests import `rdkit` and `duckdb` directly, and without
+those extras ~79 tests fail on `ModuleNotFoundError` rather than anything real. CI
+installs `-e ".[dev,all]"` for the same reason.
 
 ## Interactive terminal
 

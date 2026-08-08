@@ -84,7 +84,9 @@ class TestTerminalMethods:
         assert terminal._model_display_name("claude-opus-4-6") == "Opus 4.6"
         assert terminal._model_display_name("gpt-5.5") == "GPT-5.5"
         assert terminal._model_display_name("gpt-5.4-mini") == "GPT-5.4 Mini"
-        assert terminal._model_display_name("unknown-model") == "unknown-model"
+        # Unmapped ids fall through to the discovered-label formatter so gateway
+        # models still read as names rather than raw slugs.
+        assert terminal._model_display_name("unknown-model") == "Unknown Model"
 
     def test_current_provider_status_openai_compatible_when_custom_endpoint_active(self, terminal):
         def _cfg_get(key, default=None):
@@ -131,8 +133,12 @@ class TestTerminalMethods:
         terminal._worker_thread = None
         terminal._queued_queries = []
         toolbar = terminal._bottom_toolbar()
-        assert "gemma4:e2b-mlx" in str(toolbar)
+        # The toolbar renders the display label, not the raw id.
+        expected_model = terminal._model_display_name("gemma4:e2b-mlx")
+        assert expected_model in str(toolbar)
         assert "Unsloth" in str(toolbar)
+        # Backend sits directly beside the model, not in a separate segment.
+        assert f"{expected_model} · Unsloth" in str(toolbar)
 
     def test_compose_provider_label_omlx_not_qwen_cloud_for_local_qwen_id(self, terminal):
         """Local oMLX Qwen* weights must not surface as Qwen Cloud in the compose bar."""
@@ -736,10 +742,17 @@ class TestTerminalMethods:
         terminal._render_resumed_history.assert_called_once()
         assert terminal._last_response is None
         assert terminal.agent is resumed
-        printed = " ".join(str(c) for c in terminal.console.print.call_args_list)
-        assert "Resumed" in printed
-        assert "Full resume" in printed
-        assert "2 turns" in printed
+        # With a transcript attached, the resume line is appended there rather
+        # than printed to the console.
+        resume_lines = " ".join(
+            str(getattr(entry, "text", "") or "")
+            for entry in terminal.transcript.entries
+        )
+        assert "Resumed" in resume_lines
+        assert "Full resume" in resume_lines
+        assert "2 turns" in resume_lines
+        # The prior session's scrollback must not survive the resume.
+        assert "old noisy turn" not in resume_lines
 
     def test_session_display_title_heals_instruction_echo(self, terminal):
         turn = MagicMock()

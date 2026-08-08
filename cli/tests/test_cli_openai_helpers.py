@@ -299,13 +299,40 @@ class TestResolveProviderKey:
         key = _resolve_provider_key(cfg, "anthropic", cli_key="sk-ant-api03-valid-key-here")
         assert key == "sk-ant-api03-valid-key-here"
 
-    def test_cli_key_invalid_exits(self, captured_console, monkeypatch):
+    def test_cli_key_passthrough_is_not_shape_validated(
+        self, captured_console, monkeypatch
+    ):
+        """``--api-key`` is passed through as-is.
+
+        Shape heuristics were removed because providers rotate key formats
+        (e.g. Qwen ``sk-sp-`` plan keys); a live probe validates auth instead.
+        """
         console, _ = captured_console
         monkeypatch.setattr("cli.console", console)
         cfg = Config(data={})
-        with pytest.raises(typer.Exit) as exc:
-            _resolve_provider_key(cfg, "anthropic", cli_key="not-a-key")
-        assert exc.value.exit_code == 2
+        key = _resolve_provider_key(cfg, "anthropic", cli_key="not-a-conventional-key")
+        assert key == "not-a-conventional-key"
+
+    def test_cli_key_whitespace_returns_empty_without_prompting(
+        self, captured_console, monkeypatch
+    ):
+        """A whitespace ``--api-key`` short-circuits: it is truthy, then stripped."""
+        console, _ = captured_console
+        monkeypatch.setattr("cli.console", console)
+        cfg = Config(data={})
+        called = False
+
+        def _unexpected_prompt():
+            nonlocal called
+            called = True
+            return "sk-ant-api03-prompted"
+
+        monkeypatch.setattr(
+            "cli.setup.provider_key._prompt_api_key", _unexpected_prompt
+        )
+        key = _resolve_provider_key(cfg, "anthropic", cli_key="   ")
+        assert key == ""
+        assert called is False
 
     def test_openai_compatible_uses_default_ollama_key(self, captured_console, monkeypatch):
         console, _ = captured_console

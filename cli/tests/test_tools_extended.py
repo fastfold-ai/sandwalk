@@ -251,11 +251,14 @@ class TestSkillsManage:
         skill.name = "fold"
         skill.source = "bundled"
         skill.description = "Folding skill"
+        skill.enabled = True
         mock_list.return_value = [skill]
 
         result = manage(action="list")
         assert "fold" in result["summary"]
-        assert result["skills"] == ["fold"]
+        assert [s["name"] for s in result["skills"]] == ["fold"]
+        assert result["skills"][0]["source"] == "bundled"
+        assert result["skills"][0]["enabled"] is True
 
     @patch("agent.skills.discover_skills")
     def test_find_action(self, mock_discover):
@@ -284,16 +287,47 @@ class TestSkillsManage:
         assert result["blocked"] is True
         assert result["ok"] is False
 
+    @patch("agent.skills.skill_info")
     @patch("agent.skills.install_skill")
-    def test_install_allowed(self, mock_install):
+    def test_install_allowed(self, mock_install, mock_info):
         from tools.skills import manage
 
         session = MagicMock()
         session.config.get.return_value = True
-        mock_install.return_value = {"summary": "Installed fold", "ok": True}
+        # Install reports the names it wrote; manage then verifies each one.
+        mock_install.return_value = {
+            "summary": "Installed fold",
+            "ok": True,
+            "installed": ["fold"],
+        }
+        info = MagicMock()
+        info.name = "fold"
+        info.enabled = True
+        mock_info.return_value = info
+
         result = manage(action="install", source="fold", _session=session)
         assert result["ok"] is True
-        mock_install.assert_called_once_with("fold")
+        assert result["installation_verified"] is True
+        mock_install.assert_called_once_with("fold", manifest_source=None)
+
+    @patch("agent.skills.skill_info")
+    @patch("agent.skills.install_skill")
+    def test_install_unverified_is_not_ok(self, mock_install, mock_info):
+        """A successful installer report is not enough — info must confirm it."""
+        from tools.skills import manage
+
+        session = MagicMock()
+        session.config.get.return_value = True
+        mock_install.return_value = {
+            "summary": "Installed fold",
+            "ok": True,
+            "installed": ["fold"],
+        }
+        mock_info.return_value = None
+
+        result = manage(action="install", source="fold", _session=session)
+        assert result["ok"] is False
+        assert result.get("installation_verified") is False
 
     def test_unknown_action(self):
         from tools.skills import manage

@@ -23,6 +23,40 @@ _FAKE_HOME = Path(tempfile.mkdtemp(prefix="sandwalk-test-home-"))
 os.environ["HOME"] = str(_FAKE_HOME)
 os.environ["USERPROFILE"] = str(_FAKE_HOME)
 
+# ``agent.config`` calls ``load_dotenv()`` at import, which searches upward from
+# the working directory. A developer with a ``~/.env`` (or one above the repo)
+# therefore leaks real provider keys into the suite: setup-wizard tests then see
+# an "existing key", take the interactive branch, and block on ``input()``.
+#
+# Deleting the vars here is not enough — that import happens later, during
+# collection, and would re-inject them. python-dotenv defaults to
+# ``override=False``, so pinning each var to empty makes it skip them, and the
+# config layer normalizes blank secrets to None. Opt-in lanes that need live
+# credentials set their own env gates, so leave the real values alone there.
+_PROVIDER_KEY_ENV_VARS = (
+    "FASTFOLD_API_KEY",
+    "BOLTZ_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "XAI_API_KEY",
+    "GEMINI_API_KEY",
+    "MOONSHOT_API_KEY",
+    "NVIDIA_API_KEY",
+    "OPENCODE_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "MINIMAX_API_KEY",
+    "MISTRAL_API_KEY",
+    "QWEN_API_KEY",
+    "TOGETHER_API_KEY",
+    "OPENROUTER_API_KEY",
+)
+if not any(
+    os.environ.get(gate, "").strip().lower() in {"1", "true", "yes"}
+    for gate in ("RUN_CLI_NETWORK", "RUN_CLI_E2E", "RUN_MODAL_E2E")
+):
+    for _var in _PROVIDER_KEY_ENV_VARS:
+        os.environ[_var] = ""
+
 
 def _env_flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes"}

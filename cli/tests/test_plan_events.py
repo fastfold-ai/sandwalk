@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from agent_server.service.emit_events import make_event_emitter
@@ -97,6 +98,9 @@ def test_plan_created_payload_fallbacks_and_rejects():
 
 def test_emit_runtime_event_appends_plan_created():
     store = MagicMock()
+    # Events are dropped unless the session is still active, so give the mock a
+    # running status instead of a bare Mock attribute.
+    store.get_session.return_value = SimpleNamespace(status="running")
     emit = make_event_emitter(store, "sess-1", "run-1")
     emit(
         "tool_start",
@@ -114,3 +118,17 @@ def test_emit_runtime_event_appends_plan_created():
         c for c in store.append_event.call_args_list if c.kwargs["event_type"] == "plan.created"
     )
     assert plan_call.kwargs["payload"]["path"] == "plans/demo.md"
+
+
+def test_emit_runtime_event_drops_events_after_stop():
+    """A worker thread that outlives Stop must not repaint the UI."""
+    store = MagicMock()
+    store.get_session.return_value = SimpleNamespace(status="interrupted")
+    emit = make_event_emitter(store, "sess-1", "run-1")
+    emit(
+        "tool_start",
+        name="files.create_file",
+        arguments={"path": "/tmp/ws/plans/demo.md", "content": "# Demo\n"},
+        tool_call_id="tc-1",
+    )
+    store.append_event.assert_not_called()

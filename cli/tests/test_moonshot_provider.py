@@ -45,7 +45,9 @@ def test_moonshot_context_windows_and_lookup():
 def test_moonshot_modality_and_thinking_support():
     assert model_supports_image_inputs("moonshot", "kimi-k3") is True
     assert model_supports_image_inputs("moonshot", "kimi-k2.6") is True
-    assert model_supports_image_inputs("moonshot", "kimi-k2.7-code") is False
+    # K2.7 Code is vision-capable too (OpenRouter lists image on it).
+    assert model_supports_image_inputs("moonshot", "kimi-k2.7-code") is True
+    assert model_supports_image_inputs("moonshot", "moonshot-v1-32k") is False
     assert moonshot_model_supports_thinking_toggle("kimi-k2.6") is True
     assert moonshot_model_supports_thinking_toggle("kimi-k2.5") is True
     assert moonshot_model_supports_thinking_toggle("kimi-k3") is False

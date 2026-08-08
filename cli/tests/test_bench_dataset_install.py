@@ -34,7 +34,12 @@ def test_install_mbpp_writes_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         )
         for tid in range(11, 111)
     ).encode("utf-8")
-    monkeypatch.setattr(mod, "_download_bytes", lambda url, token=None: payload)
+    # Signature mirrors the real helper (keyword-only token + progress callback).
+    monkeypatch.setattr(
+        mod,
+        "_download_bytes",
+        lambda url, *, token=None, on_chunk=None: payload,
+    )
 
     result = install_suite("mbpp", force=True)
     assert result.ok
@@ -68,9 +73,11 @@ def test_start_install_returns_immediately(monkeypatch: pytest.MonkeyPatch):
     started = threading.Event()
     finished = threading.Event()
 
-    def slow_install(suite_id: str, *, force: bool = False):
+    def slow_install(suite_id: str, *, force: bool = False, on_progress=None):
         started.set()
         finished.wait(timeout=2)
+        if on_progress is not None:
+            on_progress(summary="halfway", files_done=1, files_total=2)
         return BenchInstallResponse(
             ok=True,
             suite_id=suite_id,

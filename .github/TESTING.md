@@ -61,6 +61,10 @@ uv sync --extra all   # or: python -m venv .venv && pip install -e ".[dev,all]"
   --cov-fail-under=80
 ```
 
+`--extra all` is **required**, not optional: tests import `rdkit` and `duckdb`
+directly, so a plain `uv sync` leaves ~79 tests failing on `ModuleNotFoundError`
+rather than on anything real.
+
 Opt-in lanes (`cli_network`, `cli_e2e`, `modal_e2e`, `data_smoke`, `integration`) are
 **auto-deselected** in `tests/conftest.py` unless their env gate is set — no
 `-m "not … and not …"` expression needed.

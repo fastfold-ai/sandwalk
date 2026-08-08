@@ -87,8 +87,12 @@ def test_agent_server_health_and_session_contract(tmp_path: Path, monkeypatch):
         )
         assert created_mcp.status_code == 201
         mcp_id = created_mcp.json()["id"]
-        assert client.get("/v1/mcp-servers").json()["data"][0]["id"] == mcp_id
+        # Seeded catalog rows share the list, so match by id instead of position.
+        listed = client.get("/v1/mcp-servers").json()["data"]
+        assert mcp_id in {row["id"] for row in listed}
         assert client.delete(f"/v1/mcp-servers/{mcp_id}").status_code == 200
+        remaining = client.get("/v1/mcp-servers").json()["data"]
+        assert mcp_id not in {row["id"] for row in remaining}
 
         created = client.post(
             "/v1/sessions",

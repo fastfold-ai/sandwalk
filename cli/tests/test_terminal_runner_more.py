@@ -156,8 +156,14 @@ class TestTerminalKeyBindings:
         terminal = _build_terminal_for_bindings()
         kb = _build_key_bindings(terminal)
         buf = _FakeBuffer(text="/he")
+        # Real prompt_toolkit completions expose ``.text``; the accept helpers
+        # inspect it to tell slash menus from @ file chips.
+        completions = [
+            SimpleNamespace(text="/help"),
+            SimpleNamespace(text="/hello"),
+        ]
         buf.complete_state = SimpleNamespace(
-            completions=["/help", "/hello"],
+            completions=completions,
             complete_index=None,
             current_completion=None,
         )
@@ -165,7 +171,7 @@ class TestTerminalKeyBindings:
 
         _handler(kb, "_accept_first_completion")(event)
 
-        assert buf.applied_completion == "/help"
+        assert buf.applied_completion is completions[0]
         assert buf.validated is True
 
     def test_enter_non_slash_submits_without_completion(self):
