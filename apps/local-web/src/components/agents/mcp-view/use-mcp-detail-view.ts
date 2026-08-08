@@ -24,6 +24,10 @@ export type McpDetailViewInput = {
   onRefreshMeta?: () => Promise<void>
   /** Reveal a saved Integrations secret for API-key MCPs (show/copy). */
   onRevealStoredSecret?: (integrationKey: string) => Promise<string>
+  /** Live-validate an Integrations secret (Test in API key modal). */
+  onValidateIntegration?: (
+    integrationKey: string
+  ) => Promise<{ ok: boolean; message: string }>
 }
 
 export function useMcpDetailView({
@@ -35,7 +39,8 @@ export function useMcpDetailView({
   onConnectCatalog,
   onDisconnectCatalog,
   onRefreshMeta,
-  onRevealStoredSecret
+  onRevealStoredSecret,
+  onValidateIntegration
 }: McpDetailViewInput) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -282,6 +287,7 @@ export function useMcpDetailView({
     catalogEntry,
     hasToggle: Boolean(onToggleEnabled),
     revealStoredApiKey,
+    onValidateIntegration,
     loadTools,
     connectOAuth,
     connectApiKey,

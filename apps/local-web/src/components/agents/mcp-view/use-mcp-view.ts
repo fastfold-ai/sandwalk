@@ -96,7 +96,7 @@ export function useMcpView({
     showApiKey,
     apiKeyDraft,
     onConnectOAuth: (entry: McpCatalogEntry) => void connectOAuth(entry),
-    onConnectApiKey: (entry: McpCatalogEntry) => void connectApiKey(entry),
+    onConnectApiKey: (entry: McpCatalogEntry) => connectApiKey(entry),
     onToggleCatalog,
     onPendingIdChange: setPendingId,
     onStatusPatchChange: setStatusPatch,

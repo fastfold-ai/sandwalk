@@ -22,7 +22,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { openInSystemBrowser } from '@/lib/desktop'
 
-import { McpApiKeyInput } from './mcp-api-key-input'
+import { McpApiKeyDialog } from './mcp-api-key-dialog'
+import { McpIcon } from './mcp-view-shared'
 import type { McpDetailViewState } from './use-mcp-detail-view'
 
 export function McpDetailHeaderBar({
@@ -214,7 +215,11 @@ export function McpDetailHeaderBar({
   )
 }
 
-export function McpDetailApiKeyBar({ state }: { state: McpDetailViewState }) {
+export function McpDetailApiKeyDialog({
+  state
+}: {
+  state: McpDetailViewState
+}) {
   const {
     showCatalogActions,
     showApiKey,
@@ -222,73 +227,70 @@ export function McpDetailApiKeyBar({ state }: { state: McpDetailViewState }) {
     catalogEntry,
     apiKeyDraft,
     setApiKeyDraft,
-    connectPending,
     connectApiKey,
     setShowApiKey,
     revealStoredApiKey,
-    configured
+    configured,
+    disconnect,
+    onValidateIntegration,
+    loadTools,
+    onDisconnectCatalog
   } = state
 
-  if (!showCatalogActions || !showApiKey || !supportsApiKey) return null
+  if (!showCatalogActions || !supportsApiKey || !catalogEntry) return null
+
+  const setupUrl =
+    catalogEntry.id === 'huggingface'
+      ? 'https://huggingface.co/settings/tokens'
+      : catalogEntry.setupUrl
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
-      <McpApiKeyInput
-        value={apiKeyDraft}
-        onChange={setApiKeyDraft}
-        placeholder={
-          configured
-            ? 'Secret saved. Enter a new key to replace it.'
-            : catalogEntry?.apiKeyEnvVar || 'API key'
+    <McpApiKeyDialog
+      open={showApiKey}
+      onOpenChange={open => {
+        setShowApiKey(open)
+        if (!open) setApiKeyDraft('')
+      }}
+      title={`${catalogEntry.name} API Key`}
+      description={catalogEntry.description}
+      icon={
+        <McpIcon
+          id={catalogEntry.id}
+          name={catalogEntry.name}
+          url={catalogEntry.url}
+        />
+      }
+      configured={configured}
+      maskedPreview={catalogEntry.maskedPreview}
+      placeholderUnset={catalogEntry.apiKeyEnvVar || 'Enter your API key'}
+      setupUrl={setupUrl}
+      draft={apiKeyDraft}
+      onDraftChange={setApiKeyDraft}
+      onRevealStored={revealStoredApiKey}
+      onSave={() => connectApiKey()}
+      onTest={async () => {
+        if (apiKeyDraft.trim()) {
+          const saved = await connectApiKey()
+          if (!saved.ok) return saved
         }
-        disabled={connectPending}
-        hasStoredKey={configured && Boolean(revealStoredApiKey)}
-        onRevealStored={revealStoredApiKey}
-        onKeyDown={event => {
-          if (event.key === 'Enter') void connectApiKey()
-        }}
-      />
-      <Button
-        type="button"
-        size="sm"
-        className="h-8 text-xs"
-        disabled={connectPending || !apiKeyDraft.trim()}
-        onClick={() => void connectApiKey()}
-      >
-        {connectPending ? (
-          <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-        ) : null}
-        Save & connect
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        className="h-8 text-xs"
-        disabled={connectPending}
-        onClick={() => {
-          setShowApiKey(false)
-          setApiKeyDraft('')
-        }}
-      >
-        Cancel
-      </Button>
-      {catalogEntry?.setupUrl || catalogEntry?.id === 'huggingface' ? (
-        <button
-          type="button"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
-          onClick={() =>
-            void openInSystemBrowser(
-              catalogEntry?.id === 'huggingface'
-                ? 'https://huggingface.co/settings/tokens'
-                : catalogEntry?.setupUrl || ''
-            )
-          }
-        >
-          Get API token
-          <ExternalLink className="size-3" />
-        </button>
-      ) : null}
-    </div>
+        if (onValidateIntegration && catalogEntry.integrationKey) {
+          const result = await onValidateIntegration(
+            catalogEntry.integrationKey
+          )
+          if (result.ok) await loadTools(true)
+          return result
+        }
+        const next = await loadTools(true)
+        return {
+          ok: Boolean(next?.ok),
+          message:
+            next?.message ||
+            (next?.ok
+              ? `Connected · ${next.toolCount ?? 0} tools`
+              : 'Probe failed')
+        }
+      }}
+      onRemove={onDisconnectCatalog ? () => disconnect() : undefined}
+    />
   )
 }

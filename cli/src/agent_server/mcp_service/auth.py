@@ -25,6 +25,29 @@ def _cfg_secret(config: Config, config_key: str | None, env_var: str | None) -> 
     return None
 
 
+def mask_secret_preview(value: str | None) -> str | None:
+    """Short preview for UI placeholders (same shape as Integrations)."""
+    normalized = (value or "").strip()
+    if not normalized:
+        return None
+    if len(normalized) <= 8:
+        return "••••••••"
+    return f"{normalized[:4]}…{normalized[-4:]}"
+
+
+def api_key_masked_preview(
+    entry: McpCatalogEntry,
+    config: Config | None = None,
+) -> str | None:
+    """Masked API key when one is stored for this catalog entry."""
+    if not entry.api_key_config_key:
+        return None
+    cfg = config or Config.load()
+    return mask_secret_preview(
+        _cfg_secret(cfg, entry.api_key_config_key, entry.api_key_env_var)
+    )
+
+
 def oauth_access_token_expired(
     entry: McpCatalogEntry,
     config: Config | None = None,

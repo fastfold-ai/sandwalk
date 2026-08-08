@@ -51,6 +51,8 @@ export function McpCustomSection({
   onRefresh,
   onInstallCatalog,
   onRevealStoredSecret,
+  onDisconnectCatalog,
+  onValidateIntegration,
   onResetFeaturedDefaults
 }: {
   installedServers: McpServer[]
@@ -97,6 +99,10 @@ export function McpCustomSection({
   onRefresh?: () => Promise<void>
   onInstallCatalog?: (catalogId: string) => void | Promise<void>
   onRevealStoredSecret?: (integrationKey: string) => Promise<string>
+  onDisconnectCatalog?: (catalogId: string) => Promise<void>
+  onValidateIntegration?: (
+    integrationKey: string
+  ) => Promise<{ ok: boolean; message: string }>
   onResetFeaturedDefaults?: () => void | Promise<void>
 }) {
   const [showAddForm, setShowAddForm] = useState(false)
@@ -116,6 +122,8 @@ export function McpCustomSection({
         onConnectCatalog={onConnectCatalog}
         onRefresh={onRefresh}
         onRevealStoredSecret={onRevealStoredSecret}
+        onDisconnectCatalog={onDisconnectCatalog}
+        onValidateIntegration={onValidateIntegration}
         onAddNew={() => setShowAddForm(true)}
       />
 

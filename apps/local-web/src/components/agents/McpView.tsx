@@ -38,6 +38,8 @@ export function McpView({
   onLoadMcpJson,
   onSaveMcpJson,
   onRevealStoredSecret,
+  onDisconnectCatalog,
+  onValidateIntegration,
   embedded = false
 }: {
   mcpServers: McpServer[]
@@ -77,6 +79,10 @@ export function McpView({
   onLoadMcpJson?: () => Promise<{ path: string; document: McpJsonDocument }>
   onSaveMcpJson?: (document: McpJsonDocument) => Promise<void>
   onRevealStoredSecret?: (integrationKey: string) => Promise<string>
+  onDisconnectCatalog?: (catalogId: string) => Promise<void>
+  onValidateIntegration?: (
+    integrationKey: string
+  ) => Promise<{ ok: boolean; message: string }>
   embedded?: boolean
 }) {
   const [jsonOpen, setJsonOpen] = useState(false)
@@ -160,6 +166,8 @@ export function McpView({
       onShowAll={onShowAll}
       onOpenCatalog={onOpenCatalog}
       onRevealStoredSecret={onRevealStoredSecret}
+      onDisconnectCatalog={onDisconnectCatalog}
+      onValidateIntegration={onValidateIntegration}
       {...view.catalogCardProps}
     />
   )
@@ -236,6 +244,8 @@ export function McpView({
             onRefresh={onRefresh}
             onInstallCatalog={onInstallCatalog}
             onRevealStoredSecret={onRevealStoredSecret}
+            onDisconnectCatalog={onDisconnectCatalog}
+            onValidateIntegration={onValidateIntegration}
             onResetFeaturedDefaults={
               onResetFeaturedDefaults ? runResetDefaults : undefined
             }

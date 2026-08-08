@@ -23,6 +23,8 @@ class McpCatalogEntryStatus(ApiModel):
     default_enabled: bool = False
     configured: bool = False
     auth_method: str | None = None
+    # Masked API key preview when a secret is stored (Integrations-style).
+    masked_preview: str | None = None
     enabled: bool = False
     server_id: str | None = None
     connected: bool = False

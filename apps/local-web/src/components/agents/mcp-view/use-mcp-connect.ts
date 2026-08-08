@@ -58,7 +58,7 @@ export function useMcpConnect({
           /no oauth registration|use api key connect/i.test(message)
         if (apiKeyOnly || oauthUnavailable) {
           toast.message('API key required', {
-            description: `${entry.name} uses an API key — paste it below to connect.`
+            description: `${entry.name} uses an API key — enter it in the dialog to connect.`
           })
         } else {
           toast.error(message, { description: entry.name })
@@ -75,11 +75,14 @@ export function useMcpConnect({
   )
 
   const connectApiKey = useCallback(
-    async (entry: McpCatalogEntry) => {
+    async (
+      entry: McpCatalogEntry
+    ): Promise<{ ok: boolean; message: string }> => {
       const apiKey = (apiKeyDraft[entry.id] || '').trim()
       if (!apiKey) {
-        toast.error('API key is required', { description: entry.name })
-        return
+        const message = 'API key is required'
+        toast.error(message, { description: entry.name })
+        return { ok: false, message }
       }
       setPendingId(entry.id)
       try {
@@ -88,11 +91,10 @@ export function useMcpConnect({
           apiKey
         })
         if (result.ok) {
+          const message =
+            result.message || `Connected · ${result.toolCount ?? 0} tools`
           toast.dismiss()
-          toast.success(
-            result.message || `Connected · ${result.toolCount ?? 0} tools`,
-            { description: entry.name }
-          )
+          toast.success(message, { description: entry.name })
           setStatusPatch(prev => ({
             ...prev,
             [entry.id]: {
@@ -107,23 +109,24 @@ export function useMcpConnect({
             delete next[entry.id]
             return next
           })
-          setShowApiKey(prev => ({ ...prev, [entry.id]: false }))
-        } else {
-          toast.error(result.message || 'Connect failed', {
-            description: entry.name
-          })
-          setStatusPatch(prev => ({
-            ...prev,
-            [entry.id]: {
-              connected: false,
-              enabled: false,
-              statusMessage: result.message || 'Connect failed',
-              toolCount: null
-            }
-          }))
+          return { ok: true, message }
         }
+        const message = result.message || 'Connect failed'
+        toast.error(message, { description: entry.name })
+        setStatusPatch(prev => ({
+          ...prev,
+          [entry.id]: {
+            connected: false,
+            enabled: false,
+            statusMessage: message,
+            toolCount: null
+          }
+        }))
+        return { ok: false, message }
       } catch (err) {
-        toast.error(formatConnectError(err), { description: entry.name })
+        const message = formatConnectError(err)
+        toast.error(message, { description: entry.name })
+        return { ok: false, message }
       } finally {
         setPendingId(null)
         await onRefresh()
@@ -135,7 +138,6 @@ export function useMcpConnect({
       onRefresh,
       setApiKeyDraft,
       setPendingId,
-      setShowApiKey,
       setStatusPatch
     ]
   )

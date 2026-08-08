@@ -45,10 +45,22 @@ export function isAuthReconnectMessage(
   return /expired|reconnect|invalid_token|unauthorized|401/i.test(message)
 }
 
+export function isLocalStdioServer(
+  server: McpServer,
+  catalogEntry: McpCatalogEntry | undefined
+): boolean {
+  if (catalogEntry) {
+    return (
+      catalogEntry.transport === 'stdio' || catalogEntry.authMode === 'none'
+    )
+  }
+  return server.transport === 'stdio'
+}
+
 export function authStatusLabel(
   server: McpServer,
   catalogEntry: McpCatalogEntry | undefined,
-  options: { waiting: boolean; needsAuth: boolean }
+  options: { waiting: boolean; needsAuth: boolean; needsSetup?: boolean }
 ): { text: string; tone: 'muted' | 'amber' | 'waiting' } {
   if (options.waiting) {
     return { text: 'Waiting for callback…', tone: 'waiting' }
@@ -56,6 +68,9 @@ export function authStatusLabel(
   const statusMessage = catalogEntry?.statusMessage?.trim()
   if (statusMessage && isAuthReconnectMessage(statusMessage)) {
     return { text: 'Needs reconnect', tone: 'amber' }
+  }
+  if (options.needsSetup) {
+    return { text: 'Needs setup', tone: 'amber' }
   }
   if (options.needsAuth) {
     return { text: 'Needs authentication', tone: 'amber' }

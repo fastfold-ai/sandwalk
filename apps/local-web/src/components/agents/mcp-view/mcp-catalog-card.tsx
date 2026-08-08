@@ -17,7 +17,7 @@ import {
 import { openInSystemBrowser } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
-import { McpApiKeyInput } from './mcp-api-key-input'
+import { McpApiKeyDialog } from './mcp-api-key-dialog'
 import {
   authMeta,
   type CatalogStatusPatch,
@@ -44,7 +44,9 @@ export function McpCatalogCard({
   onStatusPatchChange,
   onShowApiKeyChange,
   onApiKeyDraftChange,
-  onRevealStoredSecret
+  onRevealStoredSecret,
+  onDisconnectCatalog,
+  onValidateIntegration
 }: {
   entry: McpCatalogEntry
   statusPatch: CatalogStatusPatch | undefined
@@ -54,7 +56,9 @@ export function McpCatalogCard({
   apiKeyDraft: string
   onOpenCatalog?: (entry: McpCatalogEntry) => void
   onConnectOAuth: (entry: McpCatalogEntry) => void
-  onConnectApiKey: (entry: McpCatalogEntry) => void
+  onConnectApiKey: (
+    entry: McpCatalogEntry
+  ) => Promise<{ ok: boolean; message: string } | void>
   onToggleCatalog: (entry: McpCatalogEntry, enabled: boolean) => Promise<void>
   onPendingIdChange: (id: string | null) => void
   onStatusPatchChange: (
@@ -65,6 +69,10 @@ export function McpCatalogCard({
   onShowApiKeyChange: (id: string, show: boolean) => void
   onApiKeyDraftChange: (id: string, value: string) => void
   onRevealStoredSecret?: (integrationKey: string) => Promise<string>
+  onDisconnectCatalog?: (catalogId: string) => Promise<void>
+  onValidateIntegration?: (
+    integrationKey: string
+  ) => Promise<{ ok: boolean; message: string }>
 }) {
   const view = withStatusPatch(entry, statusPatch)
   const pending = pendingId === view.id
@@ -100,6 +108,11 @@ export function McpCatalogCard({
     }
     onShowApiKeyChange(view.id, true)
   }
+
+  const setupUrl =
+    view.id === 'huggingface'
+      ? 'https://huggingface.co/settings/tokens'
+      : view.setupUrl
 
   return (
     <div
@@ -266,63 +279,57 @@ export function McpCatalogCard({
         ) : null}
       </div>
 
-      {showApiKey && supportsApiKey ? (
-        <div
-          className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3"
-          onClick={event => event.stopPropagation()}
-        >
-          <McpApiKeyInput
-            value={apiKeyDraft}
-            onChange={value => onApiKeyDraftChange(view.id, value)}
-            placeholder={
-              view.configured
-                ? 'Secret saved. Enter a new key to replace it.'
-                : view.apiKeyEnvVar || 'API key'
-            }
-            autoFocus
-            disabled={pending}
-            hasStoredKey={
-              Boolean(view.configured && view.integrationKey && onRevealStoredSecret)
-            }
+      {supportsApiKey ? (
+        <div onClick={event => event.stopPropagation()}>
+          <McpApiKeyDialog
+            open={showApiKey}
+            onOpenChange={open => {
+              onShowApiKeyChange(view.id, open)
+              if (!open) onApiKeyDraftChange(view.id, '')
+            }}
+            title={`${view.name} API Key`}
+            description={view.description}
+            icon={<McpIcon id={view.id} name={view.name} url={view.url} />}
+            configured={Boolean(view.configured)}
+            maskedPreview={view.maskedPreview}
+            placeholderUnset={view.apiKeyEnvVar || 'Enter your API key'}
+            setupUrl={setupUrl}
+            draft={apiKeyDraft}
+            onDraftChange={value => onApiKeyDraftChange(view.id, value)}
             onRevealStored={
               view.integrationKey && onRevealStoredSecret
                 ? () => onRevealStoredSecret(view.integrationKey!)
                 : undefined
             }
-            onKeyDown={event => {
-              if (event.key === 'Enter') onConnectApiKey(view)
+            onSave={async () => {
+              const result = await onConnectApiKey(view)
+              return (
+                result || {
+                  ok: true,
+                  message: 'API key saved.'
+                }
+              )
             }}
+            onTest={
+              onValidateIntegration && view.integrationKey
+                ? async () => {
+                    if (apiKeyDraft.trim()) {
+                      const saved = await onConnectApiKey(view)
+                      if (saved && !saved.ok) return saved
+                    }
+                    return onValidateIntegration(view.integrationKey!)
+                  }
+                : undefined
+            }
+            onRemove={
+              view.configured && onDisconnectCatalog
+                ? async () => {
+                    await onDisconnectCatalog(view.id)
+                    toast.success('Disconnected', { description: view.name })
+                  }
+                : undefined
+            }
           />
-          <Button
-            size="sm"
-            disabled={pending || !apiKeyDraft.trim()}
-            onClick={() => onConnectApiKey(view)}
-          >
-            Save & enable
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onShowApiKeyChange(view.id, false)}
-          >
-            Cancel
-          </Button>
-          {view.setupUrl || view.id === 'huggingface' ? (
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
-              onClick={() =>
-                void openInSystemBrowser(
-                  view.id === 'huggingface'
-                    ? 'https://huggingface.co/settings/tokens'
-                    : view.setupUrl || ''
-                )
-              }
-            >
-              Get API token
-              <ExternalLink className="size-3" />
-            </button>
-          ) : null}
         </div>
       ) : null}
     </div>

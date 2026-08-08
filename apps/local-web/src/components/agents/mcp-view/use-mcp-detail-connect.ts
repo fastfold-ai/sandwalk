@@ -99,12 +99,18 @@ export function useMcpDetailConnect({
     supportsApiKey
   ])
 
-  const connectApiKey = useCallback(async () => {
-    if (!onConnectCatalog || !catalogEntry) return
+  const connectApiKey = useCallback(async (): Promise<{
+    ok: boolean
+    message: string
+  }> => {
+    if (!onConnectCatalog || !catalogEntry) {
+      return { ok: false, message: 'Connect is unavailable.' }
+    }
     const apiKey = apiKeyDraft.trim()
     if (!apiKey) {
-      toast.error('API key is required', { description: catalogEntry.name })
-      return
+      const message = 'API key is required'
+      toast.error(message, { description: catalogEntry.name })
+      return { ok: false, message }
     }
     setConnectPending(true)
     try {
@@ -113,22 +119,22 @@ export function useMcpDetailConnect({
         apiKey
       })
       if (!connectResult.ok) {
-        toast.error(connectResult.message || 'Connect failed', {
-          description: catalogEntry.name
-        })
-      } else {
-        toast.success(
-          connectResult.message ||
-            `Connected · ${connectResult.toolCount ?? 0} tools`,
-          { description: catalogEntry.name }
-        )
-        setShowApiKey(false)
-        setApiKeyDraft('')
-        await onRefreshMeta?.()
-        await loadTools(true)
+        const message = connectResult.message || 'Connect failed'
+        toast.error(message, { description: catalogEntry.name })
+        return { ok: false, message }
       }
+      const message =
+        connectResult.message ||
+        `Connected · ${connectResult.toolCount ?? 0} tools`
+      toast.success(message, { description: catalogEntry.name })
+      setApiKeyDraft('')
+      await onRefreshMeta?.()
+      await loadTools(true)
+      return { ok: true, message }
     } catch (err) {
-      toast.error(formatConnectError(err), { description: catalogEntry.name })
+      const message = formatConnectError(err)
+      toast.error(message, { description: catalogEntry.name })
+      return { ok: false, message }
     } finally {
       setConnectPending(false)
     }
@@ -139,8 +145,7 @@ export function useMcpDetailConnect({
     onConnectCatalog,
     onRefreshMeta,
     setApiKeyDraft,
-    setConnectPending,
-    setShowApiKey
+    setConnectPending
   ])
 
   const primaryConnect = () => {

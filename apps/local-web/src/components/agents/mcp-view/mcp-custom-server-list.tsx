@@ -3,27 +3,27 @@ import type {
   McpCatalogEntry,
   McpServer
 } from '@sandwalk/agent-ui-core'
-import { ExternalLink, KeyRound, Loader2, Plus, Trash2 } from 'lucide-react'
+import { KeyRound, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { openInSystemBrowser } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
-import { McpApiKeyInput } from './mcp-api-key-input'
+import { McpApiKeyDialog } from './mcp-api-key-dialog'
 import {
   authStatusLabel,
   CustomServerIcon,
   customServerNeedsAuth,
   isAuthReconnectMessage,
+  isLocalStdioServer,
   serverNeedsAuth
 } from './mcp-custom-server-helpers'
 import {
   disposeMcpOAuthWatch,
   openMcpOAuthBrowser
 } from './mcp-oauth-browser'
-import { formatConnectError, McpToggle } from './mcp-view-shared'
+import { formatConnectError, McpIcon, McpToggle } from './mcp-view-shared'
 
 export { customServerNeedsAuth }
 
@@ -40,6 +40,8 @@ export function McpCustomServerList({
   onConnectCatalog,
   onRefresh,
   onRevealStoredSecret,
+  onDisconnectCatalog,
+  onValidateIntegration,
   onAddNew
 }: {
   installedServers: McpServer[]
@@ -60,6 +62,10 @@ export function McpCustomServerList({
   ) => Promise<ConnectMcpResult>
   onRefresh?: () => Promise<void>
   onRevealStoredSecret?: (integrationKey: string) => Promise<string>
+  onDisconnectCatalog?: (catalogId: string) => Promise<void>
+  onValidateIntegration?: (
+    integrationKey: string
+  ) => Promise<{ ok: boolean; message: string }>
   onAddNew?: () => void
 }) {
   const [apiKeyServerId, setApiKeyServerId] = useState<string | null>(null)
@@ -168,7 +174,7 @@ export function McpCustomServerList({
         )
       if (apiKeyOnly || oauthUnavailable) {
         toast.message('API key required', {
-          description: `${server.name} uses an API key — paste it below to connect.`
+          description: `${server.name} uses an API key — enter it in the dialog to connect.`
         })
       } else {
         toast.error(message, { description: server.name })
@@ -179,8 +185,12 @@ export function McpCustomServerList({
     }
   }
 
-  const connectApiKey = async (server: McpServer) => {
-    if (!apiKeyDraft.trim()) return
+  const connectApiKey = async (
+    server: McpServer
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!apiKeyDraft.trim()) {
+      return { ok: false, message: 'API key is required' }
+    }
     setPendingId(server.id)
     try {
       const result = server.catalogId
@@ -194,16 +204,22 @@ export function McpCustomServerList({
               apiKey: apiKeyDraft.trim()
             })
           : null
-      if (!result) return
-      if (result.ok) {
-        toast.success(result.message || 'Authenticated')
-        setApiKeyServerId(null)
-        setApiKeyDraft('')
-      } else {
-        toast.error(result.message || 'Authentication failed')
+      if (!result) {
+        return { ok: false, message: 'Connect is unavailable.' }
       }
+      if (result.ok) {
+        const message = result.message || 'Authenticated'
+        toast.success(message)
+        setApiKeyDraft('')
+        return { ok: true, message }
+      }
+      const message = result.message || 'Authentication failed'
+      toast.error(message)
+      return { ok: false, message }
     } catch (err) {
-      toast.error(formatConnectError(err))
+      const message = formatConnectError(err)
+      toast.error(message)
+      return { ok: false, message }
     } finally {
       setPendingId(null)
     }
@@ -241,29 +257,42 @@ export function McpCustomServerList({
         const catalogEntry = server.catalogId
           ? catalogById.get(server.catalogId)
           : undefined
-        const needsAuth = serverNeedsAuth(server, catalogEntry)
-        const needsReconnect = isAuthReconnectMessage(
-          catalogEntry?.statusMessage
-        )
+        const isLocal = isLocalStdioServer(server, catalogEntry)
+        const needsAuth =
+          !isLocal && serverNeedsAuth(server, catalogEntry)
+        const needsReconnect =
+          !isLocal &&
+          isAuthReconnectMessage(catalogEntry?.statusMessage)
+        const needsSetup = isLocal && !catalogEntry?.configured
         const needsConnect = needsAuth || needsReconnect
         const canConnect = Boolean(
           server.catalogId ? onConnectCatalog : onConnectCustom
         )
         const apiKeyOnly = catalogEntry?.authMode === 'api_key'
+        const supportsApiKeyDialog =
+          !isLocal &&
+          canConnect &&
+          Boolean(
+            apiKeyOnly ||
+              catalogEntry?.authMode === 'api_key_or_oauth' ||
+              (!catalogEntry && server.transport !== 'stdio')
+          )
         // Prefer token mint pages over general MCP settings when known.
         const tokenSetupUrl =
           catalogEntry?.id === 'huggingface'
             ? 'https://huggingface.co/settings/tokens'
             : catalogEntry?.setupUrl || null
-        // Always show off while unauthenticated (matches Cursor).
-        const shownEnabled = needsConnect ? false : server.enabled
+        // Always show off while unauthenticated / unset up (matches Cursor).
+        const shownEnabled =
+          needsConnect || needsSetup ? false : server.enabled
         const waiting = waitingId === server.id
         const pending = pendingId === server.id
         const showApiKey = apiKeyServerId === server.id
         const openable = canOpen(server)
         const status = authStatusLabel(server, catalogEntry, {
           waiting,
-          needsAuth: needsConnect
+          needsAuth: needsConnect,
+          needsSetup
         })
 
         return (
@@ -366,6 +395,15 @@ export function McpCustomServerList({
                       Waiting for callback…
                     </Button>
                   </>
+                ) : needsSetup && openable ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs"
+                    onClick={() => openRow(server)}
+                  >
+                    Set up
+                  </Button>
                 ) : needsConnect && canConnect ? (
                   <>
                     {apiKeyOnly ? null : (
@@ -404,10 +442,6 @@ export function McpCustomServerList({
                       disabled={pending}
                       onClick={() => {
                         if (apiKeyOnly) {
-                          if (showApiKey && apiKeyDraft.trim()) {
-                            void connectApiKey(server)
-                            return
-                          }
                           setApiKeyServerId(server.id)
                           return
                         }
@@ -425,6 +459,13 @@ export function McpCustomServerList({
                     enabled={shownEnabled}
                     label={`Enable ${server.name}`}
                     onToggle={() => {
+                      if (!server.enabled && needsSetup) {
+                        toast.message('Finish setup before enabling', {
+                          description: server.name
+                        })
+                        if (openable) openRow(server)
+                        return
+                      }
                       if (!server.enabled && needsConnect) {
                         toast.message('Connect this server before enabling')
                         return
@@ -449,58 +490,71 @@ export function McpCustomServerList({
               </div>
             </div>
 
-            {showApiKey && canConnect && !waiting ? (
-              <div
-                className="bg-muted/20 flex flex-wrap items-center gap-2 border-t px-3 py-2.5"
-                onClick={event => event.stopPropagation()}
-              >
-                <McpApiKeyInput
-                  value={apiKeyDraft}
-                  onChange={setApiKeyDraft}
-                  placeholder={
-                    catalogEntry?.configured
-                      ? 'Secret saved. Enter a new key to replace it.'
-                      : catalogEntry?.apiKeyEnvVar || 'API key or Bearer token'
+            {supportsApiKeyDialog ? (
+              <div onClick={event => event.stopPropagation()}>
+                <McpApiKeyDialog
+                  open={showApiKey && !waiting}
+                  onOpenChange={open => {
+                    setApiKeyServerId(open ? server.id : null)
+                    if (!open) setApiKeyDraft('')
+                  }}
+                  title={`${server.name} API Key`}
+                  description={
+                    catalogEntry?.description || server.description
                   }
-                  autoFocus
-                  disabled={pending}
-                  hasStoredKey={Boolean(
-                    catalogEntry?.configured &&
-                      catalogEntry.integrationKey &&
-                      onRevealStoredSecret
-                  )}
+                  icon={
+                    catalogEntry ? (
+                      <McpIcon
+                        id={catalogEntry.id}
+                        name={catalogEntry.name}
+                        url={catalogEntry.url}
+                      />
+                    ) : (
+                      <CustomServerIcon server={server} />
+                    )
+                  }
+                  configured={Boolean(catalogEntry?.configured)}
+                  maskedPreview={catalogEntry?.maskedPreview}
+                  placeholderUnset={
+                    catalogEntry?.apiKeyEnvVar || 'API key or Bearer token'
+                  }
+                  setupUrl={tokenSetupUrl}
+                  draft={apiKeyDraft}
+                  onDraftChange={setApiKeyDraft}
                   onRevealStored={
                     catalogEntry?.integrationKey && onRevealStoredSecret
                       ? () =>
                           onRevealStoredSecret(catalogEntry.integrationKey!)
                       : undefined
                   }
-                  onKeyDown={event => {
-                    if (event.key === 'Enter') void connectApiKey(server)
-                  }}
+                  onSave={() => connectApiKey(server)}
+                  onTest={
+                    onValidateIntegration && catalogEntry?.integrationKey
+                      ? async () => {
+                          if (apiKeyDraft.trim()) {
+                            const saved = await connectApiKey(server)
+                            if (!saved.ok) return saved
+                          }
+                          return onValidateIntegration(
+                            catalogEntry.integrationKey!
+                          )
+                        }
+                      : undefined
+                  }
+                  onRemove={
+                    catalogEntry?.configured &&
+                    catalogEntry.id &&
+                    onDisconnectCatalog
+                      ? async () => {
+                          await onDisconnectCatalog(catalogEntry.id)
+                          toast.success('Disconnected', {
+                            description: server.name
+                          })
+                          await onRefresh?.()
+                        }
+                      : undefined
+                  }
                 />
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 text-xs"
-                  disabled={pending || !apiKeyDraft.trim()}
-                  onClick={() => void connectApiKey(server)}
-                >
-                  {pending ? (
-                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                  ) : null}
-                  Save
-                </Button>
-                {tokenSetupUrl ? (
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
-                    onClick={() => void openInSystemBrowser(tokenSetupUrl)}
-                  >
-                    Get API token
-                    <ExternalLink className="size-3" />
-                  </button>
-                ) : null}
               </div>
             ) : null}
           </div>

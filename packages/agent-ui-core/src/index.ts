@@ -1217,6 +1217,8 @@ export type McpCatalogEntry = {
   defaultEnabled: boolean
   configured: boolean
   authMethod: 'oauth' | 'api_key' | 'local' | null
+  /** Masked API key preview when a secret is stored (e.g. ``ns_…abcd``). */
+  maskedPreview?: string | null
   enabled: boolean
   serverId: string | null
   connected: boolean

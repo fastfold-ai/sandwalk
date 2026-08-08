@@ -7,6 +7,7 @@ from typing import Any
 from agent.config import Config
 from agent.mcp_catalog import MCP_CATALOG, get_catalog_entry
 from agent_server.mcp_service.auth import (
+    api_key_masked_preview,
     auth_method_in_use,
     credentials_configured,
     oauth_reconnect_required,
@@ -79,6 +80,7 @@ class CatalogMixin:
                     "default_enabled": False,
                     "configured": configured,
                     "auth_method": auth_method_in_use(entry, cfg),
+                    "masked_preview": api_key_masked_preview(entry, cfg),
                     "enabled": enabled,
                     "server_id": server.id if server else None,
                     "connected": connected,

@@ -28,7 +28,9 @@ export function McpFeaturedSection({
   onStatusPatchChange,
   onShowApiKeyChange,
   onApiKeyDraftChange,
-  onRevealStoredSecret
+  onRevealStoredSecret,
+  onDisconnectCatalog,
+  onValidateIntegration
 }: {
   featuredOnly: boolean
   featuredLabel: string
@@ -44,7 +46,9 @@ export function McpFeaturedSection({
   onShowAll?: () => void
   onOpenCatalog?: (entry: McpCatalogEntry) => void
   onConnectOAuth: (entry: McpCatalogEntry) => void
-  onConnectApiKey: (entry: McpCatalogEntry) => void
+  onConnectApiKey: (
+    entry: McpCatalogEntry
+  ) => Promise<{ ok: boolean; message: string } | void>
   onToggleCatalog: (entry: McpCatalogEntry, enabled: boolean) => Promise<void>
   onPendingIdChange: (id: string | null) => void
   onStatusPatchChange: (
@@ -55,6 +59,10 @@ export function McpFeaturedSection({
   onShowApiKeyChange: (id: string, show: boolean) => void
   onApiKeyDraftChange: (id: string, value: string) => void
   onRevealStoredSecret?: (integrationKey: string) => Promise<string>
+  onDisconnectCatalog?: (catalogId: string) => Promise<void>
+  onValidateIntegration?: (
+    integrationKey: string
+  ) => Promise<{ ok: boolean; message: string }>
 }) {
   return (
     <section className={featuredOnly ? 'space-y-3' : 'space-y-2'}>
@@ -122,6 +130,8 @@ export function McpFeaturedSection({
               onShowApiKeyChange={onShowApiKeyChange}
               onApiKeyDraftChange={onApiKeyDraftChange}
               onRevealStoredSecret={onRevealStoredSecret}
+              onDisconnectCatalog={onDisconnectCatalog}
+              onValidateIntegration={onValidateIntegration}
             />
           ))}
         </div>
@@ -145,7 +155,9 @@ export function McpMoreCatalogSection({
   onStatusPatchChange,
   onShowApiKeyChange,
   onApiKeyDraftChange,
-  onRevealStoredSecret
+  onRevealStoredSecret,
+  onDisconnectCatalog,
+  onValidateIntegration
 }: {
   moreCatalog: McpCatalogEntry[]
   statusPatch: Record<string, CatalogStatusPatch>
@@ -155,7 +167,9 @@ export function McpMoreCatalogSection({
   apiKeyDraft: Record<string, string>
   onOpenCatalog?: (entry: McpCatalogEntry) => void
   onConnectOAuth: (entry: McpCatalogEntry) => void
-  onConnectApiKey: (entry: McpCatalogEntry) => void
+  onConnectApiKey: (
+    entry: McpCatalogEntry
+  ) => Promise<{ ok: boolean; message: string } | void>
   onToggleCatalog: (entry: McpCatalogEntry, enabled: boolean) => Promise<void>
   onPendingIdChange: (id: string | null) => void
   onStatusPatchChange: (
@@ -166,6 +180,10 @@ export function McpMoreCatalogSection({
   onShowApiKeyChange: (id: string, show: boolean) => void
   onApiKeyDraftChange: (id: string, value: string) => void
   onRevealStoredSecret?: (integrationKey: string) => Promise<string>
+  onDisconnectCatalog?: (catalogId: string) => Promise<void>
+  onValidateIntegration?: (
+    integrationKey: string
+  ) => Promise<{ ok: boolean; message: string }>
 }) {
   if (moreCatalog.length === 0) return null
 
@@ -193,6 +211,8 @@ export function McpMoreCatalogSection({
             onShowApiKeyChange={onShowApiKeyChange}
             onApiKeyDraftChange={onApiKeyDraftChange}
             onRevealStoredSecret={onRevealStoredSecret}
+            onDisconnectCatalog={onDisconnectCatalog}
+            onValidateIntegration={onValidateIntegration}
           />
         ))}
       </div>

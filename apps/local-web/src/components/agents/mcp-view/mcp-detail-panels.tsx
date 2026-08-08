@@ -11,7 +11,7 @@ export {
   McpDetailStatsAside
 } from './mcp-detail-aside-panels'
 export {
-  McpDetailApiKeyBar,
+  McpDetailApiKeyDialog,
   McpDetailHeaderBar
 } from './mcp-detail-header-panels'
 

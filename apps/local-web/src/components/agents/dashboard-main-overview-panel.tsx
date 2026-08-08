@@ -140,6 +140,12 @@ export function DashboardMainOverviewPanel({
           const revealed = await client.revealIntegrationSecret(key)
           return revealed.value || ''
         }}
+        onValidateIntegration={key => client.validateIntegration(key)}
+        onDisconnectCatalog={async catalogId => {
+          await client.disconnectMcpCatalog(catalogId)
+          await refreshMcp()
+          await loadIntegrations()
+        }}
         onConnectCatalog={async (catalogId, input) => {
           const result = await client.connectMcpCatalog(catalogId, input)
           await refreshMcp()
