@@ -92,8 +92,8 @@ API_KEYS_EXTRA = {
         "provider_key": "huggingface",
         "env_var": "HF_TOKEN",
         "description": (
-            "Hugging Face access token (Bearer) for the Hub MCP server "
-            "(models, datasets, Spaces, papers, docs)"
+            "Hugging Face access token for gated Hub datasets (e.g. BixBench) "
+            "and optional Hub MCP tools"
         ),
         "url": "https://huggingface.co/settings/tokens",
         "free": True,

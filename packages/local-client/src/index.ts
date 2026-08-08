@@ -106,6 +106,21 @@ export type BenchSuiteCard = {
   author?: string | null
   authorAvatar?: string | null
   codeExec?: boolean
+  installable?: boolean
+  requiresHfToken?: boolean
+  hfTokenConfigured?: boolean
+  requiredSkills?: string[]
+  requiredMcps?: string[]
+  missingSkills?: string[]
+  missingMcps?: string[]
+}
+
+export type BenchInstallResult = {
+  ok: boolean
+  suiteId: string
+  path?: string | null
+  summary?: string
+  needsHfToken?: boolean
 }
 
 export type BenchProgress = {
@@ -410,6 +425,16 @@ export class LocalAgentClient
       signal
     })
     return result.data
+  }
+
+  installBenchSuite(
+    suiteId: string,
+    signal?: AbortSignal
+  ): Promise<BenchInstallResult> {
+    return this.request<BenchInstallResult>(
+      `/bench/packs/${encodeURIComponent(suiteId)}/install`,
+      { method: 'POST', signal }
+    )
   }
 
   spawnBench(

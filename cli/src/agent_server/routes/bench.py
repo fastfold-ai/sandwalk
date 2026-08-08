@@ -16,15 +16,18 @@ from agent_server.bench_service import (
     export_path,
     get_active_status,
     get_result,
+    install_suite,
     list_results,
     list_suite_cards,
     remove_queued,
 )
+from agent_server.bench_service.dataset_install import BenchInstallError
 from agent_server.models.bench import (
     BenchActiveStatus,
     BenchCancelResponse,
     BenchGradeRequest,
     BenchGradeResponse,
+    BenchInstallResponse,
     BenchResetResponse,
     BenchResultList,
     BenchResultSummary,
@@ -37,7 +40,26 @@ from agent_server.models.bench import (
 def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
     @app.get("/v1/bench/packs", response_model=BenchSuiteList)
     async def bench_packs() -> BenchSuiteList:
-        return BenchSuiteList(data=await asyncio.to_thread(list_suite_cards))
+        return BenchSuiteList(
+            data=await asyncio.to_thread(list_suite_cards, deps.store)
+        )
+
+    @app.post(
+        "/v1/bench/packs/{suite_id}/install",
+        response_model=BenchInstallResponse,
+    )
+    async def bench_pack_install(suite_id: str) -> BenchInstallResponse:
+        try:
+            return await asyncio.to_thread(install_suite, suite_id)
+        except BenchInstallError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={
+                    "message": str(exc),
+                    "needsHfToken": exc.needs_hf_token,
+                    "suiteId": suite_id,
+                },
+            ) from exc
 
     @app.post("/v1/bench/spawn", response_model=BenchSpawnResponse)
     async def bench_spawn(payload: BenchSpawnRequest) -> BenchSpawnResponse:

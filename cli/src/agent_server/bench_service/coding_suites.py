@@ -146,7 +146,7 @@ def _normalize(suite_id: str, raw: dict[str, Any]) -> dict[str, Any] | None:
             return None
         return {
             "id": str(raw.get("task_id") or ""),
-            "question": str(raw.get("prompt") or ""),
+            "question": str(raw.get("prompt") or raw.get("text") or ""),
             "test_list": list(tests),
             "test_setup_code": str(raw.get("test_setup_code") or ""),
             "subject": "python",

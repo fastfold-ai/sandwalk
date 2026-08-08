@@ -70,6 +70,7 @@ export function BenchView({
   const [compareSelection, setCompareSelection] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [spawning, setSpawning] = useState(false)
+  const [installingId, setInstallingId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [brokenAvatars, setBrokenAvatars] = useState<Set<string>>(
     () => new Set()
@@ -177,6 +178,7 @@ export function BenchView({
   const queuedCount = active?.queue?.length ?? 0
 
   const toggleSuite = (card: BenchSuiteCard) => {
+    if (!card.available) return
     setSelected(prev => {
       const next = { ...prev }
       if (card.id in next) {
@@ -188,6 +190,39 @@ export function BenchView({
     })
   }
 
+  const installSuite = async (card: BenchSuiteCard) => {
+    if (card.requiresHfToken && !card.hfTokenConfigured) {
+      setError(
+        'Set a Hugging Face token under Integrations → Hugging Face, accept the dataset terms, then Install.'
+      )
+      navigate('/dashboard/integrations/huggingface')
+      return
+    }
+    setInstallingId(card.id)
+    setError(null)
+    try {
+      await client.installBenchSuite(card.id)
+      await loadCatalog()
+      setError(null)
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : `Unable to install ${card.title}`
+      const needsToken =
+        card.requiresHfToken ||
+        /hugging face|hf_token|needsHfToken/i.test(message)
+      if (needsToken) {
+        setError(
+          'Hugging Face token required. Save it under Integrations → Hugging Face, then try Install again.'
+        )
+        navigate('/dashboard/integrations/huggingface')
+      } else {
+        setError(message)
+      }
+    } finally {
+      setInstallingId(null)
+    }
+  }
+
   const runSelected = async () => {
     if (!selectedCount) {
       setError('Select at least one suite')
@@ -195,6 +230,20 @@ export function BenchView({
     }
     if (!primaryModel) {
       setError('Select a model')
+      return
+    }
+    const blocked = suites.filter(
+      card =>
+        card.id in selected &&
+        ((card.missingSkills?.length || 0) > 0 ||
+          (card.missingMcps?.length || 0) > 0)
+    )
+    if (blocked.length) {
+      const first = blocked[0]
+      setError(
+        first.unavailableReason ||
+          `Missing required skills or MCPs for ${first.title}`
+      )
       return
     }
     setSpawning(true)
@@ -489,18 +538,29 @@ export function BenchView({
                     : card.defaultSampleSize
                       ? [card.defaultSampleSize]
                       : []
+                const installing = installingId === card.id
                 return (
-                  <button
+                  <div
                     key={card.id}
-                    type="button"
-                    disabled={!card.available}
-                    onClick={() => toggleSuite(card)}
+                    role={card.available ? 'button' : undefined}
+                    tabIndex={card.available ? 0 : undefined}
+                    onClick={() => {
+                      if (card.available) toggleSuite(card)
+                    }}
+                    onKeyDown={e => {
+                      if (!card.available) return
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        toggleSuite(card)
+                      }
+                    }}
                     className={cn(
                       'rounded-md border p-3 text-left transition-colors',
                       on
                         ? 'border-border bg-muted/50'
-                        : 'border-border/60 hover:bg-muted/20',
-                      !card.available && 'opacity-50'
+                        : 'border-border/60',
+                      card.available && 'hover:bg-muted/20 cursor-pointer',
+                      !card.available && 'opacity-80'
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -527,7 +587,7 @@ export function BenchView({
                             e.stopPropagation()
                             void copyCli(card)
                           }}
-                          className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-7 items-center justify-center rounded-md"
+                          className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-7 items-center justify-center rounded-md disabled:opacity-40"
                         >
                           {copiedId === card.id ? (
                             <Check className="size-3.5 text-emerald-600" />
@@ -563,7 +623,7 @@ export function BenchView({
                                   ? ' · coding'
                                   : ''}
                       </span>
-                      {sampleChoices.length ? (
+                      {card.available && sampleChoices.length ? (
                         <label
                           className="flex flex-col items-end gap-0.5"
                           onClick={e => e.stopPropagation()}
@@ -595,12 +655,90 @@ export function BenchView({
                         </label>
                       ) : null}
                     </div>
-                    {!card.available && card.unavailableReason ? (
-                      <p className="text-destructive mt-1.5 text-[11px]">
-                        {card.unavailableReason}
-                      </p>
+                    {!card.available ? (
+                      <div
+                        className="mt-2 space-y-2"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {card.unavailableReason ? (
+                          <p className="text-destructive text-[11px]">
+                            {card.unavailableReason}
+                          </p>
+                        ) : null}
+                        {(card.missingSkills?.length ||
+                          card.missingMcps?.length) ? (
+                          <div className="border-destructive/30 bg-destructive/5 space-y-1.5 rounded-md border px-2.5 py-2">
+                            <p className="text-destructive text-[11px] font-medium">
+                              Missing required skills or MCPs
+                            </p>
+                            {card.missingSkills?.length ? (
+                              <p className="text-destructive/90 text-[11px]">
+                                Skills: {card.missingSkills.join(', ')}
+                              </p>
+                            ) : null}
+                            {card.missingMcps?.length ? (
+                              <p className="text-destructive/90 text-[11px]">
+                                MCPs: {card.missingMcps.join(', ')}
+                              </p>
+                            ) : null}
+                            <div className="flex flex-wrap gap-2 pt-0.5">
+                              {card.missingSkills?.length ? (
+                                <button
+                                  type="button"
+                                  className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
+                                  onClick={() => navigate('/dashboard/skills')}
+                                >
+                                  Open Skills
+                                </button>
+                              ) : null}
+                              {card.missingMcps?.length ? (
+                                <button
+                                  type="button"
+                                  className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
+                                  onClick={() => navigate('/dashboard/mcp')}
+                                >
+                                  Open MCP
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
+                        {card.installable ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={Boolean(installingId)}
+                              onClick={() => void installSuite(card)}
+                            >
+                              {installing ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                <Download className="size-3.5" />
+                              )}
+                              {installing
+                                ? 'Installing…'
+                                : card.requiresHfToken && !card.hfTokenConfigured
+                                  ? 'Set HF token'
+                                  : 'Install'}
+                            </Button>
+                            {card.requiresHfToken && !card.hfTokenConfigured ? (
+                              <button
+                                type="button"
+                                className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
+                                onClick={() =>
+                                  navigate('/dashboard/integrations/huggingface')
+                                }
+                              >
+                                Open Hugging Face integration
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
                     ) : null}
-                  </button>
+                  </div>
                 )
               })}
             </div>

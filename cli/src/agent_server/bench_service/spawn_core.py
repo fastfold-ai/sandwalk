@@ -447,9 +447,10 @@ def _copy_bix_capsule(source: dict[str, Any], workspace: Path) -> bool:
     if not folder:
         return False
     try:
+        from agent_server.bench_service.dataset_install import resolve_hf_token
         from sandwalk_bench.capsules import ensure_capsule
 
-        data = ensure_capsule(folder)
+        data = ensure_capsule(folder, token=resolve_hf_token() or None)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Capsule download failed for %s: %s", folder, exc)
         data = None

@@ -157,11 +157,13 @@ def test_list_suite_cards_includes_mmlu_and_packs():
     assert mbpp.question_count == 500
     assert mbpp.default_sample_size == 200
     assert mbpp.sample_sizes[-1] == 500
+    assert mbpp.installable is True
     lcb = next(c for c in cards if c.id == "livecodebench")
     assert lcb.code_exec is True
     assert lcb.question_count == 1055
     assert lcb.default_sample_size == 100
     assert lcb.sample_sizes[-1] == 1055
+    assert lcb.installable is True
     # One card per YAML pack (not one per matrix) — UI owns model selection.
     pack_cards = [c for c in cards if c.pack_id and c.id != "bixbench-verified-50"]
     assert pack_cards, "expected at least one YAML pack suite card"
@@ -174,10 +176,22 @@ def test_list_suite_cards_includes_mmlu_and_packs():
         assert skills.author == "Sandwalk"
         assert skills.question_count == 12
         assert skills.matrix == "full-coverage-same-model"
+        assert "fold" in skills.required_skills
+        assert "pymol" in skills.required_mcps
+        # Without a store, MCP readiness is empty → missing mcps expected.
+        if skills.missing_skills or skills.missing_mcps:
+            assert skills.available is False
+            assert skills.unavailable_reason
+            assert "Missing required" in skills.unavailable_reason
     mmlu_card = next(c for c in cards if c.id == "mmlu")
     assert mmlu_card.author == "Hendrycks et al."
     bix = next(c for c in cards if c.id == "bixbench-verified-50")
     assert bix.author == "Phylo"
+    assert bix.installable is True
+    assert bix.requires_hf_token is True
+    if not bix.available:
+        assert bix.unavailable_reason
+        assert "Hugging Face" in bix.unavailable_reason or "Install" in bix.unavailable_reason
 
 
 def test_grade_mc_supports_mmlu_pro_letters():

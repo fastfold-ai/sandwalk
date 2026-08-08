@@ -30,12 +30,13 @@ describe('Integrations UI ownership', () => {
       integration('tamarind', 'MCP'),
       integration('modal', 'Agent Runtime'),
       integration('slack', 'Communication'),
-      integration('tavily', 'MCP')
+      integration('tavily', 'MCP'),
+      integration('huggingface', 'Data')
     ]
 
     expect(
       integrationsOwnedByIntegrations(entries).map(item => item.key)
-    ).toEqual(['modal', 'slack'])
+    ).toEqual(['modal', 'slack', 'huggingface'])
   })
 
   it('routes hidden entries to their owning settings page', () => {
@@ -48,6 +49,9 @@ describe('Integrations UI ownership', () => {
     expect(integrationManagementPath(integration('tavily', 'MCP'))).toBe(
       '/dashboard/mcp'
     )
+    expect(
+      integrationManagementPath(integration('huggingface', 'Data'))
+    ).toBeNull()
     expect(
       integrationManagementPath(integration('modal', 'Agent Runtime'))
     ).toBeNull()

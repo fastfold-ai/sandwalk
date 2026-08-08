@@ -14,11 +14,19 @@ from agent_server.bench_service.coding_suites import (
     count_fixture as coding_count,
     dataset_available as coding_available,
 )
+from agent_server.bench_service.dataset_install import (
+    INSTALLABLE_SUITE_IDS,
+    hf_token_configured,
+)
 from agent_server.bench_service.mcq_suites import (
     MCQ_SUITES,
     catalog_sample_sizes,
     count_fixture,
     dataset_available,
+)
+from agent_server.bench_service.pack_requirements import (
+    missing_pack_requirements,
+    required_skills_mcps,
 )
 from agent_server.models.bench import BenchSuiteCard
 
@@ -32,8 +40,9 @@ _PACK_AUTHORS = {
     "skills-mcp-bakeoff": ("Sandwalk", "/brand/bench/sandwalk-mark.svg"),
 }
 
-def list_suite_cards() -> list[BenchSuiteCard]:
+def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
     cards: list[BenchSuiteCard] = []
+    hf_ready = hf_token_configured()
     for suite in MCQ_SUITES.values():
         n = count_fixture(suite.id)
         ok = dataset_available(suite.id)
@@ -63,6 +72,7 @@ def list_suite_cards() -> list[BenchSuiteCard]:
     for suite in CODING_SUITES.values():
         n = coding_count(suite.id)
         ok = coding_available(suite.id)
+        installable = suite.id in INSTALLABLE_SUITE_IDS
         cards.append(
             BenchSuiteCard(
                 id=suite.id,
@@ -77,15 +87,30 @@ def list_suite_cards() -> list[BenchSuiteCard]:
                 unavailable_reason=None
                 if ok
                 else (
-                    f"{suite.title} dataset missing. Place "
-                    f"{suite.full_fixture} under apps/benchmarking/.cache/mcq/"
+                    f"{suite.title} dataset missing. Click Install to download it."
+                    if installable
+                    else (
+                        f"{suite.title} dataset missing. Place "
+                        f"{suite.full_fixture} under apps/benchmarking/.cache/mcq/"
+                    )
                 ),
                 author=suite.author,
                 author_avatar=suite.author_avatar,
                 code_exec=True,
+                installable=installable,
             )
         )
 
+    bix_ok = _bix50_available()
+    if bix_ok:
+        bix_reason = None
+    elif not hf_ready:
+        bix_reason = (
+            "Hugging Face token required. Set it under Integrations → Hugging Face, "
+            "accept the dataset terms, then Install."
+        )
+    else:
+        bix_reason = "Dataset not downloaded yet. Click Install to fetch BixBench-Verified-50."
     cards.append(
         BenchSuiteCard(
             id="bixbench-verified-50",
@@ -100,12 +125,13 @@ def list_suite_cards() -> list[BenchSuiteCard]:
             question_count=50,
             sample_sizes=[5, 15, 50],
             default_sample_size=5,
-            available=_bix50_available(),
-            unavailable_reason=None
-            if _bix50_available()
-            else "Download JSONL first (HF_TOKEN): sandwalk-bench bixbench download",
+            available=bix_ok,
+            unavailable_reason=bix_reason,
             author="Phylo",
             author_avatar="/brand/bench/phylo-logo.png",
+            installable=True,
+            requires_hf_token=True,
+            hf_token_configured=hf_ready,
         ),
     )
 
@@ -122,6 +148,26 @@ def list_suite_cards() -> list[BenchSuiteCard]:
             if n >= 5:
                 sample_sizes = sorted({min(5, n), n})
             author, avatar = _PACK_AUTHORS.get(pack.id, (None, None))
+            req_skills, req_mcps = required_skills_mcps(pack)
+            miss_skills, miss_mcps = missing_pack_requirements(pack, store=store)
+            ready = not miss_skills and not miss_mcps
+            if ready:
+                reason = None
+            elif miss_skills and miss_mcps:
+                reason = (
+                    f"Missing required skills ({len(miss_skills)}) and "
+                    f"MCPs ({len(miss_mcps)}). Enable/install them before running."
+                )
+            elif miss_skills:
+                reason = (
+                    f"Missing required skills: {', '.join(miss_skills)}. "
+                    "Install/enable them under Skills."
+                )
+            else:
+                reason = (
+                    f"Missing required MCPs: {', '.join(miss_mcps)}. "
+                    "Install/enable them under MCP."
+                )
             cards.append(
                 BenchSuiteCard(
                     id=pack.id,
@@ -136,9 +182,14 @@ def list_suite_cards() -> list[BenchSuiteCard]:
                     question_count=n,
                     sample_sizes=sample_sizes,
                     default_sample_size=n or None,
-                    available=True,
+                    available=ready,
+                    unavailable_reason=reason,
                     author=author,
                     author_avatar=avatar,
+                    required_skills=req_skills,
+                    required_mcps=req_mcps,
+                    missing_skills=miss_skills,
+                    missing_mcps=miss_mcps,
                 )
             )
     return cards

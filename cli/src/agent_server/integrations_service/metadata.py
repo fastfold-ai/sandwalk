@@ -237,10 +237,26 @@ PROVIDER_METADATA = {
     },
     "huggingface": {
         "name": "Hugging Face",
-        "category": "MCP",
+        "category": "Data",
         "description": (
-            "Hugging Face Hub MCP — models, datasets, Spaces, papers, and docs."
+            "Hub access token for gated datasets (BixBench) and optional Hub MCP "
+            "tools — models, Spaces, papers, and docs. MCP install is optional."
         ),
+        "unlocks": [
+            _capability(
+                "hf-hub-token",
+                "Hub downloads",
+                "Unlock gated Hugging Face datasets used by Benchmarking "
+                "(BixBench-Verified-50) and capsule downloads.",
+                requirement="ambient",
+            ),
+            _notice(
+                "hf-mcp-optional",
+                "Optional Hub MCP",
+                "Want Hub search tools in chat? Install the Hugging Face MCP "
+                "from the MCP catalog — it reuses this same token.",
+            ),
+        ],
     },
     "ibm-rxn": {
         "unlocks": [

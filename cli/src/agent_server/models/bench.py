@@ -25,10 +25,25 @@ class BenchSuiteCard(ApiModel):
     author: str | None = None
     author_avatar: str | None = None
     code_exec: bool = False
+    installable: bool = False
+    requires_hf_token: bool = False
+    hf_token_configured: bool = False
+    required_skills: list[str] = Field(default_factory=list)
+    required_mcps: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+    missing_mcps: list[str] = Field(default_factory=list)
 
 
 class BenchSuiteList(ApiModel):
     data: list[BenchSuiteCard]
+
+
+class BenchInstallResponse(ApiModel):
+    ok: bool
+    suite_id: str
+    path: str | None = None
+    summary: str = ""
+    needs_hf_token: bool = False
 
 
 class BenchSuiteRef(ApiModel):
