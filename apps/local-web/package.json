@@ -21,7 +21,8 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "package:dmg": "bash ../packaging/package-macos-dmg.sh"
+    "package:dmg": "bash ../packaging/package-macos-dmg.sh",
+    "relaunch:mac": "bash ../packaging/relaunch-macos-app.sh"
   },
   "dependencies": {
     "@assistant-ui/react": "0.14.20",

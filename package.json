@@ -19,6 +19,8 @@
     "test:coverage": "pnpm --filter @sandwalk/agent-local-web test:coverage",
     "test:mac": "cd apps/sandwalk-mac && ./scripts/test.sh",
     "lint:mac": "cd apps/sandwalk-mac && ./scripts/lint.sh",
+    "package:dmg": "./apps/packaging/package-macos-dmg.sh",
+    "relaunch:mac": "./apps/packaging/relaunch-macos-app.sh",
     "test:cli": "cd cli && .venv/bin/python -m pytest tests/ -q",
     "test:cli:unit": "cd cli && .venv/bin/python -m pytest tests/ -q --ignore=tests/integration_cli",
     "test:cli:functional": "cd cli && .venv/bin/python -m pytest tests/integration_cli -m cli_functional -q --tb=short",
