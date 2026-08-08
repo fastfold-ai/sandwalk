@@ -28,6 +28,11 @@ class InstallJob:
     error: str | None = None
     needs_hf_token: bool = False
     path: str | None = None
+    bytes_done: int = 0
+    bytes_total: int | None = None
+    files_done: int = 0
+    files_total: int = 0
+    label: str = ""
 
 
 _lock = threading.Lock()
@@ -46,6 +51,11 @@ def get_install_job(suite_id: str) -> InstallJob | None:
             error=job.error,
             needs_hf_token=job.needs_hf_token,
             path=job.path,
+            bytes_done=job.bytes_done,
+            bytes_total=job.bytes_total,
+            files_done=job.files_done,
+            files_total=job.files_total,
+            label=job.label,
         )
 
 
@@ -59,6 +69,14 @@ def install_error(suite_id: str) -> str | None:
     if job is None or job.status != "error":
         return None
     return job.error or job.summary or "Install failed."
+
+
+def install_progress_text(suite_id: str) -> str | None:
+    """Human progress line for catalog / UI while installing."""
+    job = get_install_job(suite_id)
+    if job is None or job.status != "installing":
+        return None
+    return _format_progress(job)
 
 
 def start_install(suite_id: str, *, force: bool = False) -> BenchInstallResponse:
@@ -83,13 +101,14 @@ def start_install(suite_id: str, *, force: bool = False) -> BenchInstallResponse
             return BenchInstallResponse(
                 ok=True,
                 suite_id=key,
-                summary="Install already in progress.",
+                summary=install_progress_text(key) or "Install already in progress.",
                 status="installing",
             )
         _jobs[key] = InstallJob(
             suite_id=key,
             status="installing",
-            summary="Downloading dataset…",
+            summary="Starting download…",
+            label="Starting…",
         )
 
     thread = threading.Thread(
@@ -108,8 +127,35 @@ def start_install(suite_id: str, *, force: bool = False) -> BenchInstallResponse
 
 
 def _run_install(suite_id: str, force: bool) -> None:
+    def on_progress(
+        *,
+        summary: str | None = None,
+        bytes_done: int | None = None,
+        bytes_total: int | None = None,
+        files_done: int | None = None,
+        files_total: int | None = None,
+        label: str | None = None,
+    ) -> None:
+        with _lock:
+            job = _jobs.get(suite_id)
+            if job is None or job.status != "installing":
+                return
+            if summary is not None:
+                job.summary = summary
+            if bytes_done is not None:
+                job.bytes_done = max(0, int(bytes_done))
+            if bytes_total is not None:
+                job.bytes_total = int(bytes_total) if bytes_total > 0 else None
+            if files_done is not None:
+                job.files_done = max(0, int(files_done))
+            if files_total is not None:
+                job.files_total = max(0, int(files_total))
+            if label is not None:
+                job.label = label
+            job.summary = _format_progress(job)
+
     try:
-        result = install_suite(suite_id, force=force)
+        result = install_suite(suite_id, force=force, on_progress=on_progress)
     except BenchInstallError as exc:
         logger.warning("Bench install failed for %s: %s", suite_id, exc)
         with _lock:
@@ -139,3 +185,32 @@ def _run_install(suite_id: str, force: bool) -> None:
             summary=result.summary,
             path=result.path,
         )
+
+
+def _format_progress(job: InstallJob) -> str:
+    parts: list[str] = []
+    if job.files_total > 0:
+        parts.append(f"file {min(job.files_done + 1, job.files_total)}/{job.files_total}")
+    if job.label and job.label not in {"Starting…", "Starting..."}:
+        parts.append(job.label)
+    size = _format_bytes(job.bytes_done)
+    if job.bytes_total and job.bytes_total > 0:
+        parts.append(f"{size} / {_format_bytes(job.bytes_total)}")
+        pct = min(100.0, (100.0 * job.bytes_done) / job.bytes_total)
+        parts.append(f"{pct:.0f}%")
+    elif job.bytes_done > 0:
+        parts.append(f"{size} downloaded")
+    if not parts:
+        return job.summary or "Downloading dataset…"
+    return " · ".join(parts)
+
+
+def _format_bytes(n: int) -> str:
+    value = float(max(0, n))
+    for unit in ("B", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            if unit == "B":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{n} B"

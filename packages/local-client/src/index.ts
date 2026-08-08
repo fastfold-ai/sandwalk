@@ -111,6 +111,10 @@ export type BenchSuiteCard = {
   hfTokenConfigured?: boolean
   installing?: boolean
   installError?: string | null
+  /** Human progress while installing, e.g. ``file 2/6 · 12.4 MB``. */
+  installProgress?: string | null
+  installBytesDone?: number | null
+  installBytesTotal?: number | null
   requiredSkills?: string[]
   requiredMcps?: string[]
   missingSkills?: string[]

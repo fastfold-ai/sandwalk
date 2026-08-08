@@ -30,6 +30,10 @@ class BenchSuiteCard(ApiModel):
     hf_token_configured: bool = False
     installing: bool = False
     install_error: str | None = None
+    """Human progress while installing, e.g. ``file 2/6 · 12.4 MB``."""
+    install_progress: str | None = None
+    install_bytes_done: int | None = None
+    install_bytes_total: int | None = None
     required_skills: list[str] = Field(default_factory=list)
     required_mcps: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)

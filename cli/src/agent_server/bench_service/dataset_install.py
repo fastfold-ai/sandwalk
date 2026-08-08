@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -11,6 +12,8 @@ from urllib.request import Request, urlopen
 
 from agent_server.bench_service.bootstrap import bench_root, ensure_sandwalk_bench_importable
 from agent_server.models.bench import BenchInstallResponse
+
+ProgressCb = Callable[..., None]
 
 
 class BenchInstallError(RuntimeError):
@@ -84,7 +87,12 @@ def mcq_cache_dir() -> Path:
     return path
 
 
-def install_suite(suite_id: str, *, force: bool = False) -> BenchInstallResponse:
+def install_suite(
+    suite_id: str,
+    *,
+    force: bool = False,
+    on_progress: ProgressCb | None = None,
+) -> BenchInstallResponse:
     """Download a suite dataset into the local bench cache."""
     key = (suite_id or "").strip()
     if key not in INSTALLABLE_SUITE_IDS:
@@ -93,7 +101,7 @@ def install_suite(suite_id: str, *, force: bool = False) -> BenchInstallResponse
             status_code=404,
         )
     if key == "mbpp":
-        path = _install_mbpp(force=force)
+        path = _install_mbpp(force=force, on_progress=on_progress)
         return BenchInstallResponse(
             ok=True,
             suite_id=key,
@@ -101,14 +109,14 @@ def install_suite(suite_id: str, *, force: bool = False) -> BenchInstallResponse
             summary=f"Installed MBPP ({_count_lines(path)} problems).",
         )
     if key == "livecodebench":
-        path = _install_livecodebench(force=force)
+        path = _install_livecodebench(force=force, on_progress=on_progress)
         return BenchInstallResponse(
             ok=True,
             suite_id=key,
             path=str(path),
             summary=f"Installed LiveCodeBench ({_count_lines(path)} problems).",
         )
-    path = _install_bixbench(force=force)
+    path = _install_bixbench(force=force, on_progress=on_progress)
     return BenchInstallResponse(
         ok=True,
         suite_id=key,
@@ -117,11 +125,44 @@ def install_suite(suite_id: str, *, force: bool = False) -> BenchInstallResponse
     )
 
 
-def _install_mbpp(*, force: bool) -> Path:
+def _emit(on_progress: ProgressCb | None, **kwargs: Any) -> None:
+    if on_progress is None:
+        return
+    on_progress(**kwargs)
+
+
+def _install_mbpp(*, force: bool, on_progress: ProgressCb | None = None) -> Path:
     out = mcq_cache_dir() / "mbpp.jsonl"
     if out.is_file() and out.stat().st_size > 0 and not force:
         return out
-    raw = _download_bytes(_MBPP_URL)
+    _emit(
+        on_progress,
+        label="mbpp.jsonl",
+        files_done=0,
+        files_total=1,
+        bytes_done=0,
+        bytes_total=None,
+        summary="Downloading MBPP…",
+    )
+    raw = _download_bytes(
+        _MBPP_URL,
+        on_chunk=lambda done, total: _emit(
+            on_progress,
+            label="mbpp.jsonl",
+            files_done=0,
+            files_total=1,
+            bytes_done=done,
+            bytes_total=total,
+        ),
+    )
+    _emit(
+        on_progress,
+        label="Parsing MBPP…",
+        files_done=0,
+        files_total=1,
+        bytes_done=len(raw),
+        bytes_total=len(raw),
+    )
     rows: list[dict[str, Any]] = []
     for line in raw.decode("utf-8").splitlines():
         if not line.strip():
@@ -150,17 +191,59 @@ def _install_mbpp(*, force: bool) -> Path:
         )
     rows.sort(key=lambda row: int(row["task_id"]))
     _write_jsonl(out, rows)
+    _emit(
+        on_progress,
+        label="Done",
+        files_done=1,
+        files_total=1,
+        bytes_done=len(raw),
+        bytes_total=len(raw),
+    )
     return out
 
 
-def _install_livecodebench(*, force: bool) -> Path:
+def _install_livecodebench(
+    *, force: bool, on_progress: ProgressCb | None = None
+) -> Path:
     out = mcq_cache_dir() / "livecodebench.jsonl"
     if out.is_file() and out.stat().st_size > 0 and not force:
         return out
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for name in _LCB_FILES:
-        raw = _download_bytes(_LCB_BASE + name)
+    files_total = len(_LCB_FILES)
+    bytes_before = 0
+    for index, name in enumerate(_LCB_FILES):
+        _emit(
+            on_progress,
+            label=name,
+            files_done=index,
+            files_total=files_total,
+            bytes_done=bytes_before,
+            bytes_total=None,
+            summary=f"Downloading {name}…",
+        )
+
+        def _chunk(
+            done: int,
+            total: int | None,
+            *,
+            base: int = bytes_before,
+            file_index: int = index,
+            file_name: str = name,
+        ) -> None:
+            # Prefer aggregate known total when Content-Length is present.
+            file_total = total if total and total > 0 else None
+            _emit(
+                on_progress,
+                label=file_name,
+                files_done=file_index,
+                files_total=files_total,
+                bytes_done=base + done,
+                bytes_total=(base + file_total) if file_total else None,
+            )
+
+        raw = _download_bytes(_LCB_BASE + name, on_chunk=_chunk)
+        bytes_before += len(raw)
         for line in raw.decode("utf-8").splitlines():
             if not line.strip():
                 continue
@@ -185,16 +268,34 @@ def _install_livecodebench(*, force: bool) -> Path:
                     "difficulty": str(item.get("difficulty") or ""),
                 }
             )
+        _emit(
+            on_progress,
+            label=name,
+            files_done=index + 1,
+            files_total=files_total,
+            bytes_done=bytes_before,
+            bytes_total=bytes_before,
+        )
     if len(rows) < 400:
         raise BenchInstallError(
             f"LiveCodeBench download looked incomplete ({len(rows)} problems).",
             status_code=502,
         )
+    _emit(
+        on_progress,
+        label="Writing livecodebench.jsonl…",
+        files_done=files_total,
+        files_total=files_total,
+        bytes_done=bytes_before,
+        bytes_total=bytes_before,
+    )
     _write_jsonl(out, rows)
     return out
 
 
-def _install_bixbench(*, force: bool) -> Path:
+def _install_bixbench(
+    *, force: bool, on_progress: ProgressCb | None = None
+) -> Path:
     token = resolve_hf_token()
     if not token:
         raise BenchInstallError(
@@ -210,6 +311,13 @@ def _install_bixbench(*, force: bool) -> Path:
         )
     from sandwalk_bench.bixbench import download_jsonl, jsonl_path
 
+    _emit(
+        on_progress,
+        label="BixBench-Verified-50",
+        files_done=0,
+        files_total=1,
+        summary="Downloading BixBench-Verified-50 from Hugging Face…",
+    )
     try:
         path = download_jsonl(token=token, force=force)
     except HTTPError as exc:
@@ -236,17 +344,43 @@ def _install_bixbench(*, force: bool) -> Path:
         raise BenchInstallError(msg, status_code=502) from exc
     if not path.is_file():
         path = jsonl_path()
+    size = path.stat().st_size if path.is_file() else 0
+    _emit(
+        on_progress,
+        label="Done",
+        files_done=1,
+        files_total=1,
+        bytes_done=size,
+        bytes_total=size or None,
+    )
     return path
 
 
-def _download_bytes(url: str, *, token: str | None = None) -> bytes:
+def _download_bytes(
+    url: str,
+    *,
+    token: str | None = None,
+    on_chunk: Callable[[int, int | None], None] | None = None,
+) -> bytes:
     headers = {"User-Agent": "sandwalk-bench"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     req = Request(url, headers=headers)
     try:
         with urlopen(req, timeout=300) as resp:  # noqa: S310 — fixed HF URLs
-            return resp.read()
+            raw_len = resp.headers.get("Content-Length")
+            total = int(raw_len) if raw_len and str(raw_len).isdigit() else None
+            chunks: list[bytes] = []
+            done = 0
+            while True:
+                chunk = resp.read(256 * 1024)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                done += len(chunk)
+                if on_chunk is not None:
+                    on_chunk(done, total)
+            return b"".join(chunks)
     except HTTPError as exc:
         raise BenchInstallError(
             f"Download failed for {url} (HTTP {exc.code}).",

@@ -55,6 +55,7 @@ def run_agent_suite(
     from agent_server.bench_service.coding_suites import CODING_SUITES
     from agent_server.bench_service.mcq_suites import MCQ_SUITES
 
+    skipped_meta: list[dict[str, Any]] = []
     if suite_id in MCQ_SUITES or pack_id in MCQ_SUITES:
         cells, pack, benchmark = _resolve_mcq_cells(
             suite_id=suite_id if suite_id in MCQ_SUITES else pack_id,
@@ -70,13 +71,19 @@ def run_agent_suite(
             provider=provider,
         )
     else:
-        cells, pack, benchmark = _resolve_cells(
+        cells, pack, benchmark, skipped_meta = _resolve_cells(
             pack_id=pack_id,
             matrix=matrix,
             suite_id=suite_id,
             sample_size=sample_size,
             model_id=model_id,
             provider=provider,
+            store=deps.store,
+        )
+    if not cells and skipped_meta:
+        raise RuntimeError(
+            f"All questions for {suite_id} were skipped — install missing "
+            "skills/MCPs or pick another suite."
         )
     if not cells:
         raise RuntimeError(f"No cells for suite {suite_id}")
@@ -187,6 +194,11 @@ def run_agent_suite(
                     cell=cell,
                     index=idx,
                 )
+            )
+        base = len(question_rows)
+        for skip_idx, item in enumerate(skipped_meta):
+            question_rows.append(
+                _skipped_question_row(item, index=base + skip_idx)
             )
     finally:
         SettingsService.update(
@@ -334,12 +346,17 @@ def _resolve_cells(
     sample_size: int | None,
     model_id: str,
     provider: str | None,
+    store: Any | None = None,
 ):
     from sandwalk_bench.bixbench import as_is_pack, jsonl_path, load_jsonl
     from sandwalk_bench.pack import expand_matrix, load_pack
     from sandwalk_bench.paths import PACKS_DIR
     from sandwalk_bench.schema import MatrixCell
     from sandwalk_bench.spawn import copy_cell_inputs  # noqa: F401
+
+    from agent_server.bench_service.pack_requirements import (
+        partition_cells_by_requirements,
+    )
 
     if pack_id == "bixbench-verified-50" or suite_id == "bixbench-verified-50":
         if not jsonl_path().is_file():
@@ -371,7 +388,7 @@ def _resolve_cells(
                     question=q,
                 )
             )
-        return cells, pack, "bixbench-verified-50"
+        return cells, pack, "bixbench-verified-50", []
 
     # YAML pack + matrix — filename may differ from pack.id
     # (e.g. sandwalk_skills_mcp.yaml → pack: skills-mcp-bakeoff).
@@ -420,9 +437,40 @@ def _resolve_cells(
                 )
             )
         cells = deduped
+    # Soft-skip questions that need missing skills/MCPs, then sample.
+    cells, skipped_meta = partition_cells_by_requirements(cells, store=store)
     if sample_size and sample_size > 0:
         cells = cells[:sample_size]
-    return cells, pack, pack.id
+    return cells, pack, pack.id, skipped_meta
+
+
+def _skipped_question_row(item: dict[str, Any], *, index: int) -> dict[str, Any]:
+    cell = item["cell"]
+    question = getattr(cell, "question", None)
+    return {
+        "id": str(index),
+        "correct": False,
+        "skipped": True,
+        "skip_reason": item.get("reason") or "Missing skills/MCPs",
+        "missing_skills": list(item.get("missing_skills") or []),
+        "missing_mcps": list(item.get("missing_mcps") or []),
+        "expected": (question.ideal if question else "") or "",
+        "predicted": "",
+        "question": (
+            (question.question if question else cell.prompt) or ""
+        )[:2000],
+        "raw_response": "",
+        "category": (
+            (question.focus if question and question.focus else None)
+            or (question.id if question else cell.question_id)
+        ),
+        "time_s": 0,
+        "session_id": None,
+        "eval_mode": str(question.eval_mode if question else "checklist"),
+        "judge": None,
+        "tools_seen": [],
+        "heuristics": {},
+    }
 
 
 def _copy_inputs(pack: Any, cell: Any, workspace: Path) -> None:

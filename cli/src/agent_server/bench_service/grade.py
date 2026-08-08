@@ -127,11 +127,13 @@ def build_result(
     project_id: str | None = None,
     environment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    correct = sum(1 for q in questions if q.get("correct"))
-    total = len(questions)
+    graded = [q for q in questions if not q.get("skipped")]
+    skipped = [q for q in questions if q.get("skipped")]
+    correct = sum(1 for q in graded if q.get("correct"))
+    total = len(graded)
     category_scores: dict[str, float] = {}
     buckets: dict[str, list[bool]] = {}
-    for q in questions:
+    for q in graded:
         cat = str(q.get("category") or "all")
         buckets.setdefault(cat, []).append(bool(q.get("correct")))
     for cat, flags in buckets.items():
@@ -143,6 +145,7 @@ def build_result(
         "accuracy": (correct / total) if total else 0.0,
         "correct": correct,
         "total": total,
+        "skipped": len(skipped),
         "time_s": round(time_s, 1),
         "thinking_used": thinking_used,
         "category_scores": category_scores,

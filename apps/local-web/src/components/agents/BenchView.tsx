@@ -37,6 +37,28 @@ import { cn } from '@/lib/utils'
 
 type Tab = 'new' | 'results'
 
+function formatBytes(n: number): string {
+  let value = Math.max(0, n)
+  for (const unit of ['B', 'KB', 'MB', 'GB'] as const) {
+    if (value < 1024 || unit === 'GB') {
+      return unit === 'B' ? `${Math.round(value)} ${unit}` : `${value.toFixed(1)} ${unit}`
+    }
+    value /= 1024
+  }
+  return `${n} B`
+}
+
+function installPercent(card: BenchSuiteCard): number {
+  const done = card.installBytesDone
+  const total = card.installBytesTotal
+  if (done != null && total != null && total > 0) {
+    return Math.max(2, Math.min(100, Math.round((100 * done) / total)))
+  }
+  // Indeterminate-ish pulse when size unknown — keep a visible sliver.
+  if (card.installing || (done != null && done > 0)) return 35
+  return 8
+}
+
 export function BenchView({
   client,
   runtimeSettings,
@@ -243,20 +265,6 @@ export function BenchView({
     }
     if (!primaryModel) {
       setError('Select a model')
-      return
-    }
-    const blocked = suites.filter(
-      card =>
-        card.id in selected &&
-        ((card.missingSkills?.length || 0) > 0 ||
-          (card.missingMcps?.length || 0) > 0)
-    )
-    if (blocked.length) {
-      const first = blocked[0]
-      setError(
-        first.unavailableReason ||
-          `Missing required skills or MCPs for ${first.title}`
-      )
       return
     }
     setSpawning(true)
@@ -669,53 +677,93 @@ export function BenchView({
                         </label>
                       ) : null}
                     </div>
-                    {!card.available ? (
+                    {(card.missingSkills?.length ||
+                      card.missingMcps?.length) ? (
+                      <div
+                        className="border-amber-500/30 bg-amber-500/10 mt-2 space-y-1.5 rounded-md border px-2.5 py-2"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                          Missing skills/MCPs — matching questions will be
+                          skipped
+                        </p>
+                        {card.unavailableReason ? (
+                          <p className="text-[11px] text-amber-800/90 dark:text-amber-200/90">
+                            {card.unavailableReason}
+                          </p>
+                        ) : null}
+                        {card.missingSkills?.length ? (
+                          <p className="text-[11px] text-amber-800/90 dark:text-amber-200/90">
+                            Skills: {card.missingSkills.join(', ')}
+                          </p>
+                        ) : null}
+                        {card.missingMcps?.length ? (
+                          <p className="text-[11px] text-amber-800/90 dark:text-amber-200/90">
+                            MCPs: {card.missingMcps.join(', ')}
+                          </p>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2 pt-0.5">
+                          {card.missingSkills?.length ? (
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
+                              onClick={() => navigate('/dashboard/skills')}
+                            >
+                              Open Skills
+                            </button>
+                          ) : null}
+                          {card.missingMcps?.length ? (
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
+                              onClick={() => navigate('/dashboard/mcp')}
+                            >
+                              Open MCP
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                    {!card.available || installing ? (
                       <div
                         className="mt-2 space-y-2"
                         onClick={e => e.stopPropagation()}
                       >
-                        {card.unavailableReason ? (
+                        {installing ? (
+                          <div className="border-border/60 bg-muted/30 space-y-1.5 rounded-md border px-2.5 py-2">
+                            <p className="text-foreground text-[11px] font-medium">
+                              Downloading in the background…
+                            </p>
+                            <p className="text-muted-foreground font-mono text-[11px]">
+                              {card.installProgress ||
+                                card.unavailableReason ||
+                                'Starting download…'}
+                            </p>
+                            <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+                              <div
+                                className="bg-foreground/70 h-full rounded-full transition-[width] duration-300"
+                                style={{
+                                  width: `${installPercent(card)}%`
+                                }}
+                              />
+                            </div>
+                            {card.installBytesDone != null ? (
+                              <p className="text-muted-foreground text-[10px]">
+                                {formatBytes(card.installBytesDone)}
+                                {card.installBytesTotal
+                                  ? ` / ${formatBytes(card.installBytesTotal)}`
+                                  : ' downloaded'}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : card.unavailableReason &&
+                          !(
+                            card.missingSkills?.length ||
+                            card.missingMcps?.length
+                          ) ? (
                           <p className="text-destructive text-[11px]">
                             {card.unavailableReason}
                           </p>
-                        ) : null}
-                        {(card.missingSkills?.length ||
-                          card.missingMcps?.length) ? (
-                          <div className="border-destructive/30 bg-destructive/5 space-y-1.5 rounded-md border px-2.5 py-2">
-                            <p className="text-destructive text-[11px] font-medium">
-                              Missing required skills or MCPs
-                            </p>
-                            {card.missingSkills?.length ? (
-                              <p className="text-destructive/90 text-[11px]">
-                                Skills: {card.missingSkills.join(', ')}
-                              </p>
-                            ) : null}
-                            {card.missingMcps?.length ? (
-                              <p className="text-destructive/90 text-[11px]">
-                                MCPs: {card.missingMcps.join(', ')}
-                              </p>
-                            ) : null}
-                            <div className="flex flex-wrap gap-2 pt-0.5">
-                              {card.missingSkills?.length ? (
-                                <button
-                                  type="button"
-                                  className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
-                                  onClick={() => navigate('/dashboard/skills')}
-                                >
-                                  Open Skills
-                                </button>
-                              ) : null}
-                              {card.missingMcps?.length ? (
-                                <button
-                                  type="button"
-                                  className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
-                                  onClick={() => navigate('/dashboard/mcp')}
-                                >
-                                  Open MCP
-                                </button>
-                              ) : null}
-                            </div>
-                          </div>
                         ) : null}
                         {card.installable ? (
                           <div className="flex flex-wrap items-center gap-2">

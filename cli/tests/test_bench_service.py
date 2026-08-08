@@ -178,11 +178,11 @@ def test_list_suite_cards_includes_mmlu_and_packs():
         assert skills.matrix == "full-coverage-same-model"
         assert "fold" in skills.required_skills
         assert "pymol" in skills.required_mcps
-        # Without a store, MCP readiness is empty → missing mcps expected.
+        # Without a store, MCP readiness is empty → soft skip warning, still runnable.
         if skills.missing_skills or skills.missing_mcps:
-            assert skills.available is False
+            assert skills.available is True
             assert skills.unavailable_reason
-            assert "Missing required" in skills.unavailable_reason
+            assert "skipped" in skills.unavailable_reason.lower()
     mmlu_card = next(c for c in cards if c.id == "mmlu")
     assert mmlu_card.author == "Hendrycks et al."
     bix = next(c for c in cards if c.id == "bixbench-verified-50")

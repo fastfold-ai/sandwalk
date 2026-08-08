@@ -18,7 +18,12 @@ from agent_server.bench_service.dataset_install import (
     INSTALLABLE_SUITE_IDS,
     hf_token_configured,
 )
-from agent_server.bench_service.install_jobs import install_error, is_installing
+from agent_server.bench_service.install_jobs import (
+    get_install_job,
+    install_error,
+    install_progress_text,
+    is_installing,
+)
 from agent_server.bench_service.mcq_suites import (
     MCQ_SUITES,
     catalog_sample_sizes,
@@ -28,6 +33,7 @@ from agent_server.bench_service.mcq_suites import (
 from agent_server.bench_service.pack_requirements import (
     missing_pack_requirements,
     required_skills_mcps,
+    skip_warning_message,
 )
 from agent_server.models.bench import BenchSuiteCard
 
@@ -76,10 +82,12 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
         installable = suite.id in INSTALLABLE_SUITE_IDS
         installing = is_installing(suite.id)
         err = install_error(suite.id)
+        progress = install_progress_text(suite.id) if installing else None
+        job = get_install_job(suite.id) if installing else None
         if ok:
             reason = None
         elif installing:
-            reason = f"Downloading {suite.title} in the background…"
+            reason = progress or f"Downloading {suite.title} in the background…"
         elif err:
             reason = err
         elif installable:
@@ -107,16 +115,25 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
                 installable=installable,
                 installing=installing,
                 install_error=err,
+                install_progress=progress,
+                install_bytes_done=job.bytes_done if job else None,
+                install_bytes_total=job.bytes_total if job else None,
             )
         )
 
     bix_ok = _bix50_available()
     bix_installing = is_installing("bixbench-verified-50")
     bix_err = install_error("bixbench-verified-50")
+    bix_progress = (
+        install_progress_text("bixbench-verified-50") if bix_installing else None
+    )
+    bix_job = get_install_job("bixbench-verified-50") if bix_installing else None
     if bix_ok:
         bix_reason = None
     elif bix_installing:
-        bix_reason = "Downloading BixBench-Verified-50 in the background…"
+        bix_reason = (
+            bix_progress or "Downloading BixBench-Verified-50 in the background…"
+        )
     elif bix_err:
         bix_reason = bix_err
     elif not hf_ready:
@@ -149,6 +166,9 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
             hf_token_configured=hf_ready,
             installing=bix_installing,
             install_error=bix_err,
+            install_progress=bix_progress,
+            install_bytes_done=bix_job.bytes_done if bix_job else None,
+            install_bytes_total=bix_job.bytes_total if bix_job else None,
         ),
     )
 
@@ -167,24 +187,9 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
             author, avatar = _PACK_AUTHORS.get(pack.id, (None, None))
             req_skills, req_mcps = required_skills_mcps(pack)
             miss_skills, miss_mcps = missing_pack_requirements(pack, store=store)
-            ready = not miss_skills and not miss_mcps
-            if ready:
-                reason = None
-            elif miss_skills and miss_mcps:
-                reason = (
-                    f"Missing required skills ({len(miss_skills)}) and "
-                    f"MCPs ({len(miss_mcps)}). Enable/install them before running."
-                )
-            elif miss_skills:
-                reason = (
-                    f"Missing required skills: {', '.join(miss_skills)}. "
-                    "Install/enable them under Skills."
-                )
-            else:
-                reason = (
-                    f"Missing required MCPs: {', '.join(miss_mcps)}. "
-                    "Install/enable them under MCP."
-                )
+            # Soft gate: suite stays selectable; runner skips questions that
+            # need missing skills/MCPs.
+            reason = skip_warning_message(miss_skills, miss_mcps)
             cards.append(
                 BenchSuiteCard(
                     id=pack.id,
@@ -199,7 +204,7 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
                     question_count=n,
                     sample_sizes=sample_sizes,
                     default_sample_size=n or None,
-                    available=ready,
+                    available=True,
                     unavailable_reason=reason,
                     author=author,
                     author_avatar=avatar,
