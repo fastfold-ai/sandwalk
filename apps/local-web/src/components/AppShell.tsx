@@ -58,6 +58,7 @@ export function AppShell(props: AppShellProps) {
           loadProjects={props.loadProjects}
           createSession={props.createSession}
           clearSessionSelection={props.clearSessionSelection}
+          batchMarkReadSelected={props.batchMarkReadSelected}
           batchArchiveSelected={props.batchArchiveSelected}
           batchMoveSelected={props.batchMoveSelected}
           batchExportSelected={props.batchExportSelected}
@@ -188,6 +189,7 @@ export function AppShell(props: AppShellProps) {
           prefetchSessionMessages={props.prefetchSessionMessages}
           closeSessionTab={props.closeSessionTab}
           closeOtherSessionTabs={props.closeOtherSessionTabs}
+          reorderSessionTabs={props.reorderSessionTabs}
           openRenameDialog={props.openRenameDialog}
           updateSession={props.updateSession}
           exportTranscript={props.exportTranscript}

@@ -2,23 +2,70 @@ import type { AgentProject } from '@sandwalk/agent-ui-core'
 import {
   Archive,
   Download,
-  Folder,
+  FolderInput,
+  MailOpen,
   Trash2,
   X
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 export type SidebarBatchBarProps = {
   selectedCount: number
   batchBusy: boolean
   projects: AgentProject[]
   onClearSelection: () => void
+  onBatchMarkRead: () => void | Promise<void>
   onBatchArchive: () => void | Promise<void>
   onBatchMove: (projectId: string | null) => void | Promise<void>
   onBatchExport: () => void | Promise<void>
   onBatchDelete: () => void
+}
+
+function IconAction({
+  label,
+  disabled,
+  destructive,
+  onClick,
+  children
+}: {
+  label: string
+  disabled?: boolean
+  destructive?: boolean
+  onClick?: () => void
+  children: ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={cn(
+            'size-7 shrink-0 rounded-full text-zinc-800 hover:bg-black/10 hover:text-zinc-950',
+            destructive &&
+              'text-red-600 hover:bg-red-500/15 hover:text-red-700'
+          )}
+          disabled={disabled}
+          aria-label={label}
+          onClick={onClick}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 export function SidebarBatchBar({
@@ -26,6 +73,7 @@ export function SidebarBatchBar({
   batchBusy,
   projects,
   onClearSelection,
+  onBatchMarkRead,
   onBatchArchive,
   onBatchMove,
   onBatchExport,
@@ -34,80 +82,76 @@ export function SidebarBatchBar({
   if (selectedCount <= 0) return null
 
   return (
-    <div className="mx-2 mb-1 space-y-2 rounded-2xl border border-black/5 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-white/10">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-foreground text-[12px] font-medium">
-          {selectedCount} selected
-        </span>
-        <button
-          type="button"
-          className="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-md"
-          aria-label="Clear selection"
-          disabled={batchBusy}
-          onClick={onClearSelection}
-        >
-          <X className="size-3.5" />
-        </button>
-      </div>
-      <div className="flex flex-wrap gap-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 px-2 text-[11px]"
-          disabled={batchBusy}
-          onClick={() => void onBatchArchive()}
-        >
-          <Archive className="size-3" />
-          Archive
-        </Button>
-        <ProjectPicker
-          projects={projects}
-          value={null}
-          disabled={batchBusy}
-          noneLabel="No project"
-          trigger={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-[11px]"
+    <TooltipProvider delayDuration={200}>
+      <div
+        className="pointer-events-none absolute inset-x-2 bottom-full z-20 mb-1.5 flex justify-center"
+        role="toolbar"
+        aria-label="Session selection actions"
+      >
+        <div className="animate-in fade-in slide-in-from-bottom-3 fill-mode-both pointer-events-auto flex flex-col items-center gap-1 rounded-2xl bg-zinc-100 px-2.5 py-1.5 text-zinc-900 shadow-lg shadow-black/35 duration-300 ease-out dark:bg-zinc-200 dark:text-zinc-900">
+          <span className="text-[10px] font-medium tabular-nums leading-none text-zinc-500">
+            {selectedCount} selected
+          </span>
+          <div className="flex items-center gap-0.5">
+            <IconAction
+              label="Mark as read"
               disabled={batchBusy}
+              onClick={() => void onBatchMarkRead()}
             >
-              <Folder className="size-3" />
-              Move
-            </Button>
-          }
-          onChange={projectId => {
-            void onBatchMove(projectId)
-          }}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 px-2 text-[11px]"
-          disabled={batchBusy}
-          onClick={() => void onBatchExport()}
-        >
-          <Download className="size-3" />
-          Export
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="text-destructive hover:text-destructive h-7 px-2 text-[11px]"
-          disabled={batchBusy}
-          onClick={onBatchDelete}
-        >
-          <Trash2 className="size-3" />
-          Delete
-        </Button>
+              <MailOpen className="size-3.5" />
+            </IconAction>
+            <IconAction
+              label="Archive"
+              disabled={batchBusy}
+              onClick={() => void onBatchArchive()}
+            >
+              <Archive className="size-3.5" />
+            </IconAction>
+            <ProjectPicker
+              projects={projects}
+              value={null}
+              disabled={batchBusy}
+              noneLabel="No project"
+              trigger={
+                <span>
+                  <IconAction label="Move to project" disabled={batchBusy}>
+                    <FolderInput className="size-3.5" />
+                  </IconAction>
+                </span>
+              }
+              onChange={projectId => {
+                void onBatchMove(projectId)
+              }}
+            />
+            <IconAction
+              label="Export"
+              disabled={batchBusy}
+              onClick={() => void onBatchExport()}
+            >
+              <Download className="size-3.5" />
+            </IconAction>
+            <IconAction
+              label="Delete"
+              disabled={batchBusy}
+              destructive
+              onClick={onBatchDelete}
+            >
+              <Trash2 className="size-3.5" />
+            </IconAction>
+            <span
+              className="mx-0.5 h-3.5 w-px shrink-0 bg-zinc-400/70"
+              aria-hidden
+            />
+            <IconAction
+              label="Clear selection"
+              disabled={batchBusy}
+              onClick={onClearSelection}
+            >
+              <X className="size-3.5" />
+            </IconAction>
+          </div>
+        </div>
       </div>
-      <p className="text-muted-foreground text-[10px] leading-snug">
-        Shift+click range · ⌘/Ctrl+click toggle · Esc clears
-      </p>
-    </div>
+    </TooltipProvider>
   )
 }

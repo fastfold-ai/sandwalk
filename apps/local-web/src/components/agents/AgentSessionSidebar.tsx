@@ -58,6 +58,7 @@ type AgentSessionSidebarProps = {
   onOpenGlobalSearch: () => void
   onCreateSession: () => void
   onClearSessionSelection: () => void
+  onBatchMarkReadSelected: () => void
   onBatchArchiveSelected: () => void | Promise<void>
   onBatchMoveSelected: (projectId: string | null) => void | Promise<void>
   onBatchExportSelected: () => void | Promise<void>
@@ -104,6 +105,7 @@ export function AgentSessionSidebar({
   onOpenGlobalSearch,
   onCreateSession,
   onClearSessionSelection,
+  onBatchMarkReadSelected,
   onBatchArchiveSelected,
   onBatchMoveSelected,
   onBatchExportSelected,
@@ -233,16 +235,6 @@ export function AgentSessionSidebar({
           Sites
         </button>
       </div>
-      <SidebarBatchBar
-        selectedCount={selectedSessionIds.size}
-        batchBusy={batchBusy}
-        projects={projects}
-        onClearSelection={onClearSessionSelection}
-        onBatchArchive={() => void onBatchArchiveSelected()}
-        onBatchMove={projectId => void onBatchMoveSelected(projectId)}
-        onBatchExport={() => void onBatchExportSelected()}
-        onBatchDelete={onBatchDeletePending}
-      />
       <SidebarSessionList
         sections={sections}
         scopeKey={activeProjectId}
@@ -267,7 +259,18 @@ export function AgentSessionSidebar({
         setDeleteTarget={setDeleteTarget}
         onClearSessionSelection={onClearSessionSelection}
       />
-      <div className="shrink-0 p-2">
+      <div className="relative shrink-0 p-2">
+        <SidebarBatchBar
+          selectedCount={selectedSessionIds.size}
+          batchBusy={batchBusy}
+          projects={projects}
+          onClearSelection={onClearSessionSelection}
+          onBatchMarkRead={onBatchMarkReadSelected}
+          onBatchArchive={() => void onBatchArchiveSelected()}
+          onBatchMove={projectId => void onBatchMoveSelected(projectId)}
+          onBatchExport={() => void onBatchExportSelected()}
+          onBatchDelete={onBatchDeletePending}
+        />
         <SidebarUserMenu
           userName={sidebarUserName}
           onLogout={onLogout}

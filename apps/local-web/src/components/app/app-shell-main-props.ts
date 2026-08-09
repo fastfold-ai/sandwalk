@@ -141,6 +141,7 @@ export type AppShellMainProps = {
   prefetchSessionMessages: (id: string, signal?: AbortSignal) => void | Promise<void>
   closeSessionTab: (sessionId: string) => void
   closeOtherSessionTabs: (sessionId: string) => void
+  reorderSessionTabs: (orderedIds: string[]) => void
   openRenameDialog: (target: AgentSession) => void
   updateSession: (
     target: AgentSession,

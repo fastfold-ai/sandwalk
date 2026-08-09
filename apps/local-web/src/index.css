@@ -1401,19 +1401,107 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
 }
 
 /*
- * Session tab strip: hide the scrollbar entirely so overflow never steals
- * vertical space (which misaligns chips vs flanking icon buttons).
- * Trackpad / wheel still scrolls via useHorizontalWheelScroll.
+ * Session chrome tabs — two colors only:
+ *   1) gray  = strip + inactive tabs (--muted)
+ *   2) chat  = active tab (--background) merges into the pane below
  */
-.session-tabs-scroll {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+.sandwalk-chrome-tabs.chrome-tabs {
+  /* Lib sets display:flex inline — keep width inside the tabs column only */
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  /* Match lib proportions: tab 36 + top pad + seat for bottom-bar */
+  height: 44px;
+  /* No side inset — strip gray is continuous to the edges */
+  padding: 4px 0 4px;
+  border-radius: 0;
+  /* Clip absolute tabs so they cannot paint over the overflow slot */
+  overflow: hidden !important;
+  /* Background set in session-chrome-tabs.css to match library chrome gray */
 }
 
-.session-tabs-scroll::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
+/* Same height/baseline for active + inactive — no per-state top offset. */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab,
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme .chrome-tab,
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab[active],
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme .chrome-tab[active] {
+  top: 0;
+  height: 36px;
+}
+
+/*
+ * Content-colored seat under tab ears (keeps bottom merge without shifting
+ * the active tab down).
+ */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tabs-bottom-bar,
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme .chrome-tabs-bottom-bar {
+  height: 6px;
+  background: hsl(var(--background)) !important;
+  z-index: 10;
+}
+
+/*
+ * Inactive: strip gray by default; subtle wash only on hover.
+ * Active: chat --background (merge with pane below).
+ */
+.sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab:not([active])
+  .chrome-tab-background,
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme
+  .chrome-tab:not([active])
+  .chrome-tab-background {
+  opacity: 0 !important;
+}
+
+.sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab:not([active]):hover
+  .chrome-tab-background,
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme
+  .chrome-tab:not([active]):hover
+  .chrome-tab-background {
+  opacity: 1 !important;
+}
+
+/* Hover fill for inactive tabs is set in session-chrome-tabs.css
+   (opaque color-mix — alpha fills show the SVG 52%/52% seam). */
+
+/* Divider + close-on-hover overrides live in session-chrome-tabs.css
+   (imported after the chrome-tabs package CSS). */
+
+/*
+ * Active = same pixel color as .sandwalk-shell-main / chat (bg-background).
+ * !important beats chrome-tabs-dark-theme.css (#323639) loaded from the package.
+ */
+.sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab[active]
+  .chrome-tab-background
+  > svg
+  .chrome-tab-geometry,
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme
+  .chrome-tab[active]
+  .chrome-tab-background
+  > svg
+  .chrome-tab-geometry {
+  fill: hsl(var(--background)) !important;
+}
+
+/* Library title/favicon replaced by React label host (icons + marquee). */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab-favicon,
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab-title {
+  display: none !important;
+}
+
+.sandwalk-chrome-tabs .sandwalk-tab-label-host {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-right: 2px;
+  pointer-events: none;
+  overflow: hidden;
 }
 
 /* Horizontal strips (file/terminal tabs) — no reserved gutter, thinner thumb. */
@@ -1477,6 +1565,28 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
   height: 3.15rem; /* aligned with traffic_light_position y=24 in lib.rs */
   align-items: center;
   transition: padding-left 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Session tab strip = same chrome gray as .sandwalk-chrome-tabs
+ * (light #dee1e6 / dark #202124). Beats mac-glass transparent nav.
+ */
+.sandwalk-session-tab-strip,
+html.sandwalk-mac-glass .sandwalk-session-tab-strip,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-session-tab-strip {
+  background-color: #dee1e6 !important;
+}
+
+.dark .sandwalk-session-tab-strip,
+html.sandwalk-mac-glass.dark .sandwalk-session-tab-strip,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark
+  .sandwalk-session-tab-strip {
+  background-color: #202124 !important;
+}
+
+/* Session tab strip: pin children to the bottom seat (not vertically centered). */
+.sandwalk-session-tab-strip.sandwalk-shell-nav-strip {
+  align-items: flex-end;
 }
 
 /*

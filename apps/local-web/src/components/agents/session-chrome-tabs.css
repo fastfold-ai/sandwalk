@@ -1,0 +1,182 @@
+/*
+ * Loaded after @sinm/react-chrome-tabs CSS so these rules win the cascade.
+ *
+ * Strip + overflow slot must match the tabs container (library chrome gray):
+ *   light #dee1e6 · dark #202124
+ * (Not theme --muted — that was the two-tone seam.)
+ *
+ * Hover mid-line: SVG halves at 52%; use opaque hover fill only.
+ */
+
+.sandwalk-chrome-tabs.chrome-tabs {
+  background: #dee1e6 !important;
+}
+
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme {
+  background: #202124 !important;
+}
+
+/*
+ * Chrome-like separators: short, faint, between inactive tabs only.
+ * One hairline per gap (right edge only) — left+right stacked looks like
+ * a double line once tabs have a little air between them.
+ * Full-height library hairlines are replaced — never cut through titles.
+ */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab .chrome-tab-dividers {
+  display: block !important;
+  position: absolute !important;
+  top: 50% !important;
+  bottom: auto !important;
+  left: var(--tab-content-margin) !important;
+  right: var(--tab-content-margin) !important;
+  height: 12px !important;
+  transform: translateY(-50%);
+  pointer-events: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Never draw the left edge — neighbor’s ::after owns the gap. */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab .chrome-tab-dividers::before {
+  content: none !important;
+  display: none !important;
+  width: 0 !important;
+  opacity: 0 !important;
+}
+
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab .chrome-tab-dividers::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  left: auto !important;
+  width: 1px !important;
+  height: 100% !important;
+  background: hsl(var(--foreground) / 0.05) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  border: 0 !important;
+}
+
+/* No separators on / beside the active tab (or hovered plate). */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab[active] .chrome-tab-dividers,
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab[active] .chrome-tab-dividers::after,
+.sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab:has(+ .chrome-tab[active])
+  .chrome-tab-dividers::after,
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab:hover .chrome-tab-dividers::after,
+.sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab:has(+ .chrome-tab:hover)
+  .chrome-tab-dividers::after,
+.sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab:last-child
+  .chrome-tab-dividers::after {
+  opacity: 0 !important;
+  width: 0 !important;
+}
+
+/* Dropdown lives outside Tabs — collapse empty toolbar so it doesn’t steal width. */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tabs-toolbar-right:empty {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Tabs column — hard clip so absolute .chrome-tab nodes stay inside. */
+.sandwalk-tab-strip-main {
+  position: relative;
+  z-index: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+/*
+ * Overflow slot: own flex column to the RIGHT of tabs (not overlaid).
+ * Shares the tabs’ 6px --background bottom seat.
+ * Wide enough for chip: [ ⌄ +N ] with noticeable left padding.
+ */
+.sandwalk-tab-overflow-slot {
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  min-width: 3.25rem;
+  height: 44px;
+  /* Top pad matches chrome-tabs; bottom pad = bottom-bar seat */
+  padding: 4px 8px 6px 6px;
+  margin: 0;
+  /* Match tabs container (library chrome gray), not --muted */
+  background: #dee1e6 !important;
+  pointer-events: auto;
+}
+
+.dark .sandwalk-tab-overflow-slot {
+  background: #202124 !important;
+}
+
+.sandwalk-tab-overflow-slot::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  background: hsl(var(--background));
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sandwalk-tab-overflow-btn {
+  position: relative;
+  z-index: 2;
+}
+
+/* Opaque subtle hover plate — must not use alpha fills. */
+.sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab:not([active])
+  .chrome-tab-background
+  > svg
+  .chrome-tab-geometry {
+  fill: color-mix(in srgb, hsl(var(--muted)) 72%, hsl(var(--foreground))) !important;
+}
+
+.dark
+  .sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab:not([active])
+  .chrome-tab-background
+  > svg
+  .chrome-tab-geometry {
+  fill: color-mix(in srgb, hsl(var(--muted)) 82%, #fff) !important;
+}
+
+/* Close (X) only while hovering that tab — frees title space. */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab .chrome-tab-close {
+  opacity: 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  flex: 0 0 0 !important;
+  transition:
+    opacity 0.12s ease,
+    width 0.12s ease;
+}
+
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab:hover .chrome-tab-close {
+  opacity: 1 !important;
+  width: 16px !important;
+  min-width: 16px !important;
+  flex: 0 0 16px !important;
+  pointer-events: auto !important;
+}

@@ -6,6 +6,8 @@ import {
   useState
 } from 'react'
 
+import { clearSessionAttention } from '@/lib/session-attention'
+
 import type { UseSessionActionsArgs } from './useSessionActionsTypes'
 
 type UseSessionActionsSelectionArgs = Pick<
@@ -95,6 +97,14 @@ export function useSessionActionsSelection({
       return next
     })
     setSelectionAnchorId(targetId)
+  }
+
+  const batchMarkReadSelected = () => {
+    if (selectedSessions.length === 0) return
+    for (const item of selectedSessions) {
+      clearSessionAttention(item.id)
+    }
+    clearSessionSelection()
   }
 
   const batchArchiveSelected = async () => {
@@ -189,6 +199,7 @@ export function useSessionActionsSelection({
     clearSessionSelection,
     selectSessionRange,
     toggleSessionSelected,
+    batchMarkReadSelected,
     batchArchiveSelected,
     batchMoveSelected,
     batchExportSelected,

@@ -39,6 +39,111 @@ const UNREAD_DOT_COLOR =
 /** Initial rows per sidebar section; "Load more" reveals the next page. */
 const SECTION_PAGE_SIZE = 40
 
+/** Hover: scroll truncated titles RTL so the full label can be read. */
+function SidebarMarqueeTitle({ text }: { text: string }) {
+  const wrapRef = useRef<HTMLSpanElement>(null)
+  const textRef = useRef<HTMLSpanElement>(null)
+  const revealTimerRef = useRef<number | null>(null)
+  const [overflow, setOverflow] = useState(0)
+  const [hovering, setHovering] = useState(false)
+  // Drop the right-edge fade early so the end of the title reads cleanly
+  // before the scroll animation fully settles.
+  const [revealEnd, setRevealEnd] = useState(false)
+
+  const measureOverflow = () => {
+    const wrap = wrapRef.current
+    const node = textRef.current
+    if (!wrap || !node) return 0
+    return Math.max(0, node.scrollWidth - wrap.clientWidth)
+  }
+
+  const clearRevealTimer = () => {
+    if (revealTimerRef.current == null) return
+    window.clearTimeout(revealTimerRef.current)
+    revealTimerRef.current = null
+  }
+
+  useEffect(() => {
+    const update = () => setOverflow(measureOverflow())
+    update()
+    const wrap = wrapRef.current
+    if (!wrap || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(wrap)
+    return () => observer.disconnect()
+  }, [text])
+
+  useEffect(() => () => clearRevealTimer(), [])
+
+  // Soft start, then crawl to a stop; snap back instantly on leave.
+  const durationSec =
+    overflow > 0 ? Math.min(13, Math.max(2.6, overflow / 24)) : 0.45
+  // Mild ease-in, stronger ease-out — slower takeoff, slow finish.
+  const easing = 'cubic-bezier(0.35, 0.12, 0.2, 1)'
+
+  // Edge “diffusion”: fade into the row so hard crops disappear.
+  // Idle → right fade; early scroll → both; after ~40% → left only.
+  const edgeFade =
+    overflow <= 0
+      ? undefined
+      : hovering && revealEnd
+        ? 'linear-gradient(to right, transparent, #000 14px, #000 100%)'
+        : hovering
+          ? 'linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent)'
+          : 'linear-gradient(to right, #000 0%, #000 calc(100% - 16px), transparent)'
+
+  return (
+    <span
+      ref={wrapRef}
+      className="min-w-0 flex-1 overflow-hidden"
+      style={
+        edgeFade
+          ? {
+              maskImage: edgeFade,
+              WebkitMaskImage: edgeFade
+            }
+          : undefined
+      }
+      onMouseEnter={() => {
+        const next = measureOverflow()
+        setOverflow(next)
+        setRevealEnd(false)
+        clearRevealTimer()
+        if (next <= 0) return
+        setHovering(true)
+        const duration =
+          Math.min(13, Math.max(2.6, next / 24)) * 1000
+        // Reveal the trailing edge mid-scroll (~40%), not at the end.
+        revealTimerRef.current = window.setTimeout(() => {
+          setRevealEnd(true)
+          revealTimerRef.current = null
+        }, duration * 0.4)
+      }}
+      onMouseLeave={() => {
+        clearRevealTimer()
+        setHovering(false)
+        setRevealEnd(false)
+      }}
+    >
+      <span
+        ref={textRef}
+        className="text-foreground/90 group-hover:text-foreground inline-block whitespace-nowrap text-[13px] leading-snug will-change-transform"
+        style={{
+          transform:
+            hovering && overflow > 0
+              ? `translateX(-${overflow}px)`
+              : 'translateX(0)',
+          transition: hovering
+            ? `transform ${durationSec}s ${easing}`
+            : 'none'
+        }}
+      >
+        {text}
+      </span>
+    </span>
+  )
+}
+
 type SessionSection = ReturnType<typeof groupSessions>[number]
 
 export type SidebarSessionListProps = {
@@ -162,7 +267,7 @@ export function SidebarSessionList({
   return (
     <ScrollArea className="flex-1">
       <div
-        className="space-y-3 p-3 transition-opacity duration-150 ease-out"
+        className="space-y-2.5 p-2.5 transition-opacity duration-150 ease-out"
         style={{ opacity: listOpacity }}
       >
         {displayedSections.length === 0 ? (
@@ -176,10 +281,10 @@ export function SidebarSessionList({
             const visibleItems = section.items.slice(0, limit)
             const remaining = Math.max(0, section.items.length - visibleItems.length)
             return (
-              <div key={section.id} className="space-y-1">
+              <div key={section.id} className="space-y-0.5">
                 <button
                   type="button"
-                  className="text-muted-foreground/80 hover:text-foreground flex w-full items-center gap-1 rounded-lg px-2 py-0.5 text-left text-[13px]"
+                  className="text-muted-foreground/80 hover:text-foreground flex w-full items-center gap-1 rounded-md px-2 py-0.5 text-left text-[12px]"
                   aria-expanded={!collapsed}
                   onClick={() =>
                     setCollapsedSidebarSections(current => ({
@@ -202,79 +307,107 @@ export function SidebarSessionList({
                   </span>
                 </button>
                 {!collapsed ? (
-                  <ul className="space-y-0.5">
+                  <ul className="space-y-px">
                     {visibleItems.map(item => {
                       const isSelected = selectedSessionIds.has(item.id)
+                      const selecting = selectedSessionIds.size > 0
                       const tabColor = tabColors[item.id]
                       return (
                         <li key={item.id}>
                           <div
                             className={cn(
-                              'hover:bg-sidebar-accent/50 group grid grid-cols-[minmax(0,1fr)_2.75rem] items-center rounded-lg px-2 py-1.5',
-                              item.id === sessionId && 'bg-sidebar-accent/55',
-                              isSelected &&
-                                'bg-sidebar-accent/55 ring-primary/30 ring-1'
+                              'hover:bg-sidebar-accent/45 group grid grid-cols-[minmax(0,1fr)_2.5rem] items-center rounded-md px-2 py-1.5',
+                              item.id === sessionId &&
+                                !isSelected &&
+                                'bg-sidebar-accent/55',
+                              isSelected && 'bg-sidebar-accent'
                             )}
                             onContextMenu={event => {
                               event.preventDefault()
                               setThreadMenuOpenId(item.id)
                             }}
                           >
-                            <button
-                              type="button"
-                              className="flex min-w-0 items-center gap-1.5 text-left"
-                              onClick={(event: MouseEvent<HTMLButtonElement>) => {
-                                if (event.shiftKey) {
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <button
+                                type="button"
+                                className={cn(
+                                  'grid size-3.5 shrink-0 place-items-center',
+                                  (isSelected || selecting) &&
+                                    'rounded-[4px] border',
+                                  isSelected
+                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    : selecting
+                                      ? 'border-muted-foreground/45 bg-background'
+                                      : null
+                                )}
+                                aria-label={
+                                  isSelected
+                                    ? `Deselect ${item.title || 'chat'}`
+                                    : `Select ${item.title || 'chat'}`
+                                }
+                                aria-pressed={isSelected}
+                                onClick={(
+                                  event: MouseEvent<HTMLButtonElement>
+                                ) => {
                                   event.preventDefault()
-                                  selectSessionRange(
-                                    orderedRenderedSessionIds,
-                                    item.id
-                                  )
-                                  return
-                                }
-                                if (event.metaKey || event.ctrlKey) {
-                                  event.preventDefault()
-                                  toggleSessionSelected(item.id)
-                                  return
-                                }
-                                if (selectedSessionIds.size > 0) {
-                                  onClearSessionSelection()
-                                }
-                                setSelectionAnchorId(item.id)
-                                openSessionTab(item.id)
-                                void prefetchSessionMessages(item.id)
-                                navigate(`/agents/${item.id}`)
-                              }}
-                            >
-                              {isSelected || selectedSessionIds.size > 0 ? (
-                                <span
-                                  className={cn(
-                                    'grid size-3.5 shrink-0 place-items-center rounded-[4px] border',
-                                    isSelected
-                                      ? 'border-primary bg-primary text-primary-foreground'
-                                      : 'border-muted-foreground/40'
-                                  )}
-                                  aria-hidden
-                                >
-                                  {isSelected ? (
-                                    <Check
-                                      className="size-2.5"
-                                      strokeWidth={3}
-                                    />
-                                  ) : null}
-                                </span>
-                              ) : (
-                                <SessionStatusIcon
-                                  status={
-                                    item.status === 'awaiting_approval' ||
-                                    chatBySessionId[item.id]?.pendingApproval
-                                      ? 'awaiting_approval'
-                                      : chatBySessionId[item.id]?.runActive
-                                        ? 'running'
-                                        : item.status
+                                  event.stopPropagation()
+                                  if (event.shiftKey) {
+                                    selectSessionRange(
+                                      orderedRenderedSessionIds,
+                                      item.id
+                                    )
+                                    return
                                   }
-                                />
-                              )}
+                                  toggleSessionSelected(item.id)
+                                }}
+                              >
+                                {isSelected ? (
+                                  <Check
+                                    className="size-2.5"
+                                    strokeWidth={3}
+                                  />
+                                ) : selecting ? null : (
+                                  <SessionStatusIcon
+                                    status={
+                                      item.status === 'awaiting_approval' ||
+                                      chatBySessionId[item.id]?.pendingApproval
+                                        ? 'awaiting_approval'
+                                        : chatBySessionId[item.id]?.runActive
+                                          ? 'running'
+                                          : item.status
+                                    }
+                                  />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                                onClick={(
+                                  event: MouseEvent<HTMLButtonElement>
+                                ) => {
+                                  if (event.shiftKey) {
+                                    event.preventDefault()
+                                    selectSessionRange(
+                                      orderedRenderedSessionIds,
+                                      item.id
+                                    )
+                                    return
+                                  }
+                                  if (event.metaKey || event.ctrlKey) {
+                                    event.preventDefault()
+                                    toggleSessionSelected(item.id)
+                                    return
+                                  }
+                                  if (selecting) {
+                                    toggleSessionSelected(item.id)
+                                    return
+                                  }
+                                  setSelectionAnchorId(item.id)
+                                  openSessionTab(item.id)
+                                  void prefetchSessionMessages(item.id)
+                                  navigate(`/agents/${item.id}`)
+                                }}
+                              >
                               <SessionSourceIcon
                                 source={item.source}
                                 label={item.sourceLabel}
@@ -296,11 +429,12 @@ export function SidebarSessionList({
                                   aria-hidden
                                 />
                               ) : null}
-                              <span className="text-foreground/90 group-hover:text-foreground truncate text-[13px]">
-                                {item.title || 'Untitled'}
-                              </span>
-                            </button>
-                            <div className="relative h-7 w-11 justify-self-end">
+                              <SidebarMarqueeTitle
+                                text={item.title || 'Untitled'}
+                              />
+                              </button>
+                            </div>
+                            <div className="relative h-6 w-10 justify-self-end">
                               <span
                                 className={cn(
                                   'text-muted-foreground/70 pointer-events-none absolute inset-0 flex items-center justify-end pr-0.5 text-[11px] transition-opacity',
@@ -323,14 +457,14 @@ export function SidebarSessionList({
                                   <button
                                     type="button"
                                     className={cn(
-                                      'text-muted-foreground hover:bg-muted absolute right-0 top-0 inline-flex h-7 w-7 items-center justify-center rounded-md',
+                                      'text-muted-foreground hover:bg-muted absolute right-0 top-0 inline-flex size-6 items-center justify-center rounded-md',
                                       threadMenuOpenId === item.id
                                         ? 'opacity-100'
                                         : 'opacity-0 group-hover:opacity-100'
                                     )}
                                     aria-label="Thread options"
                                   >
-                                    <MoreHorizontal className="h-4 w-4" />
+                                    <MoreHorizontal className="size-3.5" />
                                   </button>
                                 </PopoverTrigger>
                                 <PopoverContent
@@ -406,7 +540,7 @@ export function SidebarSessionList({
                       <li>
                         <button
                           type="button"
-                          className="text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground w-full rounded-lg px-2 py-1.5 text-left text-[12px]"
+                          className="text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground w-full rounded-md px-2 py-1 text-left text-[12px]"
                           onClick={() =>
                             setVisibleBySection(current => ({
                               ...current,

@@ -93,6 +93,10 @@ export function useSessionActionsTabs({
     if (sessionId !== keepId) navigate(`/agents/${keepId}`)
   }
 
+  const reorderSessionTabs = (orderedIds: string[]) => {
+    setOpenTabIds(orderedIds)
+  }
+
   const retainActiveTabInScope = (scopeId: string | null) => {
     // Keep the current chat in the destination scope's tab strip so switching
     // projects does not blank the tab bar / remount the main panel.
@@ -130,6 +134,7 @@ export function useSessionActionsTabs({
   return {
     closeSessionTab,
     closeOtherSessionTabs,
+    reorderSessionTabs,
     selectAllProjects,
     selectProjectScope
   }

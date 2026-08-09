@@ -54,6 +54,7 @@ export type AgentSessionMainPanelProps = {
   prefetchSessionMessages: (sessionId: string) => void | Promise<void>
   closeSessionTab: (sessionId: string) => void
   closeOtherSessionTabs: (sessionId: string) => void
+  reorderSessionTabs: (orderedIds: string[]) => void
   openRenameDialog: (target: AgentSession) => void
   updateSession: (
     target: AgentSession,
@@ -134,6 +135,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     prefetchSessionMessages,
     closeSessionTab,
     closeOtherSessionTabs,
+    reorderSessionTabs,
     openRenameDialog,
     updateSession,
     exportTranscript,
@@ -288,6 +290,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             prefetchSessionMessages={prefetchSessionMessages}
             closeSessionTab={closeSessionTab}
             closeOtherSessionTabs={closeOtherSessionTabs}
+            reorderSessionTabs={reorderSessionTabs}
             openRenameDialog={openRenameDialog}
             updateSession={updateSession}
             exportTranscript={exportTranscript}

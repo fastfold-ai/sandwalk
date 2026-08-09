@@ -105,6 +105,7 @@ export function AppShellMain(props: AppShellMainProps) {
             prefetchSessionMessages={props.prefetchSessionMessages}
             closeSessionTab={props.closeSessionTab}
             closeOtherSessionTabs={props.closeOtherSessionTabs}
+            reorderSessionTabs={props.reorderSessionTabs}
             openRenameDialog={props.openRenameDialog}
             updateSession={props.updateSession}
             exportTranscript={props.exportTranscript}

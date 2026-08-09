@@ -62,6 +62,7 @@ export type AppShellProps = {
   createSession: CreateDraftSession
   setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
   clearSessionSelection: () => void
+  batchMarkReadSelected: () => void
   batchArchiveSelected: () => void | Promise<void>
   batchMoveSelected: (projectId: string | null) => void | Promise<void>
   batchExportSelected: () => void | Promise<void>
@@ -169,6 +170,7 @@ export type AppShellProps = {
   session: AgentSession | null
   closeSessionTab: (sessionId: string) => void
   closeOtherSessionTabs: (sessionId: string) => void
+  reorderSessionTabs: (orderedIds: string[]) => void
   cliMenuOpen: boolean
   setCliMenuOpen: Dispatch<SetStateAction<boolean>>
   copiedResumeCommand: boolean

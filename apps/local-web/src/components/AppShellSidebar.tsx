@@ -59,6 +59,7 @@ export type AppShellSidebarProps = {
   loadProjects: () => void | Promise<void>
   createSession: CreateDraftSession
   clearSessionSelection: () => void
+  batchMarkReadSelected: () => void
   batchArchiveSelected: () => void | Promise<void>
   batchMoveSelected: (projectId: string | null) => void | Promise<void>
   batchExportSelected: () => void | Promise<void>
@@ -127,6 +128,7 @@ export function AppShellSidebar({
   loadProjects,
   createSession,
   clearSessionSelection,
+  batchMarkReadSelected,
   batchArchiveSelected,
   batchMoveSelected,
   batchExportSelected,
@@ -217,6 +219,7 @@ export function AppShellSidebar({
             onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
             onCreateSession={() => createSession(activeProjectId)}
             onClearSessionSelection={clearSessionSelection}
+            onBatchMarkReadSelected={batchMarkReadSelected}
             onBatchArchiveSelected={batchArchiveSelected}
             onBatchMoveSelected={batchMoveSelected}
             onBatchExportSelected={batchExportSelected}

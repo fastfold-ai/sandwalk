@@ -14,7 +14,14 @@ import {
   Upload,
   X
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { structureFormat } from '@/components/agents/artifact-grid-thumb-utils'
@@ -103,7 +110,7 @@ function structurePreviewFormat(
   return 'cif'
 }
 
-function LibraryThumb({
+const LibraryThumb = memo(function LibraryThumb({
   item,
   client,
   className,
@@ -117,6 +124,8 @@ function LibraryThumb({
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [structureText, setStructureText] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const [mediaReady, setMediaReady] = useState(false)
+  const urlRef = useRef<string | null>(null)
   const name = item.displayName || item.originalName
   const structureFormatKind = structurePreviewFormat(name)
   const isStructurePreview =
@@ -132,10 +141,8 @@ function LibraryThumb({
   useEffect(() => {
     if (!needsMediaPreview && !isStructurePreview) return
     const controller = new AbortController()
-    let url: string | null = null
     setFailed(false)
-    setObjectUrl(null)
-    setStructureText(null)
+    // Keep the previous frame until the next blob is ready — avoids icon↔image flicker.
     void client
       .fetchLibraryContent(item.id, controller.signal)
       .then(async blob => {
@@ -144,27 +151,34 @@ function LibraryThumb({
           setStructureText(await blob.text())
           return
         }
-        url = URL.createObjectURL(blob)
-        setObjectUrl(url)
+        const next = URL.createObjectURL(blob)
+        if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+        urlRef.current = next
+        setMediaReady(false)
+        setObjectUrl(next)
       })
       .catch(() => {
         if (!controller.signal.aborted) setFailed(true)
       })
     return () => {
       controller.abort()
-      if (url) URL.revokeObjectURL(url)
     }
   }, [client, isStructurePreview, item.id, needsMediaPreview])
+
+  useEffect(
+    () => () => {
+      if (urlRef.current) {
+        URL.revokeObjectURL(urlRef.current)
+        urlRef.current = null
+      }
+    },
+    []
+  )
 
   if (!failed && isStructurePreview) {
     if (!structureText) {
       return (
-        <div
-          className={cn(
-            'bg-muted/30 h-full w-full animate-pulse',
-            className
-          )}
-        />
+        <div className={cn('bg-muted/30 h-full w-full', className)} />
       )
     }
     return (
@@ -180,16 +194,19 @@ function LibraryThumb({
 
   if (!failed && isImageItem(item) && objectUrl) {
     return (
-      <img
-        src={objectUrl}
-        alt=""
-        className={cn(
-          'h-full w-full',
-          fit === 'contain' ? 'object-contain' : 'object-cover',
-          className
-        )}
-        onError={() => setFailed(true)}
-      />
+      <div className={cn('bg-muted/30 relative h-full w-full', className)}>
+        <img
+          src={objectUrl}
+          alt=""
+          className={cn(
+            'h-full w-full transition-opacity duration-200 ease-out',
+            fit === 'contain' ? 'object-contain' : 'object-cover',
+            mediaReady ? 'opacity-100' : 'opacity-0'
+          )}
+          onLoad={() => setMediaReady(true)}
+          onError={() => setFailed(true)}
+        />
+      </div>
     )
   }
 
@@ -218,6 +235,10 @@ function LibraryThumb({
     )
   }
 
+  if (!failed && (needsMediaPreview || isStructurePreview)) {
+    return <div className={cn('bg-muted/30 h-full w-full', className)} />
+  }
+
   return (
     <div
       className={cn(
@@ -228,7 +249,7 @@ function LibraryThumb({
       <Icon icon={getFileIcon(name)} className="size-10 opacity-80" />
     </div>
   )
-}
+})
 
 export function LibraryView({
   client,
@@ -279,6 +300,7 @@ export function LibraryView({
   const loadMoreInFlight = useRef(false)
   const pageRef = useRef(0)
   const hasMoreRef = useRef(false)
+  const hasLoadedOnceRef = useRef(false)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250)
@@ -286,9 +308,10 @@ export function LibraryView({
   }, [query])
 
   const reload = useCallback(async () => {
-    setLoading(true)
+    // First paint only — keep existing cards mounted on filter/search so
+    // thumbs don't flash placeholder → image.
+    if (!hasLoadedOnceRef.current) setLoading(true)
     setError(null)
-    setItems([])
     pageRef.current = 0
     loadMoreInFlight.current = false
     try {
@@ -303,8 +326,10 @@ export function LibraryView({
       setHasMore(result.pagination.hasMore)
       hasMoreRef.current = result.pagination.hasMore
       pageRef.current = result.pagination.page
+      hasLoadedOnceRef.current = true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load library')
+      setItems([])
       setTotal(0)
       setHasMore(false)
       hasMoreRef.current = false
@@ -651,7 +676,7 @@ export function LibraryView({
           ref={listSectionRef}
           className="mx-auto w-full max-w-6xl px-6 pb-10 md:px-10"
         >
-          {loading ? (
+          {loading && items.length === 0 ? (
             <div className="text-muted-foreground flex items-center gap-2 py-16 text-[13px]">
               <Loader2 className="size-4 animate-spin" />
               Loading library…

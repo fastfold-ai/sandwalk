@@ -1,0 +1,13 @@
+diff --git a/dist/chrome-tabs.js b/dist/chrome-tabs.js
+index f2be69af3a33147ab2f2be1c4530830255bde231..417598535c8af4ea32b17fb580c602244cfde826 100644
+--- a/dist/chrome-tabs.js
++++ b/dist/chrome-tabs.js
+@@ -44,7 +44,7 @@ var util_1 = require("./utils/util");
+ var TAB_CONTENT_MARGIN = 9;
+ var TAB_CONTENT_OVERLAP_DISTANCE = 1;
+ var TAB_OVERLAP_DISTANCE = TAB_CONTENT_MARGIN * 2 + TAB_CONTENT_OVERLAP_DISTANCE;
+-var TAB_CONTENT_MIN_WIDTH = 60;
++var TAB_CONTENT_MIN_WIDTH = 200;
+ var TAB_CONTENT_MAX_WIDTH = 240;
+ var TAB_SIZE_SMALL = 84;
+ var TAB_SIZE_SMALLER = 60;
