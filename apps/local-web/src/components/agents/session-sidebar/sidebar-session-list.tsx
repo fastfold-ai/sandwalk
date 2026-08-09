@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
+import { navigateToSession } from '@/lib/navigate-session'
 import { groupSessions, relativeTime, type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
@@ -403,9 +404,12 @@ export function SidebarSessionList({
                                     return
                                   }
                                   setSelectionAnchorId(item.id)
-                                  openSessionTab(item.id)
-                                  void prefetchSessionMessages(item.id)
-                                  navigate(`/agents/${item.id}`)
+                                  void navigateToSession({
+                                    id: item.id,
+                                    openSessionTab,
+                                    prefetchSessionMessages,
+                                    navigate
+                                  })
                                 }}
                               >
                               <SessionSourceIcon

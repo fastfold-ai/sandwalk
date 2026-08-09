@@ -13,6 +13,28 @@ type UseChatScrollArgs = {
   conversationTimelineLength: number
 }
 
+type SessionScrollMemory = {
+  stickToBottom: boolean
+  scrollTop: number
+}
+
+const NEAR_BOTTOM_PX = 96
+
+function getChatViewport(root: HTMLElement | null) {
+  if (!root) return null
+  return root.querySelector(
+    '[data-radix-scroll-area-viewport]'
+  ) as HTMLElement | null
+}
+
+function distanceFromBottom(viewport: HTMLElement) {
+  return viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
+}
+
+/**
+ * Per-session scroll affinity: remember stick-to-bottom vs offset, restore on
+ * tab return. Pairs with `key={sessionId}` on ChatTranscript (fresh viewport).
+ */
 export function useChatScroll({
   sessionId,
   messagesLoaded,
@@ -22,58 +44,127 @@ export function useChatScroll({
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
   const chatEndRef = useRef<HTMLDivElement | null>(null)
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
-  const chatPinnedSessionRef = useRef<string | null>(null)
+  const memoryRef = useRef<Record<string, SessionScrollMemory>>({})
+  const stickToBottomRef = useRef(true)
+  const activeSessionRef = useRef<string | null>(null)
+  const appliedForRef = useRef<string | null>(null)
+
+  const rememberActive = useCallback(() => {
+    const id = activeSessionRef.current
+    const viewport = getChatViewport(chatScrollRef.current)
+    if (!id || !viewport) return
+    const distance = distanceFromBottom(viewport)
+    const stick = distance < NEAR_BOTTOM_PX
+    stickToBottomRef.current = stick
+    memoryRef.current[id] = {
+      stickToBottom: stick,
+      scrollTop: viewport.scrollTop
+    }
+    setShowScrollToBottom(distance > NEAR_BOTTOM_PX)
+  }, [])
 
   const scrollChatToBottom = useCallback(() => {
-    const root = chatScrollRef.current
-    const viewport = root?.querySelector(
-      '[data-radix-scroll-area-viewport]'
-    ) as HTMLElement | null
+    const id = activeSessionRef.current
+    const viewport = getChatViewport(chatScrollRef.current)
     if (viewport) {
       viewport.scrollTop = viewport.scrollHeight
-      setShowScrollToBottom(false)
-      return
+      viewport.scrollTop = viewport.scrollHeight
     }
-    chatEndRef.current?.scrollIntoView({ block: 'end' })
+    chatEndRef.current?.scrollIntoView({ block: 'end', behavior: 'auto' })
+    stickToBottomRef.current = true
+    if (id) {
+      memoryRef.current[id] = { stickToBottom: true, scrollTop: 0 }
+    }
     setShowScrollToBottom(false)
   }, [])
 
-  const updateScrollToBottomVisibility = useCallback(() => {
-    const root = chatScrollRef.current
-    const viewport = root?.querySelector(
-      '[data-radix-scroll-area-viewport]'
-    ) as HTMLElement | null
-    if (!viewport) {
+  const applySessionScroll = useCallback(() => {
+    const id = activeSessionRef.current
+    const viewport = getChatViewport(chatScrollRef.current)
+    if (!id || !viewport) return false
+    const mem = memoryRef.current[id]
+    const stick = mem?.stickToBottom ?? true
+    stickToBottomRef.current = stick
+    if (stick) {
+      viewport.scrollTop = viewport.scrollHeight
+      chatEndRef.current?.scrollIntoView({ block: 'end', behavior: 'auto' })
+      setShowScrollToBottom(false)
+    } else {
+      viewport.scrollTop = mem?.scrollTop ?? 0
+      setShowScrollToBottom(
+        distanceFromBottom(viewport) > NEAR_BOTTOM_PX
+      )
+    }
+    return true
+  }, [])
+
+  useLayoutEffect(() => {
+    activeSessionRef.current = sessionId
+    appliedForRef.current = null
+    if (!sessionId) {
+      stickToBottomRef.current = true
+      setShowScrollToBottom(false)
+    }
+  }, [sessionId])
+
+  // After remount + messages: restore affinity or pin bottom (first visit).
+  useLayoutEffect(() => {
+    if (!sessionId || !messagesLoaded) return
+    if (appliedForRef.current === sessionId) return
+
+    if (messagesLength === 0) {
+      // Don't mark applied — cold hydrate still needs a pin when messages arrive.
+      stickToBottomRef.current = true
       setShowScrollToBottom(false)
       return
     }
-    const distanceFromBottom =
-      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
-    setShowScrollToBottom(distanceFromBottom > 96)
-  }, [])
+
+    const run = () => {
+      if (activeSessionRef.current !== sessionId) return
+      if (applySessionScroll()) appliedForRef.current = sessionId
+    }
+    run()
+    const frame = window.requestAnimationFrame(run)
+    const timer = window.setTimeout(run, 40)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+    }
+  }, [
+    sessionId,
+    messagesLoaded,
+    messagesLength,
+    conversationTimelineLength,
+    applySessionScroll
+  ])
 
   useEffect(() => {
     if (!sessionId || !messagesLoaded || messagesLength === 0) {
       setShowScrollToBottom(false)
       return
     }
-    const root = chatScrollRef.current
-    const viewport = root?.querySelector(
-      '[data-radix-scroll-area-viewport]'
-    ) as HTMLElement | null
+    const viewport = getChatViewport(chatScrollRef.current)
     if (!viewport) return
 
-    updateScrollToBottomVisibility()
-    viewport.addEventListener('scroll', updateScrollToBottomVisibility, {
-      passive: true
+    rememberActive()
+    viewport.addEventListener('scroll', rememberActive, { passive: true })
+    const observer = new ResizeObserver(() => {
+      if (
+        activeSessionRef.current === sessionId &&
+        stickToBottomRef.current
+      ) {
+        scrollChatToBottom()
+      } else {
+        rememberActive()
+      }
     })
-    const observer = new ResizeObserver(() => updateScrollToBottomVisibility())
     observer.observe(viewport)
     const content = viewport.firstElementChild
     if (content) observer.observe(content)
 
     return () => {
-      viewport.removeEventListener('scroll', updateScrollToBottomVisibility)
+      rememberActive()
+      viewport.removeEventListener('scroll', rememberActive)
       observer.disconnect()
     }
   }, [
@@ -81,25 +172,9 @@ export function useChatScroll({
     messagesLength,
     messagesLoaded,
     sessionId,
-    updateScrollToBottomVisibility
+    rememberActive,
+    scrollChatToBottom
   ])
-
-  // Show the latest message when opening/loading a session with history.
-  // Only pin once per session — do not keep forcing scroll while streaming.
-  useLayoutEffect(() => {
-    if (!sessionId || !messagesLoaded || messagesLength === 0) return
-    if (chatPinnedSessionRef.current === sessionId) return
-    chatPinnedSessionRef.current = sessionId
-    scrollChatToBottom()
-    const frame = window.requestAnimationFrame(() => scrollChatToBottom())
-    const timers = [80, 250, 600].map(ms =>
-      window.setTimeout(() => scrollChatToBottom(), ms)
-    )
-    return () => {
-      window.cancelAnimationFrame(frame)
-      for (const timer of timers) window.clearTimeout(timer)
-    }
-  }, [messagesLength, messagesLoaded, scrollChatToBottom, sessionId])
 
   return {
     chatScrollRef,

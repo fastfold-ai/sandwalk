@@ -25,12 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { cn } from '@/lib/utils'
 
-import {
-  CHROME_TAB_OVERLAP_DISTANCE,
-  CHROME_TAB_SIDE_MARGIN,
-  chromeTabMinOuter,
-  enforceChromeTabMinWidths
-} from './chrome-tab-layout'
+import { chromeTabMinOuter, chromeTabOverlap } from './chrome-tab-layout'
 import { useSessionTabColors } from './session-tab-colors'
 import { SessionSourceIcon } from './SessionSourceIcon'
 import { SessionStatusIcon } from './SessionStatusIcon'
@@ -51,10 +46,8 @@ import './session-chrome-tabs.css'
 const UNREAD_DOT_COLOR =
   TAB_INLINE_COLORS.find(item => item.name === 'Blue')?.value ?? '#8BB8F5'
 
-/** Extra px between tabs (CSS `translate` on top of lib layout). Keep subtle. */
-const TAB_EXTRA_GAP_PX = 3
 const TAB_MIN_OUTER = chromeTabMinOuter
-const TAB_OVERLAP = 2 * CHROME_TAB_SIDE_MARGIN + CHROME_TAB_OVERLAP_DISTANCE
+const TAB_OVERLAP = chromeTabOverlap
 
 type TabContextMenuState = {
   sessionId: string
@@ -329,16 +322,15 @@ export function SessionTabs({
     if (!(strip instanceof HTMLElement)) return 0
     const avail = strip.clientWidth
     if (avail <= 0) return 0
-    const gap = TAB_EXTRA_GAP_PX
-    const stride = TAB_MIN_OUTER - TAB_OVERLAP + gap
+    const stride = TAB_MIN_OUTER - TAB_OVERLAP
     const capacity = Math.max(
       1,
-      Math.floor((avail + TAB_OVERLAP - gap) / stride)
+      Math.floor((avail + TAB_OVERLAP) / stride)
     )
     return Math.max(0, tabCount - capacity)
   }
 
-  // Mount React label hosts + refresh +N when layout changes.
+  // Label hosts + +N only — never rewrite lib transforms (causes click jumps).
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
@@ -349,19 +341,6 @@ export function SessionTabs({
       syncing = true
       try {
         const next: Record<string, HTMLElement> = {}
-        const strip = root.querySelector('.sandwalk-chrome-tabs')
-        if (strip instanceof HTMLElement) {
-          // Beat stale Vite prebundle (min 60) — keep titles readable.
-          enforceChromeTabMinWidths(strip, TAB_EXTRA_GAP_PX)
-        }
-        const tabEls = [
-          ...root.querySelectorAll('.chrome-tab')
-        ] as HTMLElement[]
-        tabEls.forEach((tabEl, i) => {
-          // Stacks with the lib’s transform — subtle gap without forking layout math.
-          const gap = i === 0 ? '' : `${i * TAB_EXTRA_GAP_PX}px`
-          if (tabEl.style.translate !== gap) tabEl.style.translate = gap
-        })
         for (const tab of orderedTabs) {
           const tabEl = root.querySelector(
             `[data-tab-id="${CSS.escape(tab.id)}"]`
@@ -396,7 +375,7 @@ export function SessionTabs({
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['style', 'class']
+      attributeFilter: ['class']
     })
     const strip = root.querySelector('.sandwalk-chrome-tabs')
     const ro =
@@ -410,7 +389,7 @@ export function SessionTabs({
       observer.disconnect()
       ro?.disconnect()
     }
-  }, [orderKey, orderedTabs, activeId])
+  }, [orderKey, orderedTabs])
 
   const filteredSearchTabs = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase()
@@ -460,7 +439,7 @@ export function SessionTabs({
           className="sandwalk-chrome-tabs"
           darkMode={darkMode}
           draggable={Boolean(onReorder)}
-          tabs={chromeTabs.map(tab => ({ ...tab }))}
+          tabs={chromeTabs}
           onTabActive={onSelect}
           onTabClose={onClose}
           onTabReorder={(tabId, fromIndex, toIndex) => {

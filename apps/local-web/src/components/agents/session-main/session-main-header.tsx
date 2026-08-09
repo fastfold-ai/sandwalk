@@ -29,6 +29,7 @@ import { useCrossfadeFlag } from '@/hooks/useDeferredTrue'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { copyText } from '@/lib/clipboard'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import { navigateToSession } from '@/lib/navigate-session'
 import { cn } from '@/lib/utils'
 
 export type SessionMainHeaderProps = {
@@ -194,9 +195,12 @@ export function SessionMainHeader({
           tabs={openTabs}
           activeId={sessionId}
           onSelect={id => {
-            openSessionTab(id)
-            void prefetchSessionMessages(id)
-            navigate(`/agents/${id}`)
+            void navigateToSession({
+              id,
+              openSessionTab,
+              prefetchSessionMessages,
+              navigate
+            })
           }}
           onClose={closeSessionTab}
           onCloseOthers={closeOtherSessionTabs}

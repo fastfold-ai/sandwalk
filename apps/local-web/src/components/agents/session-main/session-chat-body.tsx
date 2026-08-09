@@ -1,6 +1,18 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentMessage, AgentPlanCard, AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
-import { type ComponentProps, type Dispatch, lazy, type RefObject, type SetStateAction,Suspense, useCallback, useMemo, useRef } from 'react'
+import {
+  type ComponentProps,
+  type Dispatch,
+  lazy,
+  type RefObject,
+  type SetStateAction,
+  Suspense,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
@@ -79,7 +91,7 @@ export function SessionChatBody({
   isInspect,
   messages,
   tools,
-  messagesLoaded: _messagesLoaded,
+  messagesLoaded,
   runActive,
   showChatSkeleton: _showChatSkeleton,
   agentComposerSlotProps,
@@ -164,9 +176,22 @@ export function SessionChatBody({
     [sessionId]
   )
 
-  // One continuous layout: empty = composer centered; active = transcript +
-  // composer docked at the bottom. No skeleton swap — flex-grow animates.
-  const showTranscript = messages.length > 0 || runActive
+  // While hydrating a tab switch, keep the transcript dock (no empty Aura flash).
+  // Empty chrome only after load confirms there is no history.
+  const hasConversation = messages.length > 0 || runActive
+  const showTranscript = hasConversation || !messagesLoaded
+  const showEmptyChrome = messagesLoaded && !hasConversation
+
+  // Skip flex morph for one paint when the route session changes.
+  const prevSessionRef = useRef(sessionId)
+  const [layoutInstant, setLayoutInstant] = useState(false)
+  useLayoutEffect(() => {
+    if (prevSessionRef.current === sessionId) return
+    prevSessionRef.current = sessionId
+    setLayoutInstant(true)
+    const frame = window.requestAnimationFrame(() => setLayoutInstant(false))
+    return () => window.cancelAnimationFrame(frame)
+  }, [sessionId])
 
   return (
     <>
@@ -186,7 +211,11 @@ export function SessionChatBody({
         )}
       >
         <div
-          className="flex min-h-0 flex-col overflow-hidden transition-[flex-grow,opacity] duration-500 ease-out"
+          className={cn(
+            'flex min-h-0 flex-col overflow-hidden',
+            !layoutInstant &&
+              'transition-[flex-grow,opacity] duration-500 ease-out'
+          )}
           style={{
             flexGrow: showTranscript ? 1 : 0,
             flexShrink: 1,
@@ -196,6 +225,7 @@ export function SessionChatBody({
         >
           {showTranscript ? (
             <ChatTranscript
+              key={sessionId ?? 'no-session'}
               chatScrollRef={chatScrollRef}
               chatEndRef={chatEndRef}
               conversationTimeline={conversationTimeline}
@@ -233,23 +263,27 @@ export function SessionChatBody({
 
         <div
           className={cn(
-            'bg-background mx-auto flex w-full max-w-[44rem] flex-col px-5 transition-[flex-grow,padding] duration-500 ease-out',
-            showTranscript ? 'justify-end' : 'justify-center'
+            'bg-background mx-auto flex w-full max-w-[44rem] flex-col px-5',
+            !layoutInstant &&
+              'transition-[flex-grow,padding] duration-500 ease-out',
+            showEmptyChrome ? 'justify-center' : 'justify-end'
           )}
           style={{
-            flexGrow: showTranscript ? 0 : 1,
+            flexGrow: showEmptyChrome ? 1 : 0,
             flexShrink: 0,
             flexBasis: 'auto',
-            paddingBottom: showTranscript ? '1.5rem' : '5rem',
-            paddingTop: showTranscript ? '0.5rem' : 0
+            paddingBottom: showEmptyChrome ? '5rem' : '1.5rem',
+            paddingTop: showEmptyChrome ? 0 : '0.5rem'
           }}
         >
           <div
             className={cn(
-              'flex flex-col items-center overflow-hidden transition-[max-height,opacity,margin] duration-300 ease-out',
-              showTranscript
-                ? 'mb-0 max-h-0 opacity-0'
-                : 'mb-2 max-h-40 opacity-100'
+              'flex flex-col items-center overflow-hidden',
+              !layoutInstant &&
+                'transition-[max-height,opacity,margin] duration-300 ease-out',
+              showEmptyChrome
+                ? 'mb-2 max-h-40 opacity-100'
+                : 'mb-0 max-h-0 opacity-0'
             )}
           >
             <AuraIconPulse className="text-muted-foreground/70 mb-6 h-12 w-12" />

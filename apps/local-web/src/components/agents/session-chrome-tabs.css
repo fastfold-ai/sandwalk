@@ -1,9 +1,9 @@
 /*
  * Loaded after @sinm/react-chrome-tabs CSS so these rules win the cascade.
  *
- * Strip + overflow slot must match the tabs container (library chrome gray):
- *   light #dee1e6 · dark #202124
- * (Not theme --muted — that was the two-tone seam.)
+ * Tabs strip uses library chrome gray (light #dee1e6 · dark #202124).
+ * Overflow slot is a transparent sibling — chip wash only on the button
+ * (opaque slot bg looked like it covered the last tab when panning).
  *
  * Hover mid-line: SVG halves at 52%; use opaque hover fill only.
  */
@@ -95,15 +95,20 @@
   overflow: hidden;
 }
 
+/* Kill library slide on content transform — feels like strip flicker on activate. */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tabs-content {
+  transition: none !important;
+}
+
 /*
- * Overflow slot: own flex column to the RIGHT of tabs (not overlaid).
- * Shares the tabs’ 6px --background bottom seat.
- * Wide enough for chip: [ ⌄ +N ] with noticeable left padding.
+ * Overflow slot: flex sibling to the RIGHT of the tabs column (not overlaid).
+ * Transparent — only the chip button paints a wash. Bottom seat matches
+ * chrome-tabs-bottom-bar so the floor line continues under the chip.
  */
 .sandwalk-tab-overflow-slot {
   box-sizing: border-box;
   position: relative;
-  z-index: 1;
+  z-index: 0;
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -111,16 +116,10 @@
   align-self: flex-end;
   min-width: 3.25rem;
   height: 44px;
-  /* Top pad matches chrome-tabs; bottom pad = bottom-bar seat */
   padding: 4px 8px 6px 6px;
   margin: 0;
-  /* Match tabs container (library chrome gray), not --muted */
-  background: #dee1e6 !important;
+  background: transparent;
   pointer-events: auto;
-}
-
-.dark .sandwalk-tab-overflow-slot {
-  background: #202124 !important;
 }
 
 .sandwalk-tab-overflow-slot::after {
@@ -132,30 +131,42 @@
   height: 6px;
   background: hsl(var(--background));
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
 
 .sandwalk-tab-overflow-btn {
   position: relative;
-  z-index: 2;
+  z-index: 1;
 }
 
-/* Opaque subtle hover plate — must not use alpha fills. */
+/*
+ * Inactive hover = floating pill (Chrome/Arc-style), not the ear SVG plate.
+ * Keep the same wash colors; only the shape changes.
+ */
 .sandwalk-chrome-tabs.chrome-tabs
-  .chrome-tab:not([active])
-  .chrome-tab-background
-  > svg
-  .chrome-tab-geometry {
-  fill: color-mix(in srgb, hsl(var(--muted)) 72%, hsl(var(--foreground))) !important;
+  .chrome-tab:not([active]):hover
+  .chrome-tab-background {
+  opacity: 0 !important;
+}
+
+.sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab:not([active]):hover
+  .chrome-tab-content {
+  top: 3px !important;
+  bottom: 3px !important;
+  border-radius: 9999px !important;
+  background: color-mix(
+    in srgb,
+    hsl(var(--muted)) 72%,
+    hsl(var(--foreground))
+  ) !important;
 }
 
 .dark
   .sandwalk-chrome-tabs.chrome-tabs
-  .chrome-tab:not([active])
-  .chrome-tab-background
-  > svg
-  .chrome-tab-geometry {
-  fill: color-mix(in srgb, hsl(var(--muted)) 82%, #fff) !important;
+  .chrome-tab:not([active]):hover
+  .chrome-tab-content {
+  background: color-mix(in srgb, hsl(var(--muted)) 82%, #fff) !important;
 }
 
 /* Close (X) only while hovering that tab — frees title space. */

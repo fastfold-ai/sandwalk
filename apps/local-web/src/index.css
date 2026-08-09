@@ -1453,17 +1453,16 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
   opacity: 0 !important;
 }
 
+/* Inactive hover pill is painted on .chrome-tab-content (session-chrome-tabs.css);
+   keep the ear SVG hidden so hover reads as a floating pill. */
 .sandwalk-chrome-tabs.chrome-tabs
   .chrome-tab:not([active]):hover
   .chrome-tab-background,
 .sandwalk-chrome-tabs.chrome-tabs-dark-theme
   .chrome-tab:not([active]):hover
   .chrome-tab-background {
-  opacity: 1 !important;
+  opacity: 0 !important;
 }
-
-/* Hover fill for inactive tabs is set in session-chrome-tabs.css
-   (opaque color-mix — alpha fills show the SVG 52%/52% seam). */
 
 /* Divider + close-on-hover overrides live in session-chrome-tabs.css
    (imported after the chrome-tabs package CSS). */

@@ -58,9 +58,15 @@ export function buildChatTimelineItems(
   while (cursor < conversationTimeline.length) {
     const entry = conversationTimeline[cursor]
     if (entry.kind !== 'tool') {
+      const stableKey =
+        entry.kind === 'message' || entry.kind === 'thought'
+          ? `${entry.kind}-${entry.message.id}`
+          : entry.kind === 'todos' || entry.kind === 'plan'
+            ? `${entry.kind}-${entry.messageId}`
+            : `${entry.kind}-${cursor}`
       items.push({
         kind: 'entry',
-        key: `${entry.kind}-${cursor}`,
+        key: stableKey,
         entry
       })
       cursor += 1
@@ -78,19 +84,20 @@ export function buildChatTimelineItems(
       cursor += 1
     }
     if (runTools.length > TOOL_RUN_VISIBLE_COUNT) {
+      const runKey = runTools.map(tool => tool.id).join('-')
       items.push({
         kind: 'tool_run',
-        key: `tool-run-${runTools[0]?.id || cursor}`,
+        key: `tool-run-${runKey || cursor}`,
         tools: runTools
       })
     } else {
-      runTools.forEach((tool, index) => {
+      for (const tool of runTools) {
         items.push({
           kind: 'entry',
-          key: `tool-${tool.id}-${index}`,
+          key: `tool-${tool.id}`,
           entry: { kind: 'tool', tool }
         })
-      })
+      }
     }
   }
   return items
