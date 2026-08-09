@@ -25,7 +25,11 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { cn } from '@/lib/utils'
 
-import { chromeTabMinOuter, chromeTabOverlap } from './chrome-tab-layout'
+import {
+  CHROME_TAB_GEOMETRY_PATH,
+  chromeTabMinOuter,
+  chromeTabOverlap
+} from './chrome-tab-layout'
 import { useSessionTabColors } from './session-tab-colors'
 import { SessionSourceIcon } from './SessionSourceIcon'
 import { SessionStatusIcon } from './SessionStatusIcon'
@@ -340,6 +344,16 @@ export function SessionTabs({
       if (syncing) return
       syncing = true
       try {
+        // Lib duplicates symbol ids per tab; <use> resolves the first path.
+        // Keep every geometry path on our silhouette so ears actually update.
+        root
+          .querySelectorAll('.chrome-tab-background symbol path')
+          .forEach(node => {
+            if (!(node instanceof SVGPathElement)) return
+            if (node.getAttribute('d') !== CHROME_TAB_GEOMETRY_PATH) {
+              node.setAttribute('d', CHROME_TAB_GEOMETRY_PATH)
+            }
+          })
         const next: Record<string, HTMLElement> = {}
         for (const tab of orderedTabs) {
           const tabEl = root.querySelector(

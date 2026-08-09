@@ -1420,12 +1420,12 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
   /* Background set in session-chrome-tabs.css to match library chrome gray */
 }
 
-/* Same height/baseline for active + inactive — no per-state top offset. */
+/* Same height/baseline for active + inactive. */
 .sandwalk-chrome-tabs.chrome-tabs .chrome-tab,
 .sandwalk-chrome-tabs.chrome-tabs-dark-theme .chrome-tab,
 .sandwalk-chrome-tabs.chrome-tabs .chrome-tab[active],
 .sandwalk-chrome-tabs.chrome-tabs-dark-theme .chrome-tab[active] {
-  top: 0;
+  top: 2px;
   height: 36px;
 }
 
@@ -1453,16 +1453,7 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
   opacity: 0 !important;
 }
 
-/* Inactive hover pill is painted on .chrome-tab-content (session-chrome-tabs.css);
-   keep the ear SVG hidden so hover reads as a floating pill. */
-.sandwalk-chrome-tabs.chrome-tabs
-  .chrome-tab:not([active]):hover
-  .chrome-tab-background,
-.sandwalk-chrome-tabs.chrome-tabs-dark-theme
-  .chrome-tab:not([active]):hover
-  .chrome-tab-background {
-  opacity: 0 !important;
-}
+/* Inactive hover uses the same SVG chrome as active (session-chrome-tabs.css). */
 
 /* Divider + close-on-hover overrides live in session-chrome-tabs.css
    (imported after the chrome-tabs package CSS). */
