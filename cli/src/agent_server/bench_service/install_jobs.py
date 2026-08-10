@@ -79,6 +79,12 @@ def install_progress_text(suite_id: str) -> str | None:
     return _format_progress(job)
 
 
+def clear_install_job(suite_id: str) -> None:
+    """Forget a finished job so a removed dataset stops reporting done/error."""
+    with _lock:
+        _jobs.pop(suite_id, None)
+
+
 def start_install(suite_id: str, *, force: bool = False) -> BenchInstallResponse:
     """Kick off a daemon install and return immediately."""
     key = (suite_id or "").strip()

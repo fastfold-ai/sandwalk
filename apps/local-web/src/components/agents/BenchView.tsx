@@ -166,6 +166,9 @@ export function BenchView({
   )
   const [cliMenuOpen, setCliMenuOpen] = useState(false)
   const [copiedCli, setCopiedCli] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
+  const [cacheBytes, setCacheBytes] = useState(0)
   const [brokenAvatars, setBrokenAvatars] = useState<Set<string>>(
     () => new Set()
   )
@@ -203,8 +206,8 @@ export function BenchView({
 
   const loadCatalog = useCallback(async () => {
     try {
-      const [cards, models, profiles, specialistRows] = await Promise.all([
-        client.listBenchSuites(),
+      const [catalog, models, profiles, specialistRows] = await Promise.all([
+        client.getBenchCatalog(),
         client.listModels({ enabledOnly: true, discover: true }).catch(() => []),
         client.listModelProfiles().catch(() => []),
         client.listSpecialists().catch(() => [])
@@ -212,7 +215,8 @@ export function BenchView({
       const backendsByProfileId = Object.fromEntries(
         (profiles || []).map(profile => [profile.id, profile.backend])
       )
-      setSuites(cards)
+      setSuites(catalog.suites)
+      setCacheBytes(catalog.cacheBytes)
       setSpecialists((specialistRows || []).filter(row => row.enabled !== false))
       setModelOptions(
         toComposerModelOptions(
@@ -370,6 +374,30 @@ export function BenchView({
       }
     } finally {
       setStartingInstallId(null)
+    }
+  }
+
+  const removeSuiteDataset = async (card: BenchSuiteCard) => {
+    if (card.installing || removingId === card.id) return
+    setRemovingId(card.id)
+    setError(null)
+    try {
+      await client.uninstallBenchSuite(card.id)
+      // Drop it from the next run so a removed suite cannot be spawned.
+      setSelectedIds(prev => {
+        if (!prev.has(card.id)) return prev
+        const next = new Set(prev)
+        next.delete(card.id)
+        return next
+      })
+      await loadCatalog()
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : `Unable to remove ${card.title}`
+      )
+    } finally {
+      setRemovingId(null)
+      setConfirmRemoveId(null)
     }
   }
 
@@ -757,6 +785,12 @@ export function BenchView({
                 <span>View on Results →</span>
               </button>
             ) : null}
+            {cacheBytes > 0 ? (
+              <p className="text-muted-foreground text-[11px]">
+                Dataset cache: {formatBytes(cacheBytes)} · remove a suite below to
+                free space
+              </p>
+            ) : null}
             <div className="grid gap-2 sm:grid-cols-2">
               {suites.map(card => {
                 const on = selectedIds.has(card.id)
@@ -974,8 +1008,7 @@ export function BenchView({
                                 : card.requiresHfToken && !card.hfTokenConfigured
                                   ? 'Set HF token'
                                   : 'Install'}
-                            </Button>
-                            {card.requiresHfToken && !card.hfTokenConfigured ? (
+                            </Button>                            {card.requiresHfToken && !card.hfTokenConfigured ? (
                               <button
                                 type="button"
                                 className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
@@ -988,6 +1021,58 @@ export function BenchView({
                             ) : null}
                           </div>
                         ) : null}
+                        {card.installable && card.missingDependency ? (
+                          <p className="text-muted-foreground text-[11px]">
+                            {card.missingDependency}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {card.installed && !installing ? (
+                      <div
+                        className="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <span>
+                          Cached
+                          {card.installedBytes
+                            ? ` · ${formatBytes(card.installedBytes)}`
+                            : ''}
+                          {card.installedCount
+                            ? ` · ${card.installedCount.toLocaleString()} questions`
+                            : ''}
+                        </span>
+                        {confirmRemoveId === card.id ? (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="text-foreground">Remove data?</span>
+                            <button
+                              type="button"
+                              className="text-destructive underline-offset-2 hover:underline disabled:opacity-60"
+                              disabled={removingId === card.id}
+                              onClick={() => void removeSuiteDataset(card)}
+                            >
+                              {removingId === card.id
+                                ? 'Removing…'
+                                : 'Yes, remove'}
+                            </button>
+                            <button
+                              type="button"
+                              className="hover:text-foreground underline-offset-2 hover:underline"
+                              onClick={() => setConfirmRemoveId(null)}
+                            >
+                              Cancel
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                            onClick={() => setConfirmRemoveId(card.id)}
+                          >
+                            <Trash2 className="size-3" />
+                            Remove
+                          </button>
+                        )}
                       </div>
                     ) : null}
                   </div>

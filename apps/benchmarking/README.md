@@ -22,13 +22,38 @@ Results are written to `~/.sandwalk/bench-runs/` and show up in Dashboard → Be
 
 | Suite | Runner | Notes |
 |-------|--------|-------|
-| **MMLU** | Agent | Full corpus (14,042); sample sizes + Full; agent sessions |
-| **MMLU-Pro** | Agent | Full corpus (12,032); sample sizes + Full; agent sessions |
-| **ARC-C** | Agent | Full corpus (1,172); sample sizes + Full; agent sessions |
+| **MMLU** | Agent | Full corpus (14,042); Install to fetch, then sizes + Full |
+| **MMLU-Pro** | Agent | Full corpus (12,032); Install to fetch, then sizes + Full |
+| **ARC-C** | Agent | Full corpus (1,172); Install to fetch, then sizes + Full |
 | **MBPP** | Agent | Python problems; host code-exec grading (sizes + Full) |
 | **LiveCodeBench** | Agent | Competitive coding; host code-exec grading (sizes + Full) |
 | **BixBench-Verified-50** | Agent | As-is upstream questions + CapsuleData; needs `HF_TOKEN` + accepted dataset terms |
 | **Bio-Capybara-full** | Agent | Featured skills + MCP coverage pack (`sandwalk_skills_mcp`) |
+
+Only 30-question **sample fixtures** for MMLU / MMLU-Pro / ARC-C are committed to
+git. Until you click **Install** on the suite card, those cards offer sample sizes
+up to 30 only — the larger picks appear once the full corpus is cached under
+`.cache/mcq/`. Install pulls a single parquet from Hugging Face (no token needed),
+falling back to the paged rows API when no parquet reader is present.
+
+## Managing cached datasets
+
+Suite cards show what each dataset uses on disk (`Cached · 7.2 MB · 14,042
+questions`) and the Bench tab shows the cache total. **Remove** deletes a suite's
+cached files to reclaim space — the card falls back to its sample fixture, so the
+suite stays runnable at small sizes and can be re-installed later. Removal is
+blocked while a download is in progress, and BixBench removal includes its
+downloaded capsule data.
+
+The fast single-request install needs a parquet reader:
+
+```bash
+cd cli && uv sync --extra bench   # or: pip install -e ".[bench]"
+```
+
+Without it, installs fall back to a paged Hugging Face API that gets rate-limited
+on the larger corpora (MMLU needs ~141 pages), and the suite card says so.
+`--extra all` already includes it.
 
 Persisted run JSON lives under `~/.sandwalk/bench-runs/` (or `$SANDWALK_CONFIG_DIR/bench-runs/`).
 

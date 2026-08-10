@@ -34,6 +34,14 @@ class BenchSuiteCard(ApiModel):
     install_progress: str | None = None
     install_bytes_done: int | None = None
     install_bytes_total: int | None = None
+    """True when a downloadable dataset is cached on disk (Remove is available)."""
+    installed: bool = False
+    """Bytes this suite occupies in the local bench cache."""
+    installed_bytes: int | None = None
+    """Questions actually cached locally (may differ from the declared corpus)."""
+    installed_count: int | None = None
+    """Set when the fast parquet download needs a reader that is not installed."""
+    missing_dependency: str | None = None
     required_skills: list[str] = Field(default_factory=list)
     required_mcps: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
@@ -42,6 +50,17 @@ class BenchSuiteCard(ApiModel):
 
 class BenchSuiteList(ApiModel):
     data: list[BenchSuiteCard]
+    """Total bytes used by every cached bench dataset."""
+    cache_bytes: int = 0
+    cache_path: str | None = None
+
+
+class BenchUninstallResponse(ApiModel):
+    ok: bool
+    suite_id: str
+    summary: str = ""
+    freed_bytes: int = 0
+    removed: list[str] = Field(default_factory=list)
 
 
 class BenchInstallResponse(ApiModel):

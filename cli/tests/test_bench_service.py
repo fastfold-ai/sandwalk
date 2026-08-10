@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from agent_server.bench_service.catalog import list_suite_cards
+from agent_server.bench_service.mcq_suites import full_dataset_available
 from agent_server.bench_service.grade import (
     build_result,
     extract_answer,
@@ -138,13 +139,23 @@ def test_list_suite_cards_includes_mmlu_and_packs():
     assert mmlu.question_count == 14042
     assert mmlu.default_sample_size == 30
     assert 30 in mmlu.sample_sizes
-    assert 2000 in mmlu.sample_sizes
-    assert mmlu.sample_sizes[-1] == 14042  # Full
+    # Offered sizes depend on what is cached locally: the full corpus unlocks the
+    # large picks, while the bundled sample fixture must not advertise sizes it
+    # cannot serve (picking one used to fail mid-run).
+    if full_dataset_available("mmlu"):
+        assert 2000 in mmlu.sample_sizes
+        assert mmlu.sample_sizes[-1] == 14042  # Full
+    else:
+        assert max(mmlu.sample_sizes) <= 30
+        assert mmlu.installable is True
     pro = next(c for c in cards if c.id == "mmlu-pro")
     assert pro.available is True
     assert pro.question_count == 12032
     assert pro.default_sample_size == 30
-    assert pro.sample_sizes[-1] == 12032
+    if full_dataset_available("mmlu-pro"):
+        assert pro.sample_sizes[-1] == 12032
+    else:
+        assert max(pro.sample_sizes) <= 30
     assert pro.author == "TIGER-Lab"
     arc = next(c for c in cards if c.id == "arc-challenge")
     assert arc.available is True

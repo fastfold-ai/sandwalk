@@ -60,6 +60,10 @@ notebook = ["nbconvert>=7.0"]
 slack = ["slack-bolt>=1.21"]
 chemistry = ["rdkit>=2023.03"]
 biology = ["biopython>=1.81"]
+# Parquet reader for Bench dataset installs (MMLU / MMLU-Pro / ARC-C). Without it
+# those downloads fall back to a paged HF API that gets rate-limited on the large
+# corpora, so keep it in `dev` too — the suite exercises the install path.
+bench = ["pyarrow>=14.0"]
 singlecell = [
     "scanpy>=1.9",
     "anndata>=0.10",

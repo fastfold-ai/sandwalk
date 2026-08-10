@@ -95,10 +95,53 @@ MCQ_SUITES: dict[str, McqSuite] = {
 }
 
 
-def catalog_sample_sizes(suite: McqSuite) -> list[int]:
-    """Discrete sizes under full, then Full (= full_size)."""
+def catalog_sample_sizes(
+    suite: McqSuite, *, full_available: bool = True
+) -> list[int]:
+    """Discrete sizes under full, then Full (= full_size).
+
+    With only the sample fixture on disk, cap the list at what that fixture can
+    serve — offering 100 when 30 rows exist just fails once the run starts.
+    """
+    if not full_available:
+        n = sample_fixture_size(suite)
+        if n <= 0:
+            return [suite.default_sample_size]
+        return [size for size in suite.sample_sizes if size <= n] or [n]
     sizes = [n for n in suite.sample_sizes if n < suite.full_size]
     return sizes + [suite.full_size]
+
+
+def sample_fixture_size(suite: McqSuite) -> int:
+    """Row count of the small bundled fixture (0 when absent)."""
+    fix = fixtures_dir()
+    if fix is None:
+        return 0
+    path = fix / suite.sample_fixture
+    if not path.is_file():
+        return 0
+    try:
+        return _count_records(path)
+    except OSError:
+        return 0
+
+
+def _count_records(path: Path) -> int:
+    """Count JSONL records as the loader reads them (newline-delimited only).
+
+    ``str.splitlines`` also splits on U+0085 / U+2028 / U+2029, which occur inside
+    a few MMLU questions and would inflate the count.
+    """
+    with path.open(encoding="utf-8") as fh:
+        return sum(1 for line in fh if line.strip())
+
+
+def full_dataset_available(suite_id: str) -> bool:
+    """True when the full corpus is cached (not just the sample fixture)."""
+    suite = MCQ_SUITES.get(suite_id)
+    if suite is None:
+        return False
+    return resolve_dataset_path(suite, prefer_full=True) is not None
 
 
 def count_fixture(suite_id: str) -> int:
@@ -147,17 +190,17 @@ def ensure_dataset_path(suite: McqSuite, sample_size: int) -> Path:
     if path is None:
         raise FileNotFoundError(
             f"Missing {suite.title} dataset ({suite.full_fixture}). "
-            f"Place it under apps/benchmarking/.cache/mcq/"
+            f"Install it from Dashboard → Bench (the suite card's Install button)."
         )
     if path.name == suite.sample_fixture:
-        n_lines = sum(
-            1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
-        )
+        n_lines = _count_records(path)
         need = suite.full_size if sample_size <= 0 else sample_size
         if need > n_lines:
             raise FileNotFoundError(
-                f"{suite.title} full dataset missing for sample size {need}. "
-                f"Expected apps/benchmarking/.cache/mcq/{suite.full_fixture}"
+                f"{suite.title}: only the {n_lines}-question sample fixture is "
+                f"installed, but {need} questions were requested. Install the full "
+                f"{suite.title} dataset from Dashboard → Bench, or pick a sample "
+                f"size of {n_lines} or fewer."
             )
     return path
 

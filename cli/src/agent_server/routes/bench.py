@@ -25,7 +25,12 @@ from agent_server.bench_service import (
     resume_run,
     start_install,
 )
-from agent_server.bench_service.dataset_install import BenchInstallError
+from agent_server.bench_service.dataset_install import (
+    BenchInstallError,
+    cache_root,
+    total_cache_bytes,
+    uninstall_suite,
+)
 from agent_server.models.bench import (
     BenchActiveStatus,
     BenchCancelResponse,
@@ -39,8 +44,17 @@ from agent_server.models.bench import (
     BenchResumeResponse,
     BenchSpawnRequest,
     BenchSpawnResponse,
+    BenchSuiteCard,
     BenchSuiteList,
+    BenchUninstallResponse,
 )
+
+
+def _packs_payload(store: object) -> tuple[list[BenchSuiteCard], int, str | None]:
+    """Suite cards plus cache totals, computed together off the event loop."""
+    cards = list_suite_cards(store)
+    root = cache_root()
+    return cards, total_cache_bytes(), (str(root) if root is not None else None)
 
 
 def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
@@ -49,8 +63,11 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
 
     @app.get("/v1/bench/packs", response_model=BenchSuiteList)
     async def bench_packs() -> BenchSuiteList:
+        cards, cache_bytes, cache_path = await asyncio.to_thread(
+            _packs_payload, deps.store
+        )
         return BenchSuiteList(
-            data=await asyncio.to_thread(list_suite_cards, deps.store)
+            data=cards, cache_bytes=cache_bytes, cache_path=cache_path
         )
 
     @app.post(
@@ -70,6 +87,19 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
                     "needsHfToken": exc.needs_hf_token,
                     "suiteId": suite_id,
                 },
+            ) from exc
+
+    @app.delete(
+        "/v1/bench/packs/{suite_id}/install",
+        response_model=BenchUninstallResponse,
+    )
+    async def bench_pack_uninstall(suite_id: str) -> BenchUninstallResponse:
+        try:
+            return await asyncio.to_thread(uninstall_suite, suite_id)
+        except BenchInstallError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"message": str(exc), "suiteId": suite_id},
             ) from exc
 
     @app.post("/v1/bench/spawn", response_model=BenchSpawnResponse)
