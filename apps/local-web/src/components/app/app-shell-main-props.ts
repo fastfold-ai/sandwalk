@@ -36,9 +36,6 @@ import {
 export type AppShellMainProps = {
   sidebarCollapsed: boolean
   setSidebarCollapsed: (value: boolean | ((current: boolean) => boolean)) => void
-  showConnectionLimitWarning: boolean
-  runningCount: number
-  setConnectionLimitDismissed: (value: boolean | ((current: boolean) => boolean)) => void
   showSessionTabs: boolean
   isHome: boolean
   isLibrary: boolean

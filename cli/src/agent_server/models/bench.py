@@ -67,6 +67,10 @@ class BenchSpawnRequest(ApiModel):
     specialist_id: str | None = None
     thinking: bool = False
     dry_run: bool = False
+    # Parallel cells within a single suite run (in-process workers).
+    concurrency: int = 1
+    # After a successful suite, optionally delete the bench project + sessions.
+    cleanup_sessions: bool | None = False
     # Dashboard Bench defaults to ui; `sandwalk eval` should send cli.
     client_surface: Literal["cli", "ui"] = "ui"
 
@@ -86,6 +90,7 @@ class BenchProgress(ApiModel):
     total: int = 0
     bench_current: int = 0
     bench_total: int = 0
+    in_flight: int = 0
 
 
 class BenchQueueItem(ApiModel):
@@ -101,6 +106,8 @@ class BenchActiveStatus(ApiModel):
     current_run_id: str | None = None
     last_progress: BenchProgress | None = None
     queue: list[BenchQueueItem] = Field(default_factory=list)
+    resumable_run_id: str | None = None
+    project_id: str | None = None
 
 
 class BenchResultSummary(ApiModel):
@@ -114,6 +121,9 @@ class BenchResultSummary(ApiModel):
     thinking_used: bool = False
     project_id: str | None = None
     created_at: str | None = None
+    status: str | None = None
+    reasoning_effort: str | None = None
+    reasoning_fast: bool | None = None
 
 
 class BenchResultList(ApiModel):
@@ -125,9 +135,20 @@ class BenchCancelResponse(ApiModel):
     run_id: str | None = None
 
 
+class BenchPauseResponse(ApiModel):
+    ok: bool
+    run_id: str | None = None
+
+
+class BenchResumeResponse(ApiModel):
+    ok: bool
+    run_id: str | None = None
+
+
 class BenchResetResponse(ApiModel):
     ok: bool
     cleared: int
+    sessions_deleted: int = 0
 
 
 class BenchGradeRequest(ApiModel):

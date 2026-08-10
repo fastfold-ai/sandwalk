@@ -66,10 +66,15 @@ export function useAppBootstrapLoaders({
     useState<SandboxSettings | null>(null)
   const [modelOptions, setModelOptions] = useState<ComposerModelOption[]>([])
   const loadSessionsRef = useRef<
-    ((options?: { force?: boolean }) => Promise<void>) | null
+    ((options?: {
+      force?: boolean
+      projectId?: string | null
+    }) => Promise<void>) | null
   >(null)
   const loadSkillsRef = useRef<(() => Promise<void>) | null>(null)
   const sessionsRevisionRef = useRef<string | null>(null)
+  /** When set, listSessions is project-scoped (includes bench). */
+  const sessionsListScopeRef = useRef<string | null>(null)
   const sessionPreviewsRef = useRef<Record<string, string>>({})
   const previewInFlightRef = useRef(new Set<string>())
   const specialistsRef = useRef(specialists)
@@ -77,11 +82,22 @@ export function useAppBootstrapLoaders({
   specialistsRef.current = specialists
 
   const loadSessions = useCallback(
-    async (options?: { force?: boolean }) => {
-      const key = `sessions:${client.baseUrl}`
-      // Cheap watermark first: idle UIs only hit a tiny aggregate query until
-      // CLI / Slack / another client actually changes the session list.
-      if (!options?.force) {
+    async (options?: { force?: boolean; projectId?: string | null }) => {
+      if (options && 'projectId' in options) {
+        const nextScope = options.projectId ?? null
+        if (sessionsListScopeRef.current !== nextScope) {
+          sessionsListScopeRef.current = nextScope
+          // Scope change must not reuse the global revision watermark.
+          sessionsRevisionRef.current = null
+        }
+      }
+      const projectId = sessionsListScopeRef.current
+      const key = projectId
+        ? `sessions:${client.baseUrl}:project:${projectId}`
+        : `sessions:${client.baseUrl}`
+      // Cheap watermark first for the global (non-bench) list. Project scope
+      // includes bench sessions that do not bump the global revision.
+      if (!options?.force && !projectId) {
         try {
           const revision = await dedupeAsync(`${key}:rev`, () =>
             client.getSessionsRevision()
@@ -91,11 +107,15 @@ export function useAppBootstrapLoaders({
           // Older servers without /sessions/revision fall through to full list.
         }
       }
-      const nextSessions = await dedupeAsync(key, () => client.listSessions())
-      try {
-        sessionsRevisionRef.current = await client.getSessionsRevision()
-      } catch {
-        sessionsRevisionRef.current = null
+      const nextSessions = await dedupeAsync(key, () =>
+        client.listSessions(projectId ? { projectId } : undefined)
+      )
+      if (!projectId) {
+        try {
+          sessionsRevisionRef.current = await client.getSessionsRevision()
+        } catch {
+          sessionsRevisionRef.current = null
+        }
       }
       // Keep the previous array when nothing moved, so a forced refresh cannot
       // re-render the sidebar on a timer when the payload is identical.

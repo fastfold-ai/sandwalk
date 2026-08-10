@@ -169,9 +169,9 @@ def test_list_suite_cards_includes_mmlu_and_packs():
     assert pack_cards, "expected at least one YAML pack suite card"
     pack_ids = [c.pack_id for c in pack_cards]
     assert len(pack_ids) == len(set(pack_ids))
-    skills = next((c for c in pack_cards if c.pack_id == "skills-mcp-bakeoff"), None)
+    skills = next((c for c in pack_cards if c.pack_id == "bio-capybara-full"), None)
     if skills is not None:
-        assert skills.id == "skills-mcp-bakeoff"
+        assert skills.id == "bio-capybara-full"
         assert skills.title == "Bio-Capybara-full"
         assert skills.author == "Sandwalk"
         assert skills.question_count == 12

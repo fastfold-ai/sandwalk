@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import {
@@ -109,7 +109,6 @@ export default function App() {
     setProjectScopeId: ui.setProjectScopeId,
     setRecentProjectIds: ui.setRecentProjectIds,
     setCollapsedSidebarSections: ui.setCollapsedSidebarSections,
-    setConnectionLimitDismissed: ui.setConnectionLimitDismissed,
     setWorkspaceVersion: ui.setWorkspaceVersion,
     workspaceFiles: ui.workspaceFiles,
     setFilesPanelCollapsed: ui.setFilesPanelCollapsed,
@@ -122,10 +121,6 @@ export default function App() {
   // Route wins. Draft materialization uses a separate ref inside session CRUD
   // so /agents/new never "sticks" to a previous real session id.
   ui.sessionIdRef.current = route.sessionId
-
-  const showConnectionLimitWarning =
-    layer.runningCount >= layer.concurrentRunSoftLimit &&
-    !ui.connectionLimitDismissed
 
   const { showChatSkeleton } = useAppShellEffects({
     locationPathname: location.pathname,
@@ -168,9 +163,6 @@ export default function App() {
     sidebarPanelRef: ui.sidebarPanelRef,
     filesPanelRef: ui.filesPanelRef,
     collapsedSidebarSections: ui.collapsedSidebarSections,
-    runningCount: layer.runningCount,
-    concurrentRunSoftLimit: layer.concurrentRunSoftLimit,
-    setConnectionLimitDismissed: ui.setConnectionLimitDismissed,
     routeProjectId: route.routeProjectId,
     setProjectScopeId: ui.setProjectScopeId,
     messagesLoaded: layer.chat.messagesLoaded,
@@ -206,6 +198,16 @@ export default function App() {
     setComposer: layer.chat.setComposer,
     setComposerFiles: layer.chat.setComposerFiles
   })
+
+  // Bench sessions are omitted from the global list (sidebar noise). When a
+  // project is selected, reload with projectId so Project Home + scoped
+  // sidebar show those chats.
+  useEffect(() => {
+    void bootstrap.loadSessions({
+      force: true,
+      projectId: ui.projectScopeId
+    })
+  }, [bootstrap.loadSessions, ui.projectScopeId])
 
   const { sections, openTabs } = buildSessionSidebarModel({
     sessions: bootstrap.sessions,
@@ -317,8 +319,6 @@ export default function App() {
         activeBuildPlan: layer.activeBuildPlan,
         builtPlanPaths: layer.builtPlanPaths,
         submitApprovals: layer.submitApprovals,
-        showConnectionLimitWarning,
-        runningCount: layer.runningCount,
         prefetchSessionMessages: layer.prefetchSessionMessages,
         showChatSkeleton
       })}

@@ -14,8 +14,6 @@ import {
 } from '@/lib/app-storage'
 
 export function useAppUiState() {
-  const [connectionLimitDismissed, setConnectionLimitDismissed] =
-    useState(false)
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false)
   const [projectScopeId, setProjectScopeId] = useState<string | null>(() =>
@@ -81,8 +79,6 @@ export function useAppUiState() {
   const sessionIdRef = useRef<string | null>(null)
 
   return {
-    connectionLimitDismissed,
-    setConnectionLimitDismissed,
     newProjectOpen,
     setNewProjectOpen,
     projectSettingsOpen,

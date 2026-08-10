@@ -9,7 +9,7 @@ logger = logging.getLogger("system_prompt")
 
 _PTC_RUNTIME_BLURB = (
     "\nOther tools: **run_python** (write code here; the `tools` namespace is "
-    "pre-bound), **run_r** (R via rpy2), **shell_run** (run skill scripts / shell "
+    "pre-bound), **shell_run** (run skill scripts / shell "
     "commands), **search_tools** (look up domain-tool signatures), "
     "**sandbox_status** / **sandbox_start** / **sandbox_stop** (inspect or "
     "control Modal).\n"
@@ -75,7 +75,6 @@ def build_tools_section(
             "You have access to all tools via MCP. Key tools:\n"
             "- **shell.run**: Execute terminal commands (best for skill scripts, e.g. `python scripts/<name>.py ...` from a skill's directory).\n"
             "- **run_python**: Execute Python code in a sandbox (pd, np, plt, scipy, sklearn, pysam, gseapy, pydeseq2, BioPython). Variables persist between calls.\n"
-            "- **run_r**: Execute R code directly. Prefer run_r over run_python for: natural splines (ns()), wilcox.test(), p.adjust(), fisher.test(), lm()/predict(), organism-specific KEGG ORA (use KEGGREST package: keggList, keggLink, keggGet for any organism code), and any analysis where R is the reference implementation. R and Python give DIFFERENT results for splines, multiple testing correction, and nonparametric tests — when the expected answer was computed in R, use R.\n"
             "- **sandbox_status** / **sandbox_start** / **sandbox_stop**: Inspect or control the chat sandbox (Built-in vs Modal).\n"
             "- **literature.pubmed_search**, **literature.chembl_query**, **literature.openalex_search**: Literature/DB search\n"
             "- **data_api.opentargets_search**, **data_api.depmap_search**, **data_api.uniprot_lookup**: Platform APIs\n"

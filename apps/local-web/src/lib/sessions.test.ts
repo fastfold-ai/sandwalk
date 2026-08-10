@@ -5,6 +5,7 @@ import {
   emptySessionChatState,
   groupSessions,
   isLowSignalTitle,
+  relativeDayLabel,
   relativeTime
 } from './sessions'
 
@@ -42,6 +43,27 @@ describe('relativeTime', () => {
     expect(relativeTime('2026-07-13T11:45:00.000Z')).toBe('15m')
     expect(relativeTime('2026-07-13T09:00:00.000Z')).toBe('3h')
     expect(relativeTime('2026-07-11T12:00:00.000Z')).toBe('2d')
+  })
+})
+
+describe('relativeDayLabel', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('uses Today, Yesterday, then Nd ago', () => {
+    vi.useFakeTimers()
+    const now = new Date(2026, 6, 13, 15, 0, 0)
+    vi.setSystemTime(now)
+    expect(relativeDayLabel(new Date(2026, 6, 13, 1, 0, 0).toISOString(), now)).toBe(
+      'Today'
+    )
+    expect(relativeDayLabel(new Date(2026, 6, 12, 23, 0, 0).toISOString(), now)).toBe(
+      'Yesterday'
+    )
+    expect(relativeDayLabel(new Date(2026, 6, 3, 12, 0, 0).toISOString(), now)).toBe(
+      '10d ago'
+    )
   })
 })
 

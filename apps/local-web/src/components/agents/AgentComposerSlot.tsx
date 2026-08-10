@@ -357,16 +357,29 @@ export function AgentComposerSlot({
         onReasoningSettingsChange={async changes => {
           const runtimeProvider =
             changes.provider === 'local' ? 'openai' : changes.provider
-          // Effort prefs stay global; provider/model stay per-session when set.
-          setRuntimeSettings(
-            await client.updateRuntimeSettings({
-              ...(isDraftSession
-                ? { provider: runtimeProvider, model: changes.model }
-                : {}),
-              reasoningEffort: changes.reasoningEffort,
-              reasoningFast: changes.reasoningFast
-            })
+          // Optimistic: picker follows runtimeSettings; avoid blocking on
+          // a full model-catalog rediscover.
+          setRuntimeSettings(prev =>
+            prev
+              ? {
+                  ...prev,
+                  ...(typeof changes.reasoningEffort === 'string'
+                    ? { reasoningEffort: changes.reasoningEffort }
+                    : {}),
+                  ...(typeof changes.reasoningFast === 'boolean'
+                    ? { reasoningFast: changes.reasoningFast }
+                    : {})
+                }
+              : prev
           )
+          const updatedSettings = await client.updateRuntimeSettings({
+            ...(isDraftSession
+              ? { provider: runtimeProvider, model: changes.model }
+              : {}),
+            reasoningEffort: changes.reasoningEffort,
+            reasoningFast: changes.reasoningFast
+          })
+          setRuntimeSettings(updatedSettings)
           if (!isDraftSession && sessionId) {
             const updated = await client.updateSession(sessionId, {
               provider: runtimeProvider,
@@ -374,7 +387,7 @@ export function AgentComposerSlot({
             })
             onSessionUpdated?.(updated)
           }
-          await loadModelOptions()
+          void loadModelOptions()
         }}
         onPlanModeChange={async planMode => {
           setRuntimeSettings(

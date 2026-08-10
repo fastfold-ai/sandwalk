@@ -87,9 +87,6 @@ export function AppShell(props: AppShellProps) {
         <AppShellMain
           sidebarCollapsed={props.sidebarCollapsed}
           setSidebarCollapsed={props.setSidebarCollapsed}
-          showConnectionLimitWarning={props.showConnectionLimitWarning}
-          runningCount={props.runningCount}
-          setConnectionLimitDismissed={props.setConnectionLimitDismissed}
           showSessionTabs={props.showSessionTabs}
           isHome={props.isHome}
           isLibrary={props.isLibrary}

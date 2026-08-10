@@ -140,6 +140,7 @@ export type BenchProgress = {
   total?: number
   benchCurrent?: number
   benchTotal?: number
+  inFlight?: number
 }
 
 export type BenchActiveStatus = {
@@ -149,6 +150,8 @@ export type BenchActiveStatus = {
   currentRunId?: string | null
   lastProgress?: BenchProgress | null
   queue: Array<{ runId: string; modelId: string; suites: string[] }>
+  resumableRunId?: string | null
+  projectId?: string | null
 }
 
 export type BenchResultSummary = {
@@ -162,6 +165,9 @@ export type BenchResultSummary = {
   thinkingUsed?: boolean
   projectId?: string | null
   createdAt?: string | null
+  status?: string | null
+  reasoningEffort?: string | null
+  reasoningFast?: boolean | null
 }
 
 function num(raw: Record<string, unknown>, camel: string, snake: string): number {
@@ -454,6 +460,8 @@ export class LocalAgentClient
       specialistId?: string | null
       thinking?: boolean
       dryRun?: boolean
+      concurrency?: number
+      cleanupSessions?: boolean
       clientSurface?: 'cli' | 'ui'
     },
     signal?: AbortSignal
@@ -495,7 +503,33 @@ export class LocalAgentClient
     })
   }
 
-  resetBenchResults(signal?: AbortSignal): Promise<{ ok: boolean; cleared: number }> {
+  pauseBenchRun(runId: string, signal?: AbortSignal): Promise<{ ok: boolean }> {
+    return this.request(`/bench/runs/${encodeURIComponent(runId)}/pause`, {
+      method: 'POST',
+      signal
+    })
+  }
+
+  resumeBenchRun(runId: string, signal?: AbortSignal): Promise<{ ok: boolean }> {
+    return this.request(`/bench/runs/${encodeURIComponent(runId)}/resume`, {
+      method: 'POST',
+      signal
+    })
+  }
+
+  deleteBenchResult(
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean }> {
+    return this.request(`/bench/runs/${encodeURIComponent(runId)}`, {
+      method: 'DELETE',
+      signal
+    })
+  }
+
+  resetBenchResults(
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean; cleared: number; sessionsDeleted?: number }> {
     return this.request('/bench/results/reset', { method: 'POST', signal })
   }
 

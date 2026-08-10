@@ -8,7 +8,7 @@ import {
   Search,
   Settings
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type UIEvent } from 'react'
 
 import {
   DropdownMenu,
@@ -19,9 +19,34 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 import { ProjectMark } from './ProjectMark'
+
+const SHOW_BENCH_PROJECTS_KEY = 'sandwalk.projects.showBench'
+const PROJECT_PAGE_SIZE = 20
+
+function isBenchProject(project: AgentProject): boolean {
+  if (project.name.trim().toLowerCase().startsWith('bench ·')) return true
+  return /sandwalk-bench/i.test(project.description || '')
+}
+
+function readShowBenchProjects(): boolean {
+  try {
+    return localStorage.getItem(SHOW_BENCH_PROJECTS_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeShowBenchProjects(value: boolean) {
+  try {
+    localStorage.setItem(SHOW_BENCH_PROJECTS_KEY, value ? '1' : '0')
+  } catch {
+    // ignore quota / private mode
+  }
+}
 
 export function ProjectSelector({
   projects,
@@ -43,25 +68,46 @@ export function ProjectSelector({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [showBench, setShowBench] = useState(readShowBenchProjects)
+  const [visibleCount, setVisibleCount] = useState(PROJECT_PAGE_SIZE)
 
   const active = useMemo(
     () => projects.find(project => project.id === value) || null,
     [projects, value]
   )
 
+  const benchCount = useMemo(
+    () => projects.filter(isBenchProject).length,
+    [projects]
+  )
+
   const ordered = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    const rows = [...projects].sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-      return a.name.localeCompare(b.name)
-    })
+    const rows = [...projects]
+      .filter(project => {
+        if (showBench || project.id === value) return true
+        return !isBenchProject(project)
+      })
+      .sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+        return (
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )
+      })
     if (!needle) return rows
     return rows.filter(
       project =>
         project.name.toLowerCase().includes(needle) ||
         (project.description || '').toLowerCase().includes(needle)
     )
-  }, [projects, query])
+  }, [projects, query, showBench, value])
+
+  useEffect(() => {
+    setVisibleCount(PROJECT_PAGE_SIZE)
+  }, [query, showBench, open])
+
+  const visible = ordered.slice(0, visibleCount)
+  const hasMore = visibleCount < ordered.length
 
   const label = active?.name || 'All'
 
@@ -73,6 +119,17 @@ export function ProjectSelector({
     } finally {
       setRefreshing(false)
     }
+  }
+
+  const onListScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (!hasMore) return
+    const target = event.currentTarget
+    const remaining =
+      target.scrollHeight - target.scrollTop - target.clientHeight
+    if (remaining > 48) return
+    setVisibleCount(current =>
+      Math.min(current + PROJECT_PAGE_SIZE, ordered.length)
+    )
   }
 
   return (
@@ -166,12 +223,39 @@ export function ProjectSelector({
             {value === null ? <Check className="size-3.5 shrink-0" /> : null}
           </DropdownMenuItem>
 
+          {benchCount > 0 ? (
+            <DropdownMenuItem
+              className="gap-2"
+              onSelect={event => {
+                // Keep the menu open while toggling the filter.
+                event.preventDefault()
+                const next = !showBench
+                setShowBench(next)
+                writeShowBenchProjects(next)
+              }}
+            >
+              <span className="min-w-0 flex-1 truncate">
+                Show bench ({benchCount})
+              </span>
+              <Check
+                className={cn(
+                  'size-3.5 shrink-0',
+                  showBench ? 'opacity-100' : 'opacity-0'
+                )}
+              />
+            </DropdownMenuItem>
+          ) : null}
+
           {ordered.length > 0 ? (
             <>
               <DropdownMenuSeparator />
-              <ScrollArea className="max-h-64">
+              {/* Fixed height so Radix ScrollArea viewport can scroll (max-h alone won't). */}
+              <ScrollArea
+                className={cn(ordered.length > 6 ? 'h-64' : 'max-h-64')}
+                onScroll={onListScroll}
+              >
                 <div className="pr-1">
-                  {ordered.map(project => (
+                  {visible.map(project => (
                     <DropdownMenuItem
                       key={project.id}
                       className="items-start gap-2 py-2"
@@ -188,11 +272,18 @@ export function ProjectSelector({
                       />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm">{project.name}</div>
-                        {project.description ? (
-                          <div className="text-muted-foreground truncate text-xs">
-                            {project.description}
-                          </div>
-                        ) : null}
+                        <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                          {project.description ? (
+                            <span className="min-w-0 flex-1 truncate">
+                              {project.description}
+                            </span>
+                          ) : (
+                            <span className="min-w-0 flex-1" />
+                          )}
+                          <span className="shrink-0 tabular-nums">
+                            {relativeTime(project.updatedAt)}
+                          </span>
+                        </div>
                       </div>
                       <Check
                         className={cn(
@@ -202,6 +293,11 @@ export function ProjectSelector({
                       />
                     </DropdownMenuItem>
                   ))}
+                  {hasMore ? (
+                    <div className="text-muted-foreground px-2 py-2 text-center text-[11px]">
+                      Scroll for more ({visible.length} of {ordered.length})
+                    </div>
+                  ) : null}
                 </div>
               </ScrollArea>
             </>
@@ -211,7 +307,9 @@ export function ProjectSelector({
               <div className="text-muted-foreground px-2 py-3 text-xs">
                 {query.trim()
                   ? 'No projects match your search.'
-                  : 'No projects yet.'}
+                  : showBench || benchCount === 0
+                    ? 'No projects yet.'
+                    : 'No non-bench projects. Enable “Show bench” above.'}
               </div>
             </>
           )}

@@ -39,13 +39,35 @@ from agent_server.models.bench import BenchSuiteCard
 
 # Friendly titles for YAML packs (UI picks models; one card per pack).
 _PACK_TITLES = {
+    "bio-capybara-full": "Bio-Capybara-full",
+    # Legacy pack id (pre-rename).
     "skills-mcp-bakeoff": "Bio-Capybara-full",
 }
 
 # Author attribution shown on suite cards (local-web serves /brand/bench/*).
 _PACK_AUTHORS = {
+    "bio-capybara-full": ("Sandwalk", "/brand/bench/sandwalk-mark.svg"),
     "skills-mcp-bakeoff": ("Sandwalk", "/brand/bench/sandwalk-mark.svg"),
 }
+
+
+def pack_display_title(pack_id: str | None) -> str:
+    """Human label for a pack/suite id (falls back to the raw id)."""
+    if not pack_id:
+        return ""
+    key = str(pack_id)
+    return _PACK_TITLES.get(key, key)
+
+
+def pack_aliases(pack: Any) -> list[str]:
+    """Legacy ids from YAML `aliases:` (plus the current pack.id)."""
+    raw = getattr(pack, "raw", None) or {}
+    aliases = [str(x) for x in (raw.get("aliases") or []) if x]
+    return [str(pack.id), *aliases]
+
+
+def pack_matches_id(pack: Any, pack_id: str) -> bool:
+    return str(pack_id) in pack_aliases(pack)
 
 def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
     cards: list[BenchSuiteCard] = []
@@ -194,10 +216,14 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
             cards.append(
                 BenchSuiteCard(
                     id=pack.id,
-                    title=_PACK_TITLES.get(pack.id, pack.id),
+                    title=pack_display_title(pack.id),
                     description=(pack.description or "")[:240],
                     lane="skills"
-                    if "skills" in pack.id or "bakeoff" in pack.id
+                    if any(
+                        token in pack.id
+                        for token in ("skills", "bakeoff", "capybara")
+                    )
+                    or "skills" in str(getattr(pack, "path", "")).lower()
                     else "intelligence",
                     runner="agent",
                     pack_id=pack.id,

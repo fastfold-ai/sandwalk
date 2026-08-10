@@ -11,11 +11,13 @@ import {
   Columns2,
   Copy,
   Download,
+  ExternalLink,
   Gauge,
   Loader2,
+  Pause,
   Play,
-  Square,
   Target,
+  Terminal,
   Trash2,
   X
 } from 'lucide-react'
@@ -28,11 +30,20 @@ import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelP
 import { ComposerSpecialistPicker } from '@/components/agents/composer/ComposerSpecialistPicker'
 import { composerModelOptionKey } from '@/components/agents/composer/useComposerModelPickerNav'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   type ComposerModelOption,
+  formatModelEffortBadge,
+  patchComposerModelEffort,
   toComposerModelOptions
 } from '@/lib/composer-models'
+import { copyText } from '@/lib/clipboard'
+import { relativeDayLabel } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 type Tab = 'new' | 'results'
@@ -46,6 +57,41 @@ function formatBytes(n: number): string {
     value /= 1024
   }
   return `${n} B`
+}
+
+/** Compact run duration: `39s`, `11m 12s`, `2h 35m`, `1d 2h`. */
+function formatRunDuration(seconds: number): string {
+  const total = Math.max(0, Math.round(Number(seconds) || 0))
+  if (total < 60) return `${total}s`
+  const days = Math.floor(total / 86_400)
+  const hours = Math.floor((total % 86_400) / 3_600)
+  const minutes = Math.floor((total % 3_600) / 60)
+  const secs = total % 60
+  if (days > 0) {
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`
+  }
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  }
+  return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`
+}
+
+/** Map stable pack ids to Dashboard card titles. */
+const PACK_DISPLAY_TITLES: Record<string, string> = {
+  'bio-capybara-full': 'Bio-Capybara-full',
+  // Legacy pack id (pre-rename).
+  'skills-mcp-bakeoff': 'Bio-Capybara-full'
+}
+
+function suiteDisplayName(
+  id: string | null | undefined,
+  suites: BenchSuiteCard[]
+): string {
+  if (!id) return ''
+  const fromCard = suites.find(
+    card => card.id === id || card.packId === id
+  )?.title
+  return fromCard || PACK_DISPLAY_TITLES[id] || id
 }
 
 function installPercent(card: BenchSuiteCard): number {
@@ -113,15 +159,38 @@ export function BenchView({
   const [compareSelection, setCompareSelection] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [spawning, setSpawning] = useState(false)
+  const [concurrency, setConcurrency] = useState(1)
+  const [cleanupSessions, setCleanupSessions] = useState(false)
   const [startingInstallId, setStartingInstallId] = useState<string | null>(
     null
   )
-  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [cliMenuOpen, setCliMenuOpen] = useState(false)
+  const [copiedCli, setCopiedCli] = useState(false)
   const [brokenAvatars, setBrokenAvatars] = useState<Set<string>>(
     () => new Set()
   )
   const wasBusyRef = useRef(false)
   const prevOverlayRef = useRef(false)
+  const cliCloseTimerRef = useRef<number | null>(null)
+
+  const openCliMenu = () => {
+    if (cliCloseTimerRef.current != null) {
+      window.clearTimeout(cliCloseTimerRef.current)
+      cliCloseTimerRef.current = null
+    }
+    setCliMenuOpen(true)
+  }
+
+  const scheduleCloseCliMenu = () => {
+    if (cliCloseTimerRef.current != null) {
+      window.clearTimeout(cliCloseTimerRef.current)
+    }
+    cliCloseTimerRef.current = window.setTimeout(() => {
+      setCliMenuOpen(false)
+      setCopiedCli(false)
+      cliCloseTimerRef.current = null
+    }, 160)
+  }
 
   // After leaving a result detail / compare URL, show the Results tab.
   useEffect(() => {
@@ -162,13 +231,19 @@ export function BenchView({
     }
   }, [client])
 
-  const loadStatus = useCallback(async () => {
+  const loadResults = useCallback(async () => {
     try {
-      const [res, status] = await Promise.all([
-        client.listBenchResults(),
-        client.getBenchActive()
-      ])
+      const res = await client.listBenchResults()
       setResults(res)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load results')
+    }
+  }, [client])
+
+  const loadActive = useCallback(async () => {
+    try {
+      const status = await client.getBenchActive()
       setActive(status)
       setError(null)
     } catch (err) {
@@ -176,21 +251,30 @@ export function BenchView({
     }
   }, [client])
 
+  const loadStatus = useCallback(async () => {
+    await Promise.all([loadResults(), loadActive()])
+  }, [loadActive, loadResults])
+
   useEffect(() => {
     void loadCatalog()
     void loadStatus()
   }, [loadCatalog, loadStatus])
 
-  const busy = Boolean(active?.running || (active?.queue?.length ?? 0) > 0)
+  const paused = active?.phase === 'paused' || Boolean(active?.resumableRunId)
+  const busy = Boolean(
+    active?.running || (active?.queue?.length ?? 0) > 0 || spawning
+  )
+  const showProgress = busy || paused
   const installsInFlight = suites.some(card => card.installing)
 
+  // While a run is active, poll only /runs/active (skip heavy results list).
   useEffect(() => {
     if (!busy) return
     const timer = window.setInterval(() => {
-      void loadStatus()
+      void loadActive()
     }, 1500)
     return () => window.clearInterval(timer)
-  }, [busy, loadStatus])
+  }, [busy, loadActive])
 
   // Poll catalog while a background dataset install is running (survives navigation).
   useEffect(() => {
@@ -201,7 +285,7 @@ export function BenchView({
     return () => window.clearInterval(timer)
   }, [installsInFlight, loadCatalog])
 
-  // When a run finishes, refresh Results (stay on whatever tab the user chose).
+  // When a run finishes or pauses, refresh Results.
   useEffect(() => {
     if (wasBusyRef.current && !busy) {
       void loadStatus()
@@ -209,6 +293,12 @@ export function BenchView({
     }
     wasBusyRef.current = busy
   }, [busy, loadStatus])
+
+  useEffect(() => {
+    if (paused && !busy) {
+      void loadResults()
+    }
+  }, [paused, busy, loadResults])
 
   const selectedCount = selectedIds.size
   const primaryModel = runtimeSettings?.model || ''
@@ -305,7 +395,9 @@ export function BenchView({
         }),
         model: primaryModel,
         models: compareQueue.map(option => option.model),
-        specialistId
+        specialistId,
+        concurrency,
+        cleanupSessions
       })
       wasBusyRef.current = true
       await loadStatus()
@@ -317,37 +409,113 @@ export function BenchView({
     }
   }
 
-  const progressCard = busy || spawning ? (
+  const runIdForActions =
+    active?.currentRunId || active?.resumableRunId || 'active'
+
+  const progressCard = showProgress ? (
     <section className="border-border/70 space-y-3 rounded-md border p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">
-            {spawning && !busy ? 'Queuing…' : 'In progress'}
+            {paused
+              ? 'Paused'
+              : spawning && !active?.running
+                ? 'Queuing…'
+                : 'In progress'}
           </h3>
           <p className="text-muted-foreground mt-0.5 text-xs">
             {active?.currentModel || primaryModel}
-            {progress?.benchmark ? ` · ${progress.benchmark}` : ''}
+            {progress?.benchmark
+              ? ` · ${suiteDisplayName(progress.benchmark, suites)}`
+              : ''}
             {queuedCount ? ` · ${queuedCount} queued` : ''}
+            {progress?.inFlight
+              ? ` · ${progress.inFlight} in flight`
+              : ''}
           </p>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            void client
-              .cancelBenchRun(active?.currentRunId || 'active')
-              .then(loadStatus)
-          }
-        >
-          <Square className="size-3.5" />
-          Cancel
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          {active?.projectId ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => navigate(`/projects/${active.projectId}`)}
+            >
+              <ExternalLink className="size-3.5" />
+              View
+            </Button>
+          ) : null}
+          {paused ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                void client.resumeBenchRun(runIdForActions).then(loadStatus)
+              }
+            >
+              <Play className="size-3.5" />
+              Resume
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={!active?.running}
+              onClick={() =>
+                void client.pauseBenchRun(runIdForActions).then(loadActive)
+              }
+            >
+              <Pause className="size-3.5" />
+              Pause
+            </Button>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
+            onClick={() =>
+              void (async () => {
+                try {
+                  await client.cancelBenchRun(runIdForActions)
+                } finally {
+                  // Drop the paused card immediately even if the server
+                  // already had a stale resumable pointer.
+                  setActive(prev =>
+                    prev
+                      ? {
+                          ...prev,
+                          running: false,
+                          phase: 'idle',
+                          resumableRunId: null,
+                          currentRunId: null,
+                          lastProgress: null,
+                          queue: [],
+                          projectId: null
+                        }
+                      : prev
+                  )
+                  await loadStatus()
+                }
+              })()
+            }
+          >
+            <Trash2 className="size-3.5" />
+            Remove
+          </Button>
+        </div>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {active?.currentModel ? (
           <span className="bg-muted text-foreground inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs">
-            <Loader2 className="size-3 animate-spin" />
+            {paused ? (
+              <Pause className="size-3" />
+            ) : (
+              <Loader2 className="size-3 animate-spin" />
+            )}
             {active.currentModel}
           </span>
         ) : spawning ? (
@@ -366,9 +534,15 @@ export function BenchView({
         ))}
       </div>
       <p className="text-muted-foreground text-sm">
-        {progress?.message || (spawning ? 'Queuing run…' : 'Working…')}
+        {progress?.message ||
+          (paused
+            ? 'Paused — resume to continue'
+            : spawning
+              ? 'Queuing run…'
+              : 'Working…')}
         {' · '}
-        {progress?.current ?? 0}/{progress?.total ?? 0}
+        {progress?.benchCurrent ?? progress?.current ?? 0}/
+        {progress?.benchTotal ?? progress?.total ?? 0}
       </p>
       <div className="bg-muted h-1.5 overflow-hidden rounded-full">
         <div
@@ -395,31 +569,37 @@ export function BenchView({
     )
   }
 
-  const cliCommandFor = (card: BenchSuiteCard) => {
-    const n = sampleFor(card)
-    const model = primaryModel || '<model>'
-    const parts = [
-      'sandwalk eval run',
-      `-s ${card.id}`,
-      ...(n != null ? [`-n ${n}`] : []),
-      `-m ${model}`
-    ]
-    if (specialistId) parts.push(`--specialist ${specialistId}`)
-    return parts.join(' ')
-  }
-
-  const copyCli = async (card: BenchSuiteCard) => {
-    const cmd = cliCommandFor(card)
-    try {
-      await navigator.clipboard.writeText(cmd)
-      setCopiedId(card.id)
-      window.setTimeout(() => {
-        setCopiedId(prev => (prev === card.id ? null : prev))
-      }, 1500)
-    } catch {
-      setError('Could not copy CLI command')
+  const benchCliCommand = useMemo(() => {
+    const parts = ['sandwalk eval run']
+    const selected = suites.filter(card => selectedIds.has(card.id))
+    for (const card of selected) {
+      const n = sampleFor(card)
+      parts.push(n != null ? `-s ${card.id}:${n}` : `-s ${card.id}`)
     }
-  }
+    if (!selected.length) parts.push('-s <suite>')
+    parts.push(`-m ${primaryModel || '<model>'}`)
+    for (const option of compareQueue) {
+      if (option.model) parts.push(`--compare ${option.model}`)
+    }
+    if (specialistId) parts.push(`--specialist ${specialistId}`)
+    if (concurrency > 1) parts.push(`--workers ${concurrency}`)
+    if (cleanupSessions) parts.push('--cleanup')
+    const effort = runtimeSettings?.reasoningEffort
+    if (effort) parts.push(`--effort ${effort}`)
+    if (runtimeSettings?.reasoningFast) parts.push('--fast')
+    return parts.join(' ')
+  }, [
+    cleanupSessions,
+    compareQueue,
+    concurrency,
+    primaryModel,
+    runtimeSettings?.reasoningEffort,
+    runtimeSettings?.reasoningFast,
+    sampleBySuite,
+    selectedIds,
+    specialistId,
+    suites
+  ])
 
   const modelCount = 1 + compareQueue.length
   const runLabel = [
@@ -556,16 +736,22 @@ export function BenchView({
 
         {tab === 'new' ? (
           <>
-            {busy ? (
+            {showProgress ? (
               <button
                 type="button"
                 onClick={() => setTab('results')}
                 className="border-border/70 bg-muted/30 text-muted-foreground hover:text-foreground flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors"
               >
                 <span className="inline-flex items-center gap-1.5">
-                  <Loader2 className="size-3 animate-spin" />
-                  Run in progress
-                  {progress?.benchmark ? ` · ${progress.benchmark}` : ''}
+                  {paused ? (
+                    <Pause className="size-3" />
+                  ) : (
+                    <Loader2 className="size-3 animate-spin" />
+                  )}
+                  {paused ? 'Run paused' : 'Run in progress'}
+                  {progress?.benchmark
+                    ? ` · ${suiteDisplayName(progress.benchmark, suites)}`
+                    : ''}
                   {queuedCount ? ` · ${queuedCount} queued` : ''}
                 </span>
                 <span>View on Results →</span>
@@ -615,28 +801,9 @@ export function BenchView({
                           ) : null}
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
-                          title="Copy CLI command"
-                          aria-label={`Copy CLI for ${card.title}`}
-                          disabled={!card.available}
-                          onClick={e => {
-                            e.stopPropagation()
-                            void copyCli(card)
-                          }}
-                          className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-7 items-center justify-center rounded-md disabled:opacity-40"
-                        >
-                          {copiedId === card.id ? (
-                            <Check className="size-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="size-3.5" />
-                          )}
-                        </button>
-                        {on ? (
-                          <Check className="text-foreground size-4" />
-                        ) : null}
-                      </div>
+                      {on ? (
+                        <Check className="text-foreground size-4 shrink-0" />
+                      ) : null}
                     </div>
                     <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs leading-relaxed">
                       {card.description || card.runner}
@@ -953,15 +1120,27 @@ export function BenchView({
                         >
                           <div className="flex flex-wrap items-center gap-1.5">
                             <h4 className="text-sm font-semibold">
-                              {r.benchmark}
+                              {suiteDisplayName(r.benchmark, suites)}
                             </h4>
                             <span className="bg-muted text-muted-foreground rounded-md px-1.5 py-0.5 text-[11px]">
                               {r.modelId}
+                              {r.reasoningEffort ||
+                              r.reasoningFast != null
+                                ? ` · ${formatModelEffortBadge({
+                                    reasoningEffort:
+                                      r.reasoningEffort || 'medium',
+                                    reasoningFast: Boolean(r.reasoningFast)
+                                  })}`
+                                : r.thinkingUsed
+                                  ? ' · thinking'
+                                  : ''}
                             </span>
                           </div>
                           <p className="text-muted-foreground mt-0.5 text-xs">
-                            {r.correct}/{r.total} · {r.timeS}s
-                            {r.thinkingUsed ? ' · thinking' : ''}
+                            {r.correct}/{r.total} · {formatRunDuration(r.timeS)}
+                            {r.createdAt
+                              ? ` · ${relativeDayLabel(r.createdAt)}`
+                              : ''}
                           </p>
                         </button>
                       </div>
@@ -1012,10 +1191,11 @@ export function BenchView({
                       {r.projectId ? (
                         <button
                           type="button"
-                          className="text-muted-foreground hover:text-foreground"
+                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                           onClick={() => navigate(`/projects/${r.projectId}`)}
                         >
-                          Open project
+                          <ExternalLink className="size-3" />
+                          View
                         </button>
                       ) : null}
                     </div>
@@ -1094,6 +1274,23 @@ export function BenchView({
                   onReasoningSettingsChange={async changes => {
                     const runtimeProvider =
                       changes.provider === 'local' ? 'openai' : changes.provider
+                    // Optimistic paint — picker reads effort from runtimeSettings.
+                    setRuntimeSettings(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            ...(typeof changes.reasoningEffort === 'string'
+                              ? { reasoningEffort: changes.reasoningEffort }
+                              : {}),
+                            ...(typeof changes.reasoningFast === 'boolean'
+                              ? { reasoningFast: changes.reasoningFast }
+                              : {})
+                          }
+                        : prev
+                    )
+                    setModelOptions(prev =>
+                      patchComposerModelEffort(prev, changes)
+                    )
                     setRuntimeSettings(
                       await client.updateRuntimeSettings({
                         provider: runtimeProvider,
@@ -1165,20 +1362,133 @@ export function BenchView({
                     })
                   }
                 />
+                <label className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+                  Workers
+                  <select
+                    className="border-border bg-background text-foreground rounded-md border px-1.5 py-1 text-xs"
+                    value={concurrency}
+                    onChange={e =>
+                      setConcurrency(
+                        Math.max(1, Math.min(8, Number(e.target.value) || 1))
+                      )
+                    }
+                  >
+                    {[1, 2, 3, 4, 6, 8].map(n => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label
+                  className="text-muted-foreground flex items-center gap-1.5 text-[11px]"
+                  title="After a successful run, delete the bench project and its chats. Results JSON is kept."
+                >
+                  <input
+                    type="checkbox"
+                    className="size-3.5 accent-foreground"
+                    checked={cleanupSessions}
+                    onChange={e => setCleanupSessions(e.target.checked)}
+                  />
+                  Delete chats after run
+                </label>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                disabled={spawning || !selectedCount || !primaryModel}
-                onClick={() => void runSelected()}
-              >
-                {spawning ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Play className="size-3.5" />
-                )}
-                {runLabel}
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <DropdownMenu
+                  open={cliMenuOpen}
+                  onOpenChange={open => {
+                    setCliMenuOpen(open)
+                    if (!open) setCopiedCli(false)
+                  }}
+                  modal={false}
+                >
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="size-8 shrink-0"
+                      aria-label="Show CLI command"
+                      title="Show CLI command"
+                      disabled={!selectedCount || !primaryModel}
+                      onMouseEnter={() => {
+                        if (selectedCount && primaryModel) openCliMenu()
+                      }}
+                      onMouseLeave={scheduleCloseCliMenu}
+                    >
+                      <Terminal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    side="top"
+                    sideOffset={8}
+                    className="w-[min(36rem,calc(100vw-2rem))] overflow-hidden rounded-xl p-0"
+                    onCloseAutoFocus={event => event.preventDefault()}
+                    onMouseEnter={openCliMenu}
+                    onMouseLeave={scheduleCloseCliMenu}
+                  >
+                    <div className="px-4 pt-3">
+                      <p className="text-foreground text-sm font-semibold">
+                        Run in Agent CLI
+                      </p>
+                    </div>
+                    <div className="px-4 pb-3 pt-2">
+                      <div className="border-border/80 bg-muted/35 flex items-start gap-2 rounded-lg border p-2.5">
+                        <Terminal className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+                        <code className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-[12px] leading-relaxed">
+                          {benchCliCommand}
+                        </code>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 shrink-0 rounded-md"
+                          onClick={event => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            void copyText(benchCliCommand).then(ok => {
+                              if (!ok) {
+                                setError('Could not copy CLI command')
+                                return
+                              }
+                              setCopiedCli(true)
+                              window.setTimeout(() => setCopiedCli(false), 2000)
+                            })
+                          }}
+                          aria-label="Copy CLI command"
+                          title="Copy CLI command"
+                        >
+                          {copiedCli ? (
+                            <Check className="size-3.5" />
+                          ) : (
+                            <Copy className="size-3.5" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-muted-foreground mt-2 text-xs">
+                        Paste into a terminal while Sandwalk is running. Results
+                        show under Dashboard → Benchmarking → Results.
+                      </p>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={
+                    spawning || busy || paused || !selectedCount || !primaryModel
+                  }
+                  onClick={() => void runSelected()}
+                >
+                  {spawning ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Play className="size-3.5" />
+                  )}
+                  {runLabel}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

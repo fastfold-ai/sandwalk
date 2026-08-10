@@ -5,7 +5,10 @@
 #
 # Coverage goal: every Featured skill + every MCP except Linear and Lucid.
 
-pack: skills-mcp-bakeoff
+pack: bio-capybara-full
+# Legacy id kept so older checkpoints / results still resolve this pack.
+aliases:
+  - skills-mcp-bakeoff
 version: "3.0"
 description: >
   Featured skills and MCP workflows.

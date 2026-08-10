@@ -4,10 +4,6 @@ import { slugifyIntegrationRoute } from '@/components/agents/dashboard-main-view
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { groupSessions } from '@/lib/sessions'
 
-const CONCURRENT_RUN_SOFT_LIMIT = 8
-
-export { CONCURRENT_RUN_SOFT_LIMIT }
-
 export function resolveSelectedIntegrationKey(
   decodedIntegrationRouteName: string | null,
   normalizedIntegrationRouteName: string | null,
@@ -30,19 +26,6 @@ export function resolveSelectedIntegrationKey(
   // Prefer a real catalog key; never return a display slug that would bounce
   // the detail view back to the list (e.g. "moonshot-kimi" vs key "moonshot").
   return matched?.key ?? null
-}
-
-export function computeRunningCount(sessions: AgentSession[]) {
-  const runningSessionIdsKey = sessions
-    .filter(
-      item => item.status === 'running' || item.status === 'awaiting_approval'
-    )
-    .map(item => item.id)
-    .sort()
-    .join(',')
-  return runningSessionIdsKey
-    ? runningSessionIdsKey.split(',').length
-    : 0
 }
 
 export function resolveActiveTitle(input: {

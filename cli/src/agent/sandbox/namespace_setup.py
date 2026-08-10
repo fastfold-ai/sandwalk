@@ -101,14 +101,22 @@ class SandboxSetupMixin:
         except ImportError:
             pass
 
-        # rpy2 for R model fitting (when questions explicitly require R).
-        # Package may be installed without a working R_HOME — treat that as optional.
-        try:
-            import rpy2.robjects as ro
-            self._namespace["ro"] = ro
-            self._namespace["rpy2"] = __import__("rpy2")
-        except Exception:
-            pass
+        # R/rpy2 is opt-in (SANDWALK_ENABLE_R) — never probe on every sandbox boot.
+        import os
+
+        if os.environ.get("SANDWALK_ENABLE_R", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            try:
+                import rpy2.robjects as ro
+
+                self._namespace["ro"] = ro
+                self._namespace["rpy2"] = __import__("rpy2")
+            except Exception:
+                pass
 
         # Pre-built helper for parsimony informative sites (gap-correct)
         from collections import Counter as _Counter

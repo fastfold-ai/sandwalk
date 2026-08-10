@@ -82,9 +82,6 @@ export type AppShellProps = {
   exportTranscript: (target: AgentSession) => void | Promise<void>
   setDeleteTarget: Dispatch<SetStateAction<AgentSession | null>>
   sidebarCollapsed: boolean
-  showConnectionLimitWarning: boolean
-  runningCount: number
-  setConnectionLimitDismissed: Dispatch<SetStateAction<boolean>>
   showSessionTabs: boolean
   isHome: boolean
   isLibrary: boolean

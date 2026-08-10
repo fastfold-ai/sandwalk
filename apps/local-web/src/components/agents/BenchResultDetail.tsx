@@ -136,6 +136,18 @@ function formatStartedAt(value: string | undefined | null) {
   })
 }
 
+function formatRunDuration(seconds: number): string {
+  const total = Math.max(0, Math.round(Number(seconds) || 0))
+  if (total < 60) return `${total}s`
+  const days = Math.floor(total / 86_400)
+  const hours = Math.floor((total % 86_400) / 3_600)
+  const minutes = Math.floor((total % 3_600) / 60)
+  const secs = total % 60
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`
+}
+
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-w-0 items-baseline justify-between gap-3 text-sm">
@@ -374,11 +386,15 @@ export function BenchResultDetail({
   const [loading, setLoading] = useState(true)
   const [openId, setOpenId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'pass' | 'fail'>('all')
+  const [visibleCount, setVisibleCount] = useState(40)
+  const PAGE = 40
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
+    setVisibleCount(PAGE)
+    setOpenId(null)
     void client
       .getBenchResult(runId)
       .then(row => {
@@ -406,7 +422,15 @@ export function BenchResultDetail({
     if (filter === 'fail') return questions.filter(q => !q.correct)
     return questions
   }, [filter, questions])
+  const visible = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount]
+  )
 
+  useEffect(() => {
+    setVisibleCount(PAGE)
+    setOpenId(null)
+  }, [filter])
   const accuracy = Number(detail?.accuracy ?? 0)
   const pct = Math.round(accuracy * 1000) / 10
   const correct = Number(detail?.correct ?? 0)
@@ -522,7 +546,7 @@ export function BenchResultDetail({
                     </h1>
                     <p className="text-muted-foreground mt-1 text-sm">
                       {modelId}
-                      {timeS ? ` · ${timeS}s` : ''}
+                      {timeS ? ` · ${formatRunDuration(timeS)}` : ''}
                       {startedLabel ? ` · ${startedLabel}` : ''}
                       {detail.thinking_used || detail.thinkingUsed
                         ? ' · thinking'
@@ -599,7 +623,9 @@ export function BenchResultDetail({
                       <button
                         key={id}
                         type="button"
-                        onClick={() => setFilter(id)}
+                        onClick={() => {
+                          setFilter(id)
+                        }}
                         className={cn(
                           'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
                           filter === id
@@ -614,17 +640,21 @@ export function BenchResultDetail({
                 </div>
 
                 <div className="space-y-2">
-                  {filtered.map((q, index) => {
+                  {visible.map((q, index) => {
                     const qid = String(q.id ?? index)
                     const open = openId === qid
                     const sessionId = q.sessionId || q.session_id
                     const evalMode = q.evalMode || q.eval_mode || '—'
                     const tools = q.toolsSeen || q.tools_seen || []
-                    const raw = q.rawResponse || q.raw_response || ''
+                    const raw = open
+                      ? q.rawResponse || q.raw_response || ''
+                      : ''
                     const judge = q.judge
                     const judgePass =
                       judge?.overallPass ?? judge?.overall_pass ?? null
-                    const uniqueTools = [...new Set(tools)]
+                    const uniqueTools = open
+                      ? [...new Set(tools)]
+                      : []
                     return (
                       <div
                         key={qid}
@@ -812,6 +842,20 @@ export function BenchResultDetail({
                       </div>
                     )
                   })}
+
+                  {visibleCount < filtered.length ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() =>
+                        setVisibleCount(n => Math.min(filtered.length, n + PAGE))
+                      }
+                    >
+                      Show more · {visible.length} of {filtered.length}
+                    </Button>
+                  ) : null}
 
                   {!filtered.length ? (
                     <div className="border-border/60 text-muted-foreground rounded-md border border-dashed px-4 py-8 text-center text-sm">

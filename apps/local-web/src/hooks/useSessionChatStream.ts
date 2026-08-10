@@ -33,7 +33,10 @@ type UseSessionChatStreamArgs = {
   setWorkspaceVersion: Dispatch<SetStateAction<number>>
   setError: Dispatch<SetStateAction<string | null>>
   loadSessionsRef: MutableRefObject<
-    ((options?: { force?: boolean }) => Promise<void>) | null
+    ((options?: {
+      force?: boolean
+      projectId?: string | null
+    }) => Promise<void>) | null
   >
   loadSkillsRef: MutableRefObject<(() => Promise<void>) | null>
 }

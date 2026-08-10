@@ -165,6 +165,8 @@ export function BenchCompareView({
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<CompareFilter>('disagreements')
   const [openId, setOpenId] = useState<string | null>(null)
+  const [visibleCount, setVisibleCount] = useState(40)
+  const PAGE = 40
 
   useEffect(() => {
     if (!runA || !runB) {
@@ -286,6 +288,15 @@ export function BenchCompareView({
       return true
     })
   }, [filter, rows])
+  const visible = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount]
+  )
+
+  useEffect(() => {
+    setVisibleCount(PAGE)
+    setOpenId(null)
+  }, [filter, runA, runB])
 
   useEffect(() => {
     document.title = `Compare · Benchmarking · Sandwalk`
@@ -473,7 +484,7 @@ export function BenchCompareView({
                 </div>
 
                 <div className="space-y-2">
-                  {filtered.map(row => {
+                  {visible.map(row => {
                     const open = openId === row.key
                     const aOk = row.a?.correct ?? null
                     const bOk = row.b?.correct ?? null
@@ -532,6 +543,19 @@ export function BenchCompareView({
                       </div>
                     )
                   })}
+                  {visibleCount < filtered.length ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() =>
+                        setVisibleCount(n => Math.min(filtered.length, n + PAGE))
+                      }
+                    >
+                      Show more · {visible.length} of {filtered.length}
+                    </Button>
+                  ) : null}
                   {!filtered.length ? (
                     <div className="border-border/60 text-muted-foreground rounded-md border border-dashed px-4 py-8 text-center text-sm">
                       No questions match this filter.

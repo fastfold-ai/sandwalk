@@ -13,7 +13,7 @@ from sandwalk_bench.verify import extract_final_answer, grade
 
 def test_sandwalk_pack_loads_and_covers_matrices():
     pack = load_pack(PACKS_DIR / "sandwalk_skills_mcp.yaml")
-    assert pack.id == "skills-mcp-bakeoff"
+    assert pack.id == "bio-capybara-full"
     assert len(pack.questions) >= 12
     cells = expand_matrix(pack, "full-coverage")
     assert len(cells) == len(pack.questions)

@@ -117,7 +117,11 @@ export function useSessionActionsCrudSessions({
       }))
       composerLiveRef.current = composer
       sessionIdRef.current = DRAFT_AGENT_SESSION_ID
-      navigate(`/agents/${DRAFT_AGENT_SESSION_ID}`)
+      // Always bump state so remounting /agents/new clears any silently
+      // materialized draft workspace from a prior New Agent in this scope.
+      navigate(`/agents/${DRAFT_AGENT_SESSION_ID}`, {
+        state: { draftReset: Date.now() }
+      })
     },
     [
       activeProjectId,

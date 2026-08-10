@@ -18,8 +18,8 @@ SandboxBackendChoice = Literal["builtin", "modal"]
 # pending = still eligible for auto-title; auto = model-generated; user = manual rename
 TitleSource = Literal["pending", "auto", "user"]
 
-# Connector that spawned the session; None means it started locally.
-SessionSource = Literal["slack"]
+# Connector/origin that spawned the session; None means it started locally.
+SessionSource = Literal["slack", "bench"]
 
 # Product surface for usage attribution (independent of Slack `source`).
 ClientSurface = Literal["cli", "ui", "slack", "unknown"]

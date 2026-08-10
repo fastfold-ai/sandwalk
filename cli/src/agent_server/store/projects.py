@@ -169,9 +169,10 @@ class ProjectMixin:
         return self.get_project(project_id)
 
     def delete_project(self, project_id: str) -> bool:
+        """Delete the project and all sessions under it (messages/events cascade)."""
         with self._write_lock, self._connect() as connection:
             connection.execute(
-                "UPDATE sessions SET project_id = NULL WHERE project_id = ?",
+                "DELETE FROM sessions WHERE project_id = ?",
                 (project_id,),
             )
             cursor = connection.execute(

@@ -101,6 +101,22 @@
 }
 
 /*
+ * Opening a tab must not jump the strip: kill the drop-in animation, and ease
+ * width/x when the pack reflows (left tabs stay put visually).
+ */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab.chrome-tab-was-just-added,
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme .chrome-tab.chrome-tab-was-just-added {
+  top: 2px !important;
+  animation: none !important;
+}
+
+.sandwalk-chrome-tabs.chrome-tabs:not(.chrome-tabs-is-sorting) .chrome-tab {
+  transition:
+    transform 160ms ease-out,
+    width 160ms ease-out;
+}
+
+/*
  * Overflow slot: flex sibling to the RIGHT of the tabs column (not overlaid).
  * Transparent — only the chip button paints a wash. Bottom seat matches
  * chrome-tabs-bottom-bar so the floor line continues under the chip.

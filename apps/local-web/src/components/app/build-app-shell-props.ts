@@ -47,8 +47,6 @@ type AppShellBridgeInput = {
   activeBuildPlan: AppShellProps['activeBuildPlan']
   builtPlanPaths: AppShellProps['builtPlanPaths']
   submitApprovals: AppShellProps['onSubmitApprovals']
-  showConnectionLimitWarning: boolean
-  runningCount: number
   prefetchSessionMessages: AppShellProps['prefetchSessionMessages']
   showChatSkeleton: boolean
 }
@@ -105,9 +103,6 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     exportTranscript: input.actions.exportTranscript,
     setDeleteTarget: input.actions.setDeleteTarget,
     sidebarCollapsed: input.ui.sidebarCollapsed,
-    showConnectionLimitWarning: input.showConnectionLimitWarning,
-    runningCount: input.runningCount,
-    setConnectionLimitDismissed: input.ui.setConnectionLimitDismissed,
     showSessionTabs: input.showSessionTabs,
     isHome: input.route.isHome,
     isLibrary: input.route.isLibrary,
