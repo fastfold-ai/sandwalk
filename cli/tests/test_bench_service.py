@@ -162,7 +162,11 @@ def test_list_suite_cards_includes_mmlu_and_packs():
     assert arc.title == "ARC-C"
     assert arc.question_count == 1172
     assert arc.default_sample_size == 30
-    assert arc.sample_sizes == [30, 50, 100, 200, 300, 1172]
+    if full_dataset_available("arc-challenge"):
+        assert arc.sample_sizes == [30, 50, 100, 200, 300, 1172]
+    else:
+        assert max(arc.sample_sizes) <= 30
+        assert 30 in arc.sample_sizes
     mbpp = next(c for c in cards if c.id == "mbpp")
     assert mbpp.code_exec is True
     assert mbpp.question_count == 500

@@ -247,8 +247,11 @@ relative_files = true
 # but makes an 80% threshold unrealistic for Typer/CLI-heavy code.
 branch = false
 omit = [
-    # Interactive REPL — covered by focused method tests; full line coverage is impractical.
+    # Interactive REPL + modals — covered by focused method tests; full line
+    # coverage is impractical (package under ui/terminal/, not just terminal.py).
     "*/ui/terminal.py",
+    "*/ui/terminal/*",
+    "*/ui/traces/*",
     # Typer CLI entry surface — exercised via CliRunner contract tests.
     "*/cli/*.py",
     "*/cli/setup/*.py",

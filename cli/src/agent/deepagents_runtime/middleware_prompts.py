@@ -9,6 +9,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+# Used when the installed deepagents build omits FILESYSTEM_SYSTEM_PROMPT.
+_FALLBACK_FILESYSTEM_PROMPT = (
+    "You have access to a filesystem. Prefer ls/read/write/edit tools for "
+    "workspace files; keep paths inside the session workspace."
+)
+
 
 def middleware_system_prompt_text(
     *,
@@ -29,10 +35,9 @@ def middleware_system_prompt_text(
         fs_prompt = getattr(_fs_mod, "FILESYSTEM_SYSTEM_PROMPT", None) or getattr(
             _fs_mod, "EXECUTION_SYSTEM_PROMPT", None
         )
-        if fs_prompt:
-            parts.append(str(fs_prompt).strip())
     except ImportError:
-        pass
+        fs_prompt = None
+    parts.append(str(fs_prompt or _FALLBACK_FILESYSTEM_PROMPT).strip())
 
     if "task" not in excluded:
         # Default SubAgentMiddleware system_prompt (task tool guidance).

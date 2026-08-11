@@ -106,7 +106,11 @@ result = {'summary': 'Plot saved'}
         assert "test_plot.png" in result["plots"][0]
         assert Path(result["plots"][0]).exists()
 
-    def test_write_outside_output_dir_blocked(self, sandbox, tmp_path):
+    def test_write_outside_output_dir_blocked(self, sandbox, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "agent_server.file_access.full_file_access_enabled",
+            lambda: False,
+        )
         outside = Path.home() / ".fastfold_sandbox_blocked_write_test.txt"
         code = f"""
 with open(r"{outside}", "w") as f:
@@ -149,7 +153,11 @@ result = {{"summary": txt}}
         assert result["error"] is None
         assert target.read_text(encoding="utf-8") == "old-new"
 
-    def test_read_outside_allowed_dirs_blocked(self, sandbox, tmp_path):
+    def test_read_outside_allowed_dirs_blocked(self, sandbox, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "agent_server.file_access.full_file_access_enabled",
+            lambda: False,
+        )
         outside = Path.home() / ".fastfold_sandbox_blocked_read_test.txt"
         outside.write_text("secret")
         try:
