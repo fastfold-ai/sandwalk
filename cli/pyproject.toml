@@ -142,8 +142,8 @@ packages = ["src/agent", "src/agent_server", "src/api", "src/cli", "src/data", "
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/_version.py" = "_version.py"
-# Vendored PyMOL MCP server (pyproject + sources) for offline launcher install.
-"src/agent/mcps/pymol_mcp/vendor" = "agent/mcps/pymol_mcp/vendor"
+# pymol_mcp/vendor ships inside the agent package path — do not force-include
+# it again or hatchling duplicates paths in the wheel.
 # hatchling includes all files under the package path, so skills/ data files
 # (SKILL.md, scripts/, references/) are bundled automatically
 
