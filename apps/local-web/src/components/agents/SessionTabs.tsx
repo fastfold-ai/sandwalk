@@ -8,6 +8,10 @@ import {
   type DragEndEvent
 } from '@dnd-kit/core'
 import {
+  restrictToHorizontalAxis,
+  restrictToParentElement
+} from '@dnd-kit/modifiers'
+import {
   arrayMove,
   horizontalListSortingStrategy,
   SortableContext
@@ -229,6 +233,7 @@ export function SessionTabs({
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
+          modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
         >
           <SortableContext
             items={sortableIds}

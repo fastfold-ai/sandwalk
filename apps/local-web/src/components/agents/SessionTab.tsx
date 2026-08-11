@@ -212,7 +212,11 @@ export function SessionTab({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.6 : 1,
+    // Solid on drag (no opacity dip) + soft lift shadow for presence.
+    opacity: 1,
+    filter: isDragging
+      ? 'drop-shadow(0 6px 14px rgb(0 0 0 / 0.35))'
+      : undefined,
     zIndex: isDragging ? 5 : active ? 4 : hovering ? 3 : 1
   }
 

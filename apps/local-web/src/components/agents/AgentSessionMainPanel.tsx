@@ -267,55 +267,61 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     canShowFilesPanel && Boolean(workspaceSessionId) && (!isDraft || inProject)
 
   return (
-    <ResizablePanelGroup
-      direction="horizontal"
-      // Draft chats must not restore a previous session's open Files layout.
-      autoSaveId={isDraft ? undefined : SESSION_PANELS_AUTO_SAVE_ID}
-      className="min-h-0 flex-1"
-    >
-      <ResizablePanel
-        id="chat"
-        order={1}
-        defaultSize={65}
-        minSize={30}
-        className="min-w-0"
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+      {/*
+        Header (tab strip + top action bar) lives OUTSIDE the horizontal
+        ResizablePanelGroup so the workspace panel opens BELOW the tabs,
+        letting the tabs keep their full width instead of getting squeezed.
+      */}
+      <SessionMainHeader
+        sidebarCollapsed={sidebarCollapsed}
+        setSidebarCollapsed={setSidebarCollapsed}
+        openTabs={openTabs}
+        sessionId={sessionId}
+        session={session}
+        navigate={navigate}
+        openSessionTab={openSessionTab}
+        prefetchSessionMessages={prefetchSessionMessages}
+        closeSessionTab={closeSessionTab}
+        closeOtherSessionTabs={closeOtherSessionTabs}
+        reorderSessionTabs={reorderSessionTabs}
+        openRenameDialog={openRenameDialog}
+        updateSession={updateSession}
+        exportTranscript={exportTranscript}
+        setDeleteTarget={setDeleteTarget}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        selectProjectScope={selectProjectScope}
+        cliMenuOpen={cliMenuOpen}
+        setCliMenuOpen={setCliMenuOpen}
+        copiedResumeCommand={copiedResumeCommand}
+        setCopiedResumeCommand={setCopiedResumeCommand}
+        terminalOpen={terminalOpen}
+        setTerminalOpen={setTerminalOpen}
+        filesPanelCollapsed={filesPanelCollapsed}
+        setFilesPanelCollapsed={setFilesPanelCollapsed}
+        panelView={panelView}
+        setPanelView={setPanelView}
+        onPrepareDraftWorkspace={async () => {
+          await prepareDraftWorkspace()
+        }}
+        createSession={props.createSession}
+      />
+      <ResizablePanelGroup
+        direction="horizontal"
+        // Draft chats must not restore a previous session's open Files layout.
+        autoSaveId={isDraft ? undefined : SESSION_PANELS_AUTO_SAVE_ID}
+        className="min-h-0 min-w-0 flex-1"
       >
-        <main className="relative flex h-full min-w-0 flex-col">
-          <SessionMainHeader
-            sidebarCollapsed={sidebarCollapsed}
-            setSidebarCollapsed={setSidebarCollapsed}
-            openTabs={openTabs}
-            sessionId={sessionId}
-            session={session}
-            navigate={navigate}
-            openSessionTab={openSessionTab}
-            prefetchSessionMessages={prefetchSessionMessages}
-            closeSessionTab={closeSessionTab}
-            closeOtherSessionTabs={closeOtherSessionTabs}
-            reorderSessionTabs={reorderSessionTabs}
-            openRenameDialog={openRenameDialog}
-            updateSession={updateSession}
-            exportTranscript={exportTranscript}
-            setDeleteTarget={setDeleteTarget}
-            projects={projects}
-            activeProjectId={activeProjectId}
-            selectProjectScope={selectProjectScope}
-            cliMenuOpen={cliMenuOpen}
-            setCliMenuOpen={setCliMenuOpen}
-            copiedResumeCommand={copiedResumeCommand}
-            setCopiedResumeCommand={setCopiedResumeCommand}
-            terminalOpen={terminalOpen}
-            setTerminalOpen={setTerminalOpen}
-            filesPanelCollapsed={filesPanelCollapsed}
-            setFilesPanelCollapsed={setFilesPanelCollapsed}
-            panelView={panelView}
-            setPanelView={setPanelView}
-            onPrepareDraftWorkspace={async () => {
-              await prepareDraftWorkspace()
-            }}
-            createSession={props.createSession}
-          />
-          <SessionChatBody
+        <ResizablePanel
+          id="chat"
+          order={1}
+          defaultSize={65}
+          minSize={30}
+          className="min-w-0"
+        >
+          <main className="relative flex h-full min-w-0 flex-col">
+            <SessionChatBody
             client={client}
             navigate={navigate}
             sessionId={sessionId}
@@ -366,7 +372,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         <>
           <ResizableHandle
             className={cn(
-              'w-px',
+              'w-px bg-transparent after:bg-transparent',
               filesPanelCollapsed && 'pointer-events-none opacity-0'
             )}
           />
@@ -449,6 +455,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           </ResizablePanel>
         </>
       ) : null}
-    </ResizablePanelGroup>
+      </ResizablePanelGroup>
+    </div>
   )
 }
