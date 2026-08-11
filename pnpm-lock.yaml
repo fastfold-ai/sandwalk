@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@sinm/react-chrome-tabs@2.6.3':
-    hash: 69b0443f605bcf9c3cc56ac8e3c1bec7a83e17bef4e9bd3d6417599ea7189f6d
+    hash: 5736d86b055382e67289b43d875839d74e0fc320c479f6513519172f3c5b1714
     path: patches/@sinm__react-chrome-tabs@2.6.3.patch
 
 importers:
@@ -65,7 +65,7 @@ importers:
         version: link:../../packages/agent-ui-core
       '@sinm/react-chrome-tabs':
         specifier: ^2.6.3
-        version: 2.6.3(patch_hash=69b0443f605bcf9c3cc56ac8e3c1bec7a83e17bef4e9bd3d6417599ea7189f6d)(esbuild@0.27.7)(postcss@8.5.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 2.6.3(patch_hash=5736d86b055382e67289b43d875839d74e0fc320c479f6513519172f3c5b1714)(esbuild@0.27.7)(postcss@8.5.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tauri-apps/plugin-dialog':
         specifier: ^2.7.2
         version: 2.7.2
@@ -8296,7 +8296,7 @@ snapshots:
 
   '@shikijs/vscode-textmate@10.0.2': {}
 
-  '@sinm/react-chrome-tabs@2.6.3(patch_hash=69b0443f605bcf9c3cc56ac8e3c1bec7a83e17bef4e9bd3d6417599ea7189f6d)(esbuild@0.27.7)(postcss@8.5.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@sinm/react-chrome-tabs@2.6.3(patch_hash=5736d86b055382e67289b43d875839d74e0fc320c479f6513519172f3c5b1714)(esbuild@0.27.7)(postcss@8.5.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
       draggabilly: 2.2.0
       lodash.isequal: 4.5.0
