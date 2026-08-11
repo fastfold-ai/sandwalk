@@ -17,11 +17,15 @@ const UNREAD_DOT_COLOR =
 function TabMarqueeTitle({
   text,
   active,
-  hovering
+  hovering,
+  tabWidth
 }: {
   text: string
   active: boolean
   hovering: boolean
+  /** Passed down from SessionTab so we can react to tab resize without
+   * running a per-tab ResizeObserver (SessionTab already runs one). */
+  tabWidth: number
 }) {
   const wrapRef = useRef<HTMLSpanElement>(null)
   const textRef = useRef<HTMLSpanElement>(null)
@@ -42,17 +46,10 @@ function TabMarqueeTitle({
     revealTimerRef.current = null
   }
 
+  // Re-measure when the title text or the tab's outer width changes.
   useEffect(() => {
-    const update = () => setOverflow(measureOverflow())
-    update()
-    const wrap = wrapRef.current
-    if (!wrap || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(update)
-    observer.observe(wrap)
-    return () => observer.disconnect()
-  }, [text])
-
-  useEffect(() => () => clearRevealTimer(), [])
+    setOverflow(measureOverflow())
+  }, [text, tabWidth])
 
   useEffect(() => {
     clearRevealTimer()
@@ -66,6 +63,8 @@ function TabMarqueeTitle({
       setRevealEnd(true)
       revealTimerRef.current = null
     }, duration * 0.4)
+    // Cleanup runs on hovering/text change AND on unmount.
+    return () => clearRevealTimer()
   }, [hovering, text])
 
   const durationSec =
@@ -137,26 +136,9 @@ function buildTabPath(width: number) {
   )
 }
 
-function TabBackground() {
-  const ref = useRef<HTMLDivElement | null>(null)
-  const [width, setWidth] = useState(240)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const update = () => setWidth(el.clientWidth)
-    update()
-    if (typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
+function TabBackground({ width }: { width: number }) {
   return (
-    <div
-      ref={ref}
-      className="chrome-tab-background pointer-events-none absolute inset-0"
-    >
+    <div className="chrome-tab-background pointer-events-none absolute inset-0">
       {/* Hover-only shape: rounded rectangle (visible only on inactive hover) */}
       <div className="chrome-tab-hover-shape" />
       {/* Active-only shape: SVG with curved ears (visible only when active) */}
@@ -205,6 +187,27 @@ export function SessionTab({
     isDragging
   } = useSortable({ id: tab.id, disabled: !draggable })
 
+  // Single ResizeObserver per tab — width is passed down to TabBackground
+  // (SVG path) and TabMarqueeTitle (overflow measurement) so we don't run
+  // two independent observers per tab (was: 2N observers → now: N).
+  const tabRef = useRef<HTMLDivElement | null>(null)
+  const [tabWidth, setTabWidth] = useState(240)
+  useEffect(() => {
+    const el = tabRef.current
+    if (!el) return
+    const update = () => setTabWidth(el.clientWidth)
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const combinedRef = (node: HTMLDivElement | null) => {
+    setNodeRef(node)
+    tabRef.current = node
+  }
+
   const pinned = tab.organizeLabel === 'pinned'
   const title = tab.title || 'Untitled'
   const showClose = !pinned
@@ -222,7 +225,7 @@ export function SessionTab({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={combinedRef}
       className="chrome-tab"
       data-tab-id={tab.id}
       style={style}
@@ -243,7 +246,7 @@ export function SessionTab({
       }}
       {...(active ? { 'data-active': 'true' } : {})}
     >
-      <TabBackground />
+      <TabBackground width={tabWidth} />
       <div className="chrome-tab-content">
         <SessionStatusIcon status={tab.status} />
         <SessionSourceIcon source={tab.source} label={tab.sourceLabel} />
@@ -264,7 +267,12 @@ export function SessionTab({
             aria-hidden
           />
         ) : null}
-        <TabMarqueeTitle text={title} active={active} hovering={hovering} />
+        <TabMarqueeTitle
+          text={title}
+          active={active}
+          hovering={hovering}
+          tabWidth={tabWidth}
+        />
       </div>
       {showClose ? (
         <button

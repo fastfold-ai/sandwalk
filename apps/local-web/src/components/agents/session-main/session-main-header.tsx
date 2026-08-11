@@ -9,7 +9,7 @@ import {
   Globe2,
   Terminal
 } from 'lucide-react'
-import { useEffect, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { SessionTabs } from '@/components/agents/SessionTabs'
@@ -174,35 +174,34 @@ export function SessionMainHeader({
     setFilesPanelCollapsed(false)
   }
 
-  // Keyboard shortcuts for the three top-strip toggles.
+  /*
+   * Keyboard shortcuts for the three top-strip toggles.
+   * Handlers change on every render (they close over local state); we stash
+   * them in a ref that's updated on each render so the effect's listener
+   * always calls the latest version without re-registering — that lets the
+   * dep array stay honest (just the three visibility flags) and drops the
+   * previous eslint-disable.
+   */
+  const shortcutHandlersRef = useRef({ openTerminal, toggleFiles, togglePreview })
+  shortcutHandlersRef.current = { openTerminal, toggleFiles, togglePreview }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || !event.shiftKey) return
       const key = event.key.toLowerCase()
       if (key === 't' && showTerminalAction) {
         event.preventDefault()
-        openTerminal()
+        shortcutHandlersRef.current.openTerminal()
       } else if (key === 'e' && showFilesAction) {
         event.preventDefault()
-        toggleFiles()
+        shortcutHandlersRef.current.toggleFiles()
       } else if (key === 'v' && showPreviewAction) {
         event.preventDefault()
-        togglePreview()
+        shortcutHandlersRef.current.togglePreview()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    showTerminalAction,
-    showFilesAction,
-    showPreviewAction,
-    terminalOpen,
-    filesPanelCollapsed,
-    panelView,
-    isDraft,
-    inProject
-  ])
+  }, [showTerminalAction, showFilesAction, showPreviewAction])
 
   const projectName =
     showCliAction && session?.projectId

@@ -58,6 +58,9 @@ import {
 
 import './session-chrome-tabs.css'
 
+/** Height of the two chrome-tab overflow buttons (all-tabs + new-agent). */
+const OVERFLOW_BTN_HEIGHT = 'h-[30px]'
+
 type TabContextMenuState = {
   sessionId: string
   x: number
@@ -126,7 +129,6 @@ export function SessionTabs({
     [orderedTabs]
   )
 
-  const orderKey = sortableIds.join('\0')
 
 
   // Auto-scroll active tab so it's fully in view:
@@ -164,7 +166,7 @@ export function SessionTabs({
       : 'auto'
     strip.scrollTo({ left: Math.max(0, targetLeft), behavior })
     didScrollOnceRef.current = true
-  }, [activeId, orderKey, orderedTabs])
+  }, [activeId, sortableIds, orderedTabs])
 
   const filteredSearchTabs = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase()
@@ -270,7 +272,7 @@ export function SessionTabs({
                 <button
                   type="button"
                   className={cn(
-                    'sandwalk-tab-overflow-btn inline-flex h-[30px] items-center justify-center gap-1 rounded-lg',
+                    `sandwalk-tab-overflow-btn inline-flex ${OVERFLOW_BTN_HEIGHT} items-center justify-center gap-1 rounded-lg`,
                     'px-2.5',
                     'bg-black/[0.06] text-foreground/85',
                     'hover:bg-black/[0.1] hover:text-foreground',
@@ -310,7 +312,7 @@ export function SessionTabs({
                   <button
                     type="button"
                     className={cn(
-                      'sandwalk-tab-overflow-btn inline-flex h-[30px] items-center justify-center gap-1 rounded-lg',
+                      `sandwalk-tab-overflow-btn inline-flex ${OVERFLOW_BTN_HEIGHT} items-center justify-center gap-1 rounded-lg`,
                       'pl-2.5 pr-2',
                       'bg-black/[0.06] text-foreground/85',
                       'hover:bg-black/[0.1] hover:text-foreground',
@@ -351,11 +353,14 @@ export function SessionTabs({
             onCloseAutoFocus={event => event.preventDefault()}
             onFocusOutside={event => event.preventDefault()}
             onInteractOutside={event => {
-              // Only close on real pointer outside, not on scroll / focus.
+              // Keep the panel open on strip scroll / gutter clicks, BUT
+              // let it close when the user clicks a specific tab so the
+              // panel doesn't linger over a fresh selection.
               const target = event.target as Node | null
               if (
                 target instanceof HTMLElement &&
-                target.closest('.sandwalk-tab-strip-main')
+                target.closest('.sandwalk-tab-strip-main') &&
+                !target.closest('.chrome-tab')
               ) {
                 event.preventDefault()
               }
@@ -367,7 +372,7 @@ export function SessionTabs({
                 ref={searchInputRef}
                 value={searchQuery}
                 onChange={event => setSearchQuery(event.target.value)}
-                placeholder="Buscar por nombre"
+                placeholder="Search by name"
                 className="h-7 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
               />
               <span className="text-muted-foreground/70 shrink-0 text-[10px] tabular-nums">
@@ -375,10 +380,10 @@ export function SessionTabs({
               </span>
             </div>
             <div className="max-h-[32rem] overflow-y-auto overscroll-contain">
-              <div className="p-1.5">
+              <div className="p-1.5" role="listbox" aria-label="Session tabs">
                 {filteredSearchTabs.length === 0 ? (
                   <p className="text-muted-foreground px-2 py-6 text-center text-xs">
-                    Sin coincidencias
+                    No matches
                   </p>
                 ) : (
                   filteredSearchTabs.map(tab => {
@@ -390,7 +395,8 @@ export function SessionTabs({
                     return (
                       <div
                         key={tab.id}
-                        role="button"
+                        role="option"
+                        aria-selected={active}
                         tabIndex={0}
                         className={cn(
                           'group/item hover:bg-muted flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
