@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from ui.markdown.config_utils import _as_bool, _config_get
 from ui.markdown.fences import _split_mermaid_fences
-from ui.markdown.heading import _LeftHeading, LeftMarkdown
+from ui.markdown.heading import LeftMarkdown, _LeftHeading
 from ui.markdown.mermaid_source import _neaten_mermaid_source
 from ui.markdown.paths import looks_like_local_path, unwrap_path_code_spans
 from ui.markdown.render import _print_mermaid_block, print_markdown_with_mermaid

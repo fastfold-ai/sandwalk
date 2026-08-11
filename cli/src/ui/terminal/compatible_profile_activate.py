@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 class _CompatibleProfileActivateMixin:
     def _activate_compatible_profile(self, profile_id: str) -> None:
         """Activate a compatible profile and select a model for it."""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from agent.model_catalog.context_windows import context_window_for_model
 from agent.model_catalog.data import (
     AVAILABLE_MODELS,
     CATALOG_DEFAULTS_VERSION,
@@ -9,7 +10,6 @@ from agent.model_catalog.data import (
     DEFAULT_DISABLED_MODELS,
     CatalogModel,
 )
-from agent.model_catalog.context_windows import context_window_for_model
 from agent.model_catalog.lookup import (
     CATALOG_MODEL_ALIASES,
     catalog_label_for_model,
@@ -18,6 +18,21 @@ from agent.model_catalog.lookup import (
     cloud_catalog_models,
     resolve_catalog_model_id,
     terminal_available_models,
+)
+from agent.model_catalog.modality_support import (
+    AUDIO_EXTENSIONS,
+    FILE_EXTENSIONS,
+    IMAGE_EXTENSIONS,
+    VIDEO_EXTENSIONS,
+    allowlist_modalities,
+    modality_capability_fields,
+    modality_for_extension,
+    model_supports_audio_inputs,
+    model_supports_image_inputs,
+    model_supports_modality,
+    model_supports_pdf_inputs,
+    model_supports_video_inputs,
+    profile_supports_modality,
 )
 from agent.model_catalog.opencode import (
     OPENCODE_UNSUPPORTED_MODELS,
@@ -49,21 +64,6 @@ from agent.model_catalog.reasoning_store import (
     read_model_reasoning_store,
     reasoning_settings_key,
     upsert_model_reasoning,
-)
-from agent.model_catalog.modality_support import (
-    AUDIO_EXTENSIONS,
-    FILE_EXTENSIONS,
-    IMAGE_EXTENSIONS,
-    VIDEO_EXTENSIONS,
-    allowlist_modalities,
-    modality_capability_fields,
-    modality_for_extension,
-    model_supports_audio_inputs,
-    model_supports_image_inputs,
-    model_supports_modality,
-    model_supports_pdf_inputs,
-    model_supports_video_inputs,
-    profile_supports_modality,
 )
 from agent.model_catalog.reasoning_support import (
     REASONING_EFFORT_LEVELS,

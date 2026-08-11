@@ -22,7 +22,7 @@ def test_install_suite_rejects_unknown():
 def test_install_mbpp_writes_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     payload = "\n".join(
         json.dumps(
             {
@@ -123,7 +123,7 @@ def test_install_mcq_pages_rows_and_normalizes(
     """Rows-API fallback pages through the corpus when no parquet reader exists."""
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(mod, "_HF_ROWS_PAGE", 2)
     monkeypatch.setattr(mod, "_HF_ROWS_PAGE_PAUSE", 0)
     monkeypatch.setattr(mod, "resolve_hf_token", lambda: "")
@@ -167,7 +167,7 @@ def test_install_mcq_prefers_parquet_single_request(
     """One parquet request beats ~141 rows-API pages, so it must win when available."""
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(mod, "resolve_hf_token", lambda: "")
 
     calls: list[str] = []
@@ -200,7 +200,7 @@ def test_install_mcq_falls_back_when_parquet_unreadable(
     """A corrupt parquet must not fail the install — page the rows API instead."""
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(mod, "_HF_ROWS_PAGE_PAUSE", 0)
     monkeypatch.setattr(mod, "resolve_hf_token", lambda: "")
 
@@ -242,7 +242,7 @@ def test_count_lines_ignores_unicode_line_separators(tmp_path: Path):
 def test_suite_sizes_and_total_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     mcq = tmp_path / ".cache" / "mcq"
     mcq.mkdir(parents=True)
     (mcq / "mmlu_test.jsonl").write_text(
@@ -264,7 +264,7 @@ def test_uninstall_suite_removes_file_and_reports_freed(
 ):
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     mcq = tmp_path / ".cache" / "mcq"
     mcq.mkdir(parents=True)
     target = mcq / "mmlu_test.jsonl"
@@ -289,7 +289,7 @@ def test_uninstall_suite_removes_capsule_directory(
     """BixBench caches capsule data in a directory, which dwarfs the JSONL."""
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     caps = tmp_path / ".cache" / "bixbench-verified-50" / "nested"
     caps.mkdir(parents=True)
     (caps / "capsule.bin").write_bytes(b"0" * 4096)
@@ -315,7 +315,7 @@ def test_uninstall_blocked_while_installing(
     from agent_server.bench_service import dataset_install as mod
     from agent_server.bench_service import install_jobs as jobs
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(jobs, "_jobs", {})
     jobs._jobs["mmlu"] = jobs.InstallJob(suite_id="mmlu", status="installing")
 
@@ -331,7 +331,7 @@ def test_uninstall_clears_stale_install_job(
     from agent_server.bench_service import dataset_install as mod
     from agent_server.bench_service import install_jobs as jobs
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(jobs, "_jobs", {})
     jobs._jobs["mmlu"] = jobs.InstallJob(
         suite_id="mmlu", status="error", summary="boom", error="boom"
@@ -365,9 +365,9 @@ def test_bench_packs_route_exposes_cache_and_uninstall(
     from agent_server.bench_service import dataset_install as mod
     from agent_server.bench_service import mcq_suites as mcq
 
-    # Both modules import bench_root separately; patch each so the catalog and the
-    # uninstall path agree on where the cache lives.
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    # Patch cache roots so catalog + uninstall agree on where datasets live.
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
+    monkeypatch.setattr(mcq, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(mcq, "bench_root", lambda: tmp_path)
     mcq_dir = tmp_path / ".cache" / "mcq"
     mcq_dir.mkdir(parents=True)
@@ -405,7 +405,7 @@ def test_install_mcq_skips_unusable_rows(
     """A row without choices or with an out-of-range answer must not be written."""
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(mod, "_HF_ROWS_PAGE_PAUSE", 0)
     monkeypatch.setattr(mod, "resolve_hf_token", lambda: "")
     monkeypatch.setattr(mod, "_parquet_reader", lambda: None)
@@ -436,7 +436,7 @@ def test_install_mcq_arc_maps_label_dict(
 ):
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(mod, "_HF_ROWS_PAGE_PAUSE", 0)
     monkeypatch.setattr(mod, "resolve_hf_token", lambda: "")
     monkeypatch.setattr(mod, "_parquet_reader", lambda: None)
@@ -477,7 +477,7 @@ def test_install_mcq_retries_then_reports_rate_limit(
     """429s are retried; a persistent one becomes an actionable message."""
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(mod, "_HF_ROWS_RETRIES", 3)
     monkeypatch.setattr(mod, "_HF_ROWS_BACKOFF", 0)
     monkeypatch.setattr(mod, "_HF_ROWS_PAGE_PAUSE", 0)
@@ -504,7 +504,7 @@ def test_install_mcq_recovers_after_transient_429(
 ):
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(mod, "_HF_ROWS_RETRIES", 3)
     monkeypatch.setattr(mod, "_HF_ROWS_BACKOFF", 0)
     monkeypatch.setattr(mod, "_HF_ROWS_PAGE_PAUSE", 0)
@@ -535,7 +535,7 @@ def test_install_mcq_does_not_retry_404(
 ):
     from agent_server.bench_service import dataset_install as mod
 
-    monkeypatch.setattr(mod, "bench_root", lambda: tmp_path)
+    monkeypatch.setattr(mod, "bench_cache_root", lambda: tmp_path)
     monkeypatch.setattr(mod, "_HF_ROWS_RETRIES", 4)
     monkeypatch.setattr(mod, "_HF_ROWS_BACKOFF", 0)
     monkeypatch.setattr(mod, "resolve_hf_token", lambda: "")

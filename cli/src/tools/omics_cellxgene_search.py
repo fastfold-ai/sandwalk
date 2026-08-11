@@ -1,8 +1,6 @@
 """omics.cellxgene_search: search CELLxGENE Discover. Split from tools/omics.py."""
-from tools import registry
-
 from tools import omics as _omics
-
+from tools import registry
 
 _CELLXGENE_API = "https://api.cellxgene.cziscience.com/curation/v1"
 

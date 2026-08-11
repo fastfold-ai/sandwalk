@@ -1,6 +1,6 @@
 """chemistry.scaffold_hop: bioisostere and scaffold-replacement suggestions. Split from tools/chemistry.py."""
-from tools import registry
 from tools import chemistry as _chemistry
+from tools import registry
 from tools.chemistry_bioisosteres import detect_functional_groups, suggest_scaffold_replacements
 
 

@@ -1,7 +1,6 @@
 """chemistry.descriptors: RDKit molecular descriptor calculation. Split from tools/chemistry.py."""
-from tools import registry
-
 from tools import chemistry as _chemistry
+from tools import registry
 
 
 @registry.register(

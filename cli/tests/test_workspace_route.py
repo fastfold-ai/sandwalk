@@ -168,3 +168,51 @@ def test_mirror_allows_sandwalk_base_files(tmp_path: Path, monkeypatch):
     write = backend.write(str(created), "result\n")
     assert write.error is None
     assert created.read_text(encoding="utf-8") == "result\n"
+
+
+def test_mirror_delete_removes_host_and_is_protocol_visible(tmp_path: Path):
+    """deepagents 0.7 probes type(backend).delete — must exist on the class."""
+    root = tmp_path / "ws"
+    root.mkdir()
+    target = root / "plans" / "gone.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("x\n", encoding="utf-8")
+
+    inner = MagicMock()
+    # Prefer a simple namespace result so older deepagents without DeleteResult
+    # still exercise the host-delete path.
+    inner.delete.return_value = SimpleNamespace(
+        path="/workspace/plans/gone.md", error=None
+    )
+    backend = HostWorkspaceMirrorBackend(inner, root)
+
+    assert hasattr(type(backend), "delete")
+    result = backend.delete(str(target))
+    assert getattr(result, "error", None) is None
+    assert not target.exists()
+    inner.delete.assert_called_once_with("/workspace/plans/gone.md")
+
+
+def test_mirror_backend_survives_deepagents_class_attr_probes(tmp_path: Path):
+    """Regression: __getattr__ forwarding is invisible to type(backend).attr.
+
+    deepagents 0.7+ uses ``type(backend).delete is not BackendProtocol.delete``
+    (and similar) before filtering tools. If a method only exists via
+    ``__getattr__``, that probe raises AttributeError and kills the run.
+    """
+    from deepagents.backends.protocol import BackendProtocol
+
+    backend = HostWorkspaceMirrorBackend(MagicMock(), tmp_path)
+    # Methods deepagents may probe on the class (optional overrides).
+    for name in ("delete", "adelete", "write", "edit", "read", "awrite", "aedit", "aread"):
+        if not hasattr(BackendProtocol, name):
+            continue
+        # Must not raise — class attr lookup, not instance __getattr__.
+        getattr(type(backend), name)
+    supports = getattr(
+        __import__("deepagents.backends.protocol", fromlist=["_supports_delete"]),
+        "_supports_delete",
+        None,
+    )
+    if callable(supports):
+        assert supports(backend) is True

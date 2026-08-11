@@ -1,6 +1,6 @@
 """omics.deseq2: differential expression orchestrator (R DESeq2 -> pyDESeq2 -> Mann-Whitney). Split from tools/omics.py."""
-from tools import registry
 from tools import omics as _omics
+from tools import registry
 from tools.omics_deseq2_setup import prepare_deseq2_design
 
 

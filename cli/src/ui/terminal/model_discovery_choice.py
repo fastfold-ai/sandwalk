@@ -42,7 +42,6 @@ class _ModelDiscoveryChoiceMixin:
 
     def _getch(self):
         """Read a single character from standard input without requiring Enter."""
-        import os
         import sys
 
         if os.name == "nt":

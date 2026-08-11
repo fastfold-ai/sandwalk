@@ -67,7 +67,8 @@ def test_run_server_rejects_uds_with_public(tmp_path: Path):
 
 
 def test_run_server_rejects_non_loopback_without_public():
-    with pytest.raises(ValueError, match="Non-loopback"):
+    # Non-loopback implies public/LAN mode; still requires an API key.
+    with pytest.raises(ValueError, match="api-key|Public / LAN"):
         run_server(host="0.0.0.0")
 
 

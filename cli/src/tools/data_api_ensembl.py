@@ -1,7 +1,6 @@
 """data_api.ensembl_lookup: Ensembl REST gene lookup. Split from tools/data_api.py."""
-from tools import registry
-
 from tools import data_api as _data_api
+from tools import registry
 
 
 @registry.register(

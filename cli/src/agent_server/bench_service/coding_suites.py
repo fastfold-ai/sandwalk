@@ -12,7 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from agent_server.bench_service.bootstrap import bench_root, fixtures_dir
+from agent_server.bench_service.bootstrap import (
+    bench_cache_root,
+    bench_root,
+    fixtures_dir,
+)
 from agent_server.bench_service.code_exec import parse_lcb_public_tests
 from agent_server.bench_service.mcq_suites import SAMPLE_SEED
 
@@ -79,8 +83,11 @@ def dataset_available(suite_id: str) -> bool:
 
 def resolve_dataset_path(suite: CodingSuite) -> Path | None:
     candidates: list[Path] = []
+    cache = bench_cache_root()
     root = bench_root()
     fix = fixtures_dir()
+    candidates.append(cache / ".cache" / "mcq" / suite.full_fixture)
+    candidates.append(cache / ".cache" / "bench" / suite.full_fixture)
     if root is not None:
         candidates.append(root / ".cache" / "mcq" / suite.full_fixture)
         candidates.append(root / ".cache" / "bench" / suite.full_fixture)

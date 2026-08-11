@@ -1,4 +1,4 @@
-//! Probe the local IPv4 /24 for Sandwalk servers on port 8787.
+//! Probe the local IPv4 /24 for Sandwalk servers on common API ports.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -7,7 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-const DISCOVER_PORT: u16 = 8787;
+/// Default agent API ports (primary + common alternates).
+const DISCOVER_PORTS: &[u16] = &[8787, 8789, 8790];
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(200);
 const HTTP_TIMEOUT: Duration = Duration::from_millis(300);
 const MAX_IN_FLIGHT: usize = 48;
@@ -61,12 +62,16 @@ fn candidates_for(ip: Ipv4Addr) -> Vec<Ipv4Addr> {
         .collect()
 }
 
-fn probe_ip(client: &reqwest::blocking::Client, ip: Ipv4Addr) -> Option<LanServerHit> {
-    let addr = SocketAddr::from((ip, DISCOVER_PORT));
+fn probe_ip_port(
+    client: &reqwest::blocking::Client,
+    ip: Ipv4Addr,
+    port: u16,
+) -> Option<LanServerHit> {
+    let addr = SocketAddr::from((ip, port));
     if TcpStream::connect_timeout(&addr, CONNECT_TIMEOUT).is_err() {
         return None;
     }
-    let url = format!("http://{ip}:{DISCOVER_PORT}/v1/discover");
+    let url = format!("http://{ip}:{port}/v1/discover");
     let resp = client.get(&url).send().ok()?;
     if !resp.status().is_success() {
         return None;
@@ -76,7 +81,7 @@ fn probe_ip(client: &reqwest::blocking::Client, ip: Ipv4Addr) -> Option<LanServe
         return None;
     }
     Some(LanServerHit {
-        url: format!("http://{ip}:{DISCOVER_PORT}"),
+        url: format!("http://{ip}:{port}"),
         hostname: body.hostname.unwrap_or_else(|| ip.to_string()),
         platform: body.platform.unwrap_or_default(),
         arch: body.arch.unwrap_or_default(),
@@ -89,7 +94,7 @@ fn probe_ip(client: &reqwest::blocking::Client, ip: Ipv4Addr) -> Option<LanServe
     })
 }
 
-fn scan_ips(ips: Vec<Ipv4Addr>) -> Vec<LanServerHit> {
+fn scan_targets(targets: Vec<(Ipv4Addr, u16)>) -> Vec<LanServerHit> {
     let client = match reqwest::blocking::Client::builder()
         .timeout(HTTP_TIMEOUT)
         .connect_timeout(CONNECT_TIMEOUT)
@@ -100,15 +105,15 @@ fn scan_ips(ips: Vec<Ipv4Addr>) -> Vec<LanServerHit> {
     };
     let hits: Arc<Mutex<Vec<LanServerHit>>> = Arc::new(Mutex::new(Vec::new()));
 
-    for chunk in ips.chunks(MAX_IN_FLIGHT) {
+    for chunk in targets.chunks(MAX_IN_FLIGHT) {
         let handles: Vec<_> = chunk
             .iter()
             .copied()
-            .map(|ip| {
+            .map(|(ip, port)| {
                 let client = Arc::clone(&client);
                 let hits = Arc::clone(&hits);
                 thread::spawn(move || {
-                    if let Some(hit) = probe_ip(&client, ip) {
+                    if let Some(hit) = probe_ip_port(&client, ip, port) {
                         if let Ok(mut guard) = hits.lock() {
                             guard.push(hit);
                         }
@@ -135,7 +140,8 @@ fn scan_ips(ips: Vec<Ipv4Addr>) -> Vec<LanServerHit> {
     rows
 }
 
-/// Scan localhost + each local /24 for Sandwalk `/v1/discover` on :8787.
+/// Scan localhost + each local /24 for Sandwalk `/v1/discover` on
+/// 8787 / 8789 / 8790.
 pub fn scan_lan_servers() -> Vec<LanServerHit> {
     let mut ips: Vec<Ipv4Addr> = vec![Ipv4Addr::new(127, 0, 0, 1)];
     let mut seen = HashSet::new();
@@ -147,7 +153,13 @@ pub fn scan_lan_servers() -> Vec<LanServerHit> {
             }
         }
     }
-    scan_ips(ips)
+    let mut targets = Vec::with_capacity(ips.len() * DISCOVER_PORTS.len());
+    for ip in ips {
+        for &port in DISCOVER_PORTS {
+            targets.push((ip, port));
+        }
+    }
+    scan_targets(targets)
 }
 
 /// Run the LAN probe off the async runtime so the dialog can open immediately.

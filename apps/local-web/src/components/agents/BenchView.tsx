@@ -5,7 +5,6 @@ import type {
   LocalAgentClient
 } from '@sandwalk/agent-local-client'
 import type { RuntimeSettings, Specialist } from '@sandwalk/agent-ui-core'
-
 import {
   Check,
   Columns2,
@@ -36,13 +35,13 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { copyText } from '@/lib/clipboard'
 import {
   type ComposerModelOption,
   formatModelEffortBadge,
   patchComposerModelEffort,
   toComposerModelOptions
 } from '@/lib/composer-models'
-import { copyText } from '@/lib/clipboard'
 import { relativeDayLabel } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
@@ -94,15 +93,17 @@ function suiteDisplayName(
   return fromCard || PACK_DISPLAY_TITLES[id] || id
 }
 
-function installPercent(card: BenchSuiteCard): number {
-  const done = card.installBytesDone
-  const total = card.installBytesTotal
-  if (done != null && total != null && total > 0) {
-    return Math.max(2, Math.min(100, Math.round((100 * done) / total)))
+function installButtonLabel(card: BenchSuiteCard, installing: boolean): string {
+  if (installing) {
+    // Server already formats "12.4 MB / 48 MB · 35.6 MB left · 26%" or
+    // "1,200 / 14,042 questions · 12,842 left · 9%".
+    return card.installProgress?.trim() || 'Installing…'
   }
-  // Indeterminate-ish pulse when size unknown — keep a visible sliver.
-  if (card.installing || (done != null && done > 0)) return 35
-  return 8
+  if (card.requiresHfToken && !card.hfTokenConfigured) {
+    return 'Hugging Face required'
+  }
+  if (card.installError) return 'Retry install'
+  return 'Install'
 }
 
 function sampleChoicesFor(card: BenchSuiteCard): number[] {
@@ -343,12 +344,14 @@ export function BenchView({
     })
   }
 
+  const openHuggingFaceIntegration = () => {
+    setError(null)
+    navigate('/dashboard/integrations/huggingface')
+  }
+
   const installSuite = async (card: BenchSuiteCard) => {
     if (card.requiresHfToken && !card.hfTokenConfigured) {
-      setError(
-        'Set a Hugging Face token under Integrations → Hugging Face, accept the dataset terms, then Install.'
-      )
-      navigate('/dashboard/integrations/huggingface')
+      openHuggingFaceIntegration()
       return
     }
     if (card.installing || startingInstallId === card.id) return
@@ -365,10 +368,7 @@ export function BenchView({
         card.requiresHfToken ||
         /hugging face|hf_token|needsHfToken/i.test(message)
       if (needsToken) {
-        setError(
-          'Hugging Face token required. Save it under Integrations → Hugging Face, then try Install again.'
-        )
-        navigate('/dashboard/integrations/huggingface')
+        openHuggingFaceIntegration()
       } else {
         setError(message)
       }
@@ -946,86 +946,28 @@ export function BenchView({
                         </div>
                       </div>
                     ) : null}
-                    {!card.available || installing ? (
+                    {card.installable && (!card.installed || installing) ? (
                       <div
-                        className="mt-2 space-y-2"
+                        className="mt-2"
                         onClick={e => e.stopPropagation()}
                       >
-                        {installing ? (
-                          <div className="border-border/60 bg-muted/30 space-y-1.5 rounded-md border px-2.5 py-2">
-                            <p className="text-foreground text-[11px] font-medium">
-                              Downloading in the background…
-                            </p>
-                            <p className="text-muted-foreground font-mono text-[11px]">
-                              {card.installProgress ||
-                                card.unavailableReason ||
-                                'Starting download…'}
-                            </p>
-                            <div className="bg-muted h-1.5 overflow-hidden rounded-full">
-                              <div
-                                className="bg-foreground/70 h-full rounded-full transition-[width] duration-300"
-                                style={{
-                                  width: `${installPercent(card)}%`
-                                }}
-                              />
-                            </div>
-                            {card.installBytesDone != null ? (
-                              <p className="text-muted-foreground text-[10px]">
-                                {formatBytes(card.installBytesDone)}
-                                {card.installBytesTotal
-                                  ? ` / ${formatBytes(card.installBytesTotal)}`
-                                  : ' downloaded'}
-                              </p>
-                            ) : null}
-                          </div>
-                        ) : card.unavailableReason &&
-                          !(
-                            card.missingSkills?.length ||
-                            card.missingMcps?.length
-                          ) ? (
-                          <p className="text-destructive text-[11px]">
-                            {card.unavailableReason}
-                          </p>
-                        ) : null}
-                        {card.installable ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={
-                                installing || Boolean(startingInstallId)
-                              }
-                              onClick={() => void installSuite(card)}
-                            >
-                              {installing ? (
-                                <Loader2 className="size-3.5 animate-spin" />
-                              ) : (
-                                <Download className="size-3.5" />
-                              )}
-                              {installing
-                                ? 'Installing…'
-                                : card.requiresHfToken && !card.hfTokenConfigured
-                                  ? 'Set HF token'
-                                  : 'Install'}
-                            </Button>                            {card.requiresHfToken && !card.hfTokenConfigured ? (
-                              <button
-                                type="button"
-                                className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
-                                onClick={() =>
-                                  navigate('/dashboard/integrations/huggingface')
-                                }
-                              >
-                                Open Hugging Face integration
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : null}
-                        {card.installable && card.missingDependency ? (
-                          <p className="text-muted-foreground text-[11px]">
-                            {card.missingDependency}
-                          </p>
-                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-auto min-h-8 w-full whitespace-normal px-2 py-1.5 text-left text-[11px] leading-snug"
+                          disabled={installing || Boolean(startingInstallId)}
+                          onClick={() => void installSuite(card)}
+                        >
+                          {installing ? (
+                            <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                          ) : (
+                            <Download className="size-3.5 shrink-0" />
+                          )}
+                          <span className="min-w-0 flex-1">
+                            {installButtonLabel(card, installing)}
+                          </span>
+                        </Button>
                       </div>
                     ) : null}
                     {card.installed && !installing ? (

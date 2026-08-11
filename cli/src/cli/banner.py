@@ -1,7 +1,8 @@
 """Startup banner rendering for interactive/batch CLI runs."""
 
 from _version import __version__
-from cli.app import BANNER, console  # console: monkeypatched by tests
+from cli.app import BANNER
+from cli.app import console as _app_console
 from cli.banner_support import (
     _count_installed_claude_skills,
     _get_cached_skills_update_safe,
@@ -12,6 +13,9 @@ from cli.banner_support import (
 )
 from cli.subscription import _format_plan_label, _resolve_fastfold_subscription_tier_local
 from cli.version_check import _get_cached_upgrade_available_version
+
+# Re-export for tests that monkeypatch ``cli.banner.console``.
+console = _app_console
 
 
 def print_banner(cfg=None, *, console=None):
@@ -26,7 +30,7 @@ def print_banner(cfg=None, *, console=None):
 
     from agent.config import Config
 
-    # Prefer explicit console; else module ``console`` (tests patch this).
+    # Prefer explicit console; else module ``console`` (tests monkeypatch it).
     out = console if console is not None else globals()["console"]
     cfg = cfg or Config.load()
     n_tools = _get_loaded_tool_count_hint()

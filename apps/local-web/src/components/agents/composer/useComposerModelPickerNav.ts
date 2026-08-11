@@ -39,6 +39,8 @@ export function useComposerModelPickerNav({
     }
     // Reset highlight when the open/search result set changes — not on every
     // parent re-render of ``selected`` (that would eat ArrowDown moves).
+    // Do not scroll to the selected model on open — that fights the user
+    // while they browse/search (especially on Bench).
     const match = flatOptions.some(
       option => composerModelOptionKey(option) === selectedKey
     )
@@ -51,13 +53,12 @@ export function useComposerModelPickerNav({
     )
   }, [flatOptions, open, search, selectedKey])
 
-  useEffect(() => {
-    if (!open || !activeKey) return
+  const scrollActiveIntoView = (key: string) => {
     const node = Array.from(
       document.querySelectorAll('[data-composer-model-option]')
-    ).find(el => el.getAttribute('data-composer-model-option') === activeKey)
+    ).find(el => el.getAttribute('data-composer-model-option') === key)
     node?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [activeKey, open])
+  }
 
   const activeOption =
     flatOptions.find(option => composerModelOptionKey(option) === activeKey) ||
@@ -81,7 +82,12 @@ export function useComposerModelPickerNav({
           ? Math.min(safeIndex + 1, flatOptions.length - 1)
           : Math.max(safeIndex - 1, 0)
       const next = flatOptions[nextIndex]
-      if (next) setActiveKey(composerModelOptionKey(next))
+      if (next) {
+        const key = composerModelOptionKey(next)
+        setActiveKey(key)
+        // Keep keyboard highlight visible without snapping on open.
+        requestAnimationFrame(() => scrollActiveIntoView(key))
+      }
       return
     }
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -97,7 +103,11 @@ export function useComposerModelPickerNav({
         event.key === 'Home'
           ? flatOptions[0]
           : flatOptions[flatOptions.length - 1]
-      if (next) setActiveKey(composerModelOptionKey(next))
+      if (next) {
+        const key = composerModelOptionKey(next)
+        setActiveKey(key)
+        requestAnimationFrame(() => scrollActiveIntoView(key))
+      }
     }
   }
 

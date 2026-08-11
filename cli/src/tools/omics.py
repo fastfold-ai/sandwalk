@@ -19,7 +19,10 @@ patches take effect regardless of which submodule performs the call.
 
 from agent.config import CONFIG_DIR
 from tools.http_client import request, request_json
-
+from tools.omics_atac import atac_peak_annotate, chipseq_enrich
+from tools.omics_cellxgene_fetch import cellxgene_fetch
+from tools.omics_cellxgene_search import cellxgene_search
+from tools.omics_chromatin import chromatin_accessibility, hic_compartments
 from tools.omics_common import (
     _check_episcanpy,
     _check_muon,
@@ -30,32 +33,28 @@ from tools.omics_common import (
     _stream_download,
     logger,
 )
+from tools.omics_cytof import cytof_cluster
+from tools.omics_deseq2 import deseq2
+from tools.omics_geo_fetch import geo_fetch
+from tools.omics_geo_search import geo_search
 from tools.omics_inspect import _inspect_h5ad, _inspect_tabular, dataset_info
+from tools.omics_kegg import KEGG_ORA_SYSTEM_PROMPT, kegg_ora
 from tools.omics_loaders import _inspect_matrix_gz, _load_tabular
+from tools.omics_methylation_cluster import methylation_cluster
+from tools.omics_methylation_diff import methylation_diff, methylation_profile
+from tools.omics_multiomics import multiomics_integrate
+from tools.omics_proteomics_diff import proteomics_diff
+from tools.omics_proteomics_enrich import proteomics_enrich
+from tools.omics_spatial import spatial_cluster
+from tools.omics_spatial_autocorrelation import spatial_autocorrelation
 from tools.omics_stats import (
     _enrichr_libraries_for_organism,
     _fdr_correct,
     _parse_gene_list_file,
     _parse_sample_groups,
 )
-from tools.omics_geo_search import geo_search
-from tools.omics_geo_fetch import geo_fetch
-from tools.omics_cellxgene_search import cellxgene_search
-from tools.omics_cellxgene_fetch import cellxgene_fetch
-from tools.omics_tcga_search import tcga_search
 from tools.omics_tcga_fetch import tcga_fetch
-from tools.omics_methylation_diff import methylation_diff, methylation_profile
-from tools.omics_proteomics_diff import proteomics_diff
-from tools.omics_proteomics_enrich import proteomics_enrich
-from tools.omics_atac import atac_peak_annotate, chipseq_enrich
-from tools.omics_chromatin import chromatin_accessibility, hic_compartments
-from tools.omics_spatial import spatial_cluster
-from tools.omics_spatial_autocorrelation import spatial_autocorrelation
-from tools.omics_cytof import cytof_cluster
-from tools.omics_deseq2 import deseq2
-from tools.omics_multiomics import multiomics_integrate
-from tools.omics_methylation_cluster import methylation_cluster
-from tools.omics_kegg import KEGG_ORA_SYSTEM_PROMPT, kegg_ora
+from tools.omics_tcga_search import tcga_search
 
 __all__ = [
     "CONFIG_DIR",

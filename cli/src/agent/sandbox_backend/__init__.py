@@ -47,8 +47,8 @@ from agent.sandbox_backend.skills_route import (
     _wrap_composite_execute_for_skills,
 )
 from agent.sandbox_backend.workspace_route import (
-    wrap_backend_for_host_workspace,
     workspace_relative_tool_path,
+    wrap_backend_for_host_workspace,
 )
 
 __all__ = [

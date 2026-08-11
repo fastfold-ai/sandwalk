@@ -34,7 +34,7 @@ def _resolve_compound_filters(req: QueryRequest, ds_config: dict[str, Any]) -> d
 @router.post("/query", response_model=QueryResponse)
 def query_dataset(req: QueryRequest) -> QueryResponse:
     """Run a filtered query against a dataset."""
-    from api.app import engine, DATASET_REGISTRY
+    from api.app import DATASET_REGISTRY, engine
 
     if req.dataset not in DATASET_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Unknown dataset: {req.dataset}")
@@ -67,7 +67,7 @@ def query_dataset(req: QueryRequest) -> QueryResponse:
 @router.get("/datasets/{name}/gene/{gene}")
 def gene_summary(name: str, gene: str) -> dict[str, Any]:
     """Get a gene-level summary from a dataset."""
-    from api.app import engine, DATASET_REGISTRY
+    from api.app import DATASET_REGISTRY, engine
 
     if name not in DATASET_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Unknown dataset: {name}")
@@ -106,7 +106,7 @@ def gene_summary(name: str, gene: str) -> dict[str, Any]:
 @router.get("/datasets/{name}/compound/{compound}")
 def compound_summary(name: str, compound: str) -> dict[str, Any]:
     """Get a compound-level summary from a dataset."""
-    from api.app import engine, DATASET_REGISTRY
+    from api.app import DATASET_REGISTRY, engine
 
     if name not in DATASET_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Unknown dataset: {name}")

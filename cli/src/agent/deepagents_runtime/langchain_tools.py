@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent.deepagents_runtime.chat_model import _cap_tools_for_openai, provider_needs_openai_tool_cap
+from agent.deepagents_runtime.chat_model import (
+    _cap_tools_for_openai,
+    provider_needs_openai_tool_cap,
+)
 from agent.deepagents_runtime.langchain_tools_sandbox import attach_sandbox_tools
 from agent.deepagents_runtime.langchain_tools_setup import (
     build_native_domain_tools,

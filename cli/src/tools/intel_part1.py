@@ -1,6 +1,8 @@
 """intel — part 1 of split module. See tools/intel.py."""
 from __future__ import annotations
+
 from tools.intel_base import Any, datetime, registry
+
 
 def _to_int(value: Any, default: int = 0) -> int:
     try:

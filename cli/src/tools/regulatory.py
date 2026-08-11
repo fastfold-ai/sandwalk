@@ -24,13 +24,13 @@ import pandas as pd
 
 from tools.regulatory_cdisc import cdisc_lint
 from tools.regulatory_common import (
-    _attr_by_local_name,
     _COLUMN_RE,
     _DOMAIN_REQUIRED,
+    _ISO8601_PARTIAL_RE,
+    _attr_by_local_name,
     _duplicate_oids,
     _extract_leaf_hrefs,
     _infer_domain_from_path,
-    _ISO8601_PARTIAL_RE,
     _issue,
     _local_name,
     _read_tabular,

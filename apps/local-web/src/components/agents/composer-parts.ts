@@ -13,11 +13,11 @@ const TOKEN_RE = /⟦@:([^⟧]+)⟧|⟦\/:([^⟧]+)⟧|⟦mcp:([^⟧]+)⟧/g
  * `https://news.ycombinator.com/` are not treated as `/news`.
  */
 const FILE_MENTION_RE =
-  /(?:^|[\s(\["'])(@[^\s]+)(?=[\s.,;:!?)\]"'`]|$)/g
+  /(?:^|[\s(["'])(@[^\s]+)(?=[\s.,;:!?)\]"'`]|$)/g
 const SKILL_SLASH_RE =
-  /(?:^|[\s(\["'])(\/[A-Za-z][\w-]*)(?=[\s.,;:!?)\]"'`]|$)/g
+  /(?:^|[\s(["'])(\/[A-Za-z][\w-]*)(?=[\s.,;:!?)\]"'`]|$)/g
 const MCP_MENTION_RE =
-  /(?:^|[\s(\["'])(mcp:[^\s]+)(?=[\s.,;:!?)\]"'`]|$)/g
+  /(?:^|[\s(["'])(mcp:[^\s]+)(?=[\s.,;:!?)\]"'`]|$)/g
 
 /** Normalize a workspace mention path; directories keep a trailing `/`. */
 export function normalizeMentionPath(

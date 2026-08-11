@@ -1,6 +1,6 @@
 """data_api.drug_info: aggregated PubChem drug information lookup. Split from tools/data_api.py."""
-from tools import registry
 from tools import data_api as _data_api
+from tools import registry
 from tools.data_api_druginfo_fetch import fetch_pharmacology, fetch_properties, fetch_synonyms
 from tools.data_api_druginfo_resolve import resolve_cid
 

@@ -1,9 +1,8 @@
 """omics.spatial_autocorrelation: Moran's I spatial autocorrelation. Split from tools/omics.py."""
 from pathlib import Path
 
-from tools import registry
-
 from tools import omics as _omics
+from tools import registry
 
 
 @registry.register(

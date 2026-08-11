@@ -1,9 +1,8 @@
 """omics.multiomics_integrate: MOFA+ multi-omics integration. Split from tools/omics.py."""
 from pathlib import Path
 
-from tools import registry
-
 from tools import omics as _omics
+from tools import registry
 
 
 @registry.register(

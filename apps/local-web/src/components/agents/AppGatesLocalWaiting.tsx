@@ -15,7 +15,8 @@ export function AppGatesLocalWaiting({
   backendUrl,
   setBackendUrl,
   backendApiKey,
-  setBackendApiKey
+  setBackendApiKey,
+  onBackHome
 }: {
   backendDown: boolean
   connecting: boolean
@@ -25,6 +26,7 @@ export function AppGatesLocalWaiting({
   setBackendUrl: (value: string) => void
   backendApiKey: string
   setBackendApiKey: (value: string) => void
+  onBackHome?: () => void
 }) {
   const [showRemote, setShowRemote] = useState(false)
 
@@ -129,8 +131,19 @@ export function AppGatesLocalWaiting({
           disabled={connecting}
           onClick={() => setShowRemote(true)}
         >
-          Use a different server
+          Open remote…
         </Button>
+        {onBackHome ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            disabled={connecting}
+            onClick={onBackHome}
+          >
+            Back to home
+          </Button>
+        ) : null}
       </div>
     </main>
   )

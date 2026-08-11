@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 REPORT_DATE_SENTINEL = "__SANDWALK_REPORT_DATE__"
@@ -34,7 +34,7 @@ def report_date() -> str:
                 f"{_REPORT_DATE_ENV} must be YYYY-MM-DD, got {override!r}"
             )
         return override
-    return datetime.now(timezone.utc).date().isoformat()
+    return datetime.now(UTC).date().isoformat()
 
 
 def stamp_report_date(root: Path, day: str | None = None) -> str:

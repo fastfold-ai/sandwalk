@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from rich.markdown import Markdown as RichMarkdown
+
 from ui.markdown import print_markdown_with_mermaid
 
 

@@ -27,10 +27,10 @@ from tools.parity_bioentity import (
 )
 from tools.parity_chemistry import _count_aromatic_rings, sa_score
 from tools.parity_common import (
+    _MYGENE_SPECIES_MAP,
     _clip,
     _coerce_int,
     _flatten_hits,
-    _MYGENE_SPECIES_MAP,
     _normalize_mygene_species,
 )
 from tools.parity_search import pdbe_search, preprint_search, reactome_pathway_search

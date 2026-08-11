@@ -49,7 +49,7 @@ def schema_health() -> JSONResponse:
 @router.get("/datasets")
 def list_datasets() -> list[dict[str, Any]]:
     """List available datasets with metadata."""
-    from api.app import discover_datasets, DATASET_REGISTRY
+    from api.app import DATASET_REGISTRY, discover_datasets
 
     available = discover_datasets()
     result: list[dict[str, Any]] = []

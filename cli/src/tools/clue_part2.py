@@ -2,6 +2,7 @@
 from tools.clue_base import np, pd, registry
 from tools.clue_part1 import _load_profiles
 
+
 @registry.register(
     name="clue.connectivity_query",
     description="Find compounds with similar or opposing transcriptomic signatures to a gene set",

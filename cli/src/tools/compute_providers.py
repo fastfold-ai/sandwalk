@@ -63,7 +63,10 @@ def estimate_cost(job_type: str, n_samples: int = 1, gpu_type: str = None, provi
     Looks up the job template, finds the best GPU option, and calculates
     estimated_hours and estimated_cost based on per-sample time and pricing.
     """
-    from tools.compute import _find_cheapest_gpu, _load_providers  # indirect import for test patchability
+    from tools.compute import (  # indirect import for test patchability
+        _find_cheapest_gpu,
+        _load_providers,
+    )
 
     data = _load_providers()
     templates = data["job_templates"]

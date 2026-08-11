@@ -1,10 +1,11 @@
+import { useEffect, useState } from 'react'
+
 import type { TranscriptTool } from '@/components/agents/ToolCard'
 import {
   agentStatusKey,
   resolveAgentStatus
 } from '@/lib/agent-status-words'
 import { cn } from '@/lib/utils'
-import { useEffect, useState } from 'react'
 
 export function AgentStatusText({
   tools,

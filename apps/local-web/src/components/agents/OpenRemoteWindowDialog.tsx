@@ -22,13 +22,13 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { DEFAULT_BACKEND_URL, normalizeBackendUrl } from '@/lib/backend-url'
+import { normalizeBackendUrl } from '@/lib/backend-url'
 import { copyText } from '@/lib/clipboard'
 import {
   isTauri,
+  type LanDesktopServer,
   openDesktopWindow,
-  scanLanDesktopServers,
-  type LanDesktopServer
+  scanLanDesktopServers
 } from '@/lib/desktop'
 import { persistRememberedApiKey, readRememberedApiKey } from '@/lib/remembered-auth'
 import { rememberRemoteHostname } from '@/lib/remote-hostname'
@@ -66,7 +66,7 @@ export function OpenRemoteWindowDialog({
   onOpenChange: (open: boolean) => void
   initialUrl?: string | null
 }) {
-  const [draftUrl, setDraftUrl] = useState(DEFAULT_BACKEND_URL)
+  const [draftUrl, setDraftUrl] = useState('')
   const [draftKey, setDraftKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -101,9 +101,11 @@ export function OpenRemoteWindowDialog({
 
   useEffect(() => {
     if (!open) return
-    const url = normalizeBackendUrl(initialUrl || DEFAULT_BACKEND_URL)
+    const url = initialUrl?.trim()
+      ? normalizeBackendUrl(initialUrl)
+      : ''
     setDraftUrl(url)
-    setDraftKey(readRememberedApiKey(url) || '')
+    setDraftKey(url ? readRememberedApiKey(url) || '' : '')
     setError(null)
     setBusy(false)
     setSelectedUrl(null)
@@ -157,11 +159,11 @@ export function OpenRemoteWindowDialog({
   }
 
   const submit = async () => {
-    const url = normalizeBackendUrl(draftUrl)
-    if (!url) {
+    if (!draftUrl.trim()) {
       setError('Enter a server URL')
       return
     }
+    const url = normalizeBackendUrl(draftUrl)
     const key = draftKey.trim()
     const selected = hits.find(hit => normalizeBackendUrl(hit.url) === url)
     if (selected?.authRequired && !key) {
@@ -304,7 +306,7 @@ export function OpenRemoteWindowDialog({
               const remembered = readRememberedApiKey(normalized)
               if (remembered && !draftKey) setDraftKey(remembered)
             }}
-            placeholder="http://192.168.1.10:8787"
+            placeholder="http://<Local or remote>"
             autoFocus
             autoComplete="url"
             spellCheck={false}

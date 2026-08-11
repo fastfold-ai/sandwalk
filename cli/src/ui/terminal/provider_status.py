@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from ui.terminal.model_ids import _ANTHROPIC_MODEL_IDS
-from ui.terminal.model_ids import _is_openai_managed_base_url
+from ui.terminal.model_ids import _ANTHROPIC_MODEL_IDS, _is_openai_managed_base_url
 
 
 class _ProviderStatusMixin:

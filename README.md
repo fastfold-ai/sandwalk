@@ -67,6 +67,21 @@ We ship a curated toolkit out of the box (targets and genetics, chemistry, prote
 
 ## Install
 
+### CLI
+
+```bash
+curl -fsSL https://sandwalk.sh/install | bash
+sandwalk --version
+```
+
+Tracks the latest **stable** [GitHub Release](https://github.com/fastfold-ai/sandwalk/releases). For pre-releases:
+
+```bash
+curl -fsSL https://sandwalk.sh/install | bash -s -- --pre
+```
+
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/) (or pipx / pip). While the repo is private, GitHub auth is required (`gh auth login` or `GITHUB_TOKEN`).
+
 ### Install from source
 
 Clone once, then pick **macOS** or **CLI + Web UI**.

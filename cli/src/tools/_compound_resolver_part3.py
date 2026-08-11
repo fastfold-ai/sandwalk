@@ -4,6 +4,7 @@ from tools._compound_resolver_part1 import _load_prot_mapping, _tanimoto_search
 from tools._compound_resolver_part2 import resolve_to_smiles
 from tools._compound_resolver_part4 import _get_dataset_compounds
 
+
 def resolve_compound(name_or_id: str, dataset: str = "prism") -> str:
     """Resolve a compound name or ID to a dataset-specific ID.
 

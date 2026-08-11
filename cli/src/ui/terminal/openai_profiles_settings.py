@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import os
 import shutil
 import subprocess
+from pathlib import Path
 
 
 class _OpenaiProfilesSettingsMixin:

@@ -7,7 +7,16 @@ import unusedImports from 'eslint-plugin-unused-imports'
 
 export default [
   {
-    ignores: ['node_modules/**', 'dist/**', 'build/**', 'public/**/*.js']
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'build/**',
+      'coverage/**',
+      'public/**/*.js',
+      'src-tauri/**',
+      // Vendored / minified 2D mol runtime — not worth eslint on dense catch{} lines.
+      'src/components/agents/py2dmol/runtime.ts'
+    ]
   },
   js.configs.recommended,
   {

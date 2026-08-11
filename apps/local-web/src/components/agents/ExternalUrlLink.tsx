@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from 'react'
+import { type ReactNode,useState } from 'react'
 
-import { faviconCandidatesForUrl } from '@/lib/favicon'
 import { openInSystemBrowser } from '@/lib/desktop'
+import { faviconCandidatesForUrl } from '@/lib/favicon'
 import { cn } from '@/lib/utils'
 
 /** Inline external link with site favicon; opens in the system browser. */

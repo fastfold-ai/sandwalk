@@ -2,9 +2,8 @@
 import logging
 from pathlib import Path
 
-from tools import registry
-
 from tools import omics as _omics
+from tools import registry
 
 logger = logging.getLogger("tools.omics")
 

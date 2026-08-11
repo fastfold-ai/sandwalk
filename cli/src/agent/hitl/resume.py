@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from agent.hitl.broker import get_approval_broker
 from agent.hitl.cli_prompt import collect_cli_decisions

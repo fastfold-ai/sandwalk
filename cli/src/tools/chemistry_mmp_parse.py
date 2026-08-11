@@ -7,9 +7,9 @@ def load_and_parse_compounds(compounds_csv: str | None, activity_col: str) -> di
     Returns a dict with either an "error" key, or "parsed" (list of compound dicts)
     and "using_demo" (bool).
     """
+    import pandas as pd
     from rdkit import Chem
     from rdkit.Chem.Scaffolds import MurckoScaffold
-    import pandas as pd
 
     if compounds_csv:
         try:

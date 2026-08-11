@@ -10,8 +10,14 @@ from agent_server.bench_service.bootstrap import (
 )
 from agent_server.bench_service.coding_suites import (
     CODING_SUITES,
+)
+from agent_server.bench_service.coding_suites import (
     catalog_sample_sizes as coding_sample_sizes,
+)
+from agent_server.bench_service.coding_suites import (
     count_fixture as coding_count,
+)
+from agent_server.bench_service.coding_suites import (
     dataset_available as coding_available,
 )
 from agent_server.bench_service.dataset_install import (
@@ -91,24 +97,11 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
         # 30-row sample fixture, larger picks used to fail mid-run.
         sizes = catalog_sample_sizes(suite, full_available=full_ok)
         if installing:
-            reason = progress or f"Downloading {suite.title} in the background…"
+            reason = progress or f"Downloading {suite.title}…"
         elif err:
             reason = err
-        elif not ok:
-            reason = (
-                f"{suite.title} dataset missing. Click Install to download it."
-                if installable
-                else (
-                    f"{suite.title} dataset missing. Place "
-                    f"{suite.full_fixture} under apps/benchmarking/.cache/mcq/"
-                )
-            )
-        elif not full_ok:
-            reason = (
-                f"Sample fixture only ({max(sizes)} questions). "
-                f"Install {suite.title} to unlock larger sample sizes."
-            )
         else:
+            # Not-installed is not an error — the Install button is enough.
             reason = None
         cards.append(
             BenchSuiteCard(
@@ -148,19 +141,12 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
         err = install_error(suite.id)
         progress = install_progress_text(suite.id) if installing else None
         job = get_install_job(suite.id) if installing else None
-        if ok:
-            reason = None
-        elif installing:
-            reason = progress or f"Downloading {suite.title} in the background…"
+        if installing:
+            reason = progress or f"Downloading {suite.title}…"
         elif err:
             reason = err
-        elif installable:
-            reason = f"{suite.title} dataset missing. Click Install to download it."
         else:
-            reason = (
-                f"{suite.title} dataset missing. Place "
-                f"{suite.full_fixture} under apps/benchmarking/.cache/mcq/"
-            )
+            reason = None
         cards.append(
             BenchSuiteCard(
                 id=suite.id,
@@ -195,21 +181,12 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
         install_progress_text("bixbench-verified-50") if bix_installing else None
     )
     bix_job = get_install_job("bixbench-verified-50") if bix_installing else None
-    if bix_ok:
-        bix_reason = None
-    elif bix_installing:
-        bix_reason = (
-            bix_progress or "Downloading BixBench-Verified-50 in the background…"
-        )
+    if bix_installing:
+        bix_reason = bix_progress or "Downloading BixBench-Verified-50…"
     elif bix_err:
         bix_reason = bix_err
-    elif not hf_ready:
-        bix_reason = (
-            "Hugging Face token required. Set it under Integrations → Hugging Face, "
-            "accept the dataset terms, then Install."
-        )
     else:
-        bix_reason = "Dataset not downloaded yet. Click Install to fetch BixBench-Verified-50."
+        bix_reason = None
     cards.append(
         BenchSuiteCard(
             id="bixbench-verified-50",

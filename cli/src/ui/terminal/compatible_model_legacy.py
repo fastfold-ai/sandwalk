@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 class _CompatibleModelLegacyMixin:
     def _configure_openai_compatible_model_legacy(self) -> None:
         """Legacy single-endpoint OpenAI-compatible setup for backward compatibility."""

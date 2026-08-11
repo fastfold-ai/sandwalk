@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 class _TraceReplayMixin:
     def _replay_trace_events(self, events: list[dict]) -> bool:
         """Replay persisted trace events using the same renderer as live runs.

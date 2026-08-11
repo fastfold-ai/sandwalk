@@ -1,6 +1,7 @@
 """_compound_resolver — part 4 of split module. See tools/_compound_resolver.py."""
 from tools._compound_resolver_part1 import _load_prot_mapping
 
+
 def _get_dataset_compounds(dataset: str) -> set:
     """Get the set of YU compound IDs available in a dataset."""
     try:

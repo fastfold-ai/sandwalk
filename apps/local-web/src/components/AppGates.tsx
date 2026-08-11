@@ -8,11 +8,12 @@ import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { BackendConnectFields } from '@/components/agents/BackendConnectFields'
 import { LoginView } from '@/components/agents/LoginView'
 import { OnboardingWizardHost } from '@/components/agents/OnboardingWizardHost'
+import { WelcomeHome } from '@/components/agents/WelcomeHome'
 import { DesktopGateFrame } from '@/components/DesktopGateFrame'
 import { ErrorPage } from '@/components/ErrorPage'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import { isBackendUnavailableError } from '@/lib/app-error'
-import { isLocalBackendUrl } from '@/lib/backend-url'
+import { DEFAULT_BACKEND_URL, isLocalBackendUrl } from '@/lib/backend-url'
 import {
   clampOnboardingStep,
   ONBOARDING_MAX_STEP,
@@ -30,12 +31,15 @@ type AppGatesProps = {
   submitAuthLogin: (apiKey: string, remember: boolean) => void | Promise<void>
   changeBackend: (url: string, apiKey?: string) => void | Promise<void>
   health: BackendHealth | null
+  connectionPaused: boolean
+  setConnectionPaused: (value: boolean) => void
   backendUrl: string
   setBackendUrl: (value: string) => void
   backendApiKey: string
   setBackendApiKey: (value: string) => void
   error: string | null
   errorStack: string | null
+  setError: (value: string | null) => void
   onOnboardingPath: boolean
   onboardingStep: number
   client: LocalAgentClient
@@ -45,6 +49,7 @@ type AppGatesProps = {
   loadSkills: () => void | Promise<void>
   loadMcpServers: () => void | Promise<void>
   loadMcpCatalog: () => void | Promise<void>
+  onOpenRemote: (prefillUrl?: string | null) => void
 }
 
 export function AppGates({
@@ -58,12 +63,15 @@ export function AppGates({
   submitAuthLogin,
   changeBackend,
   health,
+  connectionPaused,
+  setConnectionPaused,
   backendUrl,
   setBackendUrl,
   backendApiKey,
   setBackendApiKey,
   error,
   errorStack,
+  setError,
   onOnboardingPath,
   onboardingStep,
   client,
@@ -72,18 +80,9 @@ export function AppGates({
   loadIntegrations,
   loadSkills,
   loadMcpServers,
-  loadMcpCatalog
+  loadMcpCatalog,
+  onOpenRemote
 }: AppGatesProps): ReactElement | null {
-  if (!authBootstrapped && !needsAuthLogin) {
-    return (
-      <DesktopGateFrame>
-        <main className="grid h-full min-h-full place-items-center bg-[#f5f5f5] dark:bg-neutral-950">
-          <AuraIconPulse className="text-muted-foreground/50 h-12 w-12" />
-        </main>
-      </DesktopGateFrame>
-    )
-  }
-
   if (needsAuthLogin) {
     return (
       <LoginView
@@ -97,6 +96,29 @@ export function AppGates({
         backendUrl={backendUrl}
         onChangeBackend={url => changeBackend(url)}
       />
+    )
+  }
+
+  // Desktop cold start / Disconnect — chooser before auto-hitting local.
+  if (connectionPaused && !health) {
+    return (
+      <DesktopGateFrame>
+        <WelcomeHome
+          connecting={connecting}
+          onConnectLocal={() => void changeBackend(DEFAULT_BACKEND_URL)}
+          onOpenRemote={onOpenRemote}
+        />
+      </DesktopGateFrame>
+    )
+  }
+
+  if (!authBootstrapped && !needsAuthLogin) {
+    return (
+      <DesktopGateFrame>
+        <main className="grid h-full min-h-full place-items-center bg-[#f5f5f5] dark:bg-neutral-950">
+          <AuraIconPulse className="text-muted-foreground/50 h-12 w-12" />
+        </main>
+      </DesktopGateFrame>
     )
   }
 
@@ -120,6 +142,10 @@ export function AppGates({
             setBackendUrl={setBackendUrl}
             backendApiKey={backendApiKey}
             setBackendApiKey={setBackendApiKey}
+            onBackHome={() => {
+              setError(null)
+              setConnectionPaused(true)
+            }}
           />
         </DesktopGateFrame>
       )

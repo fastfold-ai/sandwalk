@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from agent_server.models import (
     SkillDepCheck,
+    SkillDepSetupStep,
     SkillDepsInstallResponse,
     SkillDepsStatus,
-    SkillDepSetupStep,
 )
 
 

@@ -14,7 +14,7 @@ export { ensureMermaidFences } from './markdown-mermaid-fences'
 /** While streaming, long single-paragraph dumps read as a wall of text. */
 function loosenStreamingParagraphs(content: string): string {
   if (!content.trim() || content.includes('\n\n')) return content
-  return content.replace(/([.!?])\s+(?=[A-Z“"(\[])/g, '$1\n\n')
+  return content.replace(/([.!?])\s+(?=[A-Z“"([])/g, '$1\n\n')
 }
 
 export const MarkdownContent = memo(function MarkdownContent({

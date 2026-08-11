@@ -20,6 +20,7 @@ import {
   clearRememberedApiKey,
   persistRememberedApiKey
 } from '@/lib/remembered-auth'
+import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 import { cloudAccountDisplayName } from '@/lib/skills-catalog'
 
 type UseAppBootstrapAuthArgs = {
@@ -178,34 +179,41 @@ export function useAppBootstrapAuth({
     ]
   )
 
-  const clearBackendSession = useCallback(() => {
-    needsAuthLoginRef.current = false
-    setNeedsAuthLogin(false)
-    setAuthLoginError(null)
-    setHealth(null)
-    setError(null)
-    setAuthBootstrapped(true)
-    setBackendApiKey('')
-    setClientApiKey(undefined)
-    clearRememberedApiKey(client.baseUrl)
-    setRuntimeSettings(null)
-    setCloudUserName(null)
-  }, [
-    client.baseUrl,
-    needsAuthLoginRef,
-    setAuthBootstrapped,
-    setBackendApiKey,
-    setClientApiKey,
-    setError,
-    setHealth,
-    setNeedsAuthLogin,
-    setRuntimeSettings
-  ])
+  const clearBackendSession = useCallback(
+    (options?: { clearRemembered?: boolean }) => {
+      needsAuthLoginRef.current = false
+      setNeedsAuthLogin(false)
+      setAuthLoginError(null)
+      setHealth(null)
+      setError(null)
+      setAuthBootstrapped(true)
+      setBackendApiKey('')
+      setClientApiKey(undefined)
+      // Never wipe remembered keys on Change server / Connect locally — only on
+      // explicit logout or disconnect. Cookie sessions do not stick in Tauri.
+      if (options?.clearRemembered) {
+        clearRememberedApiKey(client.baseUrl)
+      }
+      setRuntimeSettings(null)
+      setCloudUserName(null)
+    },
+    [
+      client.baseUrl,
+      needsAuthLoginRef,
+      setAuthBootstrapped,
+      setBackendApiKey,
+      setClientApiKey,
+      setError,
+      setHealth,
+      setNeedsAuthLogin,
+      setRuntimeSettings
+    ]
+  )
 
   /** Drop the current backend session and show the connect gate again. */
   const disconnectBackend = useCallback(async () => {
     setConnectionPaused(true)
-    clearBackendSession()
+    clearBackendSession({ clearRemembered: true })
     if (location.pathname !== '/' || location.search) {
       navigate('/', { replace: true })
     }
@@ -230,12 +238,17 @@ export function useAppBootstrapAuth({
   const changeBackend = useCallback(
     async (nextUrl: string, nextApiKey?: string) => {
       const normalized = normalizeBackendUrl(nextUrl || DEFAULT_BACKEND_URL)
-      pinDesktopBackendBind(normalized, nextApiKey)
+      const key =
+        (await resolveBackendApiKey(normalized, nextApiKey)) || undefined
+      pinDesktopBackendBind(normalized, key || null)
       persistBackendUrl(normalized)
       setConnectionPaused(false)
       clearBackendSession()
       setBackendUrl(normalized)
-      setBackendApiKey(nextApiKey?.trim() || '')
+      // Prefer Authorization header (clientApiKey); cookies do not stick in Tauri.
+      setClientApiKey(key)
+      setBackendApiKey('')
+      if (key) persistRememberedApiKey(normalized, key)
       if (location.pathname !== '/' || location.search) {
         navigate('/', { replace: true })
       }
@@ -264,6 +277,7 @@ export function useAppBootstrapAuth({
       navigate,
       setBackendApiKey,
       setBackendUrl,
+      setClientApiKey,
       setConnectionPaused
     ]
   )

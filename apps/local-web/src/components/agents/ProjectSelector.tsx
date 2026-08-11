@@ -8,7 +8,7 @@ import {
   Search,
   Settings
 } from 'lucide-react'
-import { useEffect, useMemo, useState, type UIEvent } from 'react'
+import { type UIEvent,useEffect, useMemo, useState } from 'react'
 
 import {
   DropdownMenu,

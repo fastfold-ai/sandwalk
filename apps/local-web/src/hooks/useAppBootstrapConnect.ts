@@ -17,14 +17,20 @@ import {
   nextFromSearch,
   sanitizeAuthReturnTo
 } from '@/lib/auth-routing'
-import { isLocalBackendUrl, persistBackendUrl } from '@/lib/backend-url'
+import {
+  hasDesktopBackendInject,
+  isLocalBackendUrl,
+  persistBackendUrl
+} from '@/lib/backend-url'
+import { isTauri } from '@/lib/desktop'
 import { dedupeAsync } from '@/lib/dedupe-async'
-import { clearRememberedApiKey } from '@/lib/remembered-auth'
 import {
   clampOnboardingStep,
   isOnboardingPath,
   onboardingPath
 } from '@/lib/onboarding'
+import { clearRememberedApiKey, persistRememberedApiKey } from '@/lib/remembered-auth'
+import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 
 import type { useAppBootstrapLoaders } from './useAppBootstrapLoaders'
 
@@ -61,8 +67,14 @@ export function useAppBootstrapConnect({
   const needsAuthLoginRef = useRef(false)
   const [authBootstrapped, setAuthBootstrapped] = useState(false)
   const [connecting, setConnecting] = useState(false)
-  /** User chose Disconnect — stay on the connect gate until Connect/Retry. */
-  const [connectionPaused, setConnectionPaused] = useState(false)
+  /**
+   * Stay on the welcome / connect gate until the user picks Local or Remote.
+   * Desktop cold start (no remote inject) starts paused so we don't auto-hit
+   * 127.0.0.1 and flash “Backend unreachable”. Browser/dev still auto-connects.
+   */
+  const [connectionPaused, setConnectionPaused] = useState(
+    () => isTauri() && !hasDesktopBackendInject()
+  )
   const [error, setError] = useState<string | null>(null)
   const [errorStack, setErrorStack] = useState<string | null>(null)
   const onboardingAutoOpenedRef = useRef(false)
@@ -149,6 +161,17 @@ export function useAppBootstrapConnect({
 
       if (authEnabled) {
         if (authenticated === false) {
+          // Cookie sessions do not stick in Tauri. If we have no Authorization
+          // header yet, pull the local server key (or remembered) and retry
+          // instead of wiping credentials and forcing the login modal.
+          if (!client.apiKey) {
+            const recovered = await resolveBackendApiKey(backendUrl)
+            if (recovered) {
+              persistRememberedApiKey(backendUrl, recovered)
+              setClientApiKey(recovered)
+              return
+            }
+          }
           goToLogin()
           return
         }
@@ -159,6 +182,14 @@ export function useAppBootstrapConnect({
             )
           } catch (cause) {
             if (isAuthCredentialError(cause)) {
+              if (!client.apiKey) {
+                const recovered = await resolveBackendApiKey(backendUrl)
+                if (recovered) {
+                  persistRememberedApiKey(backendUrl, recovered)
+                  setClientApiKey(recovered)
+                  return
+                }
+              }
               goToLogin()
               return
             }

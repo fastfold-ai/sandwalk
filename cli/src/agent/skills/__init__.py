@@ -117,32 +117,11 @@ SKILLS_UPDATE_CACHE = CONFIG_DIR / "skills_update_check.json"
 # ─── Prompt index cache ─────────────────────────────────────────────────────
 SKILLS_PROMPT_INDEX_CACHE = CONFIG_DIR / "skills_prompt_index.json"
 
-from .models import (  # noqa: E402
-    USER_CREATED_CATEGORY,
-    SkillInfo,
-    _derive_author,
-    _npx_lock_sources,
-    _read_skills_lock,
-    _source_from_lock_meta,
-    display_author,
-    display_updated,
-    display_version,
-    is_user_created_skill,
-    local_skill_author_name,
-    parse_skill_md,
-)
-from .prompt import (  # noqa: E402
-    _build_skill_catalog,
-    _build_skill_token_index,
-    _format_selected_skill_section,
-    _path_signature,
-    _read_prompt_index_cache,
-    _read_text_prefix,
-    _score_skill_query_match,
-    _skill_script_names,
-    _tokenize_skill_text,
-    _write_prompt_index_cache,
-    build_skills_prompt,
+from .deps import (  # noqa: E402
+    doctor_skill,
+    has_runtime_deps,
+    install_skill_deps,
+    status_for,
 )
 from .discover import (  # noqa: E402
     _collapse_skills_by_name,
@@ -186,6 +165,37 @@ from .install import (  # noqa: E402
     install_skill,
     npx_add,
 )
+from .mentions import (  # noqa: E402
+    build_skill_mention_context,
+    extract_skill_mentions,
+)
+from .models import (  # noqa: E402
+    USER_CREATED_CATEGORY,
+    SkillInfo,
+    _derive_author,
+    _npx_lock_sources,
+    _read_skills_lock,
+    _source_from_lock_meta,
+    display_author,
+    display_updated,
+    display_version,
+    is_user_created_skill,
+    local_skill_author_name,
+    parse_skill_md,
+)
+from .prompt import (  # noqa: E402
+    _build_skill_catalog,
+    _build_skill_token_index,
+    _format_selected_skill_section,
+    _path_signature,
+    _read_prompt_index_cache,
+    _read_text_prefix,
+    _score_skill_query_match,
+    _skill_script_names,
+    _tokenize_skill_text,
+    _write_prompt_index_cache,
+    build_skills_prompt,
+)
 from .releases import (  # noqa: E402
     _http_get_bytes,
     _installed_catalog_release,
@@ -205,15 +215,6 @@ from .releases import (  # noqa: E402
     resolve_bundled_path_commit,
     resolve_repo_remote_state,
 )
-from .upgrade import (  # noqa: E402
-    _clone_repo_once,
-    _copy_skill_to,
-    _project_lock_sources,
-    _run_grouped_clones,
-    _sync_tracked_sources,
-    update_npx_skills_via_git,
-    upgrade_skills,
-)
 from .remove import (  # noqa: E402
     _clear_skill_enabled_state,
     _disabled_skill_names,
@@ -225,15 +226,14 @@ from .remove import (  # noqa: E402
     remove_skill,
     set_skill_enabled,
 )
-from .mentions import (  # noqa: E402
-    build_skill_mention_context,
-    extract_skill_mentions,
-)
-from .deps import (  # noqa: E402
-    doctor_skill,
-    has_runtime_deps,
-    install_skill_deps,
-    status_for,
+from .upgrade import (  # noqa: E402
+    _clone_repo_once,
+    _copy_skill_to,
+    _project_lock_sources,
+    _run_grouped_clones,
+    _sync_tracked_sources,
+    update_npx_skills_via_git,
+    upgrade_skills,
 )
 
 __all__ = [

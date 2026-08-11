@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,15 @@ from deepagents.backends.protocol import EditResult, ReadResult, WriteResult
 from agent.sandbox_sync.paths import WORKSPACE_REMOTE_ROOT
 
 logger = logging.getLogger(__name__)
+
+try:
+    from deepagents.backends.protocol import DeleteResult
+except ImportError:  # deepagents < 0.7
+    from typing import NamedTuple
+
+    class DeleteResult(NamedTuple):
+        path: str | None = None
+        error: str | None = None
 
 
 def _sandwalk_host_path(path: str | None) -> Path | None:
@@ -170,6 +180,36 @@ def _mirror_modal_text(inner: Any, rel: str, content: str) -> None:
             logger.debug("Modal workspace write for %s: %s", path, result.error)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Modal mirror write failed for %s: %s", path, exc)
+
+
+def _delete_host_path(path: Path, display: str) -> DeleteResult:
+    """Remove a host file/dir/symlink; recursive for directories."""
+    try:
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+            return DeleteResult(path=str(path))
+        if path.is_dir():
+            shutil.rmtree(path)
+            return DeleteResult(path=str(path))
+        if not path.exists():
+            return DeleteResult(error=f"Error deleting '{display}': path does not exist")
+        path.unlink()
+        return DeleteResult(path=str(path))
+    except OSError as exc:
+        return DeleteResult(error=f"Error deleting '{display}': {exc}")
+
+
+def _mirror_modal_delete(inner: Any, rel: str) -> None:
+    path = _modal_path(rel)
+    deleter = getattr(inner, "delete", None)
+    if not callable(deleter):
+        return
+    try:
+        result = deleter(path)
+        if getattr(result, "error", None):
+            logger.debug("Modal workspace delete for %s: %s", path, result.error)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Modal mirror delete failed for %s: %s", path, exc)
 
 
 class HostWorkspaceMirrorBackend:
@@ -330,6 +370,36 @@ class HostWorkspaceMirrorBackend:
         import asyncio
 
         return await asyncio.to_thread(self.read, file_path, offset, limit)
+
+    # deepagents 0.7+ probes `type(backend).delete` (class attr) to decide
+    # whether the delete_file tool is supported. __getattr__ only works on
+    # instances, so we must define delete on the class or agent startup crashes.
+    def delete(self, file_path: str) -> DeleteResult:
+        rel = workspace_relative_tool_path(file_path, self._root)
+        if rel is None:
+            host_path = _sandwalk_host_path(file_path)
+            if host_path is not None:
+                return _delete_host_path(host_path, file_path)
+            deleter = getattr(self._inner, "delete", None)
+            if callable(deleter):
+                return deleter(file_path)
+            return DeleteResult(
+                error=f"Error deleting '{file_path}': delete not supported"
+            )
+        host_path = self._root / rel if rel else self._root
+        if host_path.exists() or host_path.is_symlink():
+            result = _delete_host_path(host_path, file_path)
+            if result.error:
+                return result
+        else:
+            result = DeleteResult(path=_host_abs(self._root, rel))
+        _mirror_modal_delete(self._inner, rel)
+        return DeleteResult(path=result.path or _host_abs(self._root, rel))
+
+    async def adelete(self, file_path: str) -> DeleteResult:
+        import asyncio
+
+        return await asyncio.to_thread(self.delete, file_path)
 
 
 def wrap_backend_for_host_workspace(backend: Any, workspace_root: str | Path) -> Any:

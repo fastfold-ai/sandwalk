@@ -1,6 +1,6 @@
 """data_api.opentargets_search: Open Targets Platform GraphQL profile lookup. Split from tools/data_api.py."""
-from tools import registry
 from tools import data_api as _data_api
+from tools import registry
 from tools.data_api_opentargets_format import format_disease, format_drug, format_target
 from tools.data_api_opentargets_gql import ot_fetch_detail, ot_search_entity
 

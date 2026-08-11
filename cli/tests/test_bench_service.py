@@ -162,7 +162,11 @@ def test_list_suite_cards_includes_mmlu_and_packs():
     assert arc.title == "ARC-C"
     assert arc.question_count == 1172
     assert arc.default_sample_size == 30
-    assert arc.sample_sizes == [30, 50, 100, 200, 300, 1172]
+    if full_dataset_available("arc-challenge"):
+        assert arc.sample_sizes == [30, 50, 100, 200, 300, 1172]
+    else:
+        assert max(arc.sample_sizes) <= 30
+        assert 30 in arc.sample_sizes
     mbpp = next(c for c in cards if c.id == "mbpp")
     assert mbpp.code_exec is True
     assert mbpp.question_count == 500
@@ -200,9 +204,11 @@ def test_list_suite_cards_includes_mmlu_and_packs():
     assert bix.author == "Phylo"
     assert bix.installable is True
     assert bix.requires_hf_token is True
+    # Not-installed is conveyed by installed/available + Install button, not copy.
     if not bix.available:
-        assert bix.unavailable_reason
-        assert "Hugging Face" in bix.unavailable_reason or "Install" in bix.unavailable_reason
+        assert bix.installed is False
+    # Bio-Capybara-full ships with the CLI (bundled packs).
+    assert any(c.pack_id == "bio-capybara-full" for c in cards)
 
 
 def test_grade_mc_supports_mmlu_pro_letters():

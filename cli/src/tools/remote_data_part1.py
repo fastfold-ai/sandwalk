@@ -1,6 +1,7 @@
 """remote_data — part 1 of split module. See tools/remote_data.py."""
 from tools.remote_data_base import Config, httpx, os, registry
 
+
 def _get_endpoint() -> str | None:
     """Get the configured data API endpoint."""
     endpoint = os.environ.get("CT_DATA_ENDPOINT")

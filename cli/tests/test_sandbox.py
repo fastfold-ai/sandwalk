@@ -106,8 +106,14 @@ result = {'summary': 'Plot saved'}
         assert "test_plot.png" in result["plots"][0]
         assert Path(result["plots"][0]).exists()
 
-    def test_write_outside_output_dir_blocked(self, sandbox, tmp_path):
-        outside = Path.home() / ".fastfold_sandbox_blocked_write_test.txt"
+    def test_write_outside_output_dir_blocked(self, sandbox, tmp_path, monkeypatch):
+        # Force restricted mode and a path outside cwd/output/tmp/workspace.
+        monkeypatch.setattr(
+            "agent_server.file_access.full_file_access_enabled",
+            lambda: False,
+            raising=False,
+        )
+        outside = Path("/opt/sandwalk_sandbox_blocked_write_test.txt")
         code = f"""
 with open(r"{outside}", "w") as f:
     f.write("blocked")
@@ -149,20 +155,23 @@ result = {{"summary": txt}}
         assert result["error"] is None
         assert target.read_text(encoding="utf-8") == "old-new"
 
-    def test_read_outside_allowed_dirs_blocked(self, sandbox, tmp_path):
-        outside = Path.home() / ".fastfold_sandbox_blocked_read_test.txt"
-        outside.write_text("secret")
-        try:
-            code = f"""
+    def test_read_outside_allowed_dirs_blocked(self, sandbox, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "agent_server.file_access.full_file_access_enabled",
+            lambda: False,
+            raising=False,
+        )
+        # System file exists and is OS-readable, but outside sandbox allowlists
+        # (cwd / output / downloads /tmp / workspace).
+        outside = Path("/etc/hosts")
+        code = f"""
 with open(r"{outside}", "r") as f:
     txt = f.read()
 result = {{"summary": txt}}
 """
-            result = sandbox.execute(code)
-            assert result["error"] is not None
-            assert "restricted" in result["error"].lower()
-        finally:
-            outside.unlink(missing_ok=True)
+        result = sandbox.execute(code)
+        assert result["error"] is not None
+        assert "restricted" in result["error"].lower()
 
 
 class TestDataInjection:

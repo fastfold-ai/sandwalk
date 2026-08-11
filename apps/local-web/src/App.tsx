@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import {
   buildSessionSidebarModel,
   computeShowSessionTabs,
@@ -9,7 +10,6 @@ import {
 import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
-import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
 import {
@@ -277,12 +277,15 @@ export default function App() {
     submitAuthLogin: bootstrap.submitAuthLogin,
     changeBackend: bootstrap.changeBackend,
     health: bootstrap.health,
+    connectionPaused: bootstrap.connectionPaused,
+    setConnectionPaused: bootstrap.setConnectionPaused,
     backendUrl: bootstrap.backendUrl,
     setBackendUrl: bootstrap.setBackendUrl,
     backendApiKey: bootstrap.backendApiKey,
     setBackendApiKey: bootstrap.setBackendApiKey,
     error: bootstrap.error,
     errorStack: bootstrap.errorStack,
+    setError: bootstrap.setError,
     onOnboardingPath: route.onOnboardingPath,
     onboardingStep: route.onboardingStep,
     client: bootstrap.client,
@@ -291,7 +294,11 @@ export default function App() {
     loadIntegrations: bootstrap.loadIntegrations,
     loadSkills: bootstrap.loadSkills,
     loadMcpServers: bootstrap.loadMcpServers,
-    loadMcpCatalog: bootstrap.loadMcpCatalog
+    loadMcpCatalog: bootstrap.loadMcpCatalog,
+    onOpenRemote: prefillUrl => {
+      windowMenu.setRemoteInitialUrl(prefillUrl ?? null)
+      windowMenu.setRemoteOpen(true)
+    }
   })
   const remoteDialog = (
     <OpenRemoteWindowDialog

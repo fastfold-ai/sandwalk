@@ -1,6 +1,6 @@
 """omics: shared download + optional-dependency helpers. Split from tools/omics.py."""
-import shutil
 import logging
+import shutil
 from pathlib import Path
 
 from agent.config import CONFIG_DIR

@@ -1,7 +1,6 @@
 """omics.tcga_search: search TCGA/GDC for datasets. Split from tools/omics.py."""
-from tools import registry
-
 from tools import omics as _omics
+from tools import registry
 
 _GDC_API = "https://api.gdc.cancer.gov"
 

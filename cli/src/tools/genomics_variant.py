@@ -1,7 +1,6 @@
 """genomics.variant_annotate: Ensembl VEP variant annotation. Split from tools/genomics.py."""
-from tools import registry
-
 from tools import genomics as _genomics
+from tools import registry
 
 
 @registry.register(

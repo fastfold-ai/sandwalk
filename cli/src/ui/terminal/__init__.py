@@ -29,10 +29,10 @@ from prompt_toolkit.patch_stdout import patch_stdout
 from rich.console import Console
 
 from .completion import (
+    PT_STYLE,
     FileMentionCompleter,
     MentionCompleter,
     MergedCompleter,
-    PT_STYLE,
     SlashCompleter,
 )
 from .interactive import (

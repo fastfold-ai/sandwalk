@@ -2,6 +2,7 @@
 from tools.remote_data_base import httpx, registry
 from tools.remote_data_part1 import _get_endpoint, _no_endpoint_error
 
+
 @registry.register(
     name="remote_data.list_datasets",
     description="List datasets available on the hosted fastfold Data API",

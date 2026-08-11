@@ -14,7 +14,8 @@ def remove_dataset(name: str) -> dict[str, Any]:
     """
     import shutil
 
-    from data.downloader import Config, list_dataset_records as _list_dataset_records
+    from data.downloader import Config
+    from data.downloader import list_dataset_records as _list_dataset_records
 
     if name not in DATASETS:
         raise KeyError(name)

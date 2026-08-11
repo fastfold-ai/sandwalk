@@ -11,20 +11,10 @@ from prompt_toolkit.history import FileHistory
 from agent.config import CONFIG_DIR
 from ui.suggestions import DEFAULT_SUGGESTIONS
 
-from .attach_lexer import AttachChipLexer
-from .completion import (
-    FileMentionCompleter,
-    MentionCompleter,
-    MergedCompleter,
-    PT_STYLE,
-    SlashCompleter,
-)
-from .key_bindings import _build_key_bindings
-from .model_ids import AVAILABLE_MODELS  # noqa: F401 — re-exported via ui.terminal
-from .slash_commands import SLASH_COMMANDS
 # Staged mixins — method bodies live in sibling modules.
 from .agent_bootstrap import _AgentBootstrapMixin
 from .agents_and_case_study import _AgentsAndCaseStudyMixin
+from .attach_lexer import AttachChipLexer
 from .boltz_setup import _BoltzSetupMixin
 from .bottom_toolbar import _BottomToolbarMixin
 from .compatible_backend_info import _CompatibleBackendInfoMixin
@@ -32,6 +22,13 @@ from .compatible_backend_prompt import _CompatibleBackendPromptMixin
 from .compatible_model_legacy import _CompatibleModelLegacyMixin
 from .compatible_profile_activate import _CompatibleProfileActivateMixin
 from .compatible_profile_edit import _CompatibleProfileEditMixin
+from .completion import (
+    PT_STYLE,
+    FileMentionCompleter,
+    MentionCompleter,
+    MergedCompleter,
+    SlashCompleter,
+)
 from .data_and_help import _DataAndHelpMixin
 from .discovery_helpers import _DiscoveryHelpersMixin
 from .effort_command import _EffortCommandMixin
@@ -40,9 +37,11 @@ from .export_session import _ExportSessionMixin
 from .export_share_and_misc import _ExportShareAndMiscMixin
 from .fetch_compatible_models import _FetchCompatibleModelsMixin
 from .fetch_openai_models import _FetchOpenaiModelsMixin
+from .key_bindings import _build_key_bindings
 from .llm_ready_check import _LlmReadyCheckMixin
 from .mention_and_activity import _MentionAndActivityMixin
 from .model_discovery_choice import _ModelDiscoveryChoiceMixin
+from .model_ids import AVAILABLE_MODELS  # noqa: F401 — re-exported via ui.terminal
 from .model_manager_command import _ModelManagerCommandMixin
 from .openai_profiles_settings import _OpenaiProfilesSettingsMixin
 from .profile_probe import _ProfileProbeMixin
@@ -58,12 +57,14 @@ from .session_upgrade_sync import _SessionUpgradeSyncMixin
 from .settings_menu import _SettingsMenuMixin
 from .skills_commands import _SkillsCommandsMixin
 from .skills_upgrade_remove import _SkillsUpgradeRemoveMixin
+from .slash_commands import SLASH_COMMANDS
 from .switch_model import _SwitchModelMixin
 from .theme_command import _ThemeCommandMixin
 from .trace_replay import _TraceReplayMixin
 from .usage_persistence import _UsagePersistenceMixin
 from .usage_tasks_display import _UsageTasksDisplayMixin
 from .usage_tracking import _UsageTrackingMixin
+
 
 class InteractiveTerminal(
     _SwitchModelMixin,
@@ -111,6 +112,7 @@ class InteractiveTerminal(
     """Interactive research session terminal."""
     def __init__(self, config=None, verbose=False):
         from agent.session import Session
+
         # Imported from the package namespace (rather than at module level)
         # so tests can monkeypatch `ui.terminal.Console` / `ui.terminal.PromptSession`.
         from ui.terminal import Console, PromptSession

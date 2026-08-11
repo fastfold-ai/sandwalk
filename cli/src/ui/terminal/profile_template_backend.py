@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 class _ProfileTemplateBackendMixin:
     def _prompt_profile_template_backend(self, default_backend: str = "ollama") -> str | None:
         """Prompt for compatible profile template backend."""

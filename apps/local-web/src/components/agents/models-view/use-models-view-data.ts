@@ -95,7 +95,6 @@ export function useModelsViewData({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only
   }, [])
 
   const providerFilterOptions = useMemo(() => {

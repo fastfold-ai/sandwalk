@@ -247,14 +247,19 @@ class TestOpenAICompatibleSetupFetch:
 
 class TestTraceAndReportHelpers:
     def test_latest_trace_path_returns_newest(self, tmp_path, monkeypatch):
+        import os
+        import time
+
         traces = tmp_path / "traces"
         traces.mkdir()
         older = traces / "old.trace.jsonl"
         newer = traces / "new.trace.jsonl"
         older.write_text("{}")
         newer.write_text("{}")
-        older.touch()
-        newer.touch()
+        # Explicit mtimes — touch() can share a second on fast CI runners.
+        now = time.time()
+        os.utime(older, (now - 10, now - 10))
+        os.utime(newer, (now, now))
         monkeypatch.setattr("agent.trace.TraceLogger.traces_dir", staticmethod(lambda: traces))
         assert _latest_trace_path() == newer
 

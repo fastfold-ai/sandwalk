@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ui.terminal.themes_modal import (
     dim_transcript_styles_for_backdrop,

@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from langchain_core.tools import BaseTool
 
 
-def _tool_name(tool: "BaseTool | dict[str, str]") -> str | None:
+def _tool_name(tool: BaseTool | dict[str, str]) -> str | None:
     if isinstance(tool, dict):
         name = tool.get("name")
         return name if isinstance(name, str) else None
@@ -107,7 +107,7 @@ class KnowledgeLevelMiddleware(AgentMiddleware[Any, Any, Any]):
     def __init__(self, *, excluded: frozenset[str]) -> None:
         self._excluded = frozenset(excluded or ())
 
-    def _filter_request(self, request: "ModelRequest[Any]") -> "ModelRequest[Any]":
+    def _filter_request(self, request: ModelRequest[Any]) -> ModelRequest[Any]:
         if not self._excluded:
             return request
         filtered = [t for t in request.tools if _tool_name(t) not in self._excluded]
@@ -119,14 +119,14 @@ class KnowledgeLevelMiddleware(AgentMiddleware[Any, Any, Any]):
 
     def wrap_model_call(
         self,
-        request: "ModelRequest[Any]",
-        handler: "Callable[[ModelRequest[Any]], ModelResponse[Any]]",
-    ) -> "ModelResponse[Any]":
+        request: ModelRequest[Any],
+        handler: Callable[[ModelRequest[Any]], ModelResponse[Any]],
+    ) -> ModelResponse[Any]:
         return handler(self._filter_request(request))
 
     async def awrap_model_call(
         self,
-        request: "ModelRequest[Any]",
-        handler: "Callable[[ModelRequest[Any]], Awaitable[ModelResponse[ResponseT]]]",
-    ) -> "ModelResponse[ResponseT] | AIMessage | ExtendedModelResponse[ResponseT]":
+        request: ModelRequest[Any],
+        handler: Callable[[ModelRequest[Any]], Awaitable[ModelResponse[ResponseT]]],
+    ) -> ModelResponse[ResponseT] | AIMessage | ExtendedModelResponse[ResponseT]:
         return await handler(self._filter_request(request))
