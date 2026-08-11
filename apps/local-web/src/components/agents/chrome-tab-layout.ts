@@ -1,21 +1,20 @@
 /**
  * Content floor for session chrome tabs — must match the pnpm patch on
- * `@sinm/react-chrome-tabs` (`TAB_CONTENT_MIN_WIDTH = 200`).
- * Outer ≈ content + 2× side margin. Used only for +N capacity math.
+ * `@sinm/react-chrome-tabs` (`TAB_CONTENT_MIN_WIDTH = 96`).
+ * Outer ≈ content + 2× side margin (min outer ≈ 120, max outer ≈ 264).
  */
-export const CHROME_TAB_CONTENT_MIN_WIDTH = 200
+export const CHROME_TAB_CONTENT_MIN_WIDTH = 96
 export const CHROME_TAB_SIDE_MARGIN = 12
 export const CHROME_TAB_OVERLAP_DISTANCE = 1
 
 /**
- * Active-tab SVG silhouette (viewBox 214×36). Must match the patched
- * `tabTemplate` path in `@sinm/react-chrome-tabs`. Forced onto DOM paths
- * because duplicate symbol ids make `<use>` stick to the first (stale) path.
+ * Tab silhouette (viewBox 214×36). Rendered inline per tab via <svg><path/>.
  *
- * Top corners 12 · bottom ears 12×11 · stub 3.
+ * Top corners 10 · bottom ears curve from the floor straight to the body
+ * (no vertical stub). Ears sized 10×11 for a slim, one-piece silhouette.
  */
 export const CHROME_TAB_GEOMETRY_PATH =
-  'M24 0h190v36H0v-3c6 0 12-5 12-11V12c0-6.75 5.25-12 12-12z'
+  'M20 0h174v36H0c5 0 10-4 10-11V10c0-5.5 4.5-10 10-10z'
 
 export const chromeTabMinOuter =
   CHROME_TAB_CONTENT_MIN_WIDTH + 2 * CHROME_TAB_SIDE_MARGIN
