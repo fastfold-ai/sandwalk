@@ -190,6 +190,9 @@ export function SessionMainHeader({
           visible={showCollapsedNav}
           sidebarCollapsed
           onToggleSidebar={() => setSidebarCollapsed(false)}
+          /* Parent uses items-end (for tabs to sit on the floor); override so
+           * the nav buttons align with the tab content vertical center. */
+          className="self-center"
         />
         <SessionTabs
           tabs={openTabs}
