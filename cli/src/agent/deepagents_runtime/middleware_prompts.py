@@ -23,9 +23,16 @@ def middleware_system_prompt_text(
 
         parts.append(str(WRITE_TODOS_SYSTEM_PROMPT or "").strip())
 
-    from deepagents.middleware.filesystem import FILESYSTEM_SYSTEM_PROMPT
+    try:
+        from deepagents.middleware import filesystem as _fs_mod
 
-    parts.append(str(FILESYSTEM_SYSTEM_PROMPT or "").strip())
+        fs_prompt = getattr(_fs_mod, "FILESYSTEM_SYSTEM_PROMPT", None) or getattr(
+            _fs_mod, "EXECUTION_SYSTEM_PROMPT", None
+        )
+        if fs_prompt:
+            parts.append(str(fs_prompt).strip())
+    except ImportError:
+        pass
 
     if "task" not in excluded:
         # Default SubAgentMiddleware system_prompt (task tool guidance).
