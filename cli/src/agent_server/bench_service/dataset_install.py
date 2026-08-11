@@ -14,7 +14,10 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from agent_server.bench_service.bootstrap import bench_root, ensure_sandwalk_bench_importable
+from agent_server.bench_service.bootstrap import (
+    bench_cache_root,
+    ensure_sandwalk_bench_importable,
+)
 from agent_server.models.bench import BenchInstallResponse, BenchUninstallResponse
 
 ProgressCb = Callable[..., None]
@@ -145,14 +148,7 @@ def hf_token_configured() -> bool:
 
 
 def mcq_cache_dir() -> Path:
-    root = bench_root()
-    if root is None:
-        raise BenchInstallError(
-            "Benchmarking package root not found "
-            "(expected apps/benchmarking next to the sandwalk checkout).",
-            status_code=500,
-        )
-    path = root / ".cache" / "mcq"
+    path = bench_cache_root() / ".cache" / "mcq"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -812,9 +808,7 @@ def _count_lines(path: Path) -> int:
 def suite_cache_paths(suite_id: str) -> list[Path]:
     """Local cache files/dirs a suite owns (may be absent)."""
     key = (suite_id or "").strip()
-    root = bench_root()
-    if root is None:
-        return []
+    root = bench_cache_root()
     if key in _MCQ_SOURCES:
         return [root / ".cache" / "mcq" / _MCQ_SOURCES[key]["fixture"]]
     if key in _CODING_FIXTURES:
@@ -860,8 +854,7 @@ def suite_installed_count(suite_id: str) -> int | None:
 
 
 def cache_root() -> Path | None:
-    root = bench_root()
-    return None if root is None else root / ".cache"
+    return bench_cache_root() / ".cache"
 
 
 def total_cache_bytes() -> int:

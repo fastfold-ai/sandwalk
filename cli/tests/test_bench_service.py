@@ -204,9 +204,11 @@ def test_list_suite_cards_includes_mmlu_and_packs():
     assert bix.author == "Phylo"
     assert bix.installable is True
     assert bix.requires_hf_token is True
+    # Not-installed is conveyed by installed/available + Install button, not copy.
     if not bix.available:
-        assert bix.unavailable_reason
-        assert "Hugging Face" in bix.unavailable_reason or "Install" in bix.unavailable_reason
+        assert bix.installed is False
+    # Bio-Capybara-full ships with the CLI (bundled packs).
+    assert any(c.pack_id == "bio-capybara-full" for c in cards)
 
 
 def test_grade_mc_supports_mmlu_pro_letters():

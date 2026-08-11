@@ -945,86 +945,30 @@ export function BenchView({
                         </div>
                       </div>
                     ) : null}
-                    {!card.available || installing ? (
+                    {card.installable && (!card.installed || installing) ? (
                       <div
-                        className="mt-2 space-y-2"
+                        className="mt-2"
                         onClick={e => e.stopPropagation()}
                       >
-                        {installing ? (
-                          <div className="border-border/60 bg-muted/30 space-y-1.5 rounded-md border px-2.5 py-2">
-                            <p className="text-foreground text-[11px] font-medium">
-                              Downloading in the background…
-                            </p>
-                            <p className="text-muted-foreground font-mono text-[11px]">
-                              {card.installProgress ||
-                                card.unavailableReason ||
-                                'Starting download…'}
-                            </p>
-                            <div className="bg-muted h-1.5 overflow-hidden rounded-full">
-                              <div
-                                className="bg-foreground/70 h-full rounded-full transition-[width] duration-300"
-                                style={{
-                                  width: `${installPercent(card)}%`
-                                }}
-                              />
-                            </div>
-                            {card.installBytesDone != null ? (
-                              <p className="text-muted-foreground text-[10px]">
-                                {formatBytes(card.installBytesDone)}
-                                {card.installBytesTotal
-                                  ? ` / ${formatBytes(card.installBytesTotal)}`
-                                  : ' downloaded'}
-                              </p>
-                            ) : null}
-                          </div>
-                        ) : card.unavailableReason &&
-                          !(
-                            card.missingSkills?.length ||
-                            card.missingMcps?.length
-                          ) ? (
-                          <p className="text-destructive text-[11px]">
-                            {card.unavailableReason}
-                          </p>
-                        ) : null}
-                        {card.installable ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={
-                                installing || Boolean(startingInstallId)
-                              }
-                              onClick={() => void installSuite(card)}
-                            >
-                              {installing ? (
-                                <Loader2 className="size-3.5 animate-spin" />
-                              ) : (
-                                <Download className="size-3.5" />
-                              )}
-                              {installing
-                                ? 'Installing…'
-                                : card.requiresHfToken && !card.hfTokenConfigured
-                                  ? 'Set HF token'
-                                  : 'Install'}
-                            </Button>                            {card.requiresHfToken && !card.hfTokenConfigured ? (
-                              <button
-                                type="button"
-                                className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
-                                onClick={() =>
-                                  navigate('/dashboard/integrations/huggingface')
-                                }
-                              >
-                                Open Hugging Face integration
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : null}
-                        {card.installable && card.missingDependency ? (
-                          <p className="text-muted-foreground text-[11px]">
-                            {card.missingDependency}
-                          </p>
-                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          disabled={installing || Boolean(startingInstallId)}
+                          onClick={() => void installSuite(card)}
+                        >
+                          {installing ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Download className="size-3.5" />
+                          )}
+                          {installing
+                            ? card.installProgress
+                              ? `Installing… ${installPercent(card)}%`
+                              : 'Installing…'
+                            : 'Install'}
+                        </Button>
                       </div>
                     ) : null}
                     {card.installed && !installing ? (
