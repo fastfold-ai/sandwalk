@@ -13,6 +13,7 @@ import type {
   McpServer,
   RuntimeSettings,
   SandboxSettings,
+  SessionGroup,
   Specialist
 } from '@sandwalk/agent-ui-core'
 import type { ComponentProps, MutableRefObject, RefObject } from 'react'
@@ -23,6 +24,7 @@ import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import {
   type DashboardMainViewsProps
 } from '@/components/agents/DashboardMainViews'
+import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { type DashboardSection } from '@/components/agents/DashboardSidebar'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
@@ -200,6 +202,13 @@ export type AppShellMainProps = {
   setPendingOpenPath: (value: string | null | ((current: string | null) => string | null)) => void
   setComposer: (value: string | ((current: string) => string)) => void
   setComposerFiles: (value: string[] | ((current: string[]) => string[])) => void
+  activeGroup: SessionGroup | null
+  perSessionBaseArgs: Omit<
+    PerSessionChatStateArgs,
+    'sessionId' | 'session' | 'sessionIdRef'
+  >
+  allSessions: AgentSession[]
+  setTabGroupActiveChat: (groupId: string, chatId: string) => void
 }
 
 export function isDashboardMainView(props: AppShellMainProps) {

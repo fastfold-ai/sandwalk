@@ -2,7 +2,8 @@ import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentMessage,
   AgentProject,
-  AgentSession
+  AgentSession,
+  SessionGroup
 } from '@sandwalk/agent-ui-core'
 import {
   type ComponentProps,
@@ -19,7 +20,9 @@ import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { type NavigateFunction,useLocation } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
+import { ChatSplitContainer } from '@/components/agents/ChatSplitContainer'
 import { fileChipToken } from '@/components/agents/composer-parts'
+import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { useSessionSiteAutoPreview } from '@/components/agents/sites/use-session-site-auto-preview'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
@@ -121,6 +124,13 @@ export type AgentSessionMainPanelProps = {
   ) => void
   /** Opens a draft session (draft only, not persisted). */
   createSession?: (projectId?: string | null) => void | Promise<void>
+  activeGroup: SessionGroup | null
+  perSessionBaseArgs: Omit<
+    PerSessionChatStateArgs,
+    'sessionId' | 'session' | 'sessionIdRef'
+  >
+  allSessions: AgentSession[]
+  setTabGroupActiveChat: (groupId: string, chatId: string) => void
 }
 
 export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
@@ -191,7 +201,11 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     pendingOpenPath,
     setPendingOpenPath,
     setComposer,
-    setComposerFiles
+    setComposerFiles,
+    activeGroup,
+    perSessionBaseArgs,
+    allSessions,
+    setTabGroupActiveChat
   } = props
 
   const isDraft = isDraftAgentSessionId(sessionId)
@@ -328,6 +342,51 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           minSize={30}
           className="min-w-0"
         >
+          {activeGroup ? (
+            <ChatSplitContainer
+              group={activeGroup}
+              sessions={allSessions}
+              onFocusChat={chatId => {
+                setTabGroupActiveChat(activeGroup.id, chatId)
+              }}
+              buildMountProps={chatId => {
+                const chatSession =
+                  allSessions.find(item => item.id === chatId) || null
+                return {
+                  perSessionArgs: {
+                    ...perSessionBaseArgs,
+                    sessionId: chatId,
+                    session: chatSession
+                  },
+                  shared: {
+                    isInspect,
+                    showChatSkeleton,
+                    projects,
+                    recentProjectIds,
+                    onNewProject,
+                    selectAllProjects,
+                    selectProjectScope,
+                    updateSession,
+                    chatScrollRef,
+                    chatEndRef,
+                    expandedToolRunKeys,
+                    runIdByMessageId,
+                    usageByRunId,
+                    copiedMessageId,
+                    setCopiedMessageId,
+                    liveDelta,
+                    showScrollToBottom,
+                    scrollChatToBottom,
+                    patchChat,
+                    ensureWorkspaceForMentions,
+                    navigate,
+                    client,
+                    error
+                  }
+                }
+              }}
+            />
+          ) : (
           <main className="relative flex h-full min-w-0 flex-col">
             <SessionChatBody
             client={client}
@@ -375,6 +434,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             error={error}
           />
         </main>
+          )}
       </ResizablePanel>
       {canShowFilesPanel && showWorkspaceFiles ? (
         <>

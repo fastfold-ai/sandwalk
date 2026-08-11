@@ -12,6 +12,7 @@ import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
+import { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import {
   useAppRouteContext,
   useChatBySessionIdBridge
@@ -61,6 +62,26 @@ export default function App() {
     ui.openTabsByProject,
     ui.setOpenTabsByProject
   )
+  const tabGroupsStore = useAppTabGroups(
+    ui.projectScopeId,
+    ui.tabGroupsByProject,
+    ui.setTabGroupsByProject,
+    tabs.setOpenTabIds
+  )
+
+  // Grupos son "tabs virtuales": cuando la ruta apunta a un grupo, el shell
+  // trabaja con su chat activo para todos los efectos por-sesión y luego el
+  // AgentSessionMainPanel decide si renderiza vista split o single-tab.
+  const activeGroup = useMemo(
+    () =>
+      route.sessionId
+        ? tabGroupsStore.tabGroups.find(g => g.id === route.sessionId) || null
+        : null,
+    [route.sessionId, tabGroupsStore.tabGroups]
+  )
+  const effectiveSessionId = activeGroup
+    ? activeGroup.activeChatId
+    : route.sessionId
 
   const context = useAppRouteContext({
     decodedIntegrationRouteName: route.decodedIntegrationRouteName,
@@ -73,7 +94,7 @@ export default function App() {
     mcpCatalog: bootstrap.mcpCatalog,
     mcpServerDetailId: route.mcpServerDetailId,
     mcpServers: bootstrap.mcpServers,
-    sessionId: route.sessionId,
+    sessionId: effectiveSessionId,
     sessions: bootstrap.sessions
   })
 
@@ -95,7 +116,7 @@ export default function App() {
     runtimeSettings: bootstrap.runtimeSettings,
     setRuntimeSettings: bootstrap.setRuntimeSettings,
     loadModelOptions: bootstrap.loadModelOptions,
-    sessionId: route.sessionId,
+    sessionId: effectiveSessionId,
     sessionIdRef: ui.sessionIdRef,
     session: context.session,
     activeProjectId: context.activeProjectId,
@@ -121,9 +142,94 @@ export default function App() {
     setChatBySessionIdRef
   })
 
+  // Args comunes que todo `SessionChatMount` de split view va a instanciar
+  // combinándolos con su chatId + session propia. Se calcula una vez para que
+  // los mounts secundarios de un grupo puedan levantar su pipeline con los
+  // mismos handles compartidos que ya usa el mount activo.
+  const perSessionBaseArgs = useMemo(
+    () => ({
+      client: bootstrap.client,
+      health: bootstrap.health,
+      navigate,
+      activeProjectId: context.activeProjectId,
+      activeProject: context.activeProject,
+      tabsScopeKey: tabs.tabsScopeKey,
+      sessions: bootstrap.sessions,
+      setSessions: bootstrap.setSessions,
+      setError: bootstrap.setError,
+      loadSessions: bootstrap.loadSessions,
+      loadSessionsRef: bootstrap.loadSessionsRef,
+      loadSkillsRef: bootstrap.loadSkillsRef,
+      loadProjects: bootstrap.loadProjects,
+      setSandboxSettings: bootstrap.setSandboxSettings,
+      skills: bootstrap.skills,
+      mcpServers: bootstrap.mcpServers,
+      modelOptions: bootstrap.modelOptions,
+      specialists: bootstrap.specialists,
+      runtimeSettings: bootstrap.runtimeSettings,
+      setRuntimeSettings: bootstrap.setRuntimeSettings,
+      loadModelOptions: bootstrap.loadModelOptions,
+      openTabsByProject: ui.openTabsByProject,
+      setOpenTabsByProject: ui.setOpenTabsByProject,
+      lastSessionByScope: ui.lastSessionByScope,
+      setLastSessionByScope: ui.setLastSessionByScope,
+      setProjectScopeId: ui.setProjectScopeId,
+      setRecentProjectIds: ui.setRecentProjectIds,
+      patchOpenTabs: tabs.patchOpenTabs,
+      setOpenTabIds: tabs.setOpenTabIds,
+      setCollapsedSidebarSections: ui.setCollapsedSidebarSections,
+      setWorkspaceVersion: ui.setWorkspaceVersion,
+      workspaceFiles: ui.workspaceFiles,
+      setFilesPanelCollapsed: ui.setFilesPanelCollapsed,
+      setTerminalOpen: ui.setTerminalOpen,
+      setPendingOpenPath: ui.setPendingOpenPath,
+      pendingAttachmentsRef: ui.pendingAttachmentsRef,
+      setChatBySessionIdRef
+    }),
+    [
+      bootstrap.client,
+      bootstrap.health,
+      navigate,
+      context.activeProjectId,
+      context.activeProject,
+      tabs.tabsScopeKey,
+      bootstrap.sessions,
+      bootstrap.setSessions,
+      bootstrap.setError,
+      bootstrap.loadSessions,
+      bootstrap.loadSessionsRef,
+      bootstrap.loadSkillsRef,
+      bootstrap.loadProjects,
+      bootstrap.setSandboxSettings,
+      bootstrap.skills,
+      bootstrap.mcpServers,
+      bootstrap.modelOptions,
+      bootstrap.specialists,
+      bootstrap.runtimeSettings,
+      bootstrap.setRuntimeSettings,
+      bootstrap.loadModelOptions,
+      ui.openTabsByProject,
+      ui.setOpenTabsByProject,
+      ui.lastSessionByScope,
+      ui.setLastSessionByScope,
+      ui.setProjectScopeId,
+      ui.setRecentProjectIds,
+      tabs.patchOpenTabs,
+      tabs.setOpenTabIds,
+      ui.setCollapsedSidebarSections,
+      ui.setWorkspaceVersion,
+      ui.workspaceFiles,
+      ui.setFilesPanelCollapsed,
+      ui.setTerminalOpen,
+      ui.setPendingOpenPath,
+      ui.pendingAttachmentsRef,
+      setChatBySessionIdRef
+    ]
+  )
+
   // Route wins. Draft materialization uses a separate ref inside session CRUD
   // so /agents/new never "sticks" to a previous real session id.
-  ui.sessionIdRef.current = route.sessionId
+  ui.sessionIdRef.current = effectiveSessionId
 
   const { showChatSkeleton } = useAppShellEffects({
     locationPathname: location.pathname,
@@ -170,7 +276,7 @@ export default function App() {
     setProjectScopeId: ui.setProjectScopeId,
     messagesLoaded: layer.chat.messagesLoaded,
     runActive: layer.chat.runActive,
-    sessionId: route.sessionId,
+    sessionId: effectiveSessionId,
     client: bootstrap.client,
     messages: layer.chat.messages,
     setSessions: bootstrap.setSessions
@@ -182,7 +288,7 @@ export default function App() {
     isIntegrations: route.isIntegrations,
     integrations: bootstrap.integrations,
     navigate,
-    sessionId: route.sessionId,
+    sessionId: effectiveSessionId,
     sessions: bootstrap.sessions,
     activeProjectId: context.activeProjectId,
     openSessionTab: tabs.openSessionTab,
@@ -346,7 +452,11 @@ export default function App() {
           builtPlanPaths: layer.builtPlanPaths,
           submitApprovals: layer.submitApprovals,
           prefetchSessionMessages: layer.prefetchSessionMessages,
-          showChatSkeleton
+          showChatSkeleton,
+          tabGroupsStore,
+          activeGroup,
+          perSessionBaseArgs,
+          allSessions: bootstrap.sessions
         })}
       />
       {remoteDialog}

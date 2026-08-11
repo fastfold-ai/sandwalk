@@ -13,6 +13,7 @@ import type {
   McpServer,
   RuntimeSettings,
   SandboxSettings,
+  SessionGroup,
   Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
@@ -22,6 +23,7 @@ import type { Location, NavigateFunction } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { type DashboardMainViewsProps } from '@/components/agents/DashboardMainViews'
+import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { type DashboardSection } from '@/components/agents/DashboardSidebar'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
@@ -244,4 +246,23 @@ export type AppShellProps = {
   confirmDelete: () => Promise<void>
   batchDeletePending: boolean
   confirmBatchDelete: () => Promise<void>
+  tabGroups: SessionGroup[]
+  createTabGroup: (
+    chatIds: string[],
+    overrides?: Partial<SessionGroup>
+  ) => string | null
+  dissolveTabGroup: (groupId: string) => void
+  addChatToGroup: (groupId: string, chatId: string) => void
+  removeChatFromGroup: (groupId: string, chatId: string) => number
+  renameTabGroup: (groupId: string, name: string) => void
+  setTabGroupColor: (groupId: string, color: string | null) => void
+  setTabGroupPinned: (groupId: string, pinned: boolean) => void
+  setTabGroupActiveChat: (groupId: string, chatId: string) => void
+  reorderChatsInTabGroup: (groupId: string, orderedChatIds: string[]) => void
+  activeGroup: SessionGroup | null
+  perSessionBaseArgs: Omit<
+    PerSessionChatStateArgs,
+    'sessionId' | 'session' | 'sessionIdRef'
+  >
+  allSessions: AgentSession[]
 }

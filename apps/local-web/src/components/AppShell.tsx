@@ -238,6 +238,10 @@ export function AppShell(props: AppShellProps) {
           setPendingOpenPath={props.setPendingOpenPath}
           setComposer={props.setComposer}
           setComposerFiles={props.setComposerFiles}
+          activeGroup={props.activeGroup}
+          perSessionBaseArgs={props.perSessionBaseArgs}
+          allSessions={props.allSessions}
+          setTabGroupActiveChat={props.setTabGroupActiveChat}
         />
         </ResizablePanelGroup>
       </div>

@@ -6,6 +6,7 @@ import type { buildAgentComposerSlotProps } from '@/components/app/build-agent-c
 import type { AppShellProps } from '@/components/app-shell-props'
 import type { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import type { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
+import type { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import type { useAppRouting } from '@/hooks/useAppRouting'
 import type { useAppUiState } from '@/hooks/useAppUiState'
 import type { useChatScroll } from '@/hooks/useChatScroll'
@@ -49,6 +50,10 @@ type AppShellBridgeInput = {
   submitApprovals: AppShellProps['onSubmitApprovals']
   prefetchSessionMessages: AppShellProps['prefetchSessionMessages']
   showChatSkeleton: boolean
+  tabGroupsStore: ReturnType<typeof useAppTabGroups>
+  activeGroup: AppShellProps['activeGroup']
+  perSessionBaseArgs: AppShellProps['perSessionBaseArgs']
+  allSessions: AppShellProps['allSessions']
 }
 
 export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
@@ -246,6 +251,19 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     deleteTarget: input.actions.deleteTarget,
     confirmDelete: input.actions.confirmDelete,
     batchDeletePending: input.actions.batchDeletePending,
-    confirmBatchDelete: input.actions.confirmBatchDelete
+    confirmBatchDelete: input.actions.confirmBatchDelete,
+    tabGroups: input.tabGroupsStore.tabGroups,
+    createTabGroup: input.tabGroupsStore.createGroup,
+    dissolveTabGroup: input.tabGroupsStore.dissolveGroup,
+    addChatToGroup: input.tabGroupsStore.addToGroup,
+    removeChatFromGroup: input.tabGroupsStore.removeFromGroup,
+    renameTabGroup: input.tabGroupsStore.renameGroup,
+    setTabGroupColor: input.tabGroupsStore.setGroupColor,
+    setTabGroupPinned: input.tabGroupsStore.setGroupPinned,
+    setTabGroupActiveChat: input.tabGroupsStore.setGroupActiveChat,
+    reorderChatsInTabGroup: input.tabGroupsStore.reorderChatsInGroup,
+    activeGroup: input.activeGroup,
+    perSessionBaseArgs: input.perSessionBaseArgs,
+    allSessions: input.allSessions
   }
 }

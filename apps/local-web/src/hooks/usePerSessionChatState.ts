@@ -9,7 +9,7 @@ import type {
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { buildConversationTimeline } from '@/components/agents/transcript'
@@ -46,7 +46,12 @@ export type PerSessionChatStateArgs = {
   activeProject: import('@sandwalk/agent-ui-core').AgentProject | null
   tabsScopeKey: string
   sessionId: string | null
-  sessionIdRef: MutableRefObject<string | null>
+  /**
+   * Ref del sessionId activo — usado por streams para cortar callbacks tras
+   * cambio de sesión. Es OPCIONAL: si no se provee, el hook crea uno interno
+   * que sigue a `sessionId`. Necesario para el mount por-panel de split view.
+   */
+  sessionIdRef?: MutableRefObject<string | null>
   session: AgentSession | null
   sessions: AgentSession[]
   setSessions: Dispatch<SetStateAction<AgentSession[]>>
@@ -105,11 +110,19 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
   const chat = useSessionChatState(args.sessionId)
   args.setChatBySessionIdRef.current = chat.setChatBySessionId
 
+  // Ref interno cuando el caller no provee uno: cada mount de split view
+  // necesita su propio ref para que los streams no se pisen entre paneles.
+  const internalSessionIdRef = useRef<string | null>(args.sessionId)
+  useEffect(() => {
+    internalSessionIdRef.current = args.sessionId
+  }, [args.sessionId])
+  const sessionIdRef = args.sessionIdRef ?? internalSessionIdRef
+
   useSessionChatStream({
     client: args.client,
     health: args.health,
     sessionId: args.sessionId,
-    sessionIdRef: args.sessionIdRef,
+    sessionIdRef,
     sessions: args.sessions,
     chatBySessionIdRef: chat.chatBySessionIdRef,
     patchChat: chat.patchChat,
@@ -126,7 +139,7 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     activeProjectId: args.activeProjectId,
     tabsScopeKey: args.tabsScopeKey,
     sessionId: args.sessionId,
-    sessionIdRef: args.sessionIdRef,
+    sessionIdRef,
     session: args.session,
     sessions: args.sessions,
     setSessions: args.setSessions,
@@ -180,7 +193,7 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     client: args.client,
     health: args.health,
     sessionId: args.sessionId,
-    sessionIdRef: args.sessionIdRef,
+    sessionIdRef,
     session: args.session,
     loadSessions: args.loadSessions,
     loadProjects: args.loadProjects,
