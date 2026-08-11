@@ -541,6 +541,32 @@ export type AgentSession = {
   updatedAt: string
 }
 
+/**
+ * A tab-strip group that contains N chat sessions displayed side by side in a
+ * split view. Behaves like a "virtual tab" — has its own name, color, and pin,
+ * and lives in the tab strip alongside solo tabs. The chatIds are the sessions
+ * that live INSIDE this group (they no longer appear in the strip as solo tabs
+ * while inside the group; on dissolve they come back).
+ *
+ * Persisted client-side (localStorage) as a UI preference — not on the backend.
+ */
+export type SessionGroup = {
+  /** Prefixed id: `grp_<random>` so it never collides with session ids. */
+  id: string
+  name: string
+  /** Same palette as the tab color tag; null = no color. */
+  color: string | null
+  pinned: boolean
+  chatIds: string[]
+  /** Which chat inside the split has focus (composer visible, side panel bound). */
+  activeChatId: string
+}
+
+/** True for tab-strip ids that identify a group instead of a chat session. */
+export function isSessionGroupId(id: string): boolean {
+  return id.startsWith('grp_')
+}
+
 export type SpecialistColor =
   | 'ink'
   | 'gray'

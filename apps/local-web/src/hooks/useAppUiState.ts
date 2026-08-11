@@ -1,4 +1,8 @@
-import type { AgentSkillDetail, WorkspaceFile } from '@sandwalk/agent-ui-core'
+import type {
+  AgentSkillDetail,
+  SessionGroup,
+  WorkspaceFile
+} from '@sandwalk/agent-ui-core'
 import { useRef, useState } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 
@@ -9,6 +13,7 @@ import {
   readOpenTabsByProject,
   readProjectScopeId,
   readRecentProjectIds,
+  readTabGroupsByProject,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   TERMINAL_OPEN_STORAGE_KEY
 } from '@/lib/app-storage'
@@ -67,6 +72,9 @@ export function useAppUiState() {
   const [openTabsByProject, setOpenTabsByProject] = useState<
     Record<string, string[]>
   >(() => readOpenTabsByProject())
+  const [tabGroupsByProject, setTabGroupsByProject] = useState<
+    Record<string, SessionGroup[]>
+  >(() => readTabGroupsByProject())
   const [workspaceVersion, setWorkspaceVersion] = useState(0)
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([])
   /** Materialized session used for Files/@ mentions while the route stays on /agents/new. */
@@ -117,6 +125,8 @@ export function useAppUiState() {
     setCollapsedSidebarSections,
     openTabsByProject,
     setOpenTabsByProject,
+    tabGroupsByProject,
+    setTabGroupsByProject,
     workspaceVersion,
     setWorkspaceVersion,
     workspaceFiles,

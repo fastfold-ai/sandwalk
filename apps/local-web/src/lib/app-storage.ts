@@ -1,3 +1,5 @@
+import type { SessionGroup } from '@sandwalk/agent-ui-core'
+
 export const SIDEBAR_COLLAPSED_STORAGE_KEY =
   'agent-ide-v2-assistant-ui-base-sidebar-collapsed'
 export const FILES_PANEL_COLLAPSED_STORAGE_KEY =
@@ -12,6 +14,7 @@ export const PROJECT_SCOPE_STORAGE_KEY = 'fastfold.project-scope-id'
 export const LAST_SESSION_BY_SCOPE_KEY = 'fastfold.last-session-by-scope'
 export const RECENT_PROJECT_IDS_STORAGE_KEY = 'fastfold.recent-project-ids'
 export const SIDEBAR_SECTIONS_COLLAPSED_KEY = 'fastfold.sidebar-sections-collapsed'
+export const TAB_GROUPS_STORAGE_KEY = 'fastfold.tab-groups-by-project'
 
 export function projectTabsKey(projectId: string | null | undefined) {
   return projectId || ALL_PROJECTS_TABS_KEY
@@ -156,6 +159,48 @@ export function readCollapsedSidebarSections(): Record<string, boolean> {
 export function writeCollapsedSidebarSections(value: Record<string, boolean>) {
   try {
     localStorage.setItem(SIDEBAR_SECTIONS_COLLAPSED_KEY, JSON.stringify(value))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+/**
+ * Read the persisted tab groups per project scope. Groups are strictly a UI
+ * preference (how the user arranges tabs into split views), not chat data.
+ * Chat sessions themselves live on the backend.
+ */
+export function readTabGroupsByProject(): Record<string, SessionGroup[]> {
+  try {
+    const raw = localStorage.getItem(TAB_GROUPS_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {}
+    }
+    const result: Record<string, SessionGroup[]> = {}
+    for (const [key, value] of Object.entries(
+      parsed as Record<string, unknown>
+    )) {
+      if (!Array.isArray(value)) continue
+      result[key] = value.filter(
+        (item): item is SessionGroup =>
+          !!item &&
+          typeof item === 'object' &&
+          typeof (item as SessionGroup).id === 'string' &&
+          Array.isArray((item as SessionGroup).chatIds)
+      )
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
+export function writeTabGroupsByProject(
+  map: Record<string, SessionGroup[]>
+) {
+  try {
+    localStorage.setItem(TAB_GROUPS_STORAGE_KEY, JSON.stringify(map))
   } catch {
     // ignore storage failures
   }
