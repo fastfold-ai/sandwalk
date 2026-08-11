@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 class _ProfilePromptsMixin:
     def _model_display_name(self, model_id: str = None) -> str:
         """Get a short display name for a model ID."""

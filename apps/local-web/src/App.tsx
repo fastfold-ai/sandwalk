@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import {
   buildSessionSidebarModel,
   computeShowSessionTabs,
@@ -9,7 +10,6 @@ import {
 import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
-import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
 import {

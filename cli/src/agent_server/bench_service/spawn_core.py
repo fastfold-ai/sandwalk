@@ -6,9 +6,10 @@ import logging
 import shutil
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from agent_server.app_deps import AppDeps
 from agent_server.bench_service.bootstrap import ensure_sandwalk_bench_importable
@@ -456,12 +457,13 @@ def _resolve_mcq_cells(
     provider: str | None,
 ):
     """MCQ suites (MMLU / MMLU-Pro / ARC-C) as agent-session cells."""
+    from sandwalk_bench.schema import MatrixCell, Pack, Question
+
     from agent_server.bench_service.mcq_suites import (
         MCQ_SUITES,
         format_mcq_prompt,
         load_mcq_items,
     )
-    from sandwalk_bench.schema import MatrixCell, Pack, Question
 
     suite = MCQ_SUITES[suite_id]
     items = load_mcq_items(suite_id, int(sample_size or suite.default_sample_size))
@@ -516,12 +518,13 @@ def _resolve_coding_cells(
     provider: str | None,
 ):
     """MBPP / LiveCodeBench as agent-session cells (host-side code exec grade)."""
+    from sandwalk_bench.schema import MatrixCell, Pack, Question
+
     from agent_server.bench_service.coding_suites import (
         CODING_SUITES,
         format_coding_prompt,
         load_coding_items,
     )
-    from sandwalk_bench.schema import MatrixCell, Pack, Question
 
     suite = CODING_SUITES[suite_id]
     items = load_coding_items(suite_id, int(sample_size or suite.default_sample_size))
@@ -621,8 +624,9 @@ def _resolve_cells(
 
     # YAML pack + matrix — filename may differ from pack.id
     # (e.g. sandwalk_skills_mcp.yaml → pack: bio-capybara-full).
-    from agent_server.bench_service.catalog import pack_matches_id
     from sandwalk_bench.pack import list_packs
+
+    from agent_server.bench_service.catalog import pack_matches_id
 
     path = PACKS_DIR / f"{pack_id}.yaml"
     if not path.is_file():
@@ -729,8 +733,9 @@ def _copy_bix_capsule(source: dict[str, Any], workspace: Path) -> bool:
     if not folder:
         return False
     try:
-        from agent_server.bench_service.dataset_install import resolve_hf_token
         from sandwalk_bench.capsules import ensure_capsule
+
+        from agent_server.bench_service.dataset_install import resolve_hf_token
 
         data = ensure_capsule(folder, token=resolve_hf_token() or None)
     except Exception as exc:  # noqa: BLE001

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 class _CompatibleBackendInfoMixin:
     @staticmethod
     def _compatible_install_url(backend: str) -> str:

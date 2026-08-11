@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from data.downloader.catalog import console, DATASETS
+from data.downloader.catalog import DATASETS, console
 
 
 def download_dataset(name: str, output: Path | None = None) -> None:

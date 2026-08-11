@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from tools.singlecell_annotate import cell_type_annotate
 from tools.singlecell_cluster import cluster
-from tools.singlecell_common import _check_scanpy, MARKER_PANELS
+from tools.singlecell_common import MARKER_PANELS, _check_scanpy
 from tools.singlecell_trajectory import trajectory
 
 __all__ = [

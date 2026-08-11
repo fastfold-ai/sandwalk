@@ -1,6 +1,7 @@
 """viability — part 1 of split module. See tools/viability.py."""
 from tools.viability_base import registry
 
+
 @registry.register(
     name="viability.dose_response",
     description="Analyze dose-response curves for a compound across PRISM cell lines",

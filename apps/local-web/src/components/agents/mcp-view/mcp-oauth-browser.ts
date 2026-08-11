@@ -77,11 +77,7 @@ export async function openMcpOAuthBrowser(
   disposeMcpOAuthWatch()
 
   if (isTauri()) {
-    try {
-      await openInSystemBrowser(url)
-    } catch (error) {
-      throw error
-    }
+    await openInSystemBrowser(url)
     const dispose = onReturn ? startReturnWatch(onReturn) : () => {}
     return { dispose }
   }

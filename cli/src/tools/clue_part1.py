@@ -1,6 +1,7 @@
 """clue — part 1 of split module. See tools/clue.py."""
 from tools.clue_base import Config, Path, lru_cache, pd, registry
 
+
 def _get_clue_key() -> str | None:
     """Get CLUE API key from config/environment (for API-based fallback)."""
     import os

@@ -82,7 +82,7 @@ jobs:
 
       - name: Upload Agent CLI coverage to Codecov
         uses: codecov/codecov-action@v5
-        if: always()
+        if: always() && hashFiles('cli/coverage-agent-cli.xml') != ''
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: cli/coverage-agent-cli.xml
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload Agent Server coverage to Codecov
         uses: codecov/codecov-action@v5
-        if: always()
+        if: always() && hashFiles('cli/coverage-agent-server.xml') != ''
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: cli/coverage-agent-server.xml
@@ -102,7 +102,7 @@ jobs:
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && hashFiles('cli/coverage-*.xml') != ''
         with:
           name: coverage-agent-cli-server
           path: |
@@ -110,6 +110,7 @@ jobs:
             cli/coverage-agent-server.xml
             cli/coverage-full.xml
           retention-days: 14
+          if-no-files-found: ignore
 
       - name: Verify wheel builds and installs
         run: |
@@ -151,7 +152,7 @@ jobs:
 
       - name: Upload Local Web coverage to Codecov
         uses: codecov/codecov-action@v5
-        if: always()
+        if: always() && hashFiles('apps/local-web/coverage/lcov.info') != ''
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: apps/local-web/coverage/lcov.info
@@ -161,11 +162,12 @@ jobs:
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && hashFiles('apps/local-web/coverage/**') != ''
         with:
           name: coverage-local-web
           path: apps/local-web/coverage/
           retention-days: 14
+          if-no-files-found: ignore
 
   # ── Mac App (XCTest + llvm-cov → lcov → Codecov) ──────────────────────────
   mac-app:

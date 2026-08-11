@@ -15,14 +15,13 @@ from tools import registry
 )
 def job_status(job_id: str, provider: str | None = None, **kwargs) -> dict:
     """Check the status of a compute job via the provider API."""
+    from agent.config import Config
     from tools.compute import (  # indirect import for test patchability
         _provider_api_key_config,
         _provider_info,
         _request_json,
         _resolve_provider,
     )
-
-    from agent.config import Config
     cfg = Config.load()
     provider = _resolve_provider(provider, cfg)
 

@@ -1,8 +1,7 @@
 """omics.cellxgene_fetch: download an h5ad from CELLxGENE. Split from tools/omics.py."""
+from tools import omics as _omics
 from tools import registry
 from tools.omics_cellxgene_search import _CELLXGENE_API
-
-from tools import omics as _omics
 
 
 @registry.register(

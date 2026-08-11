@@ -5,7 +5,7 @@ from __future__ import annotations
 import mimetypes
 import re
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 from ui.terminal.clipboard_image import read_clipboard_image
@@ -147,7 +147,7 @@ def _safe_stem(name: str) -> str:
 
 
 def _timestamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    return datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
 
 
 def save_image_bytes(

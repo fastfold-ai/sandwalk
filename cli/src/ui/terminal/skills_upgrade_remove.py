@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 class _SkillsUpgradeRemoveMixin:
     def _upgrade_skills(self):
         """Sync the Fastfold catalog and update installed skills."""

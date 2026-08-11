@@ -1,9 +1,9 @@
-import { cn } from '@/lib/utils'
 import {
   projectColorBgClass,
   projectColorTextClass,
   projectIconComponent
 } from '@/lib/project-appearance'
+import { cn } from '@/lib/utils'
 
 export function ProjectMark({
   icon,

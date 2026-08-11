@@ -14,7 +14,7 @@ export type SkillMentionSegment =
 const SKILL_TOKEN_RE = /⟦\/:([^⟧]+)⟧/g
 /** `/lab-notes` but not `/Users/foo` or mid-path segments. */
 const SKILL_SLASH_RE =
-  /(?:^|[\s(\["'])(\/[A-Za-z][\w-]*)(?=[\s.,;:!?)\]"'`]|$)/g
+  /(?:^|[\s(["'])(\/[A-Za-z][\w-]*)(?=[\s.,;:!?)\]"'`]|$)/g
 
 export function splitTextWithSkillMentions(text: string): SkillMentionSegment[] {
   type Hit = { start: number; end: number; name: string }

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import shlex
 import subprocess
 import threading
 import time
+from pathlib import Path
 
 
 class _ExportShareAndMiscMixin:

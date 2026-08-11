@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-from ui.terminal.model_ids import _BOLTZ_INSTALL_SCRIPT
-from ui.terminal.model_ids import _BOLTZ_SKILL_SOURCE
+
+from ui.terminal.model_ids import _BOLTZ_INSTALL_SCRIPT, _BOLTZ_SKILL_SOURCE
 
 
 class _BoltzSetupMixin:

@@ -30,8 +30,9 @@ def probe_stdio_mcp_server(
         return {**empty, "message": "stdio MCP requires a command"}
 
     async def _run() -> list[Any]:
-        from agent.deepagents_runtime.mcp_tools import ensure_quiet_stdio_mcp_errlog
         from langchain_mcp_adapters.client import MultiServerMCPClient
+
+        from agent.deepagents_runtime.mcp_tools import ensure_quiet_stdio_mcp_errlog
 
         # Child MCP servers log to stderr; keep probes from painting the TTY.
         ensure_quiet_stdio_mcp_errlog()

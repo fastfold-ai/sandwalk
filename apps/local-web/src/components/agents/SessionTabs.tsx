@@ -1,3 +1,8 @@
+import '@sinm/react-chrome-tabs/css/chrome-tabs.css'
+import '@sinm/react-chrome-tabs/css/chrome-tabs-dark-theme.css'
+/* After the package CSS so divider/close overrides actually win. */
+import './session-chrome-tabs.css'
+
 import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { Tabs } from '@sinm/react-chrome-tabs'
 import type { TabProperties } from '@sinm/react-chrome-tabs/dist/chrome-tabs'
@@ -40,11 +45,6 @@ import {
   TabContextSeparator,
   TabInlineColorRow
 } from './tab-context-menu'
-
-import '@sinm/react-chrome-tabs/css/chrome-tabs.css'
-import '@sinm/react-chrome-tabs/css/chrome-tabs-dark-theme.css'
-/* After the package CSS so divider/close overrides actually win. */
-import './session-chrome-tabs.css'
 
 /** Same Blue pastel as the tab color tag — marks unread notification sessions. */
 const UNREAD_DOT_COLOR =

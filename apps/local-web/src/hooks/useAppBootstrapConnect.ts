@@ -19,12 +19,12 @@ import {
 } from '@/lib/auth-routing'
 import { isLocalBackendUrl, persistBackendUrl } from '@/lib/backend-url'
 import { dedupeAsync } from '@/lib/dedupe-async'
-import { clearRememberedApiKey } from '@/lib/remembered-auth'
 import {
   clampOnboardingStep,
   isOnboardingPath,
   onboardingPath
 } from '@/lib/onboarding'
+import { clearRememberedApiKey } from '@/lib/remembered-auth'
 
 import type { useAppBootstrapLoaders } from './useAppBootstrapLoaders'
 

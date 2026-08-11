@@ -8,14 +8,14 @@ import {
   resolveDashboardSection
 } from '@/hooks/app-routing-helpers'
 import {
-  isOnboardingPath,
-  onboardingStepFromSlug
-} from '@/lib/onboarding'
-import {
   DRAFT_AGENT_SESSION_ID,
   isDraftAgentSessionId,
   isReservedAgentRouteId
 } from '@/lib/draft-agent'
+import {
+  isOnboardingPath,
+  onboardingStepFromSlug
+} from '@/lib/onboarding'
 import {
   parseCatalogSkillId,
   type SkillsViewMode

@@ -1,7 +1,10 @@
 """chemistry.pharmacophore: pharmacophore model generation from active compounds. Split from tools/chemistry.py."""
-from tools import registry
 from tools import chemistry as _chemistry
-from tools.chemistry_pharmacophore_features import PHARMACOPHORE_FEATURES, detect_features_per_molecule
+from tools import registry
+from tools.chemistry_pharmacophore_features import (
+    PHARMACOPHORE_FEATURES,
+    detect_features_per_molecule,
+)
 
 
 @registry.register(

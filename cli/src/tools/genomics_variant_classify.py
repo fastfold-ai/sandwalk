@@ -1,7 +1,6 @@
 """genomics.variant_classify: variant analysis via generated code (code-gen tool). Split from tools/genomics.py."""
 from tools import registry
 
-
 VARIANT_CLASSIFY_PROMPT = """You are an expert bioinformatics data analyst classifying and analyzing genomic variants.
 
 {namespace_description}

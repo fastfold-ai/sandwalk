@@ -19,9 +19,8 @@ import {
 } from '@/lib/skills-catalog'
 
 import {
-  SkillsDetailDepsPanel,
-  type SkillDepsHandlers
-} from './skills-view-detail-deps'
+  type SkillDepsHandlers,
+  SkillsDetailDepsPanel} from './skills-view-detail-deps'
 import {
   InstallCommandBlock,
   SkillsBreadcrumb,

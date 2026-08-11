@@ -23,9 +23,8 @@ import { catalogCoordsFromInstalledSkill, skillsShSkillUrl, stripFrontmatter } f
 import { cn } from '@/lib/utils'
 
 import {
-  SkillsDetailDepsPanel,
-  type SkillDepsHandlers
-} from './skills-view-detail-deps'
+  type SkillDepsHandlers,
+  SkillsDetailDepsPanel} from './skills-view-detail-deps'
 import {
   InstallCommandBlock,
   SkillEnabledToggle,

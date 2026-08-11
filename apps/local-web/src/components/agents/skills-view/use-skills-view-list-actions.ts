@@ -9,8 +9,8 @@ import { copyText } from '@/lib/clipboard'
 import { skillInstallSource, type SkillsViewMode } from '@/lib/skills-catalog'
 
 import { resolveInstalledDetailPresentation } from './skills-view-installed-detail'
-import type { useSkillsViewFilters } from './use-skills-view-filters'
 import type { FeaturedPendingSkill } from './skills-view-utils'
+import type { useSkillsViewFilters } from './use-skills-view-filters'
 
 type SkillsViewListActionsInput = {
   mode: SkillsViewMode

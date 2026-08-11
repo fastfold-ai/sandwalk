@@ -26,9 +26,9 @@ import { DEFAULT_BACKEND_URL, normalizeBackendUrl } from '@/lib/backend-url'
 import { copyText } from '@/lib/clipboard'
 import {
   isTauri,
+  type LanDesktopServer,
   openDesktopWindow,
-  scanLanDesktopServers,
-  type LanDesktopServer
+  scanLanDesktopServers
 } from '@/lib/desktop'
 import { persistRememberedApiKey, readRememberedApiKey } from '@/lib/remembered-auth'
 import { rememberRemoteHostname } from '@/lib/remote-hostname'

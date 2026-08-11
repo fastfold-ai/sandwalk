@@ -5,7 +5,6 @@ import type {
   LocalAgentClient
 } from '@sandwalk/agent-local-client'
 import type { RuntimeSettings, Specialist } from '@sandwalk/agent-ui-core'
-
 import {
   Check,
   Columns2,
@@ -36,13 +35,13 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { copyText } from '@/lib/clipboard'
 import {
   type ComposerModelOption,
   formatModelEffortBadge,
   patchComposerModelEffort,
   toComposerModelOptions
 } from '@/lib/composer-models'
-import { copyText } from '@/lib/clipboard'
 import { relativeDayLabel } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 

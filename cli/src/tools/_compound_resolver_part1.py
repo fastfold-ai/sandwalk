@@ -1,5 +1,15 @@
 """_compound_resolver — part 1 of split module. See tools/_compound_resolver.py."""
-from tools._compound_resolver_base import _PROT_MAPPING_CSV, _SMILES_CSV, _prot_to_yu, _yu_smiles, _yu_to_prot, csv, lru_cache, os
+from tools._compound_resolver_base import (
+    _PROT_MAPPING_CSV,
+    _SMILES_CSV,
+    _prot_to_yu,
+    _yu_smiles,
+    _yu_to_prot,
+    csv,
+    lru_cache,
+    os,
+)
+
 
 def _load_yu_smiles() -> dict:
     """Load YU compound → SMILES mapping (lazy, cached)."""

@@ -25,7 +25,7 @@ from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.styles import merge_styles
 
 from ui.terminal.attach_lexer import AttachChipLexer
-from ui.terminal.completion import ComposeCompletionsMenu, PT_STYLE
+from ui.terminal.completion import PT_STYLE, ComposeCompletionsMenu
 from ui.terminal.theme import (
     resolve_ui_palette,
     resolve_ui_theme,

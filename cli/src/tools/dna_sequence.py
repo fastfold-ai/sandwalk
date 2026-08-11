@@ -10,11 +10,11 @@ import re
 from tools import registry
 from tools.dna_common import (
     _PREF_CODONS,
-    _reverse_complement,
     _STOP_CODONS,
+    _gc_content,
+    _reverse_complement,
     _translate_dna,
     _validate_dna,
-    _gc_content,
 )
 
 

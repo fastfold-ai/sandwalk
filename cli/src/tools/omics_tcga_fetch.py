@@ -1,7 +1,6 @@
 """omics.tcga_fetch: download a TCGA/GDC file. Split from tools/omics.py."""
-from tools import registry
-
 from tools import omics as _omics
+from tools import registry
 from tools.omics_tcga_search import _GDC_API
 
 

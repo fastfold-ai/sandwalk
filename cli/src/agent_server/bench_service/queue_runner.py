@@ -14,6 +14,7 @@ from agent_server.bench_service.checkpoint import (
     load_checkpoint,
     save_checkpoint,
 )
+from agent_server.bench_service.results_store import new_run_id
 from agent_server.bench_service.spawn_core import run_agent_suite
 from agent_server.models.bench import (
     BenchActiveStatus,
@@ -21,7 +22,6 @@ from agent_server.models.bench import (
     BenchQueueItem,
     BenchSpawnRequest,
 )
-from agent_server.bench_service.results_store import new_run_id
 from agent_server.settings_service import SettingsService
 
 logger = logging.getLogger(__name__)

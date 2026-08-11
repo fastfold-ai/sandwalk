@@ -3,7 +3,12 @@
 from pathlib import Path
 from typing import Any
 
-from agent.sandbox.guards import configure_matplotlib, make_safe_import, make_safe_open, make_safe_subprocess
+from agent.sandbox.guards import (
+    configure_matplotlib,
+    make_safe_import,
+    make_safe_open,
+    make_safe_subprocess,
+)
 
 
 class SandboxSetupMixin:

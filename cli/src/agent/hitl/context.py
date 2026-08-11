@@ -7,9 +7,10 @@ need approval read this context at invoke time.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 ProgressCallback = Callable[..., None] | None
 

@@ -1,7 +1,6 @@
 """chemistry.pairwise_similarity / similarity_search: fingerprint-based similarity. Split from tools/chemistry.py."""
-from tools import registry
-
 from tools import chemistry as _chemistry
+from tools import registry
 
 
 @registry.register(

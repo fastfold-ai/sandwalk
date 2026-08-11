@@ -1,6 +1,6 @@
 """chemistry.retrosynthesis: retrosynthetic route planning orchestrator. Split from tools/chemistry.py."""
-from tools import registry
 from tools import chemistry as _chemistry
+from tools import registry
 from tools.chemistry_retro_heuristic import retrosynthesis_heuristic
 from tools.chemistry_retro_ibm import retrosynthesis_ibm_rxn
 

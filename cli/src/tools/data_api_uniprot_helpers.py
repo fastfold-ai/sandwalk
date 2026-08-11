@@ -1,7 +1,6 @@
 """data_api.uniprot_lookup: query normalization helpers. Split from tools/data_api.py."""
 import re
 
-
 _UNIPROT_NON_HUMAN_HINTS = (
     "helminth",
     "parasite",

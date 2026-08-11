@@ -10,11 +10,11 @@ import type {
 
 import { type SkillsViewMode } from '@/lib/skills-catalog'
 
+import type { SkillDepsHandlers } from './skills-view/skills-view-detail-deps'
 import {
   SkillsFeaturedOverview,
   SkillsMainListView
 } from './skills-view/skills-view-list'
-import type { SkillDepsHandlers } from './skills-view/skills-view-detail-deps'
 import { SkillsViewDetailMode } from './skills-view/skills-view-mode-detail'
 import {
   SkillsViewCatalogMode,

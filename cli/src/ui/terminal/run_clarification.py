@@ -5,8 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from ui.terminal.mentions import build_mention_context
-from ui.terminal.mentions import extract_mentions
+from ui.terminal.mentions import build_mention_context, extract_mentions
 
 
 class _RunClarificationMixin:

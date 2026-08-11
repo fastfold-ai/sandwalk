@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 class _CompatibleProfileEditMixin:
     def _create_or_edit_compatible_profile(self, profile_id: str | None = None) -> str | None:
         """Create or edit an OpenAI-compatible profile and return profile id."""

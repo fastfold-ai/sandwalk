@@ -38,10 +38,9 @@ def build_ptc_domain_tools(
     unique_name,
 ) -> tuple[list[Any], Any]:
     """PTC mode: expose only search_tools (+ shell.run) as schemas."""
-    from tools import EXPERIMENTAL_CATEGORIES, registry
-
     from agent.mcp_server import _make_tool_handler
     from agent.ptc_tools import build_tools_namespace
+    from tools import EXPERIMENTAL_CATEGORIES, registry
 
     tools: list[Any] = []
     ptc_excludes = set(exclude_categories) | set(EXPERIMENTAL_CATEGORIES)
@@ -80,9 +79,8 @@ def build_native_domain_tools(
     unique_name,
 ) -> list[Any]:
     """Native mode: expose every non-excluded registry tool as its own schema."""
-    from tools import EXPERIMENTAL_CATEGORIES, registry
-
     from agent.mcp_server import _make_tool_handler
+    from tools import EXPERIMENTAL_CATEGORIES, registry
 
     tools: list[Any] = []
     for tool_obj in registry.list_tools():

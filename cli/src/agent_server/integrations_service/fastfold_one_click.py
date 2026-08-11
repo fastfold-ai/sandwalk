@@ -161,7 +161,7 @@ def start_fastfold_one_click(*, return_to: str | None = None) -> str:
 
 
 def import_fastfold_one_click(
-    integrations: "IntegrationsService",
+    integrations: IntegrationsService,
 ) -> dict[str, Any]:
     """Claim a minted key (if ready) and persist it as FASTFOLD_API_KEY."""
     global _pending_claim_token

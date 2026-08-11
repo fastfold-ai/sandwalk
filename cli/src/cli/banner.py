@@ -1,7 +1,8 @@
 """Startup banner rendering for interactive/batch CLI runs."""
 
 from _version import __version__
-from cli.app import BANNER, console  # console: monkeypatched by tests
+from cli.app import BANNER
+from cli.app import console as _default_console  # monkeypatched by tests
 from cli.banner_support import (
     _count_installed_claude_skills,
     _get_cached_skills_update_safe,
@@ -26,8 +27,8 @@ def print_banner(cfg=None, *, console=None):
 
     from agent.config import Config
 
-    # Prefer explicit console; else module ``console`` (tests patch this).
-    out = console if console is not None else globals()["console"]
+    # Prefer explicit console; else module console (tests patch ``cli.app.console``).
+    out = console if console is not None else _default_console
     cfg = cfg or Config.load()
     n_tools = _get_loaded_tool_count_hint()
     n_skills = _count_installed_claude_skills()

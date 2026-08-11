@@ -15,7 +15,7 @@ class _TaskEventsMixin:
 
     def render_task_started(self, task_id: str, description: str, task_type: str | None = None) -> None:
         """Render a background task start event."""
-        line = f"  ⌛ background task started"
+        line = "  ⌛ background task started"
         if task_type:
             line += f" [{task_type}]"
         line += f"  {task_id}"

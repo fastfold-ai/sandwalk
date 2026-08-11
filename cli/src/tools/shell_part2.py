@@ -7,6 +7,7 @@ from tools.shell_part1 import (
     _split_cd_prefix,
 )
 
+
 @registry.register(
     name="shell.run",
     description=(

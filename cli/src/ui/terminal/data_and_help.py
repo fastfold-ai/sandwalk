@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from prompt_toolkit.formatted_text import HTML
 from rich.panel import Panel
+
 from ui.markdown import LeftMarkdown
 from ui.terminal.slash_commands import SLASH_COMMANDS
 

@@ -11,6 +11,7 @@ import { BusyConfirmOverlay } from '@/components/BusyConfirmOverlay'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
+import { FastfoldAddControls } from './fastfold/FastfoldAddControls'
 import { IntegrationUnlocksSection } from './integration-unlocks-section'
 import {
   IntegrationsDetailHeader,
@@ -20,7 +21,6 @@ import {
   IntegrationsDetailFieldsTable,
   IntegrationsDetailVercelPanel
 } from './integrations-view-detail-panels'
-import { FastfoldAddControls } from './fastfold/FastfoldAddControls'
 import { SlackConnectorPanel } from './slack/SlackConnectorPanel'
 import { useIntegrationsDetailView } from './use-integrations-detail-view'
 import { VercelAddControls } from './vercel/VercelAddControls'

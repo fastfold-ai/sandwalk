@@ -10,8 +10,8 @@ from rich.markdown import Markdown
 from ui.markdown.config_utils import _as_bool, _config_get
 from ui.markdown.fences import _split_mermaid_fences
 from ui.markdown.heading import LeftMarkdown
-from ui.markdown.mermaid_source import _neaten_mermaid_source
 from ui.markdown.links import expose_markdown_links
+from ui.markdown.mermaid_source import _neaten_mermaid_source
 from ui.markdown.paths import unwrap_path_code_spans
 
 

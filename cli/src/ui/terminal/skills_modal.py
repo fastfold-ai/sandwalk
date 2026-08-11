@@ -5,8 +5,9 @@ In-app centered Float over the live transcript (same chrome as /models).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from ui.terminal.themes_modal import (
     dim_transcript_styles_for_backdrop,

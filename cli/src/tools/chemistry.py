@@ -8,17 +8,16 @@ helpers indirectly via ``from tools import chemistry as _chemistry`` so that
 such patches take effect regardless of which submodule performs the call.
 """
 
-from tools.http_client import request
-
 from tools.chemistry_common import _extract_smiles
 from tools.chemistry_descriptors import descriptors
-from tools.chemistry_similarity import pairwise_similarity, similarity_search
-from tools.chemistry_sar import sar_analyze
 from tools.chemistry_mmp import mmp_analysis
-from tools.chemistry_scaffold_hop import scaffold_hop
+from tools.chemistry_pharmacophore import pharmacophore
 from tools.chemistry_pubchem import pubchem_lookup
 from tools.chemistry_retrosynthesis import retrosynthesis
-from tools.chemistry_pharmacophore import pharmacophore
+from tools.chemistry_sar import sar_analyze
+from tools.chemistry_scaffold_hop import scaffold_hop
+from tools.chemistry_similarity import pairwise_similarity, similarity_search
+from tools.http_client import request
 
 __all__ = [
     "request",

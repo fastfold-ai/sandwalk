@@ -4,6 +4,7 @@ import re
 
 from tools.http_client import request
 
+
 def _http_get(url: str, *, params=None, headers=None, timeout: int = 15, retries: int = 2):
     """GET helper with transient retry/backoff semantics."""
     import httpx

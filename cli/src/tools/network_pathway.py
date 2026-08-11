@@ -3,7 +3,11 @@
 from tools import registry
 from tools.http_client import request_json
 from tools.network_common import _coerce_gene_list
-from tools.network_pathway_stats import _crosstalk_nodes, _fetch_pathway_participants, _pathway_overlaps
+from tools.network_pathway_stats import (
+    _crosstalk_nodes,
+    _fetch_pathway_participants,
+    _pathway_overlaps,
+)
 
 
 @registry.register(

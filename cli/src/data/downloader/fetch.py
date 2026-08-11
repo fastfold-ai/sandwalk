@@ -5,7 +5,7 @@ from pathlib import Path
 import httpx
 from rich.progress import BarColumn, DownloadColumn, Progress, SpinnerColumn, TransferSpeedColumn
 
-from data.downloader.catalog import console, DOWNLOAD_TIMEOUT
+from data.downloader.catalog import DOWNLOAD_TIMEOUT, console
 
 
 def _download_file(url: str, dest: Path, desc: str | None = None) -> bool:

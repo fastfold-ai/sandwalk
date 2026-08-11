@@ -6,8 +6,8 @@ import type {
 } from '@sandwalk/agent-ui-core'
 
 import {
-  type DayCell,
   addDays,
+  type DayCell,
   formatMonthLabel,
   formatShortDate,
   levelForCount,

@@ -1,9 +1,8 @@
 """omics.dataset_info: inspect local dataset files (h5ad/tabular). Split from tools/omics.py."""
 from pathlib import Path
 
-from tools import registry
-
 from tools import omics as _omics
+from tools import registry
 
 
 @registry.register(

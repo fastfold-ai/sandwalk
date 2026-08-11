@@ -7,7 +7,7 @@ those tools are excluded; the filesystem guidance remains (scaffolding).
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def middleware_system_prompt_text(
@@ -29,8 +29,9 @@ def middleware_system_prompt_text(
 
     if "task" not in excluded:
         # Default SubAgentMiddleware system_prompt (task tool guidance).
-        from deepagents.middleware.subagents import SubAgentMiddleware
         import inspect
+
+        from deepagents.middleware.subagents import SubAgentMiddleware
 
         default = inspect.signature(SubAgentMiddleware.__init__).parameters[
             "system_prompt"

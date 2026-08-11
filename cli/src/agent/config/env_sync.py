@@ -17,7 +17,7 @@ _EXTRA_ENV_FROM_CONFIG: dict[str, str] = {
 }
 
 
-def _config_secret_for_env(config: "object", config_key: str) -> str:
+def _config_secret_for_env(config: object, config_key: str) -> str:
     """Resolve a config value for export into ``os.environ`` (no env read-back)."""
     if config_key == "llm.anthropic_api_key":
         return str(
@@ -74,7 +74,7 @@ def sync_sandwalk_path_env(*, force: bool = True) -> list[str]:
 
 
 def sync_process_env_from_config(
-    config: "object | None" = None,
+    config: object | None = None,
     *,
     only_missing: bool = True,
     config_keys: list[str] | None = None,
@@ -130,7 +130,7 @@ def sync_process_env_from_config(
     return applied
 
 
-def listed_integration_env_vars(config: "object | None" = None) -> list[str]:
+def listed_integration_env_vars(config: object | None = None) -> list[str]:
     """Return sorted env var *names* that Integrations/config currently populate.
 
     Values are never returned — only names the agent can ``printenv`` / rely on.

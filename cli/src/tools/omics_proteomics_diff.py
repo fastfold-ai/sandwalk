@@ -1,7 +1,6 @@
 """omics.proteomics_diff: differential proteomics abundance. Split from tools/omics.py."""
-from tools import registry
-
 from tools import omics as _omics
+from tools import registry
 
 
 @registry.register(

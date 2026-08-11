@@ -275,7 +275,7 @@ class UnsupportedModalityMiddleware(AgentMiddleware[Any, Any, Any]):
         self._provider = str(provider or "")
         self._model_id = str(model_id or "")
 
-    def _filter_request(self, request: "ModelRequest[Any]") -> "ModelRequest[Any]":
+    def _filter_request(self, request: ModelRequest[Any]) -> ModelRequest[Any]:
         if not self._unsupported:
             return request
         messages, changed = sanitize_messages(
@@ -295,14 +295,14 @@ class UnsupportedModalityMiddleware(AgentMiddleware[Any, Any, Any]):
 
     def wrap_model_call(
         self,
-        request: "ModelRequest[Any]",
-        handler: "Callable[[ModelRequest[Any]], ModelResponse[Any]]",
-    ) -> "ModelResponse[Any]":
+        request: ModelRequest[Any],
+        handler: Callable[[ModelRequest[Any]], ModelResponse[Any]],
+    ) -> ModelResponse[Any]:
         return handler(self._filter_request(request))
 
     async def awrap_model_call(
         self,
-        request: "ModelRequest[Any]",
-        handler: "Callable[[ModelRequest[Any]], Awaitable[ModelResponse[ResponseT]]]",
-    ) -> "ModelResponse[ResponseT] | AIMessage | ExtendedModelResponse[ResponseT]":
+        request: ModelRequest[Any],
+        handler: Callable[[ModelRequest[Any]], Awaitable[ModelResponse[ResponseT]]],
+    ) -> ModelResponse[ResponseT] | AIMessage | ExtendedModelResponse[ResponseT]:
         return await handler(self._filter_request(request))

@@ -1,7 +1,9 @@
 """intel — part 2 of split module. See tools/intel.py."""
 from __future__ import annotations
+
 from tools.intel_base import registry
 from tools.intel_part1 import _to_int
+
 
 @registry.register(
     name="intel.competitor_snapshot",

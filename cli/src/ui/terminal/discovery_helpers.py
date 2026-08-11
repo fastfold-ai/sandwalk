@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from urllib.parse import urlparse, urlunparse
 import json
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse, urlunparse
 
 
 class _DiscoveryHelpersMixin:

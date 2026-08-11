@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from agent_server.bench_service.grade import (
     build_result,
@@ -38,10 +39,9 @@ def run_mmlu(
 ) -> dict[str, Any]:
     from agent.config import Config
     from agent.deepagents_runtime.chat_model import build_chat_model
+    from agent_server.bench_service.environment import capture_bench_environment
     from agent_server.models import UpdateRuntimeSettingsRequest
     from agent_server.settings_service import SettingsService
-
-    from agent_server.bench_service.environment import capture_bench_environment
 
     run_id = new_run_id()
     items = load_mmlu_items(sample_size)

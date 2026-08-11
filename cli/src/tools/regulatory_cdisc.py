@@ -11,8 +11,8 @@ from tools import registry
 from tools.regulatory_common import (
     _COLUMN_RE,
     _DOMAIN_REQUIRED,
-    _infer_domain_from_path,
     _ISO8601_PARTIAL_RE,
+    _infer_domain_from_path,
     _issue,
     _read_tabular,
     _score_quality,

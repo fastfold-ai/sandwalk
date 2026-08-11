@@ -1,9 +1,8 @@
 """omics.geo_fetch: download a GEO dataset. Split from tools/omics.py."""
 import re
 
-from tools import registry
-
 from tools import omics as _omics
+from tools import registry
 
 
 @registry.register(
