@@ -8,7 +8,11 @@ from agent_server.store.rows import session_from_row
 
 class SessionQueryMixin:
     def sessions_revision(self) -> str:
-        """Compact watermark for list polling — one aggregate row, no payloads."""
+        """Compact watermark for list polling — one aggregate row, no payloads.
+
+        Bench sessions are excluded so multi-worker benches do not thrash the
+        sidebar revision poll.
+        """
         with self._connect() as connection:
             row = connection.execute(
                 """
@@ -19,12 +23,18 @@ class SessionQueryMixin:
                          0
                        )
                 FROM sessions
+                WHERE COALESCE(source, '') != 'bench'
                 """
             ).fetchone()
         count, updated_at, running = row[0], row[1], row[2]
         return f"{count}:{updated_at}:{running}"
 
-    def list_sessions(self, *, project_id: str | None = None) -> list[AgentSession]:
+    def list_sessions(
+        self,
+        *,
+        project_id: str | None = None,
+        include_bench: bool = False,
+    ) -> list[AgentSession]:
         with self._connect() as connection:
             if project_id:
                 rows = connection.execute(
@@ -35,9 +45,17 @@ class SessionQueryMixin:
                     """,
                     (project_id,),
                 ).fetchall()
-            else:
+            elif include_bench:
                 rows = connection.execute(
                     "SELECT * FROM sessions ORDER BY updated_at DESC, id DESC"
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT * FROM sessions
+                    WHERE COALESCE(source, '') != 'bench'
+                    ORDER BY updated_at DESC, id DESC
+                    """
                 ).fetchall()
         return [session_from_row(row) for row in rows]
 

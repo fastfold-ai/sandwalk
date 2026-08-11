@@ -75,6 +75,33 @@ Composer: mic before Send → listening bar (live mic levels) → confirm insert
 | **Server Settings…** | Swift Settings (Server + General only) |
 | **Stop / Restart / Quit** | Process supervision |
 
+## App + File menus (multi-window)
+
+The Tauri client supports multiple windows in one process (Cursor-style). Each window is an independent SPA instance bound to a backend via `__SANDWALK_HTTP__` inject, `?sw_http=` / `?sw_key=` bootstrap, and per-window `window.name` (shared `localStorage` is not used for remote binds, so a remote window cannot overwrite the local main window).
+
+On macOS the **first** submenu is the app menu (named **Sandwalk**). New Window lives under **File**.
+
+| Menu | Item | Behavior |
+|------|------|----------|
+| **Sandwalk** | About Sandwalk | Native about panel |
+| **Sandwalk** | Check for Updates… | Opens Dashboard → General and runs the update check |
+| **Sandwalk** | Server Settings… | Opens the nested **Sandwalk Server** helper Settings UI (`sandwalk://settings/general`) |
+| **File** | New Window (`⇧⌘N`) | Another window on the **same** API as the focused window |
+| **File** | New Window (Remote)… | Dialog for server URL + optional API key; auto-scans LAN `:8787` via `/v1/discover` |
+| **File** | Open Recent | MRU **window snapshots** (`window-recents.json`: url + last route + title); keys in SPA remembered-auth |
+| **File** | Close Window | `main` **hides**; extra `client-*` windows **destroy** |
+
+Dock right-click / Mission Control lists every open window using the **current chat or page title** (Cursor-style). Remote windows append ` — host:port`.
+
+### Manual verification
+
+1. File → New Window → two windows on local `8787`, independent navigation.
+2. File → New Window (Remote) → LAN scan lists nearby Sandwalk hosts (OS/device label); pick one or type URL + key → only that window talks to remote; `main` unchanged. Expose the other machine via Server Settings → Network (Allow Remote) + Security (API key), or CLI: `sandwalk auth enable` + `sandwalk serve --host 0.0.0.0`. macOS may prompt for Local Network access.
+3. Quit/reopen → Open Recent lists windows by last title (not just host); choosing one reopens that snapshot (same route when possible) or focuses if still open.
+4. Close a secondary window (destroys); Close on `main` (hides).
+5. Dock right-click shows local + remote titles; selecting one focuses it.
+6. General → Change server in `main` retargets that window only (siblings keep inject).
+
 ## QA matrix
 
 | Host | Chats / Agent settings | Server Status | Desktop General |

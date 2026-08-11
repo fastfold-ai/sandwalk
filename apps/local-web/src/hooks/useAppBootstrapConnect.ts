@@ -119,6 +119,16 @@ export function useAppBootstrapConnect({
       )
       if (needsAuthLoginRef.current) return
       persistBackendUrl(backendUrl)
+      try {
+        const { isTauri, rememberDesktopWindowRecent } = await import(
+          '@/lib/desktop'
+        )
+        if (isTauri()) {
+          await rememberDesktopWindowRecent(backendUrl)
+        }
+      } catch {
+        // Browser / bridge unavailable.
+      }
 
       let authEnabled = false
       let authenticated: boolean | null = null

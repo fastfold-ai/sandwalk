@@ -228,16 +228,40 @@ def eval_show(
     console.print_json(data=get_result(match_id) or {})
 
 
+def _parse_suite_spec(
+    raw: str, *, default_sample: int | None
+) -> tuple[str, int | None]:
+    """Parse ``suite`` or ``suite:n`` / ``suite=n`` (Dashboard sample size)."""
+    text = str(raw or "").strip()
+    if not text:
+        _fail("Empty --suite value")
+    for sep in (":", "="):
+        if sep not in text:
+            continue
+        left, right = text.rsplit(sep, 1)
+        suite_id = left.strip()
+        size_text = right.strip()
+        if suite_id and size_text.isdigit():
+            return suite_id, int(size_text)
+    return text, default_sample
+
+
 @eval_app.command("run")
 def eval_run(
     suite: list[str] = typer.Option(
         ...,
         "--suite",
         "-s",
-        help="Suite id (repeatable), e.g. mmlu, mbpp, bixbench-verified-50",
+        help=(
+            "Suite id (repeatable). Use id:n for per-suite sample size "
+            "(e.g. mmlu:30, bio-capybara-full:5)."
+        ),
     ),
     sample: int | None = typer.Option(
-        None, "--sample", "-n", help="Sample size (default = suite default)"
+        None,
+        "--sample",
+        "-n",
+        help="Default sample size when a --suite has no :n suffix",
     ),
     model: str | None = typer.Option(
         None, "--model", "-m", help="Model id (default = runtime settings)"
@@ -247,6 +271,29 @@ def eval_run(
     ),
     specialist: str | None = typer.Option(
         None, "--specialist", help="Specialist id (optional)"
+    ),
+    workers: int = typer.Option(
+        1,
+        "--workers",
+        "-w",
+        min=1,
+        max=8,
+        help="Parallel cells within each suite (Dashboard Workers)",
+    ),
+    cleanup: bool = typer.Option(
+        False,
+        "--cleanup/--no-cleanup",
+        help="Delete bench project chats after a successful run",
+    ),
+    effort: str | None = typer.Option(
+        None,
+        "--effort",
+        help="Reasoning effort (low|medium|high|xhigh) — applied to runtime settings",
+    ),
+    fast: bool | None = typer.Option(
+        None,
+        "--fast/--no-fast",
+        help="Reasoning Fast (thinking off) — applied to runtime settings",
     ),
     base_url: str | None = typer.Option(None, "--base-url"),
     wait: bool = typer.Option(
@@ -260,19 +307,28 @@ def eval_run(
     ),
 ):
     """Queue and run Dashboard Bench suites; results land in bench-runs/."""
+    suite_specs = [_parse_suite_spec(s, default_sample=sample) for s in suite]
     # camelCase matches ApiModel wire format used by /v1/bench/spawn.
     payload = {
-        "suites": [{"suiteId": s, "sampleSize": sample} for s in suite],
+        "suites": [
+            {"suiteId": sid, "sampleSize": n} for sid, n in suite_specs
+        ],
         "model": model,
         "models": list(models or []),
         "specialistId": specialist,
+        "concurrency": max(1, int(workers or 1)),
+        "cleanupSessions": bool(cleanup),
         "clientSurface": "cli",
     }
     local_payload = {
-        "suites": [{"suite_id": s, "sample_size": sample} for s in suite],
+        "suites": [
+            {"suite_id": sid, "sample_size": n} for sid, n in suite_specs
+        ],
         "model": model,
         "models": list(models or []),
         "specialist_id": specialist,
+        "concurrency": max(1, int(workers or 1)),
+        "cleanup_sessions": bool(cleanup),
         "client_surface": "cli",
     }
 
@@ -281,6 +337,15 @@ def eval_run(
 
     if use_http:
         console.print(f"[dim]Using agent-server[/dim] {base}")
+        if effort is not None or fast is not None:
+            patch: dict[str, Any] = {}
+            if model:
+                patch["model"] = model
+            if effort is not None:
+                patch["reasoningEffort"] = effort
+            if fast is not None:
+                patch["reasoningFast"] = bool(fast)
+            _http_json("PATCH", base, "/v1/settings/runtime", json_body=patch)
         resp = _http_json("POST", base, "/v1/bench/spawn", json_body=payload)
         run_ids = resp.get("runIds") or resp.get("run_ids") or []
         console.print(
@@ -297,6 +362,9 @@ def eval_run(
         "[dim]No reachable agent-server — running in-process "
         "(same DB / bench-runs as Dashboard).[/dim]"
     )
+    if effort is not None or fast is not None:
+        local_payload["reasoning_effort"] = effort
+        local_payload["reasoning_fast"] = fast
     result_rows = _run_local(local_payload)
     for row in result_rows:
         acc = float(row.get("accuracy") or 0)
@@ -406,6 +474,8 @@ def _run_local(payload: dict[str, Any]) -> list[dict[str, Any]]:
         thinking=bool(payload.get("thinking")),
         provider=payload.get("provider"),
         project_name=payload.get("project_name"),
+        concurrency=max(1, int(payload.get("concurrency") or 1)),
+        cleanup_sessions=bool(payload.get("cleanup_sessions")),
         client_surface=payload.get("client_surface") or "cli",
     )
 
@@ -422,6 +492,19 @@ def _run_local(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
     deps = fastapi_app.state.deps
     settings = SettingsService.get()
+    effort = payload.get("reasoning_effort")
+    fast = payload.get("reasoning_fast")
+    if effort is not None or fast is not None:
+        from agent_server.models.settings import UpdateRuntimeSettingsRequest
+
+        SettingsService.update(
+            UpdateRuntimeSettingsRequest(
+                model=req.model,
+                reasoning_effort=None if effort is None else str(effort),
+                reasoning_fast=None if fast is None else bool(fast),
+            )
+        )
+        settings = SettingsService.get()
     models = list(req.models or [])
     if req.model:
         models.insert(0, req.model)
@@ -474,6 +557,8 @@ def _run_local(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     specialist_id=req.specialist_id,
                     thinking=bool(req.thinking),
                     client_surface=req.client_surface or "cli",
+                    concurrency=req.concurrency,
+                    cleanup_sessions=bool(req.cleanup_sessions),
                     on_progress=_progress,
                 )
                 finished.append(row)

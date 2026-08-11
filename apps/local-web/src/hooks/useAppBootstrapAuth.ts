@@ -13,7 +13,8 @@ import {
 import {
   DEFAULT_BACKEND_URL,
   normalizeBackendUrl,
-  persistBackendUrl
+  persistBackendUrl,
+  pinDesktopBackendBind
 } from '@/lib/backend-url'
 import {
   clearRememberedApiKey,
@@ -229,6 +230,7 @@ export function useAppBootstrapAuth({
   const changeBackend = useCallback(
     async (nextUrl: string, nextApiKey?: string) => {
       const normalized = normalizeBackendUrl(nextUrl || DEFAULT_BACKEND_URL)
+      pinDesktopBackendBind(normalized, nextApiKey)
       persistBackendUrl(normalized)
       setConnectionPaused(false)
       clearBackendSession()
@@ -241,6 +243,16 @@ export function useAppBootstrapAuth({
         await client.logout()
       } catch {
         // Best-effort against the previous host.
+      }
+      try {
+        const { bindDesktopWindowBackend, isTauri } = await import(
+          '@/lib/desktop'
+        )
+        if (isTauri()) {
+          await bindDesktopWindowBackend(normalized)
+        }
+      } catch {
+        // Browser / bridge unavailable.
       }
       // connect() re-runs via useEffect when client/backendUrl identity updates.
     },

@@ -12,6 +12,7 @@ SESSION_REMEMBER_MAX_AGE = 2592000  # 30d
 AUTH_EXEMPT_PATHS = frozenset(
     {
         "/v1/health",
+        "/v1/discover",
         "/v1/auth/status",
         "/v1/auth/login",
         "/v1/auth/logout",

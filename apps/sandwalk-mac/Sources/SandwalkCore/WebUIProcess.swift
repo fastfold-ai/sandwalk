@@ -111,7 +111,7 @@ final class WebUIProcess: @unchecked Sendable {
         update(.stopped)
     }
 
-    func reapSync(timeout: TimeInterval = 5) {
+    func reapSync(timeout: TimeInterval = 3) {
         expectingExit = true
         cancelHealthLoop()
         if let proc = process, proc.isRunning {

@@ -1,13 +1,24 @@
-"""Persistent run_python / run_r sandbox tool attachment."""
+"""Persistent run_python / optional run_r sandbox tool attachment."""
 
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from agent.deepagents_runtime.tool_adapter import _args_schema_for, _make_lc_tool
 
 logger = logging.getLogger("deepagents_runtime")
+
+
+def _r_support_enabled() -> bool:
+    """R/rpy2 is opt-in — probing rpy2 every session boot is expensive and noisy."""
+    return os.environ.get("SANDWALK_ENABLE_R", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def attach_sandbox_tools(
@@ -21,7 +32,7 @@ def attach_sandbox_tools(
     used_names: set[str],
     ptc: bool,
 ) -> Any:
-    """Append run_python (+ run_r, if rpy2 is available) and return the sandbox."""
+    """Append run_python (+ run_r only when ``SANDWALK_ENABLE_R`` is set)."""
     from agent.mcp_server import _make_run_python_handler, _make_run_r_handler
 
     rp_handler, sandbox = _make_run_python_handler(
@@ -62,30 +73,31 @@ def attach_sandbox_tools(
         )
     )
 
-    try:
-        import importlib.util
+    if _r_support_enabled():
+        try:
+            import importlib.util
 
-        if importlib.util.find_spec("rpy2.robjects") is None:
-            raise ImportError("rpy2 unavailable")
-        # find_spec succeeds even when R_HOME is missing — probe a real import.
-        import rpy2.robjects  # noqa: F401
+            if importlib.util.find_spec("rpy2.robjects") is None:
+                raise ImportError("rpy2 unavailable")
+            # find_spec succeeds even when R_HOME is missing — probe a real import.
+            import rpy2.robjects  # noqa: F401
 
-        rr_handler = _make_run_r_handler(code_trace_buffer)
-        display_name_map["run_r"] = "run_r"
-        used_names.add("run_r")
-        tools.append(
-            _make_lc_tool(
-                name="run_r",
-                description=(
-                    "Execute R code via rpy2 for statistical workflows (splines, "
-                    "p.adjust, wilcox.test, fisher.test, lm/predict, KEGGREST)."
-                ),
-                args_schema=_args_schema_for("run_r", None, required_code=True),
-                handler=rr_handler,
-                strip_none=False,
+            rr_handler = _make_run_r_handler(code_trace_buffer)
+            display_name_map["run_r"] = "run_r"
+            used_names.add("run_r")
+            tools.append(
+                _make_lc_tool(
+                    name="run_r",
+                    description=(
+                        "Execute R code via rpy2 for statistical workflows (splines, "
+                        "p.adjust, wilcox.test, fisher.test, lm/predict, KEGGREST)."
+                    ),
+                    args_schema=_args_schema_for("run_r", None, required_code=True),
+                    handler=rr_handler,
+                    strip_none=False,
+                )
             )
-        )
-    except Exception as exc:
-        logger.info("rpy2 not available — run_r tool disabled (%s)", exc)
+        except Exception as exc:
+            logger.info("rpy2 not available — run_r tool disabled (%s)", exc)
 
     return sandbox

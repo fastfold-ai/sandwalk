@@ -10,38 +10,64 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from agent_server.app_deps import AppDeps
 from agent_server.bench_service import (
+    bootstrap_resumable,
     cancel_current,
     clear_results,
+    delete_result,
     enqueue,
     export_path,
     get_active_status,
     get_result,
     list_results,
     list_suite_cards,
+    pause_current,
     remove_queued,
+    resume_run,
     start_install,
 )
-from agent_server.bench_service.dataset_install import BenchInstallError
+from agent_server.bench_service.dataset_install import (
+    BenchInstallError,
+    cache_root,
+    total_cache_bytes,
+    uninstall_suite,
+)
 from agent_server.models.bench import (
     BenchActiveStatus,
     BenchCancelResponse,
     BenchGradeRequest,
     BenchGradeResponse,
     BenchInstallResponse,
+    BenchPauseResponse,
     BenchResetResponse,
     BenchResultList,
     BenchResultSummary,
+    BenchResumeResponse,
     BenchSpawnRequest,
     BenchSpawnResponse,
+    BenchSuiteCard,
     BenchSuiteList,
+    BenchUninstallResponse,
 )
 
 
+def _packs_payload(store: object) -> tuple[list[BenchSuiteCard], int, str | None]:
+    """Suite cards plus cache totals, computed together off the event loop."""
+    cards = list_suite_cards(store)
+    root = cache_root()
+    return cards, total_cache_bytes(), (str(root) if root is not None else None)
+
+
 def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
+    # Advertise any leftover checkpoint from a prior process.
+    bootstrap_resumable()
+
     @app.get("/v1/bench/packs", response_model=BenchSuiteList)
     async def bench_packs() -> BenchSuiteList:
+        cards, cache_bytes, cache_path = await asyncio.to_thread(
+            _packs_payload, deps.store
+        )
         return BenchSuiteList(
-            data=await asyncio.to_thread(list_suite_cards, deps.store)
+            data=cards, cache_bytes=cache_bytes, cache_path=cache_path
         )
 
     @app.post(
@@ -61,6 +87,19 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
                     "needsHfToken": exc.needs_hf_token,
                     "suiteId": suite_id,
                 },
+            ) from exc
+
+    @app.delete(
+        "/v1/bench/packs/{suite_id}/install",
+        response_model=BenchUninstallResponse,
+    )
+    async def bench_pack_uninstall(suite_id: str) -> BenchUninstallResponse:
+        try:
+            return await asyncio.to_thread(uninstall_suite, suite_id)
+        except BenchInstallError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"message": str(exc), "suiteId": suite_id},
             ) from exc
 
     @app.post("/v1/bench/spawn", response_model=BenchSpawnResponse)
@@ -101,6 +140,17 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
                 thinking_used=bool(r.get("thinking_used")),
                 project_id=r.get("project_id"),
                 created_at=r.get("created_at"),
+                status=r.get("status"),
+                reasoning_effort=(
+                    str(r["reasoning_effort"])
+                    if r.get("reasoning_effort") not in (None, "")
+                    else None
+                ),
+                reasoning_fast=(
+                    bool(r["reasoning_fast"])
+                    if r.get("reasoning_fast") is not None
+                    else None
+                ),
             )
             for r in rows
         ]
@@ -130,6 +180,30 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
         rid = await asyncio.to_thread(cancel_current)
         return BenchCancelResponse(ok=True, run_id=rid or run_id)
 
+    @app.post("/v1/bench/runs/{run_id}/pause", response_model=BenchPauseResponse)
+    async def bench_pause(run_id: str) -> BenchPauseResponse:
+        rid = await asyncio.to_thread(pause_current)
+        if rid is None:
+            raise HTTPException(status_code=409, detail="No active run to pause.")
+        return BenchPauseResponse(ok=True, run_id=rid)
+
+    @app.post("/v1/bench/runs/{run_id}/resume", response_model=BenchResumeResponse)
+    async def bench_resume(run_id: str) -> BenchResumeResponse:
+        try:
+            rid = await asyncio.to_thread(resume_run, deps, run_id if run_id != "active" else None)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return BenchResumeResponse(ok=True, run_id=rid)
+
+    @app.delete("/v1/bench/runs/{run_id}")
+    async def bench_delete_run(run_id: str) -> dict:
+        ok = await asyncio.to_thread(
+            delete_result, run_id, store=deps.store, delete_sessions=True
+        )
+        if not ok:
+            raise HTTPException(status_code=404, detail="Run not found.")
+        return {"ok": True}
+
     @app.delete("/v1/bench/queue/{index}")
     async def bench_queue_remove(index: int) -> dict:
         ok = await asyncio.to_thread(remove_queued, index)
@@ -139,8 +213,8 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
 
     @app.post("/v1/bench/results/reset", response_model=BenchResetResponse)
     async def bench_reset() -> BenchResetResponse:
-        n = await asyncio.to_thread(clear_results)
-        return BenchResetResponse(ok=True, cleared=n)
+        cleared, sessions = await asyncio.to_thread(clear_results, store=deps.store)
+        return BenchResetResponse(ok=True, cleared=cleared, sessions_deleted=sessions)
 
     @app.post("/v1/bench/grade", response_model=BenchGradeResponse)
     async def bench_grade(payload: BenchGradeRequest) -> BenchGradeResponse:
@@ -164,6 +238,7 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
                     "running": status.running,
                     "phase": status.phase,
                     "progress": prog,
+                    "resumableRunId": status.resumable_run_id,
                 }
                 blob = json.dumps(payload)
                 if blob != last:
@@ -171,7 +246,7 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
                     last = blob
                 if not status.running and status.current_run_id != run_id:
                     # finished or never started
-                    if get_result(run_id) is not None:
+                    if get_result(run_id) is not None and status.phase != "paused":
                         yield f"data: {json.dumps({'type': 'done', 'runId': run_id})}\n\n"
                         return
                 if not status.running:

@@ -1,38 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import { DesktopDragRegion } from '@/components/DesktopDragRegion'
-import { Button } from '@/components/ui/button'
 import { startWindowDrag, toggleMaximize } from '@/lib/desktop'
-
-export function ConnectionLimitBanner({
-  runningCount,
-  onDismiss
-}: {
-  runningCount: number
-  onDismiss: () => void
-}) {
-  return (
-    <div className="border-border bg-amber-500/10 text-amber-950 dark:text-amber-100 flex shrink-0 items-start gap-3 border-b px-3 py-2 text-xs">
-      <div className="min-w-0 flex-1">
-        <p className="font-medium">{runningCount} agents running at once</p>
-        <p className="text-muted-foreground mt-0.5">
-          Live token streaming stays on the open chat; background runs update
-          via status polling. Machine load (CPU/RAM/API) is the real limit —
-          finish or pause heavy runs if the app feels slow.
-        </p>
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-7 shrink-0 px-2 text-xs"
-        onClick={onDismiss}
-      >
-        Dismiss
-      </Button>
-    </div>
-  )
-}
 
 export function AppShellTitleBar({ activeTitle }: { activeTitle: string }) {
   return (

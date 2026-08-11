@@ -94,6 +94,7 @@ export function HomeView({
         previews={previews}
         onCreateSession={onCreateSession}
         onOpenSession={onOpenSession}
+        onDeleteProject={onDeleteProject}
       />
     )
   }

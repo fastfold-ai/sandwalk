@@ -139,11 +139,19 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
             "awaiting_approval",
         }:
             return
+        is_bench = getattr(session, "source", None) == "bench"
         if event == "stream":
             # Perf probe: run pipeline reports tail latency after last token.
             import time
 
             emit_runtime_event.last_stream_at = time.monotonic()
+            # Bench sessions never stream in the chat UI — skip per-token SQLite
+            # writes (dominant cost under multi-worker benches).
+            if is_bench:
+                return
+        # High-frequency progress noise; final message/tools/usage still persist.
+        if is_bench and event == "activity":
+            return
         event_payload = _event_payload(event, payload)
         if event == "approval_required":
             # Keep runId on the wire for the UI even though payload omits it.

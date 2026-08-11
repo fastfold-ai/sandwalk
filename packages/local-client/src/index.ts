@@ -115,10 +115,33 @@ export type BenchSuiteCard = {
   installProgress?: string | null
   installBytesDone?: number | null
   installBytesTotal?: number | null
+  /** True when a downloadable dataset is cached on disk (Remove is available). */
+  installed?: boolean
+  /** Bytes this suite occupies in the local bench cache. */
+  installedBytes?: number | null
+  /** Questions actually cached locally (may differ from the declared corpus). */
+  installedCount?: number | null
+  /** Set when the fast parquet download needs a reader that is not installed. */
+  missingDependency?: string | null
   requiredSkills?: string[]
   requiredMcps?: string[]
   missingSkills?: string[]
   missingMcps?: string[]
+}
+
+export type BenchSuiteCatalog = {
+  suites: BenchSuiteCard[]
+  /** Total bytes used by every cached bench dataset. */
+  cacheBytes: number
+  cachePath?: string | null
+}
+
+export type BenchUninstallResult = {
+  ok: boolean
+  suiteId: string
+  summary?: string
+  freedBytes?: number
+  removed?: string[]
 }
 
 export type BenchInstallResult = {
@@ -140,6 +163,7 @@ export type BenchProgress = {
   total?: number
   benchCurrent?: number
   benchTotal?: number
+  inFlight?: number
 }
 
 export type BenchActiveStatus = {
@@ -149,6 +173,8 @@ export type BenchActiveStatus = {
   currentRunId?: string | null
   lastProgress?: BenchProgress | null
   queue: Array<{ runId: string; modelId: string; suites: string[] }>
+  resumableRunId?: string | null
+  projectId?: string | null
 }
 
 export type BenchResultSummary = {
@@ -162,6 +188,9 @@ export type BenchResultSummary = {
   thinkingUsed?: boolean
   projectId?: string | null
   createdAt?: string | null
+  status?: string | null
+  reasoningEffort?: string | null
+  reasoningFast?: boolean | null
 }
 
 function num(raw: Record<string, unknown>, camel: string, snake: string): number {
@@ -434,6 +463,20 @@ export class LocalAgentClient
     return result.data
   }
 
+  /** Suite cards plus local dataset cache totals. */
+  async getBenchCatalog(signal?: AbortSignal): Promise<BenchSuiteCatalog> {
+    const result = await this.request<{
+      data: BenchSuiteCard[]
+      cacheBytes?: number
+      cachePath?: string | null
+    }>('/bench/packs', { signal })
+    return {
+      suites: result.data,
+      cacheBytes: result.cacheBytes ?? 0,
+      cachePath: result.cachePath ?? null
+    }
+  }
+
   installBenchSuite(
     suiteId: string,
     signal?: AbortSignal
@@ -441,6 +484,17 @@ export class LocalAgentClient
     return this.request<BenchInstallResult>(
       `/bench/packs/${encodeURIComponent(suiteId)}/install`,
       { method: 'POST', signal }
+    )
+  }
+
+  /** Delete a suite's cached dataset to reclaim disk space. */
+  uninstallBenchSuite(
+    suiteId: string,
+    signal?: AbortSignal
+  ): Promise<BenchUninstallResult> {
+    return this.request<BenchUninstallResult>(
+      `/bench/packs/${encodeURIComponent(suiteId)}/install`,
+      { method: 'DELETE', signal }
     )
   }
 
@@ -454,6 +508,8 @@ export class LocalAgentClient
       specialistId?: string | null
       thinking?: boolean
       dryRun?: boolean
+      concurrency?: number
+      cleanupSessions?: boolean
       clientSurface?: 'cli' | 'ui'
     },
     signal?: AbortSignal
@@ -495,7 +551,33 @@ export class LocalAgentClient
     })
   }
 
-  resetBenchResults(signal?: AbortSignal): Promise<{ ok: boolean; cleared: number }> {
+  pauseBenchRun(runId: string, signal?: AbortSignal): Promise<{ ok: boolean }> {
+    return this.request(`/bench/runs/${encodeURIComponent(runId)}/pause`, {
+      method: 'POST',
+      signal
+    })
+  }
+
+  resumeBenchRun(runId: string, signal?: AbortSignal): Promise<{ ok: boolean }> {
+    return this.request(`/bench/runs/${encodeURIComponent(runId)}/resume`, {
+      method: 'POST',
+      signal
+    })
+  }
+
+  deleteBenchResult(
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean }> {
+    return this.request(`/bench/runs/${encodeURIComponent(runId)}`, {
+      method: 'DELETE',
+      signal
+    })
+  }
+
+  resetBenchResults(
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean; cleared: number; sessionsDeleted?: number }> {
     return this.request('/bench/results/reset', { method: 'POST', signal })
   }
 

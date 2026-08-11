@@ -119,8 +119,11 @@ class SessionCreateMixin:
             normalized_backend = require_sandbox_backend(sandbox_backend)
 
         normalized_source = (source or "").strip().lower() or None
-        if normalized_source is not None and normalized_source != "slack":
-            raise ValueError("source must be 'slack'")
+        if normalized_source is not None and normalized_source not in {
+            "slack",
+            "bench",
+        }:
+            raise ValueError("source must be 'slack' or 'bench'")
 
         from agent_server.store.usage import normalize_surface
 

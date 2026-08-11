@@ -196,8 +196,7 @@ export function SidebarSessionList({
   openRenameDialog,
   updateSession,
   exportTranscript,
-  setDeleteTarget,
-  onClearSessionSelection
+  setDeleteTarget
 }: SidebarSessionListProps) {
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)

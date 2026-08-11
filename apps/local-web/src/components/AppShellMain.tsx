@@ -4,8 +4,7 @@ import { DashboardMainViews } from '@/components/agents/DashboardMainViews'
 import { SitesView } from '@/components/agents/SitesView'
 import {
   AppShellMainDragStrip,
-  AppShellTitleBar,
-  ConnectionLimitBanner
+  AppShellTitleBar
 } from '@/components/app/app-shell-main-chrome'
 import {
   type AppShellMainProps,
@@ -59,12 +58,6 @@ export function AppShellMain(props: AppShellMainProps) {
       <div className="sandwalk-shell-main relative flex h-full min-w-0 flex-col bg-background">
         {/* Layout-neutral drag hit target — every main view, does not shift content. */}
         <AppShellMainDragStrip />
-        {props.showConnectionLimitWarning ? (
-          <ConnectionLimitBanner
-            runningCount={props.runningCount}
-            onDismiss={() => props.setConnectionLimitDismissed(true)}
-          />
-        ) : null}
         {showCollapsedNavStrip ? (
           <div className="relative z-20 fade-in animate-in duration-200">
             <ShellNavStrip

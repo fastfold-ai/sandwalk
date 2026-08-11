@@ -314,6 +314,138 @@ export async function listenDesktopNavigate(
   })
 }
 
+export type DesktopMenuAction = {
+  action: string
+  url?: string | null
+  route?: string | null
+  title?: string | null
+  snapshotId?: string | null
+  hostname?: string | null
+}
+
+/** File menu actions that need SPA UI (Remote dialog / Open Recent with key). */
+export async function listenDesktopMenu(
+  handler: (payload: DesktopMenuAction) => void
+): Promise<() => void> {
+  const listen = tauri()?.event?.listen
+  if (!listen) return () => {}
+  return listen('sandwalk-menu', event => {
+    const payload = event.payload as DesktopMenuAction | null
+    if (payload?.action) handler(payload)
+  })
+}
+
+export type OpenDesktopWindowArgs = {
+  backendUrl?: string | null
+  apiKey?: string | null
+  title?: string | null
+  route?: string | null
+  snapshotId?: string | null
+  hostname?: string | null
+  focusExisting?: boolean
+}
+
+/** Spawn or focus a desktop WebView bound to a backend URL / snapshot. */
+export const openDesktopWindow = (args: OpenDesktopWindowArgs = {}) =>
+  invokeStrict<string>('desktop_open_window', {
+    // Single `payload` arg — avoids flat-arg drops that left remotes on localhost.
+    payload: {
+      backendUrl: args.backendUrl ?? null,
+      apiKey: args.apiKey ?? null,
+      title: args.title ?? null,
+      route: args.route ?? null,
+      snapshotId: args.snapshotId ?? null,
+      hostname: args.hostname ?? null,
+      focusExisting: Boolean(args.focusExisting)
+    }
+  })
+
+/** Sync native window title + Open Recent after in-app Change server. */
+export const bindDesktopWindowBackend = (url: string) =>
+  invoke<void>('desktop_bind_window_backend', { url })
+
+/** Dock / Mission Control window label (chat or page title). */
+export const setDesktopWindowTitle = (title: string) =>
+  invoke<void>('desktop_set_window_title', { title })
+
+/** Persist / update Open Recent for this window (route + title snapshot). */
+export const upsertDesktopWindowSnapshot = (args: {
+  snapshotId?: string | null
+  url: string
+  route: string
+  title: string
+  hostname?: string | null
+}) =>
+  invokeStrict<string>('desktop_upsert_window_snapshot', {
+    snapshotId: args.snapshotId ?? null,
+    url: args.url,
+    route: args.route,
+    title: args.title,
+    hostname: args.hostname ?? null
+  })
+
+/** Snapshot id injected when the native window was created. */
+export function readDesktopSnapshotId(): string | null {
+  const injected = (globalThis as { __SANDWALK_SNAPSHOT_ID__?: unknown })
+    .__SANDWALK_SNAPSHOT_ID__
+  if (typeof injected === 'string' && injected.trim()) return injected.trim()
+  try {
+    const stored = sessionStorage.getItem('sandwalk.snapshotId')
+    if (stored?.trim()) return stored.trim()
+  } catch {
+    // ignore
+  }
+  return null
+}
+
+export function persistDesktopSnapshotId(id: string) {
+  const trimmed = id.trim()
+  if (!trimmed) return
+  ;(globalThis as { __SANDWALK_SNAPSHOT_ID__?: string }).__SANDWALK_SNAPSHOT_ID__ =
+    trimmed
+  try {
+    sessionStorage.setItem('sandwalk.snapshotId', trimmed)
+  } catch {
+    // ignore
+  }
+}
+
+/** Open the Sandwalk Server helper Settings window. */
+export const openDesktopServerSettings = () =>
+  invokeStrict<void>('desktop_open_server_settings')
+
+export const rememberDesktopWindowRecent = (url: string) =>
+  invoke<void>('desktop_remember_window_recent', { url })
+
+export const clearDesktopWindowRecents = () =>
+  invokeStrict<void>('desktop_clear_window_recents')
+
+export type DesktopWindowRecent = {
+  id: string
+  url: string
+  route?: string
+  title?: string
+  label?: string | null
+  lastOpenedAt: number
+}
+
+export const listDesktopWindowRecents = () =>
+  invoke<DesktopWindowRecent[]>('desktop_list_window_recents')
+
+export type LanDesktopServer = {
+  url: string
+  hostname: string
+  platform: string
+  arch: string
+  deviceLabel: string
+  authRequired: boolean
+  version: string
+}
+
+/** Probe local /24 (+ localhost) for Sandwalk servers on :8787. */
+export const scanLanDesktopServers = () =>
+  invokeStrict<LanDesktopServer[]>('desktop_scan_lan_servers')
+
 /** Native directory picker (desktop). Returns null when canceled or unavailable. */
 export async function pickDirectory(): Promise<string | null> {
   if (!isTauri()) return null

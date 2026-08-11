@@ -65,10 +65,21 @@ export function ComposerModelPickerOption({
     option.reasoningEffortOptions && option.reasoningEffortOptions.length > 0
       ? option.reasoningEffortOptions
       : ['low', 'medium', 'high']
-  const optionEffort = String(option.reasoningEffort || 'medium')
+  // Selected row follows runtime settings so Edit → Effort updates instantly.
+  const optionEffort = String(
+    (isSelected
+      ? runtimeSettings?.reasoningEffort
+      : option.reasoningEffort) ||
+      option.reasoningEffort ||
+      'medium'
+  )
     .trim()
     .toLowerCase()
-  const optionFast = Boolean(option.reasoningFast)
+  const optionFast = Boolean(
+    isSelected
+      ? (runtimeSettings?.reasoningFast ?? option.reasoningFast)
+      : option.reasoningFast
+  )
   const optionEffortLabel = formatModelEffortBadge({
     reasoningEffort: optionEffort,
     reasoningFast: optionFast

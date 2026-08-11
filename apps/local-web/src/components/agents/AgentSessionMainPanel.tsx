@@ -212,10 +212,18 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     onSiteReady: showSitePreview
   })
 
+  const draftReset =
+    location.state &&
+    typeof location.state === 'object' &&
+    'draftReset' in location.state
+      ? Number((location.state as { draftReset?: unknown }).draftReset)
+      : 0
+
   useEffect(() => {
-    // Reset when leaving the draft route or switching project scope.
+    // Reset when leaving the draft route, switching project scope, or
+    // starting a fresh New Agent (same /agents/new URL).
     setDraftWorkspaceSessionId(null)
-  }, [activeProjectId, isDraft, setDraftWorkspaceSessionId])
+  }, [activeProjectId, draftReset, isDraft, setDraftWorkspaceSessionId])
 
   const prevSessionIdRef = useRef<string | null>(null)
   useLayoutEffect(() => {
@@ -387,8 +395,11 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             maxSize={55}
             onCollapse={() => setFilesPanelCollapsed(true)}
             onExpand={() => {
-              setFilesPanelCollapsed(false)
-              if (isDraft && inProject) void prepareDraftWorkspace()
+              // Do not materialize here. Project drafts mount this panel with
+              // defaultSize>0, which fires onExpand before layout collapse —
+              // that used to create an empty session on every New Agent click.
+              // Files / Terminal / upload / send call prepareDraftWorkspace.
+              setFilesPanelCollapsed(current => (current ? true : false))
             }}
             className="min-w-0"
           >

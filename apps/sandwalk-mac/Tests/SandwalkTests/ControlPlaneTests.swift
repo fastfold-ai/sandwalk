@@ -1,6 +1,9 @@
 import XCTest
 @testable import SandwalkCore
 
+/// `ControlPlane` is `@MainActor`, so these statics must be reached from the main
+/// actor — without this the suite fails to compile under Swift 6 concurrency.
+@MainActor
 final class ControlPlaneTests: XCTestCase {
     func testControlFileURLIsUnderApplicationSupport() {
         let url = ControlPlane.controlFileURL()

@@ -5,7 +5,9 @@
 #
 # Coverage goal: every Featured skill + every MCP except Linear and Lucid.
 
-pack: skills-mcp-bakeoff
+pack: bio-capybara-full
+aliases:
+  - skills-mcp-bakeoff
 version: "3.0"
 description: >
   Full coverage of Featured skills and MCP servers (except Linear / Lucid)

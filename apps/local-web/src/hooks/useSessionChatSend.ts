@@ -11,14 +11,9 @@ import { buildSendContent, finalizePendingTools } from '@/lib/chat-actions'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import type { SessionChatState } from '@/lib/sessions'
 
-/** Soft banner only — token SSE is visible-session-only, so many concurrent
- * server runs no longer exhaust browser connections. */
-const CONCURRENT_RUN_SOFT_LIMIT = 8
-
 type UseSessionChatSendArgs = {
   client: LocalAgentClient
   sessionId: string | null
-  sessions: AgentSession[]
   runActive: boolean
   composer: string
   composerSkills: string[]
@@ -41,7 +36,6 @@ type UseSessionChatSendArgs = {
   ) => void
   setSessions: Dispatch<SetStateAction<AgentSession[]>>
   setError: Dispatch<SetStateAction<string | null>>
-  setConnectionLimitDismissed: Dispatch<SetStateAction<boolean>>
   ensureAgentSession: (
     projectId?: string | null,
     options?: { navigate?: boolean }
@@ -51,7 +45,6 @@ type UseSessionChatSendArgs = {
 export function useSessionChatSend({
   client,
   sessionId,
-  sessions,
   runActive,
   composer,
   composerSkills,
@@ -66,7 +59,6 @@ export function useSessionChatSend({
   patchChat,
   setSessions,
   setError,
-  setConnectionLimitDismissed,
   ensureAgentSession
 }: UseSessionChatSendArgs) {
   const sendMessage = async (composerOverride?: string) => {
@@ -79,14 +71,6 @@ export function useSessionChatSend({
     if (!content || runActive) return
     const targetSessionId = await ensureAgentSession()
     if (!targetSessionId || isDraftAgentSessionId(targetSessionId)) return
-    const othersRunning = sessions.filter(
-      item =>
-        (item.status === 'running' || item.status === 'awaiting_approval') &&
-        item.id !== targetSessionId
-    ).length
-    if (othersRunning + 1 >= CONCURRENT_RUN_SOFT_LIMIT) {
-      setConnectionLimitDismissed(false)
-    }
     const previousComposer = composerText
     const previousSkills = composerSkills
     const previousFiles = composerFiles

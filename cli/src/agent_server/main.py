@@ -61,8 +61,10 @@ def run_server(
 
     if uds is not None and public:
         raise ValueError("Unix-socket mode cannot be combined with --public.")
+    # Non-loopback bind (Mac Network → Allow Remote, or `serve --host 0.0.0.0`)
+    # implies public mode; callers may omit --public.
     if not is_loopback and not public:
-        raise ValueError("Non-loopback binding requires --public.")
+        public = True
 
     # Load persisted auth; public mode can use settings key when CLI key omitted.
     from agent_server.auth_settings import load_settings, resolve_effective_api_key
@@ -71,23 +73,34 @@ def run_server(
     effective = resolve_effective_api_key(cli_api_key=key, settings=persisted)
     if public and not effective:
         raise ValueError(
-            "Public mode requires --api-key, FASTFOLD_SERVER_API_KEY, "
-            "or `sandwalk auth enable` with a configured key."
+            "Public / LAN mode requires --api-key, FASTFOLD_SERVER_API_KEY, "
+            "or `sandwalk auth enable` with a configured key "
+            "(`sandwalk auth generate` then `sandwalk auth enable`)."
         )
-    if public and not origins:
-        raise ValueError("Public mode requires at least one --allowed-origin.")
-    if public and not hosts:
-        raise ValueError("Public mode requires at least one --allowed-host.")
 
     if not origins:
-        origins = [
-            "http://127.0.0.1:8969",
-            "http://localhost:8969",
-            "http://127.0.0.1:5173",
-            "http://localhost:5173",
-        ]
+        if public:
+            # Desktop + common local UI origins. Host header for LAN IPs is
+            # covered by allowed_hosts=["*"] below.
+            origins = [
+                "tauri://localhost",
+                "http://tauri.localhost",
+                "http://127.0.0.1:1420",
+                "http://localhost:1420",
+                "http://127.0.0.1:8969",
+                "http://localhost:8969",
+                "http://127.0.0.1:5173",
+                "http://localhost:5173",
+            ]
+        else:
+            origins = [
+                "http://127.0.0.1:8969",
+                "http://localhost:8969",
+                "http://127.0.0.1:5173",
+                "http://localhost:5173",
+            ]
     if not hosts:
-        hosts = ["127.0.0.1", "localhost"]
+        hosts = ["*"] if public else ["127.0.0.1", "localhost"]
 
     from agent_server.app import create_app
     from agent_server.store import AgentStoreCorruptedError, AgentStoreLockError

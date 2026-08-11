@@ -58,12 +58,12 @@ export function buildChatTimelineItems(
   while (cursor < conversationTimeline.length) {
     const entry = conversationTimeline[cursor]
     if (entry.kind !== 'tool') {
+      // Every non-tool kind is covered below, so no positional fallback is
+      // needed — TypeScript narrows the last branch to `never`.
       const stableKey =
         entry.kind === 'message' || entry.kind === 'thought'
           ? `${entry.kind}-${entry.message.id}`
-          : entry.kind === 'todos' || entry.kind === 'plan'
-            ? `${entry.kind}-${entry.messageId}`
-            : `${entry.kind}-${cursor}`
+          : `${entry.kind}-${entry.messageId}`
       items.push({
         kind: 'entry',
         key: stableKey,

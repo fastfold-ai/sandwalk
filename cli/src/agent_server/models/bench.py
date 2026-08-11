@@ -34,6 +34,14 @@ class BenchSuiteCard(ApiModel):
     install_progress: str | None = None
     install_bytes_done: int | None = None
     install_bytes_total: int | None = None
+    """True when a downloadable dataset is cached on disk (Remove is available)."""
+    installed: bool = False
+    """Bytes this suite occupies in the local bench cache."""
+    installed_bytes: int | None = None
+    """Questions actually cached locally (may differ from the declared corpus)."""
+    installed_count: int | None = None
+    """Set when the fast parquet download needs a reader that is not installed."""
+    missing_dependency: str | None = None
     required_skills: list[str] = Field(default_factory=list)
     required_mcps: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
@@ -42,6 +50,17 @@ class BenchSuiteCard(ApiModel):
 
 class BenchSuiteList(ApiModel):
     data: list[BenchSuiteCard]
+    """Total bytes used by every cached bench dataset."""
+    cache_bytes: int = 0
+    cache_path: str | None = None
+
+
+class BenchUninstallResponse(ApiModel):
+    ok: bool
+    suite_id: str
+    summary: str = ""
+    freed_bytes: int = 0
+    removed: list[str] = Field(default_factory=list)
 
 
 class BenchInstallResponse(ApiModel):
@@ -67,6 +86,10 @@ class BenchSpawnRequest(ApiModel):
     specialist_id: str | None = None
     thinking: bool = False
     dry_run: bool = False
+    # Parallel cells within a single suite run (in-process workers).
+    concurrency: int = 1
+    # After a successful suite, optionally delete the bench project + sessions.
+    cleanup_sessions: bool | None = False
     # Dashboard Bench defaults to ui; `sandwalk eval` should send cli.
     client_surface: Literal["cli", "ui"] = "ui"
 
@@ -86,6 +109,7 @@ class BenchProgress(ApiModel):
     total: int = 0
     bench_current: int = 0
     bench_total: int = 0
+    in_flight: int = 0
 
 
 class BenchQueueItem(ApiModel):
@@ -101,6 +125,8 @@ class BenchActiveStatus(ApiModel):
     current_run_id: str | None = None
     last_progress: BenchProgress | None = None
     queue: list[BenchQueueItem] = Field(default_factory=list)
+    resumable_run_id: str | None = None
+    project_id: str | None = None
 
 
 class BenchResultSummary(ApiModel):
@@ -114,6 +140,9 @@ class BenchResultSummary(ApiModel):
     thinking_used: bool = False
     project_id: str | None = None
     created_at: str | None = None
+    status: str | None = None
+    reasoning_effort: str | None = None
+    reasoning_fast: bool | None = None
 
 
 class BenchResultList(ApiModel):
@@ -125,9 +154,20 @@ class BenchCancelResponse(ApiModel):
     run_id: str | None = None
 
 
+class BenchPauseResponse(ApiModel):
+    ok: bool
+    run_id: str | None = None
+
+
+class BenchResumeResponse(ApiModel):
+    ok: bool
+    run_id: str | None = None
+
+
 class BenchResetResponse(ApiModel):
     ok: bool
     cleared: int
+    sessions_deleted: int = 0
 
 
 class BenchGradeRequest(ApiModel):

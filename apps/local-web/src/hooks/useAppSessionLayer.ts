@@ -14,7 +14,6 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
 import { buildConversationTimeline } from '@/components/agents/transcript'
-import { computeRunningCount,CONCURRENT_RUN_SOFT_LIMIT } from '@/components/app/app-display'
 import { buildAgentComposerSlotProps } from '@/components/app/build-agent-composer-slot-props'
 import { usePrefetchSessionMessages } from '@/hooks/useAppRouteContext'
 import { useChatScroll } from '@/hooks/useChatScroll'
@@ -38,9 +37,15 @@ type SessionLayerArgs = {
   sessions: AgentSession[]
   setSessions: Dispatch<SetStateAction<AgentSession[]>>
   setError: Dispatch<SetStateAction<string | null>>
-  loadSessions: () => Promise<void>
+  loadSessions: (options?: {
+    force?: boolean
+    projectId?: string | null
+  }) => Promise<void>
   loadSessionsRef: MutableRefObject<
-    ((options?: { force?: boolean }) => Promise<void>) | null
+    ((options?: {
+      force?: boolean
+      projectId?: string | null
+    }) => Promise<void>) | null
   >
   loadSkillsRef: MutableRefObject<(() => Promise<void>) | null>
   loadProjects: () => Promise<void>
@@ -72,7 +77,6 @@ type SessionLayerArgs = {
   setProjectScopeId: Dispatch<SetStateAction<string | null>>
   setRecentProjectIds: Dispatch<SetStateAction<string[]>>
   setCollapsedSidebarSections: Dispatch<SetStateAction<Record<string, boolean>>>
-  setConnectionLimitDismissed: Dispatch<SetStateAction<boolean>>
   setWorkspaceVersion: Dispatch<SetStateAction<number>>
   workspaceFiles: WorkspaceFile[]
   setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
@@ -90,8 +94,6 @@ type SessionLayerArgs = {
 export function useAppSessionLayer(args: SessionLayerArgs) {
   const chat = useSessionChatState(args.sessionId)
   args.setChatBySessionIdRef.current = chat.setChatBySessionId
-
-  const runningCount = computeRunningCount(args.sessions)
 
   useSessionChatStream({
     client: args.client,
@@ -178,7 +180,6 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
   const send = useSessionChatSend({
     client: args.client,
     sessionId: args.sessionId,
-    sessions: args.sessions,
     runActive: chat.runActive,
     composer: chat.composer,
     composerSkills: chat.composerSkills,
@@ -193,7 +194,6 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     patchChat: chat.patchChat,
     setSessions: args.setSessions,
     setError: args.setError,
-    setConnectionLimitDismissed: args.setConnectionLimitDismissed,
     ensureAgentSession: actions.ensureAgentSession
   })
 
@@ -385,8 +385,6 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     activeRunTools,
     activeBuildPlan,
     builtPlanPaths,
-    submitApprovals,
-    runningCount,
-    concurrentRunSoftLimit: CONCURRENT_RUN_SOFT_LIMIT
+    submitApprovals
   }
 }

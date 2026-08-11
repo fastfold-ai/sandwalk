@@ -17,6 +17,10 @@ from agent_server.bench_service.coding_suites import (
 from agent_server.bench_service.dataset_install import (
     INSTALLABLE_SUITE_IDS,
     hf_token_configured,
+    missing_parquet_dependency,
+    suite_installed_bytes,
+    suite_installed_count,
+    total_cache_bytes,
 )
 from agent_server.bench_service.install_jobs import (
     get_install_job,
@@ -29,6 +33,7 @@ from agent_server.bench_service.mcq_suites import (
     catalog_sample_sizes,
     count_fixture,
     dataset_available,
+    full_dataset_available,
 )
 from agent_server.bench_service.pack_requirements import (
     missing_pack_requirements,
@@ -39,20 +44,72 @@ from agent_server.models.bench import BenchSuiteCard
 
 # Friendly titles for YAML packs (UI picks models; one card per pack).
 _PACK_TITLES = {
+    "bio-capybara-full": "Bio-Capybara-full",
+    # Legacy pack id (pre-rename).
     "skills-mcp-bakeoff": "Bio-Capybara-full",
 }
 
 # Author attribution shown on suite cards (local-web serves /brand/bench/*).
 _PACK_AUTHORS = {
+    "bio-capybara-full": ("Sandwalk", "/brand/bench/sandwalk-mark.svg"),
     "skills-mcp-bakeoff": ("Sandwalk", "/brand/bench/sandwalk-mark.svg"),
 }
+
+
+def pack_display_title(pack_id: str | None) -> str:
+    """Human label for a pack/suite id (falls back to the raw id)."""
+    if not pack_id:
+        return ""
+    key = str(pack_id)
+    return _PACK_TITLES.get(key, key)
+
+
+def pack_aliases(pack: Any) -> list[str]:
+    """Legacy ids from YAML `aliases:` (plus the current pack.id)."""
+    raw = getattr(pack, "raw", None) or {}
+    aliases = [str(x) for x in (raw.get("aliases") or []) if x]
+    return [str(pack.id), *aliases]
+
+
+def pack_matches_id(pack: Any, pack_id: str) -> bool:
+    return str(pack_id) in pack_aliases(pack)
 
 def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
     cards: list[BenchSuiteCard] = []
     hf_ready = hf_token_configured()
+    dep_hint = missing_parquet_dependency()
     for suite in MCQ_SUITES.values():
         n = count_fixture(suite.id)
         ok = dataset_available(suite.id)
+        full_ok = full_dataset_available(suite.id)
+        installable = suite.id in INSTALLABLE_SUITE_IDS
+        installing = is_installing(suite.id)
+        err = install_error(suite.id)
+        progress = install_progress_text(suite.id) if installing else None
+        job = get_install_job(suite.id) if installing else None
+        # Only offer sizes the local data can actually satisfy: with just the
+        # 30-row sample fixture, larger picks used to fail mid-run.
+        sizes = catalog_sample_sizes(suite, full_available=full_ok)
+        if installing:
+            reason = progress or f"Downloading {suite.title} in the background…"
+        elif err:
+            reason = err
+        elif not ok:
+            reason = (
+                f"{suite.title} dataset missing. Click Install to download it."
+                if installable
+                else (
+                    f"{suite.title} dataset missing. Place "
+                    f"{suite.full_fixture} under apps/benchmarking/.cache/mcq/"
+                )
+            )
+        elif not full_ok:
+            reason = (
+                f"Sample fixture only ({max(sizes)} questions). "
+                f"Install {suite.title} to unlock larger sample sizes."
+            )
+        else:
+            reason = None
         cards.append(
             BenchSuiteCard(
                 id=suite.id,
@@ -60,19 +117,26 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
                 description=suite.description,
                 lane="intelligence",
                 runner="agent",
+                # Corpus size is a property of the benchmark; install state is
+                # conveyed through available / unavailable_reason instead.
                 question_count=n,
-                sample_sizes=catalog_sample_sizes(suite),
-                default_sample_size=suite.default_sample_size,
+                sample_sizes=sizes,
+                default_sample_size=min(suite.default_sample_size, max(sizes)),
                 available=ok,
-                unavailable_reason=None
-                if ok
-                else (
-                    f"{suite.title} dataset missing. Place "
-                    f"{suite.full_fixture} under apps/benchmarking/.cache/mcq/"
-                ),
+                unavailable_reason=reason,
                 author=suite.author,
                 author_avatar=suite.author_avatar,
                 code_exec=False,
+                installable=installable,
+                installing=installing,
+                install_error=err,
+                install_progress=progress,
+                install_bytes_done=job.bytes_done if job else None,
+                install_bytes_total=job.bytes_total if job else None,
+                installed=full_ok,
+                installed_bytes=suite_installed_bytes(suite.id) or None,
+                installed_count=suite_installed_count(suite.id),
+                missing_dependency=dep_hint if installable else None,
             )
         )
 
@@ -118,6 +182,9 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
                 install_progress=progress,
                 install_bytes_done=job.bytes_done if job else None,
                 install_bytes_total=job.bytes_total if job else None,
+                installed=ok,
+                installed_bytes=suite_installed_bytes(suite.id) or None,
+                installed_count=suite_installed_count(suite.id),
             )
         )
 
@@ -169,6 +236,8 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
             install_progress=bix_progress,
             install_bytes_done=bix_job.bytes_done if bix_job else None,
             install_bytes_total=bix_job.bytes_total if bix_job else None,
+            installed=bix_ok,
+            installed_bytes=suite_installed_bytes("bixbench-verified-50") or None,
         ),
     )
 
@@ -194,10 +263,14 @@ def list_suite_cards(store: Any | None = None) -> list[BenchSuiteCard]:
             cards.append(
                 BenchSuiteCard(
                     id=pack.id,
-                    title=_PACK_TITLES.get(pack.id, pack.id),
+                    title=pack_display_title(pack.id),
                     description=(pack.description or "")[:240],
                     lane="skills"
-                    if "skills" in pack.id or "bakeoff" in pack.id
+                    if any(
+                        token in pack.id
+                        for token in ("skills", "bakeoff", "capybara")
+                    )
+                    or "skills" in str(getattr(pack, "path", "")).lower()
                     else "intelligence",
                     runner="agent",
                     pack_id=pack.id,

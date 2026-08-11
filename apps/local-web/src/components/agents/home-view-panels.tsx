@@ -16,6 +16,16 @@ import { useNavigate } from 'react-router-dom'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ProjectMark } from '@/components/agents/ProjectMark'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -206,7 +216,8 @@ export function HomeProjectView({
   previews,
   client,
   onCreateSession,
-  onOpenSession
+  onOpenSession,
+  onDeleteProject
 }: {
   project: AgentProject
   sessions: AgentSession[]
@@ -214,60 +225,114 @@ export function HomeProjectView({
   client: LocalAgentClient
   onCreateSession: (projectId: string | null) => void
   onOpenSession: (id: string) => void
+  onDeleteProject: (project: AgentProject) => void
 }) {
+  const [confirmRemove, setConfirmRemove] = useState(false)
   const description =
     project.description?.trim() ||
     'Pick up where you left off or start something new.'
   const isDenseMeta =
     description.includes('\n') ||
     /sandwalk-bench|matrix:|sessions:/i.test(description)
+  const sessionCount = Math.max(sessions.length, project.sessionCount || 0)
+  const sessionLabel =
+    sessionCount === 1 ? '1 session' : `${sessionCount} sessions`
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-6xl px-6 pt-8 pb-8 md:px-10">
-        <div className="mb-8 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <ProjectMark
-                icon={project.icon}
-                color={project.color}
-                className="size-9 shrink-0"
-                iconClassName="size-4"
-              />
-              <h2 className="truncate text-xl font-semibold">{project.name}</h2>
+    <>
+      <ScrollArea className="flex-1">
+        <div className="mx-auto w-full max-w-6xl px-6 pt-8 pb-8 md:px-10">
+          <div className="mb-8 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <ProjectMark
+                  icon={project.icon}
+                  color={project.color}
+                  className="size-9 shrink-0"
+                  iconClassName="size-4"
+                />
+                <h2 className="truncate text-xl font-semibold">{project.name}</h2>
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onCreateSession(project.id)}
+                >
+                  <Plus className="size-3.5" />
+                  New Agent
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
+                  onClick={() => setConfirmRemove(true)}
+                >
+                  <Trash2 className="size-3.5" />
+                  Remove
+                </Button>
+              </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onCreateSession(project.id)}
-            >
-              <Plus className="size-3.5" />
-              New Agent
-            </Button>
+            {isDenseMeta ? (
+              <pre className="bg-muted/35 text-muted-foreground max-w-3xl overflow-x-auto rounded-xl px-4 py-3 font-sans text-xs leading-relaxed whitespace-pre-wrap">
+                {description}
+              </pre>
+            ) : (
+              <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
+                {description}
+              </p>
+            )}
           </div>
-          {isDenseMeta ? (
-            <pre className="bg-muted/35 text-muted-foreground max-w-3xl overflow-x-auto rounded-xl px-4 py-3 font-sans text-xs leading-relaxed whitespace-pre-wrap">
-              {description}
-            </pre>
-          ) : (
-            <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-              {description}
-            </p>
-          )}
+          <HomeProjectBenchLinks client={client} projectId={project.id} />
+          <section>
+            <h3 className="mb-3 text-sm font-medium">Recent sessions</h3>
+            <HomeProjectSessions
+              sessions={sessions}
+              previews={previews}
+              onOpenSession={onOpenSession}
+              onCreateSession={onCreateSession}
+              projectId={project.id}
+            />
+          </section>
         </div>
-        <HomeProjectBenchLinks client={client} projectId={project.id} />
-        <section>
-          <h3 className="mb-3 text-sm font-medium">Recent sessions</h3>
-          <HomeProjectSessions
-            sessions={sessions}
-            previews={previews}
-            onOpenSession={onOpenSession}
-            onCreateSession={onCreateSession}
-            projectId={project.id}
-          />
-        </section>
-      </div>
-    </ScrollArea>
+      </ScrollArea>
+
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove project?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  This permanently deletes the project and all of its sessions.
+                  This cannot be undone.
+                </p>
+                <div className="bg-muted/50 rounded-lg px-3 py-2.5 text-left">
+                  <div className="text-foreground truncate font-medium">
+                    {project.name}
+                  </div>
+                  <div className="text-muted-foreground mt-0.5 text-xs">
+                    {sessionLabel} will be removed
+                  </div>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-600"
+              onClick={() => {
+                setConfirmRemove(false)
+                onDeleteProject(project)
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 

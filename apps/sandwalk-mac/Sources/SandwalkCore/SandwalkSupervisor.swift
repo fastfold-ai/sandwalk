@@ -208,8 +208,10 @@ final class SandwalkSupervisor {
     }
 
     func reapSync() {
-        web.reapSync(timeout: 5)
-        api.reapSync(timeout: 5)
+        // Keep the combined budget small: AppKit force-kills a slow
+        // applicationWillTerminate, and dying mid-reap is what orphans the agent.
+        web.reapSync(timeout: 2)
+        api.reapSync(timeout: 3)
         recompute()
     }
 

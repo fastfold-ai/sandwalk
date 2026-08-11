@@ -85,6 +85,22 @@ export function relativeTime(value: string) {
   return `${Math.floor(hours / 24)}d`
 }
 
+/** Calendar-day label: Today / Yesterday / `10d ago`. */
+export function relativeDayLabel(value: string, now = new Date()) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const startOfToday = new Date(now)
+  startOfToday.setHours(0, 0, 0, 0)
+  const startOfTarget = new Date(date)
+  startOfTarget.setHours(0, 0, 0, 0)
+  const dayDiff = Math.round(
+    (startOfToday.getTime() - startOfTarget.getTime()) / 86_400_000
+  )
+  if (dayDiff <= 0) return 'Today'
+  if (dayDiff === 1) return 'Yesterday'
+  return `${dayDiff}d ago`
+}
+
 export function formatMessagePopoverDate(value: string) {
   if (!value) return ''
   const date = new Date(value)

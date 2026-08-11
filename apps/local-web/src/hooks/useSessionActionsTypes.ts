@@ -37,7 +37,10 @@ export type UseSessionActionsArgs = {
     SetStateAction<Record<string, SessionChatState>>
   >
   composerLiveRef: MutableRefObject<string>
-  loadSessions: () => Promise<void>
+  loadSessions: (options?: {
+    force?: boolean
+    projectId?: string | null
+  }) => Promise<void>
   loadProjects: () => Promise<void>
   setError: Dispatch<SetStateAction<string | null>>
   setCollapsedSidebarSections: Dispatch<

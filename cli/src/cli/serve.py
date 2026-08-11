@@ -14,7 +14,11 @@ def serve_cmd(
     public: bool = typer.Option(
         False,
         "--public",
-        help="Allow a non-loopback listener; requires API key, origins, and hosts",
+        help=(
+            "Expose on the LAN (non-loopback). Implied by --host 0.0.0.0. "
+            "Requires an API key (`sandwalk auth enable`); defaults allow "
+            "desktop origins and any Host header."
+        ),
     ),
     api_key: str | None = typer.Option(
         None,

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import {
@@ -9,6 +9,7 @@ import {
 import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
+import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
 import {
@@ -21,6 +22,7 @@ import { useAppSessionLayer } from '@/hooks/useAppSessionLayer'
 import { useAppShellEffects } from '@/hooks/useAppShellEffects'
 import { useAppUiState } from '@/hooks/useAppUiState'
 import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
+import { useDesktopWindowMenu } from '@/hooks/useDesktopWindowMenu'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { visibleSessionIds } from '@/lib/sessions'
@@ -52,6 +54,7 @@ export default function App() {
     [bootstrap.loadSessions]
   )
   useDesktopNavigate(navigate, onDesktopRoute)
+  const windowMenu = useDesktopWindowMenu()
 
   const tabs = useAppOpenTabs(
     ui.projectScopeId,
@@ -109,7 +112,6 @@ export default function App() {
     setProjectScopeId: ui.setProjectScopeId,
     setRecentProjectIds: ui.setRecentProjectIds,
     setCollapsedSidebarSections: ui.setCollapsedSidebarSections,
-    setConnectionLimitDismissed: ui.setConnectionLimitDismissed,
     setWorkspaceVersion: ui.setWorkspaceVersion,
     workspaceFiles: ui.workspaceFiles,
     setFilesPanelCollapsed: ui.setFilesPanelCollapsed,
@@ -122,10 +124,6 @@ export default function App() {
   // Route wins. Draft materialization uses a separate ref inside session CRUD
   // so /agents/new never "sticks" to a previous real session id.
   ui.sessionIdRef.current = route.sessionId
-
-  const showConnectionLimitWarning =
-    layer.runningCount >= layer.concurrentRunSoftLimit &&
-    !ui.connectionLimitDismissed
 
   const { showChatSkeleton } = useAppShellEffects({
     locationPathname: location.pathname,
@@ -168,9 +166,6 @@ export default function App() {
     sidebarPanelRef: ui.sidebarPanelRef,
     filesPanelRef: ui.filesPanelRef,
     collapsedSidebarSections: ui.collapsedSidebarSections,
-    runningCount: layer.runningCount,
-    concurrentRunSoftLimit: layer.concurrentRunSoftLimit,
-    setConnectionLimitDismissed: ui.setConnectionLimitDismissed,
     routeProjectId: route.routeProjectId,
     setProjectScopeId: ui.setProjectScopeId,
     messagesLoaded: layer.chat.messagesLoaded,
@@ -206,6 +201,16 @@ export default function App() {
     setComposer: layer.chat.setComposer,
     setComposerFiles: layer.chat.setComposerFiles
   })
+
+  // Bench sessions are omitted from the global list (sidebar noise). When a
+  // project is selected, reload with projectId so Project Home + scoped
+  // sidebar show those chats.
+  useEffect(() => {
+    void bootstrap.loadSessions({
+      force: true,
+      projectId: ui.projectScopeId
+    })
+  }, [bootstrap.loadSessions, ui.projectScopeId])
 
   const { sections, openTabs } = buildSessionSidebarModel({
     sessions: bootstrap.sessions,
@@ -288,40 +293,56 @@ export default function App() {
     loadMcpServers: bootstrap.loadMcpServers,
     loadMcpCatalog: bootstrap.loadMcpCatalog
   })
-  if (gate) return gate
+  const remoteDialog = (
+    <OpenRemoteWindowDialog
+      open={windowMenu.remoteOpen}
+      onOpenChange={windowMenu.setRemoteOpen}
+      initialUrl={windowMenu.remoteInitialUrl}
+    />
+  )
+
+  if (gate) {
+    return (
+      <>
+        {gate}
+        {remoteDialog}
+      </>
+    )
+  }
 
   return (
-    <AppShellConnected
-      {...buildAppShellProps({
-        ui,
-        route,
-        bootstrap,
-        context,
-        chat: layer.chat,
-        tabs,
-        actions: layer.actions,
-        sandbox: layer.sandbox,
-        scroll: layer.scroll,
-        location,
-        navigate,
-        sections,
-        openTabs,
-        orderedVisibleSessionIds,
-        showSessionTabs,
-        activeTitle,
-        canShowFilesPanel,
-        conversationTimeline: layer.conversationTimeline,
-        agentComposerSlotProps: layer.agentComposerSlotProps,
-        activeRunTodos: layer.activeRunTodos,
-        activeRunTools: layer.activeRunTools,
-        activeBuildPlan: layer.activeBuildPlan,
-        builtPlanPaths: layer.builtPlanPaths,
-        submitApprovals: layer.submitApprovals,
-        showConnectionLimitWarning,
-        runningCount: layer.runningCount,
-        prefetchSessionMessages: layer.prefetchSessionMessages,
-        showChatSkeleton
-      })}
-    />
+    <>
+      <AppShellConnected
+        {...buildAppShellProps({
+          ui,
+          route,
+          bootstrap,
+          context,
+          chat: layer.chat,
+          tabs,
+          actions: layer.actions,
+          sandbox: layer.sandbox,
+          scroll: layer.scroll,
+          location,
+          navigate,
+          sections,
+          openTabs,
+          orderedVisibleSessionIds,
+          showSessionTabs,
+          activeTitle,
+          canShowFilesPanel,
+          conversationTimeline: layer.conversationTimeline,
+          agentComposerSlotProps: layer.agentComposerSlotProps,
+          activeRunTodos: layer.activeRunTodos,
+          activeRunTools: layer.activeRunTools,
+          activeBuildPlan: layer.activeBuildPlan,
+          builtPlanPaths: layer.builtPlanPaths,
+          submitApprovals: layer.submitApprovals,
+          prefetchSessionMessages: layer.prefetchSessionMessages,
+          showChatSkeleton
+        })}
+      />
+      {remoteDialog}
+    </>
   )
 }

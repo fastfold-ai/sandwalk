@@ -1,7 +1,12 @@
 import { useEffect } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
-import { isTauri, listenDesktopNavigate } from '@/lib/desktop'
+import {
+  isTauri,
+  listenDesktopNavigate,
+  persistDesktopSnapshotId,
+  readDesktopSnapshotId
+} from '@/lib/desktop'
 
 /** In-app routes only — reject absolute FS paths from argv (e.g. the binary). */
 export function isSpaDesktopRoute(path: string) {
@@ -30,6 +35,9 @@ export function useDesktopNavigate(
       navigate(path)
       onRoute?.(path)
     }
+
+    const snap = readDesktopSnapshotId()
+    if (snap) persistDesktopSnapshotId(snap)
 
     const initial = (
       globalThis as { __SANDWALK_INITIAL_ROUTE__?: unknown }

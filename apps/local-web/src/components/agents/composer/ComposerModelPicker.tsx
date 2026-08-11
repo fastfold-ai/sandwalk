@@ -90,10 +90,16 @@ export function ComposerModelPicker({
       (selectedModel.reasoningEffortOptions &&
         selectedModel.reasoningEffortOptions.length > 0)
   )
-  const selectedEffort = String(selectedModel.reasoningEffort || 'medium')
+  // Prefer live runtime settings so effort changes paint immediately without
+  // waiting for a full model-catalog reload (Bench never reloads the catalog).
+  const selectedEffort = String(
+    runtimeSettings?.reasoningEffort ?? selectedModel.reasoningEffort ?? 'medium'
+  )
     .trim()
     .toLowerCase()
-  const selectedFast = Boolean(selectedModel.reasoningFast)
+  const selectedFast = Boolean(
+    runtimeSettings?.reasoningFast ?? selectedModel.reasoningFast
+  )
   const reasoningBadge = supportsReasoningEffort
     ? formatModelEffortBadge({
         reasoningEffort: selectedEffort,

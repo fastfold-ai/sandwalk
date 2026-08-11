@@ -29,6 +29,10 @@ enum ServerStartupDiagnostics {
             "no module named",
             "Python dependency missing — reinstall the agent CLI (see Logs)"
         ),
+        (
+            "public / lan mode requires",
+            "Remote access needs an API key — generate one under Security and enable auth, or turn off Allow remote connections"
+        ),
     ]
 
     struct Classification: Equatable {
@@ -43,14 +47,16 @@ enum ServerStartupDiagnostics {
         consecutiveStartupFailures: Int,
         logURL: URL
     ) -> Classification {
-        if let hint = recentFatalHint(logURL: logURL) {
-            return Classification(isFatal: true, message: hint)
-        }
-
         let base = "Exited with code \(code)"
         // SIGTERM / SIGKILL — often intentional or tooling; allow adopt/respawn.
+        // Checked before the log scan: a signalled exit is not evidence of the
+        // fatal condition some earlier line describes.
         if code == 15 || code == 9 || code == 143 || code == 137 {
             return Classification(isFatal: false, message: base)
+        }
+
+        if let hint = recentFatalHint(logURL: logURL) {
+            return Classification(isFatal: true, message: hint)
         }
 
         // Never reached /v1/health more than once: same failure will loop forever.
@@ -66,13 +72,42 @@ enum ServerStartupDiagnostics {
 
     static func recentFatalHint(logURL: URL) -> String? {
         guard let text = readTail(of: logURL, maxBytes: 24_576) else { return nil }
-        let lower = text.lowercased()
+        // Only consider the current run. A failed start writes its error and
+        // exits, but that line stays in the log; scanning the whole tail made a
+        // healthy server keep reporting the previous attempt's failure
+        // ("database is locked") even though it was serving fine.
+        let scoped = currentRunSlice(of: text)
+        let lower = scoped.lowercased()
         for pattern in fatalLogPatterns {
             if lower.contains(pattern.match) {
                 return pattern.message
             }
         }
         return nil
+    }
+
+    /// Log substrings that mark the start of a fresh `sandwalk serve` process.
+    private static let runStartMarkers = [
+        "started server process",
+        "uvicorn running on",
+    ]
+
+    /// Trim everything before the last server startup line.
+    ///
+    /// Returns the input unchanged when no marker is present — a process that
+    /// died before printing one has only its own output in the log.
+    static func currentRunSlice(of text: String) -> String {
+        let lower = text.lowercased()
+        var cut: String.Index?
+        for marker in runStartMarkers {
+            if let range = lower.range(of: marker, options: .backwards) {
+                if cut == nil || range.lowerBound > cut! {
+                    cut = range.lowerBound
+                }
+            }
+        }
+        guard let cut else { return text }
+        return String(text[cut...])
     }
 
     static func readTail(of url: URL, maxBytes: Int) -> String? {

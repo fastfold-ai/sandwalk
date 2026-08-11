@@ -268,6 +268,45 @@ export function formatModelEffortBadge(option: {
   }`
 }
 
+/** Patch Effort/Fast on matching catalog rows after a settings update. */
+export function patchComposerModelEffort(
+  options: ComposerModelOption[],
+  changes: {
+    provider: string
+    model: string
+    reasoningEffort?: string
+    reasoningFast?: boolean
+  }
+): ComposerModelOption[] {
+  const modelId = String(changes.model || '').trim()
+  const provider = String(changes.provider || '')
+    .trim()
+    .toLowerCase()
+  if (!modelId) return options
+  return options.map(option => {
+    if (option.model !== modelId) return option
+    const optionProvider = String(option.provider || '')
+      .trim()
+      .toLowerCase()
+    // Prefer same provider; still patch when the catalog row is the only match.
+    const providerMatches =
+      !provider ||
+      optionProvider === provider ||
+      (provider === 'openai' &&
+        (optionProvider === 'local' || option.source === 'profile'))
+    if (!providerMatches) return option
+    return {
+      ...option,
+      ...(typeof changes.reasoningEffort === 'string'
+        ? { reasoningEffort: changes.reasoningEffort }
+        : {}),
+      ...(typeof changes.reasoningFast === 'boolean'
+        ? { reasoningFast: changes.reasoningFast }
+        : {})
+    }
+  })
+}
+
 /** Strip vendor prefixes (`deepseek/deepseek-v4-flash` → `deepseek-v4-flash`). */
 export function composerModelBareId(modelId: string): string {
   const raw = String(modelId || '').trim()

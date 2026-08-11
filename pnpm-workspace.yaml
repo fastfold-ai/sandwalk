@@ -3,5 +3,3 @@ packages:
   - packages/*
   - docs
 
-patchedDependencies:
-  '@sinm/react-chrome-tabs@2.6.3': patches/@sinm__react-chrome-tabs@2.6.3.patch

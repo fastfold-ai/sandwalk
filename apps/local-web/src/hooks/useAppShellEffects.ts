@@ -58,9 +58,6 @@ type UseAppShellEffectsArgs = {
   sidebarPanelRef: RefObject<ImperativePanelHandle | null>
   filesPanelRef: RefObject<ImperativePanelHandle | null>
   collapsedSidebarSections: Record<string, boolean>
-  runningCount: number
-  concurrentRunSoftLimit: number
-  setConnectionLimitDismissed: Dispatch<SetStateAction<boolean>>
   routeProjectId: string | null
   setProjectScopeId: Dispatch<SetStateAction<string | null>>
   messagesLoaded: boolean
@@ -122,16 +119,6 @@ export function useAppShellEffects(args: UseAppShellEffectsArgs) {
     collapsedSidebarSections: args.collapsedSidebarSections,
     sessionId: args.sessionId
   })
-
-  useEffect(() => {
-    if (args.runningCount < args.concurrentRunSoftLimit) {
-      args.setConnectionLimitDismissed(false)
-    }
-  }, [
-    args.concurrentRunSoftLimit,
-    args.runningCount,
-    args.setConnectionLimitDismissed
-  ])
 
   useEffect(() => {
     if (args.routeProjectId) {
