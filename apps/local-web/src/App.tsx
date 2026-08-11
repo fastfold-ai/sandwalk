@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
@@ -141,6 +141,36 @@ export default function App() {
     pendingAttachmentsRef: ui.pendingAttachmentsRef,
     setChatBySessionIdRef
   })
+
+  // Multi-select para split view: cualquier click con Shift/Meta en una
+  // pestaña, chat del sidebar o item del dropdown agrega/quita ese chatId
+  // aquí. Cuando hay >= 2 seleccionados aparece un action bar que crea el
+  // grupo con todos.
+  const [selectedChatIds, setSelectedChatIds] = React.useState<Set<string>>(
+    () => new Set()
+  )
+  const toggleSelectChat = useCallback((id: string) => {
+    setSelectedChatIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+  const clearSelectChats = useCallback(() => {
+    setSelectedChatIds(prev => (prev.size === 0 ? prev : new Set()))
+  }, [])
+  const createSplitFromSelection = useCallback(() => {
+    const ids = Array.from(selectedChatIds).filter(
+      id => !id.startsWith('grp_')
+    )
+    if (ids.length < 2) return
+    const groupId = tabGroupsStore.createGroup(ids)
+    if (groupId) {
+      setSelectedChatIds(new Set())
+      navigate(`/agents/${groupId}`)
+    }
+  }, [selectedChatIds, tabGroupsStore, navigate])
 
   // Punto de entrada MVP para crear un grupo: "Split with next tab" agrupa
   // el chat sobre el que se hizo click con el siguiente tab abierto (o el
@@ -487,7 +517,30 @@ export default function App() {
           activeGroup,
           perSessionBaseArgs,
           allSessions: bootstrap.sessions,
-          onSplitWithNextTab: handleSplitWithNextTab
+          onSplitWithNextTab: handleSplitWithNextTab,
+          selectedChatIds,
+          toggleSelectChat,
+          clearSelectChats,
+          createSplitFromSelection,
+          createSplitFromSidebar: () => {
+            const ids = Array.from(layer.actions.selectedSessionIds).filter(
+              id => !id.startsWith('grp_')
+            )
+            if (ids.length < 2) return
+            const groupId = tabGroupsStore.createGroup(ids)
+            if (groupId) {
+              layer.actions.clearSessionSelection()
+              navigate(`/agents/${groupId}`)
+            }
+          },
+          canSplitFromSidebar:
+            layer.actions.selectedSessionIds.size >= 2 &&
+            Array.from(layer.actions.selectedSessionIds).filter(
+              id => !id.startsWith('grp_')
+            ).length >= 2,
+          onSelectTabGroup: (groupId: string) => {
+            navigate(`/agents/${groupId}`)
+          }
         })}
       />
       {remoteDialog}

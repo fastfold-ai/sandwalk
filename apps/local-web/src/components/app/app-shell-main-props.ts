@@ -212,6 +212,10 @@ export type AppShellMainProps = {
   tabGroups: SessionGroup[]
   onSplitWithNextTab: (sourceId: string) => void
   dissolveTabGroup: (groupId: string) => void
+  selectedChatIds: Set<string>
+  toggleSelectChat: (id: string) => void
+  clearSelectChats: () => void
+  createSplitFromSelection: () => void
 }
 
 export function isDashboardMainView(props: AppShellMainProps) {

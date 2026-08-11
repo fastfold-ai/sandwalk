@@ -63,6 +63,11 @@ export function AppShell(props: AppShellProps) {
           batchMoveSelected={props.batchMoveSelected}
           batchExportSelected={props.batchExportSelected}
           setBatchDeletePending={props.setBatchDeletePending}
+          onBatchSplitView={props.createSplitFromSidebar}
+          canBatchSplitView={props.canSplitFromSidebar}
+          tabGroups={props.tabGroups}
+          onSelectTabGroup={props.onSelectTabGroup}
+          onDissolveTabGroup={props.dissolveTabGroup}
           setCollapsedSidebarSections={props.setCollapsedSidebarSections}
           selectSessionRange={props.selectSessionRange}
           toggleSessionSelected={props.toggleSessionSelected}
@@ -245,6 +250,10 @@ export function AppShell(props: AppShellProps) {
           tabGroups={props.tabGroups}
           onSplitWithNextTab={props.onSplitWithNextTab}
           dissolveTabGroup={props.dissolveTabGroup}
+          selectedChatIds={props.selectedChatIds}
+          toggleSelectChat={props.toggleSelectChat}
+          clearSelectChats={props.clearSelectChats}
+          createSplitFromSelection={props.createSplitFromSelection}
         />
         </ResizablePanelGroup>
       </div>

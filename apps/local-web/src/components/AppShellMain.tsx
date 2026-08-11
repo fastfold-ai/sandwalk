@@ -161,6 +161,10 @@ export function AppShellMain(props: AppShellMainProps) {
             tabGroups={props.tabGroups}
             onSplitWithNextTab={props.onSplitWithNextTab}
             dissolveTabGroup={props.dissolveTabGroup}
+            selectedChatIds={props.selectedChatIds}
+            toggleSelectChat={props.toggleSelectChat}
+            clearSelectChats={props.clearSelectChats}
+            createSplitFromSelection={props.createSplitFromSelection}
           />
         )}
         </div>

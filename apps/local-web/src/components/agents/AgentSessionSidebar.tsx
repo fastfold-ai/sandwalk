@@ -63,6 +63,11 @@ type AgentSessionSidebarProps = {
   onBatchMoveSelected: (projectId: string | null) => void | Promise<void>
   onBatchExportSelected: () => void | Promise<void>
   onBatchDeletePending: () => void
+  onBatchSplitView?: () => void
+  canBatchSplitView?: boolean
+  tabGroups?: import('@sandwalk/agent-ui-core').SessionGroup[]
+  onSelectTabGroup?: (groupId: string) => void
+  onDissolveTabGroup?: (groupId: string) => void
   setCollapsedSidebarSections: Dispatch<SetStateAction<Record<string, boolean>>>
   selectSessionRange: (orderedIds: string[], targetId: string) => void
   toggleSessionSelected: (targetId: string) => void
@@ -110,6 +115,11 @@ export function AgentSessionSidebar({
   onBatchMoveSelected,
   onBatchExportSelected,
   onBatchDeletePending,
+  onBatchSplitView,
+  canBatchSplitView,
+  tabGroups,
+  onSelectTabGroup,
+  onDissolveTabGroup,
   setCollapsedSidebarSections,
   selectSessionRange,
   toggleSessionSelected,
@@ -235,6 +245,15 @@ export function AgentSessionSidebar({
           Sites
         </button>
       </div>
+      {tabGroups && tabGroups.length > 0 && onSelectTabGroup ? (
+        <SidebarGroupsRow
+          groups={tabGroups}
+          activeId={sessionId}
+          sessions={sections.flatMap(sec => sec.items)}
+          onSelectGroup={onSelectTabGroup}
+          onDissolveGroup={onDissolveTabGroup}
+        />
+      ) : null}
       <SidebarSessionList
         sections={sections}
         scopeKey={activeProjectId}
@@ -270,6 +289,8 @@ export function AgentSessionSidebar({
           onBatchMove={projectId => void onBatchMoveSelected(projectId)}
           onBatchExport={() => void onBatchExportSelected()}
           onBatchDelete={onBatchDeletePending}
+          onBatchSplitView={onBatchSplitView}
+          canSplitView={canBatchSplitView}
         />
         <SidebarUserMenu
           userName={sidebarUserName}
@@ -281,5 +302,81 @@ export function AgentSessionSidebar({
         />
       </div>
     </>
+  )
+}
+
+function SidebarGroupsRow({
+  groups,
+  activeId,
+  sessions,
+  onSelectGroup,
+  onDissolveGroup
+}: {
+  groups: import('@sandwalk/agent-ui-core').SessionGroup[]
+  activeId: string | null
+  sessions: AgentSession[]
+  onSelectGroup: (id: string) => void
+  onDissolveGroup?: (id: string) => void
+}) {
+  return (
+    <div className="mb-1 px-2">
+      <div className="text-muted-foreground mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide">
+        Split view
+      </div>
+      <div className="flex flex-col gap-0.5">
+        {groups.map(group => {
+          const active = group.id === activeId
+          const label = group.name || `${group.chatIds.length} chats`
+          const chatTitles = group.chatIds
+            .map(id => sessions.find(s => s.id === id)?.title || 'Untitled')
+            .slice(0, 3)
+          return (
+            <button
+              key={group.id}
+              type="button"
+              onClick={() => onSelectGroup(group.id)}
+              className={cn(
+                'group/gr flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px]',
+                active
+                  ? 'bg-sidebar-accent/70 text-foreground'
+                  : 'text-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground'
+              )}
+              title={chatTitles.join(', ')}
+            >
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-black/[0.06] dark:bg-white/[0.1]">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <rect x="3" y="4" width="7" height="16" rx="1" />
+                  <rect x="14" y="4" width="7" height="16" rx="1" />
+                </svg>
+              </span>
+              <span className="min-w-0 flex-1 truncate">{label}</span>
+              <span className="bg-black/10 text-foreground/70 dark:bg-white/15 shrink-0 rounded-md px-1 text-[10px] font-semibold tabular-nums leading-none">
+                {group.chatIds.length}
+              </span>
+              {onDissolveGroup ? (
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={`Dissolve ${label}`}
+                  className="text-muted-foreground hover:text-foreground -mr-1 inline-flex size-4 items-center justify-center rounded-md opacity-0 transition-opacity group-hover/gr:opacity-100"
+                  onClick={event => {
+                    event.stopPropagation()
+                    onDissolveGroup(group.id)
+                  }}
+                >
+                  ×
+                </span>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }

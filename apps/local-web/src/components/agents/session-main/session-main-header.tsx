@@ -76,6 +76,10 @@ export type SessionMainHeaderProps = {
   groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
+  selectedChatIds?: Set<string>
+  onToggleSelectChat?: (id: string) => void
+  onClearSelection?: () => void
+  onCreateSplitFromSelection?: () => void
 }
 
 export function SessionMainHeader({
@@ -111,7 +115,11 @@ export function SessionMainHeader({
   createSession,
   groups,
   onSplitWith,
-  onDissolveGroup
+  onDissolveGroup,
+  selectedChatIds,
+  onToggleSelectChat,
+  onClearSelection,
+  onCreateSplitFromSelection
 }: SessionMainHeaderProps) {
   const overlay = useMacDesktopOverlay()
   // Collapse: reveal after panel closes. Expand: keep briefly so icons don't gap.
@@ -274,6 +282,10 @@ export function SessionMainHeader({
           groups={groups}
           onSplitWith={onSplitWith}
           onDissolveGroup={onDissolveGroup}
+          selectedChatIds={selectedChatIds}
+          onToggleSelectChat={onToggleSelectChat}
+          onClearSelection={onClearSelection}
+          onCreateSplitFromSelection={onCreateSplitFromSelection}
         />
       </DesktopDragRegion>
 

@@ -266,4 +266,11 @@ export type AppShellProps = {
   >
   allSessions: AgentSession[]
   onSplitWithNextTab: (sourceId: string) => void
+  selectedChatIds: Set<string>
+  toggleSelectChat: (id: string) => void
+  clearSelectChats: () => void
+  createSplitFromSelection: () => void
+  createSplitFromSidebar: () => void
+  canSplitFromSidebar: boolean
+  onSelectTabGroup: (groupId: string) => void
 }

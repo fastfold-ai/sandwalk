@@ -162,9 +162,10 @@ export type SessionTabProps = {
   color?: string
   unread: boolean
   draggable: boolean
-  onSelect: (id: string) => void
+  onSelect: (id: string, event?: React.MouseEvent) => void
   onClose: (id: string) => void
   onContextMenu: (id: string, event: React.MouseEvent) => void
+  selected?: boolean
 }
 
 export function SessionTab({
@@ -175,7 +176,8 @@ export function SessionTab({
   draggable,
   onSelect,
   onClose,
-  onContextMenu
+  onContextMenu,
+  selected
 }: SessionTabProps) {
   const [hovering, setHovering] = useState(false)
   const {
@@ -238,13 +240,14 @@ export function SessionTab({
         if (event.button !== 0) return
         const target = event.target as HTMLElement | null
         if (target?.closest('.chrome-tab-close')) return
-        onSelect(tab.id)
+        onSelect(tab.id, event)
       }}
       onContextMenu={event => {
         event.preventDefault()
         onContextMenu(tab.id, event)
       }}
       {...(active ? { 'data-active': 'true' } : {})}
+      {...(selected ? { 'data-selected': 'true' } : {})}
     >
       <TabBackground width={tabWidth} />
       <div className="chrome-tab-content">

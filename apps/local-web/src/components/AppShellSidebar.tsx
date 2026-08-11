@@ -66,6 +66,11 @@ export type AppShellSidebarProps = {
   setBatchDeletePending: (
     value: boolean | ((current: boolean) => boolean)
   ) => void
+  onBatchSplitView?: () => void
+  canBatchSplitView?: boolean
+  tabGroups?: import('@sandwalk/agent-ui-core').SessionGroup[]
+  onSelectTabGroup?: (groupId: string) => void
+  onDissolveTabGroup?: (groupId: string) => void
   setCollapsedSidebarSections: (
     value:
       | Record<string, boolean>
@@ -133,6 +138,11 @@ export function AppShellSidebar({
   batchMoveSelected,
   batchExportSelected,
   setBatchDeletePending,
+  onBatchSplitView,
+  canBatchSplitView,
+  tabGroups,
+  onSelectTabGroup,
+  onDissolveTabGroup,
   setCollapsedSidebarSections,
   selectSessionRange,
   toggleSessionSelected,
@@ -224,6 +234,11 @@ export function AppShellSidebar({
             onBatchMoveSelected={batchMoveSelected}
             onBatchExportSelected={batchExportSelected}
             onBatchDeletePending={() => setBatchDeletePending(true)}
+            onBatchSplitView={onBatchSplitView}
+            canBatchSplitView={canBatchSplitView}
+            tabGroups={tabGroups}
+            onSelectTabGroup={onSelectTabGroup}
+            onDissolveTabGroup={onDissolveTabGroup}
             setCollapsedSidebarSections={setCollapsedSidebarSections}
             selectSessionRange={selectSessionRange}
             toggleSessionSelected={toggleSessionSelected}

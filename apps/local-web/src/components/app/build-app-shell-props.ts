@@ -55,6 +55,13 @@ type AppShellBridgeInput = {
   perSessionBaseArgs: AppShellProps['perSessionBaseArgs']
   allSessions: AppShellProps['allSessions']
   onSplitWithNextTab: AppShellProps['onSplitWithNextTab']
+  selectedChatIds: AppShellProps['selectedChatIds']
+  toggleSelectChat: AppShellProps['toggleSelectChat']
+  clearSelectChats: AppShellProps['clearSelectChats']
+  createSplitFromSelection: AppShellProps['createSplitFromSelection']
+  createSplitFromSidebar: AppShellProps['createSplitFromSidebar']
+  canSplitFromSidebar: AppShellProps['canSplitFromSidebar']
+  onSelectTabGroup: AppShellProps['onSelectTabGroup']
 }
 
 export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
@@ -266,6 +273,13 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     activeGroup: input.activeGroup,
     perSessionBaseArgs: input.perSessionBaseArgs,
     allSessions: input.allSessions,
-    onSplitWithNextTab: input.onSplitWithNextTab
+    onSplitWithNextTab: input.onSplitWithNextTab,
+    selectedChatIds: input.selectedChatIds,
+    toggleSelectChat: input.toggleSelectChat,
+    clearSelectChats: input.clearSelectChats,
+    createSplitFromSelection: input.createSplitFromSelection,
+    createSplitFromSidebar: input.createSplitFromSidebar,
+    canSplitFromSidebar: input.canSplitFromSidebar,
+    onSelectTabGroup: input.onSelectTabGroup
   }
 }

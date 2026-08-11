@@ -84,7 +84,11 @@ export function SessionTabs({
   onCreateSession,
   groups,
   onSplitWith,
-  onDissolveGroup
+  onDissolveGroup,
+  selectedChatIds,
+  onToggleSelectChat,
+  onClearSelection,
+  onCreateSplitFromSelection
 }: {
   tabs: AgentSession[]
   activeId: string | null
@@ -106,6 +110,10 @@ export function SessionTabs({
   /** Creates a new split-view group from `sourceId` + the next open tab. */
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
+  selectedChatIds?: Set<string>
+  onToggleSelectChat?: (id: string) => void
+  onClearSelection?: () => void
+  onCreateSplitFromSelection?: () => void
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -238,8 +246,33 @@ export function SessionTabs({
     setMenu({ sessionId: id, x: event.clientX, y: event.clientY })
   }
 
+  const selectionCount = selectedChatIds?.size ?? 0
   return (
     <div className="relative z-[1] flex min-w-0 flex-1 items-end">
+      {selectionCount >= 2 &&
+      onCreateSplitFromSelection &&
+      onClearSelection ? (
+        <div className="border-primary/40 bg-primary/5 text-foreground absolute -top-[36px] left-2 z-10 flex items-center gap-2 rounded-md border px-2 py-1 text-[12px] shadow-sm">
+          <Columns2 className="text-primary size-3.5" />
+          <span className="font-medium">
+            {selectionCount} chats seleccionados
+          </span>
+          <button
+            type="button"
+            onClick={onCreateSplitFromSelection}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 ml-1 rounded-md px-2 py-0.5 text-[11px] font-semibold"
+          >
+            Split view
+          </button>
+          <button
+            type="button"
+            onClick={onClearSelection}
+            className="text-muted-foreground hover:text-foreground rounded-md px-1.5 py-0.5 text-[11px]"
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : null}
       <div ref={stripRef} className="sandwalk-tab-strip-main">
         <DndContext
           sensors={sensors}
@@ -260,9 +293,20 @@ export function SessionTabs({
                   color={tabColors[tab.id]}
                   unread={attentionIds.has(tab.id)}
                   draggable={draggable}
-                  onSelect={onSelect}
+                  onSelect={(id, event) => {
+                    if (
+                      onToggleSelectChat &&
+                      event &&
+                      (event.shiftKey || event.metaKey)
+                    ) {
+                      onToggleSelectChat(id)
+                      return
+                    }
+                    onSelect(id)
+                  }}
                   onClose={onClose}
                   onContextMenu={openContextMenu}
+                  selected={selectedChatIds?.has(tab.id) ?? false}
                 />
               ))}
               {groups && groups.length > 0
@@ -423,7 +467,16 @@ export function SessionTabs({
                           'group/item hover:bg-muted flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                           active && 'bg-muted'
                         )}
-                        onClick={() => onSelect(tab.id)}
+                        onClick={event => {
+                          if (
+                            onToggleSelectChat &&
+                            (event.shiftKey || event.metaKey)
+                          ) {
+                            onToggleSelectChat(tab.id)
+                            return
+                          }
+                          onSelect(tab.id)
+                        }}
                         onKeyDown={event => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault()
@@ -434,6 +487,9 @@ export function SessionTabs({
                           event.preventDefault()
                           openContextMenu(tab.id, event)
                         }}
+                        data-selected={
+                          selectedChatIds?.has(tab.id) ? 'true' : undefined
+                        }
                       >
                         <span className="bg-muted/80 flex size-7 shrink-0 items-center justify-center rounded-md">
                           <SessionStatusIcon status={tab.status} />
@@ -491,6 +547,75 @@ export function SessionTabs({
                     )
                   })
                 )}
+                {groups && groups.length > 0 ? (
+                  <>
+                    <div className="text-muted-foreground border-border/70 mt-1 border-t px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide">
+                      Split view groups
+                    </div>
+                    {groups.map(group => {
+                      const active = group.id === activeId
+                      const label =
+                        group.name || `${group.chatIds.length} chats`
+                      return (
+                        <div
+                          key={group.id}
+                          role="option"
+                          aria-selected={active}
+                          className={cn(
+                            'group/gr hover:bg-muted flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5',
+                            active && 'bg-muted'
+                          )}
+                          onClick={() => onSelect(group.id)}
+                        >
+                          <span className="bg-muted/80 flex size-7 shrink-0 items-center justify-center rounded-md">
+                            <Columns2 className="size-3.5" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="text-foreground text-sm font-medium">
+                              {label}
+                            </span>
+                            <ul className="text-muted-foreground mt-0.5 space-y-0.5 text-[11px]">
+                              {group.chatIds.slice(0, 4).map(chatId => {
+                                const chat = tabs.find(t => t.id === chatId)
+                                return (
+                                  <li
+                                    key={chatId}
+                                    className="flex items-center gap-1.5 truncate"
+                                  >
+                                    <span className="text-muted-foreground/60">
+                                      ├─
+                                    </span>
+                                    <span className="truncate">
+                                      {chat?.title || 'Untitled'}
+                                    </span>
+                                  </li>
+                                )
+                              })}
+                              {group.chatIds.length > 4 ? (
+                                <li className="text-muted-foreground/70 pl-4">
+                                  +{group.chatIds.length - 4} más
+                                </li>
+                              ) : null}
+                            </ul>
+                          </span>
+                          {onDissolveGroup ? (
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-foreground shrink-0 opacity-0 transition-opacity group-hover/gr:opacity-100"
+                              aria-label={`Dissolve ${label}`}
+                              onClick={event => {
+                                event.stopPropagation()
+                                onDissolveGroup(group.id)
+                              }}
+                            >
+                              <X className="size-3.5" />
+                            </button>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </>
+                ) : null}
               </div>
             </div>
           </PopoverContent>

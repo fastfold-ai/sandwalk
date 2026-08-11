@@ -1,6 +1,7 @@
 import type { AgentProject } from '@sandwalk/agent-ui-core'
 import {
   Archive,
+  Columns2,
   Download,
   FolderInput,
   MailOpen,
@@ -29,6 +30,8 @@ export type SidebarBatchBarProps = {
   onBatchMove: (projectId: string | null) => void | Promise<void>
   onBatchExport: () => void | Promise<void>
   onBatchDelete: () => void
+  onBatchSplitView?: () => void
+  canSplitView?: boolean
 }
 
 function IconAction({
@@ -77,7 +80,9 @@ export function SidebarBatchBar({
   onBatchArchive,
   onBatchMove,
   onBatchExport,
-  onBatchDelete
+  onBatchDelete,
+  onBatchSplitView,
+  canSplitView
 }: SidebarBatchBarProps) {
   if (selectedCount <= 0) return null
 
@@ -130,6 +135,15 @@ export function SidebarBatchBar({
             >
               <Download className="size-3.5" />
             </IconAction>
+            {onBatchSplitView ? (
+              <IconAction
+                label="Split view"
+                disabled={batchBusy || !canSplitView}
+                onClick={onBatchSplitView}
+              >
+                <Columns2 className="size-3.5" />
+              </IconAction>
+            ) : null}
             <IconAction
               label="Delete"
               disabled={batchBusy}

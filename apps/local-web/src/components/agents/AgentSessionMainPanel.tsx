@@ -22,6 +22,8 @@ import { type NavigateFunction,useLocation } from 'react-router-dom'
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { ChatSplitContainer } from '@/components/agents/ChatSplitContainer'
 import { fileChipToken } from '@/components/agents/composer-parts'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
 import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { useSessionSiteAutoPreview } from '@/components/agents/sites/use-session-site-auto-preview'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
@@ -134,6 +136,10 @@ export type AgentSessionMainPanelProps = {
   tabGroups: SessionGroup[]
   onSplitWithNextTab: (sourceId: string) => void
   dissolveTabGroup: (groupId: string) => void
+  selectedChatIds: Set<string>
+  toggleSelectChat: (id: string) => void
+  clearSelectChats: () => void
+  createSplitFromSelection: () => void
 }
 
 export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
@@ -211,9 +217,17 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     setTabGroupActiveChat,
     tabGroups,
     onSplitWithNextTab,
-    dissolveTabGroup
+    dissolveTabGroup,
+    selectedChatIds,
+    toggleSelectChat,
+    clearSelectChats,
+    createSplitFromSelection
   } = props
 
+  const isNarrow = useIsNarrowWindow(1280)
+  // En split view con ventana angosta, el side panel deja de ser una columna
+  // resizable (no cabe junto a N chats + composer) y pasa a modal overlay.
+  const asSheet = Boolean(activeGroup) && isNarrow
   const isDraft = isDraftAgentSessionId(sessionId)
   const inProject = Boolean(activeProjectId)
   const requestedSiteId = new URLSearchParams(location.search).get('site')
@@ -337,6 +351,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         groups={tabGroups}
         onSplitWith={onSplitWithNextTab}
         onDissolveGroup={dissolveTabGroup}
+        selectedChatIds={selectedChatIds}
+        onToggleSelectChat={toggleSelectChat}
+        onClearSelection={clearSelectChats}
+        onCreateSplitFromSelection={createSplitFromSelection}
       />
       <ResizablePanelGroup
         direction="horizontal"
@@ -445,7 +463,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         </main>
           )}
       </ResizablePanel>
-      {canShowFilesPanel && showWorkspaceFiles ? (
+      {canShowFilesPanel && showWorkspaceFiles && !asSheet ? (
         <>
           <ResizableHandle
             className={cn(
@@ -472,6 +490,18 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             }}
             className="min-w-0"
           >
+            {activeGroup && workspaceSessionId ? (
+              <div className="border-border/60 bg-background/95 flex items-center gap-1.5 border-b px-3 py-1.5 text-[11px]">
+                <span className="text-muted-foreground">Split view ·</span>
+                <span className="text-foreground truncate font-medium">
+                  {allSessions.find(s => s.id === workspaceSessionId)?.title ||
+                    'Untitled'}
+                </span>
+                <span className="text-muted-foreground/60 ml-auto">
+                  ({activeGroup.chatIds.length} chats)
+                </span>
+              </div>
+            ) : null}
             {showWorkspaceFiles && workspaceSessionId ? (
               <WorkspacePanel
                 key={workspaceSessionId}
@@ -536,6 +566,64 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         </>
       ) : null}
       </ResizablePanelGroup>
+      {canShowFilesPanel && showWorkspaceFiles && asSheet && workspaceSessionId ? (
+        <Sheet
+          open={!filesPanelCollapsed}
+          onOpenChange={open => setFilesPanelCollapsed(!open)}
+        >
+          <SheetContent
+            side="right"
+            className="w-full max-w-[420px] overflow-hidden p-0"
+          >
+            {activeGroup ? (
+              <div className="border-border/60 bg-background/95 flex items-center gap-1.5 border-b px-3 py-1.5 text-[11px]">
+                <span className="text-muted-foreground">Split view ·</span>
+                <span className="text-foreground truncate font-medium">
+                  {allSessions.find(s => s.id === workspaceSessionId)?.title ||
+                    'Untitled'}
+                </span>
+                <span className="text-muted-foreground/60 ml-auto">
+                  ({activeGroup.chatIds.length} chats)
+                </span>
+              </div>
+            ) : null}
+            <WorkspacePanel
+              key={workspaceSessionId}
+              client={client}
+              sessionId={workspaceSessionId}
+              workspacePath={isDraft ? null : session?.workspacePath ?? null}
+              workspaceVersion={workspaceVersion}
+              runActive={runActive}
+              openPathRequest={pendingOpenPath}
+              onOpenPathRequestHandled={() => setPendingOpenPath(null)}
+              onAddToChat={(path, kind) => {
+                setComposer(
+                  current => `${current}${fileChipToken(path, kind)}`
+                )
+                setComposerFiles([])
+              }}
+              onBuildPlan={path => {
+                void startPlanBuild({
+                  sessionId: workspaceSessionId,
+                  plan: planCardFromPath(path),
+                  patchChat,
+                  client,
+                  setRuntimeSettings:
+                    agentComposerSlotProps.setRuntimeSettings,
+                  handleComposerSend:
+                    agentComposerSlotProps.handleComposerSend
+                })
+              }}
+              onTogglePanel={() => setFilesPanelCollapsed(true)}
+              panelView={panelView}
+              siteId={requestedSiteId}
+              terminalOpen={terminalOpen}
+              onCloseTerminal={() => setTerminalOpen(false)}
+              onOpenTerminal={() => setTerminalOpen(true)}
+            />
+          </SheetContent>
+        </Sheet>
+      ) : null}
     </div>
   )
 }
