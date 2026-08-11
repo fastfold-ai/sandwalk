@@ -2,13 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { normalizeBackendUrl } from '@/lib/backend-url'
-import {
-  isTauri,
-  listenDesktopMenu,
-  openDesktopWindow
-} from '@/lib/desktop'
+import { isTauri, listenDesktopMenu, openDesktopWindow } from '@/lib/desktop'
+import { openDesktopRecent } from '@/lib/open-desktop-recent'
 import { persistRememberedApiKey, readRememberedApiKey } from '@/lib/remembered-auth'
-import { rememberRemoteHostname } from '@/lib/remote-hostname'
 
 /**
  * File → New Window (Remote) / Open Recent + Sandwalk → Check for Updates.
@@ -36,30 +32,24 @@ export function useDesktopWindowMenu() {
         return
       }
       if (payload.action === 'open-recent' && payload.url) {
-        const url = normalizeBackendUrl(payload.url)
-        const key = readRememberedApiKey(url)
-        const route = payload.route?.trim() || '/'
-        const title = payload.title?.trim() || null
-        const snapshotId = payload.snapshotId?.trim() || null
-        const hostname = payload.hostname?.trim() || null
-        if (hostname) rememberRemoteHostname(url, hostname)
-        if (key || url.includes('127.0.0.1') || url.includes('localhost')) {
-          void openDesktopWindow({
-            backendUrl: url,
-            apiKey: key || null,
-            route,
-            title,
-            snapshotId,
-            hostname,
-            focusExisting: true
-          }).catch(() => {
+        void openDesktopRecent({
+          url: payload.url,
+          route: payload.route,
+          title: payload.title,
+          id: payload.snapshotId,
+          hostname: payload.hostname
+        })
+          .then(result => {
+            if (!result.opened) {
+              setRemoteInitialUrl(result.url)
+              setRemoteOpen(true)
+            }
+          })
+          .catch(() => {
+            const url = normalizeBackendUrl(payload.url!)
             setRemoteInitialUrl(url)
             setRemoteOpen(true)
           })
-          return
-        }
-        setRemoteInitialUrl(url)
-        setRemoteOpen(true)
       }
     }).then(fn => {
       if (cancelled) fn()
@@ -75,6 +65,7 @@ export function useDesktopWindowMenu() {
     remoteOpen,
     setRemoteOpen,
     remoteInitialUrl,
+    setRemoteInitialUrl,
     /** Helper for tests / future callers that already have a URL+key. */
     openRemoteWithAuth: async (url: string, apiKey?: string) => {
       const normalized = normalizeBackendUrl(url)

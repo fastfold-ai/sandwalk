@@ -277,12 +277,15 @@ export default function App() {
     submitAuthLogin: bootstrap.submitAuthLogin,
     changeBackend: bootstrap.changeBackend,
     health: bootstrap.health,
+    connectionPaused: bootstrap.connectionPaused,
+    setConnectionPaused: bootstrap.setConnectionPaused,
     backendUrl: bootstrap.backendUrl,
     setBackendUrl: bootstrap.setBackendUrl,
     backendApiKey: bootstrap.backendApiKey,
     setBackendApiKey: bootstrap.setBackendApiKey,
     error: bootstrap.error,
     errorStack: bootstrap.errorStack,
+    setError: bootstrap.setError,
     onOnboardingPath: route.onOnboardingPath,
     onboardingStep: route.onboardingStep,
     client: bootstrap.client,
@@ -291,7 +294,11 @@ export default function App() {
     loadIntegrations: bootstrap.loadIntegrations,
     loadSkills: bootstrap.loadSkills,
     loadMcpServers: bootstrap.loadMcpServers,
-    loadMcpCatalog: bootstrap.loadMcpCatalog
+    loadMcpCatalog: bootstrap.loadMcpCatalog,
+    onOpenRemote: prefillUrl => {
+      windowMenu.setRemoteInitialUrl(prefillUrl ?? null)
+      windowMenu.setRemoteOpen(true)
+    }
   })
   const remoteDialog = (
     <OpenRemoteWindowDialog

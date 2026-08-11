@@ -25,12 +25,16 @@ const MODE_OPTIONS: { mode: ThemeMode; label: string; Icon: typeof Sun }[] = [
 const PORTAL_ATTR = 'data-sandwalk-theme-toggle'
 
 /**
- * Login appearance control.
+ * Gate / welcome appearance control.
  *
- * Uses a viewport-locked overlay (`fixed inset-0`) so `right`/`bottom` are
- * always relative to the visible window — never Mirage/Login overflow boxes.
+ * Uses a viewport-locked overlay (`fixed inset-0`) so edges are always relative
+ * to the visible window — never Mirage/Login overflow boxes.
  */
-export function ThemeToggle() {
+export function ThemeToggle({
+  placement = 'bottom-right'
+}: {
+  placement?: 'bottom-right' | 'top-right'
+} = {}) {
   const [mode, setMode] = useState<ThemeMode>(() => getStoredTheme())
   const [palette, setPalette] = useState<ThemePaletteId>(() =>
     getStoredPalette()
@@ -92,17 +96,24 @@ export function ThemeToggle() {
     >
       <div
         ref={rootRef}
-        className="pointer-events-auto absolute bottom-6 right-6 flex w-[min(16rem,calc(100vw-3rem))] flex-col items-stretch gap-2"
+        className={cn(
+          'pointer-events-auto absolute right-6 flex w-[min(16rem,calc(100vw-3rem))] flex-col items-stretch gap-2',
+          // Clear the macOS overlay titlebar / traffic lights when top-anchored.
+          placement === 'top-right' ? 'top-10' : 'bottom-6',
+          // Keep the trigger at the corner; expand the menu toward the center.
+          placement === 'top-right' && 'flex-col-reverse'
+        )}
       >
         {open ? (
           <div
             role="menu"
             aria-label="Appearance"
-            className="bg-card w-full rounded-xl border p-1.5 shadow-xl"
+            className="bg-card flex max-h-[min(32rem,calc(100vh-6.5rem))] w-full flex-col overflow-hidden rounded-xl border p-1.5 shadow-xl"
             onPointerLeave={restorePalette}
+            onWheel={event => event.stopPropagation()}
           >
             <div
-              className="flex items-center gap-0.5 p-0.5"
+              className="flex shrink-0 items-center gap-0.5 p-0.5"
               role="group"
               aria-label="Color mode"
             >
@@ -127,49 +138,51 @@ export function ThemeToggle() {
               ))}
             </div>
 
-            <div className="bg-border my-1.5 h-px" aria-hidden />
+            <div className="bg-border my-1.5 h-px shrink-0" aria-hidden />
 
-            {THEME_PALETTES.map(item => {
-              const selected = palette === item.id
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={selected}
-                  className="hover:bg-muted/60 flex w-full cursor-pointer items-start gap-2.5 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left outline-none"
-                  onPointerEnter={() => previewPalette(item.id)}
-                  onFocus={() => previewPalette(item.id)}
-                  onClick={() => {
-                    applyPalette(item.id)
-                    setOpen(false)
-                  }}
-                >
-                  <span className="mt-0.5 flex shrink-0 items-center gap-0.5">
-                    {item.swatches.map(color => (
-                      <span
-                        key={color}
-                        className="border-border size-3 rounded-sm border"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="text-foreground block text-sm font-medium leading-tight">
-                      {item.name}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              {THEME_PALETTES.map(item => {
+                const selected = palette === item.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={selected}
+                    className="hover:bg-muted/60 flex w-full cursor-pointer items-start gap-2.5 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left outline-none"
+                    onPointerEnter={() => previewPalette(item.id)}
+                    onFocus={() => previewPalette(item.id)}
+                    onClick={() => {
+                      applyPalette(item.id)
+                      setOpen(false)
+                    }}
+                  >
+                    <span className="mt-0.5 flex shrink-0 items-center gap-0.5">
+                      {item.swatches.map(color => (
+                        <span
+                          key={color}
+                          className="border-border size-3 rounded-sm border"
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
                     </span>
-                    <span className="text-muted-foreground mt-0.5 block text-[11px] leading-snug">
-                      {item.description}
+                    <span className="min-w-0 flex-1">
+                      <span className="text-foreground block text-sm font-medium leading-tight">
+                        {item.name}
+                      </span>
+                      <span className="text-muted-foreground mt-0.5 block text-[11px] leading-snug">
+                        {item.description}
+                      </span>
                     </span>
-                  </span>
-                  {selected ? (
-                    <Check className="text-foreground mt-0.5 size-3.5 shrink-0" />
-                  ) : (
-                    <span className="size-3.5 shrink-0" aria-hidden />
-                  )}
-                </button>
-              )
-            })}
+                    {selected ? (
+                      <Check className="text-foreground mt-0.5 size-3.5 shrink-0" />
+                    ) : (
+                      <span className="size-3.5 shrink-0" aria-hidden />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         ) : null}
 
@@ -199,7 +212,11 @@ export function ThemeToggle() {
           <ChevronUp
             className={cn(
               'size-3 shrink-0 opacity-60 transition-transform',
-              open && 'rotate-180'
+              placement === 'top-right'
+                ? open
+                  ? 'rotate-0'
+                  : 'rotate-180'
+                : open && 'rotate-180'
             )}
           />
         </button>

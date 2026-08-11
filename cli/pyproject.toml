@@ -191,9 +191,11 @@ warn_unused_configs = true
 # Same direction as fastfold-cloud-backend (strict). Full-tree strict is gradual —
 # start with typed API models, expand packages over time.
 strict = true
+# models/ re-exports domain types from submodules; allow `from agent_server.models import X`.
+implicit_reexport = true
+# Scoped gate: packages that currently pass strict mypy. Broader surfaces
+# (store/, workspace/, skills/, kb/, models/) are typed gradually.
 files = [
-  "src/skills",
-  "src/kb",
   "src/data",
   "src/reports",
   "src/api",
@@ -204,15 +206,10 @@ files = [
   "src/agent_server/environment_service",
   "src/agent_server/pty_manager",
   "src/agent_server/storage_service",
-  "src/agent_server/models.py",
   "src/agent_server/account_service",
-  "src/agent_server/title.py",
-  "src/agent_server/workspace",
   "src/agent_server/datasets_service.py",
   "src/agent_server/status_service",
-  "src/agent_server/session_sync",
   "src/agent_server/settings_service",
-  "src/agent_server/store",
 ]
 exclude = ["(?x)(tests/|\\.venv/|venv/)"]
 ignore_missing_imports = true

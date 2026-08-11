@@ -17,7 +17,12 @@ import {
   nextFromSearch,
   sanitizeAuthReturnTo
 } from '@/lib/auth-routing'
-import { isLocalBackendUrl, persistBackendUrl } from '@/lib/backend-url'
+import {
+  hasDesktopBackendInject,
+  isLocalBackendUrl,
+  persistBackendUrl
+} from '@/lib/backend-url'
+import { isTauri } from '@/lib/desktop'
 import { dedupeAsync } from '@/lib/dedupe-async'
 import {
   clampOnboardingStep,
@@ -61,8 +66,14 @@ export function useAppBootstrapConnect({
   const needsAuthLoginRef = useRef(false)
   const [authBootstrapped, setAuthBootstrapped] = useState(false)
   const [connecting, setConnecting] = useState(false)
-  /** User chose Disconnect — stay on the connect gate until Connect/Retry. */
-  const [connectionPaused, setConnectionPaused] = useState(false)
+  /**
+   * Stay on the welcome / connect gate until the user picks Local or Remote.
+   * Desktop cold start (no remote inject) starts paused so we don't auto-hit
+   * 127.0.0.1 and flash “Backend unreachable”. Browser/dev still auto-connects.
+   */
+  const [connectionPaused, setConnectionPaused] = useState(
+    () => isTauri() && !hasDesktopBackendInject()
+  )
   const [error, setError] = useState<string | null>(null)
   const [errorStack, setErrorStack] = useState<string | null>(null)
   const onboardingAutoOpenedRef = useRef(false)

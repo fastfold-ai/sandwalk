@@ -74,6 +74,8 @@ export function useAppBootstrap({
     authLoginError: auth.authLoginError,
     setAuthLoginError: auth.setAuthLoginError,
     connecting: connectBundle.connecting,
+    connectionPaused: connectBundle.connectionPaused,
+    setConnectionPaused: connectBundle.setConnectionPaused,
     error: connectBundle.error,
     errorStack: connectBundle.errorStack,
     setError: connectBundle.setError,

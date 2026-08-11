@@ -425,6 +425,8 @@ export type DesktopWindowRecent = {
   url: string
   route?: string
   title?: string
+  /** Remote machine hostname from discover / LAN scan. */
+  hostname?: string
   label?: string | null
   lastOpenedAt: number
 }
