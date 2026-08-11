@@ -1,7 +1,7 @@
 import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pin, X } from 'lucide-react'
+import { Columns2, Pin, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -166,6 +166,14 @@ export type SessionTabProps = {
   onClose: (id: string) => void
   onContextMenu: (id: string, event: React.MouseEvent) => void
   selected?: boolean
+  /**
+   * Cuando la pestaña representa un grupo de split view, en vez del
+   * SessionStatusIcon + SessionSourceIcon se dibuja el icono Columns2 y un
+   * badge numérico con `groupCount`. Todo lo demás (chrome, hover, marquee,
+   * X para disolver) se mantiene idéntico al de una pestaña de sesión.
+   */
+  variant?: 'session' | 'group'
+  groupCount?: number
 }
 
 export function SessionTab({
@@ -177,8 +185,11 @@ export function SessionTab({
   onSelect,
   onClose,
   onContextMenu,
-  selected
+  selected,
+  variant = 'session',
+  groupCount
 }: SessionTabProps) {
+  const isGroup = variant === 'group'
   const [hovering, setHovering] = useState(false)
   const {
     attributes,
@@ -251,8 +262,27 @@ export function SessionTab({
     >
       <TabBackground width={tabWidth} />
       <div className="chrome-tab-content">
-        <SessionStatusIcon status={tab.status} />
-        <SessionSourceIcon source={tab.source} label={tab.sourceLabel} />
+        {isGroup ? (
+          <>
+            <Columns2
+              className="text-muted-foreground size-3.5 shrink-0"
+              aria-hidden
+            />
+            {typeof groupCount === 'number' ? (
+              <span
+                className="bg-black/10 text-foreground/70 dark:bg-white/15 shrink-0 rounded-md px-1 text-[10px] font-semibold tabular-nums leading-none"
+                aria-label={`${groupCount} chats in group`}
+              >
+                {groupCount}
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <SessionStatusIcon status={tab.status} />
+            <SessionSourceIcon source={tab.source} label={tab.sourceLabel} />
+          </>
+        )}
         {pinned ? (
           <Pin className="text-muted-foreground size-3 shrink-0" aria-hidden />
         ) : null}

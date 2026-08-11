@@ -310,15 +310,39 @@ export function SessionTabs({
                 />
               ))}
               {groups && groups.length > 0
-                ? groups.map(group => (
-                    <SessionGroupTab
-                      key={group.id}
-                      group={group}
-                      active={group.id === activeId}
-                      onSelect={onSelect}
-                      onDissolve={onDissolveGroup}
-                    />
-                  ))
+                ? groups.map(group => {
+                    const pseudoTab: AgentSession = {
+                      id: group.id,
+                      title: group.name || `${group.chatIds.length} chats`,
+                      status: 'idle',
+                      source: 'local',
+                      sourceLabel: 'Split view',
+                      organizeLabel:
+                        group.pinned ? 'pinned' : null,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                      lastMessageAt: null,
+                      projectId: null,
+                      titleSource: null,
+                      workspacePath: null
+                    } as unknown as AgentSession
+                    return (
+                      <SessionTab
+                        key={group.id}
+                        tab={pseudoTab}
+                        active={group.id === activeId}
+                        color={group.color || undefined}
+                        unread={false}
+                        draggable={false}
+                        onSelect={onSelect}
+                        onClose={onDissolveGroup || (() => {})}
+                        onContextMenu={openContextMenu}
+                        selected={selectedChatIds?.has(group.id) ?? false}
+                        variant="group"
+                        groupCount={group.chatIds.length}
+                      />
+                    )
+                  })
                 : null}
             </div>
           </SortableContext>
@@ -700,64 +724,5 @@ export function SessionTabs({
         </TabContextMenuShell>
       ) : null}
     </div>
-  )
-}
-
-/**
- * Grupo de split-view renderizado como una pestaña adicional al final de la
- * strip. Muestra icono de columnas + nombre del grupo (o `N chats` como
- * fallback) + botón para disolver.
- *
- * MVP visual: chip discreto que se pinta activo cuando la ruta apunta al
- * grupo. Fase 5 completa: pintar chats internos como sub-pestañas, color
- * de grupo, pin, reorder.
- */
-function SessionGroupTab({
-  group,
-  active,
-  onSelect,
-  onDissolve
-}: {
-  group: SessionGroup
-  active: boolean
-  onSelect: (id: string) => void
-  onDissolve?: (groupId: string) => void
-}) {
-  const label = group.name || `${group.chatIds.length} chats`
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={() => onSelect(group.id)}
-      className={cn(
-        'sandwalk-chrome-tab group/tab relative inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-t-lg px-2.5 text-[12px]',
-        'text-foreground/85 hover:text-foreground',
-        active
-          ? 'bg-background text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border))]'
-          : 'bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]'
-      )}
-      title={`Split view: ${label}`}
-    >
-      <Columns2 className="size-3.5 shrink-0" aria-hidden />
-      <span className="max-w-[16ch] truncate">{label}</span>
-      <span className="bg-black/10 text-foreground/70 dark:bg-white/15 rounded-md px-1 text-[10px] font-semibold tabular-nums leading-none">
-        {group.chatIds.length}
-      </span>
-      {onDissolve ? (
-        <span
-          role="button"
-          tabIndex={-1}
-          aria-label={`Dissolve group ${label}`}
-          className="text-muted-foreground hover:text-foreground -mr-0.5 ml-0.5 inline-flex size-4 items-center justify-center rounded-md opacity-0 transition-opacity group-hover/tab:opacity-100"
-          onClick={event => {
-            event.stopPropagation()
-            onDissolve(group.id)
-          }}
-        >
-          <X className="size-3" />
-        </span>
-      ) : null}
-    </button>
   )
 }
