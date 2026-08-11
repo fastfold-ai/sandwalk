@@ -43,6 +43,8 @@ type UseAppSessionEffectsArgs = {
   pendingMentionRef: MutableRefObject<string | string[] | null>
   setComposer: Dispatch<SetStateAction<string>>
   setComposerFiles: Dispatch<SetStateAction<string[]>>
+  /** Returns true if the chat lives inside a split-view group in this scope. */
+  chatIsInsideAnyGroup?: (chatId: string) => boolean
 }
 
 export function useAppSessionEffects({
@@ -68,7 +70,8 @@ export function useAppSessionEffects({
   setError,
   pendingMentionRef,
   setComposer,
-  setComposerFiles
+  setComposerFiles,
+  chatIsInsideAnyGroup
 }: UseAppSessionEffectsArgs) {
   useEffect(() => {
     setIntegrationValues({})
@@ -87,9 +90,16 @@ export function useAppSessionEffects({
     const item = sessions.find(session => session.id === sessionId)
     // Keep project tab strips clean: only pin sessions that belong to the scope.
     if (activeProjectId && item && item.projectId !== activeProjectId) return
+    // Chats que viven dentro de un grupo no se auto-abren como tabs sueltas:
+    // el grupo ya está en la strip como pestaña virtual y agregarlos volvería
+    // a duplicar el chat en el strip.
+    if (chatIsInsideAnyGroup?.(sessionId)) {
+      clearSessionAttention(sessionId)
+      return
+    }
     openSessionTab(sessionId)
     clearSessionAttention(sessionId)
-  }, [activeProjectId, openSessionTab, sessionId, sessions])
+  }, [activeProjectId, openSessionTab, sessionId, sessions, chatIsInsideAnyGroup])
 
   // Clear Dock badge for the open session when the window is focused again.
   useEffect(() => {

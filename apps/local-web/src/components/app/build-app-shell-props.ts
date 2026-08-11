@@ -54,6 +54,7 @@ type AppShellBridgeInput = {
   activeGroup: AppShellProps['activeGroup']
   perSessionBaseArgs: AppShellProps['perSessionBaseArgs']
   allSessions: AppShellProps['allSessions']
+  onSplitWithNextTab: AppShellProps['onSplitWithNextTab']
 }
 
 export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
@@ -264,6 +265,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     reorderChatsInTabGroup: input.tabGroupsStore.reorderChatsInGroup,
     activeGroup: input.activeGroup,
     perSessionBaseArgs: input.perSessionBaseArgs,
-    allSessions: input.allSessions
+    allSessions: input.allSessions,
+    onSplitWithNextTab: input.onSplitWithNextTab
   }
 }

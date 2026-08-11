@@ -142,6 +142,34 @@ export default function App() {
     setChatBySessionIdRef
   })
 
+  // Punto de entrada MVP para crear un grupo: "Split with next tab" agrupa
+  // el chat sobre el que se hizo click con el siguiente tab abierto (o el
+  // anterior, si es el último). Los pickers ricos (multi-select) vienen en
+  // Fase 3 completa; esto habilita testear el flujo end-to-end mientras
+  // tanto.
+  const handleSplitWithNextTab = useCallback(
+    (sourceId: string) => {
+      const ids = tabs.openTabIds
+      const idx = ids.indexOf(sourceId)
+      if (idx < 0) return
+      // Prefer next; wrap to previous if the source is the last tab.
+      const partnerId =
+        ids
+          .slice(idx + 1)
+          .find(id => id !== sourceId && !id.startsWith('grp_')) ||
+        ids
+          .slice(0, idx)
+          .reverse()
+          .find(id => id !== sourceId && !id.startsWith('grp_'))
+      if (!partnerId) return
+      const groupId = tabGroupsStore.createGroup([sourceId, partnerId])
+      if (groupId) {
+        navigate(`/agents/${groupId}`)
+      }
+    },
+    [tabs.openTabIds, tabGroupsStore, navigate]
+  )
+
   // Args comunes que todo `SessionChatMount` de split view va a instanciar
   // combinándolos con su chatId + session propia. Se calcula una vez para que
   // los mounts secundarios de un grupo puedan levantar su pipeline con los
@@ -305,7 +333,9 @@ export default function App() {
     setError: bootstrap.setError,
     pendingMentionRef: ui.pendingMentionRef,
     setComposer: layer.chat.setComposer,
-    setComposerFiles: layer.chat.setComposerFiles
+    setComposerFiles: layer.chat.setComposerFiles,
+    chatIsInsideAnyGroup: (chatId: string) =>
+      tabGroupsStore.tabGroups.some(g => g.chatIds.includes(chatId))
   })
 
   // Bench sessions are omitted from the global list (sidebar noise). When a
@@ -456,7 +486,8 @@ export default function App() {
           tabGroupsStore,
           activeGroup,
           perSessionBaseArgs,
-          allSessions: bootstrap.sessions
+          allSessions: bootstrap.sessions,
+          onSplitWithNextTab: handleSplitWithNextTab
         })}
       />
       {remoteDialog}

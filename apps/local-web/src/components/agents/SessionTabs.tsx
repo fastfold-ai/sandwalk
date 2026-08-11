@@ -1,4 +1,4 @@
-import type { AgentSession } from '@sandwalk/agent-ui-core'
+import type { AgentSession, SessionGroup } from '@sandwalk/agent-ui-core'
 import {
   closestCenter,
   DndContext,
@@ -20,6 +20,7 @@ import {
   Archive,
   ChevronDown,
   CircleX,
+  Columns2,
   Download,
   Pencil,
   Pin,
@@ -80,7 +81,10 @@ export function SessionTabs({
   onInspect,
   onArchive,
   onDelete,
-  onCreateSession
+  onCreateSession,
+  groups,
+  onSplitWith,
+  onDissolveGroup
 }: {
   tabs: AgentSession[]
   activeId: string | null
@@ -96,6 +100,12 @@ export function SessionTabs({
   onDelete: (session: AgentSession) => void
   /** Opens a fresh draft agent session (only persists on first message). */
   onCreateSession?: () => void
+  /** Split-view groups that live in this project scope. Rendered as
+   *  additional chip-tabs after the session tabs. */
+  groups?: SessionGroup[]
+  /** Creates a new split-view group from `sourceId` + the next open tab. */
+  onSplitWith?: (sourceId: string) => void
+  onDissolveGroup?: (groupId: string) => void
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -255,6 +265,17 @@ export function SessionTabs({
                   onContextMenu={openContextMenu}
                 />
               ))}
+              {groups && groups.length > 0
+                ? groups.map(group => (
+                    <SessionGroupTab
+                      key={group.id}
+                      group={group}
+                      active={group.id === activeId}
+                      onSelect={onSelect}
+                      onDissolve={onDissolveGroup}
+                    />
+                  ))
+                : null}
             </div>
           </SortableContext>
         </DndContext>
@@ -522,6 +543,16 @@ export function SessionTabs({
             }
             onClick={() => runAction(() => onArchive(menuSession))}
           />
+          {onSplitWith && tabs.length >= 2 ? (
+            <>
+              <TabContextSeparator />
+              <TabContextItem
+                icon={<Columns2 className="size-3.5" />}
+                label="Split with next tab"
+                onClick={() => runAction(() => onSplitWith(menuSession.id))}
+              />
+            </>
+          ) : null}
           <TabContextSeparator />
           <TabContextItem
             icon={<X className="size-3.5" />}
@@ -544,5 +575,64 @@ export function SessionTabs({
         </TabContextMenuShell>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Grupo de split-view renderizado como una pestaña adicional al final de la
+ * strip. Muestra icono de columnas + nombre del grupo (o `N chats` como
+ * fallback) + botón para disolver.
+ *
+ * MVP visual: chip discreto que se pinta activo cuando la ruta apunta al
+ * grupo. Fase 5 completa: pintar chats internos como sub-pestañas, color
+ * de grupo, pin, reorder.
+ */
+function SessionGroupTab({
+  group,
+  active,
+  onSelect,
+  onDissolve
+}: {
+  group: SessionGroup
+  active: boolean
+  onSelect: (id: string) => void
+  onDissolve?: (groupId: string) => void
+}) {
+  const label = group.name || `${group.chatIds.length} chats`
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={() => onSelect(group.id)}
+      className={cn(
+        'sandwalk-chrome-tab group/tab relative inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-t-lg px-2.5 text-[12px]',
+        'text-foreground/85 hover:text-foreground',
+        active
+          ? 'bg-background text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border))]'
+          : 'bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]'
+      )}
+      title={`Split view: ${label}`}
+    >
+      <Columns2 className="size-3.5 shrink-0" aria-hidden />
+      <span className="max-w-[16ch] truncate">{label}</span>
+      <span className="bg-black/10 text-foreground/70 dark:bg-white/15 rounded-md px-1 text-[10px] font-semibold tabular-nums leading-none">
+        {group.chatIds.length}
+      </span>
+      {onDissolve ? (
+        <span
+          role="button"
+          tabIndex={-1}
+          aria-label={`Dissolve group ${label}`}
+          className="text-muted-foreground hover:text-foreground -mr-0.5 ml-0.5 inline-flex size-4 items-center justify-center rounded-md opacity-0 transition-opacity group-hover/tab:opacity-100"
+          onClick={event => {
+            event.stopPropagation()
+            onDissolve(group.id)
+          }}
+        >
+          <X className="size-3" />
+        </span>
+      ) : null}
+    </button>
   )
 }

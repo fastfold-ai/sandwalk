@@ -158,6 +158,9 @@ export function AppShellMain(props: AppShellMainProps) {
             perSessionBaseArgs={props.perSessionBaseArgs}
             allSessions={props.allSessions}
             setTabGroupActiveChat={props.setTabGroupActiveChat}
+            tabGroups={props.tabGroups}
+            onSplitWithNextTab={props.onSplitWithNextTab}
+            dissolveTabGroup={props.dissolveTabGroup}
           />
         )}
         </div>

@@ -73,6 +73,9 @@ export type SessionMainHeaderProps = {
   onPrepareDraftWorkspace?: () => void | Promise<void>
   /** Opens a fresh draft session (same handler as the sidebar "New agent"). */
   createSession?: (projectId?: string | null) => void | Promise<void>
+  groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
+  onSplitWith?: (sourceId: string) => void
+  onDissolveGroup?: (groupId: string) => void
 }
 
 export function SessionMainHeader({
@@ -105,7 +108,10 @@ export function SessionMainHeader({
   panelView,
   setPanelView,
   onPrepareDraftWorkspace,
-  createSession
+  createSession,
+  groups,
+  onSplitWith,
+  onDissolveGroup
 }: SessionMainHeaderProps) {
   const overlay = useMacDesktopOverlay()
   // Collapse: reveal after panel closes. Expand: keep briefly so icons don't gap.
@@ -265,6 +271,9 @@ export function SessionMainHeader({
           onCreateSession={
             createSession ? () => void createSession(activeProjectId) : undefined
           }
+          groups={groups}
+          onSplitWith={onSplitWith}
+          onDissolveGroup={onDissolveGroup}
         />
       </DesktopDragRegion>
 

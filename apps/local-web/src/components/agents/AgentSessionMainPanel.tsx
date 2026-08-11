@@ -131,6 +131,9 @@ export type AgentSessionMainPanelProps = {
   >
   allSessions: AgentSession[]
   setTabGroupActiveChat: (groupId: string, chatId: string) => void
+  tabGroups: SessionGroup[]
+  onSplitWithNextTab: (sourceId: string) => void
+  dissolveTabGroup: (groupId: string) => void
 }
 
 export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
@@ -205,7 +208,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     activeGroup,
     perSessionBaseArgs,
     allSessions,
-    setTabGroupActiveChat
+    setTabGroupActiveChat,
+    tabGroups,
+    onSplitWithNextTab,
+    dissolveTabGroup
   } = props
 
   const isDraft = isDraftAgentSessionId(sessionId)
@@ -328,6 +334,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           await prepareDraftWorkspace()
         }}
         createSession={props.createSession}
+        groups={tabGroups}
+        onSplitWith={onSplitWithNextTab}
+        onDissolveGroup={dissolveTabGroup}
       />
       <ResizablePanelGroup
         direction="horizontal"

@@ -265,4 +265,5 @@ export type AppShellProps = {
     'sessionId' | 'session' | 'sessionIdRef'
   >
   allSessions: AgentSession[]
+  onSplitWithNextTab: (sourceId: string) => void
 }

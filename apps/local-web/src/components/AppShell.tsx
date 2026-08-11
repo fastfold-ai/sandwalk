@@ -242,6 +242,9 @@ export function AppShell(props: AppShellProps) {
           perSessionBaseArgs={props.perSessionBaseArgs}
           allSessions={props.allSessions}
           setTabGroupActiveChat={props.setTabGroupActiveChat}
+          tabGroups={props.tabGroups}
+          onSplitWithNextTab={props.onSplitWithNextTab}
+          dissolveTabGroup={props.dissolveTabGroup}
         />
         </ResizablePanelGroup>
       </div>

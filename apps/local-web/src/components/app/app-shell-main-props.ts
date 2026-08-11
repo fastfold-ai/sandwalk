@@ -209,6 +209,9 @@ export type AppShellMainProps = {
   >
   allSessions: AgentSession[]
   setTabGroupActiveChat: (groupId: string, chatId: string) => void
+  tabGroups: SessionGroup[]
+  onSplitWithNextTab: (sourceId: string) => void
+  dissolveTabGroup: (groupId: string) => void
 }
 
 export function isDashboardMainView(props: AppShellMainProps) {
