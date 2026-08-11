@@ -9,6 +9,61 @@ import subprocess
 from pathlib import Path
 
 
+def _hw_model() -> str | None:
+    """macOS hardware model id (e.g. ``Macmini9,1``)."""
+    if platform.system() != "Darwin":
+        return None
+    try:
+        result = subprocess.run(
+            ["sysctl", "-n", "hw.model"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        value = result.stdout.strip()
+        return value or None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def _mac_product_family(hw_model: str | None) -> str | None:
+    """Map Apple ``hw.model`` / Model Name to a product family label."""
+    if hw_model:
+        key = hw_model.split(",", 1)[0].lower()
+        mapping = (
+            ("macmini", "Mac mini"),
+            ("macbookpro", "MacBook Pro"),
+            ("macbookair", "MacBook Air"),
+            ("macbook", "MacBook"),
+            ("macpro", "Mac Pro"),
+            ("macstudio", "Mac Studio"),
+            ("imacpro", "iMac Pro"),
+            ("imac", "iMac"),
+            ("virtualmac", "Virtual Mac"),
+        )
+        for prefix, label in mapping:
+            if key.startswith(prefix):
+                return label
+    # Newer Apple Silicon ids are ``Mac14,3`` / ``Mac17,6`` — use Model Name.
+    try:
+        result = subprocess.run(
+            ["system_profiler", "SPHardwareDataType"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if "Model Name:" in line:
+                    name = line.split(":", 1)[1].strip()
+                    return name or None
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return None
+
+
 def _format_platform_label(*, chip_name: str | None = None) -> str:
     system = platform.system()
     release = platform.mac_ver()[0] if system == "Darwin" else platform.release()
@@ -23,6 +78,18 @@ def _format_platform_label(*, chip_name: str | None = None) -> str:
         arch = "ARM64" if machine in {"arm64", "aarch64"} else machine.upper()
         return f"Linux · {arch}"
     return f"{system} · {platform.machine()}"
+
+
+def format_device_label(*, chip_name: str | None = None) -> str:
+    """Public LAN-discover label: product family + chip/OS (or Linux/Windows)."""
+    system = platform.system()
+    if system == "Darwin":
+        family = _mac_product_family(_hw_model())
+        base = _format_platform_label(chip_name=chip_name)
+        if family:
+            return f"{family} · {base}"
+        return base
+    return _format_platform_label(chip_name=chip_name)
 
 
 def _ram_bytes() -> tuple[int, int]:

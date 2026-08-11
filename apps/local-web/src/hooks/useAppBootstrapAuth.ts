@@ -242,6 +242,16 @@ export function useAppBootstrapAuth({
       } catch {
         // Best-effort against the previous host.
       }
+      try {
+        const { bindDesktopWindowBackend, isTauri } = await import(
+          '@/lib/desktop'
+        )
+        if (isTauri()) {
+          await bindDesktopWindowBackend(normalized)
+        }
+      } catch {
+        // Browser / bridge unavailable.
+      }
       // connect() re-runs via useEffect when client/backendUrl identity updates.
     },
     [

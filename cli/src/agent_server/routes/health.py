@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import getpass
 import os
+import platform
 
 from fastapi import FastAPI, HTTPException, Response
 
@@ -12,6 +13,7 @@ from _version import __version__
 from agent_server.app_deps import AppDeps
 from agent_server.models import (
     Capabilities,
+    DiscoverResponse,
     DoctorDiagnosticsRequest,
     DoctorReport,
     EnvironmentPackageMutationResult,
@@ -52,6 +54,25 @@ def register_health_routes(app: FastAPI, deps: AppDeps) -> None:
                 terminal=True,
             ),
         )
+
+    @app.get("/v1/discover", response_model=DiscoverResponse)
+    async def discover() -> DiscoverResponse:
+        """Public LAN probe — hostname + OS/device label only."""
+
+        def _build() -> DiscoverResponse:
+            from agent_server.status_service.gpu_metrics import _chip_name
+            from agent_server.status_service.host_metrics import format_device_label
+
+            return DiscoverResponse(
+                version=__version__,
+                hostname=platform.node() or "unknown",
+                platform=platform.system() or "unknown",
+                arch=platform.machine() or "unknown",
+                device_label=format_device_label(chip_name=_chip_name()),
+                auth_required=deps.current_api_key() is not None,
+            )
+
+        return await asyncio.to_thread(_build)
 
     @app.get("/v1/status", response_model=ServerStatusReport)
     async def server_status() -> ServerStatusReport:

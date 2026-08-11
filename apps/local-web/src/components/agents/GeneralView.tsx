@@ -1,6 +1,7 @@
 import type { AccountSummary } from '@sandwalk/agent-ui-core'
 import { WandSparkles } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import {
   AlertDialog,
@@ -42,6 +43,7 @@ export function GeneralView({
   onChangeBackend: (url: string, apiKey?: string) => void | Promise<void>
   onDisconnectBackend: () => void | Promise<void>
 }) {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [account, setAccount] = useState<AccountSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [checkingUpdates, setCheckingUpdates] = useState(false)
@@ -81,6 +83,15 @@ export function GeneralView({
     void loadAccount(false, controller.signal)
     return () => controller.abort()
   }, [loadAccount])
+
+  // Sandwalk menu → Check for Updates… lands here with ?checkUpdates=1
+  useEffect(() => {
+    if (searchParams.get('checkUpdates') !== '1') return
+    const next = new URLSearchParams(searchParams)
+    next.delete('checkUpdates')
+    setSearchParams(next, { replace: true })
+    void loadAccount(true)
+  }, [loadAccount, searchParams, setSearchParams])
 
   const signOut = async () => {
     setConfirmSignOut(false)

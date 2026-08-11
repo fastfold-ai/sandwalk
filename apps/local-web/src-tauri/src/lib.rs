@@ -5,6 +5,8 @@
 //! `~/Library/Application Support/Sandwalk/control.json`.
 
 mod dictation;
+mod lan_scan;
+mod multi_window;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -15,7 +17,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::thread;
 use std::time::Duration;
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager};
 #[cfg(target_os = "macos")]
 use tauri_plugin_liquid_glass::{GlassMaterialVariant, LiquidGlassConfig, LiquidGlassExt};
 
@@ -102,7 +104,7 @@ fn apply_sidebar_glass(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
 fn set_sidebar_glass_dark(app: tauri::AppHandle, dark: bool) -> Result<(), String> {
     SIDEBAR_GLASS_DARK.store(dark, Ordering::Relaxed);
     #[cfg(target_os = "macos")]
-    if let Some(window) = app.get_webview_window("main") {
+    for window in app.webview_windows().into_values() {
         apply_sidebar_glass(&app, &window);
     }
     #[cfg(not(target_os = "macos"))]
@@ -129,7 +131,7 @@ fn set_sidebar_glass_options(
             .position(|(key, _)| *key == variant)
             .unwrap_or(0);
         SIDEBAR_GLASS_VARIANT.store(index as u8, Ordering::Relaxed);
-        if let Some(window) = app.get_webview_window("main") {
+        for window in app.webview_windows().into_values() {
             apply_sidebar_glass(&app, &window);
         }
     }
@@ -310,41 +312,82 @@ fn control_request(method: &str, path: &str, body: Option<Value>) -> Result<Valu
     serde_json::from_str(&text).map_err(|e| format!("bad JSON: {e} — {text}"))
 }
 
-fn inject_bootstrap_script(initial_route: Option<&str>) -> String {
-    let os = std::env::consts::OS;
-    let overlay = if os == "macos" {
-        "try{document.documentElement.classList.add('sandwalk-mac-overlay','sandwalk-mac-glass');document.documentElement.dataset.platform='macos';}catch(e){}"
-    } else {
-        ""
-    };
-    let route_js = initial_route
-        .filter(|r| is_spa_route(r))
-        .map(|r| {
-            format!(
-                "window.__SANDWALK_INITIAL_ROUTE__={};",
-                serde_json::to_string(r).unwrap_or_else(|_| "\"/\"".into())
-            )
-        })
-        .unwrap_or_default();
+fn control_plane_api_base() -> String {
     if let Ok(ctl) = read_control() {
         if let Some(api) = ctl.api_base {
-            let trimmed = api.trim_end_matches('/').to_string();
+            let trimmed = multi_window::normalize_url(&api);
             if !trimmed.is_empty() {
-                return format!(
-                    "window.__SANDWALK_HTTP__={};window.__SANDWALK_PLATFORM__='{}';{}{}",
-                    serde_json::to_string(&trimmed)
-                        .unwrap_or_else(|_| "\"http://127.0.0.1:8787\"".into()),
-                    os,
-                    route_js,
-                    overlay
-                );
+                return trimmed;
             }
         }
     }
-    format!(
-        "window.__SANDWALK_HTTP__='http://127.0.0.1:8787';window.__SANDWALK_PLATFORM__='{}';{}{}",
-        os, route_js, overlay
+    multi_window::DEFAULT_API.to_string()
+}
+
+#[cfg(target_os = "macos")]
+fn apply_glass_cb(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
+    apply_sidebar_glass(app, window);
+}
+
+#[tauri::command]
+fn desktop_open_window(
+    app: tauri::AppHandle,
+    backend_url: Option<String>,
+    api_key: Option<String>,
+    title: Option<String>,
+    route: Option<String>,
+    snapshot_id: Option<String>,
+    focus_existing: Option<bool>,
+) -> Result<String, String> {
+    let fallback = multi_window::focused_backend_url(&app, &control_plane_api_base());
+    #[cfg(target_os = "macos")]
+    let glass = Some(apply_glass_cb as multi_window::ApplyGlassFn);
+    #[cfg(not(target_os = "macos"))]
+    let glass = None;
+    multi_window::open_or_focus_window(
+        &app,
+        multi_window::OpenWindowArgs {
+            backend_url,
+            api_key,
+            title,
+            route,
+            snapshot_id,
+            focus_existing: focus_existing.unwrap_or(false),
+        },
+        &fallback,
+        is_spa_route,
+        glass,
     )
+}
+
+/// Keep the native window map / title / Open Recent in sync after in-app Change server.
+#[tauri::command]
+fn desktop_bind_window_backend(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    url: String,
+) -> Result<(), String> {
+    let normalized = multi_window::normalize_url(&url);
+    let id = multi_window::register_window_backend(window.label(), &normalized);
+    let title = multi_window::window_title_for_url(&normalized);
+    let _ = window.set_title(&title);
+    multi_window::upsert_recent_snapshot(&id, &normalized, "/", &title);
+    multi_window::install_app_menu(&app)
+}
+
+/// Update the native window title (Dock menu / Mission Control label).
+#[tauri::command]
+fn desktop_set_window_title(window: tauri::WebviewWindow, title: String) -> Result<(), String> {
+    let trimmed = title.trim();
+    if trimmed.is_empty() {
+        return Ok(());
+    }
+    window.set_title(trimmed).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn desktop_open_server_settings() -> Result<(), String> {
+    multi_window::open_server_settings_app()
 }
 
 #[tauri::command]
@@ -679,11 +722,7 @@ fn clear_pending_desktop_route() {
 }
 
 fn focus_main_window(app: &tauri::AppHandle) {
-    if let Some(win) = app.get_webview_window("main") {
-        let _ = win.unminimize();
-        let _ = win.show();
-        let _ = win.set_focus();
-    }
+    multi_window::focus_best_window(app);
 }
 
 fn emit_navigate(app: &tauri::AppHandle, path: String) {
@@ -794,6 +833,15 @@ pub fn run() {
             desktop_rebuild_dashboard,
             desktop_app_version,
             desktop_menubar_available,
+            desktop_open_window,
+            desktop_bind_window_backend,
+            desktop_set_window_title,
+            desktop_open_server_settings,
+            multi_window::desktop_list_window_recents,
+            multi_window::desktop_clear_window_recents,
+            multi_window::desktop_upsert_window_snapshot,
+            multi_window::desktop_remember_window_recent,
+            lan_scan::desktop_scan_lan_servers,
             start_window_drag,
             toggle_maximize,
             window_is_fullscreen,
@@ -819,69 +867,36 @@ pub fn run() {
         .setup(|app| {
             dictation::manage_dictation(app);
             ensure_server_helper();
-            // Consume pending route once so inject + delayed emit share it.
             let cold_route = initial_desktop_route();
-            let script = inject_bootstrap_script(cold_route.as_deref());
-            let mut win = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("Sandwalk")
-                .inner_size(1280.0, 860.0)
-                .min_inner_size(900.0, 600.0)
-                // Tauri's native file-drop handler blocks HTML5 DnD; the composer
-                // uses DOM drag/drop so OS file drops auto-upload into the session.
-                .disable_drag_drop_handler()
-                .initialization_script(&script);
-
+            let api_base = control_plane_api_base();
             #[cfg(target_os = "macos")]
-            {
-                // Overlay title bar + transparent webview so liquid glass / vibrancy
-                // shows through the sidebar; main pane paints an opaque canvas.
-                win = win
-                    .transparent(true)
-                    .title_bar_style(tauri::TitleBarStyle::Overlay)
-                    .hidden_title(true)
-                    // Centers the traffic lights on the 44px (h-11) shell nav
-                    // strip's icon row — verified alignment, don't change
-                    // without testing against a real build (native macOS
-                    // buttons, not CSS — no dev hot-reload for this).
-                    .traffic_light_position(tauri::LogicalPosition::new(19.0, 24.0));
-            }
+            let glass = Some(apply_glass_cb as multi_window::ApplyGlassFn);
+            #[cfg(not(target_os = "macos"))]
+            let glass = None;
 
-            let window = win.build()?;
+            multi_window::build_sandwalk_window(
+                app.handle(),
+                "main",
+                &api_base,
+                None,
+                "Sandwalk",
+                cold_route.as_deref(),
+                Some("main"),
+                true,
+                is_spa_route,
+                glass,
+            )?;
+            multi_window::install_app_menu(app.handle())?;
 
-            #[cfg(target_os = "macos")]
-            {
-                // Native glass behind the transparent sidebar (always installed;
-                // SPA paints solid on blur so traffic lights stay intact).
-                apply_sidebar_glass(app.handle(), &window);
-                let _ = window.emit("sandwalk-window-glass-active", true);
-            }
-
-            // Close hides the window; menubar keeps the agent running.
-            // Also emit fullscreen so the SPA can drop traffic-light left pad.
-            let win_clone = window.clone();
-            window.on_window_event(move |event| {
-                match event {
-                    tauri::WindowEvent::CloseRequested { api, .. } => {
-                        api.prevent_close();
-                        let _ = win_clone.hide();
-                    }
-                    tauri::WindowEvent::Resized(_)
-                    | tauri::WindowEvent::ScaleFactorChanged { .. } => {
-                        if let Ok(fullscreen) = win_clone.is_fullscreen() {
-                            let _ = win_clone.emit("sandwalk-window-fullscreen", fullscreen);
-                        }
-                    }
-                    #[cfg(target_os = "macos")]
-                    tauri::WindowEvent::Focused(focused) => {
-                        // Never tear down native glass (that hides traffic lights).
-                        // SPA covers it with a solid sidebar while unfocused.
-                        let _ = win_clone.emit("sandwalk-window-glass-active", *focused);
-                    }
-                    _ => {}
-                }
+            app.on_menu_event(move |app, event| {
+                let fallback = control_plane_api_base();
+                #[cfg(target_os = "macos")]
+                let glass = Some(apply_glass_cb as multi_window::ApplyGlassFn);
+                #[cfg(not(target_os = "macos"))]
+                let glass = None;
+                multi_window::handle_menu_event(app, &event, &fallback, is_spa_route, glass);
             });
 
-            // Emit after the SPA can subscribe (setup emit is usually dropped).
             if let Some(route) = cold_route {
                 let handle = app.handle().clone();
                 thread::spawn(move || {
@@ -898,7 +913,7 @@ pub fn run() {
         .expect("error while building Sandwalk")
         .run(|app_handle, event| {
             // Close hides the window so the Dock stays dotted. Clicking the
-            // Dock icon fires Reopen — show/focus the main window again.
+            // Dock icon fires Reopen — show/focus a visible window again.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {
                 focus_main_window(app_handle);

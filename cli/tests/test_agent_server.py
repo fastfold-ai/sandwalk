@@ -156,8 +156,14 @@ def test_agent_server_api_key_protects_v1_routes(tmp_path: Path, monkeypatch):
     app = create_app(store_path=tmp_path / "agent.db", api_key="test-secret")
 
     with TestClient(app) as client:
-        # Health stays public for connect probes.
+        # Health / discover stay public for connect + LAN probes.
         assert client.get("/v1/health").status_code == 200
+        discover = client.get("/v1/discover")
+        assert discover.status_code == 200
+        body = discover.json()
+        assert body["service"] == "sandwalk"
+        assert body["authRequired"] is True
+        assert body.get("deviceLabel")
         assert client.get("/v1/sessions").status_code == 401
         response = client.get(
             "/v1/sessions",
@@ -260,19 +266,37 @@ def test_agent_server_workspace_file_contract(tmp_path: Path, monkeypatch):
         assert not (workspace / "notes").exists()
 
 
-def test_public_server_requires_security_configuration(monkeypatch):
+def test_public_server_requires_api_key(monkeypatch, tmp_path):
+    monkeypatch.setenv("SANDWALK_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
     monkeypatch.setattr("agent_server.main._serve", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "agent_server.app.create_app",
+        lambda **kwargs: type(
+            "App",
+            (),
+            {
+                "state": type(
+                    "State",
+                    (),
+                    {
+                        "runtime_api_key": kwargs.get("api_key"),
+                        "ui_dist": None,
+                    },
+                )()
+            },
+        )(),
+    )
 
     with pytest.raises(ValueError, match="api-key"):
         run_server(host="0.0.0.0", public=True)
 
-    with pytest.raises(ValueError, match="allowed-origin"):
-        run_server(host="0.0.0.0", public=True, api_key="secret")
-
-    with pytest.raises(ValueError, match="allowed-host"):
-        run_server(
-            host="0.0.0.0",
-            public=True,
-            api_key="secret",
-            allowed_origins=["https://agent.example.com"],
-        )
+    # LAN defaults: --host 0.0.0.0 implies public; origins/hosts get safe defaults.
+    run_server(host="0.0.0.0", api_key="secret")
+    run_server(
+        host="0.0.0.0",
+        public=True,
+        api_key="secret",
+        allowed_origins=["https://agent.example.com"],
+        allowed_hosts=["agent.example.com"],
+    )

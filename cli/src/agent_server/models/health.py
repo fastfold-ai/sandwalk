@@ -28,6 +28,18 @@ class HealthResponse(ApiModel):
     capabilities: Capabilities = Field(default_factory=Capabilities)
 
 
+class DiscoverResponse(ApiModel):
+    """Auth-exempt LAN probe payload (keep small — no RAM/GPU/pid)."""
+
+    service: Literal["sandwalk"] = "sandwalk"
+    version: str
+    hostname: str
+    platform: str
+    arch: str
+    device_label: str
+    auth_required: bool = False
+
+
 class ServerSystemInfo(ApiModel):
     label: str
     platform: str

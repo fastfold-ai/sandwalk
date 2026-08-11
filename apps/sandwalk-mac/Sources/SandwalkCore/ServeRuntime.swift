@@ -82,7 +82,13 @@ struct ServeRuntime {
     }
 
     func makeServeArguments(host: String, port: Int) -> [String] {
-        argumentsPrefix + ["serve", "--host", host, "--port", String(port)]
+        var args = argumentsPrefix + ["serve", "--host", host, "--port", String(port)]
+        // Match CLI: non-loopback bind (Network → Allow Remote Connections).
+        let loopback = host == "127.0.0.1" || host == "localhost" || host == "::1"
+        if !loopback {
+            args.append("--public")
+        }
+        return args
     }
 
     func makeEnvironment(config: AppConfig) -> [String: String] {

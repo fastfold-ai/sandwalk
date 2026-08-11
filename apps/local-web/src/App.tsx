@@ -9,6 +9,7 @@ import {
 import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
+import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
 import {
@@ -21,6 +22,7 @@ import { useAppSessionLayer } from '@/hooks/useAppSessionLayer'
 import { useAppShellEffects } from '@/hooks/useAppShellEffects'
 import { useAppUiState } from '@/hooks/useAppUiState'
 import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
+import { useDesktopWindowMenu } from '@/hooks/useDesktopWindowMenu'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { visibleSessionIds } from '@/lib/sessions'
@@ -52,6 +54,7 @@ export default function App() {
     [bootstrap.loadSessions]
   )
   useDesktopNavigate(navigate, onDesktopRoute)
+  const windowMenu = useDesktopWindowMenu()
 
   const tabs = useAppOpenTabs(
     ui.projectScopeId,
@@ -290,38 +293,56 @@ export default function App() {
     loadMcpServers: bootstrap.loadMcpServers,
     loadMcpCatalog: bootstrap.loadMcpCatalog
   })
-  if (gate) return gate
+  const remoteDialog = (
+    <OpenRemoteWindowDialog
+      open={windowMenu.remoteOpen}
+      onOpenChange={windowMenu.setRemoteOpen}
+      initialUrl={windowMenu.remoteInitialUrl}
+    />
+  )
+
+  if (gate) {
+    return (
+      <>
+        {gate}
+        {remoteDialog}
+      </>
+    )
+  }
 
   return (
-    <AppShellConnected
-      {...buildAppShellProps({
-        ui,
-        route,
-        bootstrap,
-        context,
-        chat: layer.chat,
-        tabs,
-        actions: layer.actions,
-        sandbox: layer.sandbox,
-        scroll: layer.scroll,
-        location,
-        navigate,
-        sections,
-        openTabs,
-        orderedVisibleSessionIds,
-        showSessionTabs,
-        activeTitle,
-        canShowFilesPanel,
-        conversationTimeline: layer.conversationTimeline,
-        agentComposerSlotProps: layer.agentComposerSlotProps,
-        activeRunTodos: layer.activeRunTodos,
-        activeRunTools: layer.activeRunTools,
-        activeBuildPlan: layer.activeBuildPlan,
-        builtPlanPaths: layer.builtPlanPaths,
-        submitApprovals: layer.submitApprovals,
-        prefetchSessionMessages: layer.prefetchSessionMessages,
-        showChatSkeleton
-      })}
-    />
+    <>
+      <AppShellConnected
+        {...buildAppShellProps({
+          ui,
+          route,
+          bootstrap,
+          context,
+          chat: layer.chat,
+          tabs,
+          actions: layer.actions,
+          sandbox: layer.sandbox,
+          scroll: layer.scroll,
+          location,
+          navigate,
+          sections,
+          openTabs,
+          orderedVisibleSessionIds,
+          showSessionTabs,
+          activeTitle,
+          canShowFilesPanel,
+          conversationTimeline: layer.conversationTimeline,
+          agentComposerSlotProps: layer.agentComposerSlotProps,
+          activeRunTodos: layer.activeRunTodos,
+          activeRunTools: layer.activeRunTools,
+          activeBuildPlan: layer.activeBuildPlan,
+          builtPlanPaths: layer.builtPlanPaths,
+          submitApprovals: layer.submitApprovals,
+          prefetchSessionMessages: layer.prefetchSessionMessages,
+          showChatSkeleton
+        })}
+      />
+      {remoteDialog}
+    </>
   )
 }
