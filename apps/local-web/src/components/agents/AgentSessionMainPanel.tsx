@@ -376,7 +376,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           />
         </main>
       </ResizablePanel>
-      {canShowFilesPanel ? (
+      {canShowFilesPanel && showWorkspaceFiles ? (
         <>
           <ResizableHandle
             className={cn(
