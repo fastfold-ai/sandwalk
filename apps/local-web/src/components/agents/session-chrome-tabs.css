@@ -63,32 +63,37 @@
   margin-left: -14px;
 }
 
-.sandwalk-chrome-tabs .chrome-tab::after {
+/*
+ * Divider lives on the RIGHT tab's ::before (not on the left tab's ::after),
+ * because tabs overlap 14 px and later-DOM siblings paint on top. Putting the
+ * divider on the right-hand tab guarantees it wins the paint order and shows
+ * inside the overlap area.
+ */
+.sandwalk-chrome-tabs .chrome-tab::before {
   content: '';
   position: absolute;
-  top: 50%;
-  right: -1px;
+  top: 8px;
+  left: 6px;
   width: 1px;
   height: 14px;
-  transform: translateY(-50%);
-  background: hsl(var(--foreground) / 0.15);
+  background: hsl(var(--foreground) / 0.1);
   pointer-events: none;
-  z-index: 0;
+  z-index: 3;
   transition: opacity 0.12s ease;
 }
 
-.dark .sandwalk-chrome-tabs .chrome-tab::after {
-  background: hsl(var(--foreground) / 0.22);
+.dark .sandwalk-chrome-tabs .chrome-tab::before {
+  background: hsl(var(--foreground) / 0.18);
 }
 
-/* Hide the divider next to the active tab, the hovered tab, and after the
- * last tab (nothing to divide against). */
-.sandwalk-chrome-tabs .chrome-tab[data-active='true']::after,
-.sandwalk-chrome-tabs
-  .chrome-tab:has(+ .chrome-tab[data-active='true'])::after,
-.sandwalk-chrome-tabs .chrome-tab:hover::after,
-.sandwalk-chrome-tabs .chrome-tab:has(+ .chrome-tab:hover)::after,
-.sandwalk-chrome-tabs .chrome-tab:last-child::after {
+/* Hide the divider next to the first tab (no left neighbor), on the active
+ * tab, on the tab following the active tab, on hover, and on the tab
+ * following the hovered tab. */
+.sandwalk-chrome-tabs .chrome-tab:first-child::before,
+.sandwalk-chrome-tabs .chrome-tab[data-active='true']::before,
+.sandwalk-chrome-tabs .chrome-tab[data-active='true'] + .chrome-tab::before,
+.sandwalk-chrome-tabs .chrome-tab:hover::before,
+.sandwalk-chrome-tabs .chrome-tab:hover + .chrome-tab::before {
   opacity: 0;
 }
 
