@@ -190,7 +190,51 @@ if isinstance(row, dict) and not row.get("message"):
 REF="$(resolve_ref)"
 ok "Installing sandwalk from git ref: ${REF}"
 
-GIT_SPEC="git+${REPO_GIT}@${REF}#subdirectory=cli"
+# Prefer SSH when keys work (private repos often fail with HTTPS PATs that
+# lack Contents access). Else tokenized HTTPS from env / gh. Else plain HTTPS.
+resolve_repo_git() {
+  local ssh_url="ssh://git@github.com/${REPO}.git"
+  if GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+    git ls-remote "${ssh_url}" HEAD >/dev/null 2>&1; then
+    printf '%s\n' "$ssh_url"
+    return
+  fi
+
+  local token=""
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    token="$GITHUB_TOKEN"
+  elif [[ -n "${GH_TOKEN:-}" ]]; then
+    token="$GH_TOKEN"
+  elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    token="$(gh auth token 2>/dev/null || true)"
+  fi
+
+  if [[ -n "$token" ]]; then
+    # Probe API access before embedding the token in the install URL.
+    if command -v gh >/dev/null 2>&1 && gh api "repos/${REPO}" >/dev/null 2>&1; then
+      printf 'https://x-access-token:%s@github.com/%s.git\n' "$token" "$REPO"
+      return
+    fi
+    if curl -fsSL -H "Authorization: Bearer ${token}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${REPO}" >/dev/null 2>&1; then
+      printf 'https://x-access-token:%s@github.com/%s.git\n' "$token" "$REPO"
+      return
+    fi
+    warn "GitHub token is set but cannot access ${REPO} — trying unauthenticated HTTPS"
+  fi
+
+  printf '%s\n' "$REPO_GIT"
+}
+
+REPO_GIT_RESOLVED="$(resolve_repo_git)"
+case "$REPO_GIT_RESOLVED" in
+  ssh://*) info "Using SSH to clone ${REPO}" ;;
+  https://x-access-token:*) info "Using authenticated HTTPS to clone ${REPO}" ;;
+  *) info "Using HTTPS to clone ${REPO}" ;;
+esac
+
+GIT_SPEC="git+${REPO_GIT_RESOLVED}@${REF}#subdirectory=cli"
 UV_SPEC="${PACKAGE} @ ${GIT_SPEC}"
 
 # ── Install ────────────────────────────────────────────────────
@@ -202,9 +246,10 @@ UV_SPEC="${PACKAGE} @ ${GIT_SPEC}"
 
 install_failed_hint() {
   warn ""
-  warn "Install failed. If the repo is private, authenticate GitHub first:"
-  warn "  gh auth login"
-  warn "  # or: export GITHUB_TOKEN=…"
+  warn "Install failed. While ${REPO} is private you need GitHub access:"
+  warn "  • SSH key added to GitHub (preferred): ssh -T git@github.com"
+  warn "  • or: gh auth login  (token must be able to read ${REPO})"
+  warn "  • or: export GITHUB_TOKEN=… with repo read access"
   warn ""
 }
 
@@ -264,6 +309,9 @@ else
 fi
 
 # ── Verify ─────────────────────────────────────────────────────
+
+# uv tool / pipx / pip --user all commonly land here
+export PATH="${HOME}/.local/bin:${PATH}"
 
 if ! command -v sandwalk >/dev/null 2>&1; then
   warn "'sandwalk' not found on PATH. Restart your shell, then run: sandwalk --version"
