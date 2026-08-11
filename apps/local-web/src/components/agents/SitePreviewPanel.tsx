@@ -152,7 +152,7 @@ export function SitePreviewPanel({
     <div className="flex h-full min-h-0 flex-col">
       <header className="sandwalk-shell-nav-strip relative z-20 flex shrink-0 items-center gap-1 px-1.5">
         <div className="chat-scrollbar-x flex min-w-0 flex-1 items-stretch overflow-x-auto">
-          <div className="bg-muted text-foreground my-auto flex h-8 w-[180px] max-w-[240px] shrink-0 items-center gap-1.5 rounded-md px-2.5">
+          <div className="text-foreground my-auto flex h-8 w-[180px] max-w-[240px] shrink-0 items-center gap-1.5 px-1">
             <Globe2 className="size-3.5 shrink-0" />
             {sites.length > 1 ? (
               <select
