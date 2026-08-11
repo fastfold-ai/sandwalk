@@ -52,6 +52,9 @@ dependencies = [
     "modal>=0.73",
     "langchain-openrouter>=0.2.7",
     "pyyaml>=6.0",
+    # Bench suite installs (MMLU / MMLU-Pro / ARC) — one-shot parquet download.
+    # Without this, installs fall back to a paged HF API that rate-limits hard.
+    "pyarrow>=14.0",
 ]
 
 [project.optional-dependencies]

@@ -93,15 +93,17 @@ function suiteDisplayName(
   return fromCard || PACK_DISPLAY_TITLES[id] || id
 }
 
-function installPercent(card: BenchSuiteCard): number {
-  const done = card.installBytesDone
-  const total = card.installBytesTotal
-  if (done != null && total != null && total > 0) {
-    return Math.max(2, Math.min(100, Math.round((100 * done) / total)))
+function installButtonLabel(card: BenchSuiteCard, installing: boolean): string {
+  if (installing) {
+    // Server already formats "12.4 MB / 48 MB · 35.6 MB left · 26%" or
+    // "1,200 / 14,042 questions · 12,842 left · 9%".
+    return card.installProgress?.trim() || 'Installing…'
   }
-  // Indeterminate-ish pulse when size unknown — keep a visible sliver.
-  if (card.installing || (done != null && done > 0)) return 35
-  return 8
+  if (card.requiresHfToken && !card.hfTokenConfigured) {
+    return 'Hugging Face required'
+  }
+  if (card.installError) return 'Retry install'
+  return 'Install'
 }
 
 function sampleChoicesFor(card: BenchSuiteCard): number[] {
@@ -342,12 +344,14 @@ export function BenchView({
     })
   }
 
+  const openHuggingFaceIntegration = () => {
+    setError(null)
+    navigate('/dashboard/integrations/huggingface')
+  }
+
   const installSuite = async (card: BenchSuiteCard) => {
     if (card.requiresHfToken && !card.hfTokenConfigured) {
-      setError(
-        'Set a Hugging Face token under Integrations → Hugging Face, accept the dataset terms, then Install.'
-      )
-      navigate('/dashboard/integrations/huggingface')
+      openHuggingFaceIntegration()
       return
     }
     if (card.installing || startingInstallId === card.id) return
@@ -364,10 +368,7 @@ export function BenchView({
         card.requiresHfToken ||
         /hugging face|hf_token|needsHfToken/i.test(message)
       if (needsToken) {
-        setError(
-          'Hugging Face token required. Save it under Integrations → Hugging Face, then try Install again.'
-        )
-        navigate('/dashboard/integrations/huggingface')
+        openHuggingFaceIntegration()
       } else {
         setError(message)
       }
@@ -954,20 +955,18 @@ export function BenchView({
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="w-full"
+                          className="h-auto min-h-8 w-full whitespace-normal px-2 py-1.5 text-left text-[11px] leading-snug"
                           disabled={installing || Boolean(startingInstallId)}
                           onClick={() => void installSuite(card)}
                         >
                           {installing ? (
-                            <Loader2 className="size-3.5 animate-spin" />
+                            <Loader2 className="size-3.5 shrink-0 animate-spin" />
                           ) : (
-                            <Download className="size-3.5" />
+                            <Download className="size-3.5 shrink-0" />
                           )}
-                          {installing
-                            ? card.installProgress
-                              ? `Installing… ${installPercent(card)}%`
-                              : 'Installing…'
-                            : 'Install'}
+                          <span className="min-w-0 flex-1">
+                            {installButtonLabel(card, installing)}
+                          </span>
                         </Button>
                       </div>
                     ) : null}

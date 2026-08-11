@@ -75,9 +75,9 @@ INSTALLABLE_SUITE_IDS = frozenset(
 # free — the parquet files would need pyarrow, which is only an optional extra.
 _HF_ROWS_URL = "https://datasets-server.huggingface.co/rows"
 _HF_ROWS_PAGE = 100
-_HF_ROWS_RETRIES = 5
-_HF_ROWS_BACKOFF = 2.0
-_HF_ROWS_PAGE_PAUSE = 0.15
+_HF_ROWS_RETRIES = 8
+_HF_ROWS_BACKOFF = 3.0
+_HF_ROWS_PAGE_PAUSE = 0.25
 
 _MCQ_SOURCES: dict[str, dict[str, str]] = {
     "mmlu": {
@@ -437,7 +437,7 @@ def _install_mcq(
     force: bool,
     on_progress: ProgressCb | None = None,
 ) -> Path:
-    """Page the full MCQ corpus out of the HF rows API into the bench cache."""
+    """Download the full MCQ corpus (parquet preferred; rows API fallback)."""
     src = _MCQ_SOURCES[suite_id]
     out = mcq_cache_dir() / src["fixture"]
     if out.is_file() and out.stat().st_size > 0 and not force:
@@ -451,12 +451,16 @@ def _install_mcq(
         files_total=1,
         bytes_done=0,
         bytes_total=None,
+        questions_done=0,
+        questions_total=None,
         summary=f"Downloading {title}…",
     )
 
     rows = _mcq_rows_from_parquet(suite_id, src, on_progress=on_progress)
     if rows is None:
-        rows = _mcq_rows_from_api(suite_id, src, on_progress=on_progress)
+        rows = _mcq_rows_from_api(
+            suite_id, src, out_path=out, force=force, on_progress=on_progress
+        )
 
     if not rows:
         raise BenchInstallError(
@@ -465,16 +469,26 @@ def _install_mcq(
         )
 
     _write_jsonl(out, rows)
+    partial = _mcq_partial_path(out)
+    if partial.is_file():
+        try:
+            partial.unlink()
+        except OSError:
+            pass
     _emit(
         on_progress,
         label="Done",
         files_done=1,
         files_total=1,
-        bytes_done=len(rows),
-        bytes_total=len(rows),
-        summary=f"Installed {title} ({len(rows)} questions).",
+        questions_done=len(rows),
+        questions_total=len(rows),
+        summary=f"Installed {title} ({len(rows):,} questions).",
     )
     return out
+
+
+def _mcq_partial_path(out: Path) -> Path:
+    return out.with_name(out.name + ".partial")
 
 
 def _mcq_rows_from_parquet(
@@ -508,6 +522,15 @@ def _mcq_rows_from_parquet(
         )
 
     raw = _download_bytes(url, token=resolve_hf_token() or None, on_chunk=on_chunk)
+    _emit(
+        on_progress,
+        label=src["fixture"],
+        files_done=0,
+        files_total=1,
+        bytes_done=len(raw),
+        bytes_total=len(raw),
+        summary=f"Parsing {src['title']}…",
+    )
     try:
         records = read(raw)
     except Exception as exc:  # noqa: BLE001 — fall back to the rows API
@@ -520,6 +543,18 @@ def _mcq_rows_from_parquet(
         normalized = _normalize_mcq_row(suite_id, record)
         if normalized is not None:
             rows.append(normalized)
+    if rows:
+        _emit(
+            on_progress,
+            label=src["fixture"],
+            files_done=0,
+            files_total=1,
+            questions_done=len(rows),
+            questions_total=len(rows),
+            bytes_done=len(raw),
+            bytes_total=len(raw),
+            summary=f"Downloaded {src['title']} · {len(rows):,} questions",
+        )
     return rows or None
 
 
@@ -583,44 +618,75 @@ def _mcq_rows_from_api(
     suite_id: str,
     src: dict[str, str],
     *,
+    out_path: Path,
+    force: bool = False,
     on_progress: ProgressCb | None = None,
 ) -> list[dict[str, Any]]:
-    """Fallback: page the HF rows API (100 rows per request)."""
+    """Fallback: page the HF rows API (100 rows per request).
+
+    Writes a ``.partial`` file as pages arrive so a rate-limit / restart can
+    resume instead of starting over.
+    """
     title = src["title"]
+    partial = _mcq_partial_path(out_path)
     rows: list[dict[str, Any]] = []
+    if not force and partial.is_file() and partial.stat().st_size > 0:
+        try:
+            with partial.open(encoding="utf-8") as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    rows.append(json.loads(line))
+        except (OSError, ValueError):
+            rows = []
+            try:
+                partial.unlink()
+            except OSError:
+                pass
+
     total: int | None = None
-    offset = 0
-    while True:
-        payload = _fetch_hf_rows(src, offset=offset, length=_HF_ROWS_PAGE)
-        if total is None:
-            raw_total = payload.get("num_rows_total")
-            total = int(raw_total) if isinstance(raw_total, int) else None
-        page = payload.get("rows") or []
-        if not page:
-            break
-        for entry in page:
-            row = entry.get("row") if isinstance(entry, dict) else None
-            if not isinstance(row, dict):
-                continue
-            normalized = _normalize_mcq_row(suite_id, row)
-            if normalized is not None:
-                rows.append(normalized)
-        offset += len(page)
-        _emit(
-            on_progress,
-            label=src["fixture"],
-            files_done=0,
-            files_total=1,
-            bytes_done=len(rows),
-            bytes_total=total,
-            summary=f"Downloading {title} ({len(rows)}/{total or '?'} questions)…",
-        )
-        if total is not None and offset >= total:
-            break
-        if len(page) < _HF_ROWS_PAGE:
-            break
-        # Gentle pacing: the public rows API 429s on sustained paging.
-        time.sleep(_HF_ROWS_PAGE_PAUSE)
+    offset = len(rows)
+    mode = "a" if rows else "w"
+    with partial.open(mode, encoding="utf-8") as fh:
+        while True:
+            payload = _fetch_hf_rows(src, offset=offset, length=_HF_ROWS_PAGE)
+            if total is None:
+                raw_total = payload.get("num_rows_total")
+                total = int(raw_total) if isinstance(raw_total, int) else None
+            page = payload.get("rows") or []
+            if not page:
+                break
+            page_rows: list[dict[str, Any]] = []
+            for entry in page:
+                row = entry.get("row") if isinstance(entry, dict) else None
+                if not isinstance(row, dict):
+                    continue
+                normalized = _normalize_mcq_row(suite_id, row)
+                if normalized is not None:
+                    page_rows.append(normalized)
+            for item in page_rows:
+                fh.write(json.dumps(item, ensure_ascii=False) + "\n")
+            fh.flush()
+            rows.extend(page_rows)
+            offset += len(page)
+            _emit(
+                on_progress,
+                label=src["fixture"],
+                files_done=0,
+                files_total=1,
+                questions_done=len(rows),
+                questions_total=total,
+                summary=(
+                    f"Downloading {title} · {len(rows):,}/"
+                    f"{total or '?'} questions…"
+                ),
+            )
+            if total is not None and offset >= total:
+                break
+            if len(page) < _HF_ROWS_PAGE:
+                break
+            # Gentle pacing: the public rows API 429s on sustained paging.
+            time.sleep(_HF_ROWS_PAGE_PAUSE)
     return rows
 
 

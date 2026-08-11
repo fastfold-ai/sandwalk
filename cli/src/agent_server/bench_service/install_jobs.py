@@ -30,6 +30,8 @@ class InstallJob:
     path: str | None = None
     bytes_done: int = 0
     bytes_total: int | None = None
+    questions_done: int = 0
+    questions_total: int | None = None
     files_done: int = 0
     files_total: int = 0
     label: str = ""
@@ -53,6 +55,8 @@ def get_install_job(suite_id: str) -> InstallJob | None:
             path=job.path,
             bytes_done=job.bytes_done,
             bytes_total=job.bytes_total,
+            questions_done=job.questions_done,
+            questions_total=job.questions_total,
             files_done=job.files_done,
             files_total=job.files_total,
             label=job.label,
@@ -138,6 +142,8 @@ def _run_install(suite_id: str, force: bool) -> None:
         summary: str | None = None,
         bytes_done: int | None = None,
         bytes_total: int | None = None,
+        questions_done: int | None = None,
+        questions_total: int | None = None,
         files_done: int | None = None,
         files_total: int | None = None,
         label: str | None = None,
@@ -152,6 +158,12 @@ def _run_install(suite_id: str, force: bool) -> None:
                 job.bytes_done = max(0, int(bytes_done))
             if bytes_total is not None:
                 job.bytes_total = int(bytes_total) if bytes_total > 0 else None
+            if questions_done is not None:
+                job.questions_done = max(0, int(questions_done))
+            if questions_total is not None:
+                job.questions_total = (
+                    int(questions_total) if questions_total > 0 else None
+                )
             if files_done is not None:
                 job.files_done = max(0, int(files_done))
             if files_total is not None:
@@ -194,21 +206,32 @@ def _run_install(suite_id: str, force: bool) -> None:
 
 
 def _format_progress(job: InstallJob) -> str:
-    parts: list[str] = []
-    if job.files_total > 0:
-        parts.append(f"file {min(job.files_done + 1, job.files_total)}/{job.files_total}")
+    # Prefer question counts for paged MCQ installs (not byte sizes).
+    if job.questions_done > 0 or job.questions_total:
+        done = job.questions_done
+        total = job.questions_total
+        if total and total > 0:
+            left = max(0, total - done)
+            pct = min(100.0, (100.0 * done) / total)
+            return (
+                f"{done:,} / {total:,} questions · {left:,} left · {pct:.0f}%"
+            )
+        return f"{done:,} questions downloaded"
+
+    if job.bytes_done > 0 or (job.bytes_total and job.bytes_total > 0):
+        done = _format_bytes(job.bytes_done)
+        if job.bytes_total and job.bytes_total > 0:
+            left = max(0, job.bytes_total - job.bytes_done)
+            pct = min(100.0, (100.0 * job.bytes_done) / job.bytes_total)
+            return (
+                f"{done} / {_format_bytes(job.bytes_total)} · "
+                f"{_format_bytes(left)} left · {pct:.0f}%"
+            )
+        return f"{done} downloaded"
+
     if job.label and job.label not in {"Starting…", "Starting..."}:
-        parts.append(job.label)
-    size = _format_bytes(job.bytes_done)
-    if job.bytes_total and job.bytes_total > 0:
-        parts.append(f"{size} / {_format_bytes(job.bytes_total)}")
-        pct = min(100.0, (100.0 * job.bytes_done) / job.bytes_total)
-        parts.append(f"{pct:.0f}%")
-    elif job.bytes_done > 0:
-        parts.append(f"{size} downloaded")
-    if not parts:
-        return job.summary or "Downloading dataset…"
-    return " · ".join(parts)
+        return f"Downloading {job.label}…"
+    return job.summary or "Downloading dataset…"
 
 
 def _format_bytes(n: int) -> str:
