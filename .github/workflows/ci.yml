@@ -56,13 +56,13 @@ jobs:
           # are auto-deselected in tests/conftest.py unless their env gate is set.
           # Scoped omit list in pyproject.toml (REPL/CLI entry + agent_server glue)
           # mirrors local-web / Mac unit-testable coverage gates.
+          # Coverage gate at 75%: interactive TUI packages are omitted; buffer
+          # avoids flakes when new lightly-tested helpers land.
           pytest tests/ -q \
             --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models \
             --cov=reports --cov=skills --cov=tools --cov=ui \
             --cov-report=term-missing:skip-covered \
             --cov-report=xml:coverage-full.xml \
-            # Measured ~77–85% after omitting interactive TUI packages; keep a
-            # small buffer so new helpers don't flake the gate.
             --cov-fail-under=75
 
       - name: Agent server scoped coverage gate
