@@ -10,15 +10,34 @@
   z-index: 0;
   min-width: 0;
   flex: 1 1 auto;
+  order: 2; /* strip goes AFTER the overflow slot */
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
+  /* Soft LEFT-edge fade so the first visible tab dissolves into the
+   * overflow slot (now on the left) instead of getting cut off. */
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 24px,
+    black calc(100% - 24px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 24px,
+    black calc(100% - 24px),
+    transparent 100%
+  );
 }
 
 .sandwalk-tab-strip-main::-webkit-scrollbar {
   display: none;
 }
+
+
 
 /* ── Strip inner (holds every tab, flex row) ──────────────────────────── */
 .sandwalk-chrome-tabs {
@@ -234,12 +253,13 @@
   z-index: 0;
   display: flex;
   flex: 0 0 auto;
+  order: 1; /* slot goes BEFORE the strip in the visual row */
   align-items: center;
   justify-content: center;
   align-self: flex-end;
   min-width: 3.25rem;
   height: 44px;
-  padding: 4px 8px 6px 6px;
+  padding: 4px 8px 10px 8px;
   margin: 0;
   background: transparent;
   pointer-events: auto;
@@ -260,4 +280,21 @@
 .sandwalk-tab-overflow-btn {
   position: relative;
   z-index: 1;
+}
+
+/* New-agent slot lives at the far right of the strip row (after the tabs). */
+.sandwalk-tab-new-slot {
+  box-sizing: border-box;
+  position: relative;
+  z-index: 0;
+  display: flex;
+  flex: 0 0 auto;
+  order: 3;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  height: 44px;
+  padding: 4px 12px 10px 8px;
+  background: transparent;
+  pointer-events: auto;
 }

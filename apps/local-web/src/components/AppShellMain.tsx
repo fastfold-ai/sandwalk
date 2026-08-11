@@ -101,6 +101,7 @@ export function AppShellMain(props: AppShellMainProps) {
             openTabs={props.openTabs}
             sessionId={props.sessionId}
             session={props.session}
+            createSession={props.createSession}
             openSessionTab={props.openSessionTab}
             prefetchSessionMessages={props.prefetchSessionMessages}
             closeSessionTab={props.closeSessionTab}

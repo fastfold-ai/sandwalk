@@ -9,7 +9,7 @@ import {
   Globe2,
   Terminal
 } from 'lucide-react'
-import type { Dispatch, SetStateAction } from 'react'
+import { useEffect, type Dispatch, type SetStateAction } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { SessionTabs } from '@/components/agents/SessionTabs'
@@ -19,6 +19,12 @@ import {
   ShellNavControlsSlot
 } from '@/components/ShellNavStrip'
 import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +71,8 @@ export type SessionMainHeaderProps = {
   panelView: 'files' | 'preview'
   setPanelView: Dispatch<SetStateAction<'files' | 'preview'>>
   onPrepareDraftWorkspace?: () => void | Promise<void>
+  /** Opens a fresh draft session (same handler as the sidebar "New agent"). */
+  createSession?: (projectId?: string | null) => void | Promise<void>
 }
 
 export function SessionMainHeader({
@@ -96,7 +104,8 @@ export function SessionMainHeader({
   setFilesPanelCollapsed,
   panelView,
   setPanelView,
-  onPrepareDraftWorkspace
+  onPrepareDraftWorkspace,
+  createSession
 }: SessionMainHeaderProps) {
   const overlay = useMacDesktopOverlay()
   // Collapse: reveal after panel closes. Expand: keep briefly so icons don't gap.
@@ -165,6 +174,36 @@ export function SessionMainHeader({
     setFilesPanelCollapsed(false)
   }
 
+  // Keyboard shortcuts for the three top-strip toggles.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey) return
+      const key = event.key.toLowerCase()
+      if (key === 't' && showTerminalAction) {
+        event.preventDefault()
+        openTerminal()
+      } else if (key === 'e' && showFilesAction) {
+        event.preventDefault()
+        toggleFiles()
+      } else if (key === 'v' && showPreviewAction) {
+        event.preventDefault()
+        togglePreview()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    showTerminalAction,
+    showFilesAction,
+    showPreviewAction,
+    terminalOpen,
+    filesPanelCollapsed,
+    panelView,
+    isDraft,
+    inProject
+  ])
+
   const projectName =
     showCliAction && session?.projectId
       ? projects.find(p => p.id === session.projectId)?.name || null
@@ -224,6 +263,9 @@ export function SessionMainHeader({
             })
           }
           onDelete={item => setDeleteTarget(item)}
+          onCreateSession={
+            createSession ? () => void createSession(activeProjectId) : undefined
+          }
         />
       </DesktopDragRegion>
 
@@ -252,18 +294,26 @@ export function SessionMainHeader({
                   if (!open) setCopiedResumeCommand(false)
                 }}
               >
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={cn(floatBtn, 'size-7')}
-                    aria-label="Resume in Agent CLI"
-                    title="Resume in Agent CLI"
-                  >
-                    <Terminal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className={cn(floatBtn, 'size-7')}
+                          aria-label="Resume in Agent CLI"
+                        >
+                          <Terminal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Resume in Agent CLI
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <DropdownMenuContent
                   align="end"
                   sideOffset={6}
@@ -327,93 +377,130 @@ export function SessionMainHeader({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
-            {showTerminalAction ? (
-              <button
-                type="button"
-                className={cn(
-                  floatBtn,
-                  terminalOpen && 'text-foreground bg-background dark:bg-zinc-800'
-                )}
-                onClick={openTerminal}
-                aria-label={
-                  terminalOpen ? 'Hide terminal' : 'Show terminal'
-                }
-                title={
-                  isDraft && !inProject
-                    ? terminalOpen
-                      ? 'Hide terminal'
-                      : 'Open terminal in home'
-                    : terminalOpen
-                      ? 'Hide terminal'
-                      : 'Show terminal'
-                }
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="size-4"
-                  aria-hidden
-                >
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="m8 10 2 2-2 2" />
-                  <path d="M12 14h4" />
-                </svg>
-              </button>
-            ) : null}
-            {showFilesAction ? (
-              <button
-                type="button"
-                className={cn(
-                  floatBtn,
-                  !filesPanelCollapsed &&
-                    panelView === 'files' &&
-                    'text-foreground bg-background dark:bg-zinc-800'
-                )}
-                onClick={toggleFiles}
-                aria-label={
-                  filesPanelCollapsed
-                    ? 'Show files panel'
-                    : 'Hide files panel'
-                }
-                title={
-                  filesPanelCollapsed
-                    ? hasProjectFolder
-                      ? 'Show project folder'
-                      : 'Show files panel'
-                    : 'Hide files panel'
-                }
-              >
-                <Files className="size-4" />
-              </button>
-            ) : null}
-            {showPreviewAction ? (
-              <button
-                type="button"
-                className={cn(
-                  floatBtn,
-                  !filesPanelCollapsed &&
-                    panelView === 'preview' &&
-                    'text-foreground bg-background dark:bg-zinc-800'
-                )}
-                onClick={togglePreview}
-                aria-label={
-                  panelView === 'preview' && !filesPanelCollapsed
-                    ? 'Hide site preview'
-                    : 'Show site preview'
-                }
-                title={
-                  panelView === 'preview' && !filesPanelCollapsed
-                    ? 'Hide site preview'
-                    : 'Show site preview'
-                }
-              >
-                <Globe2 className="size-4" />
-              </button>
-            ) : null}
+            <TooltipProvider delayDuration={300}>
+              {showTerminalAction ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        floatBtn,
+                        terminalOpen &&
+                          'text-foreground bg-background dark:bg-zinc-800'
+                      )}
+                      onClick={openTerminal}
+                      aria-label={
+                        terminalOpen ? 'Hide terminal' : 'Show terminal'
+                      }
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="size-4"
+                        aria-hidden
+                      >
+                        <rect width="18" height="18" x="3" y="3" rx="2" />
+                        <path d="m8 10 2 2-2 2" />
+                        <path d="M12 14h4" />
+                      </svg>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="flex items-center gap-2"
+                  >
+                    <span>
+                      {terminalOpen
+                        ? 'Hide terminal'
+                        : isDraft && !inProject
+                          ? 'Open terminal in home'
+                          : 'Show terminal'}
+                    </span>
+                    <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
+                      ⌘⇧T
+                    </kbd>
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
+              {showFilesAction ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        floatBtn,
+                        !filesPanelCollapsed &&
+                          panelView === 'files' &&
+                          'text-foreground bg-background dark:bg-zinc-800'
+                      )}
+                      onClick={toggleFiles}
+                      aria-label={
+                        filesPanelCollapsed
+                          ? 'Show files panel'
+                          : 'Hide files panel'
+                      }
+                    >
+                      <Files className="size-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="flex items-center gap-2"
+                  >
+                    <span>
+                      {filesPanelCollapsed
+                        ? hasProjectFolder
+                          ? 'Show project folder'
+                          : 'Show files panel'
+                        : 'Hide files panel'}
+                    </span>
+                    <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
+                      ⌘⇧E
+                    </kbd>
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
+              {showPreviewAction ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        floatBtn,
+                        !filesPanelCollapsed &&
+                          panelView === 'preview' &&
+                          'text-foreground bg-background dark:bg-zinc-800'
+                      )}
+                      onClick={togglePreview}
+                      aria-label={
+                        panelView === 'preview' && !filesPanelCollapsed
+                          ? 'Hide site preview'
+                          : 'Show site preview'
+                      }
+                    >
+                      <Globe2 className="size-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className="flex items-center gap-2"
+                  >
+                    <span>
+                      {panelView === 'preview' && !filesPanelCollapsed
+                        ? 'Hide site preview'
+                        : 'Show site preview'}
+                    </span>
+                    <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
+                      ⌘⇧V
+                    </kbd>
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
+            </TooltipProvider>
           </div>
         </div>
       ) : null}

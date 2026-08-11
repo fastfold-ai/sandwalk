@@ -119,6 +119,8 @@ export type AgentSessionMainPanelProps = {
   setComposerFiles: (
     value: string[] | ((current: string[]) => string[])
   ) => void
+  /** Opens a draft session (draft only, not persisted). */
+  createSession?: (projectId?: string | null) => void | Promise<void>
 }
 
 export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
@@ -311,6 +313,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             onPrepareDraftWorkspace={async () => {
               await prepareDraftWorkspace()
             }}
+            createSession={props.createSession}
           />
           <SessionChatBody
             client={client}

@@ -40,8 +40,10 @@ export function useAppOpenTabs(
 
   const openSessionTab = useCallback(
     (id: string, scopeKey: string = tabsScopeKey) => {
+      // New tabs land at the START of the strip (pinned tabs are still
+      // rendered first in SessionTabs by the pin cluster sort).
       patchOpenTabs(scopeKey, current =>
-        current.includes(id) ? current : [...current, id]
+        current.includes(id) ? current : [id, ...current]
       )
     },
     [patchOpenTabs, tabsScopeKey]

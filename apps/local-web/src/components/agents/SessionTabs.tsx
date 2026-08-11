@@ -19,6 +19,7 @@ import {
   Download,
   Pencil,
   Pin,
+  Plus,
   Search,
   Trash2,
   X
@@ -31,6 +32,12 @@ import {
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
@@ -65,7 +72,8 @@ export function SessionTabs({
   onExport,
   onInspect,
   onArchive,
-  onDelete
+  onDelete,
+  onCreateSession
 }: {
   tabs: AgentSession[]
   activeId: string | null
@@ -79,6 +87,8 @@ export function SessionTabs({
   onInspect: (session: AgentSession) => void
   onArchive: (session: AgentSession) => void
   onDelete: (session: AgentSession) => void
+  /** Opens a fresh draft agent session (only persists on first message). */
+  onCreateSession?: () => void
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -114,7 +124,14 @@ export function SessionTabs({
 
   const orderKey = sortableIds.join('\0')
 
-  // Auto-scroll active tab into view when the active id changes.
+
+  // Auto-scroll active tab so it's fully in view:
+  //   first tab  → snap to the strip's left edge
+  //   last tab   → snap to the right edge (fade removed via [data-last-active])
+  //   otherwise  → center it in the viewport
+  // First mount uses instant scroll (auto) so entering the section shows the
+  // tab already correctly positioned; later changes animate smoothly.
+  const didScrollOnceRef = useRef(false)
   useEffect(() => {
     const strip = stripRef.current
     if (!strip || !activeId) return
@@ -122,15 +139,28 @@ export function SessionTabs({
       `[data-tab-id="${CSS.escape(activeId)}"]`
     )
     if (!(tabEl instanceof HTMLElement)) return
-    const stripRect = strip.getBoundingClientRect()
-    const tabRect = tabEl.getBoundingClientRect()
-    const outOfView =
-      tabRect.left < stripRect.left || tabRect.right > stripRect.right
-    if (!outOfView) return
-    const targetLeft =
-      tabEl.offsetLeft - (strip.clientWidth - tabEl.offsetWidth) / 2
-    strip.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' })
-  }, [activeId, orderKey])
+
+    const idx = orderedTabs.findIndex(tab => tab.id === activeId)
+    if (idx < 0) return
+    const isFirst = idx === 0
+    const isLast = idx === orderedTabs.length - 1
+
+    let targetLeft: number
+    if (isFirst) {
+      targetLeft = 0
+    } else if (isLast) {
+      targetLeft = strip.scrollWidth - strip.clientWidth
+    } else {
+      targetLeft =
+        tabEl.offsetLeft - (strip.clientWidth - tabEl.offsetWidth) / 2
+    }
+
+    const behavior: ScrollBehavior = didScrollOnceRef.current
+      ? 'smooth'
+      : 'auto'
+    strip.scrollTo({ left: Math.max(0, targetLeft), behavior })
+    didScrollOnceRef.current = true
+  }, [activeId, orderKey, orderedTabs])
 
   const filteredSearchTabs = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase()
@@ -224,40 +254,107 @@ export function SessionTabs({
       </div>
 
       {/*
+        Right-hand "New agent" button — opens a draft session (composer only).
+        Nothing persists in the backend until the user sends the first message.
+      */}
+      {onCreateSession ? (
+        <div className="sandwalk-tab-new-slot">
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    'sandwalk-tab-overflow-btn inline-flex h-[30px] items-center justify-center gap-1 rounded-lg',
+                    'px-2.5',
+                    'bg-black/[0.06] text-foreground/85',
+                    'hover:bg-black/[0.1] hover:text-foreground',
+                    'dark:bg-white/[0.1] dark:text-zinc-100',
+                    'dark:hover:bg-white/[0.16] dark:hover:text-white'
+                  )}
+                  aria-label="New agent"
+                  onClick={onCreateSession}
+                >
+                  <Plus className="size-3.5 shrink-0" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="bottom"
+                className="flex items-center gap-2"
+              >
+                <span>New agent</span>
+                <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
+                  ⌘N
+                </kbd>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      ) : null}
+
+      {/*
         Right-hand panel: full navigator of all tabs (search + list with state +
         time). Not an "overflow" list anymore — it always shows every tab.
       */}
       <div className="sandwalk-tab-overflow-slot">
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className={cn(
-                'sandwalk-tab-overflow-btn inline-flex h-7 items-center justify-center gap-1 rounded-lg',
-                'pl-2.5 pr-2',
-                'bg-black/[0.06] text-foreground/85',
-                'hover:bg-black/[0.1] hover:text-foreground',
-                'dark:bg-white/[0.1] dark:text-zinc-100',
-                'dark:hover:bg-white/[0.16] dark:hover:text-white',
-                searchOpen &&
-                  'bg-black/[0.12] text-foreground dark:bg-white/[0.18] dark:text-white'
-              )}
-              aria-label={`Todos los tabs (${orderedTabs.length})`}
-              title="Todos los tabs"
-            >
-              <ChevronDown className="size-3.5 shrink-0 stroke-[2.25]" />
-              {orderedTabs.length > 0 ? (
-                <span className="text-[11px] font-semibold tabular-nums leading-none">
-                  {orderedTabs.length}
-                </span>
-              ) : null}
-            </button>
-          </PopoverTrigger>
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      'sandwalk-tab-overflow-btn inline-flex h-[30px] items-center justify-center gap-1 rounded-lg',
+                      'pl-2.5 pr-2',
+                      'bg-black/[0.06] text-foreground/85',
+                      'hover:bg-black/[0.1] hover:text-foreground',
+                      'dark:bg-white/[0.1] dark:text-zinc-100',
+                      'dark:hover:bg-white/[0.16] dark:hover:text-white',
+                      searchOpen &&
+                        'bg-black/[0.12] text-foreground dark:bg-white/[0.18] dark:text-white'
+                    )}
+                    aria-label={`All tabs (${orderedTabs.length})`}
+                  >
+                    <ChevronDown className="size-3.5 shrink-0 stroke-[2.25]" />
+                    {orderedTabs.length > 0 ? (
+                      <span className="text-[11px] font-semibold tabular-nums leading-none">
+                        {orderedTabs.length}
+                      </span>
+                    ) : null}
+                  </button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent
+                side="bottom"
+                className="flex items-center gap-2"
+              >
+                <span>All tabs</span>
+                <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
+                  ⌘⇧A
+                </kbd>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <PopoverContent
-            align="end"
+            align="start"
             sideOffset={6}
             className="w-[22rem] overflow-hidden rounded-xl p-0"
+            /* Non-modal so tab-strip scrollTo() and other background
+             * side-effects don't count as "outside interaction". */
             onOpenAutoFocus={event => event.preventDefault()}
+            onCloseAutoFocus={event => event.preventDefault()}
+            onFocusOutside={event => event.preventDefault()}
+            onInteractOutside={event => {
+              // Only close on real pointer outside, not on scroll / focus.
+              const target = event.target as Node | null
+              if (
+                target instanceof HTMLElement &&
+                target.closest('.sandwalk-tab-strip-main')
+              ) {
+                event.preventDefault()
+              }
+            }}
           >
             <div className="border-border/70 flex items-center gap-2 border-b px-3 py-2">
               <Search className="text-muted-foreground size-3.5 shrink-0" />
@@ -272,12 +369,8 @@ export function SessionTabs({
                 ⇧⌘A
               </span>
             </div>
-            <div className="text-muted-foreground flex items-center justify-between px-3 py-1.5 text-[10px] font-medium tracking-wide uppercase">
-              <span>Todos los tabs</span>
-              <span className="tabular-nums">{orderedTabs.length}</span>
-            </div>
-            <div className="max-h-72 overflow-y-auto overscroll-contain">
-              <div className="p-1.5 pt-0">
+            <div className="max-h-[32rem] overflow-y-auto overscroll-contain">
+              <div className="p-1.5">
                 {filteredSearchTabs.length === 0 ? (
                   <p className="text-muted-foreground px-2 py-6 text-center text-xs">
                     Sin coincidencias
@@ -292,48 +385,76 @@ export function SessionTabs({
                     return (
                       <div
                         key={tab.id}
+                        role="button"
+                        tabIndex={0}
                         className={cn(
-                          'group/item hover:bg-muted flex items-center gap-2 rounded-lg px-2 py-2',
+                          'group/item hover:bg-muted flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                           active && 'bg-muted'
                         )}
-                      >
-                        <button
-                          type="button"
-                          className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                          onClick={() => {
+                        onClick={() => onSelect(tab.id)}
+                        onKeyDown={event => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
                             onSelect(tab.id)
-                            setSearchOpen(false)
-                          }}
-                        >
-                          <span className="bg-muted/80 flex size-7 shrink-0 items-center justify-center rounded-md">
-                            <SessionStatusIcon status={tab.status} />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2">
-                              <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
-                                {title}
-                              </span>
-                              <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+                          }
+                        }}
+                        onContextMenu={event => {
+                          event.preventDefault()
+                          openContextMenu(tab.id, event)
+                        }}
+                      >
+                        <span className="bg-muted/80 flex size-7 shrink-0 items-center justify-center rounded-md">
+                          <SessionStatusIcon status={tab.status} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            {tabColors[tab.id] ? (
+                              <span
+                                className="size-2 shrink-0 rounded-full border border-black/10"
+                                style={{
+                                  backgroundColor: tabColors[tab.id]
+                                }}
+                                aria-hidden
+                              />
+                            ) : null}
+                            <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
+                              {title}
+                            </span>
+                            {/*
+                              Stamp and close X share the same slot: the stamp
+                              fades out on item hover while the X fades in in
+                              its place. Fixed min-width keeps the layout stable.
+                            */}
+                            <span
+                              className="relative block h-4 shrink-0"
+                              style={{ width: 28 }}
+                            >
+                              <span className="text-muted-foreground absolute inset-0 inline-flex items-center justify-center text-[11px] tabular-nums transition-opacity group-hover/item:opacity-0">
                                 {stamp}
                               </span>
-                            </span>
-                            <span className="text-muted-foreground block truncate text-[11px]">
-                              {tab.sourceLabel || tab.source || 'Agent'}
-                              {tab.organizeLabel === 'pinned' ? ' · Pinned' : ''}
+                              <button
+                                type="button"
+                                className="text-muted-foreground hover:text-foreground absolute inset-0 inline-flex items-center justify-center rounded-md opacity-0 transition-opacity group-hover/item:opacity-100"
+                                aria-label={`Close ${title}`}
+                                onClick={event => {
+                                  event.stopPropagation()
+                                  onClose(tab.id)
+                                }}
+                              >
+                                <X className="size-3.5" />
+                              </button>
                             </span>
                           </span>
-                        </button>
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-md opacity-0 group-hover/item:opacity-100"
-                          aria-label={`Close ${title}`}
-                          onClick={event => {
-                            event.stopPropagation()
-                            onClose(tab.id)
-                          }}
-                        >
-                          <X className="size-3.5" />
-                        </button>
+                          {tab.organizeLabel === 'pinned' ? (
+                            <span className="text-muted-foreground mt-0.5 flex items-center gap-1 text-[11px]">
+                              <Pin
+                                className="size-3 shrink-0"
+                                aria-hidden
+                              />
+                              Pinned
+                            </span>
+                          ) : null}
+                        </span>
                       </div>
                     )
                   })
@@ -350,18 +471,6 @@ export function SessionTabs({
           y={menu.y}
           onClose={() => setMenu(null)}
         >
-          <TabContextItem
-            icon={<X className="size-3.5" />}
-            label="Close"
-            onClick={() => runAction(() => onClose(menuSession.id))}
-          />
-          <TabContextItem
-            icon={<CircleX className="size-3.5" />}
-            label="Close others"
-            disabled={tabs.length <= 1}
-            onClick={() => runAction(() => onCloseOthers(menuSession.id))}
-          />
-          <TabContextSeparator />
           <TabContextItem
             icon={<Pencil className="size-3.5" />}
             label="Rename…"
@@ -401,6 +510,18 @@ export function SessionTabs({
               menuSession.organizeLabel === 'archive' ? 'Unarchive' : 'Archive'
             }
             onClick={() => runAction(() => onArchive(menuSession))}
+          />
+          <TabContextSeparator />
+          <TabContextItem
+            icon={<X className="size-3.5" />}
+            label="Close"
+            onClick={() => runAction(() => onClose(menuSession.id))}
+          />
+          <TabContextItem
+            icon={<CircleX className="size-3.5" />}
+            label="Close others"
+            disabled={tabs.length <= 1}
+            onClick={() => runAction(() => onCloseOthers(menuSession.id))}
           />
           <TabContextSeparator />
           <TabContextItem
