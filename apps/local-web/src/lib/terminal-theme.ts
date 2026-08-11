@@ -2,10 +2,9 @@ import type { ITheme } from '@xterm/xterm'
 
 import {
   getStoredPalette,
-  type ThemePaletteId,
+  PALETTE_CHANGE_EVENT,
   THEME_CHANGE_EVENT,
-  PALETTE_CHANGE_EVENT
-} from '@/lib/theme'
+  type ThemePaletteId} from '@/lib/theme'
 
 type AnsiTheme = Pick<
   ITheme,
@@ -65,10 +64,14 @@ const DEFAULT_DARK_ANSI: AnsiTheme = {
   brightWhite: '#FFFFFF'
 }
 
-/** Palette-tinted ANSI sets so the terminal feels native to Mirage / Mahal / Darwin. */
-const PALETTE_ANSI: Record<
-  Exclude<ThemePaletteId, 'default'>,
-  { light: AnsiTheme; dark: AnsiTheme }
+/**
+ * Palette-tinted ANSI sets so the terminal feels native to Mirage / Mahal /
+ * Darwin / Fabienk / Dune / Neon Noir. Newer palettes (Ember, Verdant,
+ * Custom) fall back to the default ANSI set — `readDocumentPalette()`
+ * already maps them to "default".
+ */
+const PALETTE_ANSI: Partial<
+  Record<Exclude<ThemePaletteId, 'default'>, { light: AnsiTheme; dark: AnsiTheme }>
 > = {
   mirage: {
     light: {
@@ -183,6 +186,120 @@ const PALETTE_ANSI: Record<
       brightCyan: '#7AD8C8',
       brightWhite: '#F0FFF2'
     }
+  },
+  fabienk: {
+    light: {
+      black: '#0A0A0A',
+      red: '#C45A3C',
+      green: '#6B8F3C',
+      yellow: '#B8891F',
+      blue: '#8B6B3C',
+      magenta: '#A85A4A',
+      cyan: '#9A7B2E',
+      white: '#F5F0E6',
+      brightBlack: '#6A6A6A',
+      brightRed: '#E07A5A',
+      brightGreen: '#8CB85A',
+      brightYellow: '#F8B144',
+      brightBlue: '#C49A5A',
+      brightMagenta: '#D47B6A',
+      brightCyan: '#E2C45A',
+      brightWhite: '#FFFFFF'
+    },
+    dark: {
+      black: '#1A1A1A',
+      red: '#E07A5A',
+      green: '#9BBB5C',
+      yellow: '#F8B144',
+      blue: '#D4A574',
+      magenta: '#E07A6A',
+      cyan: '#C9A227',
+      white: '#E8E0D0',
+      brightBlack: '#7A7A7A',
+      brightRed: '#FF8A6A',
+      brightGreen: '#B4D47A',
+      brightYellow: '#FFC857',
+      brightBlue: '#E8C09A',
+      brightMagenta: '#F0A090',
+      brightCyan: '#E2C45A',
+      brightWhite: '#FFFFFF'
+    }
+  },
+  dune: {
+    light: {
+      black: '#2A1610',
+      red: '#A8482E',
+      green: '#6B8F3C',
+      yellow: '#B8891F',
+      blue: '#5A7A7A',
+      magenta: '#8E5C3C',
+      cyan: '#6A9A9A',
+      white: '#E8F0F0',
+      brightBlack: '#7A6A58',
+      brightRed: '#C45A3C',
+      brightGreen: '#8CB85A',
+      brightYellow: '#D4A373',
+      brightBlue: '#8BB6B6',
+      brightMagenta: '#C48A5A',
+      brightCyan: '#A5C5C5',
+      brightWhite: '#F5FAFA'
+    },
+    dark: {
+      black: '#3D2118',
+      red: '#E07A5A',
+      green: '#9BBB5C',
+      yellow: '#E09030',
+      blue: '#8BB6B6',
+      magenta: '#D4A373',
+      cyan: '#C9A227',
+      white: '#E8DFD0',
+      brightBlack: '#8A7A68',
+      brightRed: '#F09070',
+      brightGreen: '#B4D47A',
+      brightYellow: '#F0B85A',
+      brightBlue: '#A5C5C5',
+      brightMagenta: '#E8C49A',
+      brightCyan: '#E2C45A',
+      brightWhite: '#FFF8F0'
+    }
+  },
+  neonnoir: {
+    light: {
+      black: '#0A0614',
+      red: '#C4456A',
+      green: '#5A8A7A',
+      yellow: '#C49A5A',
+      blue: '#3A2DB0',
+      magenta: '#E83A8A',
+      cyan: '#4A6A9A',
+      white: '#F0E8F4',
+      brightBlack: '#6A5A7A',
+      brightRed: '#E85A8A',
+      brightGreen: '#7AB8A0',
+      brightYellow: '#E8C49A',
+      brightBlue: '#5C8AE0',
+      brightMagenta: '#FF4DA6',
+      brightCyan: '#7A9AD0',
+      brightWhite: '#FFF5FA'
+    },
+    dark: {
+      black: '#1A0A2E',
+      red: '#E85A8A',
+      green: '#7AB8A0',
+      yellow: '#E8C49A',
+      blue: '#5C8AE0',
+      magenta: '#E83A8A',
+      cyan: '#7A9AD0',
+      white: '#E8D8F0',
+      brightBlack: '#7A6A8A',
+      brightRed: '#FF6AA0',
+      brightGreen: '#9AD4B8',
+      brightYellow: '#F0D0A0',
+      brightBlue: '#7AA8F0',
+      brightMagenta: '#FF4DA6',
+      brightCyan: '#A0C0E8',
+      brightWhite: '#FFF5FA'
+    }
   }
 }
 
@@ -205,7 +322,16 @@ function cssHslAlpha(token: `--${string}`, alpha: number, fallback: string): str
 export function readDocumentPalette(): ThemePaletteId {
   if (typeof document === 'undefined') return getStoredPalette()
   const attr = document.documentElement.getAttribute('data-palette')
-  if (attr === 'mirage' || attr === 'mahal' || attr === 'darwin') return attr
+  if (
+    attr === 'mirage' ||
+    attr === 'mahal' ||
+    attr === 'darwin' ||
+    attr === 'fabienk' ||
+    attr === 'dune' ||
+    attr === 'neonnoir'
+  ) {
+    return attr
+  }
   return 'default'
 }
 
@@ -222,11 +348,9 @@ export function buildTerminalTheme(
   palette: ThemePaletteId = readDocumentPalette()
 ): ITheme {
   const ansi =
-    palette === 'default'
-      ? dark
-        ? DEFAULT_DARK_ANSI
-        : DEFAULT_LIGHT_ANSI
-      : PALETTE_ANSI[palette][dark ? 'dark' : 'light']
+    (palette === 'default' ? undefined : PALETTE_ANSI[palette])?.[
+      dark ? 'dark' : 'light'
+    ] ?? (dark ? DEFAULT_DARK_ANSI : DEFAULT_LIGHT_ANSI)
 
   const background = cssHsl(
     '--card',

@@ -111,6 +111,7 @@ class TestSettingsAndCommands:
         term.session.config.get.return_value = False
         term._toggle_plan_mode()
         term.session.config.set.assert_called_once_with("agent.plan_preview", True)
+        term.session.config.save.assert_called_once()
 
     def test_show_usage_fallback_when_no_calls(self):
         term = _mk_terminal()
@@ -129,7 +130,7 @@ class TestOpenAICompatibleSetupAndFetch:
         cfg = Config(data={"llm.provider": "openai", "llm.model": "gpt-5.5"})
         cfg.upsert_openai_profile(
             profile_id="omlx_local",
-            label="oMLX Local",
+            label="oMLX",
             backend="omlx",
             base_url="http://localhost:8000/v1",
             api_key="sk-omlx-test",
@@ -138,7 +139,7 @@ class TestOpenAICompatibleSetupAndFetch:
         )
         cfg.upsert_openai_profile(
             profile_id="unsloth_local",
-            label="Unsloth Local",
+            label="Unsloth",
             backend="unsloth",
             base_url="http://localhost:8888/v1",
             api_key="sk-unsloth-test",
@@ -169,8 +170,8 @@ class TestOpenAICompatibleSetupAndFetch:
         )
         assert "[0] OpenAI-compatible profiles" not in rendered
         assert "(custom)" not in rendered
-        assert "oMLX Local: omlx-a" in rendered
-        assert "Unsloth Local: unsloth-a" in rendered
+        assert "oMLX: omlx-a" in rendered
+        assert "Unsloth: unsloth-a" in rendered
         assert "(oMLX)" in rendered
         assert "(openai:omlx_local)" not in rendered
 
@@ -179,7 +180,7 @@ class TestOpenAICompatibleSetupAndFetch:
         cfg = Config(data={"llm.provider": "openai", "llm.model": "gpt-5.5"})
         cfg.upsert_openai_profile(
             profile_id="unsloth_local",
-            label="Unsloth Local",
+            label="Unsloth",
             backend="unsloth",
             base_url="http://localhost:8888/v1",
             api_key="sk-unsloth-test",
@@ -218,7 +219,7 @@ class TestOpenAICompatibleSetupAndFetch:
         cfg = Config(data={"llm.provider": "openai", "llm.model": "gpt-5.5"})
         cfg.upsert_openai_profile(
             profile_id="omlx_local",
-            label="oMLX Local",
+            label="oMLX",
             backend="omlx",
             base_url="http://127.0.0.1:8005/v1",
             api_key="sk-omlx-test",
@@ -246,7 +247,7 @@ class TestOpenAICompatibleSetupAndFetch:
         endpoint_col = list(getattr(table.columns[2], "_cells", []))
         path_col = list(getattr(table.columns[3], "_cells", []))
         models_col = list(getattr(table.columns[6], "_cells", []))
-        assert any("oMLX Local" in cell for cell in first_col)
+        assert any("oMLX" in cell for cell in first_col)
         assert any(cell == "oMLX" for cell in backend_col)
         assert any("http://127.0.0.1:8005/v1" in cell for cell in endpoint_col)
         assert any(cell == "/v1/models" for cell in path_col)
@@ -257,7 +258,7 @@ class TestOpenAICompatibleSetupAndFetch:
         cfg = Config(data={"llm.provider": "openai", "llm.model": "gpt-5.5"})
         cfg.upsert_openai_profile(
             profile_id="omlx_local",
-            label="oMLX Local",
+            label="oMLX",
             backend="omlx",
             base_url="http://127.0.0.1:8005/v1",
             api_key="sk-omlx-test",
@@ -626,11 +627,23 @@ class TestTerminalPresentationAndSkills:
 
     def test_skills_commands_cover_usage_and_success_paths(self):
         term = _mk_terminal()
+        # Modal skips under pytest; table fallback still prints.
         with patch("agent.skills.list_skills", return_value=[]):
             term._show_skills()
         with patch(
             "agent.skills.list_skills",
-            return_value=[SimpleNamespace(name="fold", source="repo", description="desc")],
+            return_value=[
+                SimpleNamespace(
+                    name="fold",
+                    source="repo",
+                    description="desc",
+                    enabled=True,
+                    author="fastfold-ai",
+                    version="1.0.0",
+                    category="catalog",
+                    updated_at="",
+                )
+            ],
         ):
             term._show_skills()
         with patch("agent.skills.install_skill", return_value={"ok": True, "summary": "installed"}):
@@ -675,6 +688,7 @@ class TestTerminalInitAndMentionCandidates:
             return SimpleNamespace(
                 app=SimpleNamespace(is_running=False, invalidate=MagicMock()),
                 default_buffer=SimpleNamespace(on_completions_changed=_Hook()),
+                prompt=MagicMock(return_value=""),
             )
 
         fake_session = SimpleNamespace(
@@ -695,34 +709,52 @@ class TestTerminalInitAndMentionCandidates:
         assert term._plain_prompt_session is not None
         assert term._merged_completer is not None
 
-    def test_build_mention_candidates_includes_tools_workflows_and_files(self):
+    def test_build_mention_candidates_includes_tools_and_workflows(self):
+        term = _mk_terminal()
+        fake_tool = SimpleNamespace(
+            name="target.search", category="target", description="search"
+        )
+        fake_registry = SimpleNamespace(list_tools=lambda: [fake_tool])
+        fake_workflows = {
+            "wf-a": {"description": "workflow", "steps": ["a", "b"]},
+        }
+
+        with patch("tools.registry", fake_registry), patch(
+            "tools.ensure_loaded", return_value=None
+        ), patch("agent.workflows.WORKFLOWS", fake_workflows):
+            candidates = term._build_mention_candidates(include_files=False)
+
+        names = [c[0] for c in candidates]
+        assert "target.search" in names
+        assert "wf-a" in names
+
+    def test_build_file_candidates_includes_data_base_files(self):
         term = _mk_terminal()
         with tempfile.TemporaryDirectory() as td:
             from pathlib import Path
 
             root = Path(td)
-            (root / "a.txt").write_text("x", encoding="utf-8")
-            (root / ".hidden").write_text("x", encoding="utf-8")
+            empty = root / "empty"
+            empty.mkdir()
+            data = root / "data"
+            data.mkdir()
+            (data / "a.txt").write_text("x", encoding="utf-8")
+            (data / ".hidden").write_text("x", encoding="utf-8")
             term.session.config.get = MagicMock(
-                side_effect=lambda key, default=None: str(root) if key == "data.base" else default
+                side_effect=lambda key, default=None: (
+                    str(data) if key == "data.base" else default
+                )
             )
-
-            fake_tool = SimpleNamespace(name="target.search", category="target", description="search")
-            fake_registry = SimpleNamespace(list_tools=lambda: [fake_tool])
-            fake_workflows = {
-                "wf-a": {"description": "workflow", "steps": ["a", "b"]},
-            }
-
-            with patch("tools.registry", fake_registry), patch(
-                "tools.ensure_loaded", return_value=None
-            ), patch("agent.workflows.WORKFLOWS", fake_workflows):
-                candidates = term._build_mention_candidates()
+            with patch(
+                "ui.terminal.attachments.session_workspace_path", return_value=None
+            ), patch(
+                "ui.terminal.mention_and_activity.Path.cwd", return_value=empty
+            ):
+                candidates = term._build_file_candidates()
 
         names = [c[0] for c in candidates]
-        assert "target.search" in names
-        assert "wf-a" in names
-        assert "a.txt" in names
-        assert ".hidden" not in names
+        assert any(n.endswith("a.txt") for n in names)
+        assert not any(n.endswith(".hidden") for n in names)
 
 
 class TestTerminalSessionAndCommandBranches:
@@ -755,13 +787,20 @@ class TestTerminalSessionAndCommandBranches:
 
     def test_handle_agents_command_usage_and_prompt_branches(self):
         term = _mk_terminal()
-        term._run_orchestrated = MagicMock()
+        term._start_orchestrated = MagicMock()
         term._handle_agents_command("/agents", {})
         term._handle_agents_command("/agents 0", {})
-        term._prompt_session.prompt.side_effect = [KeyboardInterrupt(), ""]
         term._handle_agents_command("/agents 2", {})
         term._handle_agents_command("/agents 2", {})
-        term._run_orchestrated.assert_not_called()
+        term._start_orchestrated.assert_not_called()
+
+    def test_handle_agents_command_starts_orchestrated(self):
+        term = _mk_terminal()
+        term._start_orchestrated = MagicMock()
+        term._handle_agents_command("/agents 3 profile crbn", {"source": "t"})
+        term._start_orchestrated.assert_called_once_with(
+            "profile crbn", {"source": "t"}, 3
+        )
 
     def test_handle_case_study_list_and_unknown(self):
         term = _mk_terminal()
@@ -790,13 +829,12 @@ class TestTerminalUsageAndSpinnerHelpers:
         assert term._coerce_cost(False) == 0.0
         assert term._estimate_output_tokens_from_chars(21) == 5
 
-        term._toolbar_frames = ["A", "B"]
-        term._toolbar_frame_interval_s = 0.25
-        term._toolbar_spinner_palette = ["#111111", "#222222"]
-        with patch("ui.terminal.time.time", return_value=1.0):
+        term._toolbar_scanner_width = 10
+        term._toolbar_frame_interval_s = 0.04
+        with patch("ui.terminal.usage_persistence.time.time", return_value=1.0):
             markup = term._toolbar_spinner_markup()
         assert "style fg" in markup
-        assert "A" in markup or "B" in markup
+        assert "■" in markup or "⬝" in markup
 
     def test_record_sdk_usage_handles_missing_and_split_costs(self):
         term = _mk_terminal()

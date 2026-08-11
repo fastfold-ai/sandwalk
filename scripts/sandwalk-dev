@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Local editable Sandwalk CLI — does not replace a globally installed `sandwalk`.
+# Warp (local WarpOss) detects argv0 `sandwalk-dev` as the Sandwalk CLI agent.
+set -euo pipefail
+ROOT="${SANDWALK_REPO:-$HOME/Projects/sandwalk}"
+CLI="$ROOT/cli"
+if [[ ! -d "$CLI" ]]; then
+  echo "sandwalk-dev: CLI dir not found at $CLI (set SANDWALK_REPO)" >&2
+  exit 1
+fi
+cd "$CLI"
+exec uv run sandwalk "$@"

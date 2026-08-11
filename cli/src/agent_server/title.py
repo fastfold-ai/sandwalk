@@ -1,9 +1,10 @@
-"""Auto-generate short chat titles the same way as FastFold Cloud Agents."""
+"""Auto-generate short chat titles from the session's selected model."""
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 logger = logging.getLogger("agent_server.title")
 
@@ -19,9 +20,44 @@ PLACEHOLDER_TITLES = frozenset(
     }
 )
 
+# Wait for two full turns (user+assistant × 2) so the title has real signal.
+MIN_MESSAGES_FOR_LLM_TITLE = 4
+# Still need at least one user turn before calling the model (force / short chats).
+MIN_MESSAGES_FOR_FORCED_LLM_TITLE = 2
+MAX_TITLE_PROMPT_MESSAGES = 6
+MAX_TITLE_PROMPT_CHARS = 400
+
 TITLE_SYSTEM_PROMPT = (
-    "Generate a short, concise title (max 4 words) for this chat based on the user intent."
+    "Generate a short, concise title (max 4 words) for this chat based on the user intent. "
+    "Return only the title text — no quotes, labels, or explanation."
 )
+
+# Models sometimes echo or paraphrase the title instruction instead of naming
+# the chat — reject those so /sessions Preview stays useful.
+_TITLE_INSTRUCTION_MARKERS = (
+    "generate a short",
+    "concise title",
+    "max 4 word",
+    "based on the user intent",
+    "return only the title",
+    "the user wants me to generate",
+    "title for this chat",
+    "title based on",
+)
+_MAX_GENERATED_TITLE_WORDS = 8
+
+
+@dataclass(frozen=True)
+class TitleResult:
+    """Result of a title attempt.
+
+    ``final`` is True only when the model produced a usable title — the session
+    ``title_source`` should then become ``auto``. Interim/fallback titles keep
+    ``title_source=pending`` so a later turn can upgrade them.
+    """
+
+    title: str
+    final: bool = False
 
 
 def sanitize_generated_title(raw_title: str | None) -> str:
@@ -38,9 +74,23 @@ def sanitize_generated_title(raw_title: str | None) -> str:
     return title
 
 
+def looks_like_title_instruction(title: str | None) -> bool:
+    """True when ``title`` looks like an echoed title-generation prompt."""
+    value = " ".join(str(title or "").lower().split())
+    if not value:
+        return False
+    if any(marker in value for marker in _TITLE_INSTRUCTION_MARKERS):
+        return True
+    # Real auto-titles are short; long "…title…" strings are usually meta.
+    return "title" in value and len(value.split()) > _MAX_GENERATED_TITLE_WORDS
+
+
 def is_placeholder_title(title: str | None) -> bool:
+    """Legacy helper for display/CLI; auto-title gating uses ``title_source``."""
     value = (title or "").strip().lower()
     if not value or value in PLACEHOLDER_TITLES:
+        return True
+    if looks_like_title_instruction(title):
         return True
     return (
         "greeting chat" in value
@@ -58,62 +108,113 @@ def fallback_title_from_query(query: str | None) -> str:
     return generated
 
 
-def _title_model_for_provider(provider: str, configured_model: str | None) -> str:
-    provider_name = str(provider or "").strip().lower()
-    if provider_name == "openai":
-        return "gpt-4o-mini"
-    if provider_name == "anthropic":
-        return "claude-haiku-4-5-20251001"
-    return str(configured_model or "").strip() or "gpt-4o-mini"
-
-
-def build_title_prompt(messages: Iterable[dict[str, str]]) -> str:
-    prompt_lines: list[str] = []
+def conversation_messages(messages: Iterable[dict[str, str]]) -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
     for message in messages:
         role = str(message.get("role") or "").strip().lower()
         content = str(message.get("content") or "").strip()
         if role not in {"user", "assistant"} or not content:
             continue
-        prompt_lines.append(f"{role.title()}: {content}")
-        if len(prompt_lines) >= 2:
+        out.append({"role": role, "content": content})
+    return out
+
+
+def first_user_content(messages: Iterable[dict[str, str]]) -> str:
+    for message in conversation_messages(messages):
+        if message["role"] == "user":
+            return message["content"]
+    return ""
+
+
+def should_attempt_llm_title(
+    messages: Iterable[dict[str, str]], *, force: bool = False
+) -> bool:
+    count = len(conversation_messages(messages))
+    if force:
+        return count >= MIN_MESSAGES_FOR_FORCED_LLM_TITLE
+    return count >= MIN_MESSAGES_FOR_LLM_TITLE
+
+
+def build_title_prompt(
+    messages: Iterable[dict[str, str]],
+    *,
+    max_messages: int = MAX_TITLE_PROMPT_MESSAGES,
+    max_chars: int = MAX_TITLE_PROMPT_CHARS,
+) -> str:
+    prompt_lines: list[str] = []
+    for message in conversation_messages(messages):
+        content = message["content"]
+        if len(content) > max_chars:
+            content = content[: max_chars - 3].rstrip() + "..."
+        prompt_lines.append(f"{message['role'].title()}: {content}")
+        if len(prompt_lines) >= max_messages:
             break
     return "\n".join(prompt_lines)
+
+
+def _title_llm_client():
+    """Build an LLM client for the currently selected session model."""
+    from agent.config import Config
+    from models.llm import LLMClient
+
+    config = Config.load()
+    provider = str(config.get("llm.provider") or "anthropic").strip().lower()
+    model = str(config.get("llm.model") or "").strip() or None
+    api_key = config.llm_api_key(provider)
+    if provider == "openai":
+        base_url = config.llm_openai_base_url()
+    else:
+        base_url = config.llm_provider_base_url(provider)
+    return LLMClient(
+        provider=provider,
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+    )
 
 
 def generate_session_title(
     messages: Iterable[dict[str, str]],
     *,
     fallback_query: str | None = None,
-) -> str:
-    """Generate a short title from the first user/assistant exchange.
+) -> TitleResult:
+    """Generate a short title using the active session model.
 
-    Uses the configured FastFold LLM provider. Falls back to a truncated query
-    when the model call is unavailable.
+    Uses a normal chat completion against whatever provider/model the user has
+    selected. Falls back to a truncated first-user query when the model call is
+    unavailable (``final=False`` so auto-title can retry later).
     """
     prompt = build_title_prompt(messages)
+    fallback = fallback_title_from_query(
+        fallback_query or first_user_content(messages)
+    )
     if not prompt:
-        return fallback_title_from_query(fallback_query)
+        return TitleResult(title=fallback, final=False)
 
     try:
-        from agent.config import Config
-        from agent.session import Session
-
-        session = Session(config=Config.load())
-        provider = str(session.config.get("llm.provider") or "anthropic").strip().lower()
-        configured_model = str(session.config.get("llm.model") or "").strip() or None
-        title_model = _title_model_for_provider(provider, configured_model)
-        session.set_model(title_model, provider=provider)
-        llm = session.get_llm()
+        llm = _title_llm_client()
         response = llm.chat(
             TITLE_SYSTEM_PROMPT,
             [{"role": "user", "content": prompt}],
             temperature=0.2,
-            max_tokens=16,
+            max_tokens=32,
         )
         title = sanitize_generated_title(response.content)
-        if title:
-            return title
-    except Exception:
-        logger.exception("Failed to generate session title via LLM")
+        if (
+            title
+            and not is_placeholder_title(title)
+            and len(title.split()) <= _MAX_GENERATED_TITLE_WORDS
+        ):
+            return TitleResult(title=title, final=True)
+        logger.debug(
+            "Session title model returned empty/placeholder/instruction title "
+            "(provider=%s model=%s title=%r)",
+            getattr(llm, "provider", "?"),
+            getattr(llm, "model", "?"),
+            title,
+        )
+    except Exception as exc:
+        # Title generation is best-effort — never break the session for it.
+        logger.debug("Session title generation skipped: %s", exc)
 
-    return fallback_title_from_query(fallback_query)
+    return TitleResult(title=fallback, final=False)

@@ -38,6 +38,10 @@ class TestOpenAIKwargs:
     def test_temperature_passed_for_legacy_models(self):
         assert _openai_temperature_kwargs("gpt-4o-mini", 0.3) == {"temperature": 0.3}
 
+    def test_temperature_forced_for_kimi_models(self):
+        assert _openai_temperature_kwargs("kimi-k3", 0.2) == {"temperature": 1.0}
+        assert _openai_temperature_kwargs("kimi-k2.6", 0.1) == {"temperature": 1.0}
+
 
 class TestLLMResponse:
     def test_defaults(self):

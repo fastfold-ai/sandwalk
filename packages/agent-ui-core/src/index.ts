@@ -113,12 +113,32 @@ export type StorageCategory = {
   children?: StorageCategory[]
 }
 
+export type StorageDatabaseProbe = {
+  path: string
+  exists: boolean
+  bytes: number
+  walBytes: number
+  shmBytes: number
+  integrity: string
+  pageCount?: number | null
+  pageSize?: number | null
+  journalMode?: string | null
+  sessionCount?: number | null
+  messageCount?: number | null
+  backupPath?: string | null
+  backupBytes: number
+  backupIntegrity?: string | null
+  autoHealEnabled: boolean
+  quarantineCount: number
+}
+
 export type StorageReport = {
   location: StorageLocation
   categories: StorageCategory[]
   totalBytes: number
   availableBytes: number
   checkedAt: string
+  database?: StorageDatabaseProbe | null
 }
 
 export type EnvironmentPackage = {
@@ -158,28 +178,364 @@ export type EnvironmentPackageMutationResult = {
   message: string
 }
 
-export type AgentSessionStatus = 'idle' | 'running' | 'interrupted' | 'error'
+export type AgentSessionStatus =
+  | 'idle'
+  | 'running'
+  | 'awaiting_approval'
+  | 'interrupted'
+  | 'error'
+
+export type HitlDecisionType = 'approve' | 'edit' | 'reject' | 'respond'
+
+export type HitlActionRequest = {
+  name: string
+  args: Record<string, unknown>
+  description?: string | null
+}
+
+export type HitlReviewConfig = {
+  actionName: string
+  allowedDecisions: HitlDecisionType[]
+  description?: string | null
+}
+
+export type HitlDecision = {
+  type: HitlDecisionType
+  message?: string
+  /** Auto-approve matching skill install/remove calls for the rest of this run. */
+  scope?: 'remaining' | 'once'
+  editedAction?: {
+    name: string
+    args: Record<string, unknown>
+  }
+}
+
+export type PendingHitlApproval = {
+  interruptId: string
+  runId: string | null
+  actionRequests: HitlActionRequest[]
+  reviewConfigs: HitlReviewConfig[]
+}
 
 export type AgentProject = {
   id: string
   name: string
   description: string | null
   agentContext: string | null
+  folderPath: string | null
+  icon: string
+  color: string
   pinned: boolean
   sessionCount: number
   createdAt: string
   updatedAt: string
 }
 
+export type LibraryKind = 'image' | 'document' | 'structure' | 'code' | 'other'
+
+export type LibraryItem = {
+  id: string
+  sha256: string
+  bytes: number
+  mime: string | null
+  originalName: string
+  displayName: string
+  kind: LibraryKind
+  originSessionId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type LibraryPagination = {
+  page: number
+  perPage: number
+  total: number
+  hasMore: boolean
+}
+
+export type LibraryItemList = {
+  data: LibraryItem[]
+  pagination: LibraryPagination
+}
+
+export type UseLibraryInChatResult = {
+  sessionId: string
+  paths: string[]
+}
+
+export type SiteStatus =
+  | 'draft'
+  | 'ready'
+  | 'publishing'
+  | 'published'
+  | 'error'
+
+export type SiteDeployment = {
+  id: string
+  status: 'publishing' | 'published' | 'error'
+  slug: string
+  publicUrl: string | null
+  sizeBytes: number | null
+  createdAt: string
+  updatedAt: string
+  publishedAt: string | null
+}
+
+export type Site = {
+  id: string
+  name: string
+  slug: string | null
+  status: SiteStatus
+  sourceSessionId: string | null
+  sourceProjectId: string | null
+  sourcePath: string | null
+  sizeBytes: number | null
+  deployment: SiteDeployment | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type CreateSiteInput = {
+  name: string
+  sourceSessionId?: string | null
+  sourceProjectId?: string | null
+  sourcePath?: string | null
+  slug?: string | null
+}
+
+export type UpdateSiteInput = {
+  name?: string
+  slug?: string | null
+}
+
+export type SitePreviewTicket = {
+  url: string
+  expiresAt: string | null
+}
+
+export interface SiteProvider {
+  listSites(options?: {
+    q?: string | null
+    signal?: AbortSignal
+  }): Promise<Site[]>
+  createSite(input: CreateSiteInput, signal?: AbortSignal): Promise<Site>
+  getSite(siteId: string, signal?: AbortSignal): Promise<Site>
+  updateSite(
+    siteId: string,
+    input: UpdateSiteInput,
+    signal?: AbortSignal
+  ): Promise<Site>
+  deleteSite(siteId: string, signal?: AbortSignal): Promise<void>
+  refreshSite(siteId: string, signal?: AbortSignal): Promise<Site>
+  createSitePreviewTicket(
+    siteId: string,
+    signal?: AbortSignal
+  ): Promise<SitePreviewTicket>
+  publishSite(
+    siteId: string,
+    input?: { slug?: string | null },
+    signal?: AbortSignal
+  ): Promise<Site>
+}
+
+/** Where an inbound message came from. Display only — the model sees `content`. */
+export type MessageSource = {
+  connector: 'slack'
+  channelId: string
+  channelName: string | null
+  senderId: string
+  senderName: string | null
+  senderAvatarUrl?: string | null
+  /** Raw text, without the reply-handle framing added for the model. */
+  text: string
+  permalink?: string | null
+}
+
+export type SessionTitleSource = 'pending' | 'auto' | 'user'
+
+export type SessionSource = 'slack'
+
+export type ClientSurface = 'cli' | 'ui' | 'slack' | 'unknown'
+
+export type UsageDayPoint = {
+  day: string
+  tokens: number
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cliTokens: number
+  uiTokens: number
+  slackTokens: number
+  unknownTokens: number
+  runs: number
+}
+
+export type UsageModelRow = {
+  modelId: string
+  provider: string
+  tokens: number
+  inputTokens: number
+  outputTokens: number
+  runs: number
+  messages: number
+}
+
+export type UsageChartModel = {
+  modelId: string
+  provider: string
+}
+
+export type UsageModelDayPoint = {
+  day: string
+  modelId: string
+  provider: string
+  tokens: number
+}
+
+export type UsageOverview = {
+  lifetimeTokens: number
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  peakDayTokens: number
+  peakDay: string | null
+  modelsUsed: number
+  runs: number
+  sessions: number
+  messages: number
+  avgTokensPerSession: number
+  longestAgentSeconds: number
+  longestStreakDays: number
+  currentStreakDays: number
+  cliTokens: number
+  uiTokens: number
+  slackTokens: number
+  unknownTokens: number
+  cliShare: number
+  uiShare: number
+  days: UsageDayPoint[]
+  topModels: UsageModelRow[]
+  /** Last-30-day stacked chart series (day × model). */
+  modelDays: UsageModelDayPoint[]
+  /** Stable model order for chart colors. */
+  chartModels: UsageChartModel[]
+  backfilled: boolean
+}
+
+/** relay = inbound via FastFold Cloud; socket = inbound via Slack Socket Mode. */
+export type SlackMode = 'relay' | 'socket'
+
+export type SlackRelayState =
+  | 'off'
+  | 'signed_out'
+  | 'auth_expired'
+  | 'reconnecting'
+  | 'live'
+
+export type SlackWorkspace = {
+  teamId: string
+  teamName: string | null
+  domain: string | null
+  mode: SlackMode
+  botUserId: string | null
+  connectionId: string | null
+  assistantEnabled: boolean
+  enabled: boolean
+  /** Actually receiving mentions right now, not just "enabled". */
+  live: boolean
+  /** Tokens are never returned; these only report whether one is stored. */
+  hasBotToken: boolean
+  hasAppToken: boolean
+  /** An outbound Slack call recently failed with an auth error (e.g. the bot
+   * token was rotated by a reinstall) — distinct from `live`, which only
+   * reflects the inbound socket/relay connection. */
+  needsReauth: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type SlackConnectorStatus = {
+  mode: SlackMode | null
+  relayState: SlackRelayState
+  relayDetail: string | null
+  workspaces: SlackWorkspace[]
+}
+
+export type SlackAllowedUser = {
+  teamId: string
+  slackUserId: string
+  displayName: string | null
+  createdAt: string
+}
+
+export type SlackSubscription = {
+  sessionId: string
+  channel: string
+  createdAt: string
+}
+
+export type SlackParkedMessage = {
+  id: string
+  teamId: string
+  channel: string
+  threadTarget: string | null
+  slackUserId: string
+  userName: string | null
+  text: string
+  createdAt: string
+}
+
+export type SlackDirectoryPerson = {
+  id: string
+  name: string
+  handle: string | null
+  avatarUrl: string | null
+}
+
+export type SlackDirectoryChannel = {
+  id: string
+  name: string
+  isPrivate: boolean
+}
+
+export type SlackDirectory = {
+  people: SlackDirectoryPerson[]
+  channels: SlackDirectoryChannel[]
+}
+
+export type SlackManifest = {
+  appName: string
+  manifest: string
+  steps: string[]
+}
+
+export type SessionConnectorMute = {
+  sessionId: string
+  connector: 'slack'
+  muted: boolean
+}
+
 export type AgentSession = {
   id: string
   title: string
+  /** pending = still eligible for auto-title; auto = model-generated; user = renamed */
+  titleSource?: SessionTitleSource
   status: AgentSessionStatus
   organizeLabel: 'pinned' | 'archive' | null
   projectId: string | null
   specialistId: string | null
   sandboxBackend?: 'builtin' | 'modal' | null
+  /** Per-chat model; null/undefined falls back to global runtime settings. */
+  provider?: string | null
+  model?: string | null
+  openaiProfileId?: string | null
   workspacePath: string | null
+  /** Connector that spawned the session; null when it started locally. */
+  source?: SessionSource | null
+  /** Human-readable origin, e.g. "#dev-ops · Acme". */
+  sourceLabel?: string | null
+  /** Product surface for usage attribution. */
+  clientSurface?: ClientSurface
   lastMessageAt: string | null
   createdAt: string
   updatedAt: string
@@ -245,6 +601,8 @@ export type AgentMessage = {
   sessionId: string
   role: AgentMessageRole
   content: string
+  /** Present when the message arrived through a connector, e.g. Slack. */
+  source?: MessageSource | null
   createdAt: string
 }
 
@@ -267,11 +625,17 @@ type EventEnvelope<TType extends string, TPayload> = {
 }
 
 export type AgentEvent =
-  | EventEnvelope<'session.created' | 'session.updated', { session: AgentSession }>
+  | EventEnvelope<
+      'session.created' | 'session.updated',
+      { session: AgentSession }
+    >
   | EventEnvelope<'run.started', { messageId: string }>
   | EventEnvelope<'assistant.delta', { delta: string }>
   | EventEnvelope<'assistant.message', { message: AgentMessage }>
-  | EventEnvelope<'tool.started', { name: string; arguments: unknown; toolCallId: string }>
+  | EventEnvelope<
+      'tool.started',
+      { name: string; arguments: unknown; toolCallId: string }
+    >
   | EventEnvelope<
       'tool.completed',
       {
@@ -285,6 +649,10 @@ export type AgentEvent =
   | EventEnvelope<'run.progress', { text?: string }>
   | EventEnvelope<'todos.updated', { todos: AgentTodo[] }>
   | EventEnvelope<
+      'plan.created',
+      { path: string; title: string; summary: string }
+    >
+  | EventEnvelope<
       'run.usage',
       {
         inputTokens: number
@@ -296,6 +664,34 @@ export type AgentEvent =
   | EventEnvelope<'run.completed', { messageId: string }>
   | EventEnvelope<'run.failed', { error: string }>
   | EventEnvelope<'run.interrupted', { reason: string }>
+  | EventEnvelope<
+      'run.awaiting_approval',
+      {
+        runId?: string
+        interruptId: string
+        actionRequests: HitlActionRequest[]
+        reviewConfigs: HitlReviewConfig[]
+      }
+    >
+  | EventEnvelope<
+      'run.approval_resolved',
+      {
+        interruptId?: string
+        decisions: HitlDecision[]
+      }
+    >
+
+export type IntegrationUnlock = {
+  kind: 'tool' | 'skill' | 'capability' | 'notice'
+  id: string
+  label: string
+  description: string
+  source: string | null
+  requirement: 'built_in' | 'install' | 'connector' | 'ambient' | 'not_wired'
+  installable: boolean
+  installed: boolean | null
+  statusDetail: string | null
+}
 
 export type IntegrationSummary = {
   key: string
@@ -315,7 +711,9 @@ export type IntegrationSummary = {
     configured: boolean
     source: 'environment' | 'config' | 'none'
     maskedPreview: string | null
+    updatedAt: string | null
   }>
+  unlocks: IntegrationUnlock[]
 }
 
 export type IntegrationSetupStep = {
@@ -337,10 +735,21 @@ export interface IntegrationProvider {
   updateIntegration(
     key: string,
     values: Record<string, string>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<IntegrationSummary>
-  removeIntegration(key: string, signal?: AbortSignal): Promise<IntegrationSummary>
-  autofillIntegration(key: string, signal?: AbortSignal): Promise<IntegrationSummary>
+  removeIntegration(
+    key: string,
+    signal?: AbortSignal
+  ): Promise<IntegrationSummary>
+  autofillIntegration(
+    key: string,
+    signal?: AbortSignal
+  ): Promise<IntegrationSummary>
+  installIntegrationCapability(
+    key: string,
+    capabilityId: string,
+    signal?: AbortSignal
+  ): Promise<IntegrationSummary>
   setupIntegration(
     key: string,
     workingDirectory?: string | null,
@@ -348,8 +757,13 @@ export interface IntegrationProvider {
   ): Promise<IntegrationSetupResult>
   validateIntegration(
     key: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ ok: boolean; message: string }>
+  /** Fetch the stored secret for local reveal/copy (user opt-in). */
+  revealIntegrationSecret(
+    key: string,
+    signal?: AbortSignal
+  ): Promise<{ configured: boolean; envVar: string; value: string }>
 }
 
 export type RuntimeSettings = {
@@ -360,6 +774,8 @@ export type RuntimeSettings = {
   openaiProfileId?: string | null
   agentProfile: string
   toolMode: string
+  /** Always-on prompt / Deep Agents surface: low | medium | high. */
+  knowledgeLevel?: 'low' | 'medium' | 'high' | string
   /** Stored effort level: low | medium | high (Fast maps to API none). */
   reasoningEffort?: string
   /** When true, API reasoning_effort is none regardless of reasoningEffort. */
@@ -374,6 +790,20 @@ export type RuntimeSettings = {
   toolHealthEnabled: boolean
   toolHealthFailThreshold: number
   toolHealthSuppressSeconds: number
+  /** True = Plan mode (author plans/*.md); false = Agent mode. */
+  planMode?: boolean
+  /**
+   * Agent file-access policy:
+   * - "project": workspace + linked project folder only (default, safe).
+   * - "full": anywhere on the host filesystem (opt-in, higher risk).
+   */
+  fileAccess?: 'project' | 'full'
+}
+
+export type AgentPlanCard = {
+  path: string
+  title: string
+  summary: string
 }
 
 export type OnboardingSettings = {
@@ -412,7 +842,14 @@ export type SessionSandboxStatus = {
   backend: 'builtin' | 'modal' | string
   sessionBackend: 'builtin' | 'modal' | null
   globalBackend: 'builtin' | 'modal' | string
-  status: 'ready' | 'running' | 'stopped' | 'unavailable' | 'starting' | 'stopping' | string
+  status:
+    | 'ready'
+    | 'running'
+    | 'stopped'
+    | 'unavailable'
+    | 'starting'
+    | 'stopping'
+    | string
   providerSandboxName: string | null
   modalConfigured: boolean
   computeType: string
@@ -420,6 +857,9 @@ export type SessionSandboxStatus = {
   cpuCores: number
   ramGb: number
   cpuImage: string
+  gpuImage?: string
+  /** Active base image for the current compute mode (CPU or GPU). */
+  baseImage?: string
   detail: string | null
   type?: 'sandbox_status'
   ready?: boolean
@@ -469,17 +909,42 @@ export type AgentModel = {
   health: string | null
   /** True when Effort / Fast controls apply (OpenAI GPT-5 / o-series, etc.). */
   supportsReasoningEffort?: boolean
+  /** False when Fast (thinking off) is rejected — e.g. Muse Spark. */
+  supportsReasoningFast?: boolean
   reasoningEffortOptions?: string[]
   /** Per-model effort level (low|medium|high). */
   reasoningEffort?: string | null
   /** Per-model Fast toggle. */
   reasoningFast?: boolean
+  /** Multimodal user-input capabilities (image / PDF / audio / video content blocks). */
+  supportsImageInputs?: boolean
+  supportsPdfInputs?: boolean
+  supportsAudioInputs?: boolean
+  supportsVideoInputs?: boolean
+  /** Effective context window when known (e.g. oMLX max_model_len). */
+  contextWindow?: number | null
 }
 
 export type CreateAgentModelInput = {
   id: string
   provider?: string
   label?: string | null
+}
+
+export type ModelPreferences = {
+  favorites: string[]
+  recent: string[]
+}
+
+export type ToggleModelFavoriteInput = {
+  provider?: string | null
+  model: string
+  profileId?: string | null
+}
+
+export type ToggleModelFavoriteResult = {
+  favorite: boolean
+  favorites: string[]
 }
 
 export type ModelProfile = {
@@ -526,22 +991,23 @@ export interface SettingsProvider {
   getRuntimeSettings(signal?: AbortSignal): Promise<RuntimeSettings>
   updateRuntimeSettings(
     changes: Partial<RuntimeSettings>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<RuntimeSettings>
   getOnboardingSettings?(signal?: AbortSignal): Promise<OnboardingSettings>
   updateOnboardingSettings?(
     changes: Partial<OnboardingSettings>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<OnboardingSettings>
   getSandboxSettings?(signal?: AbortSignal): Promise<SandboxSettings>
   updateSandboxSettings?(
     changes: Partial<SandboxSettings>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SandboxSettings>
   probeSandboxSettings?(signal?: AbortSignal): Promise<SandboxProbeReport>
-  getAccount?(
-    options?: { checkUpdates?: boolean; signal?: AbortSignal },
-  ): Promise<AccountSummary>
+  getAccount?(options?: {
+    checkUpdates?: boolean
+    signal?: AbortSignal
+  }): Promise<AccountSummary>
   logoutAccount?(signal?: AbortSignal): Promise<AccountSummary>
 }
 
@@ -576,6 +1042,8 @@ export type ToolSummary = {
   description: string
   requiresData: string[]
   enabled: boolean
+  /** False for registry core tools — always on; UI locks the toggle. */
+  toggleable?: boolean
 }
 
 export type PromptBudgetBucket = {
@@ -595,11 +1063,15 @@ export type PromptBudgetToolCounts = {
   openaiCap: number
 }
 
+export type PromptBudgetTokenCountMethod = 'tiktoken' | 'provider'
+
 export type PromptBudgetResponse = {
   totalTokens: number
   totalChars: number
   tokenizer: string
   toolMode: string
+  knowledgeLevel?: 'low' | 'medium' | 'high' | string
+  tokenCountMethod?: PromptBudgetTokenCountMethod | string
   provider: string | null
   model: string | null
   specialistId: string | null
@@ -621,11 +1093,11 @@ export interface DatasetsProvider {
   listDatasets(signal?: AbortSignal): Promise<DatasetSummary[]>
   installDataset(
     datasetId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<DatasetInstallResult>
   removeDataset(
     datasetId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<DatasetInstallResult>
 }
 
@@ -648,12 +1120,12 @@ export interface ToolsProvider {
   updateToolEnabled(
     toolId: string,
     enabled: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ToolSummary>
   batchUpdateTools(
     action: ToolBatchAction,
     ids: string[],
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ToolBatchResult>
 }
 
@@ -663,15 +1135,21 @@ export interface ModelsProvider {
     discover?: boolean
     signal?: AbortSignal
   }): Promise<AgentModel[]>
+  getModelPreferences?(signal?: AbortSignal): Promise<ModelPreferences>
+  toggleModelFavorite?(
+    input: ToggleModelFavoriteInput,
+    signal?: AbortSignal
+  ): Promise<ToggleModelFavoriteResult>
   createCustomModel?(
     input: CreateAgentModelInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentModel>
   deleteCustomModel?(modelId: string, signal?: AbortSignal): Promise<void>
   updateModelEnabled(
     modelId: string,
     enabled: boolean,
     signal?: AbortSignal,
+    provider?: string | null
   ): Promise<AgentModel>
   listModelProfiles(options?: {
     includeCloud?: boolean
@@ -679,21 +1157,26 @@ export interface ModelsProvider {
   }): Promise<ModelProfile[]>
   createModelProfile(
     input: UpsertModelProfileInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfile>
   updateModelProfile(
     profileId: string,
     input: UpsertModelProfileInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfile>
   deleteModelProfile(profileId: string, signal?: AbortSignal): Promise<void>
+  /** Fetch the stored Local LLM API key for reveal/copy (user opt-in). */
+  revealModelProfileSecret?(
+    profileId: string,
+    signal?: AbortSignal
+  ): Promise<{ configured: boolean; value: string }>
   probeModelProfile(
     profileId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfileProbeResult>
   discoverModelEndpoint?(
     input: DiscoverModelEndpointInput,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ModelProfileProbeResult>
 }
 
@@ -713,6 +1196,8 @@ export type McpServer = {
   headersHelperCommand?: string | null
   headerNames?: string[]
   headersConfigured?: boolean
+  /** Cached tools/list count when enabled (from last successful probe). */
+  toolCount?: number | null
   /** Write-only on create/update — never returned by the API. */
   headers?: Record<string, string> | null
   createdAt: string
@@ -723,9 +1208,9 @@ export type McpCatalogEntry = {
   id: string
   name: string
   description: string
-  url: string
+  url: string | null
   transport: 'stdio' | 'sse' | 'streamable_http'
-  authMode: 'oauth' | 'api_key' | 'api_key_or_oauth'
+  authMode: 'oauth' | 'api_key' | 'api_key_or_oauth' | 'none'
   preferredAuth: 'oauth' | 'api_key'
   apiKeyEnvVar: string | null
   docsUrl: string | null
@@ -735,12 +1220,16 @@ export type McpCatalogEntry = {
   featured?: boolean
   defaultEnabled: boolean
   configured: boolean
-  authMethod: 'oauth' | 'api_key' | null
+  authMethod: 'oauth' | 'api_key' | 'local' | null
+  /** Masked API key preview when a secret is stored (e.g. ``ns_…abcd``). */
+  maskedPreview?: string | null
   enabled: boolean
   serverId: string | null
   connected: boolean
   toolCount?: number | null
   statusMessage?: string | null
+  command?: string | null
+  args?: string[]
 }
 
 export type McpToolDetail = {
@@ -771,6 +1260,16 @@ export type ValidateMcpResult = {
   toolDetails?: McpToolDetail[]
 }
 
+/** mcp.json document (`{ mcpServers: { ... } }`). */
+export type McpJsonDocument = {
+  mcpServers: Record<string, Record<string, unknown>>
+}
+
+export type McpJsonConfig = {
+  path: string
+  document: McpJsonDocument
+}
+
 export type PtySessionInfo = {
   id: string
   sessionId: string
@@ -785,27 +1284,58 @@ export type PtySessionInfo = {
 export interface McpProvider {
   listMcpServers(signal?: AbortSignal): Promise<McpServer[]>
   listMcpCatalog(signal?: AbortSignal): Promise<McpCatalogEntry[]>
+  /** Re-add a removed catalog template to the installed list. */
+  installMcpCatalog?(
+    catalogId: string,
+    options?: { force?: boolean; signal?: AbortSignal }
+  ): Promise<McpServer>
+  /** Re-install all missing featured catalog templates. */
+  resetFeaturedMcpDefaults?(signal?: AbortSignal): Promise<{
+    installed: string[]
+    errors: Array<{ id: string; error: string }>
+  }>
   connectMcpCatalog(
     catalogId: string,
     input: { method: 'oauth' | 'api_key'; apiKey?: string },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ConnectMcpResult>
-  disconnectMcpCatalog(catalogId: string, signal?: AbortSignal): Promise<ConnectMcpResult>
+  connectMcpServer?(
+    serverId: string,
+    input: { method: 'oauth' | 'api_key'; apiKey?: string },
+    signal?: AbortSignal
+  ): Promise<ConnectMcpResult>
+  disconnectMcpCatalog(
+    catalogId: string,
+    signal?: AbortSignal
+  ): Promise<ConnectMcpResult>
   setMcpCatalogEnabled(
     catalogId: string,
     enabled: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<ConnectMcpResult>
-  validateMcpCatalog(catalogId: string, signal?: AbortSignal): Promise<ValidateMcpResult>
-  validateMcpServer(serverId: string, signal?: AbortSignal): Promise<ValidateMcpResult>
+  validateMcpCatalog(
+    catalogId: string,
+    signal?: AbortSignal
+  ): Promise<ValidateMcpResult>
+  validateMcpServer(
+    serverId: string,
+    signal?: AbortSignal
+  ): Promise<ValidateMcpResult>
+  getMcpJsonConfig?(signal?: AbortSignal): Promise<McpJsonConfig>
+  putMcpJsonConfig?(
+    document: McpJsonDocument,
+    signal?: AbortSignal
+  ): Promise<McpJsonConfig>
   createMcpServer(
     input: Omit<McpServer, 'id' | 'createdAt' | 'updatedAt'>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<McpServer>
   updateMcpServer(
     id: string,
-    changes: Partial<Omit<McpServer, 'id' | 'transport' | 'createdAt' | 'updatedAt'>>,
-    signal?: AbortSignal,
+    changes: Partial<
+      Omit<McpServer, 'id' | 'transport' | 'createdAt' | 'updatedAt'>
+    >,
+    signal?: AbortSignal
   ): Promise<McpServer>
   deleteMcpServer(id: string, signal?: AbortSignal): Promise<void>
 }
@@ -838,15 +1368,51 @@ export type AgentSkill = {
   tags: string[]
   source: string
   author: string
+  category?: string
   version: string | null
   updatedAt: string | null
   iconSrc: string | null
   enabled: boolean
+  commit?: string | null
+  updateAvailable?: boolean
+  latestVersion?: string | null
+  updateChannel?: 'release' | 'commit' | string | null
+  hasRuntimeDeps?: boolean
+  depsStatus?: string | null
 }
 
 export type AgentSkillDetail = AgentSkill & {
   content: string
   directory: string | null
+}
+
+export type AgentSkillDepCheck = {
+  name: string
+  status: string
+  detail: string
+  fix?: string
+}
+
+export type AgentSkillDepSetupStep = {
+  title: string
+  body: string
+}
+
+export type AgentSkillDepsStatus = {
+  adapterId: string
+  skillName: string
+  status: string
+  summary: string
+  command?: string
+  hasRuntimeDeps?: boolean
+  checks: AgentSkillDepCheck[]
+  setupSteps: AgentSkillDepSetupStep[]
+}
+
+export type AgentSkillDepsInstallResult = {
+  ok: boolean
+  summary: string
+  status: AgentSkillDepsStatus | null
 }
 
 export type AgentSkillSource = {
@@ -867,6 +1433,21 @@ export type AgentCatalogSkill = {
   url: string | null
 }
 
+export type AgentCatalogLeaderboardView = 'all-time' | 'trending' | 'hot'
+
+export type AgentCatalogLeaderboard = {
+  data: AgentCatalogSkill[]
+  view: AgentCatalogLeaderboardView | string
+  page: number
+  perPage: number
+  /** Unique ranked skills (API pagination.total). */
+  total: number
+  /** Homepage All Time badge — e.g. 986330. */
+  allTimeTotal: number
+  hasMore: boolean
+  count: number
+}
+
 export type AgentCatalogSkillFile = {
   path: string
   contents: string
@@ -879,6 +1460,10 @@ export type AgentCatalogSkillDetail = {
   installs: number
   hash: string | null
   files: AgentCatalogSkillFile[] | null
+  /** skills.sh page Summary (rich markdown), not SKILL.md description. */
+  summary?: string | null
+  githubStars?: number | null
+  firstSeen?: string | null
 }
 
 export type AgentCatalogSkillAuditEntry = {
@@ -922,6 +1507,14 @@ export interface SkillProvider {
     limit?: number,
     signal?: AbortSignal
   ): Promise<AgentCatalogSkill[]>
+  listSkillCatalogLeaderboard?(
+    options?: {
+      view?: AgentCatalogLeaderboardView
+      page?: number
+      perPage?: number
+    },
+    signal?: AbortSignal
+  ): Promise<AgentCatalogLeaderboard>
   getCatalogSkillDetail(
     source: string,
     skill: string,
@@ -946,11 +1539,28 @@ export interface SkillProvider {
   installSkill(source: string, signal?: AbortSignal): Promise<string[]>
   removeSkill(name: string, signal?: AbortSignal): Promise<void>
   upgradeSkills(signal?: AbortSignal): Promise<string[]>
+  getSkillDeps?(
+    name: string,
+    signal?: AbortSignal
+  ): Promise<AgentSkillDepsStatus>
+  doctorSkillDeps?(
+    name: string,
+    signal?: AbortSignal
+  ): Promise<AgentSkillDepsStatus>
+  installSkillDeps?(
+    name: string,
+    options?: { force?: boolean },
+    signal?: AbortSignal
+  ): Promise<AgentSkillDepsInstallResult>
 }
 
 export interface FileProvider {
   listFiles(sessionId: string, signal?: AbortSignal): Promise<WorkspaceFile[]>
-  readFile(sessionId: string, path: string, signal?: AbortSignal): Promise<WorkspaceFileContent>
+  readFile(
+    sessionId: string,
+    path: string,
+    signal?: AbortSignal
+  ): Promise<WorkspaceFileContent>
   writeFile(
     sessionId: string,
     input: {
@@ -959,26 +1569,30 @@ export interface FileProvider {
       encoding?: 'text' | 'base64'
       baseVersion?: string | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<FileWriteResult>
   uploadFile(
     sessionId: string,
     file: File,
     relativeDirectory?: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<WorkspaceFileContent>
-  createFolder(sessionId: string, path: string, signal?: AbortSignal): Promise<void>
+  createFolder(
+    sessionId: string,
+    path: string,
+    signal?: AbortSignal
+  ): Promise<void>
   moveFile(
     sessionId: string,
     sourcePath: string,
     targetPath: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void>
   deleteFile(
     sessionId: string,
     path: string,
     recursive?: boolean,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void>
   downloadUrl(sessionId: string, path: string): string
 }
@@ -992,28 +1606,66 @@ export interface AgentClient {
   runDoctor?(
     signalOrOptions?:
       | AbortSignal
-      | { scope?: 'full' | 'core'; signal?: AbortSignal },
+      | { scope?: 'full' | 'core'; signal?: AbortSignal }
   ): Promise<DoctorReport>
   getStorage?(signal?: AbortSignal): Promise<StorageReport>
   getEnvironment?(signal?: AbortSignal): Promise<EnvironmentReport>
   installEnvironmentPackage?(
     name: string,
-    options?: { allowUnlisted?: boolean; signal?: AbortSignal },
+    options?: { allowUnlisted?: boolean; signal?: AbortSignal }
   ): Promise<EnvironmentPackageMutationResult>
   uninstallEnvironmentPackage?(
     name: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<EnvironmentPackageMutationResult>
   downloadDiagnostics?(
     uiDiagnostics?: Record<string, unknown> | null,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<{ blob: Blob; filename: string }>
-  listSessions(
-    options?: { projectId?: string | null; signal?: AbortSignal },
-  ): Promise<AgentSession[]>
+  listSessions(options?: {
+    projectId?: string | null
+    signal?: AbortSignal
+  }): Promise<AgentSession[]>
+  getSessionsRevision?(signal?: AbortSignal): Promise<string>
   listProjects?(signal?: AbortSignal): Promise<AgentProject[]>
+  listLibrary?(options?: {
+    kind?: LibraryKind | null
+    q?: string | null
+    page?: number
+    perPage?: number
+    signal?: AbortSignal
+  }): Promise<LibraryItemList>
+  uploadLibraryFile?(file: File, signal?: AbortSignal): Promise<LibraryItem>
+  updateLibraryItem?(
+    itemId: string,
+    input: { displayName: string },
+    signal?: AbortSignal
+  ): Promise<LibraryItem>
+  deleteLibraryItem?(itemId: string, signal?: AbortSignal): Promise<void>
+  useLibraryInChat?(
+    input: {
+      itemIds: string[]
+      projectId?: string | null
+      title?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<UseLibraryInChatResult>
+  getLibraryContentUrl?(itemId: string): string
+  fetchLibraryContent?(itemId: string, signal?: AbortSignal): Promise<Blob>
+  readLibraryFile?(
+    itemId: string,
+    signal?: AbortSignal
+  ): Promise<WorkspaceFileContent>
+  writeLibraryFile?(
+    itemId: string,
+    input: { content: string; encoding?: 'text' | 'base64' },
+    signal?: AbortSignal
+  ): Promise<WorkspaceFileContent>
   listSpecialists?(signal?: AbortSignal): Promise<Specialist[]>
-  getSpecialist?(specialistId: string, signal?: AbortSignal): Promise<Specialist>
+  getSpecialist?(
+    specialistId: string,
+    signal?: AbortSignal
+  ): Promise<Specialist>
   createSpecialist?(
     input: {
       name: string
@@ -1028,7 +1680,7 @@ export interface AgentClient {
       mcpCatalogIds?: string[]
       enabled?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<Specialist>
   updateSpecialist?(
     specialistId: string,
@@ -1045,15 +1697,16 @@ export interface AgentClient {
       mcpCatalogIds?: string[]
       enabled?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<Specialist>
   getPromptBudget?(
     options?: {
       specialistId?: string | null
       projectId?: string | null
       sampleQuery?: string | null
+      tokenCountMethod?: PromptBudgetTokenCountMethod | string | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<PromptBudgetResponse>
   deleteSpecialist?(specialistId: string, signal?: AbortSignal): Promise<void>
   createProject?(
@@ -1061,9 +1714,12 @@ export interface AgentClient {
       name: string
       description?: string | null
       agentContext?: string | null
+      folderPath?: string | null
+      icon?: string | null
+      color?: string | null
       pinned?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentProject>
   updateProject?(
     projectId: string,
@@ -1071,9 +1727,12 @@ export interface AgentClient {
       name?: string
       description?: string | null
       agentContext?: string | null
+      folderPath?: string | null
+      icon?: string | null
+      color?: string | null
       pinned?: boolean
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentProject>
   deleteProject?(projectId: string, signal?: AbortSignal): Promise<void>
   searchSessions(query: string, signal?: AbortSignal): Promise<AgentSession[]>
@@ -1084,9 +1743,11 @@ export interface AgentClient {
       projectId?: string | null
       specialistId?: string | null
       sandboxBackend?: 'builtin' | 'modal' | null
+      clientSurface?: ClientSurface
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSession>
+  getUsageOverview?(signal?: AbortSignal): Promise<UsageOverview>
   updateSession(
     sessionId: string,
     input: {
@@ -1096,47 +1757,64 @@ export interface AgentClient {
       specialistId?: string | null
       sandboxBackend?: 'builtin' | 'modal' | null
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSession>
   getSessionSandbox?(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus>
   sandboxStreamUrl?(sessionId: string): string
   startSessionSandbox?(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus>
   stopSessionSandbox?(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus>
   restartSessionSandbox?(
     sessionId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<SessionSandboxStatus>
   autoTitleSession(
     sessionId: string,
     input?: { force?: boolean },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<AgentSession>
+  compactSession?(
+    sessionId: string,
+    input?: { instructions?: string | null },
+    signal?: AbortSignal
+  ): Promise<{ turnsBefore: number; turnsAfter: number; summary: string }>
   deleteSession(sessionId: string, signal?: AbortSignal): Promise<void>
   listMessages(sessionId: string, signal?: AbortSignal): Promise<AgentMessage[]>
-  listEventHistory(sessionId: string, signal?: AbortSignal): Promise<AgentEvent[]>
+  listEventHistory(
+    sessionId: string,
+    signal?: AbortSignal
+  ): Promise<AgentEvent[]>
   setMessageFeedback(
     sessionId: string,
     messageId: string,
     reaction: 'up' | 'down' | null,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<void>
-  sendMessage(sessionId: string, content: string, signal?: AbortSignal): Promise<{ runId: string }>
+  sendMessage(
+    sessionId: string,
+    content: string,
+    signal?: AbortSignal
+  ): Promise<{ runId: string }>
   interrupt(sessionId: string, signal?: AbortSignal): Promise<boolean>
+  submitApprovals?(
+    sessionId: string,
+    decisions: HitlDecision[],
+    options?: { interruptId?: string | null; signal?: AbortSignal }
+  ): Promise<{ accepted: boolean; interruptId?: string | null }>
   streamEvents(
     sessionId: string,
     options: {
       afterSequence?: number
       signal?: AbortSignal
       onEvent: (event: AgentEvent) => void
-    },
+    }
   ): Promise<void>
 }

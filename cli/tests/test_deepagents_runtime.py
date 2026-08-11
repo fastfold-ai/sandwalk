@@ -164,6 +164,7 @@ class TestBuildChatModel:
         assert captured["kwargs"]["api_key"] == "k"
         assert captured["kwargs"]["base_url"] == "http://localhost:11434/v1"
         assert captured["kwargs"]["use_responses_api"] is False
+        assert captured["kwargs"]["stream_chunk_timeout"] == 300.0
 
     def test_openai_gpt5_omits_temperature(self, monkeypatch):
         captured = self._patch_init(monkeypatch)
@@ -246,7 +247,9 @@ class TestHelpers:
             "cache_creation_input_tokens": 2,
             "cache_read_input_tokens": 7,
         }
-        assert dr._usage_from_message(_Msg("no usage")) is None
+        # Empty content + no usage metadata → None (non-empty content may
+        # fall back to an estimated token count for local servers).
+        assert dr._usage_from_message(_Msg("")) is None
 
     def test_args_schema_for_filters_and_required_code(self):
         model = dr._args_schema_for(
@@ -545,10 +548,33 @@ class TestProcessEvents:
             tool_detail_limit=2,
         ))
         assert len(result["tool_calls"]) == 4
-        # The two most recent calls render in full; older ones collapse to a
-        # compact console line.
+        # The two most recent calls render in full; older ones collapse.
         assert renderer.render_tool_complete.call_count == 2
-        assert renderer.console.print.call_count >= 2
+        assert renderer.render_tool_compact.call_count == 2
+
+    def test_grouped_tools_collapsed_by_default(self):
+        renderer = MagicMock()
+        renderer.console = MagicMock()
+        events = []
+        for i in range(3):
+            rid = f"r{i}"
+            events.append({"event": "on_tool_start", "name": "neo", "run_id": rid,
+                           "data": {"input": {"i": i}}})
+            events.append({"event": "on_tool_end", "name": "neo", "run_id": rid,
+                           "data": {"output": _ToolOut(f"out{i}")}})
+        events.append({"event": "on_chat_model_end",
+                       "data": {"output": _Msg("wrap up")}})
+        _run(dr.process_events(
+            _aiter(events),
+            trace_renderer=renderer,
+            headless=False,
+            display_name_map={"neo": "target.neo"},
+            allow_live_spinner=False,
+            group_tools=True,
+            tool_detail_limit=0,
+        ))
+        assert renderer.render_tool_compact.call_count == 3
+        assert renderer.render_tool_complete.call_count == 0
 
     def test_error_tool_renders_error_and_marks_trace(self):
         renderer = MagicMock()

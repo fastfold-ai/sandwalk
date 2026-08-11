@@ -7,11 +7,53 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import { AppErrorBoundary } from './components/AppErrorBoundary.tsx'
 import { Toaster } from './components/ui/sonner.tsx'
-import { applyPalette, applyTheme, getStoredPalette, getStoredTheme, watchSystemTheme } from './lib/theme.ts'
+import { installBlockBrowserBackspace } from './lib/block-browser-backspace.ts'
+import { isMacDesktopOverlay, platformOS } from './lib/desktop.ts'
+import {
+  applyAccentColor,
+  applyAppFont,
+  applyCustomTheme,
+  applyDockIcon,
+  applyGlassMaterial,
+  applyGlassTintStrength,
+  applyLiquidGlass,
+  applyPalette,
+  applyTheme,
+  applyUiFontSize,
+  getStoredAccentColor,
+  getStoredAppFont,
+  getStoredCustomTheme,
+  getStoredDockIcon,
+  getStoredGlassMaterial,
+  getStoredGlassTintStrength,
+  getStoredLiquidGlass,
+  getStoredPalette,
+  getStoredTheme,
+  getStoredUiFontSize,
+  watchSystemTheme
+} from './lib/theme.ts'
 
 applyTheme(getStoredTheme())
 applyPalette(getStoredPalette())
+applyAccentColor(getStoredAccentColor())
+applyCustomTheme(getStoredCustomTheme())
+applyUiFontSize(getStoredUiFontSize())
+applyAppFont(getStoredAppFont())
 watchSystemTheme()
+installBlockBrowserBackspace()
+
+document.documentElement.dataset.platform = platformOS()
+if (isMacDesktopOverlay()) {
+  document.documentElement.classList.add(
+    'sandwalk-mac-overlay',
+    'sandwalk-mac-glass',
+    'sandwalk-mac-glass-active'
+  )
+  applyLiquidGlass(getStoredLiquidGlass())
+  applyGlassMaterial(getStoredGlassMaterial())
+  applyGlassTintStrength(getStoredGlassTintStrength())
+  applyDockIcon(getStoredDockIcon())
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -19,7 +61,7 @@ createRoot(document.getElementById('root')!).render(
       <AppErrorBoundary>
         <App />
       </AppErrorBoundary>
-      <Toaster richColors closeButton position="top-center" />
+      <Toaster closeButton position="top-center" />
     </BrowserRouter>
   </StrictMode>
 )

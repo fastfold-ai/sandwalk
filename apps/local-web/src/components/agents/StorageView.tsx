@@ -61,14 +61,14 @@ export function StorageView({
 
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 py-10">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold">Storage</h2>
             <p className="text-muted-foreground mt-2 text-sm">
-              Where FastFold Agent keeps projects, datasets, chat files, and
-              history on this machine — plus the Python environment used by the
-              built-in code sandbox.
+              Where Sandwalk keeps projects, datasets, chat files, voice
+              models, and history on this machine — plus the Python environment
+              used by the built-in code sandbox.
             </p>
           </div>
           <Button
@@ -176,6 +176,65 @@ export function StorageView({
             </>
           ) : null}
         </section>
+
+        {report?.database ? (
+          <section className="space-y-3 border-t pt-8">
+            <h3 className="text-base font-semibold">Agent database</h3>
+            <p className="text-muted-foreground text-sm">
+              SQLite store for sessions, messages, and MCP rows. Refresh runs
+              integrity_check.
+            </p>
+            <div className="space-y-2 text-sm">
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="text-muted-foreground">Path</span>
+                <code className="max-w-[70%] truncate font-mono text-xs">
+                  {report.database.path}
+                </code>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="text-muted-foreground">Size</span>
+                <span className="tabular-nums">
+                  {formatBytes(
+                    report.database.bytes +
+                      report.database.walBytes +
+                      report.database.shmBytes
+                  )}
+                </span>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="text-muted-foreground">Integrity</span>
+                <span
+                  className={
+                    report.database.integrity === 'ok'
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                  }
+                >
+                  {report.database.integrity}
+                </span>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="text-muted-foreground">Contents</span>
+                <span>
+                  {report.database.sessionCount ?? '—'} sessions ·{' '}
+                  {report.database.messageCount ?? '—'} messages
+                </span>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="text-muted-foreground">Backup</span>
+                <span className="max-w-[70%] truncate text-right text-xs">
+                  {report.database.backupPath
+                    ? `${report.database.backupIntegrity} · ${formatBytes(report.database.backupBytes)}`
+                    : 'none yet'}
+                </span>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="text-muted-foreground">Auto-heal</span>
+                <span>{report.database.autoHealEnabled ? 'on' : 'off'}</span>
+              </div>
+            </div>
+          </section>
+        ) : null}
       </div>
     </ScrollArea>
   )
@@ -192,7 +251,7 @@ function CategoryRow({
 }) {
   const isPythonEnv = category.id === 'python_env'
   const children = (category.children || []).filter(child =>
-    isPythonEnv ? true : child.bytes > 0
+    isPythonEnv || child.path ? true : child.bytes > 0
   )
   const hasChildren = children.length > 0
 
@@ -226,10 +285,10 @@ function CategoryRow({
           {formatBytes(category.bytes)}
         </span>
       </button>
-      {isPythonEnv && category.path ? (
+      {category.path ? (
         <p className="text-muted-foreground truncate px-2 pb-1 pl-7 font-mono text-[11px]">
           {category.path}
-          {hasChildren
+          {isPythonEnv && hasChildren
             ? ` · ${children.filter(c => !c.id.endsWith(':truncated')).length} packages`
             : ''}
         </p>

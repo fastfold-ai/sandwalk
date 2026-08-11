@@ -1,0 +1,19 @@
+{
+  "title": "CLI",
+  "pages": [
+    "---Ways to run---",
+    "terminal",
+    "one-shot",
+    "serve",
+    "---Reference---",
+    "commands",
+    "installation",
+    "plan",
+    "sandbox",
+    "tools",
+    "skills",
+    "config",
+    "data",
+    "doctor"
+  ]
+}

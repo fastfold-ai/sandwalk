@@ -44,6 +44,7 @@ def isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def test_cloud_catalog_excludes_custom_entry():
     ids = {item["id"] for item in cloud_catalog_models()}
     assert "__custom_openai_compatible__" not in ids
+    assert "claude-opus-5" in ids
     assert "claude-sonnet-5" in ids
     assert "gpt-5.5" in ids
 
@@ -65,7 +66,9 @@ def test_catalog_defaults_migration(tmp_path, monkeypatch):
     hidden = set(migrated.hidden_models())
     assert DEFAULT_DISABLED_MODELS.issubset(hidden)
     # New-generation models remain enabled by default.
+    assert "claude-opus-5" not in hidden
     assert "claude-sonnet-5" not in hidden
+    assert "claude-opus-4-8" in hidden
     assert "gpt-5.6-sol" not in hidden
     assert "gpt-5.5" not in hidden
 
@@ -181,10 +184,19 @@ def test_models_http_routes(isolated_config: Config, tmp_path: Path, monkeypatch
             "backend": "lm_studio",
             "base_url": "http://127.0.0.1:1234/v1",
             "default_model": "local-chat",
+            "api_key": "sk-local-test-secret",
         },
     )
     assert created.status_code == 201
     profile_id = created.json()["id"]
+    assert created.json()["hasApiKey"] is True
+    assert created.json()["apiKeyPreview"]
+
+    revealed = client.get(f"/v1/model-profiles/{profile_id}/secret")
+    assert revealed.status_code == 200
+    secret_body = revealed.json()
+    assert secret_body["configured"] is True
+    assert secret_body["value"] == "sk-local-test-secret"
 
     probed = client.post(f"/v1/model-profiles/{profile_id}/probe")
     assert probed.status_code == 200
@@ -271,16 +283,96 @@ def test_opencode_discovers_models_when_key_set(
     opencode_ids = {
         item.id for item in listed.data if item.provider == "opencode"
     }
-    assert "kimi-k2.7-code" in opencode_ids
-    assert "glm-5.2" in opencode_ids
-    kimi = next(item for item in listed.data if item.id == "kimi-k2.7-code")
+    # Discovered Zen ids surface under provider=opencode even when the same
+    # bare id is also curated for Moonshot / DeepSeek / Qwen.
+    assert opencode_ids == {"kimi-k2.7-code", "glm-5.2", "deepseek-v4-flash"}
+    assert any(
+        item.id == "kimi-k2.7-code" and item.provider == "moonshot"
+        for item in listed.data
+    )
+    glm = next(
+        item
+        for item in listed.data
+        if item.id == "glm-5.2" and item.provider == "opencode"
+    )
+    # Enabled even when Qwen/Moonshot/DeepSeek lack keys (provider-scoped hide).
+    assert glm.enabled is True
+    assert glm.source == "cloud"
+    assert glm.label == "GLM 5.2"
+    kimi = next(
+        item
+        for item in listed.data
+        if item.id == "kimi-k2.7-code" and item.provider == "opencode"
+    )
     assert kimi.enabled is True
-    assert kimi.source == "cloud"
-    assert kimi.label == "Kimi K2.7 Code"
 
     # No models when discover=False (static catalog has no opencode entries).
     static = service.list_models(discover=False)
     assert all(item.provider != "opencode" for item in static.data)
+
+
+def test_shared_model_ids_can_exist_under_multiple_providers(
+    isolated_config: Config, monkeypatch: pytest.MonkeyPatch
+):
+    """Same bare id (kimi-k3, glm-5.2, deepseek-v4-pro) across providers."""
+    from agent.config import Config as ConfigCls
+    from agent_server.models import UpdateAgentModelRequest
+
+    cfg = ConfigCls.load()
+    cfg.set("llm.opencode_api_key", "oc-test-key")
+    cfg.set("llm.qwen_api_key", "qwen-test-key")
+    cfg.set("llm.moonshot_api_key", "moonshot-test-key")
+    cfg.set("llm.deepseek_api_key", "deepseek-test-key")
+    cfg.save()
+
+    monkeypatch.setattr(
+        "agent_server.models_service.probe_compatible_profile",
+        lambda **_kwargs: {
+            "health": "ok",
+            "models": ["kimi-k3", "glm-5.2", "deepseek-v4-pro"],
+            "models_source": "v1_models",
+            "error": None,
+        },
+    )
+
+    service = ModelsService()
+    listed = service.list_models(discover=True)
+
+    kimi_rows = [item for item in listed.data if item.id == "kimi-k3"]
+    providers = {item.provider for item in kimi_rows}
+    assert {"moonshot", "opencode"} <= providers
+    assert all(item.enabled for item in kimi_rows)
+
+    glm_rows = [item for item in listed.data if item.id == "glm-5.2"]
+    assert {"qwen", "opencode"} <= {item.provider for item in glm_rows}
+
+    deepseek_rows = [item for item in listed.data if item.id == "deepseek-v4-pro"]
+    assert {"deepseek", "qwen", "opencode"} <= {
+        item.provider for item in deepseek_rows
+    }
+
+    # Toggling OpenCode off must not hide the Moonshot row.
+    service.update_model(
+        "kimi-k3",
+        UpdateAgentModelRequest(enabled=False, provider="opencode"),
+    )
+    after = service.list_models(discover=True)
+    assert (
+        next(
+            item
+            for item in after.data
+            if item.id == "kimi-k3" and item.provider == "opencode"
+        ).enabled
+        is False
+    )
+    assert (
+        next(
+            item
+            for item in after.data
+            if item.id == "kimi-k3" and item.provider == "moonshot"
+        ).enabled
+        is True
+    )
 
 
 def test_format_discovered_model_label():
@@ -290,7 +382,16 @@ def test_format_discovered_model_label():
     )
 
     assert format_discovered_model_label("kimi-k2.7-code") == "Kimi K2.7 Code"
-    assert format_discovered_model_label("deepseek-v4-flash") == "Deepseek V4 Flash"
+    assert format_discovered_model_label("deepseek-v4-flash") == "DeepSeek V4 Flash"
+    assert (
+        format_discovered_model_label("deepseek/deepseek-v4-flash")
+        == "DeepSeek V4 Flash 0423"
+    )
+    assert (
+        format_discovered_model_label("deepseek/deepseek-v4-flash-0731")
+        == "DeepSeek V4 Flash 0731"
+    )
+    assert format_discovered_model_label("deepseek-v4-flash-0731") == "DeepSeek V4 Flash 0731"
     assert format_discovered_model_label("gpt-5.1") == "GPT 5.1"
     assert format_discovered_model_label("gpt-5.6-luna") == "GPT 5.6 Luna"
     assert format_discovered_model_label("glm-5") == "GLM 5"
@@ -328,6 +429,7 @@ def test_model_supports_reasoning_effort():
     assert model_supports_reasoning_effort("openai", "gpt-5.6-sol") is True
     assert model_supports_reasoning_effort("openai", "o3-mini") is True
     assert model_supports_reasoning_effort("opencode", "gpt-5.2") is True
+    assert model_supports_reasoning_effort("anthropic", "claude-opus-5") is True
     assert model_supports_reasoning_effort("anthropic", "claude-opus-4-8") is True
     assert model_supports_reasoning_effort("anthropic", "claude-sonnet-5") is True
     assert model_supports_reasoning_effort("anthropic", "claude-fable-5") is True
@@ -338,8 +440,90 @@ def test_model_supports_reasoning_effort():
     assert model_supports_reasoning_effort("xai", "grok-4.5") is True
     assert model_supports_reasoning_effort("xai", "grok-4.3") is True
     assert model_supports_reasoning_effort("xai", "grok-4.20") is True
+    assert model_supports_reasoning_effort("moonshot", "kimi-k2.6") is True
+    assert model_supports_reasoning_effort("moonshot", "kimi-k3") is False
+    assert (
+        model_supports_reasoning_effort(
+            "local", "gemma-4", compatible_backend="unsloth"
+        )
+        is True
+    )
     assert model_supports_reasoning_effort("nvidia", "nvidia/nemotron-3-ultra-550b-a55b") is False
     assert model_supports_reasoning_effort("openai", "gpt-5-chat-latest") is False
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "anthropic/claude-sonnet-5"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "anthropic/claude-haiku-4.5"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "openai/gpt-5.6-terra"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "openai/gpt-5.6-luna"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "qwen/qwen3.7-flash"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "thinkingmachines/inkling"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "google/gemini-2.5-pro"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "google/gemini-2.5-flash"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort("openrouter", "x-ai/grok-4.5") is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "deepseek/deepseek-chat-v3.1"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort("openrouter", "openai/gpt-4o-mini")
+        is False
+    )
+    assert (
+        model_supports_reasoning_effort("openrouter", "moonshotai/kimi-k2")
+        is False
+    )
+    assert (
+        model_supports_reasoning_effort("openrouter", "qwen/qwen3-max") is False
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "mistralai/mistral-large-2512"
+        )
+        is False
+    )
     assert reasoning_effort_options("openai", "gpt-5.6-sol") == [
         "low",
         "medium",
@@ -370,6 +554,7 @@ def test_model_supports_reasoning_effort():
     from agent.model_catalog import (
         effective_anthropic_effort,
         effective_gemini_thinking_level,
+        effective_openrouter_reasoning,
         effective_xai_reasoning_effort,
     )
 
@@ -388,11 +573,50 @@ def test_model_supports_reasoning_effort():
         effective_xai_reasoning_effort(effort="high", fast=True, model_id="grok-4.3")
         == "none"
     )
+    assert effective_openrouter_reasoning(
+        effort="high", fast=False, model_id="anthropic/claude-sonnet-5"
+    ) == {"effort": "high"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="anthropic/claude-sonnet-5"
+    ) == {"effort": "none"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="openai/gpt-5.6-terra"
+    ) == {"effort": "none"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="x-ai/grok-4.5"
+    ) == {"effort": "low"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="google/gemini-2.5-pro"
+    ) == {"effort": "low"}
+    assert effective_openrouter_reasoning(
+        effort="medium", fast=False, model_id="google/gemini-2.5-flash"
+    ) == {"effort": "medium"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="deepseek/deepseek-chat-v3.1"
+    ) == {"effort": "none"}
+    assert effective_openrouter_reasoning(
+        effort="high", fast=True, model_id="meta/muse-spark-1.2"
+    ) == {"effort": "low"}
+    from agent.model_catalog import (
+        model_supports_reasoning_fast,
+        openrouter_model_reasoning_mandatory,
+    )
+
+    assert openrouter_model_reasoning_mandatory("meta/muse-spark-1.2") is True
+    assert (
+        model_supports_reasoning_fast("openrouter", "meta/muse-spark-1.2")
+        is False
+    )
+    assert (
+        model_supports_reasoning_fast("openrouter", "anthropic/claude-sonnet-5")
+        is True
+    )
 
 
 def test_anthropic_model_omits_temperature():
     from agent.model_catalog import anthropic_model_omits_temperature
 
+    assert anthropic_model_omits_temperature("claude-opus-5") is True
     assert anthropic_model_omits_temperature("claude-opus-4-8") is True
     assert anthropic_model_omits_temperature("claude-sonnet-5") is True
     assert anthropic_model_omits_temperature("claude-fable-5") is True
@@ -430,3 +654,34 @@ def test_custom_models_http_routes(isolated_config: Config, tmp_path: Path):
 
     missing = client.delete("/v1/models/claude-custom-x")
     assert missing.status_code == 404
+
+
+def test_model_preferences_http_routes(isolated_config: Config, tmp_path: Path):
+    app = create_app(store_path=tmp_path / "agent-prefs.db", allowed_hosts=["testserver"])
+    client = TestClient(app)
+
+    empty = client.get("/v1/models/preferences")
+    assert empty.status_code == 200
+    assert empty.json()["favorites"] == []
+    assert empty.json()["recent"] == []
+
+    toggled = client.post(
+        "/v1/models/preferences/favorite",
+        json={"provider": "deepseek", "model": "deepseek-v4-flash"},
+    )
+    assert toggled.status_code == 200
+    body = toggled.json()
+    assert body["favorite"] is True
+    assert body["favorites"] == ["deepseek:deepseek-v4-flash"]
+
+    again = client.get("/v1/models/preferences")
+    assert again.status_code == 200
+    assert again.json()["favorites"] == ["deepseek:deepseek-v4-flash"]
+
+    untoggled = client.post(
+        "/v1/models/preferences/favorite",
+        json={"provider": "deepseek", "model": "deepseek-v4-flash"},
+    )
+    assert untoggled.status_code == 200
+    assert untoggled.json()["favorite"] is False
+    assert untoggled.json()["favorites"] == []

@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
 from rich.console import Console
 
+from agent.config import Config, DEFAULTS, _validate_config
+from agent import config as config_mod
 from agent.sandbox_manage import (
+    CLI_SANDBOX_CONFIG_KEY,
     get_sandbox_backend,
     handle_sandbox_argv,
     normalize_sandbox_backend,
@@ -15,6 +19,7 @@ from agent.sandbox_manage import (
     set_sandbox_backend,
     toggle_sandbox_backend,
 )
+from agent.specialists_manage.state import CLI_SPECIALIST_CONFIG_KEY
 
 
 def test_normalize_aliases():
@@ -94,7 +99,101 @@ def test_handle_sandbox_argv_status(capsys):
     console = Console(force_terminal=True, width=80)
     cfg = MagicMock()
     cfg.get.return_value = "builtin"
-    handle_sandbox_argv(["status"], console, config=cfg)
+    with patch(
+        "agent.sandbox_manage._print_local_host_info",
+        return_value=None,
+    ):
+        handle_sandbox_argv(["status"], console, config=cfg)
     out = capsys.readouterr().out
     assert "Local Sandbox" in out
     assert "builtin" in out
+
+
+def test_handle_sandbox_argv_modal_status_shows_image(capsys):
+    console = Console(force_terminal=True, width=100)
+
+    def _get(key, default=None):
+        return {
+            "agent.cli_sandbox": "modal",
+            "sandbox.compute_type": "gpu",
+            "sandbox.gpu_class": "T4",
+            "sandbox.cpu_cores": 4.0,
+            "sandbox.ram_gb": 16.0,
+            "sandbox.cpu_image": "python:3.12-slim",
+            "sandbox.gpu_image": "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime",
+        }.get(key, default)
+
+    cfg = MagicMock()
+    cfg.get.side_effect = _get
+    with patch(
+        "agent.sandbox_probe.modal_tokens_present",
+        return_value=(True, ""),
+    ):
+        handle_sandbox_argv(["status"], console, config=cfg)
+    out = capsys.readouterr().out
+    assert "Modal Sandbox" in out
+    assert "GPU" in out
+    assert "T4" in out
+    assert "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime" in out
+    assert "16" in out
+
+
+def test_cli_preference_keys_are_registered_in_defaults():
+    """CLI writers must use keys that Config validation already knows.
+
+    Catches the /sandbox modal false-positive "Unknown config key
+    'agent.cli_sandbox'" without needing a live TTY or Modal account.
+    """
+    for key in (CLI_SANDBOX_CONFIG_KEY, CLI_SPECIALIST_CONFIG_KEY):
+        assert key in DEFAULTS, f"{key} missing from DEFAULTS"
+        assert not any(
+            "Unknown config key" in issue and key in issue
+            for issue in _validate_config({key: DEFAULTS[key]})
+        )
+
+
+def test_set_modal_roundtrip_has_no_unknown_key_warning(tmp_path, monkeypatch):
+    """Persist agent.cli_sandbox via real Config.save/load; reload must be clean."""
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps({}))
+    monkeypatch.setattr(config_mod, "CONFIG_FILE", cfg_path)
+
+    cfg = Config.load()
+    with patch(
+        "agent.sandbox_probe.modal_tokens_present",
+        return_value=(True, ""),
+    ):
+        assert set_sandbox_backend("modal", cfg) == "modal"
+
+    # Simulate next interactive boot (Config.load re-runs validation).
+    with patch("agent.config.logger") as mock_logger:
+        reloaded = Config.load()
+        warning_msgs = [
+            " ".join(str(a) for a in call.args)
+            for call in mock_logger.warning.call_args_list
+        ]
+    assert reloaded.get(CLI_SANDBOX_CONFIG_KEY) == "modal"
+    assert not any("cli_sandbox" in msg and "Unknown" in msg for msg in warning_msgs)
+    assert not any(
+        "Unknown config key" in issue and "cli_sandbox" in issue
+        for issue in reloaded.validate()
+    )
+
+
+def test_handle_sandbox_argv_modal_uses_real_config(tmp_path, monkeypatch, capsys):
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps({}))
+    monkeypatch.setattr(config_mod, "CONFIG_FILE", cfg_path)
+    cfg = Config.load()
+    console = Console(force_terminal=True, width=80)
+    with patch(
+        "agent.sandbox_probe.modal_tokens_present",
+        return_value=(True, ""),
+    ):
+        handle_sandbox_argv(["modal"], console, config=cfg)
+    out = capsys.readouterr().out
+    assert "Modal Sandbox" in out
+    assert Config.load().get(CLI_SANDBOX_CONFIG_KEY) == "modal"
+    assert not any(
+        "Unknown" in issue and "cli_sandbox" in issue for issue in Config.load().validate()
+    )

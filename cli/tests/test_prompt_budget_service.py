@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from agent.skills import list_skills
 from agent_server.prompt_budget_service import PromptBudgetService
 from agent_server.store import AgentStore
 
@@ -40,4 +41,7 @@ def test_prompt_budget_estimates_with_specialist(tmp_path: Path):
     assert fast_est.specialist_id == fast.id
     assert fast_est.specialist_name == fast.name
     skills_fast = next(b for b in fast_est.buckets if b.id == "skills")
-    assert skills_fast.count == len(fast.skill_names)
+    # The bucket counts skills that actually resolve, so compare against the
+    # specialist's names that are installed here rather than all of them.
+    installed = {s.name for s in list_skills(enabled_only=False)}
+    assert skills_fast.count == len(installed & set(fast.skill_names))

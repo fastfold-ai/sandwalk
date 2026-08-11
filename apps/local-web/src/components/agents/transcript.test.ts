@@ -96,11 +96,44 @@ describe('buildConversationTimeline', () => {
       messages,
       tools: [],
       todosByRunId: {},
+      plansByRunId: {},
       runIdByMessageId: {}
     })
     expect(timeline).toEqual([
       { kind: 'message', message: messages[0], content: 'Hi' },
       { kind: 'message', message: messages[1], content: 'note' }
+    ])
+  })
+
+  it('excludes the active run’s unassigned tools (they render in the live stack)', () => {
+    const user = msg({ id: 'u1', role: 'user', content: 'run it' })
+    const tools = [
+      tool({
+        id: 't-live',
+        runId: 'run-live',
+        messageId: null,
+        status: 'pending',
+        name: 'run_python'
+      }),
+      tool({
+        id: 't-live-done',
+        runId: 'run-live',
+        messageId: null,
+        status: 'completed',
+        name: 'shell.run'
+      })
+    ]
+    const timeline = buildConversationTimeline({
+      messages: [user],
+      tools,
+      todosByRunId: {},
+      plansByRunId: {},
+      runIdByMessageId: { u1: 'run-live' },
+      activeRunId: 'run-live'
+    })
+    // No mirrored tool cards under the user message while the run is live.
+    expect(timeline).toEqual([
+      { kind: 'message', message: user, content: 'run it' }
     ])
   })
 
@@ -121,6 +154,7 @@ describe('buildConversationTimeline', () => {
       messages: [assistant],
       tools,
       todosByRunId: { 'run-1': todos },
+      plansByRunId: {},
       runIdByMessageId: { a1: 'run-1' }
     })
 
@@ -153,6 +187,7 @@ describe('buildConversationTimeline', () => {
       messages: [assistant],
       tools,
       todosByRunId: {},
+      plansByRunId: {},
       runIdByMessageId: {}
     })
     expect(timeline.map(e => e.kind)).toEqual(['tool'])
@@ -164,25 +199,122 @@ describe('buildConversationTimeline', () => {
       messages: [assistant],
       tools: [],
       todosByRunId: {},
+      plansByRunId: {},
       runIdByMessageId: {}
     })
     expect(timeline).toHaveLength(1)
     expect(timeline[0]?.kind).toBe('message')
   })
 
-  it('appends orphan tools except those on the active run', () => {
+  it('does not pin orphan tools at the end of the transcript', () => {
     const tools = [
-      tool({ id: 'orphan', runId: 'old-run', messageId: null }),
-      tool({ id: 'active', runId: 'active-run', messageId: null })
+      tool({ id: 'orphan', runId: 'old-run', messageId: null, status: 'completed' }),
+      tool({ id: 'active', runId: 'active-run', messageId: null, status: 'pending' })
     ]
     const timeline = buildConversationTimeline({
       messages: [],
       tools,
       todosByRunId: {},
+      plansByRunId: {},
       runIdByMessageId: {},
       activeRunId: 'active-run'
     })
-    expect(timeline).toEqual([{ kind: 'tool', tool: tools[0] }])
+    expect(timeline).toEqual([])
+  })
+
+  it('anchors interrupted-run tools on the last message of that run', () => {
+    const user = msg({ id: 'u1', role: 'user', content: 'remove skills' })
+    const later = msg({ id: 'a2', role: 'assistant', content: '👍' })
+    const tools = [
+      tool({
+        id: 'stuck',
+        runId: 'run-old',
+        messageId: null,
+        status: 'error',
+        name: 'run_python'
+      })
+    ]
+    const timeline = buildConversationTimeline({
+      messages: [user, later],
+      tools,
+      todosByRunId: {},
+      plansByRunId: {},
+      runIdByMessageId: { u1: 'run-old', a2: 'run-new' },
+      activeRunId: null
+    })
+    expect(timeline.map(entry => entry.kind)).toEqual([
+      'message',
+      'tool',
+      'message'
+    ])
+    expect(timeline[1]).toMatchObject({
+      kind: 'tool',
+      tool: { id: 'stuck' }
+    })
+  })
+
+  it('does not pin pending tools at the end when no run is active', () => {
+    const tools = [
+      tool({ id: 'stuck', runId: 'old-run', messageId: null, status: 'pending' })
+    ]
+    const timeline = buildConversationTimeline({
+      messages: [msg({ id: 'a1', role: 'assistant', content: 'Done.' })],
+      tools,
+      todosByRunId: {},
+      plansByRunId: {},
+      runIdByMessageId: {},
+      activeRunId: null
+    })
+    expect(timeline.every(entry => entry.kind !== 'tool')).toBe(true)
+  })
+
+  it('tolerates missing plansByRunId / todosByRunId maps', () => {
+    const assistant = msg({ id: 'a1', role: 'assistant', content: 'Done.' })
+    const timeline = buildConversationTimeline({
+      messages: [assistant],
+      tools: [],
+      // Simulate in-memory state from before plan fields existed.
+      todosByRunId: undefined,
+      plansByRunId: undefined,
+      runIdByMessageId: { a1: '73c557e0-ef76-41fb-82d7-493f75725533' }
+    })
+    expect(timeline).toEqual([
+      { kind: 'message', message: assistant, content: 'Done.' }
+    ])
+  })
+
+  it('shows each plan path once on the first creating run', () => {
+    const first = msg({ id: 'a1', role: 'assistant', content: 'Drafting.' })
+    const second = msg({ id: 'a2', role: 'assistant', content: 'Ready.' })
+    const followUp = msg({ id: 'a3', role: 'assistant', content: 'Updated.' })
+    const plan = {
+      path: 'plans/demo.md',
+      title: 'Demo',
+      summary: 'Overview'
+    }
+    const timeline = buildConversationTimeline({
+      messages: [first, second, followUp],
+      tools: [],
+      todosByRunId: {
+        'run-1': [{ id: 't1', content: 'Step', status: 'completed' }],
+        'run-2': [{ id: 't2', content: 'Next', status: 'pending' }]
+      },
+      plansByRunId: {
+        'run-1': [plan],
+        // Same path on a later run must not re-render the Created Plan card.
+        'run-2': [{ ...plan, title: 'Demo v2' }]
+      },
+      runIdByMessageId: { a1: 'run-1', a2: 'run-1', a3: 'run-2' }
+    })
+
+    const plans = timeline.filter(e => e.kind === 'plan')
+    expect(plans).toHaveLength(1)
+    expect(plans[0]).toMatchObject({
+      kind: 'plan',
+      messageId: 'a2',
+      plan: { path: 'plans/demo.md', title: 'Demo' }
+    })
+    expect(timeline.filter(e => e.kind === 'todos')).toHaveLength(2)
   })
 })
 
@@ -234,6 +366,11 @@ describe('toolsFromEvents', () => {
       envelope('todos.updated', {
         todos: [{ id: 't1', content: 'Next', status: 'completed' }]
       }),
+      envelope('plan.created', {
+        path: 'plans/demo.md',
+        title: 'Demo',
+        summary: 'Overview'
+      }),
       envelope(
         'tool.completed',
         {
@@ -250,6 +387,10 @@ describe('toolsFromEvents', () => {
     const result = toolsFromEvents(events)
     expect(result.runIdByMessageId).toEqual({ u1: 'run-1', a1: 'run-1' })
     expect(result.todosByRunId['run-1']?.[0]?.content).toBe('Next')
+    expect(result.plansByRunId['run-1']?.[0]).toMatchObject({
+      path: 'plans/demo.md',
+      title: 'Demo'
+    })
     expect(result.tools).toHaveLength(2)
     expect(result.tools.find(t => t.id === 'tc1')).toMatchObject({
       status: 'completed',

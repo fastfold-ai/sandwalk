@@ -1,14 +1,32 @@
-import type { AgentMessage, AgentSession, AgentTodo } from '@sandwalk/agent-ui-core'
+import type {
+  AgentMessage,
+  AgentPlanCard,
+  AgentSession,
+  AgentTodo,
+  PendingHitlApproval
+} from '@sandwalk/agent-ui-core'
 
 import type { TranscriptTool } from '@/components/agents/ToolCard'
+
+export type RunTokenUsage = {
+  inputTokens: number
+  outputTokens: number
+  tokensPerSecond?: number | null
+  promptTokensPerSecond?: number | null
+  promptEvalSeconds?: number | null
+  generationSeconds?: number | null
+  timeToFirstToken?: number | null
+  estimated?: boolean
+}
 
 export type SessionChatState = {
   messages: AgentMessage[]
   tools: TranscriptTool[]
   todosByRunId: Record<string, AgentTodo[]>
+  plansByRunId: Record<string, AgentPlanCard[]>
   runIdByMessageId: Record<string, string>
-  usageByRunId: Record<string, { inputTokens: number; outputTokens: number }>
-  tokenUsage: { inputTokens: number; outputTokens: number }
+  usageByRunId: Record<string, RunTokenUsage>
+  tokenUsage: RunTokenUsage
   activeRunId: string | null
   runActive: boolean
   liveDelta: string
@@ -18,6 +36,13 @@ export type SessionChatState = {
   queuedMessages: QueuedMessage[]
   expandedToolRunKeys: Record<string, boolean>
   messagesLoaded: boolean
+  /** Plan currently being built/executed (set by Build action). */
+  activeBuildPlan: AgentPlanCard | null
+  /** Plan paths the user already started building — hide Created Plan cards. */
+  builtPlanPaths: string[]
+  /** Pending Deep Agents HITL interrupt awaiting desktop decisions. */
+  pendingApproval: PendingHitlApproval | null
+  approvalSubmitting: boolean
 }
 
 export type QueuedMessage = {
@@ -30,6 +55,7 @@ export function emptySessionChatState(): SessionChatState {
     messages: [],
     tools: [],
     todosByRunId: {},
+    plansByRunId: {},
     runIdByMessageId: {},
     usageByRunId: {},
     tokenUsage: { inputTokens: 0, outputTokens: 0 },
@@ -41,7 +67,11 @@ export function emptySessionChatState(): SessionChatState {
     composerFiles: [],
     queuedMessages: [],
     expandedToolRunKeys: {},
-    messagesLoaded: false
+    messagesLoaded: false,
+    activeBuildPlan: null,
+    builtPlanPaths: [],
+    pendingApproval: null,
+    approvalSubmitting: false
   }
 }
 
@@ -53,6 +83,22 @@ export function relativeTime(value: string) {
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h`
   return `${Math.floor(hours / 24)}d`
+}
+
+/** Calendar-day label: Today / Yesterday / `10d ago`. */
+export function relativeDayLabel(value: string, now = new Date()) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const startOfToday = new Date(now)
+  startOfToday.setHours(0, 0, 0, 0)
+  const startOfTarget = new Date(date)
+  startOfTarget.setHours(0, 0, 0, 0)
+  const dayDiff = Math.round(
+    (startOfToday.getTime() - startOfTarget.getTime()) / 86_400_000
+  )
+  if (dayDiff <= 0) return 'Today'
+  if (dayDiff === 1) return 'Yesterday'
+  return `${dayDiff}d ago`
 }
 
 export function formatMessagePopoverDate(value: string) {
@@ -67,19 +113,13 @@ export function formatMessagePopoverDate(value: string) {
   }).format(date)
 }
 
-export function downloadMarkdown(filename: string, content: string) {
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
-  const href = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = href
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(href)
+export async function downloadMarkdown(filename: string, content: string) {
+  const { downloadTextWithLocation } = await import('@/lib/workspace-download')
+  await downloadTextWithLocation(filename, content)
 }
 
-export const AUTO_TITLE_FIRST_RESPONSE_THRESHOLD = 2
+// Two full turns (user + assistant × 2) before asking the model for a title.
+export const AUTO_TITLE_FIRST_RESPONSE_THRESHOLD = 4
 
 export function isLowSignalTitle(title: string): boolean {
   const normalized = String(title || '')

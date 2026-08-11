@@ -237,23 +237,47 @@ def test_llm_api_key_legacy_fallback_for_anthropic():
     assert cfg.llm_api_key("anthropic") == "legacy-anthropic-key"
 
 
+def test_api_keys_registry_has_required_fields_for_keys_table():
+    """Every API_KEYS entry must satisfy keys_table() — catches missing url/name."""
+    from agent.config.api_keys import API_KEYS
+
+    required = ("name", "description", "url", "free")
+    missing = []
+    for config_key, info in API_KEYS.items():
+        assert isinstance(info, dict), config_key
+        for field in required:
+            if field not in info:
+                missing.append(f"{config_key}.{field}")
+    assert missing == [], f"API_KEYS missing fields used by /keys: {missing}"
+
+
 def test_keys_table_includes_llm_provider_keys():
     cfg = Config(data={})
     table = cfg.keys_table()
     first_col = list(getattr(table.columns[0], "_cells", []))
     assert "Anthropic" in first_col
     assert "OpenAI" in first_col
+    assert "Qwen endpoint" in first_col
 
 
 def test_keys_table_includes_boltz_provider():
-    cfg = Config(data={"api.boltz_api_key": "sk_bc_test_1234567890"})
+    cfg = Config(
+        data={
+            "api.boltz_api_key": "sk_bc_test_1234567890",
+            "integrations.updated_at": {
+                "api.boltz_api_key": "2026-07-27T12:00:00",
+            },
+        }
+    )
     table = cfg.keys_table()
     services = list(getattr(table.columns[0], "_cells", []))
     previews = list(getattr(table.columns[2], "_cells", []))
+    updated = list(getattr(table.columns[-1], "_cells", []))
     assert "Boltz" in services
     boltz_idx = services.index("Boltz")
     assert previews[boltz_idx].startswith("sk_bc_te")
     assert "..." in previews[boltz_idx]
+    assert updated[boltz_idx] == "2026-07-27"
 
 
 def test_keys_table_includes_preview_column_and_masked_openai_value():
@@ -272,7 +296,7 @@ def test_keys_table_lists_compatible_profiles_dynamically():
     cfg = Config(data={"llm.provider": "openai"})
     cfg.upsert_openai_profile(
         profile_id="omlx_local",
-        label="oMLX Local",
+        label="oMLX",
         backend="omlx",
         base_url="http://localhost:8000/v1",
         api_key="sk-omlx-example",
@@ -291,10 +315,10 @@ def test_keys_table_lists_compatible_profiles_dynamically():
     status_col = list(getattr(table.columns[1], "_cells", []))
     unlocks_col = list(getattr(table.columns[3], "_cells", []))
 
-    assert "Local LLM: oMLX Local" in service_col
+    assert "Local LLM: oMLX" in service_col
     assert "Local LLM: Unsloth Lab" in service_col
 
-    omlx_idx = service_col.index("Local LLM: oMLX Local")
+    omlx_idx = service_col.index("Local LLM: oMLX")
     unsloth_idx = service_col.index("Local LLM: Unsloth Lab")
     assert "configured" in status_col[omlx_idx]
     assert "active" in status_col[omlx_idx]
@@ -307,14 +331,14 @@ def test_keys_table_uses_template_install_links_for_compatible_profiles():
     cfg = Config(data={"llm.provider": "openai"})
     cfg.upsert_openai_profile(
         profile_id="ds4_local",
-        label="DS4 Local",
+        label="DS4",
         backend="ds4",
         base_url="http://localhost:8000/v1",
         api_key=None,
     )
     cfg.upsert_openai_profile(
         profile_id="llama_cpp_local",
-        label="llama.cpp Local",
+        label="llama.cpp",
         backend="llama_cpp",
         base_url="http://localhost:8080/v1",
         api_key=None,
@@ -331,8 +355,8 @@ def test_keys_table_uses_template_install_links_for_compatible_profiles():
     service_col = list(getattr(table.columns[0], "_cells", []))
     signup_col = list(getattr(table.columns[5], "_cells", []))
 
-    ds4_idx = service_col.index("Local LLM: DS4 Local")
-    llama_idx = service_col.index("Local LLM: llama.cpp Local")
+    ds4_idx = service_col.index("Local LLM: DS4")
+    llama_idx = service_col.index("Local LLM: llama.cpp")
     custom_idx = service_col.index("Local LLM: Custom Other")
 
     assert "github.com/antirez/ds4" in signup_col[ds4_idx]
@@ -340,10 +364,11 @@ def test_keys_table_uses_template_install_links_for_compatible_profiles():
     assert signup_col[custom_idx] == "—"
 
 
-def test_set_openai_key_rejects_invalid_format():
+def test_set_openai_key_accepts_any_nonempty_format():
+    # Prefix heuristics are not enforced — live probe validates auth.
     cfg = Config(data={})
-    with pytest.raises(ValueError, match="Invalid OpenAI API key format"):
-        cfg.set("llm.openai_api_key", "not-a-key")
+    cfg.set("llm.openai_api_key", "not-a-key")
+    assert cfg.get("llm.openai_api_key") == "not-a-key"
 
 
 def test_save_merges_only_dirty_keys_and_preserves_existing_secrets(monkeypatch, tmp_path):
@@ -434,7 +459,7 @@ def test_llm_api_key_uses_active_profile_only_ignores_stale_env(monkeypatch):
                     "api_key": "sk-proj-cloud-key",
                 },
                 "omlx_local": {
-                    "label": "oMLX Local",
+                    "label": "oMLX",
                     "backend": "omlx",
                     "base_url": "http://127.0.0.1:8009/v1",
                     "api_key": "sk-omlx-profile-key",
@@ -488,7 +513,7 @@ def test_heals_openai_cloud_model_when_active_profile_is_local_backend():
                     "default_model": "gpt-5.5",
                 },
                 "ollama_local": {
-                    "label": "Ollama Local",
+                    "label": "Ollama",
                     "backend": "ollama",
                     "base_url": "http://localhost:11434/v1",
                     "default_model": "qwen3.6:32b",
@@ -541,14 +566,14 @@ def test_upsert_profile_key_does_not_get_overwritten_by_stale_legacy_projection(
                     "default_model": "gpt-5.5",
                 },
                 "omlx_local": {
-                    "label": "oMLX Local",
+                    "label": "oMLX",
                     "backend": "omlx",
                     "base_url": "http://127.0.0.1:8005/v1",
                     "api_key": "sk-omlx-old",
                     "default_model": "omlx-model",
                 },
                 "unsloth_local": {
-                    "label": "Unsloth Local",
+                    "label": "Unsloth",
                     "backend": "unsloth",
                     "base_url": "http://localhost:8888/v1",
                     "api_key": "sk-omlx-wrong",
@@ -587,7 +612,7 @@ def test_set_legacy_compatible_key_updates_active_profile_key():
                     "default_model": "gpt-5.5",
                 },
                 "unsloth_local": {
-                    "label": "Unsloth Local",
+                    "label": "Unsloth",
                     "backend": "unsloth",
                     "base_url": "http://localhost:8888/v1",
                     "api_key": "sk-unsloth-old",
@@ -607,10 +632,11 @@ def test_set_legacy_compatible_key_updates_active_profile_key():
     assert profile["api_key"] == "sk-unsloth-fresh"
 
 
-def test_set_anthropic_key_rejects_invalid_format():
+def test_set_anthropic_key_accepts_any_nonempty_format():
+    # Prefix heuristics are not enforced — live probe validates auth.
     cfg = Config(data={})
-    with pytest.raises(ValueError, match="Invalid Anthropic API key format"):
-        cfg.set("llm.anthropic_api_key", "sk-proj-not-anthropic")
+    cfg.set("llm.anthropic_api_key", "sk-proj-not-anthropic")
+    assert cfg.get("llm.anthropic_api_key") == "sk-proj-not-anthropic"
 
 
 def test_set_llm_key_blank_unsets_value():
@@ -717,6 +743,69 @@ class TestValidateConfig:
     def test_unknown_key_warns(self):
         issues = _validate_config({"agent.typo_key": True})
         assert any("Unknown config key" in i and "typo_key" in i for i in issues)
+
+    def test_integration_update_timestamps_are_known(self):
+        issues = _validate_config({
+            "integrations.updated_at": {
+                "api.boltz_api_key": "2026-07-28T02:31:24+00:00",
+            }
+        })
+        assert not any("Unknown config key" in issue for issue in issues)
+
+    def test_tavily_mcp_oauth_keys_are_known(self):
+        issues = _validate_config({
+            "mcp.tavily_access_token": "tok",
+            "mcp.tavily_refresh_token": "ref",
+            "mcp.tavily_token_expires_at": "2026-07-28T00:00:00+00:00",
+            "mcp.tavily_client_id": "cid",
+            "mcp.tavily_tool_count": 4,
+            "mcp.tavily_status_message": "ok",
+        })
+        assert not any("Unknown config key" in issue for issue in issues)
+
+    def test_exa_mcp_oauth_keys_are_known(self):
+        issues = _validate_config({
+            "mcp.exa_api_key": "exa-key",
+            "mcp.exa_access_token": "tok",
+            "mcp.exa_refresh_token": "ref",
+            "mcp.exa_token_expires_at": "2026-07-28T00:00:00+00:00",
+            "mcp.exa_client_id": "cid",
+            "mcp.exa_tool_count": 2,
+            "mcp.exa_status_message": "ok",
+        })
+        assert not any("Unknown config key" in issue for issue in issues)
+
+    def test_custom_mcp_oauth_keys_are_known(self):
+        """Dynamic mcp.custom_<uuid>_* keys written by OAuth must not warn.
+
+        Boot/CI never load a real ~/.sandwalk/config.json with connected custom
+        MCPs, so a static DEFAULTS-only allowlist previously missed this and
+        spammed interactive + serve startups with false "possible typo" warnings.
+        """
+        sid = "2fd7809c-2a40-4c7d-86d5-93ab7946ee0d"
+        issues = _validate_config({
+            f"mcp.custom_{sid}_client_id": "cid",
+            f"mcp.custom_{sid}_access_token": "tok",
+            f"mcp.custom_{sid}_refresh_token": "ref",
+            f"mcp.custom_{sid}_token_expires_at": "9999999999",
+            f"mcp.custom_{sid}_headers": {"Authorization": "Bearer x"},
+            f"mcp.custom_{sid}_tool_count": 3,
+            f"mcp.custom_{sid}_status_message": "ok",
+            "mcp.removed_catalog_ids": ["betterstack"],
+        })
+        assert not any("Unknown config key" in i for i in issues)
+
+    def test_cli_sandbox_key_is_known(self):
+        issues = _validate_config({"agent.cli_sandbox": "modal"})
+        assert not any("Unknown config key" in i for i in issues)
+        bad = _validate_config({"agent.cli_sandbox": "cloud"})
+        assert any("Invalid agent.cli_sandbox" in i for i in bad)
+
+    def test_custom_mcp_typo_suffix_still_warns(self):
+        issues = _validate_config({
+            "mcp.custom_abc_not_a_real_field": "x",
+        })
+        assert any("Unknown config key" in i for i in issues)
 
     def test_type_error_bool_as_string(self):
         issues = _validate_config({"output.verbose": "yes"})

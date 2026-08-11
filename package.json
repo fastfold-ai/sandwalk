@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "pnpm --filter @sandwalk/agent-local-web dev",
     "dev:web": "pnpm --filter @sandwalk/agent-local-web dev",
+    "dev:docs": "pnpm --filter @sandwalk/docs dev",
     "build": "pnpm -r build",
+    "build:docs": "pnpm --filter @sandwalk/docs build",
     "lint": "pnpm -r lint",
     "format": "pnpm --filter @sandwalk/agent-local-web format",
     "format:check": "pnpm --filter @sandwalk/agent-local-web format:check",
@@ -16,8 +18,17 @@
     "test": "pnpm --filter @sandwalk/agent-local-web test",
     "test:coverage": "pnpm --filter @sandwalk/agent-local-web test:coverage",
     "test:mac": "cd apps/sandwalk-mac && ./scripts/test.sh",
-    "test:cli": "cd cli && .venv/bin/python -m pytest tests/ -q -m \"not data_smoke and not integration and not modal_e2e\"",
-    "test:cli:coverage": "cd cli && .venv/bin/python -m pytest tests/ -q -m \"not data_smoke and not integration and not modal_e2e\" --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models --cov=reports --cov=skills --cov=tools --cov=ui --cov-report=term-missing:skip-covered --cov-fail-under=80",
+    "lint:mac": "cd apps/sandwalk-mac && ./scripts/lint.sh",
+    "package:dmg": "./apps/packaging/package-macos-dmg.sh",
+    "relaunch:mac": "./apps/packaging/relaunch-macos-app.sh",
+    "test:cli": "cd cli && .venv/bin/python -m pytest tests/ -q",
+    "test:cli:unit": "cd cli && .venv/bin/python -m pytest tests/ -q --ignore=tests/integration_cli",
+    "test:cli:functional": "cd cli && .venv/bin/python -m pytest tests/integration_cli -m cli_functional -q --tb=short",
+    "test:cli:network": "cd cli && RUN_CLI_NETWORK=1 .venv/bin/python -m pytest tests/integration_cli -m cli_network -q --tb=short",
+    "test:cli:e2e": "cd cli && RUN_CLI_E2E=1 .venv/bin/python -m pytest tests/integration_cli -m cli_e2e -q --tb=short",
+    "test:cli:live": "cd cli && RUN_CLI_NETWORK=1 RUN_CLI_E2E=1 .venv/bin/python -m pytest tests/integration_cli -m \"cli_network or cli_e2e\" -q --tb=short",
+    "test:cli:all": "cd cli && RUN_CLI_NETWORK=1 RUN_CLI_E2E=1 .venv/bin/python -m pytest tests/integration_cli -q --tb=short",
+    "test:cli:coverage": "cd cli && .venv/bin/python -m pytest tests/ -q --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models --cov=reports --cov=skills --cov=tools --cov=ui --cov-report=term-missing:skip-covered --cov-fail-under=80",
     "test:all": "pnpm test:coverage && pnpm test:cli:coverage && pnpm test:mac"
   }
 }

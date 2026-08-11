@@ -75,4 +75,7 @@ Mock pattern: `@patch("tools.module.load_X")` to inject test DataFrames.
 
 ## Linting
 
-Matches fastfold-cloud-backend: **ruff** (`E,W,F,I,B,C4,UP`) + **mypy** (strict, expanding package by package).
+**ruff** (`E,W,F,I,B,C4,UP`, `E501` ignored) + **mypy** (strict, expanding package by package).
+Formatter width is `line-length = 100`; long lines are a formatting preference, not a hard reject.
+
+Prefer cohesive modules. Review unusually large files for mixed responsibilities in PR review, but do **not** split files based only on line count.

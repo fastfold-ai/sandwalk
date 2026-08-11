@@ -15,8 +15,6 @@ struct RuntimeSettingsView: View {
     private var isDirty: Bool {
         guard loaded else { return false }
         return draft.toolMode != saved.toolMode
-            || draft.recursionLimit != saved.recursionLimit
-            || draft.maxSdkTurns != saved.maxSdkTurns
             || draft.groupToolTraces != saved.groupToolTraces
             || draft.toolTraceDetailLimit != saved.toolTraceDetailLimit
             || draft.backgroundWatchTimeoutS != saved.backgroundWatchTimeoutS
@@ -30,26 +28,6 @@ struct RuntimeSettingsView: View {
     var body: some View {
         AgentAPIGate {
             VStack(alignment: .leading, spacing: 0) {
-                SettingsSectionHeader(
-                    "LANGGRAPH LOOP",
-                    subtitle: "Raise these if long fold/download workflows stop early with a recursion-limit error."
-                )
-                SettingsListGroup {
-                    SettingsRow(
-                        label: "Recursion limit",
-                        sublabel: "Max model↔tool graph steps (25–2000)."
-                    ) {
-                        SettingsNumberField(value: $draft.recursionLimit, width: 80)
-                    }
-                    SettingsRow(
-                        label: "Max SDK turns",
-                        sublabel: "Soft turn budget when recursion limit is unset (1–500).",
-                        isLast: true
-                    ) {
-                        SettingsNumberField(value: $draft.maxSdkTurns, width: 80)
-                    }
-                }
-
                 SettingsSectionHeader(
                     "TOOL CALLING",
                     subtitle: "PTC keeps domain tools behind run_python; native exposes each tool schema."
@@ -209,10 +187,10 @@ struct RuntimeSettingsView: View {
         statusMessage = nil
         defer { busy = false }
 
+        // Recursion limit is fixed high in the agent runtime (LangGraph requires a
+        // finite cap; there is no documented maximum). Do not expose or overwrite it.
         let body: [String: Any] = [
             "toolMode": draft.toolMode == "native" ? "native" : "ptc",
-            "recursionLimit": clamp(draft.recursionLimit, 25, 2000, 120),
-            "maxSdkTurns": clamp(draft.maxSdkTurns, 1, 500, 30),
             "groupToolTraces": draft.groupToolTraces,
             "toolTraceDetailLimit": clamp(draft.toolTraceDetailLimit, 1, 50, 1),
             "backgroundWatchTimeoutS": clamp(draft.backgroundWatchTimeoutS, 60, 86400, 7200),

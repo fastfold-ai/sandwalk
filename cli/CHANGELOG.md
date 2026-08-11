@@ -7,15 +7,113 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Hide only OpenRouter ``qwen/qwen3.7-flash`` by default (Alibaba upstream
+  ``model_not_found``). OpenRouter ``qwen/qwen3.7-plus``, ``qwen/qwen3.7-max``,
+  and ``qwen/qwen3-max`` stay enabled; catalog defaults v12 unhides them if a
+  prior migration re-seeded them off.
+
 ### Fixed
 
-- `sandwalk fork` / `sandwalk agent fork` now imports the forked chat into the
-  shared SQLite store so it appears in the Web UI Agents list immediately
-  (no separate `sandwalk sync` required).
+- MCP OAuth Connect no longer sticks on “Waiting for callback…” in the desktop
+  app: system-browser auth has no ``window.opener``, so the UI now polls +
+  re-listens on focus until credentials land (no manual reload).
+- Workspace / Library uploads: removed the per-file size cap (was 40MB). Local
+  sessions can attach any format and any size; failed uploads toast the API
+  error instead of failing silently.
+
+### Added
+
+- Featured **Exa** MCP (`https://mcp.exa.ai/mcp`): OAuth Connect preferred
+  (browser sign-in) with optional ``EXA_API_KEY`` / ``x-api-key`` fallback for
+  web search and page fetch. Bundled integration icon; see
+  ``cli/docs/mcp-defaults/`` and https://docs.exa.ai/reference/exa-mcp.
+- Featured **anydoc** skill (`convert-documents-to-markdown` from
+  ``firecrawl/anydoc``) plus a reusable **skill runtime-deps** adapter:
+  ``sandwalk skills deps status|install|reinstall|doctor``,
+  ``GET/POST /v1/skills/{name}/deps*``, and Install / Reinstall / Health on the
+  skill detail page (managed Node install under
+  ``$SANDWALK_CONFIG_DIR/skill-deps/anydoc/``). See ``cli/docs/anydoc-skill.md``.
+- Featured **PyMOL** local MCP (plugin **v0.0.1**): Plugin Manager zip
+  (`https://sandwalk.sh/pymol/plugin.zip`), managed launcher under
+  ``~/.sandwalk/pymol-mcp/``, ``sandwalk mcp install pymol`` /
+  ``sandwalk mcp doctor pymol``, and a local-web setup checklist (no OAuth).
+  Helpers live in ``cli/src/agent/mcps/pymol_mcp/``; packaging in
+  ``packaging/pymol-mcp/``. The MCP server is **vendored** under
+  ``cli/src/agent/mcps/pymol_mcp/vendor/agentic-pymol/`` (no GitHub fetch at
+  install); ``sandwalk mcp install pymol --force`` recreates the launcher venv.
+- Interactive ``/skills`` picker (same modal chrome as ``/models``): taller
+  searchable list, lean descriptions, and ``on/off · author · version``;
+  Enter / click inserts ``skill: <name>`` into compose (keep typing); Space
+  toggles enable. ``skill:`` mentions render as pink chips (compose + transcript).
+  Rich table remains as a non-TTY / test fallback.
+- Interactive ``/mcps`` picker (same chrome as ``/skills``): search, lean
+  status/id/transport; Enter / click inserts ``mcp: <id>`` (cyan chip); Space
+  toggles enable. Subcommands (``connect``, ``validate``, …) keep working.
+  The old ``/mcp`` slash command is removed (use ``/mcps``).
+- Compose ``@`` file search across the session workspace and current cwd;
+  Enter inserts an orange ``@[filename]`` chip without sending (so you can type
+  more around it); the chip expands to a usable path for the agent on submit.
+- Interactive `/sandbox` picker aligned with the Web UI (Local + Modal CPU/GPU
+  presets) and inline base-image edit after a Modal choice.
+- CLI status bar: working-directory path and `context: N% (used/limit)` when the
+  model context window is known.
+- Curated cloud context windows (`context_windows.py`); Ollama context from
+  `/api/tags` with `/api/show` fallback; Web model picker shows a **1M** badge
+  for ≥1M windows.
+- Session sandbox status exposes `gpuImage` / `baseImage` for the active compute mode.
+- MCP page **Reset to defaults** restores missing featured catalog templates
+  after delete (``POST /v1/mcp-servers/catalog/reset-defaults``).
+- Featured **RayMol** local MCP: install from [raymol.io](https://raymol.io/),
+  enable MCP in the app, then ``sandwalk mcp install raymol`` / one-click UI
+  Install (``RayMol --mcp-bridge``). See ``cli/docs/raymol-mcp.md``.
 
 ### Changed
 
+- Tool / dataset / workflow mentions move from ``@`` to ``#`` (←/→ tabs unchanged);
+  ``@`` is reserved for file chips.
+- Interactive CLI owns a scrollable transcript panel: tool calls default to
+  collapsed `✓ Ran name ▸` lines, mouse wheel scrolls the session view, and
+  click / `Ctrl+E` expands or collapses tool details in place. Drag to select
+  transcript text (copies on release). Set `agent.tool_trace_detail_limit` > 0
+  for a trailing full-detail window, or `agent.group_tool_traces false` for
+  always-verbose cards.
 - Prefer `sandwalk fork <share_id>` (kept `sandwalk agent fork` as an alias).
+- Interactive CLI sessions start with Plan mode **off**; `/plan` persists the toggle.
+- Removed idle status-bar “? for commands / Ctrl+O verbose” chrome and the
+  Ctrl+O verbose binding.
+
+### Fixed
+
+- Text-only providers (DeepSeek, many local LLMs) no longer 400 when an MCP
+  tool returns an image (e.g. RayMol ``capture_viewport``): unsupported
+  multimodal blocks are replaced with a text stub before the provider call,
+  and bytes are saved under ``artifacts/tool-images/`` when a session
+  workspace is set.
+- Stop rewriting ``llm.provider`` from model-id prefixes (e.g. local oMLX
+  ``Qwen*`` weights labeled as Qwen Cloud). Provider + active profile from
+  config/storage are source of truth; heal only falls back when an OpenAI
+  cloud model id is stuck on a local backend.
+- Interactive transcript shows the sandwalk startup banner again (fullscreen
+  TUI had replaced the Rich scrollback where it used to live).
+- Transcript TUI no longer recreates the fullscreen app on every send (screen
+  flicker) or stacks invalidate listeners that froze the UI mid-response.
+- Exit goodbye / `sandwalk --resume …` hint prints to the real terminal again
+  after the fullscreen transcript closes.
+- Interactive slash flows (`/model`, `/sandbox`, …) suspend the transcript TUI
+  so nested prompts and Rich colors work again; printed tables are teed into
+  the transcript so they do not vanish after the UI redraws. Display-only
+  commands (`/skills`, `/sessions`, …) stay in the transcript.
+- `sandwalk fork` / `sandwalk agent fork` now imports the forked chat into the
+  shared SQLite store so it appears in the Web UI Agents list immediately
+  (no separate `sandwalk sync` required).
+- Bottom-toolbar context usage no longer deadlocks on `_run_lock` (frozen prompt /
+  missing status bar).
+- Modal GPU sandboxes recreate when an existing named sandbox lacks CUDA/GPU
+  (avoids reusing a CPU `python:3.12-slim` image after switching to T4, etc.).
+- Local/OpenAI-compatible token usage extraction for Usage UI (stream usage +
+  metadata fallbacks).
 
 ## [0.0.1] - 2026-07-12
 

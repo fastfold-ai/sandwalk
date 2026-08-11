@@ -37,16 +37,16 @@ final class SettingsSectionTests: XCTestCase {
         XCTAssertEqual(SettingsSection.runtime.symbol, "cpu")
         XCTAssertEqual(SettingsSection.sandbox.title, "Sandbox")
         XCTAssertEqual(SettingsSection.sandbox.symbol, "shippingbox")
-        XCTAssertEqual(SettingsSection.prompts.title, "Prompts")
-        XCTAssertEqual(SettingsSection.prompts.symbol, "text.alignleft")
+        XCTAssertEqual(SettingsSection.context.title, "Context")
+        XCTAssertEqual(SettingsSection.context.symbol, "doc.text")
         XCTAssertEqual(SettingsSection.advanced.title, "Advanced")
         XCTAssertEqual(SettingsSection.advanced.symbol, "gearshape.2")
     }
 
-    func testPromptsDeepLink() {
+    func testContextDeepLink() {
         XCTAssertEqual(
-            SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/prompts")!),
-            .prompts
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/context")!),
+            .context
         )
     }
 
@@ -89,9 +89,21 @@ final class SettingsSectionTests: XCTestCase {
     func testFromDeepLinkReturnsNilForUnknownSection() {
         XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/unknown")!))
         XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://not-a-section")!))
+        // Desktop client routes must not parse as Settings sections.
+        XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://open/agents/abc")!))
+        XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://open/")!))
     }
 
     func testFromDeepLinkRejectsSectionHostWithExtraPath() {
         XCTAssertNil(SettingsSection.fromDeepLink(URL(string: "sandwalk://security/extra")!))
+    }
+
+    func testGeneralSettingsSection() {
+        XCTAssertEqual(SettingsSection.general.title, "Settings")
+        XCTAssertEqual(SettingsSection.general.symbol, "gearshape")
+        XCTAssertEqual(
+            SettingsSection.fromDeepLink(URL(string: "sandwalk://settings/general")!),
+            .general
+        )
     }
 }

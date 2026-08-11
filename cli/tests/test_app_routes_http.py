@@ -69,6 +69,8 @@ def test_storage_and_doctor_routes(tmp_path: Path, monkeypatch):
 
 def test_projects_http_crud(tmp_path: Path):
     app = create_app(store_path=tmp_path / "agent.db", allowed_hosts=["testserver"])
+    folder = tmp_path / "project-data"
+    folder.mkdir()
     with TestClient(app) as client:
         created = client.post(
             "/v1/projects",
@@ -76,11 +78,18 @@ def test_projects_http_crud(tmp_path: Path):
                 "name": "Parkinsons",
                 "description": "Target discovery",
                 "agentContext": "Focus on LRRK2",
+                "folderPath": str(folder),
+                "icon": "flask",
+                "color": "green",
                 "pinned": True,
             },
         )
         assert created.status_code == 201
-        project_id = created.json()["id"]
+        body = created.json()
+        project_id = body["id"]
+        assert body["folderPath"] == str(folder.resolve())
+        assert body["icon"] == "flask"
+        assert body["color"] == "green"
 
         listed = client.get("/v1/projects")
         assert listed.status_code == 200
@@ -88,13 +97,23 @@ def test_projects_http_crud(tmp_path: Path):
 
         fetched = client.get(f"/v1/projects/{project_id}")
         assert fetched.status_code == 200
+        assert fetched.json()["icon"] == "flask"
 
         patched = client.patch(
             f"/v1/projects/{project_id}",
-            json={"name": "Parkinsons v2", "pinned": False},
+            json={
+                "name": "Parkinsons v2",
+                "pinned": False,
+                "icon": "brain",
+                "color": "purple",
+                "clearFolderPath": True,
+            },
         )
         assert patched.status_code == 200
         assert patched.json()["name"] == "Parkinsons v2"
+        assert patched.json()["icon"] == "brain"
+        assert patched.json()["color"] == "purple"
+        assert patched.json()["folderPath"] is None
 
         deleted = client.delete(f"/v1/projects/{project_id}")
         assert deleted.status_code == 200

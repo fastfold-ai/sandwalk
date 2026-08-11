@@ -11,6 +11,13 @@ struct ServeRuntime {
     let executable: URL
     let argumentsPrefix: [String]
     let workingDirectory: URL?
+    /// Bin directory of the resolved venv/install, when known. GUI-launched
+    /// processes don't get an activated venv on PATH just because we're
+    /// running its interpreter directly — without this, pip-installed
+    /// console scripts (e.g. Modal's `modal` CLI) resolve via `import` but
+    /// not via `shutil.which`, even though the exact same venv installed
+    /// them right next to the running interpreter.
+    let venvBinDirectory: URL?
 
     enum ResolutionError: Error, LocalizedError {
         case notFound
@@ -27,7 +34,12 @@ struct ServeRuntime {
         if let override = env["SANDWALK_SERVE_BIN"], !override.isEmpty {
             let url = URL(fileURLWithPath: (override as NSString).expandingTildeInPath)
             if fm.isExecutableFile(atPath: url.path) {
-                return ServeRuntime(executable: url, argumentsPrefix: [], workingDirectory: nil)
+                return ServeRuntime(
+                    executable: url,
+                    argumentsPrefix: [],
+                    workingDirectory: nil,
+                    venvBinDirectory: url.deletingLastPathComponent()
+                )
             }
         }
 
@@ -39,24 +51,30 @@ struct ServeRuntime {
                     return ServeRuntime(
                         executable: venvBin,
                         argumentsPrefix: [],
-                        workingDirectory: root
+                        workingDirectory: root,
+                        venvBinDirectory: venvBin.deletingLastPathComponent()
                     )
                 }
             }
             if let uv = PathSupport.which("uv") {
+                // `uv run` resolves/activates its own venv PATH for the
+                // subprocess it spawns, so no extra venvBinDirectory needed.
                 return ServeRuntime(
                     executable: URL(fileURLWithPath: uv),
                     argumentsPrefix: ["run", "--directory", root.path, "sandwalk"],
-                    workingDirectory: root
+                    workingDirectory: root,
+                    venvBinDirectory: nil
                 )
             }
         }
 
         if let path = PathSupport.which("sandwalk") ?? PathSupport.which("fastfold") {
+            let url = URL(fileURLWithPath: path)
             return ServeRuntime(
-                executable: URL(fileURLWithPath: path),
+                executable: url,
                 argumentsPrefix: [],
-                workingDirectory: nil
+                workingDirectory: nil,
+                venvBinDirectory: url.deletingLastPathComponent()
             )
         }
 
@@ -64,14 +82,33 @@ struct ServeRuntime {
     }
 
     func makeServeArguments(host: String, port: Int) -> [String] {
-        argumentsPrefix + ["serve", "--host", host, "--port", String(port)]
+        var args = argumentsPrefix + ["serve", "--host", host, "--port", String(port)]
+        // Match CLI: non-loopback bind (Network → Allow Remote Connections).
+        let loopback = host == "127.0.0.1" || host == "localhost" || host == "::1"
+        if !loopback {
+            args.append("--public")
+        }
+        return args
     }
 
     func makeEnvironment(config: AppConfig) -> [String: String] {
         var env = PathSupport.processEnvironment(merging: [
             "SANDWALK_SUPERVISED": "menubar",
             "SANDWALK_SETTINGS_PATH": AuthSettingsStore.settingsFileURL().path,
+            "SANDWALK_DB_AUTO_HEAL": config.dbAutoHeal ? "1" : "0",
+            // Where the dashboard actually lives — bundled on the API port in
+            // production, or the separate Vite dev server otherwise. Lets the
+            // Slack App Home builder link to the right place (e.g. "Open
+            // Sandwalk", session links) instead of assuming the API port.
+            "SANDWALK_DASHBOARD_BASE_URL": config.dashboardURL.absoluteString,
         ])
+        if let venvBinDirectory {
+            let venvBin = venvBinDirectory.path
+            let current = env["PATH"] ?? ""
+            if !current.split(separator: ":").map(String.init).contains(venvBin) {
+                env["PATH"] = "\(venvBin):\(current)"
+            }
+        }
         // Pin to Application Support; ignore stale shell overrides (e.g. /tmp).
         env.removeValue(forKey: "SANDWALK_HOME")
         if config.usesBundledDashboard, let dist = config.uiDistURL {

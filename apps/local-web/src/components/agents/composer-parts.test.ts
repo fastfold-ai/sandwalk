@@ -15,6 +15,7 @@ import {
 describe('chip tokens', () => {
   it('builds file, skill, and mcp chip tokens', () => {
     expect(fileChipToken('src/a.ts')).toBe('⟦@:src/a.ts⟧')
+    expect(fileChipToken('evals', 'directory')).toBe('⟦@:evals/⟧')
     expect(skillChipToken('fold')).toBe('⟦/:fold⟧')
     expect(mcpChipToken('linear', 'Linear')).toBe(
       '⟦mcp:linear:Linear⟧'
@@ -71,6 +72,22 @@ describe('parseMessageParts', () => {
   it('returns content as text when there are no mentions', () => {
     expect(parseMessageParts('just text')).toEqual([
       { type: 'text', text: 'just text' }
+    ])
+  })
+
+  it('does not treat URL path segments as skill mentions', () => {
+    const text =
+      'read this site https://news.ycombinator.com/\ngive me top 5 topics'
+    expect(parseMessageParts(text)).toEqual([{ type: 'text', text }])
+  })
+
+  it('still matches a real skill next to a URL', () => {
+    expect(
+      parseMessageParts('use /fold on https://news.ycombinator.com/')
+    ).toEqual([
+      { type: 'text', text: 'use ' },
+      { type: 'skill', name: 'fold' },
+      { type: 'text', text: ' on https://news.ycombinator.com/' }
     ])
   })
 })

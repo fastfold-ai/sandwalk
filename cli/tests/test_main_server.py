@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
-from agent_server.main import run_server
+from agent_server.main import _signal_shutdown, run_server
 
 
 def test_run_server_loopback_starts_uvicorn(tmp_path: Path, monkeypatch):
@@ -21,7 +23,7 @@ def test_run_server_loopback_starts_uvicorn(tmp_path: Path, monkeypatch):
     cfg_dir.mkdir()
     monkeypatch.setattr("agent.config.CONFIG_DIR", cfg_dir)
     monkeypatch.setattr("agent.config.CONFIG_FILE", cfg_dir / "config.json")
-    monkeypatch.setattr("uvicorn.run", fake_run)
+    monkeypatch.setattr("agent_server.main._serve", fake_run)
     monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
 
     run_server(host="127.0.0.1", port=9999, api_key="local-secret")
@@ -42,7 +44,7 @@ def test_run_server_uds_mode(tmp_path: Path, monkeypatch):
     cfg_dir.mkdir()
     monkeypatch.setattr("agent.config.CONFIG_DIR", cfg_dir)
     monkeypatch.setattr("agent.config.CONFIG_FILE", cfg_dir / "config.json")
-    monkeypatch.setattr("uvicorn.run", fake_run)
+    monkeypatch.setattr("agent_server.main._serve", fake_run)
     monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
 
     run_server(host="127.0.0.1", uds=socket_path)
@@ -52,7 +54,7 @@ def test_run_server_uds_mode(tmp_path: Path, monkeypatch):
 
 
 def test_run_server_rejects_public_without_key(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("uvicorn.run", lambda *args, **kwargs: None)
+    monkeypatch.setattr("agent_server.main._serve", lambda *args, **kwargs: None)
     monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
 
     with pytest.raises(ValueError, match="api-key"):
@@ -67,3 +69,16 @@ def test_run_server_rejects_uds_with_public(tmp_path: Path):
 def test_run_server_rejects_non_loopback_without_public():
     with pytest.raises(ValueError, match="Non-loopback"):
         run_server(host="0.0.0.0")
+
+
+def test_signal_shutdown_closes_long_lived_streams():
+    event = threading.Event()
+    app = SimpleNamespace(state=SimpleNamespace(shutdown_event=event))
+
+    with patch(
+        "agent_server.store.event_notifier.EVENT_NOTIFIER.wake_all"
+    ) as wake_all:
+        _signal_shutdown(app)
+
+    assert event.is_set()
+    wake_all.assert_called_once_with()

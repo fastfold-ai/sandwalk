@@ -1,5 +1,7 @@
 """Core vs extra tool tiers for Dashboard defaults and specialist allowlists.
 
+Registry ``CORE_TOOL_NAMES`` stay always enabled (cannot be hidden via Tools UI).
+
 Runtime-only tools (``run_python``, ``search_tools``, deepagents builtins) are
 not in the registry and are always available — they are not listed here.
 """

@@ -132,6 +132,8 @@ class TestSessionBasics:
 
         monkeypatch.delenv("CT_DATA_DIR", raising=False)
         monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("SANDWALK_CONFIG_DIR", raising=False)
+        monkeypatch.delenv("SANDWALK_SKILLS_DIR", raising=False)
         cfg = Config(data={
             "data.base": "/tmp/sandwalk-data-test",
             "llm.openai_base_url": "http://127.0.0.1:11434/v1",
@@ -140,6 +142,18 @@ class TestSessionBasics:
         assert "CT_DATA_DIR" in applied
         assert os.environ.get("CT_DATA_DIR") == "/tmp/sandwalk-data-test"
         assert os.environ.get("OPENAI_BASE_URL") == "http://127.0.0.1:11434/v1"
+        assert "SANDWALK_CONFIG_DIR" in applied
+        assert "SANDWALK_SKILLS_DIR" in applied
+        assert os.environ.get("SANDWALK_SKILLS_DIR", "").endswith("/skills")
+
+    def test_listed_integration_env_vars_names_only(self, monkeypatch):
+        from agent.config import listed_integration_env_vars
+
+        monkeypatch.delenv("FASTFOLD_API_KEY", raising=False)
+        cfg = Config(data={"api.fastfold_cloud_key": "sk_ff_test_value"})
+        names = listed_integration_env_vars(cfg)
+        assert "FASTFOLD_API_KEY" in names
+        assert "sk_ff_test_value" not in names
 
 
 class TestToolHealth:

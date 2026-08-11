@@ -75,7 +75,41 @@ Notes:
 
 ---
 
-## 4. Linear
+## 4. Exa
+
+| Field | Value |
+|-------|-------|
+| **ID** | `exa` |
+| **MCP URL** | `https://mcp.exa.ai/mcp` |
+| **Transport** | Streamable HTTP |
+| **Docs** | https://docs.exa.ai/reference/exa-mcp |
+| **What it does** | Web search and page fetch for science/research (papers, patents, molecules) |
+
+Default tools: `web_search_exa`, `web_fetch_exa`. Optional tools (append
+`?tools=…` on the URL): `web_search_advanced_exa`, `agent_run`.
+
+### Auth
+
+| Mode | Details |
+|------|---------|
+| **OAuth** | Preferred — browser Connect from Dashboard → MCP or `sandwalk mcp connect exa` |
+| **API key** | Header `x-api-key: <EXA_API_KEY>` (dashboard.exa.ai) |
+
+### Config sketch
+
+```json
+{
+  "mcpServers": {
+    "exa": {
+      "url": "https://mcp.exa.ai/mcp"
+    }
+  }
+}
+```
+
+---
+
+## 5. Linear
 
 | Field | Value |
 |-------|-------|
@@ -101,4 +135,5 @@ Notes:
 | tamarind | `api_key` (`x-api-key`, `TAMARIND_API_KEY`) |
 | latch | `oauth` |
 | neurosnap | `api_key` (`Authorization: Bearer`, `NEUROSNAP_API_KEY`) |
+| exa | `api_key_or_oauth` (`x-api-key`, `EXA_API_KEY`) |
 | linear | `api_key_or_oauth` (`Authorization: Bearer`, `LINEAR_API_KEY`) |

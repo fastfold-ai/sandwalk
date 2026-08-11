@@ -50,15 +50,67 @@ class TestClassifyLlmError:
         assert title == "Rate limited"
         assert "429" in body
 
+    def test_openrouter_rate_limit_surfaces_upstream_raw(self):
+        class RateLimitError(Exception):
+            def __init__(self, message: str, *, body=None, status_code=429):
+                super().__init__(message)
+                self.body = body
+                self.status_code = status_code
+
+        RateLimitError.__module__ = "openai"
+        err = RateLimitError(
+            "Error code: 429 - {'error': {'message': 'Provider returned error'}}",
+            body={
+                "error": {
+                    "message": "Provider returned error",
+                    "code": 429,
+                    "metadata": {
+                        "raw": (
+                            "together.ai: model is currently rate limited, "
+                            "please try again later"
+                        ),
+                        "provider_name": "Together",
+                    },
+                }
+            },
+        )
+        title, body = _classify_llm_error(err)
+        assert title == "Rate limited"
+        first = body.splitlines()[0]
+        assert "together.ai" in first.lower()
+        assert "rate limited" in first.lower()
+        assert "Provider returned error" not in first
+
     def test_connection(self):
         title, body = _classify_llm_error(ConnectionError("connection error"))
         assert title == "Connection problem"
+        assert body.splitlines()[0] == "connection error"
         assert "network" in body.lower()
 
     def test_connection_refused_text(self):
         title, body = _classify_llm_error(_Err("dial tcp: connection refused"))
         assert title == "Connection problem"
+        assert "connection refused" in body.splitlines()[0].lower()
         assert "could not reach" in body.lower()
+
+    def test_stream_chunk_timeout_keeps_provider_detail(self):
+        class StreamChunkTimeoutError(Exception):
+            pass
+
+        StreamChunkTimeoutError.__module__ = "langchain_openai.chat_models._client_utils"
+        err = StreamChunkTimeoutError(
+            "No streaming chunk received for 120.0s (model=grok-4.5, "
+            "chunks_received=50). The connection may be alive at the TCP layer "
+            "but is not producing content. Tune or disable via the "
+            "`stream_chunk_timeout` constructor kwarg."
+        )
+        title, body = _classify_llm_error(err)
+        assert title == "Model stream stalled"
+        first = body.splitlines()[0]
+        assert "No streaming chunk received for 120.0s" in first
+        assert "grok-4.5" in first
+        assert "chunks_received=50" in first
+        assert "Tune or disable" not in first
 
     def test_model_or_endpoint_not_found(self):
         title, body = _classify_llm_error(
@@ -72,6 +124,18 @@ class TestClassifyLlmError:
         assert title == "Model provider request failed"
         assert "something odd happened" in body
         assert "llm.model" in body
+
+    def test_openrouter_credits_exhausted(self):
+        title, body = _classify_llm_error(
+            _Err(
+                "This request requires more credits, or fewer max_tokens. "
+                "You requested up to 65536 tokens, but can only afford 19464. "
+                "To increase, visit https://openrouter.ai/settings/credits"
+            )
+        )
+        assert title == "Provider credits / quota"
+        assert "credits" in body.lower()
+        assert "openrouter" in body.lower() or "max output" in body.lower()
 
     def test_context_length_exceeded(self):
         title, body = _classify_llm_error(
@@ -239,3 +303,34 @@ class TestTaskNotificationEdge:
         r._notify_terminal_task_completion("task1", "completed")
         write.assert_not_called()
         flush.assert_not_called()
+
+
+class TestPrintFriendlyError:
+    def test_transcript_gets_plain_text_not_panel(self):
+        from ui.terminal.transcript.store import TranscriptStore
+
+        store = TranscriptStore()
+        console = MagicMock()
+        session = SimpleNamespace(console=console, transcript=store)
+        r = AgentRunner(session=session, trajectory=None, headless=False)
+        body = (
+            "moonshotai/kimi-k3 is rate-limited upstream.\n"
+            "The model provider is rate-limiting or overloaded (429).\n"
+            "During task with name 'model' and id 'abc'\n"
+            "Wait a few seconds and try again."
+        )
+        r._print_friendly_error("Rate limited", body)
+        texts = [e.text for e in store.entries if getattr(e, "text", None)]
+        joined = "\n".join(texts)
+        assert "Rate limited" in joined
+        assert "429" in joined
+        assert "During task with name" not in joined
+        assert any(getattr(e, "kind", None) == "error" for e in store.entries)
+        console.print.assert_not_called()
+
+    def test_no_transcript_uses_panel(self):
+        console = MagicMock()
+        session = SimpleNamespace(console=console, transcript=None)
+        r = AgentRunner(session=session, trajectory=None, headless=False)
+        r._print_friendly_error("Rate limited", "try again")
+        assert console.print.called

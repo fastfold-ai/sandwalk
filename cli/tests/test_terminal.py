@@ -1,4 +1,4 @@
-"""Tests for contextual ghost-text suggestions and terminal features."""
+"""Tests for interactive terminal features."""
 
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
@@ -22,16 +22,28 @@ from ui.terminal import (  # type: ignore[import-untyped]
 )
 
 
+def _fake_transcript_session(prompts):
+    """Drive ``run_transcript_session`` by feeding lines into ``on_submit``."""
+
+    def _run(terminal, history=None, on_submit=None):
+        for prompt in prompts:
+            if on_submit is None or not on_submit(prompt):
+                return
+
+    return _run
+
 
 class TestSlashCommands:
     """Verify all expected slash commands are registered."""
 
     def test_core_commands_registered(self):
-        expected = ["/help", "/tools", "/model", "/settings", "/usage", "/copy",
+        expected = ["/help", "/tools", "/models", "/settings", "/usage", "/copy",
                     "/export", "/compact", "/new", "/sessions", "/resume", "/upgrade",
-                    "/clear", "/exit", "/config", "/keys", "/doctor"]
+                    "/exit", "/config", "/keys", "/doctor"]
         for cmd in expected:
             assert cmd in SLASH_COMMANDS, f"{cmd} not in SLASH_COMMANDS"
+        assert "/model" not in SLASH_COMMANDS
+        assert "/clear" not in SLASH_COMMANDS
 
     def test_slash_commands_have_descriptions(self):
         for cmd, desc in SLASH_COMMANDS.items():
@@ -63,6 +75,8 @@ class TestTerminalMethods:
             t._run_lock = MagicMock()
             t._run_lock.__enter__ = MagicMock(return_value=None)
             t._run_lock.__exit__ = MagicMock(return_value=False)
+            t._attach_count = 0
+            t._attach_map = {}
             return t
 
     def test_model_display_name(self, terminal):
@@ -70,7 +84,9 @@ class TestTerminalMethods:
         assert terminal._model_display_name("claude-opus-4-6") == "Opus 4.6"
         assert terminal._model_display_name("gpt-5.5") == "GPT-5.5"
         assert terminal._model_display_name("gpt-5.4-mini") == "GPT-5.4 Mini"
-        assert terminal._model_display_name("unknown-model") == "unknown-model"
+        # Unmapped ids fall through to the discovered-label formatter so gateway
+        # models still read as names rather than raw slugs.
+        assert terminal._model_display_name("unknown-model") == "Unknown Model"
 
     def test_current_provider_status_openai_compatible_when_custom_endpoint_active(self, terminal):
         def _cfg_get(key, default=None):
@@ -117,8 +133,42 @@ class TestTerminalMethods:
         terminal._worker_thread = None
         terminal._queued_queries = []
         toolbar = terminal._bottom_toolbar()
-        assert "gemma4:e2b-mlx" in str(toolbar)
+        # The toolbar renders the display label, not the raw id.
+        expected_model = terminal._model_display_name("gemma4:e2b-mlx")
+        assert expected_model in str(toolbar)
         assert "Unsloth" in str(toolbar)
+        # Backend sits directly beside the model, not in a separate segment.
+        assert f"{expected_model} · Unsloth" in str(toolbar)
+
+    def test_compose_provider_label_omlx_not_qwen_cloud_for_local_qwen_id(self, terminal):
+        """Local oMLX Qwen* weights must not surface as Qwen Cloud in the compose bar."""
+        def _cfg_get(key, default=None):
+            values = {
+                "llm.provider": "openai",
+                "llm.openai_base_url": "http://localhost:8000/v1",
+                "llm.openai_compatible_backend": "omlx",
+                "agent.plan_preview": False,
+            }
+            return values.get(key, default)
+
+        terminal.session.config.get.side_effect = _cfg_get
+        terminal.session.config.get_openai_profile.return_value = {
+            "id": "omlx",
+            "label": "oMLX",
+            "backend": "omlx",
+            "base_url": "http://localhost:8000/v1",
+            "api_key": "",
+        }
+        terminal.session.current_model = "Qwen3.6-35B-A3B-OptiQ-4bit"
+        terminal.session.verbose = False
+        terminal._show_interrupt_hint = False
+        terminal._worker_thread = None
+        terminal._queued_queries = []
+        assert terminal._compose_provider_label() == "oMLX"
+        # Prefer the compose meta line (Agent · model provider · sandbox).
+        compose = str(terminal._compose_meta_toolbar())
+        assert "Qwen Cloud" not in compose
+        assert "oMLX" in compose
 
     def test_bottom_toolbar_shows_sandbox_next_to_specialist(self, terminal):
         def _cfg_get(key, default=None):
@@ -145,6 +195,16 @@ class TestTerminalMethods:
         toolbar = str(terminal._bottom_toolbar())
         assert "Modal Sandbox" in toolbar
         assert "Protein Designer" in toolbar
+        assert "#7fee64" in toolbar
+
+        terminal.session.config.get.side_effect = lambda key, default=None: {
+            "llm.provider": "openai",
+            "llm.openai_base_url": "http://localhost:8888/v1",
+            "agent.plan_preview": True,
+        }.get(key, default)
+        toolbar = str(terminal._bottom_toolbar())
+        assert "plan mode" in toolbar
+        assert "#9a7429" in toolbar
 
     def test_switch_model_header_shows_compatible_backend_next_to_model(self, terminal):
         def _cfg_get(key, default=None):
@@ -164,7 +224,8 @@ class TestTerminalMethods:
 
         rendered = "\n".join(str(call.args[0]) for call in terminal.console.print.call_args_list if call.args)
         assert "Current model:" in rendered
-        assert "gemma4:e2b-mlx (Ollama)" in rendered
+        assert "gemma4:e2b-mlx" in rendered
+        assert "(Ollama)" in rendered
         assert "Provider:" in rendered
         assert "OpenAI-compatible custom endpoint (Ollama)" in rendered
 
@@ -359,7 +420,7 @@ class TestTerminalMethods:
         terminal.session.config.get.side_effect = _cfg_get
         terminal.session.config.get_openai_profile.return_value = {
             "id": "ollama_local",
-            "label": "Ollama Local",
+            "label": "Ollama",
             "backend": "ollama",
             "base_url": "http://localhost:11434/v1",
         }
@@ -378,7 +439,7 @@ class TestTerminalMethods:
                     "ollama_local": {
                         "backend": "ollama",
                         "base_url": "http://localhost:11434/v1",
-                        "label": "Ollama Local",
+                        "label": "Ollama",
                     },
                 },
             }
@@ -498,24 +559,24 @@ class TestTerminalMethods:
         terminal.console.print.assert_called_once()
         assert "blocked" in str(terminal.console.print.call_args).lower()
 
-    def test_advance_suggestion(self, terminal):
-        assert terminal._suggestion_idx == 0
+    def test_ghost_suggestion_helpers_are_noop(self, terminal):
+        """Ghost-text placeholders were removed; helpers stay as no-ops for callers."""
+        before = list(terminal._suggestions)
+        idx = terminal._suggestion_idx
         terminal._advance_suggestion()
-        assert terminal._suggestion_idx == 1
-
-    def test_update_suggestions_with_llm_result(self, terminal):
-        """_update_suggestions extracts LLM suggestions from result.summary."""
         result = MagicMock()
         result.summary = (
             "## Suggested Next Steps\n"
             "- **\"Check co-essential partners of BRCA1\"**\n"
-            "- **\"Run pathway enrichment on BRCA1 signature\"**\n"
         )
         terminal._update_suggestions("analyze BRCA1", result=result)
-        assert len(terminal._suggestions) == 2
-        assert any("BRCA1" in s for s in terminal._suggestions)
+        assert terminal._suggestion_idx == idx
+        assert terminal._suggestions == before
+        assert terminal._current_placeholder() is None
 
     def test_compact_context_calls_llm_chat_with_messages(self, terminal):
+        import time
+
         from agent.trajectory import Trajectory, Turn
 
         terminal.agent = MagicMock()
@@ -530,8 +591,14 @@ class TestTerminalMethods:
         mock_llm = MagicMock()
         mock_llm.chat.return_value = MagicMock(content="session summary text")
         terminal.session.get_llm.return_value = mock_llm
+        terminal.session.config = MagicMock()
+        terminal.session.config.get.return_value = "benzene_breathing"
 
         terminal._compact_context("focus on actionable outcomes")
+        deadline = time.time() + 2.0
+        while getattr(terminal, "_compact_running", False) and time.time() < deadline:
+            time.sleep(0.01)
+        assert not getattr(terminal, "_compact_running", False)
 
         kwargs = mock_llm.chat.call_args.kwargs
         assert kwargs["system"].startswith("You are a research session summarizer")
@@ -648,6 +715,61 @@ class TestTerminalMethods:
         mock_resume.assert_called_once()
         assert mock_resume.call_args.args[1] == "abc12345"
 
+    def test_resume_session_clears_then_renders_history(self, terminal):
+        from ui.terminal.transcript.store import TranscriptStore
+
+        sessions = [{"session_id": "abc12345"}]
+        terminal.transcript = TranscriptStore()
+        terminal.transcript.append_text("old noisy turn", kind="user")
+        terminal._seed_transcript_banner = MagicMock()
+        terminal._restore_usage_from_trajectory = MagicMock()
+        terminal._render_resumed_history = MagicMock()
+        terminal._last_response = "stale"
+
+        resumed = MagicMock()
+        turn = MagicMock()
+        turn.query = "what's this?"
+        resumed.trajectory.turns = [turn, MagicMock()]
+        resumed.trajectory.title = "Full resume"
+        resumed.trajectory.session_id = "abc12345"
+        resumed.trajectory.save = MagicMock()
+        with patch("agent.trajectory.Trajectory.list_sessions", return_value=sessions), patch(
+            "agent.loop.AgentLoop.resume", return_value=resumed
+        ):
+            terminal._resume_session("abc12345")
+
+        terminal._seed_transcript_banner.assert_called_once()
+        terminal._render_resumed_history.assert_called_once()
+        assert terminal._last_response is None
+        assert terminal.agent is resumed
+        # With a transcript attached, the resume line is appended there rather
+        # than printed to the console.
+        resume_lines = " ".join(
+            str(getattr(entry, "text", "") or "")
+            for entry in terminal.transcript.entries
+        )
+        assert "Resumed" in resume_lines
+        assert "Full resume" in resume_lines
+        assert "2 turns" in resume_lines
+        # The prior session's scrollback must not survive the resume.
+        assert "old noisy turn" not in resume_lines
+
+    def test_session_display_title_heals_instruction_echo(self, terminal):
+        turn = MagicMock()
+        turn.query = "what's this ?[Image 1]"
+        terminal.agent = MagicMock()
+        terminal.agent.trajectory.title = (
+            "The user wants me to generate a short, concise title (max 4 words)"
+        )
+        terminal.agent.trajectory.turns = [turn]
+        terminal.agent.trajectory.save = MagicMock()
+
+        title = terminal._session_display_title()
+        assert "generate a short" not in title.lower()
+        assert "what's this" in title.lower()
+        assert terminal.agent.trajectory.title == title
+        terminal.agent.trajectory.save.assert_called_once()
+
     def test_delete_session_accepts_prefix(self, terminal):
         sessions = [
             {"session_id": "abc12345"},
@@ -689,15 +811,18 @@ class TestTerminalMethods:
         terminal._session_sdk_models = {"gpt-5.5"}
         terminal._session_sdk_turn_rows = [{"turn": 1}]
 
+        from ui.terminal.transcript.store import TranscriptStore
+
+        terminal.transcript = TranscriptStore()
+        terminal.transcript.append_text("old", kind="user")
+        terminal._seed_transcript_banner = MagicMock()
         new_loop = MagicMock()
         new_loop.trajectory.session_id = "new12345"
-        with patch("agent.loop.AgentLoop", return_value=new_loop), patch(
-            "cli.print_banner"
-        ) as mock_print_banner:
+        with patch("agent.loop.AgentLoop", return_value=new_loop):
             terminal._new_session()
 
-        terminal.console.clear.assert_called_once()
-        mock_print_banner.assert_called_once()
+        # Banner is re-seeded into the owned transcript (not Rich scrollback).
+        terminal._seed_transcript_banner.assert_called_once()
         assert terminal.agent is new_loop
         assert terminal._last_response is None
         assert terminal._session_sdk_calls == 0
@@ -715,8 +840,11 @@ class TestTerminalMethods:
         terminal.agent = MagicMock()
         terminal.agent.trajectory.session_id = "d0b0571d"
         terminal.agent.trajectory.turns = [MagicMock()]
+        terminal._console_print_original = MagicMock()
         terminal._print_exit_with_resume_hint()
-        printed = " ".join(str(c) for c in terminal.console.print.call_args_list)
+        printed = " ".join(
+            str(c) for c in terminal._console_print_original.call_args_list
+        )
         assert "Resume this session with:" in printed
         assert "sandwalk --resume d0b0571d" in printed
 
@@ -724,8 +852,11 @@ class TestTerminalMethods:
         terminal.agent = MagicMock()
         terminal.agent.trajectory.session_id = "d0b0571d"
         terminal.agent.trajectory.turns = []
+        terminal._console_print_original = MagicMock()
         terminal._print_exit_with_resume_hint()
-        printed = " ".join(str(c) for c in terminal.console.print.call_args_list)
+        printed = " ".join(
+            str(c) for c in terminal._console_print_original.call_args_list
+        )
         assert "Goodbye!" in printed
         assert "Resume this session with:" not in printed
 
@@ -737,6 +868,7 @@ class TestTerminalMethods:
         printed = " ".join(str(c) for c in terminal.console.print.call_args_list)
         assert "Session History" in printed
         assert "what can you do?" in printed
+        assert "❯" not in printed
         markdown_calls = [
             c.args[0]
             for c in terminal.console.print.call_args_list
@@ -744,6 +876,30 @@ class TestTerminalMethods:
         ]
         assert markdown_calls
         assert markdown_calls[0].markup == "I can help with target discovery."
+
+    def test_render_resumed_history_uses_compose_user_box(self, terminal):
+        from ui.terminal.transcript.render import entry_rows
+        from ui.terminal.transcript.store import TranscriptStore
+
+        turn = MagicMock()
+        turn.query = "@uploads/clip.png what's this?"
+        turn.answer = "A capybara."
+        terminal.transcript = TranscriptStore()
+        terminal._render_resumed_history(80, [turn])
+
+        user_entries = [
+            e for e in terminal.transcript.entries if getattr(e, "kind", None) == "user"
+        ]
+        assert len(user_entries) == 1
+        rows = entry_rows(user_entries[0], width=80)
+        joined = "".join(t for _e, _i, frags in rows for _s, t in frags)
+        assert "what's this?" in joined
+        assert "[Image 1]" in joined
+        assert "❯" not in joined
+        assert any("┃" in t for _e, _i, frags in rows for _s, t in frags)
+        assert any(
+            getattr(e, "kind", None) == "assistant" for e in terminal.transcript.entries
+        )
 
     def test_render_resumed_history_prefers_trace_replay(self, terminal):
         turn = MagicMock()
@@ -825,35 +981,11 @@ class TestTerminalMethods:
         mock_exec.assert_called_once_with(console_obj=terminal.console, cfg=terminal.session.config)
 
     def test_run_routes_commands_and_queries(self, terminal):
+        from ui.terminal.transcript.store import TranscriptStore
+
         terminal.console.width = 80
-        terminal._prompt_session = MagicMock()
-        terminal._prompt_session.prompt.side_effect = [
-            "/ help",
-            "/interrupt --force",
-            "/skills-add owner/repo@skills/x",
-            "/skills-find kinase",
-            "/skills-remove x",
-            "/skills",
-            "/model",
-            "/settings",
-            "/plan",
-            "/usage",
-            "/tasks refresh",
-            "/upgrade",
-            "/copy",
-            "/export out.md",
-            "/notebook out.ipynb",
-            "/compact concise summary",
-            "/new",
-            "/sessions",
-            "/resume abc",
-            "/agents 2 profile crbn",
-            "/case-study list",
-            "!echo hello",
-            "continue",
-            "find degraders",
-            "/quit",
-        ]
+        terminal.transcript = TranscriptStore()
+        terminal.history_file = MagicMock()
         terminal._current_placeholder = MagicMock(return_value="placeholder")
         terminal._has_active_query = MagicMock(return_value=False)
         terminal._advance_suggestion = MagicMock()
@@ -885,8 +1017,38 @@ class TestTerminalMethods:
         terminal.agent._last_plan = None
         terminal.session.config.get.side_effect = lambda key, default=None: default
 
+        prompts = [
+            "/ help",
+            "/interrupt --force",
+            "/skills-add owner/repo@skills/x",
+            "/skills-find kinase",
+            "/skills-remove x",
+            "/skills",
+            "/models",
+            "/settings",
+            "/plan",
+            "/usage",
+            "/tasks refresh",
+            "/upgrade",
+            "/copy",
+            "/export out.md",
+            "/notebook out.ipynb",
+            "/compact concise summary",
+            "/new",
+            "/sessions",
+            "/resume abc",
+            "/agents 2 profile crbn",
+            "/case-study list",
+            "!echo hello",
+            "continue",
+            "find degraders",
+            "/quit",
+        ]
         fake_loop = MagicMock()
-        with patch("ui.terminal.patch_stdout"), patch("agent.loop.AgentLoop", return_value=fake_loop):
+        with patch(
+            "ui.terminal.transcript.app.run_transcript_session",
+            side_effect=_fake_transcript_session(prompts),
+        ), patch("agent.loop.AgentLoop", return_value=fake_loop):
             terminal.run(initial_context={"source": "test"})
 
         terminal._show_help.assert_called_once()
@@ -915,9 +1077,11 @@ class TestTerminalMethods:
         terminal._print_exit_with_resume_hint.assert_called_once()
 
     def test_run_blocks_settings_commands_when_busy(self, terminal):
+        from ui.terminal.transcript.store import TranscriptStore
+
         terminal.console.width = 80
-        terminal._prompt_session = MagicMock()
-        terminal._prompt_session.prompt.side_effect = ["/model", "/quit"]
+        terminal.transcript = TranscriptStore()
+        terminal.history_file = MagicMock()
         terminal._current_placeholder = MagicMock(return_value="placeholder")
         terminal._has_active_query = MagicMock(return_value=True)
         terminal._advance_suggestion = MagicMock()
@@ -927,7 +1091,10 @@ class TestTerminalMethods:
         terminal.session.config.get.side_effect = lambda key, default=None: default
 
         fake_loop = MagicMock()
-        with patch("ui.terminal.patch_stdout"), patch("agent.loop.AgentLoop", return_value=fake_loop):
+        with patch(
+            "ui.terminal.transcript.app.run_transcript_session",
+            side_effect=_fake_transcript_session(["/models", "/quit"]),
+        ), patch("agent.loop.AgentLoop", return_value=fake_loop):
             terminal.run()
 
         terminal._switch_model.assert_not_called()
@@ -974,9 +1141,11 @@ class TestTerminalMethods:
         terminal._ensure_boltz_cli_ready.assert_not_called()
 
     def test_run_resume_last_renders_history(self, terminal):
+        from ui.terminal.transcript.store import TranscriptStore
+
         terminal.console.width = 80
-        terminal._prompt_session = MagicMock()
-        terminal._prompt_session.prompt.side_effect = ["/quit"]
+        terminal.transcript = TranscriptStore()
+        terminal.history_file = MagicMock()
         terminal._current_placeholder = MagicMock(return_value="placeholder")
         terminal._has_active_query = MagicMock(return_value=False)
         terminal._print_exit_with_resume_hint = MagicMock()
@@ -988,7 +1157,10 @@ class TestTerminalMethods:
         resumed.trajectory.turns = [MagicMock()]
         resumed.trajectory.title = "Session title"
         resumed.trajectory.session_id = "abc12345"
-        with patch("ui.terminal.patch_stdout"), patch("agent.loop.AgentLoop.resume_latest", return_value=resumed):
+        with patch(
+            "ui.terminal.transcript.app.run_transcript_session",
+            side_effect=_fake_transcript_session(["/quit"]),
+        ), patch("agent.loop.AgentLoop.resume_latest", return_value=resumed):
             terminal.run(resume_id="last")
 
         terminal._restore_usage_from_trajectory.assert_called_once()
@@ -1006,7 +1178,7 @@ class TestTerminalMethods:
         terminal.agent = MagicMock()
         terminal.agent.run.side_effect = [ClarificationNeeded(clar), result]
 
-        output = terminal._run_with_clarification("study @depmap signals", {"foo": "bar"})
+        output = terminal._run_with_clarification("study #depmap signals", {"foo": "bar"})
 
         assert output is result
         assert terminal.agent.run.call_count == 2
@@ -1028,23 +1200,27 @@ class TestTerminalMethods:
 
 
 class TestExtractMentions:
-    """Tests for extract_mentions() — parsing @ tokens from query text."""
+    """Tests for extract_mentions() — parsing # tokens from query text."""
 
     def test_tool_mention(self):
-        query, tools, datasets, workflows = extract_mentions("analyze CRBN with @target.coessentiality")
+        query, tools, datasets, workflows = extract_mentions(
+            "analyze CRBN with #target.coessentiality"
+        )
         assert "target.coessentiality" in tools
         assert datasets == []
         assert workflows == []
-        assert "@" not in query
+        assert "#" not in query
 
     def test_dataset_mention(self):
-        query, tools, datasets, workflows = extract_mentions("check sensitivity in @depmap @prism")
+        query, tools, datasets, workflows = extract_mentions(
+            "check sensitivity in #depmap #prism"
+        )
         assert set(datasets) == {"depmap", "prism"}
-        assert "@" not in query
+        assert "#" not in query
 
     def test_mixed_mentions(self):
         query, tools, datasets, workflows = extract_mentions(
-            "@depmap find @target.coessentiality for CRBN"
+            "#depmap find #target.coessentiality for CRBN"
         )
         assert "target.coessentiality" in tools
         assert "depmap" in datasets
@@ -1058,7 +1234,9 @@ class TestExtractMentions:
         assert workflows == []
 
     def test_workflow_mention(self):
-        query, tools, datasets, workflows = extract_mentions("run @target_validation on KRAS")
+        query, tools, datasets, workflows = extract_mentions(
+            "run #target_validation on KRAS"
+        )
         assert "target_validation" in workflows
         assert tools == []
         assert datasets == []
@@ -1066,7 +1244,7 @@ class TestExtractMentions:
 
     def test_mixed_with_workflow(self):
         query, tools, datasets, workflows = extract_mentions(
-            "@depmap @target_validation check CRBN"
+            "#depmap #target_validation check CRBN"
         )
         assert "depmap" in datasets
         assert "target_validation" in workflows
@@ -1103,7 +1281,7 @@ class TestBuildMentionContext:
 
 
 class TestMentionCompleterTabs:
-    """Tests for MentionCompleter tabbed filtering."""
+    """Tests for MentionCompleter tabbed filtering (#)."""
 
     @pytest.fixture
     def candidates(self):
@@ -1112,7 +1290,6 @@ class TestMentionCompleterTabs:
             ("expression.pathway_enrichment", "expression", "Pathway enrichment analysis", "tool"),
             ("depmap", "dataset", "DepMap CRISPR/model data", "dataset"),
             ("prism", "dataset", "PRISM drug sensitivity", "dataset"),
-            ("CRISPRGeneEffect.csv", "file", "depmap/CRISPRGeneEffect.csv", "file"),
             ("target_validation", "workflow", "Validate a potential drug target (5 steps)", "workflow"),
         ]
 
@@ -1126,41 +1303,35 @@ class TestMentionCompleterTabs:
 
     def test_all_tab_shows_everything(self, completer):
         completer._active_tab = 0
-        completions = self._get_completions(completer, "@")
-        assert len(completions) == 6
+        completions = self._get_completions(completer, "#")
+        assert len(completions) == 5
 
     def test_tools_tab_filters(self, completer):
         completer._active_tab = 1
-        completions = self._get_completions(completer, "@")
+        completions = self._get_completions(completer, "#")
         assert len(completions) == 2
         assert all("tool" in c.style for c in completions)
 
     def test_db_tab_filters(self, completer):
         completer._active_tab = 2
-        completions = self._get_completions(completer, "@")
+        completions = self._get_completions(completer, "#")
         assert len(completions) == 2
         names = {c.text for c in completions}
-        assert names == {"@depmap", "@prism"}
-
-    def test_files_tab_filters(self, completer):
-        completer._active_tab = 3
-        completions = self._get_completions(completer, "@")
-        assert len(completions) == 1
-        assert completions[0].text == "@CRISPRGeneEffect.csv"
+        assert names == {"#depmap", "#prism"}
 
     def test_flows_tab_filters(self, completer):
-        completer._active_tab = 4  # Flows
-        completions = self._get_completions(completer, "@")
+        completer._active_tab = 3  # Flows
+        completions = self._get_completions(completer, "#")
         assert len(completions) == 1
-        assert completions[0].text == "@target_validation"
+        assert completions[0].text == "#target_validation"
         assert "workflow" in completions[0].style
 
     def test_substring_match(self, completer):
-        completions = self._get_completions(completer, "@coess")
+        completions = self._get_completions(completer, "#coess")
         assert len(completions) == 1
-        assert completions[0].text == "@target.coessentiality"
+        assert completions[0].text == "#target.coessentiality"
 
-    def test_no_at_returns_nothing(self, completer):
+    def test_no_hash_returns_nothing(self, completer):
         completions = self._get_completions(completer, "hello world")
         assert len(completions) == 0
 
@@ -1181,8 +1352,8 @@ class TestMergedCompleterDispatch:
         completions = self._get_completions(merged, "/he")
         assert any(c.text == "/help" for c in completions)
 
-    def test_at_routes_to_mention(self, merged):
-        completions = self._get_completions(merged, "query @dep")
+    def test_hash_routes_to_mention(self, merged):
+        completions = self._get_completions(merged, "query #dep")
         assert any("depmap" in c.display_text for c in completions)
 
     def test_no_trigger_yields_nothing(self, merged):
@@ -1206,16 +1377,23 @@ class TestSkillsUpgradeTerminalPaths:
         terminal._advance_suggestion = MagicMock()
         terminal._request_interrupt = MagicMock(return_value=True)
         terminal._print_exit_with_resume_hint = MagicMock()
+        terminal._attach_count = 0
+        terminal._attach_map = {}
         return terminal
 
     def test_run_routes_skills_upgrade_command(self):
+        from ui.terminal.transcript.store import TranscriptStore
+
         terminal = self._make_terminal()
-        terminal._prompt_session = MagicMock()
-        terminal._prompt_session.prompt.side_effect = ["/skills-upgrade", "/quit"]
+        terminal.transcript = TranscriptStore()
+        terminal.history_file = MagicMock()
         terminal._upgrade_skills = MagicMock()
 
         fake_loop = MagicMock()
-        with patch("ui.terminal.patch_stdout"), patch(
+        with patch(
+            "ui.terminal.transcript.app.run_transcript_session",
+            side_effect=_fake_transcript_session(["/skills-upgrade", "/quit"]),
+        ), patch(
             "agent.loop.AgentLoop", return_value=fake_loop
         ):
             terminal.run()

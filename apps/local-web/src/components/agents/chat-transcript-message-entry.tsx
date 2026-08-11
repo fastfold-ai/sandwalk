@@ -1,0 +1,239 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type {
+  AgentMessage,
+  AgentSession,
+  AgentSkill,
+  McpServer,
+  WorkspaceFile
+} from '@sandwalk/agent-ui-core'
+import {
+  Check,
+  Copy,
+  Download,
+  MoreHorizontal
+} from 'lucide-react'
+import type { Dispatch, SetStateAction } from 'react'
+
+import { ConnectorMessageCard } from '@/components/agents/ConnectorMessageCard'
+import { MarkdownContent } from '@/components/agents/MarkdownContent'
+import { type TranscriptEntry } from '@/components/agents/transcript'
+import { UserMessageContent } from '@/components/agents/UserMessageContent'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover'
+import { copyText } from '@/lib/clipboard'
+import {
+  downloadMarkdown,
+  formatMessagePopoverDate,
+  type RunTokenUsage
+} from '@/lib/sessions'
+import { cn } from '@/lib/utils'
+
+function formatSeconds(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return null
+  if (value < 1) return `${Math.round(value * 1000)}ms`
+  return `${value.toFixed(2)}s`
+}
+
+function formatTokPerSec(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value) || value <= 0) return null
+  return `${value.toFixed(1)} tok/s`
+}
+
+export function ChatTranscriptMessageEntry({
+  entry,
+  runActive,
+  runIdByMessageId,
+  usageByRunId,
+  messages,
+  copiedMessageId,
+  setCopiedMessageId,
+  session,
+  onOpenFile,
+  client,
+  sessionId,
+  skills = [],
+  mcpServers = [],
+  workspaceFiles = []
+}: {
+  entry: Extract<TranscriptEntry, { kind: 'message' }>
+  runActive: boolean
+  runIdByMessageId: Record<string, string>
+  usageByRunId: Record<string, RunTokenUsage>
+  messages: AgentMessage[]
+  copiedMessageId: string | null
+  setCopiedMessageId: Dispatch<SetStateAction<string | null>>
+  session: AgentSession | null | undefined
+  onOpenFile: (path: string) => void
+  client?: LocalAgentClient | null
+  sessionId?: string | null
+  skills?: AgentSkill[]
+  mcpServers?: McpServer[]
+  workspaceFiles?: WorkspaceFile[]
+}) {
+  const message = entry.message
+  const isUser = message.role === 'user'
+  const isAssistant = message.role === 'assistant'
+  const messagePopoverDate = formatMessagePopoverDate(message.createdAt)
+  const messageRunId = runIdByMessageId[message.id] || null
+  const messageUsage = (messageRunId && usageByRunId[messageRunId]) || null
+  const hideActionsWhileStreaming =
+    runActive && isAssistant && message.id === messages.at(-1)?.id
+
+  return (
+    <div
+      className={cn(
+        'fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] duration-150',
+        isUser ? 'flex justify-end px-2' : ''
+      )}
+    >
+      {isUser && message.source ? (
+        <div className="relative min-w-0 max-w-[85%]">
+          <ConnectorMessageCard
+            source={message.source}
+            createdAt={message.createdAt}
+          />
+        </div>
+      ) : isUser ? (
+        <div className="relative min-w-0 max-w-[85%]">
+          <div className="bg-muted text-foreground peer inline-block w-auto max-w-full break-words rounded-xl px-4 py-2">
+            <UserMessageContent
+              content={entry.content}
+              onOpenFile={onOpenFile}
+              client={client}
+              sessionId={sessionId}
+              workspacePath={session?.workspacePath}
+              workspaceFiles={workspaceFiles}
+              skills={skills}
+              mcpServers={mcpServers}
+            />
+          </div>
+        </div>
+      ) : (
+        <div
+          className={cn(
+            'text-foreground min-w-0 break-words px-2 leading-relaxed',
+            message.role === 'system' &&
+              'border-border/70 text-muted-foreground rounded-xl border'
+          )}
+        >
+          {entry.content.trim() ? (
+            <MarkdownContent
+              content={entry.content}
+              streaming={hideActionsWhileStreaming}
+              onOpenFile={onOpenFile}
+              workspacePath={session?.workspacePath}
+              skills={skills}
+              className="max-w-full [&_*]:max-w-full [&_pre]:w-full [&_pre]:max-w-full [&_pre_code]:whitespace-pre-wrap [&_table]:w-full [&_table]:table-auto"
+            />
+          ) : null}
+          {isAssistant && entry.content && !hideActionsWhileStreaming ? (
+            <div className="text-muted-foreground -mb-7.5 min-h-7.5 -ml-1 flex items-center gap-0.5 pt-1.5">
+              <button
+                type="button"
+                className="hover:bg-muted hover:text-foreground inline-flex h-6 w-6 items-center justify-center rounded-md"
+                onClick={async () => {
+                  await copyText(message.content)
+                  setCopiedMessageId(message.id)
+                  window.setTimeout(() => {
+                    setCopiedMessageId(current =>
+                      current === message.id ? null : current
+                    )
+                  }, 1200)
+                }}
+                aria-label="Copy message"
+              >
+                {copiedMessageId === message.id ? (
+                  <Check className="size-3.5" />
+                ) : (
+                  <Copy className="size-3.5" />
+                )}
+              </button>
+              {formatTokPerSec(messageUsage?.tokensPerSecond) ? (
+                <span className="text-muted-foreground px-1.5 font-mono text-[11px] tabular-nums">
+                  {formatTokPerSec(messageUsage?.tokensPerSecond)}
+                </span>
+              ) : null}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="hover:bg-muted hover:text-foreground inline-flex h-6 w-6 items-center justify-center rounded-md"
+                    aria-label="More actions"
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-48 p-1.5">
+                  {messagePopoverDate ? (
+                    <div className="text-muted-foreground border-border/50 mb-1 border-b px-2 pb-1.5 pt-1 text-xs">
+                      {messagePopoverDate}
+                    </div>
+                  ) : null}
+                  <div className="text-muted-foreground border-border/50 mb-1 border-b px-2 pb-1.5 pt-1 text-xs tabular-nums">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>↑ Input</span>
+                      <span className="text-foreground">
+                        {(messageUsage?.inputTokens ?? 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between gap-3">
+                      <span>↓ Output</span>
+                      <span className="text-foreground">
+                        {(messageUsage?.outputTokens ?? 0).toLocaleString()}
+                      </span>
+                    </div>
+                    {messageUsage?.estimated ? (
+                      <div className="text-muted-foreground/80 mt-0.5 text-[10px]">
+                        Estimated (provider omitted usage)
+                      </div>
+                    ) : null}
+                    {formatTokPerSec(messageUsage?.tokensPerSecond) ? (
+                      <div className="mt-0.5 flex items-center justify-between gap-3">
+                        <span>Speed</span>
+                        <span className="text-foreground">
+                          {formatTokPerSec(messageUsage?.tokensPerSecond)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {formatSeconds(messageUsage?.promptEvalSeconds) ? (
+                      <div className="mt-0.5 flex items-center justify-between gap-3">
+                        <span>Prompt eval</span>
+                        <span className="text-foreground">
+                          {formatSeconds(messageUsage?.promptEvalSeconds)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {formatSeconds(messageUsage?.generationSeconds) ? (
+                      <div className="mt-0.5 flex items-center justify-between gap-3">
+                        <span>Generation</span>
+                        <span className="text-foreground">
+                          {formatSeconds(messageUsage?.generationSeconds)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+                    onClick={() => {
+                      void downloadMarkdown(
+                        `${session?.title || 'assistant-reply'}-${message.id.slice(0, 8)}.md`,
+                        message.content
+                      )
+                    }}
+                  >
+                    <Download className="size-4" />
+                    Export Markdown
+                  </button>
+                </PopoverContent>
+              </Popover>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -75,7 +75,7 @@ class TestTraceHelpers:
 
     def test_print_trace_diagnostics_table(self, captured_console, monkeypatch):
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.trace_helpers.console", console)
         diag = {
             "session_id": "sess1",
             "event_count": 5,

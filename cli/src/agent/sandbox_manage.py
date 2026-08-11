@@ -74,6 +74,79 @@ def toggle_sandbox_backend(config: Config | None = None) -> str:
     return set_sandbox_backend(target, cfg)
 
 
+def _format_bytes(n: int | None) -> str:
+    if n is None or n <= 0:
+        return "—"
+    gb = n / (1024**3)
+    if gb >= 10:
+        return f"{gb:.0f} GB"
+    if gb >= 1:
+        return f"{gb:.1f} GB"
+    mb = n / (1024**2)
+    return f"{mb:.0f} MB"
+
+
+def _print_local_host_info(console: Console) -> None:
+    try:
+        from agent_server.status_service import get_status_report
+
+        report = get_status_report(version="cli")
+        system = report.system
+    except Exception:  # noqa: BLE001
+        return
+    chip = str(getattr(system, "chip_name", None) or getattr(system, "label", "") or "").strip()
+    if chip:
+        console.print(f"  Host: [cyan]{chip}[/cyan]")
+    ram_used = getattr(system, "ram_used_bytes", None)
+    ram_total = getattr(system, "ram_total_bytes", None)
+    if isinstance(ram_total, int) and ram_total > 0:
+        console.print(
+            f"  RAM:  {_format_bytes(int(ram_used) if isinstance(ram_used, int) else None)}"
+            f" / {_format_bytes(ram_total)}"
+        )
+    gpu_cores = getattr(system, "gpu_cores", None)
+    if isinstance(gpu_cores, int) and gpu_cores > 0:
+        console.print(f"  GPU:  {gpu_cores} cores (host)")
+
+
+def _print_modal_compute_info(console: Console, cfg: Config) -> None:
+    from agent.sandbox_backend.profile import (
+        DEFAULT_CPU_IMAGE,
+        DEFAULT_GPU_IMAGE,
+        sandbox_compute_type,
+        sandbox_gpu_class,
+        sandbox_image_ref,
+    )
+
+    compute_type = sandbox_compute_type(cfg)
+    cpu_cores = float(cfg.get("sandbox.cpu_cores") or 2.0)
+    ram_gb = float(cfg.get("sandbox.ram_gb") or 8.0)
+    base_image = sandbox_image_ref(cfg, compute_type=compute_type)
+    console.print(f"  Mode: [cyan]{compute_type.upper()}[/cyan]")
+    if compute_type == "gpu":
+        console.print(f"  GPU:  [cyan]{sandbox_gpu_class(cfg)}[/cyan]")
+    console.print(f"  CPU:  {cpu_cores:g} cores")
+    console.print(f"  RAM:  {ram_gb:g} GB")
+    console.print(f"  Base image: [cyan]{base_image}[/cyan]")
+    cpu_image = str(cfg.get("sandbox.cpu_image") or DEFAULT_CPU_IMAGE)
+    gpu_image = str(cfg.get("sandbox.gpu_image") or DEFAULT_GPU_IMAGE)
+    if compute_type == "gpu" and cpu_image != gpu_image:
+        console.print(f"  [dim]CPU image:[/dim]  {cpu_image}")
+    if compute_type == "cpu":
+        console.print(f"  [dim]GPU image:[/dim]  {gpu_image}")
+
+
+def _print_gpu_setup_hints(console: Console) -> None:
+    console.print("  [dim]GPU Modal setup (CUDA comes from the GPU base image):[/dim]")
+    console.print("    sandwalk config set sandbox.compute_type gpu")
+    console.print("    sandwalk config set sandbox.gpu_class T4")
+    console.print(
+        "    sandwalk config set sandbox.gpu_image "
+        "pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime"
+    )
+    console.print("    /sandbox modal   # then restart / ask the agent to sandbox_start")
+
+
 def handle_sandbox_argv(argv: list[str], console: Console, config: Config | None = None) -> None:
     """Interactive `/sandbox` and `sandwalk sandbox` command handler."""
     cfg = config or Config.load()
@@ -86,10 +159,13 @@ def handle_sandbox_argv(argv: list[str], console: Console, config: Config | None
 
     if action in {"help", "-h", "--help"}:
         console.print("  [bold]/sandbox[/bold] — choose Local Sandbox or Modal Sandbox")
-        console.print("    /sandbox              Show current backend")
+        console.print("    /sandbox              Interactive picker (Local + Modal presets)")
+        console.print("    /sandbox status       Show backend + compute/image")
         console.print("    /sandbox builtin|off  Use Local Sandbox (default)")
         console.print("    /sandbox modal|on     Use Modal Sandbox")
         console.print("    /sandbox toggle       Flip Local ↔ Modal")
+        console.print("")
+        _print_gpu_setup_hints(console)
         return
 
     if action in {"status", "show", "get"}:
@@ -97,7 +173,8 @@ def handle_sandbox_argv(argv: list[str], console: Console, config: Config | None
         label = sandbox_toolbar_label(kind)
         console.print(f"  Sandbox: [bold]{label}[/bold] ([cyan]{kind}[/cyan])")
         if kind == "builtin":
-            console.print("  [dim]Default for CLI.[/dim]")
+            console.print("  [dim]Default for CLI — runs on this machine.[/dim]")
+            _print_local_host_info(console)
         if kind == "modal":
             from agent.sandbox_probe import modal_tokens_present
 
@@ -106,7 +183,16 @@ def handle_sandbox_argv(argv: list[str], console: Console, config: Config | None
                 console.print("  [dim]Modal tokens configured.[/dim]")
             else:
                 console.print(f"  [yellow]Modal tokens missing:[/yellow] {detail}")
-        console.print("  [dim]Change with[/dim] /sandbox builtin|modal|toggle")
+            _print_modal_compute_info(console, cfg)
+            from agent.sandbox_backend.profile import sandbox_compute_type
+
+            if sandbox_compute_type(cfg) != "gpu":
+                console.print(
+                    "  [yellow]Compute is CPU[/yellow] — GPU class in settings is unused "
+                    "until sandbox.compute_type=gpu."
+                )
+                _print_gpu_setup_hints(console)
+        console.print("  [dim]Change with[/dim] /sandbox  (picker)  or  /sandbox builtin|modal|toggle")
         return
 
     if action == "toggle":
@@ -129,6 +215,8 @@ def handle_sandbox_argv(argv: list[str], console: Console, config: Config | None
         console.print(
             f"  Sandbox → [bold]{sandbox_toolbar_label(kind)}[/bold] ([cyan]{kind}[/cyan])"
         )
+        if kind == "modal":
+            _print_modal_compute_info(console, cfg)
         return
 
     if rest:

@@ -20,6 +20,8 @@ _SKILL_TEMPLATE = """\
 ---
 name: {name}
 description: TODO one sentence describing what this skill does and when to use it (include trigger phrases).
+author: {author}
+category: Created by Me
 ---
 
 # {title}
@@ -49,6 +51,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("name", help="Skill name (kebab-case, e.g. my-new-skill)")
     parser.add_argument("--path", default=".", help="Output directory (default: cwd)")
     parser.add_argument("--with-scripts", action="store_true", help="Also create a scripts/ folder")
+    parser.add_argument(
+        "--author",
+        default="",
+        help="Author label written to SKILL.md frontmatter (default: local user name)",
+    )
     args = parser.parse_args(argv)
 
     name = args.name.strip()
@@ -65,9 +72,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {skill_dir} already exists.", file=sys.stderr)
         return 1
 
+    author = (args.author or "").strip()
+    if not author:
+        try:
+            from agent.skills.models import local_skill_author_name
+
+            author = local_skill_author_name()
+        except Exception:  # noqa: BLE001
+            author = "Me"
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(
-        _SKILL_TEMPLATE.format(name=name, title=_title_from_name(name)),
+        _SKILL_TEMPLATE.format(
+            name=name,
+            title=_title_from_name(name),
+            author=author,
+        ),
         encoding="utf-8",
     )
     (skill_dir / "references").mkdir(exist_ok=True)

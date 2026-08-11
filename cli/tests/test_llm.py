@@ -145,6 +145,9 @@ class TestOpenAIModelCompatibility:
     def test_openai_temperature_kwargs_for_non_gpt5(self):
         assert _openai_temperature_kwargs("gpt-4o", 0.2) == {"temperature": 0.2}
 
+    def test_openai_temperature_kwargs_for_kimi(self):
+        assert _openai_temperature_kwargs("kimi-k3", 0.2) == {"temperature": 1.0}
+
     def test_call_openai_uses_gpt5_compatible_kwargs(self):
         client = LLMClient(provider="openai", model="gpt-5.5", api_key="sk-test")
         mock_openai = MagicMock()

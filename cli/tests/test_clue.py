@@ -11,7 +11,7 @@ import pandas as pd
 
 
 class TestClueConnectivityQuery:
-    @patch("tools.clue._load_profiles")
+    @patch("tools.clue_part2._load_profiles")
     def test_signature_query_success(self, mock_load_profiles):
         from tools.clue import connectivity_query
 
@@ -57,8 +57,8 @@ class TestClueConnectivityQuery:
 
 
 class TestClueCompoundSignature:
-    @patch("tools.clue._load_profiles")
-    @patch("tools.clue._load_pert_metadata")
+    @patch("tools.clue_part1._load_profiles")
+    @patch("tools.clue_part1._load_pert_metadata")
     def test_known_compound(self, mock_load_metadata, mock_load_profiles):
         from tools.clue import compound_signature
 
@@ -89,9 +89,9 @@ class TestClueCompoundSignature:
             {"TP53": [1.5], "CDKN1A": [1.0], "MYC": [-1.2], "CCND1": [-0.8]},
             index=["vorinostat"],
         )
-        with patch("tools.clue._get_clue_key", return_value=None), patch(
-            "tools.clue._load_profiles", return_value=mock_profiles
-        ), patch("tools.clue._load_pert_metadata", return_value=pd.DataFrame()):
+        with patch("tools.clue_part1._get_clue_key", return_value=None), patch(
+            "tools.clue_part1._load_profiles", return_value=mock_profiles
+        ), patch("tools.clue_part1._load_pert_metadata", return_value=pd.DataFrame()):
             result = compound_signature(compound="vorinostat")
             # Should succeed with local data even without API key
             assert "summary" in result

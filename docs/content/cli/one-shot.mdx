@@ -1,0 +1,15 @@
+---
+title: One-shot
+description: Run a single query and exit (scripts and automation).
+---
+
+```bash
+sandwalk "What is known about KRAS G12C inhibitors?"
+sandwalk --smiles "CCO" "Profile this compound"
+```
+
+Best for scripts, CI, and quick asks without opening the interactive REPL.
+
+Uses the same agent, tools, and config as [Terminal](/cli/terminal) mode.
+
+{/* TODO: exit codes, JSON/output flags if any */}

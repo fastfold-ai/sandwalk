@@ -63,12 +63,6 @@ export function readProjectScopeId(): string | null {
         /^\/projects\/([^/]+)/
       )
       if (projectMatch?.[1]) return decodeURIComponent(projectMatch[1])
-      if (
-        window.location.pathname === '/' ||
-        window.location.pathname === '/agents/home'
-      ) {
-        return null
-      }
     }
     const raw = localStorage.getItem(PROJECT_SCOPE_STORAGE_KEY)
     if (!raw || raw === ALL_PROJECTS_TABS_KEY) return null

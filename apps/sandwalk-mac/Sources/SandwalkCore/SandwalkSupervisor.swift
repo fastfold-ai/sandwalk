@@ -41,9 +41,9 @@ final class SandwalkSupervisor {
     let web: WebUIProcess
 
     private(set) var overall: OverallState = .stopped
-    private var partialRecoveryTask: Task<Void, Never>?
-    private var partialRecoveryAttempts = 0
-    private let maxPartialRecoveries = 5
+    var partialRecoveryTask: Task<Void, Never>?
+    var partialRecoveryAttempts = 0
+    let maxPartialRecoveries = 5
 
     init(config: AppConfig) {
         self.config = config
@@ -152,6 +152,19 @@ final class SandwalkSupervisor {
         }
     }
 
+    /// Persist launch / menu-bar preferences without restarting API/web.
+    func applyGeneralPreferences(_ next: AppConfig) throws {
+        var updated = config
+        updated.autoStartOnLaunch = next.autoStartOnLaunch
+        updated.keepMenubarOnCmdQ = next.keepMenubarOnCmdQ
+        // Preserve discovery paths from the running supervisor.
+        updated.agentCliRoot = config.agentCliRoot
+        updated.repoRoot = config.repoRoot
+        try updated.saveNetworkSettings()
+        config = updated
+        NotificationCenter.default.post(name: Self.configDidChangeNotification, object: self)
+    }
+
     /// Persist health-check interval without restarting API/web.
     func applyHealthCheckInterval(_ seconds: Int) throws {
         var updated = config
@@ -167,8 +180,9 @@ final class SandwalkSupervisor {
 
     func restartAll() async throws {
         await stopAll()
-        // Let TIME_WAIT / child reaping finish so the next bind can succeed.
-        try await Task.sleep(for: .milliseconds(700))
+        // Let TIME_WAIT / child reaping / SQLite flock drain so the next serve
+        // can open agent-server.db (menubar Restart used to race this).
+        try await Task.sleep(for: .milliseconds(2_000))
         try startAll()
         // Vite may adopt quickly while the API cold-starts — retry API once if
         // we land in "web up · API down".
@@ -194,12 +208,14 @@ final class SandwalkSupervisor {
     }
 
     func reapSync() {
-        web.reapSync(timeout: 5)
-        api.reapSync(timeout: 5)
+        // Keep the combined budget small: AppKit force-kills a slow
+        // applicationWillTerminate, and dying mid-reap is what orphans the agent.
+        web.reapSync(timeout: 2)
+        api.reapSync(timeout: 3)
         recompute()
     }
 
-    private func recompute() {
+    func recompute() {
         let apiLive: Bool = {
             switch api.state {
             case .running: return true
@@ -254,51 +270,7 @@ final class SandwalkSupervisor {
         recoverPartialAPIIfNeeded()
     }
 
-    /// Web-up / API-down is the common "tools killed sandwalk serve" failure mode.
-    /// Kick API start (adopt-or-respawn) so the menubar doesn't stay orange forever.
-    private func recoverPartialAPIIfNeeded() {
-        guard case .partial(let apiUp, let webUp) = overall, !apiUp, webUp else {
-            partialRecoveryTask?.cancel()
-            partialRecoveryTask = nil
-            if case .running = overall {
-                partialRecoveryAttempts = 0
-            }
-            return
-        }
-        guard partialRecoveryTask == nil else { return }
-        guard partialRecoveryAttempts < maxPartialRecoveries else {
-            NSLog(
-                "Sandwalk: giving up partial API recovery after %d attempts — check server.log",
-                maxPartialRecoveries
-            )
-            return
-        }
-        partialRecoveryTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            defer { self.partialRecoveryTask = nil }
-            let attempt = self.partialRecoveryAttempts + 1
-            let delayMs = 700 * attempt
-            try? await Task.sleep(for: .milliseconds(delayMs))
-            guard !Task.isCancelled else { return }
-            guard case .partial(let stillApi, let stillWeb) = self.overall, !stillApi, stillWeb else {
-                return
-            }
-            self.partialRecoveryAttempts = attempt
-            do {
-                _ = try self.api.start()
-                NSLog("Sandwalk: recovered API from partial state (attempt %d)", attempt)
-            } catch {
-                NSLog(
-                    "Sandwalk: partial API recovery failed (attempt %d) — %@",
-                    attempt,
-                    error.localizedDescription
-                )
-            }
-            self.recompute()
-        }
-    }
-
-    private func notify() {
+    func notify() {
         NotificationCenter.default.post(name: Self.stateDidChangeNotification, object: self)
     }
 }

@@ -49,7 +49,7 @@ class TestGetWorkflowNames:
 class TestExtractMentions:
     def test_tool_mentions(self):
         query, tools, datasets, workflows = extract_mentions(
-            "Run @target.druggability on @depmap for TP53"
+            "Run #target.druggability on #depmap for TP53"
         )
         assert "target.druggability" in tools
         assert "depmap" in datasets
@@ -62,14 +62,14 @@ class TestExtractMentions:
             return_value=frozenset({"target_validation"}),
         ):
             query, tools, datasets, workflows = extract_mentions(
-                "Please run @target_validation workflow"
+                "Please run #target_validation workflow"
             )
         assert "target_validation" in workflows
         assert "workflow" in query.lower() or query == "Please run workflow"
 
     def test_strips_mentions_and_collapses_spaces(self):
-        query, _, _, _ = extract_mentions("  @prism   @safety.classify   check   cpd_A  ")
-        assert "@" not in query
+        query, _, _, _ = extract_mentions("  #prism   #safety.classify   check   cpd_A  ")
+        assert "#" not in query
         assert "  " not in query
         assert query == "check cpd_A"
 

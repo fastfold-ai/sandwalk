@@ -3,10 +3,9 @@ import './MirageWalkPath.css'
 import { useId, useMemo } from 'react'
 
 import {
+  MIRAGE_RADIUS,
   mirageBuildRibbonPath,
-  miragePathX,
-  MIRAGE_RADIUS
-} from '@/components/mirageGeometry'
+  miragePathX} from '@/components/mirageGeometry'
 import { ONBOARDING_STEPS } from '@/lib/onboarding'
 import { cn } from '@/lib/utils'
 

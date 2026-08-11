@@ -7,7 +7,7 @@ import httpx
 
 class TestRemoteDataQuery:
     @patch("httpx.post")
-    @patch("tools.remote_data._get_endpoint", return_value="http://localhost:8000")
+    @patch("tools.remote_data_part1._get_endpoint", return_value="http://localhost:8000")
     def test_query_success(self, mock_endpoint, mock_post):
         from tools.remote_data import query
 
@@ -33,13 +33,13 @@ class TestRemoteDataQuery:
     def test_no_endpoint_configured(self):
         from tools.remote_data import query
 
-        with patch("tools.remote_data._get_endpoint", return_value=None):
+        with patch("tools.remote_data_part1._get_endpoint", return_value=None):
             result = query(dataset="perturbatlas")
             assert "error" in result
             assert "not configured" in result["error"].lower()
 
     @patch("httpx.post", side_effect=httpx.ConnectError("Connection refused"))
-    @patch("tools.remote_data._get_endpoint", return_value="http://localhost:8000")
+    @patch("tools.remote_data_part1._get_endpoint", return_value="http://localhost:8000")
     def test_api_unreachable(self, mock_endpoint, mock_post):
         from tools.remote_data import query
 
@@ -48,7 +48,7 @@ class TestRemoteDataQuery:
         assert "unreachable" in result["summary"].lower()
 
     @patch("httpx.post")
-    @patch("tools.remote_data._get_endpoint", return_value="http://localhost:8000")
+    @patch("tools.remote_data_part1._get_endpoint", return_value="http://localhost:8000")
     def test_dataset_not_found(self, mock_endpoint, mock_post):
         from tools.remote_data import query
 
@@ -61,7 +61,7 @@ class TestRemoteDataQuery:
         assert "not found" in result["error"].lower()
 
     @patch("httpx.post")
-    @patch("tools.remote_data._get_endpoint", return_value="http://localhost:8000")
+    @patch("tools.remote_data_part1._get_endpoint", return_value="http://localhost:8000")
     def test_query_with_compound_filter(self, mock_endpoint, mock_post):
         from tools.remote_data import query
 
@@ -81,7 +81,7 @@ class TestRemoteDataQuery:
 
 class TestRemoteDataListDatasets:
     @patch("httpx.get")
-    @patch("tools.remote_data._get_endpoint", return_value="http://localhost:8000")
+    @patch("tools.remote_data_part2._get_endpoint", return_value="http://localhost:8000")
     def test_list_success(self, mock_endpoint, mock_get):
         from tools.remote_data import list_datasets
 
@@ -104,12 +104,12 @@ class TestRemoteDataListDatasets:
     def test_no_endpoint_configured(self):
         from tools.remote_data import list_datasets
 
-        with patch("tools.remote_data._get_endpoint", return_value=None):
+        with patch("tools.remote_data_part2._get_endpoint", return_value=None):
             result = list_datasets()
             assert "error" in result
 
     @patch("httpx.get", side_effect=httpx.ConnectError("Connection refused"))
-    @patch("tools.remote_data._get_endpoint", return_value="http://localhost:8000")
+    @patch("tools.remote_data_part2._get_endpoint", return_value="http://localhost:8000")
     def test_api_unreachable(self, mock_endpoint, mock_get):
         from tools.remote_data import list_datasets
 

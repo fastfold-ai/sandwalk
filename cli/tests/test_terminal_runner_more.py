@@ -19,9 +19,15 @@ class _FakeBuffer:
         self.validated = False
         self.complete_state = None
         self.applied_completion = None
+        self.pasted = None
+
+    @property
+    def document(self):
+        return SimpleNamespace(text_before_cursor=self.text)
 
     def insert_text(self, text: str):
         self.inserted.append(text)
+        self.text += text
 
     def start_completion(self):
         self.started_completion = True
@@ -34,6 +40,9 @@ class _FakeBuffer:
 
     def validate_and_handle(self):
         self.validated = True
+
+    def paste_clipboard_data(self, data):
+        self.pasted = data
 
     def go_to_completion(self, idx: int):
         if self.complete_state is not None:
@@ -70,23 +79,13 @@ def _handler(kb, name: str):
 
 
 class TestTerminalKeyBindings:
-    def test_tab_accepts_suggestion_on_empty_input(self):
-        terminal = _build_terminal_for_bindings()
-        kb = _build_key_bindings(terminal)
-        buf = _FakeBuffer(text="")
-        event = SimpleNamespace(app=SimpleNamespace(current_buffer=buf))
-
-        _handler(kb, "_accept_suggestion")(event)
-
-        assert buf.inserted == ["suggested prompt"]
-
-    def test_tab_starts_completion_on_non_empty_input(self):
+    def test_tab_starts_completion(self):
         terminal = _build_terminal_for_bindings()
         kb = _build_key_bindings(terminal)
         buf = _FakeBuffer(text="hello")
         event = SimpleNamespace(app=SimpleNamespace(current_buffer=buf))
 
-        _handler(kb, "_accept_suggestion")(event)
+        _handler(kb, "_start_completion")(event)
 
         assert buf.started_completion is True
 
@@ -98,16 +97,16 @@ class TestTerminalKeyBindings:
         event = SimpleNamespace(app=app)
 
         class _ImmediateThread:
-            def __init__(self, target=None, daemon=None):
+            def __init__(self, target=None, daemon=None, name=None):
                 self._target = target
 
             def start(self):
                 if self._target:
                     self._target()
 
-        with patch("ui.terminal.threading.Thread", _ImmediateThread), patch(
-            "ui.terminal.time.sleep", lambda _s: None
-        ), patch("ui.terminal.time.time", return_value=100.0):
+        with patch("ui.terminal.key_bindings.threading.Thread", _ImmediateThread), patch(
+            "ui.terminal.key_bindings.time.sleep", lambda _s: None
+        ), patch("ui.terminal.key_bindings.time.time", return_value=100.0):
             _handler(kb, "_handle_ctrl_c")(event)
 
         terminal._request_interrupt.assert_called_once_with(force=False)
@@ -126,42 +125,28 @@ class TestTerminalKeyBindings:
         event = SimpleNamespace(app=app)
 
         class _ImmediateThread:
-            def __init__(self, target=None, daemon=None):
+            def __init__(self, target=None, daemon=None, name=None):
                 self._target = target
 
             def start(self):
                 if self._target:
                     self._target()
 
-        with patch("ui.terminal.threading.Thread", _ImmediateThread), patch(
-            "ui.terminal.time.sleep", lambda _s: None
-        ), patch("ui.terminal.time.time", side_effect=[1.0, 1.3]):
+        with patch("ui.terminal.key_bindings.threading.Thread", _ImmediateThread), patch(
+            "ui.terminal.key_bindings.time.sleep", lambda _s: None
+        ), patch("ui.terminal.key_bindings.time.time", side_effect=[1.0, 1.3]):
             _handler(kb, "_handle_ctrl_c")(event)
             _handler(kb, "_handle_ctrl_c")(event)
 
         app.exit.assert_called_once_with(result="__EXIT__")
 
-    def test_toggle_verbose_and_mention_tabs(self):
+    def test_mention_tabs(self):
         terminal = _build_terminal_for_bindings(active_query=False)
         kb = _build_key_bindings(terminal)
-        buf = _FakeBuffer(text="@")
+        buf = _FakeBuffer(text="#")
         app = SimpleNamespace(current_buffer=buf, invalidate=MagicMock(), is_running=True)
         event = SimpleNamespace(app=app)
 
-        class _ImmediateThread:
-            def __init__(self, target=None, daemon=None):
-                self._target = target
-
-            def start(self):
-                if self._target:
-                    self._target()
-
-        with patch("ui.terminal.threading.Thread", _ImmediateThread), patch(
-            "ui.terminal.time.sleep", lambda _s: None
-        ):
-            _handler(kb, "_toggle_verbose")(event)
-
-        assert terminal.session.verbose is True
         _handler(kb, "_mention_tab_right")(event)
         assert terminal._merged_completer.mention_completer._active_tab == 1
         _handler(kb, "_mention_tab_left")(event)
@@ -171,8 +156,14 @@ class TestTerminalKeyBindings:
         terminal = _build_terminal_for_bindings()
         kb = _build_key_bindings(terminal)
         buf = _FakeBuffer(text="/he")
+        # Real prompt_toolkit completions expose ``.text``; the accept helpers
+        # inspect it to tell slash menus from @ file chips.
+        completions = [
+            SimpleNamespace(text="/help"),
+            SimpleNamespace(text="/hello"),
+        ]
         buf.complete_state = SimpleNamespace(
-            completions=["/help", "/hello"],
+            completions=completions,
             complete_index=None,
             current_completion=None,
         )
@@ -180,7 +171,7 @@ class TestTerminalKeyBindings:
 
         _handler(kb, "_accept_first_completion")(event)
 
-        assert buf.applied_completion == "/help"
+        assert buf.applied_completion is completions[0]
         assert buf.validated is True
 
     def test_enter_non_slash_submits_without_completion(self):
@@ -196,10 +187,12 @@ class TestTerminalKeyBindings:
 
         _handler(kb, "_accept_first_completion")(event)
 
-        assert buf.cancel_called is True
+        # Non-slash Enter with completions open just submits (no apply/cancel).
+        assert buf.applied_completion is None
         assert buf.validated is True
 
     def test_newline_bindings_insert_newline_text(self):
+        """Ctrl+J / Alt+Enter insert newlines; Enter submits via PromptSession default."""
         terminal = _build_terminal_for_bindings()
         kb = _build_key_bindings(terminal)
         buf = _FakeBuffer(text="line1")

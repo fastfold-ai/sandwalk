@@ -5,6 +5,30 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# Long enough for in-flight requests to finish, short enough that a restart
+# never looks stuck to whoever is waiting on it.
+SHUTDOWN_GRACE_SECONDS = 5
+
+
+def _signal_shutdown(app) -> None:
+    """Ask long-lived streams to close before Uvicorn starts draining tasks."""
+    app.state.shutdown_event.set()
+    from agent_server.store.event_notifier import EVENT_NOTIFIER
+
+    EVENT_NOTIFIER.wake_all()
+
+
+def _serve(app, **kwargs) -> None:
+    """Run Uvicorn with an early cooperative-shutdown hook."""
+    import uvicorn
+
+    class ShutdownAwareServer(uvicorn.Server):
+        def handle_exit(self, sig, frame) -> None:
+            _signal_shutdown(app)
+            super().handle_exit(sig, frame)
+
+    ShutdownAwareServer(uvicorn.Config(app, **kwargs)).run()
+
 
 def run_server(
     *,
@@ -16,8 +40,6 @@ def run_server(
     allowed_hosts: list[str] | None = None,
     uds: Path | None = None,
 ) -> None:
-    import uvicorn
-
     log_config = None
     try:
         from agent.diagnostics import ensure_logging_configured, uvicorn_log_config
@@ -39,8 +61,10 @@ def run_server(
 
     if uds is not None and public:
         raise ValueError("Unix-socket mode cannot be combined with --public.")
+    # Non-loopback bind (Mac Network → Allow Remote, or `serve --host 0.0.0.0`)
+    # implies public mode; callers may omit --public.
     if not is_loopback and not public:
-        raise ValueError("Non-loopback binding requires --public.")
+        public = True
 
     # Load persisted auth; public mode can use settings key when CLI key omitted.
     from agent_server.auth_settings import load_settings, resolve_effective_api_key
@@ -49,23 +73,34 @@ def run_server(
     effective = resolve_effective_api_key(cli_api_key=key, settings=persisted)
     if public and not effective:
         raise ValueError(
-            "Public mode requires --api-key, FASTFOLD_SERVER_API_KEY, "
-            "or `sandwalk auth enable` with a configured key."
+            "Public / LAN mode requires --api-key, FASTFOLD_SERVER_API_KEY, "
+            "or `sandwalk auth enable` with a configured key "
+            "(`sandwalk auth generate` then `sandwalk auth enable`)."
         )
-    if public and not origins:
-        raise ValueError("Public mode requires at least one --allowed-origin.")
-    if public and not hosts:
-        raise ValueError("Public mode requires at least one --allowed-host.")
 
     if not origins:
-        origins = [
-            "http://127.0.0.1:8969",
-            "http://localhost:8969",
-            "http://127.0.0.1:5173",
-            "http://localhost:5173",
-        ]
+        if public:
+            # Desktop + common local UI origins. Host header for LAN IPs is
+            # covered by allowed_hosts=["*"] below.
+            origins = [
+                "tauri://localhost",
+                "http://tauri.localhost",
+                "http://127.0.0.1:1420",
+                "http://localhost:1420",
+                "http://127.0.0.1:8969",
+                "http://localhost:8969",
+                "http://127.0.0.1:5173",
+                "http://localhost:5173",
+            ]
+        else:
+            origins = [
+                "http://127.0.0.1:8969",
+                "http://localhost:8969",
+                "http://127.0.0.1:5173",
+                "http://localhost:5173",
+            ]
     if not hosts:
-        hosts = ["127.0.0.1", "localhost"]
+        hosts = ["*"] if public else ["127.0.0.1", "localhost"]
 
     from agent_server.app import create_app
     from agent_server.store import AgentStoreCorruptedError, AgentStoreLockError
@@ -110,7 +145,26 @@ def run_server(
     except AgentStoreCorruptedError as exc:
         raise SystemExit(f"Error: {exc}") from exc
 
-    run_kwargs = {"log_level": "info"}
+    from agent_server.banner import print_server_banner
+
+    print_server_banner(
+        host=host,
+        port=port,
+        public=public,
+        auth_enabled=bool(app.state.runtime_api_key),
+        uds=uds,
+        ui_available=bool(getattr(app.state, "ui_dist", None)),
+    )
+
+    run_kwargs = {
+        "log_level": "info",
+        # The desktop UI holds event streams open for as long as it is running,
+        # and uvicorn's graceful shutdown waits for open connections forever.
+        # Without a bound, SIGTERM leaves the server sitting in "Waiting for
+        # connections to close" whenever the UI is up, and a restart looks hung
+        # — which invites a hard kill on a database mid-write.
+        "timeout_graceful_shutdown": SHUTDOWN_GRACE_SECONDS,
+    }
     if log_config is not None:
         run_kwargs["log_config"] = log_config
 
@@ -120,10 +174,10 @@ def run_server(
         socket_path.unlink(missing_ok=True)
         previous_umask = os.umask(0o077)
         try:
-            uvicorn.run(app, uds=str(socket_path), **run_kwargs)
+            _serve(app, uds=str(socket_path), **run_kwargs)
         finally:
             os.umask(previous_umask)
             socket_path.unlink(missing_ok=True)
         return
 
-    uvicorn.run(app, host=host, port=port, **run_kwargs)
+    _serve(app, host=host, port=port, **run_kwargs)

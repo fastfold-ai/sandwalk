@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A polished interactive report generated with Sandwalk."
+    />
+    <meta property="og:title" content="Report title" />
+    <meta
+      property="og:description"
+      content="A concise description for link previews."
+    />
+    <meta property="og:type" content="article" />
+    <title>Report title</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <script>
+      ;(() => {
+        let saved = null
+        try {
+          saved = localStorage.getItem('sandwalk-report-theme')
+        } catch {}
+        const dark = saved
+          ? saved === 'dark'
+          : window.matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      })()
+    </script>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="shell.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css"
+    />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+    ></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <!-- sandwalk:shell:actions -->
+    <div class="report-actions no-print" aria-label="Report controls">
+      <button
+        id="theme-toggle"
+        class="button"
+        type="button"
+        aria-label="Toggle color theme"
+      >
+        <span aria-hidden="true">◐</span>
+        Theme
+      </button>
+    </div>
+    <!-- /sandwalk:shell:actions -->
+
+    <div class="report-layout">
+      <nav class="toc no-print" aria-label="Table of contents">
+        <p class="toc-title">Contents</p>
+        <a href="#takeaway">Takeaway</a>
+        <a href="#evidence">Evidence</a>
+        <a href="#comparison">Comparison</a>
+        <a href="#details">Details</a>
+      </nav>
+
+      <main id="main">
+        <header class="report-header">
+          <p class="report-meta">
+            REPORT •
+            <time class="report-date" datetime="__SANDWALK_REPORT_DATE__"
+              >__SANDWALK_REPORT_DATE__</time>
+          </p>
+          <h1>Start with the finding that matters.</h1>
+          <p class="lede">
+            Replace this summary with a concise answer that helps the reader
+            understand the conclusion before exploring the supporting evidence.
+          </p>
+        </header>
+
+        <section id="takeaway" aria-labelledby="takeaway-title">
+          <h2 id="takeaway-title">Takeaway</h2>
+          <div class="stat-grid">
+            <article class="card">
+              <p class="card-label">Primary result</p>
+              <p class="stat">42<span> units</span></p>
+              <p class="card-note">State what changed and why it matters.</p>
+            </article>
+            <article class="card">
+              <p class="card-label">Confidence</p>
+              <p class="stat">High</p>
+              <p class="card-note">
+                Summarize the strongest supporting evidence.
+              </p>
+            </article>
+            <article class="card">
+              <p class="card-label">Next action</p>
+              <p class="stat">Review</p>
+              <p class="card-note">Give the reader a concrete next step.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="evidence" aria-labelledby="evidence-title">
+          <h2 id="evidence-title">Evidence</h2>
+          <p class="section-intro">
+            Use an interactive plot when data communicates the relationship
+            better than prose.
+          </p>
+          <figure class="card chart-card">
+            <div class="chart-frame">
+              <canvas
+                id="report-chart"
+                aria-label="Example trend chart"
+              ></canvas>
+            </div>
+            <figcaption>
+              Replace illustrative values with sourced data and units.
+            </figcaption>
+          </figure>
+          <figure class="card diagram-card">
+            <pre class="mermaid" aria-label="Example evidence flow">
+flowchart LR
+  Q[Question] --> E[Evidence]
+  E --> A[Analysis]
+  A --> D[Decision]</pre
+            >
+            <figcaption>
+              Use a diagram for flows or architecture and explain it in nearby
+              prose.
+            </figcaption>
+          </figure>
+          <div class="math-block" aria-label="Example confidence equation">
+            <p>
+              Use KaTeX when notation makes the relationship clearer:
+              $$Confidence = f(quality, coverage, consistency)$$
+            </p>
+          </div>
+        </section>
+
+        <section id="comparison" aria-labelledby="comparison-title">
+          <h2 id="comparison-title">Comparison</h2>
+          <div class="tabs">
+            <input id="tab-a" name="comparison-tabs" type="radio" checked />
+            <label for="tab-a">Summary</label>
+            <input id="tab-b" name="comparison-tabs" type="radio" />
+            <label for="tab-b">Trade-offs</label>
+            <input id="tab-c" name="comparison-tabs" type="radio" />
+            <label for="tab-c">Method</label>
+            <div class="tab-panel">
+              <p>
+                Use tabs for alternate views of the same question—not unrelated
+                content.
+              </p>
+            </div>
+            <div class="tab-panel">
+              <p>
+                Expose meaningful limitations, uncertainty, and competing
+                interpretations.
+              </p>
+            </div>
+            <div class="tab-panel">
+              <p>
+                Explain enough methodology for a reader to audit the result.
+              </p>
+            </div>
+          </div>
+
+          <label class="filter-label" for="table-filter">Filter rows</label>
+          <input
+            id="table-filter"
+            class="filter"
+            type="search"
+            placeholder="Type to filter…"
+          />
+          <div
+            class="table-wrap"
+            role="region"
+            aria-label="Sortable findings table"
+            tabindex="0"
+          >
+            <table id="findings-table">
+              <caption>
+                Example findings—select a column heading to sort.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">
+                    <button type="button" data-sort="0">Finding ↕</button>
+                  </th>
+                  <th scope="col">
+                    <button type="button" data-sort="1">Evidence ↕</button>
+                  </th>
+                  <th scope="col">
+                    <button type="button" data-sort="2">Confidence ↕</button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Result A</td>
+                  <td>Primary measurement</td>
+                  <td>High</td>
+                </tr>
+                <tr>
+                  <td>Result B</td>
+                  <td>Independent replication</td>
+                  <td>Medium</td>
+                </tr>
+                <tr>
+                  <td>Result C</td>
+                  <td>Exploratory observation</td>
+                  <td>Low</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="details" aria-labelledby="details-title">
+          <h2 id="details-title">Details</h2>
+          <p class="section-intro">
+            Keep optional depth available without making the main argument
+            difficult to scan.
+          </p>
+          <pre
+            class="code-block"
+          ><code class="language-python">def result(value):
+    return {"value": value, "status": "reviewed"}</code><button class="copy-button no-print" type="button">Copy</button></pre>
+          <details>
+            <summary>Method and assumptions</summary>
+            <p>
+              Document assumptions, exclusions, provenance, and reproducibility
+              details.
+            </p>
+          </details>
+          <details>
+            <summary>Limitations</summary>
+            <p>
+              Describe what remains uncertain and what evidence would change the
+              conclusion.
+            </p>
+          </details>
+        </section>
+
+        <!-- sandwalk:shell:footer -->
+        <footer>
+          <span>Generated with</span>
+          <a
+            class="sandwalk-brand"
+            href="https://sandwalk.sh/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Sandwalk"
+          >
+            <svg
+              class="sandwalk-logo"
+              viewBox="0 0 300 62"
+              role="img"
+              aria-hidden="true"
+            >
+              <g transform="translate(2 12) scale(0.072) translate(-72 -177)">
+                <path
+                  d="M107 458c-19 0-35 16-35 35v70c0 19 16 35 35 35s35-16 35-35v-70c0-19-16-35-35-35z"
+                />
+                <path
+                  d="M213 283c-19 0-35 16-35 35v176c0 19 16 35 35 35s35-16 35-35V318c0-19-16-35-35-35z"
+                />
+                <path
+                  d="M318 177c-19 0-35 16-35 35v246c0 19 16 35 35 35s35-16 35-35V212c0-19-16-35-35-35z"
+                />
+                <path
+                  d="M422 265c-19 0-35 16-35 35v246c0 19 16 35 35 35s35-16 35-35V300c0-19-16-35-35-35z"
+                />
+                <path
+                  d="M529 353c-19 0-35 16-35 35v246c0 19 16 35 35 35s35-16 35-35V388c0-19-16-35-35-35z"
+                />
+                <path
+                  d="M634 318c-19 0-35 16-35 35v178c0 19 16 35 35 35s35-16 35-35V353c0-19-16-35-35-35z"
+                />
+                <path
+                  d="M739 248c-19 0-35 16-35 35v70c0 19 16 35 35 35s35-16 35-35v-70c0-19-16-35-35-35z"
+                />
+              </g>
+              <text
+                x="68"
+                y="44"
+                font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+                font-size="42"
+                letter-spacing="-1.5"
+              >
+                sandwalk
+              </text>
+            </svg>
+          </a>
+        </footer>
+        <!-- /sandwalk:shell:footer -->
+      </main>
+    </div>
+
+    <script>
+      window.addEventListener('DOMContentLoaded', async () => {
+        const root = document.documentElement
+        const themeButton = document.getElementById('theme-toggle')
+        const chartGrid = () =>
+          getComputedStyle(root).getPropertyValue('--border').trim()
+        const chartText = () =>
+          getComputedStyle(root).getPropertyValue('--muted').trim()
+        let chart = null
+        const diagrams = [...document.querySelectorAll('.mermaid')]
+        diagrams.forEach(diagram => {
+          diagram.dataset.source = diagram.textContent.trim()
+        })
+        const renderDiagrams = async () => {
+          if (!window.mermaid || diagrams.length === 0) return
+          diagrams.forEach(diagram => {
+            diagram.removeAttribute('data-processed')
+            diagram.textContent = diagram.dataset.source
+          })
+          window.mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: 'strict',
+            theme: root.dataset.theme === 'dark' ? 'dark' : 'default'
+          })
+          await window.mermaid.run({ nodes: diagrams })
+        }
+
+        if (window.hljs) window.hljs.highlightAll()
+        if (window.renderMathInElement) {
+          window.renderMathInElement(document.body, {
+            delimiters: [
+              { left: '$$', right: '$$', display: true },
+              { left: '$', right: '$', display: false },
+              { left: '\\(', right: '\\)', display: false },
+              { left: '\\[', right: '\\]', display: true }
+            ]
+          })
+        }
+        await renderDiagrams()
+
+        if (window.Chart) {
+          chart = new Chart(document.getElementById('report-chart'), {
+            type: 'line',
+            data: {
+              labels: ['Baseline', 'Step 1', 'Step 2', 'Result'],
+              datasets: [
+                {
+                  label: 'Illustrative measure',
+                  data: [18, 31, 37, 42],
+                  borderColor: '#2563eb',
+                  backgroundColor: 'rgba(37, 99, 235, .12)',
+                  tension: 0.3,
+                  fill: true
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: 'bottom', labels: { color: chartText() } }
+              },
+              scales: {
+                x: {
+                  ticks: { color: chartText() },
+                  grid: { color: chartGrid() }
+                },
+                y: {
+                  beginAtZero: true,
+                  ticks: { color: chartText() },
+                  grid: { color: chartGrid() }
+                }
+              }
+            }
+          })
+        }
+
+        const syncThemeControl = () => {
+          const dark = root.dataset.theme === 'dark'
+          themeButton.setAttribute('aria-pressed', String(dark))
+          themeButton.title = dark ? 'Use light theme' : 'Use dark theme'
+        }
+        syncThemeControl()
+
+        themeButton.addEventListener('click', async () => {
+          root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark'
+          try {
+            localStorage.setItem('sandwalk-report-theme', root.dataset.theme)
+          } catch {}
+          syncThemeControl()
+          if (chart) {
+            chart.options.plugins.legend.labels.color = chartText()
+            for (const axis of Object.values(chart.options.scales)) {
+              axis.ticks.color = chartText()
+              axis.grid.color = chartGrid()
+            }
+            chart.update()
+          }
+          await renderDiagrams()
+        })
+
+        document.querySelectorAll('.copy-button').forEach(button => {
+          button.addEventListener('click', async () => {
+            const code = button.parentElement.querySelector('code').innerText
+            await navigator.clipboard.writeText(code)
+            button.textContent = 'Copied'
+            window.setTimeout(() => {
+              button.textContent = 'Copy'
+            }, 1200)
+          })
+        })
+
+        const links = [...document.querySelectorAll('.toc a')]
+        const sections = links
+          .map(link => document.querySelector(link.hash))
+          .filter(Boolean)
+        const updateToc = () => {
+          const active = sections.reduce(
+            (current, section) =>
+              section.offsetTop <= window.scrollY + 120 ? section : current,
+            sections[0]
+          )
+          links.forEach(link => {
+            const selected = link.hash === `#${active?.id}`
+            link.classList.toggle('active', selected)
+            if (selected) link.setAttribute('aria-current', 'location')
+            else link.removeAttribute('aria-current')
+          })
+        }
+        window.addEventListener('scroll', updateToc, { passive: true })
+        updateToc()
+
+        const table = document.getElementById('findings-table')
+        const body = table.tBodies[0]
+        table.querySelectorAll('th button').forEach(button => {
+          let ascending = true
+          button.addEventListener('click', () => {
+            const column = Number(button.dataset.sort)
+            const rows = [...body.rows].sort(
+              (left, right) =>
+                left.cells[column].textContent
+                  .trim()
+                  .localeCompare(right.cells[column].textContent.trim()) *
+                (ascending ? 1 : -1)
+            )
+            ascending = !ascending
+            rows.forEach(row => body.appendChild(row))
+          })
+        })
+        document
+          .getElementById('table-filter')
+          .addEventListener('input', event => {
+            const query = event.target.value.toLowerCase()
+            ;[...body.rows].forEach(row => {
+              row.hidden = !row.textContent.toLowerCase().includes(query)
+            })
+          })
+      })
+    </script>
+  </body>
+</html>

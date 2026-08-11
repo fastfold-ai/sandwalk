@@ -32,17 +32,17 @@ def _stub_setup_flow(monkeypatch):
     """Minimal mocks so setup_cmd can finish without prompts."""
     monkeypatch.delenv("ANTHROPIC_FOUNDRY_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_FOUNDRY_RESOURCE", raising=False)
-    monkeypatch.setattr("cli._prompt_setup_providers", lambda default: ["anthropic"])
+    monkeypatch.setattr("cli.setup.wizard_flow._prompt_setup_providers", lambda default: ["anthropic"])
     monkeypatch.setattr(
-        "cli._resolve_provider_key",
+        "cli.setup.wizard_flow_keys._resolve_provider_key",
         lambda cfg, provider, cli_key=None, openai_base_url=None, compatible_backend=None: (
             cli_key or "sk-ant-api03-test"
         ),
     )
-    monkeypatch.setattr("cli._prompt_fastfold_cloud_api_key", lambda cfg, cli_key: None)
-    monkeypatch.setattr("cli._prompt_boltz_api_key", lambda cfg, cli_key: None)
-    monkeypatch.setattr("cli._prompt_install_skills", lambda skills_arg=None, skip=False: None)
-    monkeypatch.setattr("cli._prompt_install_boltz_stack", lambda boltz_key: None)
+    monkeypatch.setattr("cli.setup.wizard._prompt_fastfold_cloud_api_key", lambda cfg, cli_key: None)
+    monkeypatch.setattr("cli.setup.wizard._prompt_boltz_api_key", lambda cfg, cli_key: None)
+    monkeypatch.setattr("cli.setup.wizard._prompt_install_skills", lambda skills_arg=None, skip=False: None)
+    monkeypatch.setattr("cli.setup.wizard._prompt_install_boltz_stack", lambda boltz_key: None)
     monkeypatch.setattr("agent.doctor.run_checks", lambda cfg: [])
     monkeypatch.setattr("agent.doctor.to_table", lambda checks: "")
     monkeypatch.setattr("agent.doctor.has_errors", lambda checks: False)
@@ -82,7 +82,7 @@ class TestSetupCmd:
             called["skills"] = True
             assert skip is True
 
-        monkeypatch.setattr("cli._prompt_install_skills", _track_skills)
+        monkeypatch.setattr("cli.setup.wizard._prompt_install_skills", _track_skills)
 
         setup_cmd(provider="anthropic", api_key="sk-ant-api03-x", skip_skills=True)
         assert called["skills"] is True
@@ -96,7 +96,7 @@ class TestSetupCmd:
         def _install(skills_arg=None, skip=False):
             installed.append(skills_arg)
 
-        monkeypatch.setattr("cli._prompt_install_skills", _install)
+        monkeypatch.setattr("cli.setup.wizard._prompt_install_skills", _install)
 
         setup_cmd(
             provider="anthropic",
@@ -147,7 +147,7 @@ class TestSetupCmd:
     def test_setup_cmd_saves_boltz_api_key(self, monkeypatch):
         cfg = _mock_cfg(monkeypatch)
         _stub_setup_flow(monkeypatch)
-        monkeypatch.setattr("cli._prompt_boltz_api_key", lambda _cfg, cli_key: cli_key)
+        monkeypatch.setattr("cli.setup.wizard._prompt_boltz_api_key", lambda _cfg, cli_key: cli_key)
 
         setup_cmd(
             provider="anthropic",
@@ -280,14 +280,14 @@ class TestSkillInfo:
 
 
 class TestAddSkillsCmd:
-    @patch("cli.skill_add")
+    @patch("cli.skills.skill_add")
     def test_add_skills_cmd_delegates(self, mock_add):
         result = runner.invoke(app, ["add", "skills", "owner/repo@skills/foo"])
         assert result.exit_code == 0
         mock_add.assert_called_once_with("owner/repo@skills/foo")
 
     def test_add_skills_cmd_direct(self):
-        with patch("cli.skill_add") as mock_add:
+        with patch("cli.skills.skill_add") as mock_add:
             add_skills_cmd("local/path")
             mock_add.assert_called_once_with("local/path")
 
@@ -311,6 +311,6 @@ class TestPromptInstallSkills:
         def _install(sources):
             called.extend(sources)
 
-        monkeypatch.setattr("cli._install_skill_sources", _install)
+        monkeypatch.setattr("cli.setup.skills_prompt._install_skill_sources", _install)
         _prompt_install_skills(skills_arg="fold,md")
         assert called == ["fold", "md"]

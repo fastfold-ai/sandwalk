@@ -30,7 +30,7 @@ jobs:
       - name: Install package + test deps
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,all,api]"
+          pip install -e ".[dev,all]"
 
       - name: Ruff lint
         run: ruff check src
@@ -50,12 +50,13 @@ jobs:
           sandwalk tool list | head -20
           python -c "from agent.config import Config; Config.load()"
 
-      - name: Run unit suite with coverage
+      - name: Run CI pytest suite (unit + offline functional)
         run: |
+          # Opt-in lanes (network / live chat / Modal / data smoke / pexpect)
+          # are auto-deselected in tests/conftest.py unless their env gate is set.
           # Scoped omit list in pyproject.toml (REPL/CLI entry + agent_server glue)
           # mirrors local-web / Mac unit-testable coverage gates.
           pytest tests/ -q \
-            -m "not data_smoke and not integration and not modal_e2e" \
             --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models \
             --cov=reports --cov=skills --cov=tools --cov=ui \
             --cov-report=term-missing:skip-covered \

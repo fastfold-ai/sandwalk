@@ -51,11 +51,11 @@ def ct_repl():
 
 
 class TestMentionDropdown:
-    """Test @ mention completion in the REPL."""
+    """Test # tool mention completion in the REPL."""
 
-    def test_at_trigger_shows_completions(self, ct_repl):
-        """Type @tar and check that target tools appear."""
-        ct_repl.send("@tar\t")
+    def test_hash_trigger_shows_completions(self, ct_repl):
+        """Type #tar and check that target tools appear."""
+        ct_repl.send("#tar\t")
         # The completion should show target.* tools
         try:
             ct_repl.expect("target", timeout=5)
@@ -64,7 +64,7 @@ class TestMentionDropdown:
 
 
 class TestSlashCommandsCoexist:
-    """Test that /commands still work alongside @mentions."""
+    """Test that /commands still work alongside #mentions."""
 
     def test_slash_tools(self, ct_repl):
         ct_repl.sendline("/tools")

@@ -6,21 +6,15 @@ import { cn } from '@/lib/utils'
 const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onScroll, ...props }, ref) => (
   <ScrollAreaPrimitive.Root
     ref={ref}
     className={cn('relative overflow-hidden', className)}
     {...props}
   >
     <ScrollAreaPrimitive.Viewport
-      tabIndex={-1}
-      onFocus={event => {
-        // Keep page-load focus on the chat composer, not the transcript scroller.
-        if (event.target === event.currentTarget) {
-          event.currentTarget.blur()
-        }
-      }}
       className="h-full w-full rounded-[inherit] [&>div]:!block [&>div]:!min-w-0"
+      onScroll={onScroll}
     >
       {children}
     </ScrollAreaPrimitive.Viewport>

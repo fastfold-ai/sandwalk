@@ -170,7 +170,9 @@ class TestCliSkillSelection:
         from cli import _install_skill_sources
 
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        # ``cli.app`` is shadowed by the Typer ``app`` re-export on the package;
+        # patch the console bound into the helper module itself.
+        monkeypatch.setattr("cli.setup.skills_install.console", console)
         monkeypatch.setattr("agent.skills._npx_available", lambda: False)
         monkeypatch.setattr(
             "agent.skills.install_skill",
@@ -183,7 +185,7 @@ class TestCliSkillSelection:
         from cli import _print_trace_diagnostics_table
 
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.trace_helpers.console", console)
         diag = {
             "session_id": "sess-1",
             "event_count": 10,

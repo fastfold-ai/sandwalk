@@ -147,13 +147,13 @@ class TestSkillUpgradeRemoveDelete:
         assert result.exit_code == 0
         assert "Fold proteins" in result.stdout
 
-    @patch("cli.skill_add")
+    @patch("cli.skills.skill_add")
     def test_add_skills_cmd_delegates(self, mock_add):
         result = runner.invoke(app, ["add", "skills", "owner/repo@skills/foo"])
         assert result.exit_code == 0
         mock_add.assert_called_once_with("owner/repo@skills/foo")
 
-    @patch("cli.skill_add")
+    @patch("cli.skills.skill_add")
     def test_add_skills_cmd_direct(self, mock_add):
         add_skills_cmd("local/path")
         mock_add.assert_called_once_with("local/path")
@@ -571,7 +571,7 @@ class TestRunCommand:
         assert result.exit_code == 0
         assert "sandwalk v" in result.stdout
 
-    @patch("cli.run_query")
+    @patch("cli.run_query.run_query")
     def test_run_query_with_context_flags(self, mock_run_query):
         result = runner.invoke(
             app,
@@ -593,14 +593,14 @@ class TestRunCommand:
         assert context["target"] == "EGFR"
         assert context["indication"] == "NSCLC"
 
-    @patch("cli.run_interactive")
+    @patch("cli.interactive.run_interactive")
     def test_run_continue_flag(self, mock_interactive):
         result = runner.invoke(app, ["run", "--continue"])
         assert result.exit_code == 0
         mock_interactive.assert_called_once()
         assert mock_interactive.call_args.kwargs["resume_id"] == "last"
 
-    @patch("cli.run_interactive")
+    @patch("cli.interactive.run_interactive")
     def test_run_resume_flag(self, mock_interactive):
         result = runner.invoke(app, ["run", "--resume", "abc123"])
         assert result.exit_code == 0
@@ -609,8 +609,12 @@ class TestRunCommand:
     def test_run_query_legacy_clarification(self, captured_console, monkeypatch):
         from agent.loop import ClarificationNeeded
 
+        import sys
+
+        run_query_mod = sys.modules["cli.run_query"]
+
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr(run_query_mod, "console", console)
         cfg = Config(data={"llm.api_key": "sk-ant-test", "agent.use_sdk": False})
         monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
 
@@ -618,7 +622,7 @@ class TestRunCommand:
         fake_agent = MagicMock()
         fake_agent.run.side_effect = ClarificationNeeded(clarification)
 
-        with patch("cli.print_banner"), patch("cli.setup_cmd"), patch.object(
+        with patch("cli.run_query.print_banner"), patch("cli.setup.wizard.setup_cmd"), patch.object(
             cfg, "llm_preflight_issue", return_value=None
         ), patch("agent.loop.AgentLoop", return_value=fake_agent):
             run_query("ambiguous query", {}, None, None, False)
@@ -651,7 +655,7 @@ class TestPromptInstallSkillsAndSuggestedSources:
         def _install(sources):
             called.extend(sources)
 
-        monkeypatch.setattr("cli._install_skill_sources", _install)
+        monkeypatch.setattr("cli.setup.skills_prompt._install_skill_sources", _install)
         _prompt_install_skills(skills_arg="fold,fastfold-ai/skills@skills/md")
         assert called == ["fold", "fastfold-ai/skills@skills/md"]
 
@@ -661,7 +665,7 @@ class TestPromptInstallSkillsAndSuggestedSources:
         def _install(sources):
             called["ran"] = True
 
-        with patch("cli._install_skill_sources", _install):
+        with patch("cli.setup.skills_prompt._install_skill_sources", _install):
             _prompt_install_skills(skip=True)
         assert called["ran"] is False
 
@@ -694,35 +698,58 @@ class TestPromptInstallSkillsAndSuggestedSources:
 class TestResolveProviderKeyKeepExisting:
     def test_resolve_provider_key_keeps_valid_existing_key(self, captured_console, monkeypatch):
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.setup.provider_key.console", console)
         cfg = Config(data={"llm.anthropic_api_key": "sk-ant-api03-existing-key-value"})
         monkeypatch.setattr("builtins.input", lambda _: "")
         key = _resolve_provider_key(cfg, "anthropic")
         assert key == "sk-ant-api03-existing-key-value"
         assert "Keeping existing key" in buf.getvalue()
 
-    def test_resolve_provider_key_replaces_invalid_existing_key(self, captured_console, monkeypatch):
+    def test_resolve_provider_key_keeps_any_shaped_existing_key(
+        self, captured_console, monkeypatch
+    ):
+        """Key shape is no longer validated — providers rotate prefixes.
+
+        ``validate_llm_api_key`` is normalize-only (live probes are the source of
+        truth for auth), so an odd-looking stored key still reaches the keep
+        prompt rather than being replaced outright.
+        """
+        console, buf = captured_console
+        monkeypatch.setattr("cli.setup.provider_key.console", console)
+        cfg = Config(data={"llm.anthropic_api_key": "odd-shaped-but-real-key"})
+        monkeypatch.setattr("builtins.input", lambda _: "")
+        key = _resolve_provider_key(cfg, "anthropic")
+        assert key == "odd-shaped-but-real-key"
+        assert "Keeping existing key" in buf.getvalue()
+
+    def test_resolve_provider_key_replaces_when_user_declines(
+        self, captured_console, monkeypatch
+    ):
         console, _ = captured_console
-        monkeypatch.setattr("cli.console", console)
-        cfg = Config(data={"llm.anthropic_api_key": "bad-key"})
-        monkeypatch.setattr("cli._prompt_api_key", lambda: "sk-ant-api03-replacement-key")
+        monkeypatch.setattr("cli.setup.provider_key.console", console)
+        cfg = Config(data={"llm.anthropic_api_key": "sk-ant-api03-old-key"})
+        monkeypatch.setattr("builtins.input", lambda _: "n")
+        monkeypatch.setattr(
+            "cli.setup.provider_key._prompt_api_key",
+            lambda: "sk-ant-api03-replacement-key",
+        )
         key = _resolve_provider_key(cfg, "anthropic")
         assert key == "sk-ant-api03-replacement-key"
 
 
 class TestMarkupAndVersionHelpers:
     def test_random_command_tip_empty_commands(self, monkeypatch):
-        monkeypatch.setattr("cli.SLASH_COMMANDS", {})
+        monkeypatch.setattr("cli.banner_support.SLASH_COMMANDS", {})
         tip = _random_command_tip_markup()
         assert "slash commands" in tip.lower()
 
     def test_random_command_tip_from_commands(self, monkeypatch):
-        monkeypatch.setattr("cli.SLASH_COMMANDS", {"/help": "Show help"})
+        monkeypatch.setattr("cli.banner_support.SLASH_COMMANDS", {"/help": "Show help"})
         tip = _random_command_tip_markup()
         assert "/help" in tip
 
     def test_random_news_item_without_boltz_skill(self, monkeypatch):
-        monkeypatch.setattr("cli._installed_claude_skill_names", lambda: ["fold"])
+        monkeypatch.setattr("cli.banner_support._installed_claude_skill_names", lambda: ["fold"])
         monkeypatch.setattr("cli.random.choice", lambda seq: "protein screening")
         news = _random_news_item_markup()
         assert "Boltz API skill now available" in news
@@ -731,7 +758,7 @@ class TestMarkupAndVersionHelpers:
 
     def test_random_news_item_with_boltz_skill_installed(self, monkeypatch):
         monkeypatch.setattr(
-            "cli._installed_claude_skill_names",
+            "cli.banner_support._installed_claude_skill_names",
             lambda: ["fold", "boltz"],
         )
         monkeypatch.setattr("cli.random.choice", lambda seq: "ADME prediction")
@@ -864,10 +891,10 @@ class TestSkillsUpdateAndInstallEdgeCases:
         monkeypatch.setattr("cli.sys.stdout.isatty", lambda: True)
         monkeypatch.setattr("builtins.input", MagicMock(side_effect=["y", ""]))
         monkeypatch.setattr("agent.skills.discover_skills", discover)
-        monkeypatch.setattr("cli._select_suggested_sources", lambda: [])
-        monkeypatch.setattr("cli.spinner", lambda *args, **kwargs: nullcontext())
+        monkeypatch.setattr("cli.setup.skills_prompt._select_suggested_sources", lambda: [])
+        monkeypatch.setattr("cli.setup.skills_prompt.spinner", lambda *args, **kwargs: nullcontext())
         monkeypatch.setattr(
-            "cli._install_skill_sources",
+            "cli.setup.skills_prompt._install_skill_sources",
             lambda _sources: pytest.fail("No skills should be installed in this flow"),
         )
 
@@ -880,18 +907,18 @@ class TestSkillsUpdateAndInstallEdgeCases:
         import cli
 
         console, buf = captured_console
-        monkeypatch.setattr("cli.console", console)
+        monkeypatch.setattr("cli.banner.console", console)
         cfg = Config(data={"llm.model": "claude-sonnet-4-5-20250929"})
         monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
-        monkeypatch.setattr("cli._count_installed_claude_skills", lambda: 2)
-        monkeypatch.setattr("cli._resolve_fastfold_subscription_tier", lambda _c: "pro")
-        monkeypatch.setattr("cli.get_upgrade_available_version", lambda _v: None)
+        monkeypatch.setattr("cli.banner._count_installed_claude_skills", lambda: 2)
+        monkeypatch.setattr("cli.banner._resolve_fastfold_subscription_tier_local", lambda _c: "pro")
+        monkeypatch.setattr("cli.banner._get_cached_upgrade_available_version", lambda _v: None)
         monkeypatch.setattr(
-            "cli._get_cached_skills_update_safe",
+            "cli.banner._get_cached_skills_update_safe",
             lambda: {"installed": "v1.0.0", "latest": "v1.1.0"},
         )
-        monkeypatch.setattr("cli._random_command_tip_markup", lambda: "[dim]tip[/dim]")
-        monkeypatch.setattr("cli._random_news_item_markup", lambda: "[dim]news[/dim]")
+        monkeypatch.setattr("cli.banner._random_command_tip_markup", lambda: "[dim]tip[/dim]")
+        monkeypatch.setattr("cli.banner._random_news_item_markup", lambda: "[dim]news[/dim]")
         monkeypatch.setattr("tools.registry.list_tools", lambda: ["a", "b"])
 
         with patch("tools.ensure_loaded"):

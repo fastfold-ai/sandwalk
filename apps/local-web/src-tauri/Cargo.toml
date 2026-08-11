@@ -1,0 +1,38 @@
+[package]
+name = "sandwalk-desktop"
+version = "0.0.1"
+description = "Sandwalk macOS client (Tauri; Sandwalk Server helper owns the agent)"
+authors = ["Fastfold AI Labs"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "sandwalk_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# macos-private-api: transparent window + liquid glass (NSGlassEffectView / vibrancy)
+tauri = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-liquid-glass = "0.1"
+tauri-plugin-notification = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+dirs = "5"
+base64 = "0.22"
+sandwalk-stt = { path = "../stt" }
+tauri-plugin-dialog = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Replaces the deprecated `cocoa`/`objc` crates for the Dock icon swap below.
+# default-features = false + a narrow feature list keeps this from pulling in
+# AppKit's full surface (306 features by default) and slowing the build.
+objc2 = { version = "0.6", default-features = false, features = ["std"] }
+block2 = "0.6"
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFCGTypes"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSGeometry", "NSString", "objc2-core-foundation"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSCell", "NSControl", "NSDockTile", "NSGraphics", "NSImage", "NSImageView", "NSResponder", "NSView", "block2"] }

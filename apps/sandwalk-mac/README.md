@@ -1,7 +1,20 @@
-# Sandwalk macOS menubar
+<h1 align="center">Sandwalk macOS</h1>
 
-Menubar app that owns **both** the agent API (`sandwalk serve`) and the web
-dashboard — Start / Stop / Quit together.
+<p align="center">
+  <img src="Resources/AppIcon-1024.png" alt="Sandwalk macOS app icon" width="160" height="160" />
+</p>
+
+<p align="center">
+Native macOS <strong>menu bar</strong> app that supervises the local <strong>agent API</strong>
+(<code>sandwalk serve</code>) and dashboard processes — start, stop, restart, and open the UI.
+The agent keeps running with <strong>no windows open</strong>; only Quit stops it.
+</p>
+
+<p align="center">
+  <img src="../../images/showcase-mac-app-1.png" alt="Sandwalk macOS menu bar" width="280" />
+  &nbsp;&nbsp;
+  <img src="../../images/showcase-mac-app-2.png" alt="Sandwalk macOS Settings" width="420" />
+</p>
 
 | Mode | API | Dashboard |
 |------|-----|-----------|
@@ -10,18 +23,38 @@ dashboard — Start / Stop / Quit together.
 
 Toggle under **Settings → Server → Advanced**.
 
-## Run (from monorepo root)
+## What it does
+
+- **Menu bar** — running status, pinned / recent agents, New Agent (⌘N), Open Web Dashboard (⌘O), Settings (⌘,), Stop / Restart (⌘R), Quit (⌘Q)
+- **Control plane** — local HTTP API + `control.json` so **Sandwalk Desktop** (Tauri) can Start/Stop/Restart and edit Server settings without spawning a second `serve`
+- **Settings window** — still available as fallback; when Sandwalk Desktop is installed, Settings… / Open Web Dashboard / New Agent prefer the Tauri window (Web UI now includes Server Status / Network / Advanced / Security / Logs)
+- **Supervises both processes** — API + dashboard share Start / Stop / Quit; Apply on network settings restarts both
+- **Persists config** under `~/Library/Application Support/Sandwalk/settings.json` (`server` + `auth`), same auth story as `sandwalk auth`
+
+See [`apps/local-web/DESKTOP.md`](../local-web/DESKTOP.md) for Tauri desktop UI.
+
+Clicking the Dock icon (while Settings is open) or Launchpad / Applications opens Settings (or Desktop when available).
+
+## Prerequisites
+
+- macOS 14+
+- Full **Xcode** (not Command Line Tools alone) for `swift build` / XCTest
+- From the monorepo root: `pnpm install` once (web dashboard deps for Development mode and packaging)
+
+## Run (development)
+
+From the monorepo root:
 
 ```bash
 pnpm install   # once — web dashboard deps
 cd apps/sandwalk-mac && swift run
 ```
 
-On launch (default auto-start) the menu bar starts API + web.
+On launch (default auto-start) the app starts API + web.
 Use **Start Sandwalk** / **Stop Sandwalk**, **Open Web Dashboard** (⌘O), or **Quit**.
 
-**Settings…** opens a real Settings window (Server + Security). Clicking the Dock
-icon (while Settings is open) or Launchpad / Applications relaunches into Settings.
+Do **not** run a standalone `pnpm dev` in another terminal while the app is
+supervising Development mode — it will fight over the dashboard port.
 
 ## Install as a Mac app (Launchpad / Applications)
 
@@ -31,20 +64,23 @@ cd apps/sandwalk-mac
 open ~/Applications/Sandwalk.app
 ```
 
-This builds `Sandwalk.app`, installs it to `~/Applications`, and gives it the
+This builds `Sandwalk.app`, installs it to `~/Applications`, and applies the
 Sandwalk mark icon. Prefer this over bare `swift run` so the app shows up in
 Finder / Launchpad like a normal Mac app.
 
-Persisted under `~/Library/Application Support/Sandwalk/settings.json` (`server` + `auth` sections).
+Or download a release from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases) when published.
 
-**Settings…** (menubar) manages:
+## Settings
 
-- **Server → Network** — API / dashboard ports, allow remote connections (`0.0.0.0`), start on launch. Apply restarts both services.
-- **Server → Advanced** — Production (built UI on API) vs Development (Vite HMR). Default is Production.
-- **Security** — API key generate / show / copy / reset, enable auth. Same `settings.json` as `sandwalk auth`.
+**Settings…** manages:
 
-Do **not** run a standalone `pnpm dev` in another terminal while the menubar is
-supervising Development mode — it will fight over the dashboard port.
+- **Server → Status** — running state, hardware / RAM / load, cache, health probes, endpoints
+- **Server → Network** — API / dashboard ports, allow remote connections (`0.0.0.0`), start on launch. Apply restarts both services
+- **Server → Advanced** — Production (built UI on API) vs Development (Vite HMR). Default is Production
+- **Security** — API key generate / show / copy / reset, enable auth. Same `settings.json` as `sandwalk auth`
+- **Agent / Capabilities / Workspace** — runtime, sandbox, models, tools, skills, specialists, MCPs, doctor, storage, and more
+
+Logs: `~/Library/Application Support/Sandwalk/logs/{server,web}.log`
 
 ## Env (optional overrides)
 
@@ -61,20 +97,75 @@ Env wins over `settings.json` when set at launch:
 | `SANDWALK_AGENT_CLI` | `./cli` | Python package root |
 | `SANDWALK_SERVE_BIN` | — | Absolute path to `sandwalk` binary |
 
-Logs: `~/Library/Application Support/Sandwalk/logs/{server,web}.log`
+## Project layout
+
+```
+apps/sandwalk-mac/
+├── Package.swift              # SandwalkCore library + Sandwalk executable + tests
+├── Sources/
+│   ├── SandwalkApp/           # Thin @main entry
+│   └── SandwalkCore/          # App logic, Settings UI, process supervision, Agent API client
+├── Tests/SandwalkTests/       # XCTest (@testable import SandwalkCore)
+├── scripts/
+│   ├── package-app.sh         # Build + install ~/Applications/Sandwalk.app
+│   ├── lint.sh                # SwiftLint (pinned)
+│   ├── install-swiftlint.sh   # Portable SwiftLint into .tools/
+│   └── test.sh                # Lint → XCTest → coverage gate
+├── .swiftlint.yml
+└── .swiftlint-version         # Pinned SwiftLint release (e.g. 0.65.0)
+```
+
+`SandwalkCore` holds the real app so XCTest can `@testable import` it. The
+`Sandwalk` executable is a thin entry only.
+
+## Module size guidance
+
+Prefer cohesive types and views. SwiftLint may warn around ~300 lines under
+`Sources/` (comment-only lines ignored); that is advisory, not a hard gate.
+Extract helpers, sections, and actions when a file mixes unrelated responsibilities.
+
+SwiftLint is **pinned** in `.swiftlint-version` (portable binary under `.tools/`,
+gitignored):
+
+```bash
+cd apps/sandwalk-mac
+./scripts/lint.sh
+# or from repo root:
+pnpm lint:mac
+```
+
+`./scripts/test.sh` runs lint before XCTest.
+
+## Build
+
+```bash
+cd apps/sandwalk-mac
+swift build
+# release / app bundle:
+./scripts/package-app.sh
+```
+
+If `swift` cannot find XCTest or SourceKit, point at full Xcode:
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+```
+
+`scripts/lint.sh` and `scripts/test.sh` set this when needed.
 
 ## Tests & coverage
 
-Requires full **Xcode** (not Command Line Tools alone) so `XCTest` is available.
-`scripts/test.sh` sets `DEVELOPER_DIR` to Xcode.app when needed, runs unit tests
-with coverage, and **fails if scoped line coverage is below 80%**.
+Requires full **Xcode**. `scripts/test.sh` runs SwiftLint, unit tests with
+coverage, and **fails if scoped line coverage is below 80%**.
 
 ```bash
 cd apps/sandwalk-mac
 ./scripts/test.sh
+# or from repo root:
+pnpm test:mac
 ```
 
-The gate matches **local-web**: only pure, unit-testable modules count toward
+Only pure, unit-testable modules count toward
 coverage (SwiftUI views and process supervisors are excluded):
 
 - `PathSupport.swift`
@@ -112,8 +203,34 @@ xcrun llvm-cov show \
 open coverage-html/index.html
 ```
 
-Full monorepo testing guide: [docs/TESTING.md](../../docs/TESTING.md).
+Full monorepo testing guide: [`.github/TESTING.md`](../../.github/TESTING.md).
 
-Pure helpers live in the `SandwalkCore` library target so XCTest can
-`@testable import` them. The `Sandwalk` executable is a thin `@main` entry only.
+## Contributing
 
+This package lives in the [sandwalk](https://github.com/fastfold-ai/sandwalk) monorepo
+(`cli/`, `apps/local-web/`, `apps/sandwalk-mac/`). See [CONTRIBUTING.md](../../CONTRIBUTING.md)
+for repo-wide setup.
+
+When changing the Mac app:
+
+1. Prefer cohesive modules; extract when a file mixes unrelated responsibilities
+2. Prefer logic in `SandwalkCore` (testable) over the thin `SandwalkApp` entry
+3. Add / update XCTest coverage for pure helpers you touch; keep the scoped gate ≥80%
+4. Run before opening a PR:
+
+```bash
+pnpm lint:mac
+pnpm test:mac
+# or: cd apps/sandwalk-mac && ./scripts/lint.sh && ./scripts/test.sh
+```
+
+5. Keep PRs focused; do not commit `.build/`, `.tools/`, secrets, or local settings
+6. CI runs Mac lint + tests on macOS runners (`pnpm test:mac` / Codecov flag `mac-app`)
+
+Handy scripts from this directory:
+
+| Script | Purpose |
+|--------|---------|
+| `./scripts/lint.sh` | Install pinned SwiftLint if needed + advisory lint |
+| `./scripts/test.sh` | Lint → XCTest → coverage gate + `coverage.lcov` |
+| `./scripts/package-app.sh` | Release-style `Sandwalk.app` into `~/Applications` |

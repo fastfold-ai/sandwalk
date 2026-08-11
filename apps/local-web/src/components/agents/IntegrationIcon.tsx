@@ -1,5 +1,4 @@
 import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
-import { Webhook } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
@@ -17,6 +16,13 @@ export const INTEGRATION_ICONS: Record<
   anthropic: { src: '/anthropic.png', invertInDark: true },
   xai: { src: '/xai.png' },
   google: { src: '/gemini.png' },
+  moonshot: { src: '/kimi.png' },
+  deepseek: { src: '/deepseek.svg' },
+  minimax: { src: '/minimax.svg' },
+  mistral: { src: '/mistral.svg' },
+  qwen: { src: '/qwen.svg' },
+  together: { src: '/together.svg' },
+  openrouter: { src: '/models/openrouter-color.svg' },
   'ibm-rxn': { src: '/ibm.png' },
   lens: { src: '/lens.png' },
   sendgrid: { src: '/sendgrid.png' },
@@ -25,10 +31,14 @@ export const INTEGRATION_ICONS: Record<
   tavily: { src: '/tavily-color.png' },
   slack: { src: '/integrations/slack.png' },
   'skills-sh': { src: '/integrations/vercel.png', invertInDark: true },
+  pymol: { src: '/integrations/pymol.png' },
+  raymol: { src: '/integrations/raymol.png' },
   tamarind: { src: '/integrations/tamarind.png' },
   latch: { src: '/integrations/latch.png' },
   neurosnap: { src: '/integrations/neurosnap.png' },
   paperclip: { src: '/integrations/paperclip.png' },
+  exa: { src: '/integrations/exa.png' },
+  huggingface: { src: '/integrations/huggingface.png' },
   linear: { src: '/integrations/linear.png' },
 }
 
@@ -44,7 +54,6 @@ export function IntegrationIcon({
     (integration.key.startsWith('openai') ? INTEGRATION_ICONS.openai : null)
   const imageClass = size === 'lg' ? 'size-9' : 'size-6'
   const fallbackClass = size === 'lg' ? 'size-9' : 'size-6'
-  const fallbackIconClass = size === 'lg' ? 'size-5' : 'size-4'
   if (icon) {
     return (
       <img
@@ -56,18 +65,6 @@ export function IntegrationIcon({
           icon.invertInDark && 'dark:invert'
         )}
       />
-    )
-  }
-  if (integration.key === 'custom-webhook') {
-    return (
-      <span
-        className={cn(
-          'bg-muted/30 text-foreground grid shrink-0 place-items-center rounded',
-          fallbackClass
-        )}
-      >
-        <Webhook className={fallbackIconClass} />
-      </span>
     )
   }
   return (

@@ -36,6 +36,10 @@ struct AppConfig: Equatable, Sendable {
     var healthCheckIntervalSeconds: Int
     /// Production (API-hosted UI) vs Development (Vite).
     var dashboardServeMode: DashboardServeMode
+    /// Quarantine + recover corrupt `agent-server.db` on serve start (default on).
+    var dbAutoHeal: Bool
+    /// When true, ⌘Q closes windows only; menu bar + agent keep running.
+    var keepMenubarOnCmdQ: Bool
     /// Monorepo `cli/` directory (Python package).
     var agentCliRoot: URL?
     /// Monorepo root (contains `apps/`, `cli/`, `package.json`).
@@ -47,6 +51,8 @@ struct AppConfig: Equatable, Sendable {
     static let defaultDashboardPort = 8969
     static let defaultHealthCheckIntervalSeconds = 60
     static let defaultDashboardServeMode: DashboardServeMode = .production
+    static let defaultDbAutoHeal = true
+    static let defaultKeepMenubarOnCmdQ = true
     static let minHealthCheckIntervalSeconds = 5
     static let maxHealthCheckIntervalSeconds = 300
 
@@ -98,7 +104,7 @@ struct AppConfig: Equatable, Sendable {
     }
 
     var agentsHomeURL: URL {
-        dashboardURL.appendingPathComponent("agents/home")
+        dashboardURL.appendingPathComponent("agents/new")
     }
 
     var healthURL: URL {
@@ -167,6 +173,18 @@ struct AppConfig: Equatable, Sendable {
             }
             return saved.dashboardServeMode ?? defaultDashboardServeMode
         }()
+        let dbAutoHeal: Bool = {
+            if let raw = env["SANDWALK_DB_AUTO_HEAL"]?.lowercased() {
+                return !["0", "false", "no", "off"].contains(raw)
+            }
+            return saved.dbAutoHeal ?? defaultDbAutoHeal
+        }()
+        let keepMenubarOnCmdQ: Bool = {
+            if let raw = env["SANDWALK_KEEP_MENUBAR_ON_CMDQ"]?.lowercased() {
+                return !["0", "false", "no", "off"].contains(raw)
+            }
+            return saved.keepMenubarOnCmdQ ?? defaultKeepMenubarOnCmdQ
+        }()
         let repoRoot = env["SANDWALK_REPO_ROOT"].map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
         } ?? discoverRepoRoot()
@@ -183,6 +201,8 @@ struct AppConfig: Equatable, Sendable {
             autoStartOnLaunch: autoStart,
             healthCheckIntervalSeconds: healthInterval,
             dashboardServeMode: serveMode,
+            dbAutoHeal: dbAutoHeal,
+            keepMenubarOnCmdQ: keepMenubarOnCmdQ,
             agentCliRoot: cliRoot,
             repoRoot: repoRoot
         )
@@ -198,7 +218,9 @@ struct AppConfig: Equatable, Sendable {
                 dashboardPort: dashboardPort,
                 autoStartOnLaunch: autoStartOnLaunch,
                 healthCheckIntervalSeconds: healthCheckIntervalSeconds,
-                dashboardServeMode: dashboardServeMode
+                dashboardServeMode: dashboardServeMode,
+                dbAutoHeal: dbAutoHeal,
+                keepMenubarOnCmdQ: keepMenubarOnCmdQ
             )
         )
     }
@@ -206,7 +228,7 @@ struct AppConfig: Equatable, Sendable {
     private static func discoverRepoRoot() -> URL? {
         let fm = FileManager.default
         let fromSources = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // Sandwalk/
+            .deletingLastPathComponent() // SandwalkCore/
             .deletingLastPathComponent() // Sources/
             .deletingLastPathComponent() // sandwalk-mac/
             .deletingLastPathComponent() // apps/
@@ -259,79 +281,5 @@ struct AppConfig: Equatable, Sendable {
 
     var webLogURL: URL {
         supportDirectory.appendingPathComponent("logs/web.log")
-    }
-}
-
-/// Network slice of `settings.json` (alongside `auth`).
-struct ServerNetworkSettings: Equatable, Sendable {
-    var bindHost: String?
-    var port: Int?
-    var dashboardHost: String?
-    var dashboardPort: Int?
-    var autoStartOnLaunch: Bool?
-    var healthCheckIntervalSeconds: Int?
-    var dashboardServeMode: DashboardServeMode?
-}
-
-enum ServerSettingsStore {
-    static func settingsFileURL() -> URL {
-        AuthSettingsStore.settingsFileURL()
-    }
-
-    static func load() -> ServerNetworkSettings {
-        let url = settingsFileURL()
-        guard
-            let data = try? Data(contentsOf: url),
-            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let server = root["server"] as? [String: Any]
-        else {
-            return ServerNetworkSettings()
-        }
-        let modeRaw = (server["dashboard_serve_mode"] as? String)?.lowercased()
-        let mode: DashboardServeMode? = {
-            switch modeRaw {
-            case "development", "dev": return .development
-            case "production", "prod": return .production
-            default: return nil
-            }
-        }()
-        return ServerNetworkSettings(
-            bindHost: server["host"] as? String,
-            port: server["port"] as? Int,
-            dashboardHost: server["dashboard_host"] as? String,
-            dashboardPort: server["dashboard_port"] as? Int,
-            autoStartOnLaunch: server["auto_start"] as? Bool,
-            healthCheckIntervalSeconds: server["health_check_interval_seconds"] as? Int,
-            dashboardServeMode: mode
-        )
-    }
-
-    static func save(_ settings: ServerNetworkSettings) throws {
-        let url = settingsFileURL()
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        var root: [String: Any] = [:]
-        if let data = try? Data(contentsOf: url),
-           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        {
-            root = existing
-        }
-        root["server"] = [
-            "host": settings.bindHost ?? AppConfig.defaultHost,
-            "port": settings.port ?? AppConfig.defaultPort,
-            "dashboard_host": settings.dashboardHost ?? AppConfig.defaultDashboardHost,
-            "dashboard_port": settings.dashboardPort ?? AppConfig.defaultDashboardPort,
-            "auto_start": settings.autoStartOnLaunch ?? true,
-            "health_check_interval_seconds": AppConfig.clampHealthCheckInterval(
-                settings.healthCheckIntervalSeconds ?? AppConfig.defaultHealthCheckIntervalSeconds
-            ),
-            "dashboard_serve_mode": (
-                settings.dashboardServeMode ?? AppConfig.defaultDashboardServeMode
-            ).rawValue,
-        ]
-        let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
-        try data.write(to: url, options: .atomic)
     }
 }

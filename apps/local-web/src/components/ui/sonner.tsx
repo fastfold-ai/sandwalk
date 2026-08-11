@@ -37,7 +37,11 @@ export function Toaster({ ...props }: ToasterProps) {
         classNames: {
           toast:
             'group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg',
-          description: 'group-[.toast]:text-muted-foreground',
+          success:
+            'group-[.toaster]:!bg-primary group-[.toaster]:!text-primary-foreground group-[.toaster]:!border-primary',
+          description:
+            'group-[.toast]:text-muted-foreground group-data-[type=success]:!text-primary-foreground/80',
+          icon: 'group-data-[type=success]:!text-primary-foreground',
           actionButton:
             'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground',
           cancelButton:

@@ -61,6 +61,12 @@ describe('terminal-theme', () => {
     expect(readDocumentPalette()).toBe('mahal')
     document.documentElement.setAttribute('data-palette', 'darwin')
     expect(readDocumentPalette()).toBe('darwin')
+    document.documentElement.setAttribute('data-palette', 'fabienk')
+    expect(readDocumentPalette()).toBe('fabienk')
+    document.documentElement.setAttribute('data-palette', 'dune')
+    expect(readDocumentPalette()).toBe('dune')
+    document.documentElement.setAttribute('data-palette', 'neonnoir')
+    expect(readDocumentPalette()).toBe('neonnoir')
     document.documentElement.setAttribute('data-palette', 'nope')
     expect(readDocumentPalette()).toBe('default')
   })
@@ -80,7 +86,7 @@ describe('terminal-theme', () => {
     expect(dark.selectionBackground).toBe('rgba(88, 166, 255, 0.28)')
   })
 
-  it('uses palette-tinted ANSI for mirage, mahal, and darwin', () => {
+  it('uses palette-tinted ANSI for mirage, mahal, darwin, fabienk, dune, and neonnoir', () => {
     const mirage = buildTerminalTheme(true, 'mirage')
     expect(mirage.yellow).toBe('#E2B045')
     expect(mirage.green).toBe('#9BBB5C')
@@ -90,6 +96,18 @@ describe('terminal-theme', () => {
 
     const darwinDark = buildTerminalTheme(true, 'darwin')
     expect(darwinDark.green).toBe('#52B788')
+
+    const fabienkDark = buildTerminalTheme(true, 'fabienk')
+    expect(fabienkDark.yellow).toBe('#F8B144')
+    expect(fabienkDark.brightYellow).toBe('#FFC857')
+
+    const duneLight = buildTerminalTheme(false, 'dune')
+    expect(duneLight.brightBlue).toBe('#8BB6B6')
+    expect(duneLight.brightYellow).toBe('#D4A373')
+
+    const noir = buildTerminalTheme(true, 'neonnoir')
+    expect(noir.magenta).toBe('#E83A8A')
+    expect(noir.brightMagenta).toBe('#FF4DA6')
   })
 
   it('prefers CSS token values when present on the document', () => {

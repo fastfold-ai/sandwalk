@@ -24,11 +24,31 @@ def test_settings_service_get_defaults(tmp_path: Path, monkeypatch):
     assert settings.recursion_limit >= 25
     assert settings.max_sdk_turns >= 1
     assert isinstance(settings.group_tool_traces, bool)
-    assert settings.tool_trace_detail_limit >= 1
+    assert settings.tool_trace_detail_limit >= 0
     assert settings.background_watch_timeout_s >= 60
     assert settings.interrupt_drain_timeout_s >= 1
     assert settings.parallel_max_threads >= 1
     assert isinstance(settings.tool_health_enabled, bool)
+    assert settings.file_access == "project"
+
+
+def test_settings_service_file_access_roundtrip(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
+    (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
+    Config({}).save()
+
+    updated = SettingsService.update(
+        UpdateRuntimeSettingsRequest(file_access="full")
+    )
+    assert updated.file_access == "full"
+    assert Config.load().get("agent.file_access") == "full"
+
+    # Unknown values normalize back to the safe default.
+    reset = SettingsService.update(
+        UpdateRuntimeSettingsRequest(file_access="bogus")
+    )
+    assert reset.file_access == "project"
 
 
 def test_settings_service_update_runtime_knobs(tmp_path: Path, monkeypatch):
@@ -54,9 +74,11 @@ def test_settings_service_update_runtime_knobs(tmp_path: Path, monkeypatch):
             tool_health_enabled=False,
             tool_health_fail_threshold=5,
             tool_health_suppress_seconds=600,
+            plan_mode=True,
         )
     )
     assert updated.tool_mode == "native"
+    assert updated.plan_mode is True
     assert updated.reasoning_effort == "high"
     assert updated.reasoning_fast is True
     assert updated.recursion_limit == 200
@@ -69,6 +91,7 @@ def test_settings_service_update_runtime_knobs(tmp_path: Path, monkeypatch):
     assert updated.tool_health_enabled is False
     assert updated.tool_health_fail_threshold == 5
     assert updated.tool_health_suppress_seconds == 600
+    assert Config.load().get("agent.plan_preview") is True
 
     cfg = Config.load()
     assert cfg.get("agent.tool_mode") == "native"
@@ -99,6 +122,8 @@ def test_settings_service_update_runtime_knobs(tmp_path: Path, monkeypatch):
     assert sonnet.model == "claude-sonnet-5"
     assert sonnet.reasoning_effort == "low"
     assert sonnet.reasoning_fast is False
+    assert "anthropic:claude-sonnet-5" in cfg.recent_models()
+    assert "openai:gpt-5.6-sol" in cfg.recent_models()
 
 
 def test_settings_service_onboarding(tmp_path: Path, monkeypatch):

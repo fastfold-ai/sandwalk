@@ -1,5 +1,5 @@
 import type { AgentTodo } from '@sandwalk/agent-ui-core'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
@@ -39,14 +39,14 @@ export function TodoListInline({
                     isCompleted
                       ? 'border-muted-foreground/60 bg-muted text-muted-foreground'
                       : isInProgress
-                      ? 'border-foreground/40 text-foreground'
-                      : 'border-muted-foreground/50 text-transparent'
+                        ? 'border-foreground/50 text-foreground'
+                        : 'border-muted-foreground/50 text-transparent'
                   )}
                 >
                   {isCompleted ? (
                     <Check className="h-3 w-3" />
                   ) : isInProgress ? (
-                    <Loader2 className="h-2.5 w-2.5 animate-spin [animation-duration:1.8s]" />
+                    <Loader className="h-2.5 w-2.5 animate-spin [animation-duration:1.2s]" />
                   ) : null}
                 </span>
                 <p
@@ -54,7 +54,9 @@ export function TodoListInline({
                     'whitespace-pre-wrap text-[15px] leading-6',
                     isCompleted
                       ? 'text-muted-foreground line-through'
-                      : 'text-foreground'
+                      : isInProgress
+                        ? 'text-foreground font-medium'
+                        : 'text-foreground'
                   )}
                 >
                   {todo.activeForm || todo.content}

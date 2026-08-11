@@ -1,5 +1,5 @@
-import type { DoctorCheckResult, DoctorReport } from '@sandwalk/agent-ui-core'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { DoctorCheckResult, DoctorReport } from '@sandwalk/agent-ui-core'
 import {
   AlertTriangle,
   CheckCircle2,

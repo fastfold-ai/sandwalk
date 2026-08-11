@@ -78,31 +78,41 @@ def _captured_console():
     return console, buf
 
 
+def _verbose_config():
+    return {"agent.group_tool_traces": False, "agent.tool_trace_detail_limit": 8}
+
+
 class TestTraceRendererStart:
-    def test_contains_tool_name(self):
+    def test_collapsed_by_default_skips_start(self):
         console, buf = _captured_console()
         renderer = TraceRenderer(console)
+        renderer.render_tool_start("target.coessentiality", {"gene": "CRBN"})
+        assert buf.getvalue() == ""
+
+    def test_contains_tool_name(self):
+        console, buf = _captured_console()
+        renderer = TraceRenderer(console, config=_verbose_config())
         renderer.render_tool_start("target.coessentiality", {"gene": "CRBN"})
         output = buf.getvalue()
         assert "target.coessentiality" in output
 
     def test_contains_args(self):
         console, buf = _captured_console()
-        renderer = TraceRenderer(console)
+        renderer = TraceRenderer(console, config=_verbose_config())
         renderer.render_tool_start("target.coessentiality", {"gene": "CRBN"})
         output = buf.getvalue()
         assert "CRBN" in output
 
     def test_running_indicator(self):
         console, buf = _captured_console()
-        renderer = TraceRenderer(console)
+        renderer = TraceRenderer(console, config=_verbose_config())
         renderer.render_tool_start("target.coessentiality")
         output = buf.getvalue()
         assert "\u25b8" in output  # ▸
 
     def test_strips_mcp_prefix(self):
         console, buf = _captured_console()
-        renderer = TraceRenderer(console)
+        renderer = TraceRenderer(console, config=_verbose_config())
         renderer.render_tool_start("mcp__ct-tools__target.coessentiality")
         output = buf.getvalue()
         assert "mcp__ct-tools__" not in output
@@ -110,9 +120,29 @@ class TestTraceRendererStart:
 
 
 class TestTraceRendererComplete:
+    def test_collapsed_by_default_hides_args_and_result(self):
+        from ui.traces.tool_expand import ToolExpandStore
+
+        console, buf = _captured_console()
+        store = ToolExpandStore()
+        renderer = TraceRenderer(console, expand_store=store)
+        renderer.render_tool_complete(
+            "target.coessentiality",
+            {"gene": "CRBN"},
+            "Found 20 co-essential genes.",
+            2.3,
+        )
+        output = buf.getvalue()
+        assert "Ran" in output
+        assert "target.coessentiality" in output
+        assert "CRBN" not in output
+        assert "Found 20" not in output
+        assert len(store.cards) == 1
+        assert store.cards[0].args["gene"] == "CRBN"
+
     def test_contains_tool_name_and_timing(self):
         console, buf = _captured_console()
-        renderer = TraceRenderer(console)
+        renderer = TraceRenderer(console, config=_verbose_config())
         renderer.render_tool_complete(
             "target.coessentiality",
             {"gene": "CRBN"},
@@ -125,7 +155,7 @@ class TestTraceRendererComplete:
 
     def test_contains_result_summary(self):
         console, buf = _captured_console()
-        renderer = TraceRenderer(console)
+        renderer = TraceRenderer(console, config=_verbose_config())
         renderer.render_tool_complete(
             "target.coessentiality",
             {},
@@ -137,14 +167,14 @@ class TestTraceRendererComplete:
 
     def test_checkmark_indicator(self):
         console, buf = _captured_console()
-        renderer = TraceRenderer(console)
+        renderer = TraceRenderer(console, config=_verbose_config())
         renderer.render_tool_complete("tool.name", {}, "result", 1.0)
         output = buf.getvalue()
         assert "\u2713" in output  # ✓
 
     def test_truncates_long_result(self):
         console, buf = _captured_console()
-        renderer = TraceRenderer(console)
+        renderer = TraceRenderer(console, config=_verbose_config())
         renderer.render_tool_complete("tool.name", {}, "X" * 500, 1.0)
         output = buf.getvalue()
         assert "500 chars total" in output
@@ -298,6 +328,7 @@ class TestTraceRendererSnapshot:
     @staticmethod
     def _render_sequence():
         console, buf = _captured_console()
+        # Snapshot covers the default collapsed path (start suppressed).
         renderer = TraceRenderer(console)
         renderer.render_tool_start("target.coessentiality", {"gene": "CRBN"})
         renderer.render_tool_complete(

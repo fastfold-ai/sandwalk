@@ -1,0 +1,4 @@
+This directory vendors source from Arcadia Science's agentic-pymol
+(https://github.com/Arcadia-Science/agentic-pymol), MIT License.
+Copyright (c) 2026 Arcadia Science. See LICENSE.
+Maintained for Sandwalk as a local install path (no runtime git fetch).

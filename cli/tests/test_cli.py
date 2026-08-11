@@ -91,13 +91,13 @@ def test_prompt_setup_providers_interactive_arrow_space_mode(monkeypatch):
 def test_setup_cmd_direct_call_handles_typer_option_defaults(monkeypatch):
     cfg = Config(data={})
     monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
-    monkeypatch.setattr("cli._prompt_setup_providers", lambda default: ["anthropic"])
+    monkeypatch.setattr("cli.setup.wizard_flow._prompt_setup_providers", lambda default: ["anthropic"])
     monkeypatch.setattr(
-        "cli._resolve_provider_key",
+        "cli.setup.wizard_flow_keys._resolve_provider_key",
         lambda cfg, provider, cli_key=None, openai_base_url=None, compatible_backend=None: "sk-ant-api03-test",
     )
-    monkeypatch.setattr("cli._prompt_fastfold_cloud_api_key", lambda cfg, cli_key: None)
-    monkeypatch.setattr("cli._prompt_boltz_api_key", lambda cfg, cli_key: None)
+    monkeypatch.setattr("cli.setup.wizard._prompt_fastfold_cloud_api_key", lambda cfg, cli_key: None)
+    monkeypatch.setattr("cli.setup.wizard._prompt_boltz_api_key", lambda cfg, cli_key: None)
 
     setup_cmd()
     assert cfg.get("llm.provider") == "anthropic"
@@ -107,21 +107,21 @@ def test_setup_cmd_direct_call_handles_typer_option_defaults(monkeypatch):
 def test_setup_cmd_openai_compatible_persists_backend(monkeypatch):
     cfg = Config(data={})
     monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
-    monkeypatch.setattr("cli._prompt_setup_providers", lambda default: ["openai_compatible"])
+    monkeypatch.setattr("cli.setup.wizard_flow._prompt_setup_providers", lambda default: ["openai_compatible"])
     monkeypatch.setattr(
-        "cli._resolve_openai_compatible_endpoint",
+        "cli.setup.wizard_flow._resolve_openai_compatible_endpoint",
         lambda cfg, cli_base_url=None, cli_backend=None: ("http://localhost:8888/v1", "unsloth"),
     )
     monkeypatch.setattr(
-        "cli._resolve_provider_key",
+        "cli.setup.wizard_flow_keys._resolve_provider_key",
         lambda cfg, provider, cli_key=None, openai_base_url=None, compatible_backend=None: "sk-unsloth-test",
     )
     monkeypatch.setattr(
-        "cli._prompt_compatible_model_for_setup",
+        "cli.setup.wizard_flow._prompt_compatible_model_for_setup",
         lambda cfg, base_url, backend, api_key=None: "gpt-oss:20b",
     )
-    monkeypatch.setattr("cli._prompt_fastfold_cloud_api_key", lambda cfg, cli_key: None)
-    monkeypatch.setattr("cli._prompt_boltz_api_key", lambda cfg, cli_key: None)
+    monkeypatch.setattr("cli.setup.wizard._prompt_fastfold_cloud_api_key", lambda cfg, cli_key: None)
+    monkeypatch.setattr("cli.setup.wizard._prompt_boltz_api_key", lambda cfg, cli_key: None)
     monkeypatch.setattr("agent.doctor.run_checks", lambda cfg: [])
     monkeypatch.setattr("agent.doctor.to_table", lambda checks: "")
     monkeypatch.setattr("agent.doctor.has_errors", lambda checks: False)
@@ -140,21 +140,21 @@ def test_setup_cmd_openai_compatible_persists_backend(monkeypatch):
 def test_setup_cmd_openai_compatible_model_prompt_can_override_key(monkeypatch):
     cfg = Config(data={})
     monkeypatch.setattr("agent.config.Config.load", lambda: cfg)
-    monkeypatch.setattr("cli._prompt_setup_providers", lambda default: ["openai_compatible"])
+    monkeypatch.setattr("cli.setup.wizard_flow._prompt_setup_providers", lambda default: ["openai_compatible"])
     monkeypatch.setattr(
-        "cli._resolve_openai_compatible_endpoint",
+        "cli.setup.wizard_flow._resolve_openai_compatible_endpoint",
         lambda cfg, cli_base_url=None, cli_backend=None: ("http://localhost:8000/v1", "omlx"),
     )
     monkeypatch.setattr(
-        "cli._resolve_provider_key",
+        "cli.setup.wizard_flow_keys._resolve_provider_key",
         lambda cfg, provider, cli_key=None, openai_base_url=None, compatible_backend=None: "stale-key",
     )
     monkeypatch.setattr(
-        "cli._prompt_compatible_model_for_setup",
+        "cli.setup.wizard_flow._prompt_compatible_model_for_setup",
         lambda cfg, base_url, backend, api_key=None: ("omlx-model", "fresh-key"),
     )
-    monkeypatch.setattr("cli._prompt_fastfold_cloud_api_key", lambda cfg, cli_key: None)
-    monkeypatch.setattr("cli._prompt_boltz_api_key", lambda cfg, cli_key: None)
+    monkeypatch.setattr("cli.setup.wizard._prompt_fastfold_cloud_api_key", lambda cfg, cli_key: None)
+    monkeypatch.setattr("cli.setup.wizard._prompt_boltz_api_key", lambda cfg, cli_key: None)
     monkeypatch.setattr("agent.doctor.run_checks", lambda cfg: [])
     monkeypatch.setattr("agent.doctor.to_table", lambda checks: "")
     monkeypatch.setattr("agent.doctor.has_errors", lambda checks: False)
@@ -205,13 +205,16 @@ def test_prompt_openai_compatible_backend_numeric_selection(monkeypatch):
 
 def test_resolve_openai_base_url_interactive_cloud_mode_returns_none(monkeypatch):
     cfg = Config(data={})
-    monkeypatch.setattr("cli._prompt_openai_endpoint_mode", lambda default_mode="cloud": "cloud")
+    monkeypatch.setattr("cli.setup.openai_endpoint_mode._prompt_openai_endpoint_mode", lambda default_mode="cloud": "cloud")
     assert _resolve_openai_base_url(cfg, cli_base_url=None) is None
 
 
 def test_resolve_openai_compatible_endpoint_unsloth_default(monkeypatch):
     cfg = Config(data={})
-    monkeypatch.setattr("cli._prompt_openai_compatible_backend", lambda default_backend="ollama": "unsloth")
+    monkeypatch.setattr(
+        "cli.setup.compatible_backend._prompt_openai_compatible_backend",
+        lambda default_backend="ollama": "unsloth",
+    )
     monkeypatch.setattr("builtins.input", lambda _: "")
     base_url, backend = _resolve_openai_compatible_endpoint(cfg, cli_base_url=None, cli_backend=None)
     assert backend == "unsloth"
@@ -221,7 +224,7 @@ def test_resolve_openai_compatible_endpoint_unsloth_default(monkeypatch):
 def test_prompt_compatible_model_for_setup_uses_discovered_selection(monkeypatch):
     cfg = Config(data={"llm.model": "llama3.1"})
     monkeypatch.setattr(
-        "cli._fetch_compatible_models_for_setup",
+        "cli.setup.model_prompt._fetch_compatible_models_for_setup",
         lambda base_url, backend, api_key=None: ["gemma4:12b", "gpt-oss:20b"],
     )
     monkeypatch.setattr("builtins.input", lambda _: "2")
@@ -253,7 +256,9 @@ def test_prompt_compatible_model_for_setup_allows_manual_entry(monkeypatch):
 
 def test_resolve_provider_key_openai_compatible_defaults_to_ollama(monkeypatch):
     cfg = Config(data={})
-    monkeypatch.setattr("cli._prompt_openai_api_key_with_default", lambda default_key="ollama": default_key)
+    monkeypatch.setattr(
+        "cli.setup.provider_key._prompt_openai_api_key_with_default", lambda default_key="ollama": default_key
+    )
     key = _resolve_provider_key(
         cfg,
         provider="openai",
@@ -266,8 +271,10 @@ def test_resolve_provider_key_openai_compatible_defaults_to_ollama(monkeypatch):
 
 def test_resolve_provider_key_openai_compatible_unsloth_uses_compatible_prompt(monkeypatch):
     cfg = Config(data={})
-    monkeypatch.setattr("cli._prompt_openai_compatible_api_key", lambda backend="other": "sk-unsloth-new")
-    monkeypatch.setattr("cli._prompt_openai_api_key", lambda: "sk-openai-should-not-be-used")
+    monkeypatch.setattr(
+        "cli.setup.provider_key._prompt_openai_compatible_api_key", lambda backend="other": "sk-unsloth-new"
+    )
+    monkeypatch.setattr("cli.setup.provider_key._prompt_openai_api_key", lambda: "sk-openai-should-not-be-used")
     key = _resolve_provider_key(
         cfg,
         provider="openai_compatible",
@@ -308,8 +315,8 @@ def test_doctor_subcommand_not_treated_as_query():
 
 
 def test_query_mode_uses_remaining_args_as_query():
-    with patch("cli.run_query") as mock_run_query, patch(
-        "cli.run_interactive"
+    with patch("cli.run_query.run_query") as mock_run_query, patch(
+        "cli.interactive.run_interactive"
     ) as mock_run_interactive:
         result = runner.invoke(app, ["run", "profile", "TP53", "in", "AML"])
 
@@ -321,8 +328,8 @@ def test_query_mode_uses_remaining_args_as_query():
 
 
 def test_no_args_enters_interactive_mode():
-    with patch("cli.run_query") as mock_run_query, patch(
-        "cli.run_interactive"
+    with patch("cli.run_query.run_query") as mock_run_query, patch(
+        "cli.interactive.run_interactive"
     ) as mock_run_interactive:
         result = runner.invoke(app, ["run"])
 
@@ -338,7 +345,7 @@ def test_entry_routes_plain_invocation_to_hidden_run(monkeypatch):
         called["args"] = args
         called["prog_name"] = prog_name
 
-    monkeypatch.setattr("cli.app", fake_app)
+    monkeypatch.setattr("cli.main.app", fake_app)
     monkeypatch.setattr("sys.argv", ["ct", "profile", "TP53"])
 
     from cli import entry
@@ -356,7 +363,7 @@ def test_entry_preserves_explicit_subcommand(monkeypatch):
         called["args"] = args
         called["prog_name"] = prog_name
 
-    monkeypatch.setattr("cli.app", fake_app)
+    monkeypatch.setattr("cli.main.app", fake_app)
     monkeypatch.setattr("sys.argv", ["ct", "config", "show"])
 
     from cli import entry
@@ -374,7 +381,7 @@ def test_entry_preserves_trace_subcommand(monkeypatch):
         called["args"] = args
         called["prog_name"] = prog_name
 
-    monkeypatch.setattr("cli.app", fake_app)
+    monkeypatch.setattr("cli.main.app", fake_app)
     monkeypatch.setattr("sys.argv", ["ct", "trace", "diagnose"])
 
     from cli import entry
@@ -392,7 +399,7 @@ def test_entry_preserves_upgrade_subcommand(monkeypatch):
         called["args"] = args
         called["prog_name"] = prog_name
 
-    monkeypatch.setattr("cli.app", fake_app)
+    monkeypatch.setattr("cli.main.app", fake_app)
     monkeypatch.setattr("sys.argv", ["ct", "upgrade"])
 
     from cli import entry
@@ -410,7 +417,7 @@ def test_entry_routes_top_level_resume_flag_to_hidden_run(monkeypatch):
         called["args"] = args
         called["prog_name"] = prog_name
 
-    monkeypatch.setattr("cli.app", fake_app)
+    monkeypatch.setattr("cli.main.app", fake_app)
     monkeypatch.setattr("sys.argv", ["ct", "--resume", "d0b0571d"])
 
     from cli import entry
@@ -459,19 +466,19 @@ def test_is_newer_version_semver():
 
 
 def test_get_upgrade_available_version_returns_latest_when_newer():
-    with patch("cli.fetch_pypi_latest_version", return_value="0.0.99"):
+    with patch("cli.version_check.fetch_pypi_latest_version", return_value="0.0.99"):
         assert get_upgrade_available_version("0.0.43") == "0.0.99"
 
 
 def test_get_upgrade_available_version_returns_none_when_not_newer():
-    with patch("cli.fetch_pypi_latest_version", return_value="0.0.43"):
+    with patch("cli.version_check.fetch_pypi_latest_version", return_value="0.0.43"):
         assert get_upgrade_available_version("0.0.43") is None
 
 
 def test_upgrade_subcommand_invokes_execute_upgrade():
     cfg = Config(data={})
     with patch("agent.config.Config.load", return_value=cfg), patch(
-        "cli.execute_upgrade", return_value=True
+        "cli.upgrade.execute_upgrade", return_value=True
     ) as mock_exec:
         result = runner.invoke(app, ["upgrade"])
     assert result.exit_code == 0
@@ -486,7 +493,7 @@ def test_upgrade_subcommand_invokes_execute_upgrade():
 def test_upgrade_subcommand_forwards_skill_flags():
     cfg = Config(data={})
     with patch("agent.config.Config.load", return_value=cfg), patch(
-        "cli.execute_upgrade", return_value=True
+        "cli.upgrade.execute_upgrade", return_value=True
     ) as mock_exec:
         result = runner.invoke(app, ["upgrade", "--install-skills", "--skip-skills-prompt"])
     assert result.exit_code == 0
@@ -524,16 +531,16 @@ def test_config_set_agent_profile_rejects_invalid_value():
     mock_save.assert_not_called()
 
 
-def test_config_set_openai_key_rejects_invalid_format():
+def test_config_set_openai_key_accepts_any_nonempty_format():
     cfg = Config(data={})
     with patch("agent.config.Config.load", return_value=cfg), patch.object(
         cfg, "save"
     ) as mock_save:
         result = runner.invoke(app, ["config", "set", "llm.openai_api_key", "bad-key"])
 
-    assert result.exit_code == 2
-    assert "Invalid OpenAI API key format" in result.stdout
-    mock_save.assert_not_called()
+    assert result.exit_code == 0
+    assert cfg.get("llm.openai_api_key") == "bad-key"
+    mock_save.assert_called_once()
 
 
 def test_config_unset_removes_value():

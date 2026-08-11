@@ -1,0 +1,53 @@
+---
+title: Terminal
+description: Interactive sandwalk REPL with slash commands, status bar, and shared sessions.
+---
+
+```bash
+sandwalk
+```
+
+Best for interactive development: chat, tools, skills, sandbox, and plan mode without leaving the terminal. Shares sessions with the Web UI.
+
+New here? Start with the root [Quick Start](/quickstart).
+
+Type `/` for slash-command autocomplete.
+
+## Status bar
+
+| Segment | Meaning |
+|---------|---------|
+| Model | Active model (cyan) |
+| Specialist | Active specialist, if any |
+| Sandbox | Local Sandbox or Modal Sandbox |
+| Path | Current working directory (muted) |
+| Plan mode | Only when Plan mode is on |
+| Context (right) | `context: N% (used/limit)` when known |
+
+Cloud model context windows are curated; local Ollama discovers context via `/api/tags` and `/api/show`. Mega-context models (≥1M) also show a **1M** badge in the Web UI model picker.
+
+## Common commands
+
+| Command | Purpose |
+|---------|---------|
+| `/help` | Full slash-command list |
+| `/model` | Switch model / provider |
+| `/sandbox` | Pick Local / Modal compute ([Sandbox](/cli/sandbox)) |
+| `/plan` | Toggle Plan mode ([Plan mode](/cli/plan)) — starts **off** |
+| `/specialist` | Set or clear specialist |
+| `/usage` | Session token / cost usage |
+| `/tools` | Browse curated tools |
+| `/skills` | Installed skills |
+| `/data` | Local datasets |
+| `/interrupt` | Stop the active generation |
+
+See the full table in [Command reference](/cli/commands).
+
+## Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+J` / `Alt+Enter` | Insert newline |
+| `Tab` | Accept ghost suggestion |
+| `Ctrl+C` | Interrupt active generation (double-tap forces stop) |
+| `Ctrl+C` × 2 at idle | Exit |

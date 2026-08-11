@@ -64,11 +64,14 @@ def test_hidden_tools_helpers(isolated_config: Config):
 
 
 def test_tools_service_toggle(isolated_config: Config):
+    from agent.tool_tiers import is_core_tool
+
     service = ToolsService()
     catalog = service.list_tools()
     assert catalog.count > 0
-    sample = catalog.data[0]
+    sample = next(t for t in catalog.data if not is_core_tool(t.id))
     assert sample.enabled is True
+    assert sample.toggleable is True
 
     updated = service.update_tool(sample.id, UpdateToolRequest(enabled=False))
     assert updated.enabled is False
@@ -80,10 +83,42 @@ def test_tools_service_toggle(isolated_config: Config):
         service.set_tool_enabled("nope.nope", False)
 
 
+def test_core_tools_cannot_be_disabled(isolated_config: Config):
+    from agent.tool_tiers import CORE_TOOL_NAMES
+
+    service = ToolsService()
+    core_id = sorted(CORE_TOOL_NAMES)[0]
+    summary = service.get_tool(core_id)
+    assert summary is not None
+    assert summary.tier == "core"
+    assert summary.enabled is True
+    assert summary.toggleable is False
+
+    with pytest.raises(ValueError, match="cannot be disabled"):
+        service.set_tool_enabled(core_id, False)
+
+    # Stale hidden config is ignored for core tools.
+    cfg = Config.load()
+    cfg.set("agent.hidden_tools", [core_id, "chemistry.descriptors"])
+    cfg.save()
+    assert core_id not in Config.load().hidden_tools()
+    assert Config.load().is_tool_hidden(core_id) is False
+    refreshed = service.get_tool(core_id)
+    assert refreshed is not None
+    assert refreshed.enabled is True
+
+    batch = service.batch_action("disable", [core_id, "chemistry.descriptors"])
+    assert core_id in batch.failed
+    assert "chemistry.descriptors" in batch.succeeded
+
+
 def test_tools_service_batch(isolated_config: Config):
+    from agent.tool_tiers import is_core_tool
+
     service = ToolsService()
     catalog = service.list_tools()
-    ids = [t.id for t in catalog.data[:4]]
+    ids = [t.id for t in catalog.data if not is_core_tool(t.id)][:4]
+    assert len(ids) == 4
 
     disabled = service.batch_action("disable", ids)
     assert disabled.ok is True

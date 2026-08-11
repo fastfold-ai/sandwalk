@@ -25,11 +25,35 @@ enum PortSupport {
     }
 
     static func freePort(_ port: Int) {
+        freePort(port, graceSteps: 10)
+    }
+
+    /// Terminate whoever listens on `port`.
+    ///
+    /// `graceSteps` × 0.3s of SIGTERM before SIGKILL. Instant kill -9 while
+    /// `sandwalk serve` is mid-WAL write is a common cause of agent-server.db
+    /// corruption and the menubar restart loop that follows, so prefer a grace
+    /// window — but keep it short on the app-termination path, where AppKit will
+    /// force-kill us and leave the agent orphaned.
+    static func freePort(_ port: Int, graceSteps: Int) {
+        let steps = max(1, graceSteps)
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/zsh")
         task.arguments = [
             "-c",
-            "pids=$(lsof -tiTCP:\(port) -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill $pids 2>/dev/null; sleep 0.2; pids=$(lsof -tiTCP:\(port) -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null; true",
+            """
+            pids=$(lsof -tiTCP:\(port) -sTCP:LISTEN 2>/dev/null)
+            if [ -z "$pids" ]; then exit 0; fi
+            kill -TERM $pids 2>/dev/null
+            for i in $(seq 1 \(steps)); do
+              sleep 0.3
+              pids=$(lsof -tiTCP:\(port) -sTCP:LISTEN 2>/dev/null)
+              [ -z "$pids" ] && exit 0
+            done
+            pids=$(lsof -tiTCP:\(port) -sTCP:LISTEN 2>/dev/null)
+            [ -n "$pids" ] && kill -9 $pids 2>/dev/null
+            true
+            """,
         ]
         try? task.run()
         task.waitUntilExit()
@@ -96,5 +120,22 @@ enum PortSupport {
         try? task.run()
         task.waitUntilExit()
         kill(pid, SIGTERM)
+    }
+
+    /// Signal a child and every process in its group.
+    ///
+    /// `sandwalk serve` runs uvicorn, which forks a worker into the same group.
+    /// Signaling the parent alone can leave that worker alive holding port 8787
+    /// and the exclusive SQLite lock, so the next start fails with "database is
+    /// locked by another process". Falls back to the bare pid when the process is
+    /// not its own group leader.
+    static func signalProcessGroup(pid: Int32, signal sig: Int32) {
+        guard pid > 0 else { return }
+        let group = getpgid(pid)
+        if group > 0, group == pid {
+            // Negative pid targets the whole group.
+            _ = kill(-group, sig)
+        }
+        _ = kill(pid, sig)
     }
 }

@@ -10,10 +10,18 @@ try:
 except ImportError:
     HAS_DUCKDB = False
 
+try:
+    import pyarrow  # noqa: F401
+    HAS_PYARROW = True
+except ImportError:
+    HAS_PYARROW = False
+
 pytestmark = pytest.mark.skipif(not HAS_DUCKDB, reason="duckdb not installed")
+requires_pyarrow = pytest.mark.skipif(not HAS_PYARROW, reason="pyarrow not installed")
 
 
 class TestQueryEngine:
+    @requires_pyarrow
     def test_query_parquet_file(self, tmp_path):
         from api.engine import QueryEngine
 
@@ -47,6 +55,7 @@ class TestQueryEngine:
         assert len(result) == 2
         assert result[0]["gene"] == "TP53"
 
+    @requires_pyarrow
     def test_query_with_filters(self, tmp_path):
         from api.engine import QueryEngine
 
@@ -62,6 +71,7 @@ class TestQueryEngine:
         assert len(result) == 2
         assert all(r["gene"] == "TP53" for r in result)
 
+    @requires_pyarrow
     def test_query_limit(self, tmp_path):
         from api.engine import QueryEngine
 
@@ -75,6 +85,7 @@ class TestQueryEngine:
         result = engine.query_parquet("test.parquet", limit=5)
         assert len(result) == 5
 
+    @requires_pyarrow
     def test_query_column_selection(self, tmp_path):
         from api.engine import QueryEngine
 
@@ -98,6 +109,7 @@ class TestQueryEngine:
         with pytest.raises(FileNotFoundError):
             engine.query_parquet("nonexistent.parquet")
 
+    @requires_pyarrow
     def test_count(self, tmp_path):
         from api.engine import QueryEngine
 
@@ -111,6 +123,7 @@ class TestQueryEngine:
         assert engine.count("test.parquet") == 3
         assert engine.count("test.parquet", filters={"gene": "TP53"}) == 2
 
+    @requires_pyarrow
     def test_query_with_list_filter(self, tmp_path):
         from api.engine import QueryEngine
 

@@ -1,0 +1,101 @@
+"""API key registry: compute, notification, and MCP integration credentials."""
+
+API_KEYS_EXTRA = {
+    "compute.modal_token_id": {
+        "name": "Modal Token ID",
+        "provider_key": "modal",
+        "env_var": "MODAL_TOKEN_ID",
+        "description": "Modal runtime credential ID",
+        "url": "https://modal.com/settings/tokens",
+        "free": True,
+        "secret": False,
+    },
+    "compute.modal_token_secret": {
+        "name": "Modal Token Secret",
+        "provider_key": "modal",
+        "env_var": "MODAL_TOKEN_SECRET",
+        "description": "Modal runtime credential secret",
+        "url": "https://modal.com/settings/tokens",
+        "free": True,
+    },
+    "notification.slack_bot_token": {
+        "name": "Slack",
+        "provider_key": "slack",
+        "env_var": "SLACK_BOT_TOKEN",
+        "description": "Use your agents from a Slack workspace — complete Relay Agent and Socket Mode support",
+        "url": "https://api.slack.com/apps",
+        "free": True,
+    },
+    "notification.sendgrid_api_key": {
+        "name": "SendGrid",
+        "env_var": "SENDGRID_API_KEY",
+        "description": "Email sending (notification.send_email)",
+        "url": "https://sendgrid.com",
+        "free": True,
+    },
+    "compute.lambda_api_key": {
+        "name": "Lambda Labs",
+        "env_var": "LAMBDA_API_KEY",
+        "description": "GPU compute jobs (compute.submit_job)",
+        "url": "https://cloud.lambdalabs.com",
+        "free": False,
+    },
+    "compute.runpod_api_key": {
+        "name": "RunPod",
+        "env_var": "RUNPOD_API_KEY",
+        "description": "GPU compute jobs (compute.submit_job)",
+        "url": "https://www.runpod.io",
+        "free": False,
+    },
+    "mcp.tamarind_api_key": {
+        "name": "Tamarind Bio",
+        "provider_key": "tamarind",
+        "env_var": "TAMARIND_API_KEY",
+        "description": "Tamarind MCP API key (x-api-key) for protein design / structure jobs",
+        "url": "https://app.tamarind.bio",
+        "free": False,
+    },
+    "mcp.neurosnap_api_key": {
+        "name": "Neurosnap",
+        "provider_key": "neurosnap",
+        "env_var": "NEUROSNAP_API_KEY",
+        "description": "Neurosnap MCP API key (Bearer) for computational biology jobs",
+        "url": "https://neurosnap.ai/overview?view=api",
+        "free": True,
+    },
+    "mcp.paperclip_api_key": {
+        "name": "Paperclip",
+        "provider_key": "paperclip",
+        "env_var": "PAPERCLIP_API_KEY",
+        "description": "Paperclip MCP API key (X-API-Key) for biomedical literature search",
+        "url": "https://paperclip.gxl.ai/keys",
+        "free": True,
+    },
+    "mcp.exa_api_key": {
+        "name": "Exa",
+        "provider_key": "exa",
+        "env_var": "EXA_API_KEY",
+        "description": "Exa MCP API key (x-api-key) for web search and page fetch",
+        "url": "https://dashboard.exa.ai/api-keys",
+        "free": True,
+    },
+    "mcp.linear_api_key": {
+        "name": "Linear",
+        "provider_key": "linear",
+        "env_var": "LINEAR_API_KEY",
+        "description": "Linear MCP API key (Bearer) for issues and projects",
+        "url": "https://linear.app/settings/account/security",
+        "free": True,
+    },
+    "mcp.huggingface_api_key": {
+        "name": "Hugging Face",
+        "provider_key": "huggingface",
+        "env_var": "HF_TOKEN",
+        "description": (
+            "Hugging Face access token for gated Hub datasets (e.g. BixBench) "
+            "and optional Hub MCP tools"
+        ),
+        "url": "https://huggingface.co/settings/tokens",
+        "free": True,
+    },
+}

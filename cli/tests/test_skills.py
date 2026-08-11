@@ -131,7 +131,7 @@ def test_display_version_with_release_tag():
 
 def test_display_author_and_updated_fallbacks():
     bundled = skills_mod.SkillInfo(name="x", source="bundled")
-    assert skills_mod.display_author(bundled) == "fastfold-ai"
+    assert skills_mod.display_author(bundled) == "sandwalk"
     npx = skills_mod.SkillInfo(name="y", source="npx")
     assert skills_mod.display_author(npx) == "-"
     assert skills_mod.display_updated(npx) == "-"
@@ -346,9 +346,28 @@ def test_skills_manage_find_uses_discover(monkeypatch):
         "discover_skills",
         lambda query=None: [{"name": "foo", "description": "d", "tags": [], "install_source": "o/r@skills/foo"}],
     )
+    monkeypatch.setattr(
+        skills_mod,
+        "discover_ecosystem_skills",
+        lambda query: {
+            "ok": True,
+            "summary": "eco",
+            "results": [
+                {
+                    "name": "bar",
+                    "description": "",
+                    "tags": [],
+                    "install_source": "owner/repo@bar",
+                    "tier": "ecosystem",
+                }
+            ],
+        },
+    )
     result = skills_tool.manage(action="find", query="foo")
     assert "foo" in result["summary"]
-    assert result["results"][0]["name"] == "foo"
+    assert "bar" in result["summary"]
+    assert result["catalog"][0]["name"] == "foo"
+    assert result["ecosystem"][0]["name"] == "bar"
 
 
 def test_skills_manage_install_allowed_calls_install(monkeypatch):
@@ -361,11 +380,268 @@ def test_skills_manage_install_allowed_calls_install(monkeypatch):
         return {"ok": True, "installed": ["foo"], "summary": "ok"}
 
     monkeypatch.setattr(skills_mod, "install_skill", fake_install)
+    monkeypatch.setattr(
+        skills_mod,
+        "skill_info",
+        lambda name: MagicMock(name=name, enabled=True),
+    )
     session = MagicMock()
     session.config.get.return_value = True
     result = manage(action="install", source="owner/repo@skills/foo", _session=session)
     assert result["ok"] is True
+    assert result.get("skills_updated") is True
+    assert result["installation_verified"] is True
+    assert result["installed"] is True
+    assert result["available"] is True
     assert called["source"] == "owner/repo@skills/foo"
+
+
+def test_skills_manage_install_does_not_claim_unverified_skill(monkeypatch):
+    from tools.skills import manage
+
+    monkeypatch.setattr(
+        skills_mod,
+        "install_skill",
+        lambda source, **kwargs: {
+            "ok": True,
+            "installed": ["missing"],
+            "summary": "copied",
+        },
+    )
+    monkeypatch.setattr(skills_mod, "skill_info", lambda name: None)
+
+    result = manage(action="install", source="/tmp/missing")
+
+    assert result["ok"] is False
+    assert result["installation_verified"] is False
+    assert result["installed"] is False
+    assert result["available"] is False
+    assert "Do not claim it is available" in result["summary"]
+
+
+def test_skills_manage_enable_disable(monkeypatch):
+    from tools.skills import manage
+
+    calls = []
+
+    def fake_set(name, enabled, **kwargs):
+        calls.append((name, enabled))
+        return {"ok": True, "summary": f"{'Enabled' if enabled else 'Disabled'} {name}"}
+
+    monkeypatch.setattr(skills_mod, "set_skill_enabled", fake_set)
+    assert manage(action="disable", name="fold")["enabled"] is False
+    assert manage(action="enable", name="fold")["enabled"] is True
+    assert calls == [("fold", False), ("fold", True)]
+
+
+def test_skills_manage_create_scaffolds_and_installs(tmp_path, monkeypatch):
+    from tools.skills import manage
+
+    monkeypatch.setattr(skills_mod, "GLOBAL_SKILLS_DIR", tmp_path / "global")
+    monkeypatch.setattr(skills_mod, "CONFIG_DIR", tmp_path / "cfg")
+    (tmp_path / "global").mkdir()
+    (tmp_path / "cfg").mkdir()
+
+    def fake_install(source, **kwargs):
+        from pathlib import Path
+        import shutil
+
+        assert kwargs.get("manifest_source") == "custom"
+        src = Path(source)
+        dest = tmp_path / "global" / src.name
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(src, dest)
+        return {"ok": True, "installed": [src.name], "summary": "ok"}
+
+    monkeypatch.setattr(skills_mod, "install_skill", fake_install)
+    session = MagicMock()
+    session.config.get.side_effect = lambda key, default=None: {
+        "skills.allow_agent_install": True,
+        "user.display_name": "Julio",
+    }.get(key, default)
+
+    result = manage(
+        action="create",
+        name="my-custom-skill",
+        path=str(tmp_path / "drafts"),
+        install=True,
+        _session=session,
+    )
+    assert result["ok"] is True
+    assert result["skills_updated"] is True
+    assert result["installation_verified"] is True
+    assert result["installed"] is True
+    assert result["available"] is True
+    assert result["mention"] == "/my-custom-skill"
+    assert "/my-custom-skill" in result["summary"]
+    skill_md = (tmp_path / "drafts" / "my-custom-skill" / "SKILL.md").read_text(encoding="utf-8")
+    assert "author: Julio" in skill_md
+    assert "category: Created by Me" in skill_md
+
+
+def test_skills_manage_create_defaults_to_skill_drafts(tmp_path, monkeypatch):
+    from tools.skills import manage
+
+    monkeypatch.setattr(skills_mod, "CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr(skills_mod, "GLOBAL_SKILLS_DIR", tmp_path / "global")
+    (tmp_path / "cfg").mkdir()
+    (tmp_path / "global").mkdir()
+
+    result = manage(
+        action="create",
+        name="draft-only",
+        _session=None,
+    )
+    assert result["ok"] is True
+    assert str(tmp_path / "cfg" / "skill-drafts" / "draft-only") in result["path"]
+    assert result["installed"] is False
+    assert result["installation_verified"] is False
+    assert result["available"] is False
+    assert "not installed" in result["summary"]
+    assert "mention" not in result
+
+
+def test_install_local_zip_archive(tmp_path, monkeypatch):
+    import zipfile
+
+    skill_root = tmp_path / "pack" / "zip-skill"
+    skill_root.mkdir(parents=True)
+    (skill_root / "SKILL.md").write_text(
+        "---\nname: zip-skill\ndescription: from zip\nauthor: Ada\ncategory: Created by Me\n---\n",
+        encoding="utf-8",
+    )
+    archive = tmp_path / "zip-skill.skill"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.write(skill_root / "SKILL.md", arcname="zip-skill/SKILL.md")
+
+    dest = tmp_path / "global"
+    dest.mkdir()
+    monkeypatch.setattr(skills_mod, "GLOBAL_SKILLS_DIR", dest)
+    result = skills_mod.install_skill(str(archive))
+    assert result["ok"] is True
+    assert (dest / "zip-skill" / "SKILL.md").exists()
+
+
+def test_parse_skill_md_author_and_custom_category(tmp_path):
+    skill_md = tmp_path / "SKILL.md"
+    skill_md.write_text(
+        "---\nname: authored\ndescription: d\nauthor: Ada\ncategory: Created by Me\n---\n",
+        encoding="utf-8",
+    )
+    info = skills_mod.parse_skill_md(skill_md)
+    assert info.author == "Ada"
+    assert info.category == "Created by Me"
+    assert skills_mod.is_user_created_skill(info) is True
+
+
+def test_discover_ecosystem_skills_parses_npx_output(monkeypatch):
+    class FakeProc:
+        returncode = 0
+        stdout = "googleworkspace/cli@gws-calendar  48.9K installs\n"
+        stderr = ""
+
+    monkeypatch.setattr(skills_mod, "_npx_available", lambda: True)
+    monkeypatch.setattr(
+        "agent.skills.discover.subprocess.run",
+        lambda *a, **k: FakeProc(),
+    )
+    result = skills_mod.discover_ecosystem_skills("google calendar")
+    assert result["ok"] is True
+    assert result["results"][0]["install_source"] == "googleworkspace/cli@gws-calendar"
+    assert result["results"][0]["name"] == "gws-calendar"
+
+
+def test_bundled_skill_find_exists():
+    skill_find = skills_mod.BUNDLED_SKILLS_DIR / "skill_find" / "SKILL.md"
+    assert skill_find.exists()
+    text = skill_find.read_text(encoding="utf-8")
+    assert "name: skill-find" in text
+    assert "author: sandwalk" in text
+    assert "category: Built-in" in text
+    assert "version: 1.0.0" in text
+    assert not (skills_mod.BUNDLED_SKILLS_DIR / "find_skills").exists()
+
+
+def test_bundled_skill_creator_is_sandwalk_builtin():
+    skill_creator = skills_mod.BUNDLED_SKILLS_DIR / "skill_creator" / "SKILL.md"
+    assert skill_creator.exists()
+    text = skill_creator.read_text(encoding="utf-8")
+    assert "name: skill-creator" in text
+    assert "author: sandwalk" in text
+    assert "category: Built-in" in text
+    assert "version: 1.0.0" in text
+    info = skills_mod.parse_skill_md(skill_creator)
+    info.source = "bundled"
+    assert skills_mod.display_author(info) == "sandwalk"
+    assert info.version == "1.0.0"
+
+
+def test_enrich_bundled_skill_uses_manual_version_and_mtime(tmp_path, monkeypatch):
+    skill_md = tmp_path / "skill_find" / "SKILL.md"
+    skill_md.parent.mkdir()
+    skill_md.write_text(
+        "---\nname: skill-find\ndescription: d\nauthor: sandwalk\n"
+        "category: Built-in\nversion: 2.1.0\n---\n",
+        encoding="utf-8",
+    )
+    info = skills_mod.parse_skill_md(skill_md)
+    info.source = "bundled"
+    monkeypatch.setattr(
+        "agent.skills.releases.resolve_bundled_path_commit",
+        lambda *_a, **_k: None,
+    )
+    skills_mod.enrich_bundled_skill(info)
+    assert info.version == "2.1.0"
+    assert info.updated_at  # local SKILL.md mtime fallback
+
+
+def test_enrich_bundled_skill_prefers_github_commit_date(tmp_path, monkeypatch):
+    skill_md = tmp_path / "skill_creator" / "SKILL.md"
+    skill_md.parent.mkdir()
+    skill_md.write_text(
+        "---\nname: skill-creator\ndescription: d\nauthor: sandwalk\n"
+        "category: Built-in\n---\n",
+        encoding="utf-8",
+    )
+    info = skills_mod.parse_skill_md(skill_md)
+    info.source = "bundled"
+    monkeypatch.setattr(
+        "agent.skills.releases.package_version",
+        lambda: "9.9.9",
+    )
+    monkeypatch.setattr(
+        "agent.skills.releases.resolve_bundled_path_commit",
+        lambda *_a, **_k: {
+            "sha": "abcdef1234567890",
+            "committed_at": "2026-07-01T12:00:00Z",
+        },
+    )
+    skills_mod.enrich_bundled_skill(info)
+    assert info.version == "9.9.9"
+    assert info.updated_at == "2026-07-01T12:00:00Z"
+    assert info.commit == "abcdef1234567890"
+
+
+def test_enrich_bundled_skill_keeps_manual_updated_tag(tmp_path, monkeypatch):
+    skill_md = tmp_path / "skill_find" / "SKILL.md"
+    skill_md.parent.mkdir()
+    skill_md.write_text(
+        "---\nname: skill-find\ndescription: d\nupdated: 2026-01-15\n---\n",
+        encoding="utf-8",
+    )
+    info = skills_mod.parse_skill_md(skill_md)
+    info.source = "bundled"
+    called = {"github": False}
+
+    def _remote(*_a, **_k):
+        called["github"] = True
+        return {"sha": "abc", "committed_at": "2026-07-01T12:00:00Z"}
+
+    monkeypatch.setattr("agent.skills.releases.resolve_bundled_path_commit", _remote)
+    skills_mod.enrich_bundled_skill(info)
+    assert info.updated_at == "2026-01-15"
+    assert called["github"] is False
 
 
 # ─── CLI ───────────────────────────────────────────────────────────────────
@@ -519,7 +795,10 @@ def test_setup_prompt_install_skills_with_explicit_arg(monkeypatch):
     import cli
 
     installed = []
-    monkeypatch.setattr(cli, "_install_skill_sources", lambda sources: installed.extend(sources))
+    monkeypatch.setattr(
+        "cli.setup.skills_prompt._install_skill_sources",
+        lambda sources: installed.extend(sources),
+    )
     cli._prompt_install_skills(skills_arg="fastfold-ai/skills@skills/fold, owner/repo@skills/x", skip=False)
     assert installed == ["fastfold-ai/skills@skills/fold", "owner/repo@skills/x"]
 
@@ -1101,6 +1380,7 @@ def test_provider_label_for_source():
     assert _provider_label_for_source("fastfold-ai/skills@skills/fold") == "Fastfold"
     assert _provider_label_for_source("anthropics/life-sciences") == "Anthropic"
     assert _provider_label_for_source("google-deepmind/science-skills") == "DeepMind"
+    assert _provider_label_for_source("huggingface/skills") == "Hugging Face"
     assert _provider_label_for_source("K-Dense-AI/scientific-agent-skills") == "K-Dense-AI"
     assert _provider_label_for_source("https://github.com/anthropics/life-sciences/tree/main/skills") == "Anthropic"
     assert _provider_label_for_source("someuser/their-skills") == "someuser"
@@ -1108,7 +1388,14 @@ def test_provider_label_for_source():
 
 def test_suggested_skill_sources_present():
     providers = {s["provider"] for s in skills_mod.SUGGESTED_SKILL_SOURCES}
-    assert {"K-Dense-AI", "Anthropic", "DeepMind"} <= providers
+    assert {
+        "Fastfold AI",
+        "K-Dense-AI",
+        "Anthropic",
+        "DeepMind",
+        "Hugging Face",
+    } <= providers
+    assert skills_mod.SUGGESTED_SKILL_SOURCES[0]["source"] == "fastfold-ai/skills"
     for s in skills_mod.SUGGESTED_SKILL_SOURCES:
         assert "/" in s["source"]
         assert s["url"].startswith("https://github.com/")
@@ -1120,9 +1407,11 @@ def test_setup_select_suggested_sources_inline(monkeypatch):
     # Non-tty -> inline numbered prompt; pick 'all'
     monkeypatch.setattr("builtins.input", lambda _: "all")
     sources = cli._select_suggested_sources()
+    assert "fastfold-ai/skills" in sources
     assert "K-Dense-AI/scientific-agent-skills" in sources
     assert "anthropics/life-sciences" in sources
     assert "google-deepmind/science-skills" in sources
+    assert "huggingface/skills" in sources
 
 
 def test_terminal_add_skill_invokes_install(monkeypatch):
@@ -1200,6 +1489,78 @@ def test_owner_repo_from_source_handles_empty_and_unknown():
 def test_is_newer_tag_returns_false_for_invalid_versions():
     assert skills_mod._is_newer_tag("not-semver", "v1.0.0") is False
     assert skills_mod._is_newer_tag("v1.1.0", "bad") is False
+
+
+def test_check_github_skill_update_prefers_newer_release(monkeypatch):
+    import agent.skills.releases as releases_mod
+
+    monkeypatch.setattr(
+        releases_mod,
+        "resolve_repo_remote_state",
+        lambda owner_repo, force=False, timeout_s=2.5: {
+            "release_tag": "v1.1.3",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+    )
+    out = skills_mod.check_github_skill_update(
+        "fastfold-ai/skills",
+        installed_release="v1.1.2",
+        installed_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    )
+    assert out == {
+        "available": True,
+        "channel": "release",
+        "latest": "v1.1.3",
+        "installed": "v1.1.2",
+        "owner_repo": "fastfold-ai/skills",
+    }
+
+
+def test_check_github_skill_update_same_release_ignores_head_drift(monkeypatch):
+    import agent.skills.releases as releases_mod
+
+    monkeypatch.setattr(
+        releases_mod,
+        "resolve_repo_remote_state",
+        lambda owner_repo, force=False, timeout_s=2.5: {
+            "release_tag": "v1.1.2",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+    )
+    assert (
+        skills_mod.check_github_skill_update(
+            "fastfold-ai/skills@skills/fold",
+            installed_release="v1.1.2",
+            installed_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        )
+        is None
+    )
+
+
+def test_check_github_skill_update_falls_back_to_commit(monkeypatch):
+    import agent.skills.releases as releases_mod
+
+    monkeypatch.setattr(
+        releases_mod,
+        "resolve_repo_remote_state",
+        lambda owner_repo, force=False, timeout_s=2.5: {
+            "release_tag": "",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+    )
+    out = skills_mod.check_github_skill_update(
+        "https://github.com/acme/skills.git",
+        installed_release=None,
+        installed_commit="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    )
+    assert out["channel"] == "commit"
+    assert out["latest"] == "aaaaaaa"
+    assert out["installed"] == "bbbbbbb"
+    assert out["owner_repo"] == "acme/skills"
+
+
+def test_check_github_skill_update_skips_non_github_source():
+    assert skills_mod.check_github_skill_update("custom:/tmp/skill") is None
 
 
 def test_installed_catalog_release_skips_non_dict_manifest_entries(monkeypatch):
@@ -1324,7 +1685,64 @@ def test_fetch_latest_release_success(monkeypatch):
 
     monkeypatch.setattr("httpx.Client", _Client)
     out = _REAL_FETCH_LATEST_RELEASE("fastfold-ai/skills", timeout_s=0.1)
-    assert out == {"tag": "v1.2.3", "published_at": "2026-06-18T00:00:00Z"}
+    assert out == {
+        "tag": "v1.2.3",
+        "published_at": "2026-06-18T00:00:00Z",
+        "commit": "",
+    }
+
+
+def test_fetch_latest_release_keeps_sha_target_commitish(monkeypatch):
+    """``target_commitish`` is kept only when it looks like a commit sha."""
+
+    payloads = [
+        {
+            "tag_name": "v2.0.0",
+            "published_at": "2026-07-01T00:00:00Z",
+            "target_commitish": "A1B2C3D4E5F6",
+        },
+        {
+            "tag_name": "v2.0.0",
+            "published_at": "2026-07-01T00:00:00Z",
+            # A branch name must not be reported as a commit.
+            "target_commitish": "main",
+        },
+    ]
+
+    class _Resp:
+        status_code = 200
+
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._payload
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            self._payload = payloads[0]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, headers=None):
+            return _Resp(self._payload)
+
+    monkeypatch.setattr("httpx.Client", _Client)
+    out = _REAL_FETCH_LATEST_RELEASE("fastfold-ai/skills", timeout_s=0.1)
+    assert out is not None
+    assert out["commit"] == "a1b2c3d4e5f6"
+
+    payloads.insert(0, payloads.pop(1))
+    out = _REAL_FETCH_LATEST_RELEASE("fastfold-ai/skills", timeout_s=0.1)
+    assert out is not None
+    assert out["commit"] == ""
 
 
 def test_fetch_latest_release_returns_none_on_url_error(monkeypatch):
@@ -1430,3 +1848,44 @@ def test_installed_catalog_release_returns_none_when_no_match(monkeypatch):
         },
     )
     assert skills_mod._installed_catalog_release() is None
+
+
+def test_disable_skill_when_directory_name_differs_from_frontmatter(
+    monkeypatch, tmp_path
+):
+    """Regression: firecrawl lives in firecrawl-cli/ but frontmatter name is firecrawl."""
+    global_dir = tmp_path / "global"
+    skill_dir = global_dir / "firecrawl-cli"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: firecrawl\ndescription: scrape the web\n---\n\n# firecrawl\n",
+        encoding="utf-8",
+    )
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.setattr(skills_mod, "GLOBAL_SKILLS_DIR", global_dir)
+    monkeypatch.setattr(skills_mod, "BUNDLED_SKILLS_DIR", tmp_path / "bundled")
+    monkeypatch.setattr(skills_mod, "NPX_SKILLS_DIR", tmp_path / "npx")
+    monkeypatch.setattr(skills_mod, "CONFIG_DIR", config_dir)
+
+    info = skills_mod.skill_info("firecrawl")
+    assert info is not None
+    assert info.enabled is True
+    assert info.name == "firecrawl"
+
+    result = skills_mod.set_skill_enabled("firecrawl", False)
+    assert result["ok"] is True
+
+    after = skills_mod.skill_info("firecrawl")
+    assert after is not None
+    assert after.enabled is False
+    enabled_names = {s.name for s in skills_mod.list_skills(enabled_only=True)}
+    assert "firecrawl" not in enabled_names
+
+    state = json.loads((config_dir / skills_mod.SKILL_STATE_FILENAME).read_text())
+    disabled = set(state.get("disabled") or [])
+    assert "firecrawl" in disabled
+    assert "firecrawl-cli" in disabled
+
+    skills_mod.set_skill_enabled("firecrawl", True)
+    assert skills_mod.skill_info("firecrawl").enabled is True

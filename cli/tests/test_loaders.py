@@ -47,6 +47,7 @@ def test_data_path_uses_base_dir(mock_config, tmp_path):
 
 
 def test_find_file_exact_and_parquet_variant(mock_config, tmp_path):
+    pytest.importorskip("pyarrow")
     parquet = tmp_path / "CRISPRGeneEffect.parquet"
     pd.DataFrame({"A": [1]}).to_parquet(parquet)
     found = loaders._find_file("CRISPRGeneEffect.csv")
@@ -66,6 +67,7 @@ def test_resolve_path_file_and_directory(tmp_path):
 
 
 def test_read_tabular_csv_and_parquet(tmp_path):
+    pytest.importorskip("pyarrow")
     csv_path = tmp_path / "sample.csv"
     csv_path.write_text("gene,value\nTP53,1.0\n")
     df_csv = loaders._read_tabular(csv_path)

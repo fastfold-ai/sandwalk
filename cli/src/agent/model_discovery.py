@@ -28,6 +28,15 @@ def ollama_tags_url_from_base(base_url: str) -> str:
     return parsed._replace(path=tags_path, query="", fragment="").geturl()
 
 
+def ollama_show_url_from_base(base_url: str) -> str:
+    parsed = urlparse(str(base_url or "").strip())
+    path = (parsed.path or "").rstrip("/")
+    if path.endswith("/v1"):
+        path = path[:-3]
+    show_path = f"{path}/api/show" if path else "/api/show"
+    return parsed._replace(path=show_path, query="", fragment="").geturl()
+
+
 def openai_models_url_from_base(base_url: str) -> str:
     parsed = urlparse(str(base_url or "").strip())
     path = (parsed.path or "").rstrip("/")
@@ -37,11 +46,22 @@ def openai_models_url_from_base(base_url: str) -> str:
     return parsed._replace(path=models_path, query="", fragment="").geturl()
 
 
-def _request_json(url: str, api_key: str | None, *, timeout: float = 10.0) -> tuple[Any | None, str | None]:
+def _request_json(
+    url: str,
+    api_key: str | None,
+    *,
+    timeout: float = 10.0,
+    method: str = "GET",
+    body: dict[str, Any] | None = None,
+) -> tuple[Any | None, str | None]:
     headers = dict(_DEFAULT_HEADERS)
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    req = urllib.request.Request(url=url, headers=headers, method="GET")
+    data = None
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url=url, headers=headers, method=method, data=data)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             text = resp.read().decode("utf-8", errors="replace")
@@ -59,75 +79,223 @@ def _request_json(url: str, api_key: str | None, *, timeout: float = 10.0) -> tu
         return None, f"Invalid JSON from {url}"
 
 
-def fetch_openai_models(base_url: str, api_key: str | None = None) -> tuple[list[str], str | None]:
+def _context_window_from_model_item(item: dict[str, Any]) -> int | None:
+    for key in (
+        "max_model_len",
+        "context_length",
+        "context_window",
+        "max_context_length",
+        "max_position_embeddings",
+    ):
+        raw = item.get(key)
+        if raw is None:
+            continue
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            return value
+    return None
+
+
+def _context_window_from_ollama_model_info(model_info: dict[str, Any]) -> int | None:
+    best: int | None = None
+    for key, raw in model_info.items():
+        if not (key == "context_length" or key.endswith(".context_length")):
+            continue
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if value > 0 and (best is None or value > best):
+            best = value
+    if best is not None:
+        return best
+    return _context_window_from_model_item(model_info)
+
+
+def fetch_ollama_show_context(
+    base_url: str,
+    model_name: str,
+    api_key: str | None = None,
+) -> int | None:
+    """Read native context length from Ollama /api/show when /api/tags omits it."""
+    name = str(model_name or "").strip()
+    if not name:
+        return None
+    url = ollama_show_url_from_base(base_url)
+    payload, err = _request_json(
+        url,
+        api_key,
+        method="POST",
+        body={"model": name},
+    )
+    if err or not isinstance(payload, dict):
+        return None
+    model_info = payload.get("model_info")
+    if not isinstance(model_info, dict):
+        return None
+    return _context_window_from_ollama_model_info(model_info)
+
+
+def fetch_openai_models(
+    base_url: str, api_key: str | None = None
+) -> tuple[list[str], str | None]:
+    names, _windows, err = fetch_openai_models_with_context(base_url, api_key)
+    return names, err
+
+
+def _is_openrouter_models_url(url: str) -> bool:
+    return "openrouter.ai" in str(url or "").lower()
+
+
+def openrouter_model_supports_tools(item: dict[str, Any]) -> bool:
+    """True when OpenRouter reports ``tools`` in ``supported_parameters``.
+
+    Sandwalk agents always send tools, so models without tool support fail at
+    runtime with "No endpoints found that support tool use".
+    """
+    params = item.get("supported_parameters")
+    if not isinstance(params, list):
+        return False
+    return any(str(p).strip().lower() == "tools" for p in params)
+
+
+def fetch_openai_models_with_context(
+    base_url: str, api_key: str | None = None
+) -> tuple[list[str], dict[str, int], str | None]:
     url = openai_models_url_from_base(base_url)
     payload, err = _request_json(url, api_key)
     if err:
-        return [], err
+        return [], {}, err
     data = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(data, list):
-        return [], f"Unexpected /v1/models payload ({url})"
-    names = sorted(
-        {str(item.get("id") or "").strip() for item in data if isinstance(item, dict)} - {""}
-    )
-    return names, None
+        return [], {}, f"Unexpected /v1/models payload ({url})"
+    openrouter = _is_openrouter_models_url(url)
+    names: list[str] = []
+    windows: dict[str, int] = {}
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        model_id = str(item.get("id") or "").strip()
+        if not model_id:
+            continue
+        # Agents require tool-calling; hide OpenRouter models that cannot.
+        if openrouter and not openrouter_model_supports_tools(item):
+            continue
+        names.append(model_id)
+        context_window = _context_window_from_model_item(item)
+        if context_window is not None:
+            windows[model_id] = context_window
+    names = sorted(set(names))
+    return names, windows, None
 
 
 def fetch_ollama_tags(base_url: str, api_key: str | None = None) -> tuple[list[str], str | None]:
+    names, _windows, err = fetch_ollama_tags_with_context(base_url, api_key)
+    return names, err
+
+
+def fetch_ollama_tags_with_context(
+    base_url: str, api_key: str | None = None
+) -> tuple[list[str], dict[str, int], str | None]:
     url = ollama_tags_url_from_base(base_url)
     payload, err = _request_json(url, api_key)
     if err:
-        return [], err
+        return [], {}, err
     models = payload.get("models") if isinstance(payload, dict) else None
     if not isinstance(models, list):
-        return [], f"Unexpected /api/tags payload ({url})"
-    names = sorted(
-        {str(item.get("name") or "").strip() for item in models if isinstance(item, dict)} - {""}
-    )
-    return names, None
+        return [], {}, f"Unexpected /api/tags payload ({url})"
+    names: list[str] = []
+    windows: dict[str, int] = {}
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        names.append(name)
+        # Newer Ollama includes the model's context length in tag details.
+        details = item.get("details")
+        source = details if isinstance(details, dict) else item
+        context_window = _context_window_from_model_item(source)
+        if context_window is not None:
+            windows[name] = context_window
+    names = sorted(set(names))
+    # Custom/MLX imports often omit details.context_length in /api/tags; /api/show has it.
+    for name in names:
+        if name in windows:
+            continue
+        context_window = fetch_ollama_show_context(base_url, name, api_key=api_key)
+        if context_window is not None:
+            windows[name] = context_window
+    return names, windows, None
 
 
 def discover_compatible_models(
     base_url: str,
     backend: str,
     api_key: str | None = None,
-) -> tuple[list[str], str, str | None]:
+) -> tuple[list[str], str, str | None, dict[str, int]]:
     """
     Discover models for a compatible backend.
 
-    Returns (model_ids, source_path, error_or_none).
+    Returns (model_ids, source_path, error_or_none, context_windows).
     """
     backend_type = str(backend or "").strip().lower() or "other"
     errors: list[str] = []
+    windows: dict[str, int] = {}
 
     if backend_type in {"unsloth", "omlx", "ds4", "llama_cpp", "lm_studio"}:
-        models, err = fetch_openai_models(base_url, api_key=api_key)
+        models, windows, err = fetch_openai_models_with_context(
+            base_url, api_key=api_key
+        )
         if err:
             errors.append(err)
-        return models, "/v1/models", ("; ".join(errors) if errors and not models else None)
+        return (
+            models,
+            "/v1/models",
+            ("; ".join(errors) if errors and not models else None),
+            windows,
+        )
 
     if backend_type == "ollama":
-        models, err = fetch_ollama_tags(base_url, api_key=api_key)
+        models, windows, err = fetch_ollama_tags_with_context(base_url, api_key=api_key)
         source = "/api/tags"
         if err:
             errors.append(err)
         if not models:
-            models, err2 = fetch_openai_models(base_url, api_key=api_key)
+            models, windows, err2 = fetch_openai_models_with_context(
+                base_url, api_key=api_key
+            )
             source = "/v1/models"
             if err2:
                 errors.append(err2)
-        return models, source, ("; ".join(errors) if errors and not models else None)
+        return (
+            models,
+            source,
+            ("; ".join(errors) if errors and not models else None),
+            windows,
+        )
 
-    models, err = fetch_openai_models(base_url, api_key=api_key)
+    models, windows, err = fetch_openai_models_with_context(base_url, api_key=api_key)
     source = "/v1/models"
     if err:
         errors.append(err)
     if not models:
-        models, err2 = fetch_ollama_tags(base_url, api_key=api_key)
+        models, windows, err2 = fetch_ollama_tags_with_context(
+            base_url, api_key=api_key
+        )
         source = "/api/tags"
         if err2:
             errors.append(err2)
-    return models, source, ("; ".join(errors) if errors and not models else None)
+    return (
+        models,
+        source,
+        ("; ".join(errors) if errors and not models else None),
+        windows,
+    )
 
 
 def probe_compatible_profile(
@@ -136,7 +304,9 @@ def probe_compatible_profile(
     backend: str,
     api_key: str | None,
 ) -> dict[str, Any]:
-    models, source, error = discover_compatible_models(base_url, backend, api_key=api_key)
+    models, source, error, context_windows = discover_compatible_models(
+        base_url, backend, api_key=api_key
+    )
     if models:
         health = "healthy"
     elif error:
@@ -148,5 +318,6 @@ def probe_compatible_profile(
         "models": models,
         "models_source": source,
         "models_path": source,
+        "context_windows": context_windows,
         "error": error,
     }

@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# package-app.sh — build Sandwalk.app and install to ~/Applications
+# package-app.sh — build Sandwalk Server.app (menubar supervisor)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${ROOT}/.build"
 CONFIG="${CONFIG:-debug}"
 BIN="${BUILD_DIR}/arm64-apple-macosx/${CONFIG}/Sandwalk"
-APP_OUT="${BUILD_DIR}/Sandwalk.app"
+APP_NAME="${APP_NAME:-Sandwalk Server.app}"
+APP_OUT="${BUILD_DIR}/${APP_NAME}"
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/Applications}"
-INSTALLED="${INSTALL_DIR}/Sandwalk.app"
+INSTALLED="${INSTALL_DIR}/${APP_NAME}"
+SKIP_INSTALL="${SKIP_INSTALL:-0}"
 
-echo "==> Building Sandwalk (${CONFIG})..."
+echo "==> Building Sandwalk Server (${CONFIG})..."
 cd "${ROOT}"
 if [[ "${CONFIG}" == "release" ]]; then
   swift build -c release
@@ -43,7 +45,7 @@ ICONSET="${BUILD_DIR}/AppIcon.iconset"
 rm -rf "${ICONSET}"
 mkdir -p "${ICONSET}" "${ROOT}/Resources" "$(dirname "${MODULE_ICON}")"
 
-# Bright white full-bleed master (system masks to squircle — like ChatGPT/Ollama).
+# Bright white full-bleed master (system masks it to the squircle shape).
 swift "${ROOT}/scripts/generate_app_icon.swift" "${MASTER}" 1024 >/dev/null
 cp "${MASTER}" "${MODULE_ICON}"
 
@@ -61,8 +63,15 @@ echo "==> Ad-hoc sign..."
 codesign --force --deep --sign - "${APP_OUT}" 2>/dev/null || true
 xattr -dr com.apple.quarantine "${APP_OUT}" 2>/dev/null || true
 
+if [[ "${SKIP_INSTALL}" == "1" ]]; then
+  echo "OK (skip install): ${APP_OUT}"
+  exit 0
+fi
+
 echo "==> Installing to ${INSTALLED}..."
 mkdir -p "${INSTALL_DIR}"
+# Prefer quitting by bundle id so we don't collide with the Tauri client binary name.
+osascript -e 'quit app "Sandwalk Server"' 2>/dev/null || true
 pkill -x Sandwalk 2>/dev/null || true
 sleep 0.4
 rm -rf "${INSTALLED}"

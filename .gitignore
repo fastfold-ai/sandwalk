@@ -22,7 +22,6 @@ coverage-report.txt
 coverage-html/
 htmlcov/
 **/coverage/
-!docs/**/coverage*
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
@@ -32,6 +31,7 @@ outputs/
 # Swift
 apps/sandwalk-mac/.build/
 apps/sandwalk-mac/.swiftpm/
+apps/sandwalk-mac/.tools/
 *.xcodeproj/
 xcuserdata/
 DerivedData/
@@ -41,3 +41,6 @@ DerivedData/
 .idea/
 *.swp
 .claude/worktrees/
+
+# sandwalk-bench HF cache
+apps/benchmarking/.cache/

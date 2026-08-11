@@ -31,12 +31,39 @@
   animation: breathe 1.8s ease-in-out infinite;
 }
 
+/* Soft L↔R shimmer; alternate avoids a hard jump on loop restart. */
+@keyframes text-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-text-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    hsl(var(--muted-foreground)) 0%,
+    hsl(var(--muted-foreground)) 40%,
+    hsl(var(--foreground)) 50%,
+    hsl(var(--muted-foreground)) 60%,
+    hsl(var(--muted-foreground)) 100%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: text-shimmer 1.4s ease-in-out infinite alternate;
+}
+
 @layer base {
   :root {
-    /* Soft page canvas — barely darker than sidebar; cards stay pure white */
-    --background: 0 0% 97.3%; /* ≈ #F8F8F8 */
+    /* Main canvas — pure white (theme-aware; .dark overrides below) */
+    --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
-    /* Elevated cards stay pure white */
+    /* Elevated cards match canvas; lift via sandwalk-surface-shadow */
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
@@ -55,14 +82,14 @@
     --input: 0 0% 90%;
     --ring: 240 5% 64.9%;
     --radius: 0.5rem;
-    /* Sidebar is lighter than the page (≈ #F9F9F9) */
-    --sidebar-background: 0 0% 97.6%;
+    /* Sidebar: bright surface; mac glass makes it transparent (see below) */
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 0 0% 94.5%;
+    --sidebar-accent: 0 0% 94%;
     --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 0 0% 91%;
+    --sidebar-border: 0 0% 90%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -119,11 +146,158 @@
   }
 }
 
+/*
+ * macOS desktop glass shell — window is transparent; native liquid glass /
+ * vibrancy shows through the sidebar while focused. On blur, the sidebar
+ * paints solid (native glass stays installed so traffic lights remain).
+ * Main stays opaque either way.
+ */
+html.sandwalk-mac-glass,
+html.sandwalk-mac-glass body,
+html.sandwalk-mac-glass #root {
+  background: transparent !important;
+}
+
+/*
+ * Light glass nav: subtle gray selected/hover pill (macOS-sidebar soft),
+ * charcoal labels. Accent is light so /70–/80 stays a whisper, not a slab.
+ */
+html.sandwalk-mac-glass:not(.dark) {
+  --sidebar-accent: 0 0% 90%;
+  --sidebar-accent-foreground: 0 0% 18%;
+  --sidebar-border: 0 0% 0% / 0.08;
+}
+
+html.sandwalk-mac-glass:not(.dark) .sandwalk-shell-sidebar {
+  --muted-foreground: 0 0% 34%;
+  --foreground: 0 0% 18%;
+  color: hsl(0 0% 28%);
+}
+
+html.sandwalk-mac-glass .sandwalk-shell {
+  background: transparent !important;
+}
+
+html.sandwalk-mac-glass .sandwalk-shell-main {
+  background-color: hsl(var(--background));
+}
+
+/* Continuous glass column — nav strip is not a separate painted bar. */
+html.sandwalk-mac-glass .sandwalk-shell-nav-strip,
+html.sandwalk-mac-glass .sandwalk-shell-nav-strip.bg-sidebar {
+  background-color: transparent !important;
+}
+
+/* Kill the hard ResizableHandle stroke (defaults to bg-border). */
+html.sandwalk-mac-glass .sandwalk-shell-resize-handle {
+  width: 0 !important;
+  background-color: transparent !important;
+}
+
+html.sandwalk-mac-glass .sandwalk-shell-sidebar .bg-sidebar {
+  background-color: transparent !important;
+}
+
+html.sandwalk-mac-glass .sandwalk-shell-sidebar {
+  position: relative;
+  z-index: 1;
+  border-right: none;
+}
+
+/*
+ * Focused: translucent wash so native glass shows through.
+ * Unfocused: solid sidebar (native glass stays installed but is covered).
+ */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-sidebar {
+  /* Denser wash — soft frost, not see-through. */
+  background-color: rgb(255 255 255 / 0.62) !important;
+  border-color: transparent;
+  box-shadow: inset -14px 0 22px -12px rgb(0 0 0 / 0.06);
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-sidebar {
+  /* Dark charcoal frost — Codex-like; color bleeds through the blur, not flat gray. */
+  background-color: rgb(28 28 31 / 0.62) !important;
+  border-color: transparent;
+  box-shadow: inset -16px 0 26px -12px rgb(0 0 0 / 0.28);
+}
+
+html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active) .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off.sandwalk-mac-glass-active .sandwalk-shell-sidebar {
+  background-color: hsl(var(--sidebar-background)) !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-shell-sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  pointer-events: none;
+  z-index: 5;
+  background: linear-gradient(
+    to left,
+    rgb(0 0 0 / 0.04),
+    rgb(0 0 0 / 0.015) 40%,
+    transparent 85%
+  );
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-sidebar::after {
+  background: linear-gradient(
+    to left,
+    rgb(0 0 0 / 0.14),
+    rgb(0 0 0 / 0.04) 45%,
+    transparent 85%
+  );
+}
+
+html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active) .sandwalk-shell-sidebar::after,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off .sandwalk-shell-sidebar::after {
+  content: none;
+}
+
+/* Sidebar | main hairline — web + desktop (mac glass also uses this). */
+.sandwalk-shell-main {
+  border-left: 1px solid hsl(var(--border));
+}
+
+html.sandwalk-mac-glass .sandwalk-shell-main {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  border-radius: 0;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+
+/* Soft “shadow border” — replaces hard strokes on elevated surfaces. */
+.sandwalk-surface-shadow {
+  border-color: transparent !important;
+  box-shadow:
+    0 0 0 0.5px hsl(var(--foreground) / 0.06),
+    0 1px 2px hsl(var(--foreground) / 0.04),
+    0 3px 10px hsl(var(--foreground) / 0.04);
+}
+
+.dark .sandwalk-surface-shadow {
+  box-shadow:
+    0 0 0 0.5px hsl(0 0% 100% / 0.08),
+    0 1px 3px hsl(0 0% 0% / 0.35),
+    0 4px 14px hsl(0 0% 0% / 0.25);
+}
+
 /* ── Color palettes (data-palette on <html>) ─────────────────────────────── */
 /* Each palette overrides tokens for both light (:root) and dark (.dark).    */
 
 :root[data-palette='mirage'] {
-  --background: 20 30% 97%;
+  --background: 20 40% 99%;
   --foreground: 15 25% 12%;
   --card: 0 0% 100%;
   --card-foreground: 15 25% 12%;
@@ -179,9 +353,9 @@
 }
 
 :root[data-palette='mahal'] {
-  --background: 36 40% 96%;
+  --background: 36 45% 99%;
   --foreground: 24 48% 16%;
-  --card: 40 45% 99%;
+  --card: 0 0% 100%;
   --card-foreground: 24 48% 16%;
   --popover: 40 45% 99%;
   --popover-foreground: 24 48% 16%;
@@ -234,8 +408,69 @@
   --sidebar-ring: 40 71% 59%;
 }
 
+/* Dorado — matches the golden dock icon (cream → gold, terracotta mark). */
+:root[data-palette='sandwalk'] {
+  --background: 42 55% 98%;
+  --foreground: 25 40% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 25 40% 16%;
+  --popover: 42 50% 99%;
+  --popover-foreground: 25 40% 16%;
+  --primary: 25 40% 40%;
+  --primary-foreground: 42 72% 94%;
+  --secondary: 40 40% 92%;
+  --secondary-foreground: 25 35% 22%;
+  --muted: 40 30% 93%;
+  --muted-foreground: 28 18% 40%;
+  --accent: 40 55% 92%;
+  --accent-foreground: 25 45% 28%;
+  --border: 38 28% 86%;
+  --input: 38 28% 86%;
+  --ring: 40 71% 59%;
+  --sidebar-background: 40 71% 79%;
+  --sidebar-foreground: 25 40% 18%;
+  --sidebar-primary: 25 40% 40%;
+  --sidebar-primary-foreground: 42 72% 94%;
+  --sidebar-accent: 25 40% 40%;
+  --sidebar-accent-foreground: 42 72% 94%;
+  --sidebar-border: 38 35% 72%;
+  --sidebar-ring: 40 71% 59%;
+  --sidebar-gradient-end: 40 71% 59%;
+}
+
+.dark[data-palette='sandwalk'] {
+  --background: 30 28% 8%;
+  --foreground: 40 50% 92%;
+  --card: 30 24% 11%;
+  --card-foreground: 40 50% 92%;
+  --popover: 30 24% 11%;
+  --popover-foreground: 40 50% 92%;
+  --primary: 40 71% 59%;
+  --primary-foreground: 25 40% 12%;
+  --secondary: 30 20% 16%;
+  --secondary-foreground: 40 40% 88%;
+  --muted: 30 18% 15%;
+  --muted-foreground: 40 20% 62%;
+  --accent: 30 28% 18%;
+  --accent-foreground: 40 71% 70%;
+  --border: 30 18% 20%;
+  --input: 30 18% 20%;
+  --ring: 40 71% 59%;
+  /* Olive-khaki top → deep charcoal bottom (soft vertical wash). */
+  --sidebar-background: 42 18% 32%;
+  --sidebar-foreground: 40 55% 92%;
+  --sidebar-primary: 40 71% 59%;
+  --sidebar-primary-foreground: 25 40% 12%;
+  --sidebar-accent: 42 20% 40%;
+  --sidebar-accent-foreground: 40 70% 96%;
+  --sidebar-border: 30 12% 18%;
+  --sidebar-ring: 40 71% 59%;
+  --sidebar-gradient-mid: 34 14% 18%;
+  --sidebar-gradient-end: 28 12% 10%;
+}
+
 :root[data-palette='darwin'] {
-  --background: 140 20% 97%;
+  --background: 140 25% 99%;
   --foreground: 155 35% 12%;
   --card: 0 0% 100%;
   --card-foreground: 155 35% 12%;
@@ -290,6 +525,845 @@
   --sidebar-ring: 148 40% 55%;
 }
 
+/* ── Vision-assistive palettes ────────────────────────────────────────────── */
+
+:root[data-palette='tritanopia'] {
+  --background: 230 40% 99%;
+  --foreground: 235 30% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 235 30% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 235 30% 14%;
+  --primary: 231 48% 48%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 230 25% 94%;
+  --secondary-foreground: 235 30% 20%;
+  --muted: 230 20% 94%;
+  --muted-foreground: 235 10% 40%;
+  --accent: 330 45% 95%;
+  --accent-foreground: 330 65% 35%;
+  --border: 230 18% 88%;
+  --input: 230 18% 88%;
+  --ring: 231 48% 48%;
+  --sidebar-background: 230 28% 97.5%;
+  --sidebar-foreground: 235 18% 28%;
+  --sidebar-primary: 231 48% 48%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 231 45% 94%;
+  --sidebar-accent-foreground: 231 55% 35%;
+  --sidebar-border: 230 16% 90%;
+  --sidebar-ring: 231 48% 48%;
+}
+
+.dark[data-palette='tritanopia'] {
+  --background: 235 30% 8%;
+  --foreground: 230 20% 96%;
+  --card: 235 24% 11%;
+  --card-foreground: 230 20% 96%;
+  --popover: 235 24% 11%;
+  --popover-foreground: 230 20% 96%;
+  --primary: 231 70% 65%;
+  --primary-foreground: 235 30% 10%;
+  --secondary: 235 16% 16%;
+  --secondary-foreground: 230 15% 92%;
+  --muted: 235 14% 16%;
+  --muted-foreground: 230 10% 62%;
+  --accent: 330 30% 18%;
+  --accent-foreground: 330 80% 72%;
+  --border: 235 16% 18%;
+  --input: 235 16% 18%;
+  --ring: 231 70% 65%;
+  --sidebar-background: 235 24% 9%;
+  --sidebar-foreground: 230 12% 92%;
+  --sidebar-primary: 231 70% 65%;
+  --sidebar-primary-foreground: 235 30% 10%;
+  --sidebar-accent: 231 40% 20%;
+  --sidebar-accent-foreground: 231 70% 78%;
+  --sidebar-border: 235 14% 16%;
+  --sidebar-ring: 231 70% 65%;
+}
+
+:root[data-palette='protanopia'] {
+  --background: 258 40% 99%;
+  --foreground: 258 25% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 258 25% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 258 25% 14%;
+  --primary: 262 71% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 258 25% 95%;
+  --secondary-foreground: 258 20% 20%;
+  --muted: 258 18% 94%;
+  --muted-foreground: 258 10% 40%;
+  --accent: 217 55% 93%;
+  --accent-foreground: 217 60% 32%;
+  --border: 258 18% 88%;
+  --input: 258 18% 88%;
+  --ring: 262 71% 58%;
+  --sidebar-background: 258 45% 97.5%;
+  --sidebar-foreground: 258 20% 24%;
+  --sidebar-primary: 262 71% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 262 55% 93%;
+  --sidebar-accent-foreground: 262 60% 40%;
+  --sidebar-border: 258 18% 90%;
+  --sidebar-ring: 262 71% 58%;
+}
+
+.dark[data-palette='protanopia'] {
+  --background: 258 24% 8%;
+  --foreground: 258 20% 96%;
+  --card: 258 20% 11%;
+  --card-foreground: 258 20% 96%;
+  --popover: 258 20% 11%;
+  --popover-foreground: 258 20% 96%;
+  --primary: 262 80% 72%;
+  --primary-foreground: 258 30% 10%;
+  --secondary: 258 16% 16%;
+  --secondary-foreground: 258 15% 90%;
+  --muted: 258 14% 16%;
+  --muted-foreground: 258 10% 62%;
+  --accent: 217 35% 18%;
+  --accent-foreground: 217 70% 74%;
+  --border: 258 16% 18%;
+  --input: 258 16% 18%;
+  --ring: 262 80% 72%;
+  --sidebar-background: 258 30% 14%;
+  --sidebar-foreground: 258 15% 92%;
+  --sidebar-primary: 262 80% 72%;
+  --sidebar-primary-foreground: 258 30% 10%;
+  --sidebar-accent: 262 45% 22%;
+  --sidebar-accent-foreground: 262 75% 85%;
+  --sidebar-border: 258 16% 16%;
+  --sidebar-ring: 262 80% 72%;
+}
+
+:root[data-palette='ember'] {
+  --background: 0 40% 99%;
+  --foreground: 236 30% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 236 30% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 236 30% 14%;
+  --primary: 236 70% 40%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 25% 94%;
+  --secondary-foreground: 236 30% 20%;
+  --muted: 0 20% 94%;
+  --muted-foreground: 236 10% 40%;
+  --accent: 0 55% 95%;
+  --accent-foreground: 0 70% 35%;
+  --border: 0 18% 88%;
+  --input: 0 18% 88%;
+  --ring: 236 70% 40%;
+  --sidebar-background: 0 100% 97%;
+  --sidebar-foreground: 236 30% 22%;
+  --sidebar-primary: 236 70% 32%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 236 84% 92%;
+  --sidebar-accent-foreground: 236 84% 22%;
+  --sidebar-border: 0 16% 90%;
+  --sidebar-ring: 236 70% 40%;
+  --sidebar-gradient-end: 236 84% 90%;
+}
+
+.dark[data-palette='ember'] {
+  --background: 236 30% 8%;
+  --foreground: 0 20% 96%;
+  --card: 236 24% 11%;
+  --card-foreground: 0 20% 96%;
+  --popover: 236 24% 11%;
+  --popover-foreground: 0 20% 96%;
+  --primary: 0 70% 55%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 236 16% 16%;
+  --secondary-foreground: 0 15% 92%;
+  --muted: 236 14% 16%;
+  --muted-foreground: 0 10% 62%;
+  --accent: 236 30% 18%;
+  --accent-foreground: 0 80% 72%;
+  --border: 236 16% 18%;
+  --input: 236 16% 18%;
+  --ring: 0 70% 55%;
+  --sidebar-background: 0 100% 15%;
+  --sidebar-foreground: 0 20% 92%;
+  --sidebar-primary: 0 70% 55%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 236 60% 20%;
+  --sidebar-accent-foreground: 0 20% 95%;
+  --sidebar-border: 236 16% 16%;
+  --sidebar-ring: 0 70% 55%;
+  --sidebar-gradient-end: 236 84% 10%;
+}
+
+:root[data-palette='verdant'] {
+  --background: 251 40% 99%;
+  --foreground: 251 20% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 251 20% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 251 20% 14%;
+  --primary: 139 40% 30%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 251 25% 95%;
+  --secondary-foreground: 251 20% 20%;
+  --muted: 251 18% 94%;
+  --muted-foreground: 251 10% 40%;
+  --accent: 139 45% 93%;
+  --accent-foreground: 139 55% 24%;
+  --border: 251 18% 88%;
+  --input: 251 18% 88%;
+  --ring: 139 40% 36%;
+  --sidebar-background: 251 60% 97%;
+  --sidebar-foreground: 251 20% 24%;
+  --sidebar-primary: 139 40% 30%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 139 51% 90%;
+  --sidebar-accent-foreground: 139 55% 24%;
+  --sidebar-border: 251 18% 90%;
+  --sidebar-ring: 139 40% 36%;
+  --sidebar-gradient-end: 139 51% 88%;
+}
+
+.dark[data-palette='verdant'] {
+  --background: 251 24% 8%;
+  --foreground: 139 20% 96%;
+  --card: 251 20% 11%;
+  --card-foreground: 139 20% 96%;
+  --popover: 251 20% 11%;
+  --popover-foreground: 139 20% 96%;
+  --primary: 139 51% 55%;
+  --primary-foreground: 251 30% 10%;
+  --secondary: 251 16% 16%;
+  --secondary-foreground: 139 15% 90%;
+  --muted: 251 14% 16%;
+  --muted-foreground: 139 10% 62%;
+  --accent: 251 30% 18%;
+  --accent-foreground: 139 60% 70%;
+  --border: 251 16% 18%;
+  --input: 251 16% 18%;
+  --ring: 139 51% 55%;
+  --sidebar-background: 251 60% 16%;
+  --sidebar-foreground: 139 15% 92%;
+  --sidebar-primary: 139 51% 55%;
+  --sidebar-primary-foreground: 251 30% 10%;
+  --sidebar-accent: 139 51% 22%;
+  --sidebar-accent-foreground: 139 30% 95%;
+  --sidebar-border: 251 16% 16%;
+  --sidebar-ring: 139 51% 55%;
+  --sidebar-gradient-end: 251 40% 6%;
+}
+
+
+/* Fabienk — Angine de Poitrine (black / gold / white + alien dot pattern). */
+:root[data-palette='fabienk'] {
+  --background: 40 30% 98%;
+  --foreground: 0 0% 6%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 6%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 6%;
+  --primary: 36 85% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 40 20% 94%;
+  --secondary-foreground: 0 0% 12%;
+  --muted: 40 16% 94%;
+  --muted-foreground: 0 0% 38%;
+  --accent: 36 70% 94%;
+  --accent-foreground: 36 80% 28%;
+  --border: 40 12% 88%;
+  --input: 40 12% 88%;
+  --ring: 36 93% 50%;
+  /* Sidebar stays true-black in both modes — the art is the void. */
+  --sidebar-background: 0 0% 0%;
+  --sidebar-foreground: 40 20% 96%;
+  --sidebar-primary: 36 93% 62%;
+  --sidebar-primary-foreground: 0 0% 0%;
+  --sidebar-accent: 36 93% 62%;
+  --sidebar-accent-foreground: 0 0% 0%;
+  --sidebar-border: 0 0% 12%;
+  --sidebar-ring: 36 93% 62%;
+}
+
+.dark[data-palette='fabienk'] {
+  --background: 0 0% 2%;
+  --foreground: 40 20% 96%;
+  --card: 0 0% 5%;
+  --card-foreground: 40 20% 96%;
+  --popover: 0 0% 5%;
+  --popover-foreground: 40 20% 96%;
+  --primary: 36 93% 62%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 10%;
+  --secondary-foreground: 40 15% 92%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 40 10% 62%;
+  --accent: 36 40% 12%;
+  --accent-foreground: 36 93% 70%;
+  --border: 0 0% 14%;
+  --input: 0 0% 14%;
+  --ring: 36 93% 62%;
+  --sidebar-background: 0 0% 0%;
+  --sidebar-foreground: 40 20% 96%;
+  --sidebar-primary: 36 93% 62%;
+  --sidebar-primary-foreground: 0 0% 0%;
+  --sidebar-accent: 36 93% 62%;
+  --sidebar-accent-foreground: 0 0% 0%;
+  --sidebar-border: 0 0% 12%;
+  --sidebar-ring: 36 93% 62%;
+}
+
+/*
+ * Fabienk sidebar — pure black void + alien gold dots + soft triangle.
+ * Always black (even in light mode / liquid glass) so the art reads.
+ */
+html[data-palette='fabienk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='fabienk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='fabienk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off[data-palette='fabienk'] .sandwalk-shell-sidebar {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #000 !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Light glass normally forces charcoal labels — keep Fabienk ink white/gold. */
+html[data-palette='fabienk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='fabienk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass:not(.dark)[data-palette='fabienk'] .sandwalk-shell-sidebar {
+  --sidebar-foreground: 40 20% 96%;
+  --foreground: 40 20% 96%;
+  --muted-foreground: 36 35% 68%;
+  color: hsl(40 20% 96%);
+}
+
+html[data-palette='fabienk'] .sandwalk-shell-sidebar > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Alien dot field + centered stippled triangle (Angine de Poitrine). */
+html[data-palette='fabienk'] .sandwalk-shell-sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.72;
+  background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22220%22%20viewBox%3D%220%200%20200%20220%22%3E%3Cdefs%3E%3Cpattern%20id%3D%22d%22%20width%3D%225%22%20height%3D%225%22%20patternUnits%3D%22userSpaceOnUse%22%3E%3Ccircle%20cx%3D%221.2%22%20cy%3D%221.4%22%20r%3D%220.7%22%20fill%3D%22%23F8B144%22%2F%3E%3Ccircle%20cx%3D%223.8%22%20cy%3D%223.6%22%20r%3D%220.55%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.75%22%2F%3E%3Ccircle%20cx%3D%222.5%22%20cy%3D%224.2%22%20r%3D%220.4%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.55%22%2F%3E%3C%2Fpattern%3E%3ClinearGradient%20id%3D%22sh%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23F8B144%22%20stop-opacity%3D%220%22%2F%3E%3Cstop%20offset%3D%22.45%22%20stop-color%3D%22%23F8B144%22%20stop-opacity%3D%220%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23000%22%20stop-opacity%3D%22.55%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpolygon%20points%3D%22100%2C8%2018%2C212%20182%2C212%22%20fill%3D%22url%28%23d%29%22%20fill-opacity%3D%22.95%22%2F%3E%3Cpolygon%20points%3D%22100%2C8%20182%2C212%20100%2C212%22%20fill%3D%22url%28%23sh%29%22%2F%3E%3C%2Fsvg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2272%22%20height%3D%2296%22%20viewBox%3D%220%200%2072%2096%22%3E%3Ccircle%20cx%3D%228%22%20cy%3D%227%22%20r%3D%220.7%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.7%22%2F%3E%3Ccircle%20cx%3D%2222%22%20cy%3D%2214%22%20r%3D%220.55%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.45%22%2F%3E%3Ccircle%20cx%3D%2241%22%20cy%3D%226%22%20r%3D%220.8%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.85%22%2F%3E%3Ccircle%20cx%3D%2258%22%20cy%3D%2218%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.55%22%2F%3E%3Ccircle%20cx%3D%2267%22%20cy%3D%229%22%20r%3D%220.65%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.4%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2228%22%20r%3D%220.6%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.75%22%2F%3E%3Ccircle%20cx%3D%2233%22%20cy%3D%2224%22%20r%3D%220.75%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.5%22%2F%3E%3Ccircle%20cx%3D%2249%22%20cy%3D%2232%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.9%22%2F%3E%3Ccircle%20cx%3D%2263%22%20cy%3D%2227%22%20r%3D%220.7%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.6%22%2F%3E%3Ccircle%20cx%3D%225%22%20cy%3D%2242%22%20r%3D%220.55%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.65%22%2F%3E%3Ccircle%20cx%3D%2219%22%20cy%3D%2248%22%20r%3D%220.8%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.4%22%2F%3E%3Ccircle%20cx%3D%2237%22%20cy%3D%2240%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.8%22%2F%3E%3Ccircle%20cx%3D%2254%22%20cy%3D%2246%22%20r%3D%220.65%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.55%22%2F%3E%3Ccircle%20cx%3D%2268%22%20cy%3D%2251%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.7%22%2F%3E%3Ccircle%20cx%3D%2210%22%20cy%3D%2262%22%20r%3D%220.7%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.5%22%2F%3E%3Ccircle%20cx%3D%2227%22%20cy%3D%2258%22%20r%3D%220.55%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.85%22%2F%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2266%22%20r%3D%220.75%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.45%22%2F%3E%3Ccircle%20cx%3D%2259%22%20cy%3D%2260%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.75%22%2F%3E%3Ccircle%20cx%3D%2215%22%20cy%3D%2278%22%20r%3D%220.6%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.6%22%2F%3E%3Ccircle%20cx%3D%2231%22%20cy%3D%2284%22%20r%3D%220.7%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.4%22%2F%3E%3Ccircle%20cx%3D%2248%22%20cy%3D%2276%22%20r%3D%220.55%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.9%22%2F%3E%3Ccircle%20cx%3D%2264%22%20cy%3D%2282%22%20r%3D%220.8%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.5%22%2F%3E%3Ccircle%20cx%3D%226%22%20cy%3D%2290%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.7%22%2F%3E%3Ccircle%20cx%3D%2239%22%20cy%3D%2292%22%20r%3D%220.65%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.55%22%2F%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%2288%22%20r%3D%220.5%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.8%22%2F%3E%3Ccircle%20cx%3D%2225%22%20cy%3D%2235%22%20r%3D%220.45%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.6%22%2F%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2212%22%20r%3D%220.45%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.5%22%2F%3E%3Ccircle%20cx%3D%2217%22%20cy%3D%2270%22%20r%3D%220.45%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.75%22%2F%3E%3Ccircle%20cx%3D%2261%22%20cy%3D%2238%22%20r%3D%220.45%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.65%22%2F%3E%3Ccircle%20cx%3D%2235%22%20cy%3D%2252%22%20r%3D%220.45%22%20fill%3D%22%23F8B144%22%20fill-opacity%3D%22.55%22%2F%3E%3C%2Fsvg%3E");
+  background-size:
+    min(220px, 92%) min(260px, 58%),
+    72px 96px;
+  background-position:
+    50% 42%,
+    0 0;
+  background-repeat:
+    no-repeat,
+    repeat;
+  animation: fabienk-dots-breathe 8s ease-in-out infinite;
+}
+
+@keyframes fabienk-dots-breathe {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+  50% {
+    opacity: 0.82;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-palette='fabienk'] .sandwalk-shell-sidebar::before {
+    animation: none;
+    opacity: 0.72;
+  }
+}
+
+/* Keep glass edge fade off — dots are the edge treatment. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='fabienk'] .sandwalk-shell-sidebar::after {
+  content: none;
+}
+
+/* Dune — Arrakis (teal haze / burnt umber / rose-gold + dune silhouette). */
+:root[data-palette='dune'] {
+  --background: 180 22% 94%;
+  --foreground: 18 35% 14%;
+  --card: 180 18% 97%;
+  --card-foreground: 18 35% 14%;
+  --popover: 180 18% 97%;
+  --popover-foreground: 18 35% 14%;
+  --primary: 28 45% 42%;
+  --primary-foreground: 40 50% 96%;
+  --secondary: 180 14% 90%;
+  --secondary-foreground: 18 30% 20%;
+  --muted: 180 12% 90%;
+  --muted-foreground: 18 12% 40%;
+  --accent: 28 35% 90%;
+  --accent-foreground: 28 40% 28%;
+  --border: 180 12% 84%;
+  --input: 180 12% 84%;
+  --ring: 28 42% 55%;
+  /* Sidebar stays deep umber — the dune face. */
+  --sidebar-background: 18 45% 10%;
+  --sidebar-foreground: 35 30% 92%;
+  --sidebar-primary: 28 45% 64%;
+  --sidebar-primary-foreground: 18 40% 10%;
+  --sidebar-accent: 28 42% 55%;
+  --sidebar-accent-foreground: 18 40% 10%;
+  --sidebar-border: 18 30% 16%;
+  --sidebar-ring: 28 42% 55%;
+}
+
+.dark[data-palette='dune'] {
+  --background: 18 40% 6%;
+  --foreground: 35 30% 92%;
+  --card: 18 35% 9%;
+  --card-foreground: 35 30% 92%;
+  --popover: 18 35% 9%;
+  --popover-foreground: 35 30% 92%;
+  --primary: 32 75% 55%;
+  --primary-foreground: 18 40% 8%;
+  --secondary: 18 25% 14%;
+  --secondary-foreground: 35 25% 88%;
+  --muted: 18 22% 13%;
+  --muted-foreground: 30 15% 60%;
+  --accent: 28 30% 16%;
+  --accent-foreground: 32 70% 68%;
+  --border: 18 22% 16%;
+  --input: 18 22% 16%;
+  --ring: 32 75% 55%;
+  --sidebar-background: 18 50% 7%;
+  --sidebar-foreground: 35 30% 92%;
+  --sidebar-primary: 32 75% 55%;
+  --sidebar-primary-foreground: 18 40% 8%;
+  --sidebar-accent: 32 65% 42%;
+  --sidebar-accent-foreground: 35 40% 96%;
+  --sidebar-border: 18 30% 12%;
+  --sidebar-ring: 32 75% 55%;
+}
+
+/*
+ * Dune sidebar — deep umber face + a single natural dune silhouette.
+ * Always umber (even in light mode / liquid glass) so the art reads.
+ */
+html[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off[data-palette='dune'] .sandwalk-shell-sidebar {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #1f120e !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.dark[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.dark[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark[data-palette='dune'] .sandwalk-shell-sidebar {
+  background-color: #140a07 !important;
+}
+
+/* Light glass normally forces charcoal labels — keep Dune ink sand-light. */
+html[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='dune'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass:not(.dark)[data-palette='dune'] .sandwalk-shell-sidebar {
+  --sidebar-foreground: 35 30% 92%;
+  --foreground: 35 30% 92%;
+  --muted-foreground: 30 20% 68%;
+  color: hsl(35 30% 92%);
+}
+
+html[data-palette='dune'] .sandwalk-shell-sidebar > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Single natural dune + sun above the crest (cool Arrakis plate). */
+html[data-palette='dune'] .sandwalk-shell-sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.9;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22280%22%20height%3D%22320%22%20viewBox%3D%220%200%20280%20320%22%20preserveAspectRatio%3D%22xMidYMax%20meet%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22haze%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%238BB6B6%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%238BB6B6%22%20stop-opacity%3D%22.07%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%235A3228%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22body%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%236B4030%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%231A0E0A%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22lit%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%233D2118%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.48%22%20stop-color%3D%22%238B5A3C%22%20stop-opacity%3D%22.15%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23D4A373%22%20stop-opacity%3D%22.55%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23E8C49A%22%20stop-opacity%3D%22.7%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22sun%22%20cx%3D%2250%25%22%20cy%3D%2250%25%22%20r%3D%2250%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23F0D080%22%20stop-opacity%3D%22.55%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%23E8C49A%22%20stop-opacity%3D%22.22%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23E8C49A%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%3C%2FradialGradient%3E%0A%20%20%20%20%3Cpattern%20id%3D%22rip%22%20width%3D%2248%22%20height%3D%2210%22%20patternUnits%3D%22userSpaceOnUse%22%3E%0A%20%20%20%20%20%20%3Cpath%20d%3D%22M0%205%20Q12%202.5%2024%205%20T48%205%22%20fill%3D%22none%22%20stroke%3D%22%23D4A373%22%20stroke-opacity%3D%22.14%22%20stroke-width%3D%22.7%22%2F%3E%0A%20%20%20%20%20%20%3Cpath%20d%3D%22M0%208%20Q14%205.5%2028%208%20T48%208%22%20fill%3D%22none%22%20stroke%3D%22%238BB6B6%22%20stroke-opacity%3D%22.07%22%20stroke-width%3D%22.5%22%2F%3E%0A%20%20%20%20%3C%2Fpattern%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22280%22%20height%3D%22320%22%20fill%3D%22url%28%23haze%29%22%2F%3E%0A%20%20%3C%21--%20sun%20centered%20above%20the%20dune%20crest%20%28~x%3D208%29%20--%3E%0A%20%20%3Ccircle%20cx%3D%22208%22%20cy%3D%22118%22%20r%3D%2252%22%20fill%3D%22url%28%23sun%29%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22208%22%20cy%3D%22118%22%20r%3D%2214%22%20fill%3D%22%23F0D080%22%20fill-opacity%3D%22.35%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20252%20C32%20230%2058%20222%2096%20234%20C138%20248%20168%20216%20208%20204%20C238%20194%20260%20198%20280%20206%20L280%20320%20Z%22%20fill%3D%22url%28%23body%29%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20252%20C32%20230%2058%20222%2096%20234%20C138%20248%20168%20216%20208%20204%20C238%20194%20260%20198%20280%20206%20L280%20320%20Z%22%20fill%3D%22url%28%23lit%29%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20252%20C32%20230%2058%20222%2096%20234%20C138%20248%20168%20216%20208%20204%20C238%20194%20260%20198%20280%20206%22%20fill%3D%22none%22%20stroke%3D%22%23E8C49A%22%20stroke-opacity%3D%22.45%22%20stroke-width%3D%221.5%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20252%20C32%20230%2058%20222%2096%20234%20C138%20248%20168%20216%20208%20204%20C238%20194%20260%20198%20280%20206%20L280%20320%20Z%22%20fill%3D%22url%28%23rip%29%22%2F%3E%0A%3C%2Fsvg%3E");
+  background-size: 100% 100%;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  animation: dune-haze-breathe 12s ease-in-out infinite;
+}
+
+/* Single warm dune + sun above the crest for dark mode. */
+.dark[data-palette='dune'] .sandwalk-shell-sidebar::before {
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22280%22%20height%3D%22320%22%20viewBox%3D%220%200%20280%20320%22%20preserveAspectRatio%3D%22xMidYMax%20meet%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22body%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220.2%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%231A0A06%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.46%22%20stop-color%3D%22%233D1810%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.52%22%20stop-color%3D%22%23C87828%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23E8A040%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22depth%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23000%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23000%22%20stop-opacity%3D%22.45%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22sun%22%20cx%3D%2250%25%22%20cy%3D%2250%25%22%20r%3D%2250%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23F8D080%22%20stop-opacity%3D%22.7%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.45%22%20stop-color%3D%22%23F0B85A%22%20stop-opacity%3D%22.28%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23F0B85A%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%3C%2FradialGradient%3E%0A%20%20%20%20%3Cpattern%20id%3D%22rip%22%20width%3D%2248%22%20height%3D%2210%22%20patternUnits%3D%22userSpaceOnUse%22%3E%0A%20%20%20%20%20%20%3Cpath%20d%3D%22M0%205%20Q12%202.5%2024%205%20T48%205%22%20fill%3D%22none%22%20stroke%3D%22%23F0B85A%22%20stroke-opacity%3D%22.16%22%20stroke-width%3D%22.7%22%2F%3E%0A%20%20%20%20%20%20%3Cpath%20d%3D%22M0%208%20Q14%205.5%2028%208%20T48%208%22%20fill%3D%22none%22%20stroke%3D%22%23C46A28%22%20stroke-opacity%3D%22.1%22%20stroke-width%3D%22.5%22%2F%3E%0A%20%20%20%20%3C%2Fpattern%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3C%21--%20sun%20centered%20above%20the%20dune%20crest%20%28~x%3D216%29%20--%3E%0A%20%20%3Ccircle%20cx%3D%22216%22%20cy%3D%22112%22%20r%3D%2256%22%20fill%3D%22url%28%23sun%29%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22216%22%20cy%3D%22112%22%20r%3D%2215%22%20fill%3D%22%23F8D080%22%20fill-opacity%3D%22.4%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20248%20C36%20222%2062%20214%20102%20228%20C146%20244%20176%20208%20216%20196%20C246%20186%20266%20190%20280%20198%20L280%20320%20Z%22%20fill%3D%22url%28%23body%29%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20248%20C36%20222%2062%20214%20102%20228%20C146%20244%20176%20208%20216%20196%20C246%20186%20266%20190%20280%20198%20L280%20320%20Z%22%20fill%3D%22url%28%23depth%29%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20248%20C36%20222%2062%20214%20102%20228%20C146%20244%20176%20208%20216%20196%20C246%20186%20266%20190%20280%20198%22%20fill%3D%22none%22%20stroke%3D%22%23F0B85A%22%20stroke-opacity%3D%22.5%22%20stroke-width%3D%221.6%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M0%20320%20L0%20248%20C36%20222%2062%20214%20102%20228%20C146%20244%20176%20208%20216%20196%20C246%20186%20266%20190%20280%20198%20L280%20320%20Z%22%20fill%3D%22url%28%23rip%29%22%2F%3E%0A%3C%2Fsvg%3E");
+  opacity: 0.85;
+}
+
+@keyframes dune-haze-breathe {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-palette='dune'] .sandwalk-shell-sidebar::before {
+    animation: none;
+    opacity: 0.9;
+  }
+  .dark[data-palette='dune'] .sandwalk-shell-sidebar::before {
+    opacity: 0.85;
+  }
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='dune'] .sandwalk-shell-sidebar::after {
+  content: none;
+}
+
+/* Neon Noir — magenta / violet / deep navy + holo rain & skyline. */
+:root[data-palette='neonnoir'] {
+  --background: 260 30% 97%;
+  --foreground: 270 35% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 270 35% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 270 35% 12%;
+  --primary: 330 75% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 260 20% 94%;
+  --secondary-foreground: 270 30% 20%;
+  --muted: 260 16% 94%;
+  --muted-foreground: 270 12% 40%;
+  --accent: 330 55% 94%;
+  --accent-foreground: 330 65% 32%;
+  --border: 260 14% 88%;
+  --input: 260 14% 88%;
+  --ring: 330 75% 48%;
+  --sidebar-background: 270 40% 6%;
+  --sidebar-foreground: 300 20% 94%;
+  --sidebar-primary: 330 80% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 330 75% 48%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 270 30% 14%;
+  --sidebar-ring: 330 80% 58%;
+}
+
+.dark[data-palette='neonnoir'] {
+  --background: 270 45% 5%;
+  --foreground: 300 20% 94%;
+  --card: 270 35% 8%;
+  --card-foreground: 300 20% 94%;
+  --popover: 270 35% 8%;
+  --popover-foreground: 300 20% 94%;
+  --primary: 330 80% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 270 25% 12%;
+  --secondary-foreground: 300 15% 90%;
+  --muted: 270 22% 12%;
+  --muted-foreground: 280 12% 62%;
+  --accent: 330 35% 16%;
+  --accent-foreground: 330 85% 72%;
+  --border: 270 22% 16%;
+  --input: 270 22% 16%;
+  --ring: 330 80% 58%;
+  --sidebar-background: 270 50% 4%;
+  --sidebar-foreground: 300 20% 94%;
+  --sidebar-primary: 330 80% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 330 70% 38%;
+  --sidebar-accent-foreground: 300 30% 98%;
+  --sidebar-border: 270 30% 12%;
+  --sidebar-ring: 330 80% 58%;
+}
+
+/*
+ * Neon Noir sidebar — deep noir + holographic bloom, skyline,
+ * and falling rain.
+ */
+html[data-palette='neonnoir'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='neonnoir'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='neonnoir'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off[data-palette='neonnoir'] .sandwalk-shell-sidebar {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #0A0614 !important;
+  border-color: transparent;
+  box-shadow: inset -1px 0 12px -2px hsl(330 80% 58% / 0.35) !important;
+}
+
+html[data-palette='neonnoir'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='neonnoir'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass:not(.dark)[data-palette='neonnoir'] .sandwalk-shell-sidebar {
+  --sidebar-foreground: 300 20% 94%;
+  --foreground: 300 20% 94%;
+  --muted-foreground: 300 18% 70%;
+  color: hsl(300 20% 94%);
+}
+
+html[data-palette='neonnoir'] .sandwalk-shell-sidebar > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Holographic bloom + skyline */
+html[data-palette='neonnoir'] .sandwalk-shell-sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.95;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22280%22%20height%3D%22360%22%20viewBox%3D%220%200%20280%20360%22%20preserveAspectRatio%3D%22xMidYMax%20meet%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22holo%22%20cx%3D%2228%25%22%20cy%3D%2242%25%22%20r%3D%2255%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23FF4DA6%22%20stop-opacity%3D%22.38%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.4%22%20stop-color%3D%22%23E83A8A%22%20stop-opacity%3D%22.18%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230A0614%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%3C%2FradialGradient%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22fog%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%231A0A2E%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.6%22%20stop-color%3D%22%232A1450%22%20stop-opacity%3D%22.14%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230A0614%22%20stop-opacity%3D%22.5%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22neon%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23E83A8A%22%20stop-opacity%3D%220%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23E83A8A%22%20stop-opacity%3D%22.45%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%235C2A8A%22%20stop-opacity%3D%22.12%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22280%22%20height%3D%22360%22%20fill%3D%22url%28%23holo%29%22%2F%3E%0A%20%20%3Crect%20width%3D%22280%22%20height%3D%22360%22%20fill%3D%22url%28%23fog%29%22%2F%3E%0A%20%20%3Cg%20fill%3D%22%2305030A%22%20fill-opacity%3D%22.9%22%3E%0A%20%20%20%20%3Crect%20x%3D%220%22%20y%3D%22286%22%20width%3D%2216%22%20height%3D%2274%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2214%22%20y%3D%22262%22%20width%3D%2220%22%20height%3D%2298%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2232%22%20y%3D%22274%22%20width%3D%2212%22%20height%3D%2286%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2242%22%20y%3D%22248%22%20width%3D%2226%22%20height%3D%22112%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2266%22%20y%3D%22268%22%20width%3D%2214%22%20height%3D%2292%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2278%22%20y%3D%22254%22%20width%3D%2222%22%20height%3D%22106%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2298%22%20y%3D%22270%22%20width%3D%2212%22%20height%3D%2290%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22108%22%20y%3D%22240%22%20width%3D%2228%22%20height%3D%22120%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22134%22%20y%3D%22262%22%20width%3D%2216%22%20height%3D%2298%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22148%22%20y%3D%22250%22%20width%3D%2224%22%20height%3D%22110%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22170%22%20y%3D%22276%22%20width%3D%2212%22%20height%3D%2284%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22180%22%20y%3D%22256%22%20width%3D%2228%22%20height%3D%22104%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22206%22%20y%3D%22268%22%20width%3D%2214%22%20height%3D%2292%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22218%22%20y%3D%22244%22%20width%3D%2234%22%20height%3D%22116%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22250%22%20y%3D%22260%22%20width%3D%2230%22%20height%3D%22100%22%2F%3E%0A%20%20%3C%2Fg%3E%0A%20%20%3Cg%3E%0A%20%20%20%20%3Crect%20x%3D%2220%22%20y%3D%22278%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23E83A8A%22%20fill-opacity%3D%22.65%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2250%22%20y%3D%22262%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23A8D8FF%22%20fill-opacity%3D%22.5%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%2290%22%20y%3D%22272%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23E83A8A%22%20fill-opacity%3D%22.7%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22120%22%20y%3D%22255%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23E83A8A%22%20fill-opacity%3D%22.6%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22188%22%20y%3D%22270%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23A8D8FF%22%20fill-opacity%3D%22.45%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22230%22%20y%3D%22258%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23E83A8A%22%20fill-opacity%3D%22.65%22%2F%3E%0A%20%20%3C%2Fg%3E%0A%20%20%3Crect%20x%3D%220%22%20y%3D%22322%22%20width%3D%22280%22%20height%3D%2238%22%20fill%3D%22url%28%23neon%29%22%20fill-opacity%3D%22.3%22%2F%3E%0A%3C%2Fsvg%3E");
+  background-size: 100% 100%;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+}
+
+/* Falling rain */
+html[data-palette='neonnoir'] .sandwalk-shell-sidebar::after,
+html.sandwalk-mac-glass[data-palette='neonnoir'] .sandwalk-shell-sidebar::after,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='neonnoir'] .sandwalk-shell-sidebar::after,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off[data-palette='neonnoir'] .sandwalk-shell-sidebar::after,
+html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active)[data-palette='neonnoir'] .sandwalk-shell-sidebar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  width: auto;
+  opacity: 0.35;
+  background: none;
+  background-image:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 10px,
+      hsl(330 80% 70% / 0) 10px,
+      hsl(330 80% 70% / 0.18) 11px,
+      transparent 12px,
+      transparent 28px
+    ),
+    repeating-linear-gradient(
+      185deg,
+      transparent 0,
+      transparent 18px,
+      hsl(220 60% 70% / 0) 18px,
+      hsl(220 60% 70% / 0.12) 19px,
+      transparent 20px,
+      transparent 40px
+    );
+  background-size: 14px 120px, 22px 160px;
+  animation: neonnoir-rain 2.8s linear infinite;
+}
+
+@keyframes neonnoir-rain {
+  from {
+    background-position: 0 0, 8px 0;
+  }
+  to {
+    background-position: 0 120px, 8px 160px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-palette='neonnoir'] .sandwalk-shell-sidebar::after {
+    animation: none;
+    opacity: 0.22;
+  }
+}
+
+
+/*
+ * Gradient sidebars (Sandwalk Dorado, Ember, Verdant) — blend the sidebar
+ * background into `--sidebar-gradient-end` top-to-bottom. Wins over the
+ * plain solid unfocused/liquid-glass-off fallback (tie broken by source
+ * order) *and* over the focused-glass frost wash below.
+ */
+html.sandwalk-mac-glass[data-palette='sandwalk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='ember'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='verdant'] .sandwalk-shell-sidebar,
+html[data-palette='sandwalk']:not(.sandwalk-mac-glass) .sandwalk-shell-sidebar,
+html[data-palette='ember']:not(.sandwalk-mac-glass) .sandwalk-shell-sidebar,
+html[data-palette='verdant']:not(.sandwalk-mac-glass) .sandwalk-shell-sidebar {
+  background: linear-gradient(
+    165deg,
+    hsl(var(--sidebar-background)) 0%,
+    hsl(var(--sidebar-gradient-end)) 140%
+  ) !important;
+}
+
+/* Same gradient, translucent, while the native glass wash is focused/active. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='sandwalk'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='ember'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active[data-palette='verdant'] .sandwalk-shell-sidebar {
+  background: linear-gradient(
+    165deg,
+    hsl(var(--sidebar-background) / 0.62) 0%,
+    hsl(var(--sidebar-gradient-end) / 0.62) 140%
+  ) !important;
+}
+
+/*
+ * Sandwalk dark — stronger vertical olive→charcoal wash (reads through liquid
+ * glass). Overrides the shared 165deg/140% blend above.
+ */
+html.sandwalk-mac-glass.dark[data-palette='sandwalk'] .sandwalk-shell-sidebar,
+html.dark[data-palette='sandwalk']:not(.sandwalk-mac-glass) .sandwalk-shell-sidebar {
+  background: linear-gradient(
+    180deg,
+    hsl(var(--sidebar-background)) 0%,
+    hsl(var(--sidebar-gradient-mid)) 52%,
+    hsl(var(--sidebar-gradient-end)) 100%
+  ) !important;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark[data-palette='sandwalk']
+  .sandwalk-shell-sidebar {
+  background: linear-gradient(
+    180deg,
+    hsl(var(--sidebar-background) / 0.78) 0%,
+    hsl(var(--sidebar-gradient-mid) / 0.72) 52%,
+    hsl(var(--sidebar-gradient-end) / 0.8) 100%
+  ) !important;
+}
+
+/*
+ * Custom theme (data-palette="custom") — four colors picked in Appearance →
+ * Sidebar appearance → Custom theme. `--sandwalk-custom-*-hsl` are set
+ * inline by applyCustomTheme(); harmless everywhere else since only these
+ * `[data-palette='custom']`-scoped rules read them.
+ */
+html[data-palette='custom'] {
+  --sidebar-background: var(--sandwalk-custom-nav-hsl, 0 0% 100%);
+  --sidebar-accent: var(--sandwalk-custom-selected-hsl, 0 0% 94%);
+  --sidebar-accent-foreground: 0 0% 100%;
+}
+
+html.sandwalk-mac-glass[data-palette='custom'].sandwalk-custom-gradient .sandwalk-shell-sidebar,
+html[data-palette='custom'].sandwalk-custom-gradient:not(.sandwalk-mac-glass) .sandwalk-shell-sidebar {
+  background: linear-gradient(
+    165deg,
+    hsl(var(--sidebar-background)) 0%,
+    hsl(var(--sidebar-accent)) 140%
+  ) !important;
+}
+
+html[data-palette='custom'] .sandwalk-presence-dot {
+  background-color: var(--sandwalk-custom-presence) !important;
+}
+
+/*
+ * Custom theme sidebar text — nav items use `text-foreground` /
+ * `text-muted-foreground` (not `text-sidebar-foreground`), so remap those
+ * tokens inside the sidebar. Beats the glass hard-coded gray via equal
+ * specificity + later source order. `--sandwalk-custom-text-hsl` is always
+ * set by applyCustomTheme (explicit pick, or auto from nav luminance).
+ */
+html[data-palette='custom'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass[data-palette='custom'] .sandwalk-shell-sidebar,
+html.sandwalk-mac-glass:not(.dark)[data-palette='custom'] .sandwalk-shell-sidebar {
+  --sidebar-foreground: var(--sandwalk-custom-text-hsl);
+  --foreground: var(--sandwalk-custom-text-hsl);
+  --muted-foreground: var(--sandwalk-custom-text-hsl);
+  color: hsl(var(--sandwalk-custom-text-hsl));
+}
+
+/*
+ * Accent color (data-accent on <html>) — recolors just the sidebar selected/
+ * hover pill, independent of the palette. "none" (default) keeps the
+ * neutral gray highlight already used everywhere. Same specificity as the
+ * mac-glass sidebar-accent rule (adds one more attribute selector) so it
+ * always wins regardless of source order.
+ */
+:root[data-accent='blue'],
+html.sandwalk-mac-glass[data-accent='blue']:not(.dark) {
+  --sidebar-accent: 217 89% 89%;
+  --sidebar-accent-foreground: 217 70% 32%;
+}
+.dark[data-accent='blue'],
+html.sandwalk-mac-glass[data-accent='blue'].dark {
+  --sidebar-accent: 217 45% 22%;
+  --sidebar-accent-foreground: 213 90% 78%;
+}
+
+:root[data-accent='teal'],
+html.sandwalk-mac-glass[data-accent='teal']:not(.dark) {
+  --sidebar-accent: 173 70% 88%;
+  --sidebar-accent-foreground: 173 65% 26%;
+}
+.dark[data-accent='teal'],
+html.sandwalk-mac-glass[data-accent='teal'].dark {
+  --sidebar-accent: 173 40% 20%;
+  --sidebar-accent-foreground: 168 70% 72%;
+}
+
+:root[data-accent='green'],
+html.sandwalk-mac-glass[data-accent='green']:not(.dark) {
+  --sidebar-accent: 142 65% 89%;
+  --sidebar-accent-foreground: 142 55% 27%;
+}
+.dark[data-accent='green'],
+html.sandwalk-mac-glass[data-accent='green'].dark {
+  --sidebar-accent: 142 35% 20%;
+  --sidebar-accent-foreground: 142 55% 70%;
+}
+
+:root[data-accent='red'],
+html.sandwalk-mac-glass[data-accent='red']:not(.dark) {
+  --sidebar-accent: 0 80% 92%;
+  --sidebar-accent-foreground: 0 65% 40%;
+}
+.dark[data-accent='red'],
+html.sandwalk-mac-glass[data-accent='red'].dark {
+  --sidebar-accent: 0 40% 22%;
+  --sidebar-accent-foreground: 0 80% 78%;
+}
+
+:root[data-accent='pink'],
+html.sandwalk-mac-glass[data-accent='pink']:not(.dark) {
+  --sidebar-accent: 330 75% 92%;
+  --sidebar-accent-foreground: 330 60% 38%;
+}
+.dark[data-accent='pink'],
+html.sandwalk-mac-glass[data-accent='pink'].dark {
+  --sidebar-accent: 330 40% 22%;
+  --sidebar-accent-foreground: 330 80% 78%;
+}
+
+:root[data-accent='purple'],
+html.sandwalk-mac-glass[data-accent='purple']:not(.dark) {
+  --sidebar-accent: 262 70% 92%;
+  --sidebar-accent-foreground: 262 55% 42%;
+}
+.dark[data-accent='purple'],
+html.sandwalk-mac-glass[data-accent='purple'].dark {
+  --sidebar-accent: 262 40% 25%;
+  --sidebar-accent-foreground: 262 80% 80%;
+}
+
+:root[data-accent='orange'],
+html.sandwalk-mac-glass[data-accent='orange']:not(.dark) {
+  --sidebar-accent: 25 90% 90%;
+  --sidebar-accent-foreground: 22 70% 34%;
+}
+.dark[data-accent='orange'],
+html.sandwalk-mac-glass[data-accent='orange'].dark {
+  --sidebar-accent: 22 45% 22%;
+  --sidebar-accent-foreground: 25 85% 72%;
+}
+
 .chat-scrollbar {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -326,7 +1400,101 @@
   background: hsl(var(--muted-foreground) / 0.6);
 }
 
-/* Horizontal strips (session tabs) — no reserved gutter, thinner thumb. */
+/*
+ * Session chrome tabs — two colors only:
+ *   1) gray  = strip + inactive tabs (--muted)
+ *   2) chat  = active tab (--background) merges into the pane below
+ */
+.sandwalk-chrome-tabs.chrome-tabs {
+  /* Lib sets display:flex inline — keep width inside the tabs column only */
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  /* Match lib proportions: tab 36 + top pad + seat for bottom-bar */
+  height: 44px;
+  /* No side inset — strip gray is continuous to the edges */
+  padding: 4px 0 4px;
+  border-radius: 0;
+  /* Clip absolute tabs so they cannot paint over the overflow slot */
+  overflow: hidden !important;
+  /* Background set in session-chrome-tabs.css to match library chrome gray */
+}
+
+/* Same height/baseline for active + inactive. */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab,
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme .chrome-tab,
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab[active],
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme .chrome-tab[active] {
+  top: 2px;
+  height: 36px;
+}
+
+/*
+ * Content-colored seat under tab ears (keeps bottom merge without shifting
+ * the active tab down).
+ */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tabs-bottom-bar,
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme .chrome-tabs-bottom-bar {
+  height: 6px;
+  background: hsl(var(--background)) !important;
+  z-index: 10;
+}
+
+/*
+ * Inactive: strip gray by default; subtle wash only on hover.
+ * Active: chat --background (merge with pane below).
+ */
+.sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab:not([active])
+  .chrome-tab-background,
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme
+  .chrome-tab:not([active])
+  .chrome-tab-background {
+  opacity: 0 !important;
+}
+
+/* Inactive hover uses the same SVG chrome as active (session-chrome-tabs.css). */
+
+/* Divider + close-on-hover overrides live in session-chrome-tabs.css
+   (imported after the chrome-tabs package CSS). */
+
+/*
+ * Active = same pixel color as .sandwalk-shell-main / chat (bg-background).
+ * !important beats chrome-tabs-dark-theme.css (#323639) loaded from the package.
+ */
+.sandwalk-chrome-tabs.chrome-tabs
+  .chrome-tab[active]
+  .chrome-tab-background
+  > svg
+  .chrome-tab-geometry,
+.sandwalk-chrome-tabs.chrome-tabs-dark-theme
+  .chrome-tab[active]
+  .chrome-tab-background
+  > svg
+  .chrome-tab-geometry {
+  fill: hsl(var(--background)) !important;
+}
+
+/* Library title/favicon replaced by React label host (icons + marquee). */
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab-favicon,
+.sandwalk-chrome-tabs.chrome-tabs .chrome-tab-title {
+  display: none !important;
+}
+
+.sandwalk-chrome-tabs .sandwalk-tab-label-host {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-right: 2px;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Horizontal strips (file/terminal tabs) — no reserved gutter, thinner thumb. */
 .chat-scrollbar-x {
   scrollbar-gutter: auto;
   scrollbar-width: thin;
@@ -360,4 +1528,117 @@
 .chat-scrollbar-x:hover::-webkit-scrollbar-thumb:hover,
 .chat-scrollbar-x:focus-within::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* ---- macOS Tauri overlay title bar / window drag ----------------------- */
+.sandwalk-drag-region,
+.sandwalk-desktop-titlebar {
+  -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
+  cursor: default;
+}
+
+.sandwalk-drag-region button,
+.sandwalk-drag-region a,
+.sandwalk-drag-region input,
+.sandwalk-drag-region textarea,
+.sandwalk-drag-region select,
+.sandwalk-drag-region [role='button'],
+.sandwalk-drag-region [data-no-window-drag] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* Shell nav strip: sidebar toggle + back/forward under traffic lights. */
+.sandwalk-shell-nav-strip {
+  height: 3.15rem; /* aligned with traffic_light_position y=24 in lib.rs */
+  align-items: center;
+  transition: padding-left 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Session tab strip = same chrome gray as .sandwalk-chrome-tabs
+ * (light #dee1e6 / dark #202124). Beats mac-glass transparent nav.
+ */
+.sandwalk-session-tab-strip,
+html.sandwalk-mac-glass .sandwalk-session-tab-strip,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-session-tab-strip {
+  background-color: #dee1e6 !important;
+}
+
+.dark .sandwalk-session-tab-strip,
+html.sandwalk-mac-glass.dark .sandwalk-session-tab-strip,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark
+  .sandwalk-session-tab-strip {
+  background-color: #202124 !important;
+}
+
+/* Session tab strip: pin children to the bottom seat (not vertically centered). */
+.sandwalk-session-tab-strip.sandwalk-shell-nav-strip {
+  align-items: flex-end;
+}
+
+/*
+ * Invisible window-drag hit target. Absolute — does not affect layout/spacing.
+ * Passes pointer events through when over interactive controls underneath
+ * (see AppShellMainDragStrip).
+ */
+.sandwalk-main-drag-strip {
+  height: 3.15rem; /* match shell nav strip */
+}
+
+html.sandwalk-mac-overlay .sandwalk-shell-nav-strip-mac {
+  /*
+   * Traffic lights at (19, 24) in lib.rs; cluster ~58px wide → clear ~77px,
+   * then breathing room before the sidebar toggle.
+   * Use px (not rem) so UI font-size changes do not eat into the nav buttons.
+   */
+  padding-left: 96px;
+}
+
+/*
+ * Native fullscreen: traffic lights are gone. Match sidebar chrome `px-3` so the
+ * toggle icon lines up with the Sandwalk logo below.
+ */
+html.sandwalk-mac-overlay.sandwalk-mac-fullscreen .sandwalk-shell-nav-strip-mac {
+  padding-left: 0.75rem; /* px-3 */
+}
+
+/* Animate shell sidebar open/close — skip while the user is actively dragging. */
+.sandwalk-shell-panels:not(:has([data-resize-handle-active])) > [data-panel] {
+  transition:
+    flex-grow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sandwalk-shell-nav-slot {
+  transition:
+    max-width 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease-out,
+    margin 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sandwalk-shell-nav-fade {
+  transition: opacity 160ms ease-out;
+}
+
+.sandwalk-shell-resize-handle {
+  transition: opacity 160ms ease-out;
+}
+
+/* Live mic RMS strip — height is set from real samples, no decorative animation */
+.voice-listen-bars {
+  height: 18px;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2.5px;
+  color: currentColor;
+}
+.voice-listen-bars i {
+  display: block;
+  width: 2.5px;
+  border-radius: 999px;
+  background: currentColor;
+  transition: height 80ms linear;
 }

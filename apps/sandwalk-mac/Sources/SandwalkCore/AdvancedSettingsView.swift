@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Server → Advanced — dashboard serve mode (production vs Vite development).
+/// Server → Advanced — dashboard serve mode + agent DB durability.
 struct AdvancedSettingsView: View {
     @State private var draft = AppConfig.load()
     @State private var statusMessage: String?
@@ -13,6 +13,7 @@ struct AdvancedSettingsView: View {
 
     private var isDirty: Bool {
         draft.dashboardServeMode != liveConfig.dashboardServeMode
+            || draft.dbAutoHeal != liveConfig.dbAutoHeal
     }
 
     private var distBuilt: Bool {
@@ -72,6 +73,24 @@ struct AdvancedSettingsView: View {
                 }
             }
 
+            SettingsSectionHeader(
+                "AGENT DATABASE",
+                subtitle: "Protects against corrupt ~/.sandwalk/agent-server.db after hard kills."
+            )
+            SettingsListGroup {
+                SettingsRow(
+                    label: "Auto-heal on startup",
+                    sublabel: draft.dbAutoHeal
+                        ? "Quarantine a corrupt DB, try sqlite recover, then restore the last healthy backup."
+                        : "Fail loud if the DB is corrupt — no automatic quarantine or restore.",
+                    isLast: true
+                ) {
+                    Toggle("", isOn: $draft.dbAutoHeal)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+            }
+
             HStack {
                 if let statusMessage {
                     Text(statusMessage)
@@ -128,9 +147,10 @@ struct AdvancedSettingsView: View {
         do {
             try await supervisor.applyNetworkConfig(draft)
             draft = supervisor.config
+            let healNote = draft.dbAutoHeal ? "auto-heal on" : "auto-heal off"
             statusMessage = supervisor.overall.isLive
-                ? "Applied — \(draft.dashboardServeMode.title) mode."
-                : "Saved. Use Start to run in \(draft.dashboardServeMode.title) mode."
+                ? "Applied — \(draft.dashboardServeMode.title), \(healNote)."
+                : "Saved. Use Start to run (\(healNote))."
         } catch {
             statusMessage = error.localizedDescription
         }

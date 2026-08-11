@@ -1,0 +1,14 @@
+.cache/
+.runs/
+*.egg-info/
+.venv/
+__pycache__/
+.pytest_cache/
+dist/
+build/
+.runs/
+*.pyc
+.DS_Store
+# Never commit HF tokens
+.env
+.env.*

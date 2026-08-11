@@ -61,6 +61,18 @@ const SKILL_PROMPT_EXAMPLES: Record<string, SkillPromptExample[]> = {
       prompt:
         'Create a Mermaid sequence diagram for this API workflow with retries and error handling paths.'
     }
+  ],
+  'convert-documents-to-markdown': [
+    {
+      title: 'Convert a PDF',
+      prompt:
+        'Use /convert-documents-to-markdown to convert this PDF to clean Markdown and summarize the key sections.'
+    },
+    {
+      title: 'Office docs batch',
+      prompt:
+        'Convert the Word and Excel files in my workspace to Markdown with anydoc and list the output paths.'
+    }
   ]
 }
 

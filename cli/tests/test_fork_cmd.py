@@ -59,9 +59,10 @@ def test_fork_command_imports_into_agent_store(tmp_path: Path, monkeypatch):
     }.get(key, default)
 
     runner = CliRunner()
+    # Patch the names bound into the fork modules (not the re-export on ``cli``).
     with (
-        patch("cli._agents_api_get_json", side_effect=fake_get_json),
-        patch("cli._agents_api_request_json", return_value={"fork_count": 3}),
+        patch("cli.fork._agents_api_get_json", side_effect=fake_get_json),
+        patch("cli.fork_import._agents_api_request_json", return_value={"fork_count": 3}),
         patch("agent.config.Config.load", return_value=mock_cfg),
     ):
         result = runner.invoke(

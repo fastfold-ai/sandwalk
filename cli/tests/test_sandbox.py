@@ -1,10 +1,11 @@
 """Tests for the sandboxed code execution environment."""
 
-import pytest
-import pandas as pd
-import numpy as np
 from pathlib import Path
 from unittest.mock import patch
+
+import numpy as np
+import pandas as pd
+import pytest
 
 
 @pytest.fixture
@@ -128,6 +129,25 @@ result = {{"summary": "write ok"}}
         assert result["error"] is None
         assert inside.exists()
         assert inside.read_text() == "ok"
+
+    def test_sandwalk_config_dir_read_write_allowed(
+        self, sandbox, tmp_path, monkeypatch
+    ):
+        config = tmp_path / "sandwalk"
+        config.mkdir()
+        target = config / "skill-note.md"
+        target.write_text("old", encoding="utf-8")
+        monkeypatch.setenv("SANDWALK_CONFIG_DIR", str(config))
+        code = f"""
+with open(r"{target}", "r") as f:
+    txt = f.read()
+with open(r"{target}", "w") as f:
+    f.write(txt + "-new")
+result = {{"summary": txt}}
+"""
+        result = sandbox.execute(code)
+        assert result["error"] is None
+        assert target.read_text(encoding="utf-8") == "old-new"
 
     def test_read_outside_allowed_dirs_blocked(self, sandbox, tmp_path):
         outside = Path.home() / ".fastfold_sandbox_blocked_read_test.txt"

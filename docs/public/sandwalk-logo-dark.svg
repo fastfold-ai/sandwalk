@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 62" role="img" aria-label="sandwalk">
+  <title>sandwalk</title>
+  <g fill="#ffffff" transform="translate(2 10) scale(0.085) translate(-72 -177)">
+    <path d="M107 458c-19 0-35 16-35 35v70c0 19 16 35 35 35s35-16 35-35v-70c0-19-16-35-35-35z"/>
+    <path d="M213 283c-19 0-35 16-35 35v176c0 19 16 35 35 35s35-16 35-35V318c0-19-16-35-35-35z"/>
+    <path d="M318 177c-19 0-35 16-35 35v246c0 19 16 35 35 35s35-16 35-35V212c0-19-16-35-35-35z"/>
+    <path d="M422 265c-19 0-35 16-35 35v246c0 19 16 35 35 35s35-16 35-35V300c0-19-16-35-35-35z"/>
+    <path d="M529 353c-19 0-35 16-35 35v246c0 19 16 35 35 35s35-16 35-35V388c0-19-16-35-35-35z"/>
+    <path d="M634 318c-19 0-35 16-35 35v178c0 19 16 35 35 35s35-16 35-35V353c0-19-16-35-35-35z"/>
+    <path d="M739 248c-19 0-35 16-35 35v70c0 19 16 35 35 35s35-16 35-35v-70c0-19-16-35-35-35z"/>
+  </g>
+  <text
+    x="72"
+    y="48"
+    fill="#ffffff"
+    font-family="Garet, 'Avenir Next', Inter, ui-sans-serif, system-ui, sans-serif"
+    font-size="52"
+    font-weight="400"
+    letter-spacing="-0.04em"
+    textLength="204"
+    lengthAdjust="spacingAndGlyphs"
+  >sandwalk</text>
+</svg>

@@ -52,6 +52,7 @@ def test_storage_report_categories_and_other_bucket(tmp_path: Path):
     (home / "cache" / "x.bin").write_bytes(b"x" * 10)
     (home / "skills").mkdir()
     (home / "skills" / "fold").mkdir()
+    (home / "sessions").mkdir()
     (home / "extra-bucket").mkdir()
     (home / "extra-bucket" / "orphan.txt").write_bytes(b"yy")
 
@@ -74,7 +75,41 @@ def test_storage_report_categories_and_other_bucket(tmp_path: Path):
     ids = {item.id for item in report.categories}
     assert "cache" in ids
     assert "datasets" in ids
+    assert "sessions" in ids
+    assert "models" in ids
     assert "other" in ids
     assert report.location.path == str(home)
     assert report.total_bytes > 0
     assert report.available_bytes == 999
+
+    models = next(item for item in report.categories if item.id == "models")
+    assert models.label == "Models"
+    assert models.path is not None
+    assert models.path.endswith("models") or "Sandwalk" in models.path
+
+    sessions = next(item for item in report.categories if item.id == "sessions")
+    assert sessions.path is not None
+    assert "sessions" in sessions.path
+    assert "(+" in sessions.path
+    assert sessions.children
+    assert any(child.path and "agent-server.db" in child.path for child in sessions.children)
+    assert report.database is not None
+    assert report.database.path.endswith("agent-server.db")
+
+
+def test_probe_agent_database_healthy(tmp_path: Path):
+    from agent_server.store import AgentStore
+    from agent_server.storage_service import probe_agent_database
+
+    home = tmp_path / "home"
+    home.mkdir()
+    store = AgentStore(home / "agent-server.db", exclusive=True)
+    store.create_session(title="probe", workspace_path=None)
+    store.close()
+
+    probe = probe_agent_database(home)
+    assert probe.exists
+    assert probe.integrity == "ok"
+    assert probe.session_count == 1
+    assert probe.bytes > 0
+    assert probe.journal_mode is not None

@@ -16,10 +16,14 @@ def test_init_skill_existing_and_success(tmp_path):
     existing.mkdir()
     assert init_skill.main(["my-skill", "--path", str(tmp_path)]) == 1
 
-    out_code = init_skill.main(["new-skill", "--path", str(tmp_path), "--with-scripts"])
+    out_code = init_skill.main(
+        ["new-skill", "--path", str(tmp_path), "--with-scripts", "--author", "Ada"]
+    )
     assert out_code == 0
     skill_dir = tmp_path / "new-skill"
-    assert (skill_dir / "SKILL.md").exists()
+    text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+    assert "author: Ada" in text
+    assert "category: Created by Me" in text
     assert (skill_dir / "references").exists()
     assert (skill_dir / "scripts").exists()
 
@@ -75,7 +79,7 @@ def test_quick_validate_missing_and_strict_paths(tmp_path):
     assert quick_validate.main([str(skill)]) == 1
 
 
-def test_quick_validate_success_and_strict_warning(tmp_path):
+def test_quick_validate_success_and_strict_warning(tmp_path, capsys):
     skill = tmp_path / "skill-b"
     skill.mkdir()
     (skill / "SKILL.md").write_text(
@@ -83,6 +87,10 @@ def test_quick_validate_success_and_strict_warning(tmp_path):
         encoding="utf-8",
     )
     assert quick_validate.main([str(skill)]) == 0
+    validation = capsys.readouterr()
+    assert "valid as a draft" in validation.err
+    assert "Validation does not install it" in validation.err
+    assert "skills.manage(action='info'" in validation.err
 
     warn_skill = tmp_path / "skill-c"
     warn_skill.mkdir()

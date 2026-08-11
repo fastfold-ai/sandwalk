@@ -1,0 +1,409 @@
+import type {
+  AgentSession,
+  SlackAllowedUser,
+  SlackDirectory,
+  SlackRelayState,
+  SlackSubscription,
+  SlackWorkspace
+} from '@sandwalk/agent-ui-core'
+import { RefreshCw, X } from 'lucide-react'
+import { type ReactNode, useState } from 'react'
+import { Link } from 'react-router-dom'
+
+import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
+import { McpToggle } from '@/components/agents/mcp-view/mcp-view-shared'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+
+import {
+  Avatar,
+  type PickerOption,
+  SlackPickerPopover
+} from './SlackPickerPopover'
+
+const FASTFOLD_CLOUD_PATH = '/dashboard/integrations/fastfold-cloud'
+const FASTFOLD_ICON = INTEGRATION_ICONS['fastfold-cloud']
+
+function Row({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="border-border/70 grid grid-cols-[6rem_minmax(0,1fr)] items-start gap-3 border-t px-4 py-3">
+      <span className="text-muted-foreground pt-1 text-[12px]">{label}</span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  )
+}
+
+function Chip({
+  name,
+  id,
+  avatarUrl,
+  disabled,
+  onRemove
+}: {
+  name: string
+  id: string
+  avatarUrl?: string | null
+  disabled?: boolean
+  onRemove: () => void
+}) {
+  return (
+    <span
+      title={`id ${id}`}
+      className="bg-muted/70 inline-flex items-center gap-1.5 rounded-full py-0.5 pl-1 pr-1.5 text-[12px]"
+    >
+      <Avatar name={name} src={avatarUrl} />
+      <span className="max-w-40 truncate">{name}</span>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onRemove}
+        aria-label={`Remove ${name}`}
+        className="text-muted-foreground hover:text-foreground disabled:opacity-40"
+      >
+        <X className="size-3" />
+      </button>
+    </span>
+  )
+}
+
+export function SlackWorkspaceCard({
+  workspace,
+  people,
+  directory,
+  subscriptions,
+  sessions,
+  busy,
+  onAllowPerson,
+  onDisallowPerson,
+  onAddSubscription,
+  onRemoveSubscription,
+  onUpdateTokens,
+  onDisconnect,
+  onSetEnabled,
+  onRefreshChannels,
+  relayState
+}: {
+  workspace: SlackWorkspace
+  people: SlackAllowedUser[]
+  directory: SlackDirectory | null
+  subscriptions: SlackSubscription[]
+  sessions: AgentSession[]
+  busy: boolean
+  /** One shared relay connection serves every relay-mode workspace. */
+  relayState: SlackRelayState
+  onAllowPerson: (
+    teamId: string,
+    slackUserId: string,
+    displayName?: string | null
+  ) => void
+  onDisallowPerson: (teamId: string, slackUserId: string) => void
+  onAddSubscription: (sessionId: string, channel: string) => void
+  onRemoveSubscription: (sessionId: string, channel: string) => void
+  onUpdateTokens: (workspace: SlackWorkspace) => void
+  onDisconnect: (teamId: string) => void
+  /** Pause/resume - keeps tokens and settings, unlike disconnect. */
+  onSetEnabled: (teamId: string, enabled: boolean) => void
+  onRefreshChannels: (teamId: string) => void
+}) {
+  const allowed = new Set(people.map(person => person.slackUserId))
+  const knownPeople = directory?.people ?? []
+  const nameById = new Map(knownPeople.map(person => [person.id, person]))
+
+  const peopleOptions: PickerOption[] = knownPeople
+    .filter(person => !allowed.has(person.id))
+    .map(person => ({
+      id: person.id,
+      label: person.name,
+      hint: person.handle ? `@${person.handle}` : null,
+      avatarUrl: person.avatarUrl
+    }))
+
+  const listening = subscriptions.filter(item =>
+    item.channel.startsWith(`slack:${workspace.teamId}/`)
+  )
+  const listeningKeys = new Set(listening.map(item => item.channel))
+
+  const channelOptions: PickerOption[] = (directory?.channels ?? [])
+    .filter(
+      channel =>
+        !listeningKeys.has(`slack:${workspace.teamId}/${channel.id}`)
+    )
+    .map(channel => ({
+      // Full slack:TEAM/CHANNEL — bare C… ids only resolve when exactly one
+      // workspace is connected; with multiple, the API rejects them.
+      id: `slack:${workspace.teamId}/${channel.id}`,
+      label: `#${channel.name}`,
+      hint: channel.isPrivate ? 'private' : null
+    }))
+
+  const channelLabel = (channel: string) => {
+    const id = channel.split('/').at(-1) ?? channel
+    const known = directory?.channels.find(item => item.id === id)
+    return known ? `#${known.name}` : id
+  }
+
+  const isReconnecting =
+    workspace.mode === 'relay' && relayState === 'reconnecting'
+  const relayBlocked =
+    workspace.enabled &&
+    workspace.mode === 'relay' &&
+    (relayState === 'signed_out' || relayState === 'auth_expired')
+  // A rotated/invalid bot token is a distinct, more actionable state than a
+  // dropped connection — it needs a click, not a wait, so it takes priority
+  // over every other status. Missing Fastfold key also outranks a stale Live.
+  const statusDotClass = workspace.needsReauth
+    ? 'bg-red-500'
+    : !workspace.enabled
+      ? 'bg-muted-foreground/50'
+      : relayBlocked
+        ? 'bg-amber-500'
+        : workspace.live
+          ? 'bg-emerald-500'
+          : isReconnecting
+            ? 'bg-amber-500'
+            : 'bg-red-500'
+  const statusLabel = workspace.needsReauth
+    ? 'Reconnect needed'
+    : !workspace.enabled
+      ? 'Paused'
+      : relayBlocked
+        ? relayState === 'auth_expired'
+          ? 'Key rejected'
+          : 'Needs Fastfold key'
+        : workspace.live
+          ? 'Live'
+          : isReconnecting
+            ? 'Reconnecting…'
+            : 'Error'
+  const statusTextClass = workspace.needsReauth
+    ? 'text-red-500'
+    : !workspace.enabled
+      ? 'text-muted-foreground'
+      : relayBlocked
+        ? 'text-amber-500'
+        : workspace.live
+          ? 'text-emerald-500'
+          : isReconnecting
+            ? 'text-amber-500'
+            : 'text-red-500'
+
+  return (
+    <section
+      className={cn(
+        'border-border/70 rounded-xl border',
+        !workspace.enabled && 'opacity-60'
+      )}
+    >
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className={cn('size-1.5 shrink-0 rounded-full', statusDotClass)} aria-hidden />
+            <span className={cn('text-[11px] font-medium', statusTextClass)}>{statusLabel}</span>
+          </div>
+          <p className="mt-0.5 truncate text-[13px] font-medium">
+            {workspace.teamName || workspace.teamId}
+          </p>
+          <p className="text-muted-foreground truncate text-[11px]">
+            {workspace.domain || workspace.teamId} ·{' '}
+            {workspace.mode === 'relay' ? 'relay' : 'socket mode'}
+          </p>
+          {workspace.needsReauth ? (
+            <p className="mt-0.5 truncate text-[11px] text-red-500">
+              Slack rejected the last message — the bot token needs refreshing.
+            </p>
+          ) : relayBlocked ? (
+            <p className="text-muted-foreground mt-0.5 text-[11px]">
+              Add your{' '}
+              <Link
+                to={FASTFOLD_CLOUD_PATH}
+                className="text-foreground hover:text-foreground/80 inline-flex items-center gap-1 font-medium"
+              >
+                <img
+                  src={FASTFOLD_ICON.src}
+                  alt=""
+                  className="size-3.5 object-contain"
+                />
+                Fastfold account
+              </Link>{' '}
+              {relayState === 'auth_expired'
+                ? 'to resume relay.'
+                : 'to enable relay.'}
+            </p>
+          ) : null}
+        </div>
+        <McpToggle
+          enabled={workspace.enabled}
+          pending={busy}
+          label={workspace.enabled ? 'Pause this workspace' : 'Resume this workspace'}
+          onToggle={() => onSetEnabled(workspace.teamId, !workspace.enabled)}
+        />
+      </div>
+
+      <Row label="People">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {people.map(person => {
+            const known = nameById.get(person.slackUserId)
+            return (
+              <Chip
+                key={person.slackUserId}
+                id={person.slackUserId}
+                name={known?.name || person.displayName || person.slackUserId}
+                avatarUrl={known?.avatarUrl}
+                disabled={busy}
+                onRemove={() =>
+                  onDisallowPerson(workspace.teamId, person.slackUserId)
+                }
+              />
+            )
+          })}
+          <SlackPickerPopover
+            label="Add person"
+            placeholder="Type a name…"
+            emptyHint="No people found. The bot may still be loading the directory."
+            options={peopleOptions}
+            disabled={busy}
+            showAvatars
+            onPick={option =>
+              onAllowPerson(workspace.teamId, option.id, option.label)
+            }
+          />
+        </div>
+        {people.length === 0 ? (
+          <p className="text-muted-foreground mt-1.5 text-[11px]">
+            Nobody can trigger the agent yet. Mentions from unlisted people wait
+            for your OK.
+          </p>
+        ) : null}
+      </Row>
+
+      <Row label="Listening">
+        <div className="space-y-1.5">
+          {listening.map(item => {
+            const session = sessions.find(entry => entry.id === item.sessionId)
+            return (
+              <div
+                key={`${item.sessionId}:${item.channel}`}
+                className="flex items-center gap-2 text-[12px]"
+              >
+                <span className="max-w-52 truncate font-medium">
+                  {session?.title || item.sessionId}
+                </span>
+                <span className="text-muted-foreground">←</span>
+                <span className="text-muted-foreground truncate">
+                  {channelLabel(item.channel)}
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    onRemoveSubscription(item.sessionId, item.channel)
+                  }
+                  aria-label="Stop listening"
+                  className="text-muted-foreground hover:text-foreground ml-auto disabled:opacity-40"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            )
+          })}
+
+          <SlackChannelAdder
+            busy={busy}
+            sessions={sessions}
+            channelOptions={channelOptions}
+            onAdd={onAddSubscription}
+            onRefresh={() => onRefreshChannels(workspace.teamId)}
+          />
+          <p className="text-muted-foreground text-[11px] leading-relaxed">
+            Private channels only show up after you invite{' '}
+            <span className="text-foreground font-medium">@Sandwalk</span> to
+            them. Then refresh the channel list.
+          </p>
+        </div>
+      </Row>
+
+      <div className="border-border/70 flex items-center justify-end gap-1 border-t px-4 py-2.5">
+        {/* Socket Mode always offers "Update" (re-pasting tokens). Relay has
+            no tokens of its own to paste, so it only gets a button once a
+            failure actually calls for a reconnect — the same one-click flow
+            the initial connect used. */}
+        {workspace.mode === 'socket' || workspace.needsReauth ? (
+          <Button
+            size="sm"
+            variant={workspace.needsReauth ? 'outline' : 'ghost'}
+            className={cn(
+              'h-7 text-[12px]',
+              workspace.needsReauth && 'border-red-500/40 text-red-500'
+            )}
+            disabled={busy}
+            onClick={() => onUpdateTokens(workspace)}
+          >
+            {workspace.needsReauth ? 'Reconnect' : 'Update'}
+          </Button>
+        ) : null}
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-destructive h-7 text-[12px]"
+          disabled={busy}
+          onClick={() => onDisconnect(workspace.teamId)}
+        >
+          Disconnect
+        </Button>
+      </div>
+    </section>
+  )
+}
+
+function SlackChannelAdder({
+  busy,
+  sessions,
+  channelOptions,
+  onAdd,
+  onRefresh
+}: {
+  busy: boolean
+  sessions: AgentSession[]
+  channelOptions: PickerOption[]
+  onAdd: (sessionId: string, channel: string) => void
+  onRefresh: () => void
+}) {
+  // A channel only listens on behalf of a session, so pick that first.
+  const [sessionId, setSessionId] = useState('')
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+      <select
+        value={sessionId}
+        onChange={event => setSessionId(event.target.value)}
+        className="border-border bg-background h-7 max-w-48 rounded-md border px-2 text-[12px]"
+      >
+        <option value="">Pick a session…</option>
+        {sessions.slice(0, 40).map(session => (
+          <option key={session.id} value={session.id}>
+            {session.title}
+          </option>
+        ))}
+      </select>
+      <SlackPickerPopover
+        label="Add channel"
+        placeholder="Search channels…"
+        emptyHint="No channels found. Invite @Sandwalk to the channel, then refresh."
+        options={channelOptions}
+        disabled={busy || !sessionId}
+        onPick={option => onAdd(sessionId, option.id)}
+      />
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="h-7 gap-1.5 text-[12px]"
+        disabled={busy}
+        onClick={onRefresh}
+      >
+        <RefreshCw className={cn('size-3.5', busy && 'animate-spin')} />
+        Refresh
+      </Button>
+    </div>
+  )
+}

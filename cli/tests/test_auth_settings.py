@@ -13,6 +13,7 @@ from agent_server.auth_settings import (
     validate_api_key,
     verify_session_token,
 )
+from agent_server.routes.auth import _is_site_preview_path
 
 
 def test_settings_roundtrip(tmp_path: Path, monkeypatch):
@@ -42,3 +43,10 @@ def test_session_token_roundtrip():
     assert verify_session_token(token, secret_key="abc")
     assert not verify_session_token(token, secret_key="other")
     assert not verify_session_token("bad", secret_key="abc")
+
+
+def test_only_tokenized_site_assets_are_auth_exempt():
+    assert _is_site_preview_path("/v1/sites/site-1/preview/token-1/")
+    assert _is_site_preview_path("/v1/sites/site-1/preview/token-1/assets/app.js")
+    assert not _is_site_preview_path("/v1/sites/site-1/preview-ticket")
+    assert not _is_site_preview_path("/v1/sites/site-1")

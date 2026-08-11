@@ -1,0 +1,21 @@
+---
+title: Plan mode
+description: Draft a research plan before running heavy tools.
+---
+
+Switch the composer from **Agent** to **Plan** when you want a campaign design first. The agent writes `plans/<slug>.md` (steps + Mermaid), fills todos, and surfaces **Build** with no Y/n gate.
+
+## CLI
+
+In the interactive terminal: `/plan`.
+
+- CLI sessions **start in Agent mode** (Plan mode off) by default.
+- `/plan` toggles Plan ↔ Agent and shows **plan mode** in the status bar when active.
+- See [CLI Plan mode](/cli/plan).
+
+## What you get
+
+- Plan markdown under the session workspace (`plans/<slug>.md`)
+- Steps plus an automatic Mermaid flowchart
+- Todos derived from the plan
+- No Y/n approval gate — switch back to Agent (CLI) or use **Build** (Web) to execute

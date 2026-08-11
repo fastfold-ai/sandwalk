@@ -70,60 +70,6 @@ class TestRunAsyncDispatch:
 
 
 class TestPlanPreview:
-    def _model(self, content):
-        class _M:
-            async def ainvoke(self, _messages):
-                return SimpleNamespace(content=content)
-
-        return _M()
-
-    def test_plan_accepted(self):
-        runner = _mk_runner()
-        with patch("builtins.input", return_value="y"):
-            assert _run(runner._deepagents_plan_preview(self._model("plan"), "x")) is True
-
-    def test_plan_accepted_on_empty_enter(self):
-        runner = _mk_runner()
-        with patch("builtins.input", return_value=""):
-            assert _run(runner._deepagents_plan_preview(self._model("plan"), "x")) is True
-
-    def test_plan_rejected(self):
-        runner = _mk_runner()
-        with patch("builtins.input", return_value="n"):
-            assert _run(runner._deepagents_plan_preview(self._model("plan"), "x")) is False
-
-    def test_plan_preview_model_error_defaults_true(self):
-        runner = _mk_runner()
-
-        class _Bad:
-            async def ainvoke(self, _messages):
-                raise RuntimeError("boom")
-
-        assert _run(runner._deepagents_plan_preview(_Bad(), "x")) is True
-
-    def test_plan_preview_renders_mermaid_diagram_when_enabled(self):
-        runner = _mk_runner(extra={"ui.mermaid.enabled": True})
-        plan_text = "1. Gather target context\n2. Run expression analysis\n3. Synthesize findings"
-        with patch("builtins.input", return_value="y"), patch(
-            "ui.markdown.print_markdown_with_mermaid"
-        ) as mock_mermaid:
-            assert _run(runner._deepagents_plan_preview(self._model(plan_text), "x")) is True
-
-        assert mock_mermaid.called
-        rendered_text = mock_mermaid.call_args.args[1]
-        assert "```mermaid" in rendered_text
-        assert "flowchart TD" in rendered_text
-        assert "Gather target context" in rendered_text
-
-    def test_plan_preview_skips_mermaid_when_disabled(self):
-        runner = _mk_runner(extra={"ui.mermaid.enabled": False})
-        with patch("builtins.input", return_value="y"), patch(
-            "ui.markdown.print_markdown_with_mermaid"
-        ) as mock_mermaid:
-            assert _run(runner._deepagents_plan_preview(self._model("1. Only step"), "x")) is True
-
-        mock_mermaid.assert_not_called()
-
     def test_extract_plan_preview_steps_parses_mixed_formats(self):
         text = "\n".join(
             [
@@ -184,14 +130,6 @@ class TestPlanPreview:
         assert "First action" in md
         assert "Second action" in md
         assert "Third action" in md
-
-    def test_plan_preview_mermaid_render_failure_is_non_fatal(self):
-        runner = _mk_runner(extra={"ui.mermaid.enabled": True})
-        with patch("builtins.input", return_value="y"), patch(
-            "ui.markdown.print_markdown_with_mermaid",
-            side_effect=RuntimeError("render boom"),
-        ):
-            assert _run(runner._deepagents_plan_preview(self._model("1. A\n2. B"), "x")) is True
 
 
 class TestRunnerInterruptHelpers:

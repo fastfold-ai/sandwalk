@@ -5,11 +5,63 @@ import { useEffect, useRef, useState } from 'react'
 const DARK_BG = 0x08080a
 const LIGHT_BG = 0xffffff
 
+type MolstarViewer = import('molstar/lib/apps/viewer/app').Viewer
+
 function isDocumentDark() {
   return (
     typeof document !== 'undefined' &&
     document.documentElement.classList.contains('dark')
   )
+}
+
+function applyViewerBackground(viewer: MolstarViewer, dark: boolean) {
+  const backgroundColor = dark ? DARK_BG : LIGHT_BG
+  viewer.plugin.canvas3d?.setProps({
+    renderer: { backgroundColor: backgroundColor as never }
+  })
+}
+
+/**
+ * Mol* registers custom-prop symbols on a process-global QueryRuntimeTable.
+ * Creating another Viewer re-adds the same symbols and logs noisy warnings.
+ * Mute only that known Mol* message.
+ */
+async function createViewerMuted(
+  host: HTMLElement,
+  options: Parameters<
+    typeof import('molstar/lib/apps/viewer/app').Viewer.create
+  >[1]
+) {
+  const { Viewer } = await import('molstar/lib/apps/viewer/app')
+  const originalWarn = console.warn
+  console.warn = (...args: unknown[]) => {
+    const message = typeof args[0] === 'string' ? args[0] : ''
+    if (
+      message.includes('already added') &&
+      message.includes('removeSymbol/removeCustomProps')
+    ) {
+      return
+    }
+    originalWarn.apply(console, args as Parameters<typeof console.warn>)
+  }
+  try {
+    return await Viewer.create(host, options)
+  } finally {
+    console.warn = originalWarn
+  }
+}
+
+/**
+ * Mol*'s renderReact18 does createRoot(target) and never unmounts.
+ * Always pass a fresh child node so we never call createRoot twice on the
+ * same container (which throws in React 18).
+ */
+function createFreshMountNode(host: HTMLElement) {
+  const mount = document.createElement('div')
+  mount.style.width = '100%'
+  mount.style.height = '100%'
+  host.replaceChildren(mount)
+  return mount
 }
 
 export function StructureViewer({
@@ -23,6 +75,8 @@ export function StructureViewer({
   compact?: boolean
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
+  const viewerRef = useRef<MolstarViewer | null>(null)
+  const [viewerReady, setViewerReady] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [dark, setDark] = useState(isDocumentDark)
 
@@ -37,17 +91,17 @@ export function StructureViewer({
     return () => observer.disconnect()
   }, [])
 
+  // Create the Mol* viewer once per mount/compact mode.
   useEffect(() => {
     if (!hostRef.current) return
     let active = true
-    let viewer: import('molstar/lib/apps/viewer/app').Viewer | null = null
+    let viewer: MolstarViewer | null = null
     const host = hostRef.current
-    host.innerHTML = ''
+    const mount = createFreshMountNode(host)
 
-    void import('molstar/lib/apps/viewer/app')
-      .then(async ({ Viewer }) => {
-        if (!active) return
-        viewer = await Viewer.create(host, {
+    void (async () => {
+      try {
+        viewer = await createViewerMuted(mount, {
           layoutIsExpanded: false,
           layoutShowControls: false,
           layoutShowRemoteState: false,
@@ -63,38 +117,66 @@ export function StructureViewer({
           viewportShowTrajectoryControls: false
         })
         if (!active) {
-          viewer.plugin.dispose()
+          viewer.dispose()
           return
         }
-
-        const backgroundColor = dark ? DARK_BG : LIGHT_BG
-        viewer.plugin.canvas3d?.setProps({
-          renderer: { backgroundColor: backgroundColor as never }
-        })
-
-        await viewer.loadStructureFromData(
-          data,
-          format === 'cif' ? 'mmcif' : format
-        )
-
-        // Re-apply after load — some presets reset clear color.
-        viewer.plugin.canvas3d?.setProps({
-          renderer: { backgroundColor: backgroundColor as never }
-        })
-      })
-      .catch(cause => {
+        viewerRef.current = viewer
+        applyViewerBackground(viewer, isDocumentDark())
+        setViewerReady(value => value + 1)
+      } catch (cause) {
         if (active) {
           setError(
             cause instanceof Error ? cause.message : 'Unable to load structure'
           )
         }
-      })
+      }
+    })()
 
     return () => {
       active = false
-      viewer?.plugin.dispose()
+      viewerRef.current = null
+      viewer?.dispose()
+      // Drop the node that owned the React root so the next createRoot is clean.
+      host.replaceChildren()
     }
-  }, [compact, data, dark, format])
+  }, [compact])
+
+  // Reload structure on the existing viewer — never recreate the React root.
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer || viewerReady === 0) return
+    let active = true
+
+    void (async () => {
+      try {
+        setError(null)
+        await viewer.plugin.clear()
+        if (!active) return
+        await viewer.loadStructureFromData(
+          data,
+          format === 'cif' ? 'mmcif' : format
+        )
+        if (!active) return
+        applyViewerBackground(viewer, isDocumentDark())
+      } catch (cause) {
+        if (active) {
+          setError(
+            cause instanceof Error ? cause.message : 'Unable to load structure'
+          )
+        }
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [data, format, viewerReady])
+
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+    applyViewerBackground(viewer, dark)
+  }, [dark, viewerReady])
 
   if (error) {
     return (
@@ -115,14 +197,22 @@ export function StructureViewer({
       className={
         dark
           ? compact
-            ? 'structure-viewer-dark pointer-events-none relative h-full w-full overflow-hidden bg-[#08080a]'
+            ? 'structure-viewer-dark structure-viewer-compact pointer-events-none relative h-full w-full overflow-hidden bg-[#08080a]'
             : 'structure-viewer-dark relative h-full min-h-80 w-full overflow-hidden bg-[#08080a]'
           : compact
-            ? 'structure-viewer-light pointer-events-none relative h-full w-full overflow-hidden bg-white'
+            ? 'structure-viewer-light structure-viewer-compact pointer-events-none relative h-full w-full overflow-hidden bg-white'
             : 'structure-viewer-light relative h-full min-h-80 w-full overflow-hidden bg-white'
       }
     >
       <style>{`
+        .structure-viewer-compact .msp-viewport-controls,
+        .structure-viewer-compact .msp-viewport-controls-buttons,
+        .structure-viewer-compact .msp-highlight-toast-wrapper,
+        .structure-viewer-compact .msp-logo,
+        .structure-viewer-compact .msp-image-wrapper {
+          display: none !important;
+        }
+
         .structure-viewer-dark .msp-plugin,
         .structure-viewer-dark .msp-plugin-content,
         .structure-viewer-dark .msp-layout-standard,
@@ -177,7 +267,6 @@ export function StructureViewer({
           border-color: #3f3f46 !important;
         }
 
-        /* Light mode: strip Mol* viewport borders (grid + full preview). */
         .structure-viewer-light .msp-plugin,
         .structure-viewer-light .msp-plugin-content,
         .structure-viewer-light .msp-layout-standard,

@@ -1,0 +1,25 @@
+---
+title: Config
+description: Read and set sandwalk config from the CLI.
+---
+
+```bash
+sandwalk config show
+sandwalk config set <key> <value>
+```
+
+Config lives under `~/.sandwalk/` (see [Configuration](/configuration)).
+
+### Common keys
+
+| Key | Notes |
+|-----|--------|
+| `llm.provider` / `llm.model` | Active cloud / default model |
+| `agent.cli_sandbox` | CLI Local vs Modal (`builtin` / `modal`) — see [Sandbox](/cli/sandbox) |
+| `agent.plan_preview` | Plan mode flag (CLI sessions force off at start; `/plan` toggles) |
+| `sandbox.compute_type` | `cpu` / `gpu` |
+| `sandbox.gpu_class` | e.g. `T4` |
+| `sandbox.cpu_image` / `sandbox.gpu_image` | Modal base images |
+| `compute.modal_token_id` / `compute.modal_token_secret` | Modal auth |
+
+Prefer `/sandbox` and `/plan` in the interactive terminal when possible.

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentic-pymol"
+version = "1.0.0+sandwalk"
+description = "Sandwalk-vendored MCP server for live PyMOL (from Arcadia agentic-pymol)."
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    # FastMCP lives on mcp SDK v1; mcp 2.x removed mcp.server.fastmcp.
+    "mcp[cli]>=1.0.0,<2",
+]
+
+[project.scripts]
+agentic-pymol = "agentic_pymol.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentic_pymol"]

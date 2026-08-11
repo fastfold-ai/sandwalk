@@ -5,16 +5,20 @@ import {
   featuredSkillIcon,
   isFeaturedSkill,
   skillIcon,
+  skillIconForName,
   skillIconInvertInDark
 } from './skill-icons'
 
 describe('isFeaturedSkill', () => {
-  it('detects fastfold author, bundled source, and fastfold-ai source', () => {
+  it('detects fastfold author, sandwalk/bundled, and fastfold-ai source', () => {
     expect(
       isFeaturedSkill({ name: 'x', author: 'FastFold Team', source: 'user' })
     ).toBe(true)
     expect(
       isFeaturedSkill({ name: 'x', author: '', source: 'bundled' })
+    ).toBe(true)
+    expect(
+      isFeaturedSkill({ name: 'skill-find', author: 'sandwalk', source: 'bundled' })
     ).toBe(true)
     expect(
       isFeaturedSkill({
@@ -26,6 +30,13 @@ describe('isFeaturedSkill', () => {
     expect(
       isFeaturedSkill({ name: 'x', author: 'other', source: 'user' })
     ).toBe(false)
+    expect(
+      isFeaturedSkill({
+        name: 'convert-documents-to-markdown',
+        author: 'firecrawl',
+        source: 'firecrawl/anydoc'
+      })
+    ).toBe(true)
   })
 })
 
@@ -57,6 +68,33 @@ describe('skillIcon helpers', () => {
     expect(featuredSkillIcon({ name: 'other', iconSrc: null })).toBe(
       '/ff_simbol_color.svg'
     )
+    expect(
+      featuredSkillIcon({
+        name: 'skill-creator',
+        iconSrc: null,
+        author: 'sandwalk',
+        source: 'bundled'
+      })
+    ).toBe('/sandwalk-mark.svg')
+    expect(
+      featuredSkillIcon({
+        name: 'skill-find',
+        iconSrc: null,
+        author: 'sandwalk',
+        source: 'bundled'
+      })
+    ).toBe('/sandwalk-mark.svg')
+  })
+
+  it('inverts sandwalk built-in marks in dark mode', () => {
+    expect(
+      skillIconInvertInDark({
+        name: 'skill-creator',
+        iconSrc: null,
+        author: 'sandwalk',
+        source: 'bundled'
+      })
+    ).toBe(true)
   })
 
   it('composerSkillIcon uses featured fallback only for featured skills', () => {
@@ -84,5 +122,34 @@ describe('skillIcon helpers', () => {
         source: 'user'
       })
     ).toBe('/pipelines/boltzgen.svg')
+  })
+
+  it('infers Hugging Face logos and keeps mapped skill logos by name', () => {
+    expect(skillIcon({ name: 'convert-documents-to-markdown', iconSrc: null })).toBe(
+      '/integrations/firecrawl.png'
+    )
+    expect(skillIcon({ name: 'diagrams_mermaid', iconSrc: null })).toBe(
+      '/mermaid-logo.png'
+    )
+    expect(skillIcon({ name: 'hf-cli', iconSrc: null })).toBe(
+      '/integrations/huggingface.png'
+    )
+    expect(
+      skillIcon({
+        name: 'other',
+        iconSrc: null,
+        source: 'github:huggingface/skills'
+      })
+    ).toBe('/integrations/huggingface.png')
+    expect(
+      skillIconForName('diagrams_mermaid', [
+        {
+          name: 'diagrams_mermaid',
+          iconSrc: '/custom-mermaid.png',
+          author: '',
+          source: ''
+        }
+      ])
+    ).toBe('/custom-mermaid.png')
   })
 })

@@ -1,0 +1,11 @@
+{
+  "title": "Web UI",
+  "pages": [
+    "composer",
+    "plan-mode",
+    "multimodal",
+    "projects",
+    "artifacts",
+    "terminal"
+  ]
+}

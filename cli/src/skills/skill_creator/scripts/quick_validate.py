@@ -16,7 +16,19 @@ import sys
 from pathlib import Path
 
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
-_ALLOWED_KEYS = {"name", "description", "tags", "license", "allowed-tools", "metadata", "compatibility"}
+_ALLOWED_KEYS = {
+    "name",
+    "description",
+    "tags",
+    "license",
+    "allowed-tools",
+    "metadata",
+    "compatibility",
+    "author",
+    "category",
+    "origin",
+    "icon",
+}
 
 
 def _parse_frontmatter(text: str) -> dict[str, str]:
@@ -84,7 +96,13 @@ def main(argv: list[str] | None = None) -> int:
         print("Validation failed.", file=sys.stderr)
         return 1
 
-    print(f"OK: {skill_md} is valid.", file=sys.stderr)
+    print(
+        f"OK: {skill_md} is valid as a draft. Validation does not install it. "
+        "Use skills.manage(action='install', source=<skill-path>), then verify "
+        "with skills.manage(action='info', name=<skill-name>) before claiming "
+        "the skill is available.",
+        file=sys.stderr,
+    )
     print(name)
     return 0
 
