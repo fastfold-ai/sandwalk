@@ -10,17 +10,40 @@ Requires Python 3.11+.
 ## One-liner
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fastfold-ai/sandwalk/main/cli/install.sh | bash
-```
-
-## uv / PyPI
-
-```bash
-uv tool install sandwalk
+curl -fsSL https://sandwalk.sh/install | bash
 sandwalk --version
 ```
 
-Optional science extras:
+Installs from the latest **stable** GitHub Release tag via `uv tool` (or pipx / pip).
+
+Pre-release / pin:
+
+```bash
+# Newest release including pre-releases
+curl -fsSL https://sandwalk.sh/install | bash -s -- --pre
+
+# Exact tag
+curl -fsSL https://sandwalk.sh/install | bash -s -- --version 0.0.1-rc.1
+```
+
+While `fastfold-ai/sandwalk` is private, authenticate GitHub first (`gh auth login` or `GITHUB_TOKEN`).
+
+Fallback (raw script from the repo):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fastfold-ai/sandwalk/main/cli/install.sh | bash
+```
+
+## uv / pip (after PyPI publish)
+
+```bash
+uv tool install sandwalk
+# or: pipx install sandwalk
+# or: pip install sandwalk
+sandwalk --version
+```
+
+Optional science extras (from a git checkout or when published):
 
 ```bash
 uv tool install "sandwalk[all]"
@@ -32,5 +55,7 @@ uv tool install "sandwalk[all]"
 ```bash
 sandwalk upgrade
 ```
+
+Or re-run the curl installer to pick up the latest release.
 
 Then: [Terminal](/cli/terminal), [Serve](/cli/serve), or [Command reference](/cli/commands).
