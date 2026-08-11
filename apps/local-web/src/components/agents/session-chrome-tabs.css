@@ -192,13 +192,17 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 20px 6px 20px;
+  /*
+   * `padding-right: 44px` es fijo (no cambia en hover) para reservar el hueco
+   * donde el close/dissolve button aparece al hacer hover. Antes cambiaba de
+   * 20 → 44 px on hover; con muchas pestañas comprimidas cerca del min-width
+   * eso alteraba el ancho mínimo intrínseco del tab hovereado y flex empujaba
+   * a los vecinos. Reservar siempre el hueco mantiene la strip estable a costa
+   * de ~24 px de ancho útil del título — es el mismo trade que hacen Chrome
+   * y Arc.
+   */
+  padding: 0 44px 6px 20px;
   overflow: hidden;
-  transition: padding-right 0.15s ease;
-}
-
-.sandwalk-chrome-tabs .chrome-tab:hover .chrome-tab-content {
-  padding-right: 44px;
 }
 
 /*
