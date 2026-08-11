@@ -80,7 +80,8 @@ export function Composer({
   onRefreshSandbox,
   onPlanModeChange,
   editingQueued = false,
-  onCancelEditQueued
+  onCancelEditQueued,
+  embedded = false
 }: ComposerProps) {
   const [auraTick, setAuraTick] = useState(0)
   const atMenuRef = useRef<ComposerAtMenuHandle | null>(null)
@@ -260,15 +261,28 @@ export function Composer({
             void addFiles(files)
           }}
           className={cn(
-            'bg-card hover:border-muted-foreground/25 focus-within:border-muted-foreground/40 border-border relative rounded-3xl border pt-1.5 pr-2 pb-3 pl-3 transition-colors duration-150',
-            voice.active
-              ? 'shadow-none'
-              : 'shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',
+            'relative transition-colors duration-150',
+            /*
+             * En modo `embedded` el composer se pinta como parte inferior
+             * del contenedor exterior (panel del split): sin chip propio
+             * (bg/border/rounded/shadow los aporta el panel), padding
+             * lateral y arriba/abajo generosos. En modo normal mantiene
+             * su look de "chip flotante" clásico.
+             */
+            embedded
+              ? 'bg-transparent border-0 rounded-none shadow-none px-4 pt-2 pb-3'
+              : 'bg-card hover:border-muted-foreground/25 focus-within:border-muted-foreground/40 border-border rounded-3xl border pt-1.5 pr-2 pb-3 pl-3',
+            !embedded &&
+              (voice.active
+                ? 'shadow-none'
+                : 'shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]'),
             Boolean(dragging) &&
               !voice.active &&
+              !embedded &&
               'border-sky-500/60 ring-2 ring-sky-500/20',
             editingQueued &&
               !voice.active &&
+              !embedded &&
               'rounded-t-none border-x-0 border-b-0 border-t border-sky-500/25 shadow-none focus-within:border-sky-500/40'
           )}
         >

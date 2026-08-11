@@ -98,6 +98,8 @@ type AgentComposerSlotProps = {
   setRuntimeSettings: Dispatch<SetStateAction<RuntimeSettings | null>>
   onSessionUpdated?: (session: AgentSession) => void
   loadModelOptions: () => Promise<void>
+  /** Reenvía al `Composer` para que se pinte sin chip propio. */
+  embedded?: boolean
 }
 
 export function AgentComposerSlot({
@@ -147,7 +149,8 @@ export function AgentComposerSlot({
   refreshSessionSandbox,
   setRuntimeSettings,
   onSessionUpdated,
-  loadModelOptions
+  loadModelOptions,
+  embedded
 }: AgentComposerSlotProps) {
   const [compactBusy, setCompactBusy] = useState(false)
   // Existing chats keep their own model; draft/new chats use global defaults.
@@ -178,6 +181,7 @@ export function AgentComposerSlot({
         key="session-composer"
         value={composer}
         running={runActive}
+        embedded={embedded}
         skills={skills}
         mcpServers={mcpServers}
         skillChips={composerSkills}

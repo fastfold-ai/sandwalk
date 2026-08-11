@@ -316,14 +316,22 @@ export function SessionChatBody({
             ref={composerBarRef}
             data-composer-slot
             className={cn(
-              'bg-background border-border/50 absolute inset-x-0 bottom-0 z-10 border-t px-3 pb-2 pt-2',
+              /*
+               * `inset-x-0 bottom-0`: la barra ES la parte inferior del
+               * panel. Cero padding: sin gutter lateral, sin banda vacía
+               * arriba/abajo. El único separador visual con el transcript
+               * es el `border-t border-border/50`. Las esquinas curvas
+               * inferiores las hereda del `rounded-lg` del panel gracias
+               * al `overflow-hidden` del ChatSplitContainer.
+               */
+              'bg-background border-border/50 absolute inset-x-0 bottom-0 z-10 border-t',
               'transition-[transform,opacity] duration-300 ease-out',
               splitFocused
                 ? 'translate-y-0 opacity-100'
                 : 'pointer-events-none translate-y-full opacity-0'
             )}
           >
-            <AgentComposerSlot {...agentComposerSlotProps} />
+            <AgentComposerSlot {...agentComposerSlotProps} embedded />
           </div>
         ) : (
           <div
