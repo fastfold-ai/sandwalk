@@ -29,7 +29,8 @@ import {
   isOnboardingPath,
   onboardingPath
 } from '@/lib/onboarding'
-import { clearRememberedApiKey } from '@/lib/remembered-auth'
+import { clearRememberedApiKey, persistRememberedApiKey } from '@/lib/remembered-auth'
+import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 
 import type { useAppBootstrapLoaders } from './useAppBootstrapLoaders'
 
@@ -160,6 +161,17 @@ export function useAppBootstrapConnect({
 
       if (authEnabled) {
         if (authenticated === false) {
+          // Cookie sessions do not stick in Tauri. If we have no Authorization
+          // header yet, pull the local server key (or remembered) and retry
+          // instead of wiping credentials and forcing the login modal.
+          if (!client.apiKey) {
+            const recovered = await resolveBackendApiKey(backendUrl)
+            if (recovered) {
+              persistRememberedApiKey(backendUrl, recovered)
+              setClientApiKey(recovered)
+              return
+            }
+          }
           goToLogin()
           return
         }
@@ -170,6 +182,14 @@ export function useAppBootstrapConnect({
             )
           } catch (cause) {
             if (isAuthCredentialError(cause)) {
+              if (!client.apiKey) {
+                const recovered = await resolveBackendApiKey(backendUrl)
+                if (recovered) {
+                  persistRememberedApiKey(backendUrl, recovered)
+                  setClientApiKey(recovered)
+                  return
+                }
+              }
               goToLogin()
               return
             }

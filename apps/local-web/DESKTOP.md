@@ -87,7 +87,7 @@ On macOS the **first** submenu is the app menu (named **Sandwalk**). New Window 
 | **Sandwalk** | Check for Updates… | Opens Dashboard → General and runs the update check |
 | **Sandwalk** | Server Settings… | Opens the nested **Sandwalk Server** helper Settings UI (`sandwalk://settings/general`) |
 | **File** | New Window (`⇧⌘N`) | Another window on the **same** API as the focused window |
-| **File** | New Window (Remote)… | Dialog for server URL + optional API key; auto-scans LAN `:8787` via `/v1/discover` |
+| **File** | New Window (Remote)… | Dialog for server URL + optional API key; auto-scans LAN `:8787`/`:8789`/`:8790` via `/v1/discover` |
 | **File** | Open Recent | MRU **window snapshots** (`window-recents.json`: url + last route + title); keys in SPA remembered-auth |
 | **File** | Close Window | `main` **hides**; extra `client-*` windows **destroy** |
 

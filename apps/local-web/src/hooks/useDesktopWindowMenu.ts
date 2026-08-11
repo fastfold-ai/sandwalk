@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { normalizeBackendUrl } from '@/lib/backend-url'
 import { isTauri, listenDesktopMenu, openDesktopWindow } from '@/lib/desktop'
 import { openDesktopRecent } from '@/lib/open-desktop-recent'
-import { persistRememberedApiKey, readRememberedApiKey } from '@/lib/remembered-auth'
+import { persistRememberedApiKey } from '@/lib/remembered-auth'
+import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 
 /**
  * File → New Window (Remote) / Open Recent + Sandwalk → Check for Updates.
@@ -69,7 +70,7 @@ export function useDesktopWindowMenu() {
     /** Helper for tests / future callers that already have a URL+key. */
     openRemoteWithAuth: async (url: string, apiKey?: string) => {
       const normalized = normalizeBackendUrl(url)
-      const key = (apiKey || readRememberedApiKey(normalized) || '').trim()
+      const key = (await resolveBackendApiKey(normalized, apiKey)) || ''
       if (key) persistRememberedApiKey(normalized, key)
       await openDesktopWindow({
         backendUrl: normalized,

@@ -1,6 +1,6 @@
 import { isLocalBackendUrl, normalizeBackendUrl } from '@/lib/backend-url'
 import { openDesktopWindow } from '@/lib/desktop'
-import { readRememberedApiKey } from '@/lib/remembered-auth'
+import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 import { rememberRemoteHostname } from '@/lib/remote-hostname'
 
 export type DesktopRecentRef = {
@@ -20,7 +20,7 @@ export async function openDesktopRecent(
   row: DesktopRecentRef
 ): Promise<{ opened: boolean; url: string }> {
   const url = normalizeBackendUrl(row.url)
-  const key = readRememberedApiKey(url)
+  const key = await resolveBackendApiKey(url)
   const route = row.route?.trim() || '/'
   const title = row.title?.trim() || null
   const snapshotId = row.id?.trim() || null

@@ -6,7 +6,7 @@
   <key>NSMicrophoneUsageDescription</key>
   <string>Sandwalk records only while you use the composer microphone to turn your spoken prompt into editable text. Audio is transcribed locally and is not uploaded.</string>
   <key>NSLocalNetworkUsageDescription</key>
-  <string>Sandwalk scans your local network for other Sandwalk agent servers on port 8787 so you can open a remote window without typing the URL.</string>
+  <string>Sandwalk scans your local network for other Sandwalk agent servers on ports 8787, 8789, and 8790 so you can open a remote window without typing the URL.</string>
   <key>NSBonjourServices</key>
   <array>
     <string>_http._tcp</string>

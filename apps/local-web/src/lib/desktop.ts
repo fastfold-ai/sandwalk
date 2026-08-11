@@ -444,7 +444,7 @@ export type LanDesktopServer = {
   version: string
 }
 
-/** Probe local /24 (+ localhost) for Sandwalk servers on :8787. */
+/** Probe local /24 (+ localhost) for Sandwalk servers on :8787/:8789/:8790. */
 export const scanLanDesktopServers = () =>
   invokeStrict<LanDesktopServer[]>('desktop_scan_lan_servers')
 
