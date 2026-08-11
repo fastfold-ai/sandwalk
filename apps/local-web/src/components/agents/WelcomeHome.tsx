@@ -117,7 +117,7 @@ export function WelcomeHome({
     }
     setLoadingRecents(true)
     try {
-      const rows = await listDesktopWindowRecents()
+      const rows = (await listDesktopWindowRecents()) ?? []
       setRecents(rows)
       // Seed local / hostname hints immediately; refine via /v1/discover.
       const seeded: Record<string, string> = {}
