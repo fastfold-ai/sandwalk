@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
 import type { SessionChatState } from '@/lib/sessions'
@@ -25,6 +25,7 @@ export function useAppBootstrap({
   isDashboardModels
 }: UseAppBootstrapArgs) {
   const clientBundle = useAppBootstrapClient()
+  const [authLoginError, setAuthLoginError] = useState<unknown>(null)
   const loaders = useAppBootstrapLoaders({
     client: clientBundle.client,
     setChatBySessionId
@@ -38,7 +39,8 @@ export function useAppBootstrap({
     isDashboardModels,
     loaders,
     connectRef,
-    setClientApiKey: clientBundle.setClientApiKey
+    setClientApiKey: clientBundle.setClientApiKey,
+    setAuthLoginError
   })
   const auth = useAppBootstrapAuth({
     client: clientBundle.client,
@@ -54,7 +56,8 @@ export function useAppBootstrap({
     needsAuthLoginRef: connectBundle.needsAuthLoginRef,
     setNeedsAuthLogin: connectBundle.setNeedsAuthLogin,
     setAuthBootstrapped: connectBundle.setAuthBootstrapped,
-    setConnectionPaused: connectBundle.setConnectionPaused
+    setConnectionPaused: connectBundle.setConnectionPaused,
+    setAuthLoginError
   })
 
   return {
@@ -71,8 +74,8 @@ export function useAppBootstrap({
     needsAuthLogin: connectBundle.needsAuthLogin,
     authBootstrapped: connectBundle.authBootstrapped,
     authLoggingIn: auth.authLoggingIn,
-    authLoginError: auth.authLoginError,
-    setAuthLoginError: auth.setAuthLoginError,
+    authLoginError,
+    setAuthLoginError,
     connecting: connectBundle.connecting,
     connectionPaused: connectBundle.connectionPaused,
     setConnectionPaused: connectBundle.setConnectionPaused,

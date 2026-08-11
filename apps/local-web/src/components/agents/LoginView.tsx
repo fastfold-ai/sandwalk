@@ -1,5 +1,5 @@
-import { Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { DesktopGateFrame } from '@/components/DesktopGateFrame'
@@ -7,6 +7,8 @@ import { ErrorPage } from '@/components/ErrorPage'
 import { MirageBackground } from '@/components/MirageBackground'
 import { ServerToggle } from '@/components/ServerToggle'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { injectedDesktopApiKeyFor } from '@/lib/backend-url'
+import { readRememberedApiKey } from '@/lib/remembered-auth'
 import { cn } from '@/lib/utils'
 
 import { LoginHelpDialog } from './login-view-help-dialog'
@@ -29,11 +31,25 @@ export function LoginView({
   className?: string
 }) {
   const [apiKey, setApiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
   const [remember, setRemember] = useState(true)
+  const prevBackendUrl = useRef<string | undefined>(undefined)
 
-  // Different host → different key; don't keep a stale value in the form.
+  // Prefill only keys for *this* backend. Never reuse another host’s inject.
   useEffect(() => {
-    setApiKey('')
+    const url = backendUrl?.trim() || ''
+    const hostChanged =
+      prevBackendUrl.current !== undefined && prevBackendUrl.current !== url
+    prevBackendUrl.current = url
+    if (hostChanged) setApiKey('')
+    const remembered = url ? readRememberedApiKey(url) : undefined
+    const injected = url ? injectedDesktopApiKeyFor(url) : null
+    const next = remembered || injected || ''
+    if (hostChanged) {
+      setApiKey(next)
+      return
+    }
+    if (next) setApiKey(prev => (prev.trim() ? prev : next))
   }, [backendUrl])
 
   return (
@@ -75,17 +91,31 @@ export function LoginView({
             >
               API Key
             </label>
-            <input
-              id="sandwalk-api-key"
-              type="password"
-              autoFocus
-              autoComplete="off"
-              spellCheck={false}
-              value={apiKey}
-              onChange={event => setApiKey(event.target.value)}
-              placeholder="Enter your API key"
-              className="border-input bg-background text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-ring/30 h-11 w-full rounded-lg border px-3 text-sm outline-none focus:ring-2"
-            />
+            <div className="relative">
+              <input
+                id="sandwalk-api-key"
+                type={showKey ? 'text' : 'password'}
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
+                value={apiKey}
+                onChange={event => setApiKey(event.target.value)}
+                placeholder="Enter your API key"
+                className="border-input bg-background text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-ring/30 h-11 w-full rounded-lg border px-3 pr-10 text-sm outline-none focus:ring-2"
+              />
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-1.5 flex size-8 -translate-y-1/2 items-center justify-center rounded-md"
+                onClick={() => setShowKey(v => !v)}
+                aria-label={showKey ? 'Hide API key' : 'Show API key'}
+              >
+                {showKey ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            </div>
 
             <label className="text-muted-foreground mt-4 flex cursor-pointer items-center gap-2.5 text-sm select-none">
               <input

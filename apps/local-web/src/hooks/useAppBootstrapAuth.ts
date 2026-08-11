@@ -38,6 +38,7 @@ type UseAppBootstrapAuthArgs = {
   setNeedsAuthLogin: (value: boolean) => void
   setAuthBootstrapped: (value: boolean) => void
   setConnectionPaused: (value: boolean) => void
+  setAuthLoginError: (value: unknown | null) => void
 }
 
 export function useAppBootstrapAuth({
@@ -54,11 +55,11 @@ export function useAppBootstrapAuth({
   needsAuthLoginRef,
   setNeedsAuthLogin,
   setAuthBootstrapped,
-  setConnectionPaused
+  setConnectionPaused,
+  setAuthLoginError
 }: UseAppBootstrapAuthArgs) {
   const [cloudUserName, setCloudUserName] = useState<string | null>(null)
   const [authLoggingIn, setAuthLoggingIn] = useState(false)
-  const [authLoginError, setAuthLoginError] = useState<unknown>(null)
 
   const loadAccount = useCallback(
     (options?: { checkUpdates?: boolean; signal?: AbortSignal }) =>
@@ -127,11 +128,8 @@ export function useAppBootstrapAuth({
       const key = apiKey.trim()
       try {
         await client.login(key, { remember })
-        // Put the key on the next LocalAgentClient before leaving the login gate.
-        // Cookie session from /auth/login often does not apply in the Tauri shell
-        // (tauri:// origin → http://127.0.0.1), so Authorization must be set first.
-        // Do not call connect() with the current (keyless) client — the connect
-        // effect re-runs after clientApiKey + needsAuthLogin update.
+        // Cookie Set-Cookie from a LAN host does not stick in Tauri — Bearer +
+        // sessionToken (from login JSON) must authorize the next requests.
         if (remember) {
           persistRememberedApiKey(client.baseUrl, key)
         } else {
@@ -164,6 +162,7 @@ export function useAppBootstrapAuth({
           } catch {
             // keep friendly default
           }
+          setAuthLoginError(new Error(message))
           toast.error(message)
         }
       } finally {
@@ -248,7 +247,8 @@ export function useAppBootstrapAuth({
       // Prefer Authorization header (clientApiKey); cookies do not stick in Tauri.
       setClientApiKey(key)
       setBackendApiKey('')
-      if (key) persistRememberedApiKey(normalized, key)
+      // Remembered keys are written on successful Sign in — do not persist a
+      // guessed key from another host’s inject when switching servers.
       if (location.pathname !== '/' || location.search) {
         navigate('/', { replace: true })
       }
@@ -317,8 +317,6 @@ export function useAppBootstrapAuth({
   return {
     cloudUserName,
     authLoggingIn,
-    authLoginError,
-    setAuthLoginError,
     sidebarUserName,
     loadAccount,
     loadAccountForUi,

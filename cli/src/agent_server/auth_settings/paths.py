@@ -16,6 +16,9 @@ AUTH_EXEMPT_PATHS = frozenset(
         "/v1/auth/status",
         "/v1/auth/login",
         "/v1/auth/logout",
+        # Loopback-only (enforced in the route). Lets `sandwalk auth generate`
+        # refresh runtime_api_key without knowing the previous Bearer key.
+        "/v1/auth/reload",
     }
 )
 

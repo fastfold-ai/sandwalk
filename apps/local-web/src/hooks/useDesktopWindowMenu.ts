@@ -38,7 +38,8 @@ export function useDesktopWindowMenu() {
           route: payload.route,
           title: payload.title,
           id: payload.snapshotId,
-          hostname: payload.hostname
+          hostname: payload.hostname,
+          platform: payload.platform
         })
           .then(result => {
             if (!result.opened) {

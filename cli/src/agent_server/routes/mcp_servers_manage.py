@@ -77,6 +77,11 @@ def register_mcp_server_manage_routes(app: FastAPI, deps: AppDeps) -> None:
             raise HTTPException(status_code=400, detail=str(exc)) from None
         if server is None:
             raise HTTPException(status_code=404, detail="MCP server not found.")
+        from agent.deepagents_runtime.mcp_tools import clear_mcp_tool_caches
+        from agent_server import ttl_cache
+
+        clear_mcp_tool_caches()
+        ttl_cache.invalidate("mcp:")
         return server
 
     @app.delete("/v1/mcp-servers/{server_id}", response_model=DeleteSessionResponse)

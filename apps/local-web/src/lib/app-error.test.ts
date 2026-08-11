@@ -37,4 +37,12 @@ describe('normalizeAppError extras', () => {
       )
     ).toBe(true)
   })
+
+  it('maps missing/invalid API key 401s to a clear Invalid API key title', () => {
+    const info = normalizeAppError(
+      'FastFold Agent API 401: {"detail":"Missing or invalid backend API key."}'
+    )
+    expect(info.title).toBe('Invalid API key')
+    expect(info.detail).toMatch(/rejected by this server/i)
+  })
 })

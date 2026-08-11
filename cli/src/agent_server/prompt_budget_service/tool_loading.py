@@ -43,7 +43,11 @@ async def build_tool_sets(
     domain_before = list(tools)
     domain_names = {getattr(t, "name", "") for t in domain_before}
     try:
-        external = await create_external_mcp_tools(ctx.mcp_servers)
+        # Keep Context snappy: hung remotes (Latch/Exa) must not block Settings.
+        external = await create_external_mcp_tools(
+            ctx.mcp_servers,
+            per_server_timeout_s=4.0,
+        )
     except Exception as exc:  # noqa: BLE001
         logger.warning("prompt budget MCP load failed: %s", exc)
         external = []

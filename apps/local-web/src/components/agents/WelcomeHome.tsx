@@ -5,19 +5,17 @@ import { OsPlatformIcon } from '@/components/agents/os-platform-icon'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
-import {
-  DEFAULT_BACKEND_URL,
-  isLocalBackendUrl,
-  normalizeBackendUrl
-} from '@/lib/backend-url'
+import { DEFAULT_BACKEND_URL, isLocalBackendUrl } from '@/lib/backend-url'
 import {
   clearDesktopWindowRecents,
   type DesktopWindowRecent,
   isTauri,
   listDesktopWindowRecents,
+  listenDesktopWindowRecentsChanged,
   platformOS
 } from '@/lib/desktop'
 import { openDesktopRecent } from '@/lib/open-desktop-recent'
+import { readCachedRemotePlatform } from '@/lib/remote-hostname'
 import { cn } from '@/lib/utils'
 
 function hostport(url: string): string {
@@ -75,23 +73,14 @@ function hostnamePlatformHint(hostname: string | undefined): string {
   return ''
 }
 
-async function resolveRecentPlatform(
-  url: string,
-  hostname?: string
-): Promise<string> {
-  if (isLocalBackendUrl(url)) return localPlatformHint()
-  const hint = hostnamePlatformHint(hostname)
-  try {
-    const res = await fetch(`${normalizeBackendUrl(url)}/v1/discover`, {
-      method: 'GET',
-      headers: { Accept: 'application/json' }
-    })
-    if (!res.ok) return hint
-    const body = (await res.json()) as { platform?: string }
-    return (body.platform || '').trim() || hint
-  } catch {
-    return hint
-  }
+/** Icon OS from stored recent / cache only — never probes the network. */
+function recentPlatform(row: DesktopWindowRecent): string {
+  if (isLocalBackendUrl(row.url)) return localPlatformHint()
+  const stored = (row.platform || '').trim()
+  if (stored) return stored
+  const cached = readCachedRemotePlatform(row.url)
+  if (cached) return cached
+  return hostnamePlatformHint(row.hostname)
 }
 
 export function WelcomeHome({
@@ -104,45 +93,21 @@ export function WelcomeHome({
   onOpenRemote: (prefillUrl?: string | null) => void
 }) {
   const [recents, setRecents] = useState<DesktopWindowRecent[]>([])
-  const [platforms, setPlatforms] = useState<Record<string, string>>({})
   const [loadingRecents, setLoadingRecents] = useState(isTauri())
   const [openingId, setOpeningId] = useState<string | null>(null)
 
-  const refreshRecents = useCallback(async () => {
+  const refreshRecents = useCallback(async (options?: { silent?: boolean }) => {
     if (!isTauri()) {
       setRecents([])
-      setPlatforms({})
       setLoadingRecents(false)
       return
     }
-    setLoadingRecents(true)
+    if (!options?.silent) setLoadingRecents(true)
     try {
       const rows = (await listDesktopWindowRecents()) ?? []
       setRecents(rows)
-      // Seed local / hostname hints immediately; refine via /v1/discover.
-      const seeded: Record<string, string> = {}
-      for (const row of rows) {
-        const key = row.id || row.url
-        const hint = isLocalBackendUrl(row.url)
-          ? localPlatformHint()
-          : hostnamePlatformHint(row.hostname)
-        if (hint) seeded[key] = hint
-      }
-      setPlatforms(seeded)
-      void Promise.all(
-        rows.map(async row => {
-          const key = row.id || row.url
-          const platform = await resolveRecentPlatform(row.url, row.hostname)
-          if (platform) {
-            setPlatforms(prev =>
-              prev[key] === platform ? prev : { ...prev, [key]: platform }
-            )
-          }
-        })
-      )
     } catch {
       setRecents([])
-      setPlatforms({})
     } finally {
       setLoadingRecents(false)
     }
@@ -150,6 +115,32 @@ export function WelcomeHome({
 
   useEffect(() => {
     void refreshRecents()
+  }, [refreshRecents])
+
+  // Other windows append Open Recent when they connect — refresh this list live.
+  useEffect(() => {
+    if (!isTauri()) return
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+    void listenDesktopWindowRecentsChanged(() => {
+      if (!cancelled) void refreshRecents({ silent: true })
+    }).then(fn => {
+      if (cancelled) fn()
+      else unlisten = fn
+    })
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshRecents({ silent: true })
+      }
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      cancelled = true
+      unlisten?.()
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
   }, [refreshRecents])
 
   const openRecent = async (row: DesktopWindowRecent) => {
@@ -161,7 +152,8 @@ export function WelcomeHome({
         route: row.route,
         title: row.title,
         id: row.id,
-        hostname: row.hostname
+        hostname: row.hostname,
+        platform: row.platform
       })
       if (!result.opened) onOpenRemote(result.url)
     } catch {
@@ -283,12 +275,7 @@ export function WelcomeHome({
                       className="hover:bg-muted/40 flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors disabled:opacity-50"
                     >
                       <OsPlatformIcon
-                        platform={
-                          platforms[key] ||
-                          (isLocalBackendUrl(row.url)
-                            ? localPlatformHint()
-                            : row.hostname)
-                        }
+                        platform={recentPlatform(row)}
                         className="size-7"
                       />
                       <span className="min-w-0 flex-1">

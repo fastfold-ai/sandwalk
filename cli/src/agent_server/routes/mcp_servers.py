@@ -23,24 +23,29 @@ def register_mcp_server_routes(app: FastAPI, deps: AppDeps) -> None:
 
     @app.get("/v1/mcp-servers", response_model=McpServerList)
     async def list_mcp_servers() -> McpServerList:
+        from agent_server import ttl_cache
+
         def _list() -> list[McpServer]:
-            # Seed catalog templates into DB + mcp.json before listing.
-            get_or_export_mcp_json(store)
-            out: list[McpServer] = []
-            for server in store.list_mcp_servers():
-                enriched = enrich_mcp_server(server)
-                # Persist force-off for stale remotes that were saved as enabled.
-                if (
-                    not enriched.catalog_id
-                    and enriched.transport != "stdio"
-                    and not enriched.headers_configured
-                    and server.enabled
-                ):
-                    updated = store.update_mcp_server(server.id, enabled=False)
-                    if updated is not None:
-                        enriched = enrich_mcp_server(updated)
-                out.append(enriched)
-            return out
+            def _build() -> list[McpServer]:
+                # Seed catalog templates into DB + mcp.json before listing.
+                get_or_export_mcp_json(store)
+                out: list[McpServer] = []
+                for server in store.list_mcp_servers():
+                    enriched = enrich_mcp_server(server)
+                    # Persist force-off for stale remotes that were saved as enabled.
+                    if (
+                        not enriched.catalog_id
+                        and enriched.transport != "stdio"
+                        and not enriched.headers_configured
+                        and server.enabled
+                    ):
+                        updated = store.update_mcp_server(server.id, enabled=False)
+                        if updated is not None:
+                            enriched = enrich_mcp_server(updated)
+                    out.append(enriched)
+                return out
+
+            return ttl_cache.cached("mcp:servers", 15.0, _build)
 
         return McpServerList(data=await asyncio.to_thread(_list))
 
@@ -64,10 +69,13 @@ def register_mcp_server_routes(app: FastAPI, deps: AppDeps) -> None:
         """Replace MCP servers from an mcp.json document (custom + catalog)."""
 
         def _put() -> McpJsonConfigResponse:
+            from agent_server import ttl_cache
+
             try:
                 document = apply_mcp_json(store, payload.document)
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
+            ttl_cache.invalidate("mcp:")
             return McpJsonConfigResponse(
                 path=str(mcp_json_path()),
                 document=document,
@@ -112,6 +120,9 @@ def register_mcp_server_routes(app: FastAPI, deps: AppDeps) -> None:
             if payload.headers is not None:
                 set_custom_headers(server.id, payload.headers)
             get_or_export_mcp_json(store)
+            from agent_server import ttl_cache
+
+            ttl_cache.invalidate("mcp:")
             return enrich_mcp_server(server)
 
         return await asyncio.to_thread(_create)

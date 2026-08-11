@@ -2,6 +2,7 @@ import { Check, ChevronUp, Monitor, Moon, Palette, Sun } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   applyPalette,
   applyTheme,
@@ -108,12 +109,12 @@ export function ThemeToggle({
           <div
             role="menu"
             aria-label="Appearance"
-            className="bg-card flex max-h-[min(32rem,calc(100vh-6.5rem))] w-full flex-col overflow-hidden rounded-xl border p-1.5 shadow-xl"
+            className="bg-card w-full overflow-hidden rounded-xl border p-1.5 shadow-xl"
             onPointerLeave={restorePalette}
             onWheel={event => event.stopPropagation()}
           >
             <div
-              className="flex shrink-0 items-center gap-0.5 p-0.5"
+              className="flex items-center gap-0.5 p-0.5"
               role="group"
               aria-label="Color mode"
             >
@@ -138,9 +139,10 @@ export function ThemeToggle({
               ))}
             </div>
 
-            <div className="bg-border my-1.5 h-px shrink-0" aria-hidden />
+            <div className="bg-border my-1.5 h-px" aria-hidden />
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {/* Explicit height required — Radix ScrollArea won't scroll on max-h alone. */}
+            <ScrollArea className="h-[min(20rem,calc(100vh-12rem))] w-full">
               {THEME_PALETTES.map(item => {
                 const selected = palette === item.id
                 return (
@@ -182,7 +184,7 @@ export function ThemeToggle({
                   </button>
                 )
               })}
-            </div>
+            </ScrollArea>
           </div>
         ) : null}
 

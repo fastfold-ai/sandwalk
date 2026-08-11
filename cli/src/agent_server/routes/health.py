@@ -57,13 +57,14 @@ def register_health_routes(app: FastAPI, deps: AppDeps) -> None:
 
     @app.get("/v1/discover", response_model=DiscoverResponse)
     async def discover() -> DiscoverResponse:
-        """Public LAN probe — hostname + OS/device label only."""
+        """Public LAN probe — service, sandwalk version, hostname, device label."""
 
         def _build() -> DiscoverResponse:
             from agent_server.status_service.gpu_metrics import _chip_name
             from agent_server.status_service.host_metrics import format_device_label
 
             return DiscoverResponse(
+                # Package / CLI version so LAN scanners can identify compatible servers.
                 version=__version__,
                 hostname=platform.node() or "unknown",
                 platform=platform.system() or "unknown",

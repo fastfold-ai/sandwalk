@@ -128,15 +128,21 @@ export function AgentPromptsView({
       if (soft) setRefreshing(true)
       else setLoading(true)
       setError(null)
+      const localAbort = new AbortController()
+      const onOuterAbort = () => localAbort.abort()
+      signal?.addEventListener('abort', onOuterAbort)
+      // Client-side ceiling so Context never spins forever if MCP/skill
+      // staging wedges the server-side estimate.
+      const timeout = window.setTimeout(() => localAbort.abort(), 50_000)
       try {
         const next = await onGetPromptBudget(
           {
             specialistId: specialistId || null,
             tokenCountMethod
           },
-          signal
+          localAbort.signal
         )
-        if (!signal?.aborted) {
+        if (!signal?.aborted && !localAbort.signal.aborted) {
           setBudget(next)
           writePromptBudgetCache({
             specialistId,
@@ -148,9 +154,16 @@ export function AgentPromptsView({
         }
       } catch (err) {
         if (!signal?.aborted) {
-          setError(err instanceof Error ? err.message : String(err))
+          const message = err instanceof Error ? err.message : String(err)
+          setError(
+            /aborted|abort/i.test(message)
+              ? 'Context estimate timed out. Disable hung MCP servers and retry.'
+              : message
+          )
         }
       } finally {
+        window.clearTimeout(timeout)
+        signal?.removeEventListener('abort', onOuterAbort)
         if (!signal?.aborted) {
           setLoading(false)
           setRefreshing(false)

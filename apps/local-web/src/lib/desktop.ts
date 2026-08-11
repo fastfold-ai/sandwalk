@@ -321,6 +321,7 @@ export type DesktopMenuAction = {
   title?: string | null
   snapshotId?: string | null
   hostname?: string | null
+  platform?: string | null
 }
 
 /** File menu actions that need SPA UI (Remote dialog / Open Recent with key). */
@@ -335,6 +336,40 @@ export async function listenDesktopMenu(
   })
 }
 
+export type DesktopApplyAuth = {
+  url: string
+  apiKey: string
+}
+
+/** Re-apply a remembered API key into an already-open remote WebView. */
+export async function listenDesktopApplyAuth(
+  handler: (payload: DesktopApplyAuth) => void
+): Promise<() => void> {
+  const listen = tauri()?.event?.listen
+  if (!listen) return () => {}
+  return listen('sandwalk-apply-auth', event => {
+    const payload = event.payload as {
+      url?: string
+      apiKey?: string
+      api_key?: string
+    } | null
+    const url = payload?.url?.trim()
+    const apiKey = (payload?.apiKey || payload?.api_key || '').trim()
+    if (url && apiKey) handler({ url, apiKey })
+  })
+}
+
+/** Open Recent list changed (`window-recents.json` rewritten). */
+export async function listenDesktopWindowRecentsChanged(
+  handler: () => void
+): Promise<() => void> {
+  const listen = tauri()?.event?.listen
+  if (!listen) return () => {}
+  return listen('sandwalk-window-recents-changed', () => {
+    handler()
+  })
+}
+
 export type OpenDesktopWindowArgs = {
   backendUrl?: string | null
   apiKey?: string | null
@@ -342,6 +377,7 @@ export type OpenDesktopWindowArgs = {
   route?: string | null
   snapshotId?: string | null
   hostname?: string | null
+  platform?: string | null
   focusExisting?: boolean
 }
 
@@ -356,6 +392,7 @@ export const openDesktopWindow = (args: OpenDesktopWindowArgs = {}) =>
       route: args.route ?? null,
       snapshotId: args.snapshotId ?? null,
       hostname: args.hostname ?? null,
+      platform: args.platform ?? null,
       focusExisting: Boolean(args.focusExisting)
     }
   })
@@ -368,6 +405,10 @@ export const bindDesktopWindowBackend = (url: string) =>
 export const setDesktopWindowTitle = (title: string) =>
   invoke<void>('desktop_set_window_title', { title })
 
+/** Close the current desktop WebView (remote windows quit; main may hide). */
+export const closeDesktopWindow = () =>
+  invokeStrict<void>('desktop_close_current_window')
+
 /** Persist / update Open Recent for this window (route + title snapshot). */
 export const upsertDesktopWindowSnapshot = (args: {
   snapshotId?: string | null
@@ -375,13 +416,15 @@ export const upsertDesktopWindowSnapshot = (args: {
   route: string
   title: string
   hostname?: string | null
+  platform?: string | null
 }) =>
   invokeStrict<string>('desktop_upsert_window_snapshot', {
     snapshotId: args.snapshotId ?? null,
     url: args.url,
     route: args.route,
     title: args.title,
-    hostname: args.hostname ?? null
+    hostname: args.hostname ?? null,
+    platform: args.platform ?? null
   })
 
 /** Snapshot id injected when the native window was created. */
@@ -427,6 +470,8 @@ export type DesktopWindowRecent = {
   title?: string
   /** Remote machine hostname from discover / LAN scan. */
   hostname?: string
+  /** OS from LAN scan / discover (`Linux`, `Darwin`, …) — no live probe needed. */
+  platform?: string
   label?: string | null
   lastOpenedAt: number
 }

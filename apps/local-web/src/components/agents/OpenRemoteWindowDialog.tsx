@@ -1,8 +1,6 @@
 import {
   Check,
   Copy,
-  Eye,
-  EyeOff,
   Loader2,
   Lock,
   Network,
@@ -30,8 +28,11 @@ import {
   openDesktopWindow,
   scanLanDesktopServers
 } from '@/lib/desktop'
-import { persistRememberedApiKey, readRememberedApiKey } from '@/lib/remembered-auth'
-import { rememberRemoteHostname } from '@/lib/remote-hostname'
+import {
+  rememberRemoteHostname,
+  rememberRemotePlatform
+} from '@/lib/remote-hostname'
+import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 
 const CLI_REMOTE_SNIPPET = [
   '# Security — API key',
@@ -67,7 +68,6 @@ export function OpenRemoteWindowDialog({
   initialUrl?: string | null
 }) {
   const [draftUrl, setDraftUrl] = useState('')
-  const [draftKey, setDraftKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
@@ -76,7 +76,6 @@ export function OpenRemoteWindowDialog({
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null)
   const [showCli, setShowCli] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [showKey, setShowKey] = useState(false)
   const scanGen = useRef(0)
 
   const runScan = useCallback(async () => {
@@ -105,7 +104,6 @@ export function OpenRemoteWindowDialog({
       ? normalizeBackendUrl(initialUrl)
       : ''
     setDraftUrl(url)
-    setDraftKey(url ? readRememberedApiKey(url) || '' : '')
     setError(null)
     setBusy(false)
     setSelectedUrl(null)
@@ -113,7 +111,6 @@ export function OpenRemoteWindowDialog({
     setScanError(null)
     setShowCli(false)
     setCopied(false)
-    setShowKey(false)
     // Paint the dialog first; discover runs in the background (async Tauri cmd).
     setScanning(isTauri())
     const timer = window.setTimeout(() => {
@@ -131,8 +128,6 @@ export function OpenRemoteWindowDialog({
     setDraftUrl(url)
     setSelectedUrl(url)
     setError(null)
-    const remembered = readRememberedApiKey(url)
-    if (remembered) setDraftKey(remembered)
   }
 
   const topologyNodes = useMemo(
@@ -164,23 +159,22 @@ export function OpenRemoteWindowDialog({
       return
     }
     const url = normalizeBackendUrl(draftUrl)
-    const key = draftKey.trim()
     const selected = hits.find(hit => normalizeBackendUrl(hit.url) === url)
-    if (selected?.authRequired && !key) {
-      setError('This server requires an API key')
-      return
-    }
     setBusy(true)
     setError(null)
     try {
-      if (key) persistRememberedApiKey(url, key)
+      // Auth is LoginView's job; only pass a remembered key silently.
+      const key = (await resolveBackendApiKey(url)) || null
       const hostname = selected?.hostname?.trim() || null
+      const platform = selected?.platform?.trim() || null
       if (hostname) rememberRemoteHostname(url, hostname)
+      if (platform) rememberRemotePlatform(url, platform)
       await openDesktopWindow({
         backendUrl: url,
-        apiKey: key || null,
+        apiKey: key,
         hostname,
-        focusExisting: false
+        platform,
+        focusExisting: true
       })
       onOpenChange(false)
     } catch (err) {
@@ -208,7 +202,7 @@ export function OpenRemoteWindowDialog({
                   <Lock className="size-3.5 shrink-0" aria-hidden />
                   Security
                 </span>{' '}
-                for the API key.
+                for the API key. Sign in after the window opens.
               </p>
               <div>
                 <button
@@ -299,45 +293,15 @@ export function OpenRemoteWindowDialog({
           <Input
             value={draftUrl}
             onChange={event => {
-              const next = event.target.value
-              setDraftUrl(next)
+              setDraftUrl(event.target.value)
               setSelectedUrl(null)
-              const normalized = normalizeBackendUrl(next)
-              const remembered = readRememberedApiKey(normalized)
-              if (remembered && !draftKey) setDraftKey(remembered)
+              if (error) setError(null)
             }}
             placeholder="http://<Local or remote>"
             autoFocus
             autoComplete="url"
             spellCheck={false}
           />
-          <div className="relative">
-            <Input
-              type={showKey ? 'text' : 'password'}
-              value={draftKey}
-              onChange={event => {
-                setDraftKey(event.target.value)
-                if (error) setError(null)
-              }}
-              placeholder="API key (if the server requires auth)"
-              autoComplete="off"
-              className="pr-10"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground absolute top-1/2 right-1 size-8 -translate-y-1/2"
-              onClick={() => setShowKey(v => !v)}
-              aria-label={showKey ? 'Hide API key' : 'Show API key'}
-            >
-              {showKey ? (
-                <EyeOff className="size-4" />
-              ) : (
-                <Eye className="size-4" />
-              )}
-            </Button>
-          </div>
           {error ? (
             <p className="text-destructive text-sm" role="alert">
               {error}

@@ -75,8 +75,12 @@ class PromptBudgetService:
             ctx=ctx,
         )
 
+        import asyncio
+
         tool_names = [getattr(t, "name", "") for t in tool_sets.final_tools]
-        prompt = build_prompt(
+        # create_deep_agent schema measure is CPU/IO heavy — keep the event loop free.
+        prompt = await asyncio.to_thread(
+            build_prompt,
             session=session,
             tool_names=tool_names,
             tool_mode=tool_mode,
