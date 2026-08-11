@@ -116,9 +116,9 @@ describe('SitePreviewPanel', () => {
     await waitFor(() => {
       expect(screen.getByTitle('Requested report preview')).toBeTruthy()
     })
-    expect(screen.getByLabelText('Preview site').parentElement?.className).toContain(
-      'bg-muted'
-    )
+    // The site select is present (its bg-muted pill was removed when we
+    // let the header blend into the aside — the chip is now icon + label).
+    expect(screen.getByLabelText('Preview site')).toBeTruthy()
     screen.getByRole('button', { name: 'Publish' }).click()
     await waitFor(() => {
       expect(

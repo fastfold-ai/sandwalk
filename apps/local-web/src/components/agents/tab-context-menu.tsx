@@ -1,5 +1,6 @@
 import { Ban } from 'lucide-react'
 import { type ReactNode, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 import { cn } from '@/lib/utils'
 
@@ -48,7 +49,13 @@ export function TabContextMenuShell({
   const left = Math.min(x, window.innerWidth - 220)
   const top = Math.min(y, window.innerHeight - 220)
 
-  return (
+  /*
+   * Portal to document.body so the menu escapes the tab-strip's stacking
+   * context (created by `.relative.z-[1]` in SessionTabs). Otherwise the
+   * tab ::before dividers (z:3) and close buttons (z:2) paint on top of
+   * the menu's border and produce a black hairline artifact along the edge.
+   */
+  return createPortal(
     <div
       ref={menuRef}
       className="bg-popover text-popover-foreground fixed z-50 min-w-[11.5rem] rounded-md border p-1 shadow-md"
@@ -57,7 +64,8 @@ export function TabContextMenuShell({
       onClick={event => event.stopPropagation()}
     >
       {children}
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -82,7 +90,8 @@ export function TabContextItem({
       role="menuitem"
       disabled={disabled}
       className={cn(
-        'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm',
+        'flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs',
+        '[&_svg]:size-3',
         destructive
           ? 'text-red-600 hover:bg-red-50 disabled:opacity-40 dark:hover:bg-red-950/20'
           : 'hover:bg-muted disabled:opacity-40',
@@ -121,7 +130,7 @@ export function TabInlineColorRow({
 }) {
   return (
     <div
-      className="flex items-center gap-1.5 px-2 py-1.5"
+      className="flex items-center gap-1 px-2 py-1"
       role="group"
       aria-label="Tab color"
     >
@@ -130,7 +139,7 @@ export function TabInlineColorRow({
         title="None"
         aria-label="Clear color"
         className={cn(
-          'text-muted-foreground hover:bg-muted inline-flex size-5 items-center justify-center rounded-full border border-dashed',
+          'text-muted-foreground hover:bg-muted inline-flex size-4 items-center justify-center rounded-full border border-dashed',
           !value && 'ring-primary ring-2 ring-offset-1 ring-offset-popover'
         )}
         onClick={event => {
@@ -139,7 +148,7 @@ export function TabInlineColorRow({
           onClear()
         }}
       >
-        <Ban className="size-3.5" strokeWidth={1.75} />
+        <Ban className="size-3" strokeWidth={1.75} />
       </button>
       {TAB_INLINE_COLORS.map(swatch => {
         const selected = value === swatch.value
@@ -151,7 +160,7 @@ export function TabInlineColorRow({
             aria-label={swatch.name}
             aria-pressed={selected}
             className={cn(
-              'size-5 shrink-0 rounded-full border border-black/5 transition-shadow',
+              'size-4 shrink-0 rounded-full border border-black/5 transition-shadow',
               selected
                 ? 'ring-primary ring-2 ring-offset-1 ring-offset-popover'
                 : 'hover:ring-muted-foreground/40 hover:ring-2 hover:ring-offset-1 hover:ring-offset-popover'

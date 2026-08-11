@@ -260,7 +260,7 @@ export function Composer({
             void addFiles(files)
           }}
           className={cn(
-            'bg-card focus-within:border-muted-foreground/40 border-border relative rounded-3xl border p-2',
+            'bg-card hover:border-muted-foreground/25 focus-within:border-muted-foreground/40 border-border relative rounded-3xl border pt-1.5 pr-2 pb-3 pl-3 transition-colors duration-150',
             voice.active
               ? 'shadow-none'
               : 'shadow-[0_4px_16px_-8px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)]',

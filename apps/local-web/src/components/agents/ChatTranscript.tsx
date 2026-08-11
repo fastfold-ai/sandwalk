@@ -12,7 +12,7 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import { ArrowDown } from 'lucide-react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
-import { useDeferredValue, useMemo } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 
 import { AgentStatusText } from '@/components/agents/AgentStatusText'
 import { BuildPlanStatusCard } from '@/components/agents/BuildPlanStatusCard'
@@ -25,6 +25,7 @@ import { TodoListInline } from '@/components/agents/TodoListInline'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 
 type ChatTranscriptProps = {
   chatScrollRef: RefObject<HTMLDivElement | null>
@@ -117,8 +118,55 @@ export function ChatTranscript({
     return [...activeRunTools, ...extras]
   }, [activeRunTools, tools])
 
+  // Track scroll position so we can hide the top / bottom edge fades when the
+  // user is already at that extreme. Radix ScrollArea exposes an inner viewport
+  // (`[data-radix-scroll-area-viewport]`) — that's what actually scrolls.
+  const [atTop, setAtTop] = useState(true)
+  const [atBottom, setAtBottom] = useState(true)
+  useEffect(() => {
+    const root = chatScrollRef.current
+    if (!root) return
+    const viewport = root.querySelector<HTMLElement>(
+      '[data-radix-scroll-area-viewport]'
+    )
+    if (!viewport) return
+    const update = () => {
+      const slack = 1
+      setAtTop(viewport.scrollTop <= slack)
+      setAtBottom(
+        viewport.scrollTop + viewport.clientHeight >=
+          viewport.scrollHeight - slack
+      )
+    }
+    update()
+    viewport.addEventListener('scroll', update, { passive: true })
+    const ro =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
+    ro?.observe(viewport)
+    return () => {
+      viewport.removeEventListener('scroll', update)
+      ro?.disconnect()
+    }
+  }, [chatScrollRef, sessionId, conversationTimeline])
+
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
+      {/* Top edge fade — hides when scrolled to the top. */}
+      <div
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute inset-x-0 top-0 z-10 h-5 bg-gradient-to-b from-background to-transparent transition-opacity duration-150',
+          atTop ? 'opacity-0' : 'opacity-100'
+        )}
+      />
+      {/* Bottom edge fade — hides when scrolled to the bottom. */}
+      <div
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute inset-x-0 bottom-0 z-10 h-5 bg-gradient-to-t from-background to-transparent transition-opacity duration-150',
+          atBottom ? 'opacity-0' : 'opacity-100'
+        )}
+      />
       <ScrollArea
         ref={chatScrollRef}
         className="chat-scrollbar min-h-0 flex-1"
