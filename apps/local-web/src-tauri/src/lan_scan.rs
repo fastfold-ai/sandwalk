@@ -150,7 +150,10 @@ pub fn scan_lan_servers() -> Vec<LanServerHit> {
     scan_ips(ips)
 }
 
+/// Run the LAN probe off the async runtime so the dialog can open immediately.
 #[tauri::command]
-pub fn desktop_scan_lan_servers() -> Result<Vec<LanServerHit>, String> {
-    Ok(scan_lan_servers())
+pub async fn desktop_scan_lan_servers() -> Result<Vec<LanServerHit>, String> {
+    tauri::async_runtime::spawn_blocking(scan_lan_servers)
+        .await
+        .map_err(|e| e.to_string())
 }

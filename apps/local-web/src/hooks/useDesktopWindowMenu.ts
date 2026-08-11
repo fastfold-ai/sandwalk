@@ -8,6 +8,7 @@ import {
   openDesktopWindow
 } from '@/lib/desktop'
 import { persistRememberedApiKey, readRememberedApiKey } from '@/lib/remembered-auth'
+import { rememberRemoteHostname } from '@/lib/remote-hostname'
 
 /**
  * File → New Window (Remote) / Open Recent + Sandwalk → Check for Updates.
@@ -40,6 +41,8 @@ export function useDesktopWindowMenu() {
         const route = payload.route?.trim() || '/'
         const title = payload.title?.trim() || null
         const snapshotId = payload.snapshotId?.trim() || null
+        const hostname = payload.hostname?.trim() || null
+        if (hostname) rememberRemoteHostname(url, hostname)
         if (key || url.includes('127.0.0.1') || url.includes('localhost')) {
           void openDesktopWindow({
             backendUrl: url,
@@ -47,6 +50,7 @@ export function useDesktopWindowMenu() {
             route,
             title,
             snapshotId,
+            hostname,
             focusExisting: true
           }).catch(() => {
             setRemoteInitialUrl(url)

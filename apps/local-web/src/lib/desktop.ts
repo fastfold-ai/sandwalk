@@ -320,6 +320,7 @@ export type DesktopMenuAction = {
   route?: string | null
   title?: string | null
   snapshotId?: string | null
+  hostname?: string | null
 }
 
 /** File menu actions that need SPA UI (Remote dialog / Open Recent with key). */
@@ -340,18 +341,23 @@ export type OpenDesktopWindowArgs = {
   title?: string | null
   route?: string | null
   snapshotId?: string | null
+  hostname?: string | null
   focusExisting?: boolean
 }
 
 /** Spawn or focus a desktop WebView bound to a backend URL / snapshot. */
 export const openDesktopWindow = (args: OpenDesktopWindowArgs = {}) =>
   invokeStrict<string>('desktop_open_window', {
-    backendUrl: args.backendUrl ?? null,
-    apiKey: args.apiKey ?? null,
-    title: args.title ?? null,
-    route: args.route ?? null,
-    snapshotId: args.snapshotId ?? null,
-    focusExisting: Boolean(args.focusExisting)
+    // Single `payload` arg — avoids flat-arg drops that left remotes on localhost.
+    payload: {
+      backendUrl: args.backendUrl ?? null,
+      apiKey: args.apiKey ?? null,
+      title: args.title ?? null,
+      route: args.route ?? null,
+      snapshotId: args.snapshotId ?? null,
+      hostname: args.hostname ?? null,
+      focusExisting: Boolean(args.focusExisting)
+    }
   })
 
 /** Sync native window title + Open Recent after in-app Change server. */
@@ -368,12 +374,14 @@ export const upsertDesktopWindowSnapshot = (args: {
   url: string
   route: string
   title: string
+  hostname?: string | null
 }) =>
   invokeStrict<string>('desktop_upsert_window_snapshot', {
     snapshotId: args.snapshotId ?? null,
     url: args.url,
     route: args.route,
-    title: args.title
+    title: args.title,
+    hostname: args.hostname ?? null
   })
 
 /** Snapshot id injected when the native window was created. */

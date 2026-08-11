@@ -77,7 +77,7 @@ Composer: mic before Send → listening bar (live mic levels) → confirm insert
 
 ## App + File menus (multi-window)
 
-The Tauri client supports multiple windows in one process (Cursor-style). Each window is an independent SPA instance bound to a backend via `__SANDWALK_HTTP__` inject (shared `localStorage` is not used for the active backend URL when inject is present).
+The Tauri client supports multiple windows in one process (Cursor-style). Each window is an independent SPA instance bound to a backend via `__SANDWALK_HTTP__` inject, `?sw_http=` / `?sw_key=` bootstrap, and per-window `window.name` (shared `localStorage` is not used for remote binds, so a remote window cannot overwrite the local main window).
 
 On macOS the **first** submenu is the app menu (named **Sandwalk**). New Window lives under **File**.
 

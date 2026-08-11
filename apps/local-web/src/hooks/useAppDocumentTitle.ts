@@ -1,9 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
-import {
-  isLocalBackendUrl,
-  readStoredBackendUrl
-} from '@/lib/backend-url'
+import { isLocalBackendUrl, readStoredBackendUrl } from '@/lib/backend-url'
 import {
   isTauri,
   persistDesktopSnapshotId,
@@ -12,6 +9,11 @@ import {
   upsertDesktopWindowSnapshot
 } from '@/lib/desktop'
 import { onboardingStepDef } from '@/lib/onboarding'
+import {
+  readCachedRemoteHostname,
+  remoteDockSuffix,
+  resolveRemoteHostname
+} from '@/lib/remote-hostname'
 
 type DocumentTitleArgs = {
   onOnboardingPath: boolean
@@ -91,44 +93,55 @@ function pageLabel(args: DocumentTitleArgs): string {
   return 'Sandwalk'
 }
 
-/** Host:port for remote backends — used in Dock window titles. */
-function remoteHostSuffix(backendUrl: string): string | null {
-  if (isLocalBackendUrl(backendUrl)) return null
-  try {
-    const parsed = new URL(backendUrl)
-    const host = parsed.hostname || 'remote'
-    return parsed.port ? `${host}:${parsed.port}` : host
-  } catch {
-    return null
-  }
-}
-
 /**
  * Browser tab title + native window title (Dock / Mission Control).
- * Cursor-style: `hi again friend` locally, `hi again friend — host:port` remote.
+ * Local: `Hello`. Remote Dock: `Hello — Julios-Mac-mini`.
+ * Open Recent stores page title + hostname separately (hostname · IP in the menu).
  */
 export function useAppDocumentTitle(args: DocumentTitleArgs) {
+  const backendUrl = readStoredBackendUrl()
+  const [hostname, setHostname] = useState<string | null>(() =>
+    readCachedRemoteHostname(backendUrl)
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    void resolveRemoteHostname(backendUrl).then(name => {
+      if (!cancelled && name) setHostname(name)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [backendUrl])
+
   useEffect(() => {
     const label = pageLabel(args)
-    const backendUrl = readStoredBackendUrl()
-    const remote = remoteHostSuffix(backendUrl)
+    const remote = remoteDockSuffix(backendUrl, hostname)
     document.title = `${label} · sandwalk`
 
     if (!isTauri()) return
-    // Dock / Mission Control: session or page title; remote adds host:port.
+    // Dock: session title + hostname (not IP when discover is available).
     const dockTitle = remote ? `${label} — ${remote}` : label
     void setDesktopWindowTitle(dockTitle)
-    // Open Recent: debounce snapshot writes (title can change often while streaming).
     const route =
       typeof window !== 'undefined'
         ? `${window.location.pathname}${window.location.search}`
         : '/'
     const timer = window.setTimeout(() => {
+      const path = route || '/'
+      const genericLocal =
+        isLocalBackendUrl(backendUrl) &&
+        (path === '/' || path === '') &&
+        (!label.trim() || label.trim() === 'Sandwalk')
+      // Don't spam Open Recent with blank local home windows.
+      if (genericLocal) return
       void upsertDesktopWindowSnapshot({
         snapshotId: readDesktopSnapshotId(),
         url: backendUrl,
-        route: route || '/',
-        title: dockTitle
+        route: path,
+        // Page title only — native Open Recent appends hostname · IP.
+        title: label,
+        hostname: hostname
       })
         .then(id => persistDesktopSnapshotId(id))
         .catch(() => {
@@ -165,6 +178,8 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     args.isSkills,
     args.onOnboardingPath,
     args.onboardingStep,
-    args.sessionTitle
+    args.sessionTitle,
+    backendUrl,
+    hostname
   ])
 }

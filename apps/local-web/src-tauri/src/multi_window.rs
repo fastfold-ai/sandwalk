@@ -44,9 +44,12 @@ pub struct WindowRecent {
     /// Last SPA route (e.g. `/agents/abc` or `/dashboard/bench`).
     #[serde(default)]
     pub route: String,
-    /// Last Dock / menu title (chat or page name).
+    /// Page / session title only (no host suffix — Open Recent / Dock compose that).
     #[serde(default)]
     pub title: String,
+    /// Remote machine hostname from `/v1/discover` (e.g. `Julios-Mac-mini`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub hostname: String,
     /// Legacy field — kept for older window-recents.json files.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -61,6 +64,8 @@ pub struct OpenWindowArgs {
     pub title: Option<String>,
     pub route: Option<String>,
     pub snapshot_id: Option<String>,
+    /// Friendly remote hostname (from LAN scan / discover).
+    pub hostname: Option<String>,
     /// When true, focus an existing window for this snapshot/url instead of opening another.
     #[serde(default)]
     pub focus_existing: bool,
@@ -78,6 +83,8 @@ struct MenuActionPayload {
     title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     snapshot_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostname: Option<String>,
 }
 
 fn support_dir() -> PathBuf {
@@ -108,6 +115,60 @@ pub fn normalize_url(url: &str) -> String {
     }
 }
 
+fn is_local_url(url: &str) -> bool {
+    let u = url.to_lowercase();
+    u.contains("127.0.0.1") || u.contains("localhost")
+}
+
+fn is_generic_title(title: &str) -> bool {
+    let t = title.trim();
+    t.is_empty() || t.eq_ignore_ascii_case("Sandwalk")
+}
+
+fn is_root_route(route: &str) -> bool {
+    let r = route.trim();
+    r.is_empty() || r == "/"
+}
+
+/// Untitled local home windows are noise (dev reloads / New Window spam).
+fn is_generic_local_snapshot(url: &str, route: &str, title: &str) -> bool {
+    is_local_url(url) && is_root_route(route) && is_generic_title(title)
+}
+
+/// Drop duplicate generic-local rows; keep remotes + titled/routed locals.
+fn prune_recents(rows: Vec<WindowRecent>) -> (Vec<WindowRecent>, bool) {
+    let before_len = rows.len();
+    let mut dirty = rows.len() > MAX_RECENTS;
+    let mut seen_generic_local = false;
+    let mut out = Vec::with_capacity(rows.len().min(MAX_RECENTS));
+    for row in rows {
+        if is_generic_local_snapshot(&row.url, &row.route, &row.title) {
+            if seen_generic_local {
+                dirty = true;
+                continue;
+            }
+            seen_generic_local = true;
+            let mut kept = row;
+            if kept.id != "local" || kept.title != "Local" {
+                dirty = true;
+                kept.id = "local".into();
+                kept.title = "Local".into();
+            }
+            out.push(kept);
+            continue;
+        }
+        out.push(row);
+    }
+    if out.len() > MAX_RECENTS {
+        dirty = true;
+        out.truncate(MAX_RECENTS);
+    }
+    if out.len() != before_len {
+        dirty = true;
+    }
+    (out, dirty)
+}
+
 pub fn read_recents() -> Vec<WindowRecent> {
     let path = recents_path();
     let Ok(raw) = fs::read_to_string(&path) else {
@@ -126,11 +187,19 @@ pub fn read_recents() -> Vec<WindowRecent> {
             dirty = true;
         }
         if row.title.trim().is_empty() {
-            row.title = display_title(row);
+            row.title = "Sandwalk".into();
+            dirty = true;
+        }
+        // Strip host suffixes baked into title by older builds.
+        let cleaned = page_title_only(&row.title, &row.url, &row.hostname);
+        if cleaned != row.title {
+            row.title = cleaned;
             dirty = true;
         }
     }
-    if dirty {
+    let (pruned, pruned_dirty) = prune_recents(rows);
+    rows = pruned;
+    if dirty || pruned_dirty {
         let _ = write_recents(&rows);
     }
     rows
@@ -143,28 +212,105 @@ fn write_recents(rows: &[WindowRecent]) -> Result<(), String> {
     fs::write(recents_path(), raw).map_err(|e| e.to_string())
 }
 
+fn hostport_from_url(url: &str) -> Option<String> {
+    let url = normalize_url(url);
+    if url.contains("127.0.0.1") || url.to_lowercase().contains("localhost") {
+        return None;
+    }
+    let rest = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+        .unwrap_or(&url);
+    let hostport = rest.split('/').next().unwrap_or(rest);
+    if hostport.is_empty() {
+        None
+    } else {
+        Some(hostport.to_string())
+    }
+}
+
+fn short_hostname(raw: &str) -> String {
+    let t = raw.trim();
+    if t.is_empty() {
+        return String::new();
+    }
+    t.strip_suffix(".local")
+        .unwrap_or(t)
+        .split('.')
+        .next()
+        .unwrap_or(t)
+        .to_string()
+}
+
+/// Page title without a previously baked-in ` — host` suffix (legacy rows).
+fn page_title_only(title: &str, url: &str, hostname: &str) -> String {
+    let mut out = title.trim().to_string();
+    if out.is_empty() {
+        return "Sandwalk".into();
+    }
+    let mut suffixes = Vec::new();
+    if let Some(hp) = hostport_from_url(url) {
+        suffixes.push(hp.clone());
+        if let Some((host, _)) = hp.split_once(':') {
+            suffixes.push(host.to_string());
+        }
+    }
+    let short = short_hostname(hostname);
+    if !short.is_empty() {
+        suffixes.push(short);
+    }
+    if !hostname.trim().is_empty() {
+        suffixes.push(hostname.trim().to_string());
+    }
+    for suffix in suffixes {
+        for sep in [" — ", " - ", " · "] {
+            let needle = format!("{sep}{suffix}");
+            if let Some(stripped) = out.strip_suffix(&needle) {
+                out = stripped.trim_end().to_string();
+            }
+        }
+    }
+    if out.is_empty() {
+        "Sandwalk".into()
+    } else {
+        out
+    }
+}
+
 fn display_title(row: &WindowRecent) -> String {
-    let title = row.title.trim();
-    if !title.is_empty() {
-        return title.to_string();
+    let title = page_title_only(&row.title, &row.url, &row.hostname);
+    if !title.is_empty() && title != "Sandwalk" {
+        return title;
     }
     if let Some(label) = row.label.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         return label.to_string();
     }
-    window_title_for_url(&row.url)
+    if title.is_empty() {
+        "Sandwalk".into()
+    } else {
+        title
+    }
 }
 
+/// Open Recent: `Hello — Julios-Mac-mini · 192.168.2.178:8787` (hostname + IP when both).
 fn recent_menu_label(row: &WindowRecent) -> String {
     let title = display_title(row);
-    let url = normalize_url(&row.url);
-    if url.contains("127.0.0.1") || url.to_lowercase().contains("localhost") {
+    let Some(hostport) = hostport_from_url(&row.url) else {
+        // Local: show session/page title, or "Local" for the placeholder.
+        if title.eq_ignore_ascii_case("Sandwalk") || title.eq_ignore_ascii_case("Local") {
+            return "Local".into();
+        }
         return title;
+    };
+    let short = short_hostname(&row.hostname);
+    let ip_part = hostport
+        .split_once(':')
+        .map(|(h, _)| h)
+        .unwrap_or(&hostport);
+    if !short.is_empty() && !short.eq_ignore_ascii_case(ip_part) {
+        return format!("{title} — {short} · {hostport}");
     }
-    let host = window_title_for_url(&url)
-        .strip_prefix("Sandwalk — ")
-        .unwrap_or(&url)
-        .to_string();
-    format!("{title} — {host}")
+    format!("{title} — {hostport}")
 }
 
 /// Upsert a window snapshot into Open Recent (keyed by snapshot id).
@@ -173,6 +319,7 @@ pub fn upsert_recent_snapshot(
     url: &str,
     route: &str,
     title: &str,
+    hostname: Option<&str>,
 ) {
     let url = normalize_url(url);
     let route = {
@@ -180,21 +327,67 @@ pub fn upsert_recent_snapshot(
         if t.is_empty() { "/" } else { t }
     }
     .to_string();
+    let hostname = hostname
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(short_hostname)
+        .unwrap_or_default();
     let title = {
-        let t = title.trim();
+        let t = page_title_only(title, &url, &hostname);
         if t.is_empty() {
-            window_title_for_url(&url)
+            "Sandwalk".into()
         } else {
-            t.to_string()
+            t
         }
     };
+
+    // Skip spam: untitled local home windows (dev reload / blank New Window).
+    // Remotes always record — even with a generic title — so the menu shows host · IP.
+    if is_generic_local_snapshot(&url, &route, &title) {
+        let mut rows = read_recents();
+        rows.retain(|r| !is_generic_local_snapshot(&r.url, &r.route, &r.title) && r.id != "local");
+        rows.insert(
+            0,
+            WindowRecent {
+                id: "local".into(),
+                url,
+                route,
+                title: "Local".into(),
+                hostname: String::new(),
+                label: None,
+                last_opened_at: now_secs(),
+            },
+        );
+        rows.truncate(MAX_RECENTS);
+        let _ = write_recents(&rows);
+        return;
+    }
+
     let id = if snapshot_id.trim().is_empty() {
         new_snapshot_id()
+    } else if snapshot_id == "main" && is_local_url(&url) && is_root_route(&route) && is_generic_title(&title)
+    {
+        "local".into()
     } else {
         snapshot_id.trim().to_string()
     };
     let mut rows = read_recents();
-    rows.retain(|r| r.id != id && !(r.id.is_empty() && normalize_url(&r.url) == url && r.route == route));
+    // Keep a previously learned hostname when this upsert omits it.
+    let prior_host = rows
+        .iter()
+        .find(|r| r.id == id || (normalize_url(&r.url) == url && !r.hostname.is_empty()))
+        .map(|r| r.hostname.clone())
+        .filter(|h| !h.is_empty());
+    let hostname = if hostname.is_empty() {
+        prior_host.unwrap_or_default()
+    } else {
+        hostname
+    };
+    rows.retain(|r| {
+        r.id != id
+            && !(r.id.is_empty() && normalize_url(&r.url) == url && r.route == route)
+            && !is_generic_local_snapshot(&r.url, &r.route, &r.title)
+    });
     rows.insert(
         0,
         WindowRecent {
@@ -202,6 +395,7 @@ pub fn upsert_recent_snapshot(
             url,
             route,
             title,
+            hostname,
             label: None,
             last_opened_at: now_secs(),
         },
@@ -212,7 +406,12 @@ pub fn upsert_recent_snapshot(
 
 /// Legacy helper — records a bare server entry (no route/title yet).
 pub fn remember_recent(url: &str) {
-    upsert_recent_snapshot(&new_snapshot_id(), url, "/", &window_title_for_url(url));
+    let url = normalize_url(url);
+    if is_local_url(&url) {
+        upsert_recent_snapshot("local", &url, "/", "Local", None);
+        return;
+    }
+    upsert_recent_snapshot(&new_snapshot_id(), &url, "/", "Sandwalk", None);
 }
 
 pub fn clear_recents() {
@@ -220,16 +419,26 @@ pub fn clear_recents() {
 }
 
 pub fn window_title_for_url(url: &str) -> String {
+    window_title_for_remote(url, None)
+}
+
+/// Dock / cold-start title. Prefer hostname over raw IP when known.
+pub fn window_title_for_remote(url: &str, hostname: Option<&str>) -> String {
     let url = normalize_url(url);
     if url.contains("127.0.0.1") || url.to_lowercase().contains("localhost") {
         return "Sandwalk".into();
     }
-    // Strip scheme for a short Dock / menu title: host:port
-    let rest = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))
-        .unwrap_or(&url);
-    let hostport = rest.split('/').next().unwrap_or(rest);
+    let hostport = hostport_from_url(&url).unwrap_or_else(|| url.clone());
+    let ip = hostport
+        .split_once(':')
+        .map(|(h, _)| h)
+        .unwrap_or(&hostport);
+    let short = hostname
+        .map(short_hostname)
+        .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case(ip));
+    if let Some(name) = short {
+        return format!("Sandwalk — {name}");
+    }
     if hostport.is_empty() {
         format!("Sandwalk — {url}")
     } else {
@@ -350,6 +559,38 @@ pub fn snapshot_id_for_label(label: &str) -> Option<String> {
         .and_then(|map| map.get(label).map(|m| m.snapshot_id.clone()))
 }
 
+/// Percent-encode for WebView bootstrap query params.
+fn pct_encode(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len() * 3);
+    for b in raw.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char);
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+/// App URL with per-window bind in the query string (survives shared localStorage).
+fn window_start_url(
+    backend_url: &str,
+    api_key: Option<&str>,
+    snapshot_id: &str,
+) -> WebviewUrl {
+    let http = normalize_url(backend_url);
+    let mut path = format!(
+        "index.html?sw_http={}&sw_snap={}",
+        pct_encode(&http),
+        pct_encode(snapshot_id)
+    );
+    if let Some(key) = api_key.map(str::trim).filter(|k| !k.is_empty()) {
+        path.push_str(&format!("&sw_key={}", pct_encode(key)));
+    }
+    WebviewUrl::App(path.into())
+}
+
 pub fn inject_bootstrap_script(
     initial_route: Option<&str>,
     backend_url: &str,
@@ -373,9 +614,8 @@ pub fn inject_bootstrap_script(
             )
         })
         .unwrap_or_default();
-    let snap_js = snapshot_id
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
+    let snap = snapshot_id.map(str::trim).filter(|s| !s.is_empty());
+    let snap_js = snap
         .map(|s| {
             format!(
                 "window.__SANDWALK_SNAPSHOT_ID__={};",
@@ -383,12 +623,12 @@ pub fn inject_bootstrap_script(
             )
         })
         .unwrap_or_default();
-    let http = serde_json::to_string(&normalize_url(backend_url))
+    let http_val = normalize_url(backend_url);
+    let http = serde_json::to_string(&http_val)
         .unwrap_or_else(|_| format!("\"{DEFAULT_API}\""));
     let kind = serde_json::to_string(window_kind).unwrap_or_else(|_| "\"client\"".into());
-    let key_js = api_key
-        .map(str::trim)
-        .filter(|k| !k.is_empty())
+    let key_raw = api_key.map(str::trim).filter(|k| !k.is_empty());
+    let key_js = key_raw
         .map(|k| {
             format!(
                 "window.__SANDWALK_API_KEY__={};",
@@ -396,8 +636,18 @@ pub fn inject_bootstrap_script(
             )
         })
         .unwrap_or_default();
+    // window.name is per-WebView (unlike shared localStorage/sessionStorage).
+    let bind_name = serde_json::json!({
+        "http": http_val,
+        "apiKey": key_raw.unwrap_or(""),
+        "snap": snap.unwrap_or(""),
+    });
+    let bind_js = format!(
+        "try{{window.name='sandwalk-bind:'+{};}}catch(e){{}}",
+        serde_json::to_string(&bind_name.to_string()).unwrap_or_else(|_| "\"{}\"".into())
+    );
     format!(
-        "window.__SANDWALK_HTTP__={http};window.__SANDWALK_PLATFORM__='{os}';window.__SANDWALK_WINDOW_KIND__={kind};{key_js}{snap_js}{route_js}{overlay}"
+        "window.__SANDWALK_HTTP__={http};window.__SANDWALK_PLATFORM__='{os}';window.__SANDWALK_WINDOW_KIND__={kind};{key_js}{snap_js}{route_js}{bind_js}{overlay}"
     )
 }
 
@@ -440,6 +690,7 @@ pub fn build_sandwalk_window(
     title: &str,
     initial_route: Option<&str>,
     snapshot_id: Option<&str>,
+    hostname: Option<&str>,
     hide_on_close: bool,
     is_spa_route: impl Fn(&str) -> bool,
     apply_glass: Option<ApplyGlassFn>,
@@ -457,7 +708,8 @@ pub fn build_sandwalk_window(
         if label == "main" { "main" } else { "client" },
         is_spa_route,
     );
-    let mut win = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+    let start_url = window_start_url(backend_url, api_key, &snap);
+    let mut win = WebviewWindowBuilder::new(app, label, start_url)
         .title(title)
         .inner_size(1280.0, 860.0)
         .min_inner_size(900.0, 600.0)
@@ -475,6 +727,10 @@ pub fn build_sandwalk_window(
 
     let window = win.build().map_err(|e| e.to_string())?;
 
+    // Belt-and-suspenders: re-apply bind after the WebView exists (covers cases
+    // where initialization_script is skipped for the first navigation).
+    let _ = window.eval(&script);
+
     #[cfg(target_os = "macos")]
     if let Some(apply) = apply_glass {
         apply(app, &window);
@@ -486,7 +742,11 @@ pub fn build_sandwalk_window(
     }
 
     attach_window_lifecycle(&window, hide_on_close);
-    upsert_recent_snapshot(&snap, backend_url, route, title);
+    // Only seed Open Recent for remotes (or non-generic titles). Blank local
+    // windows are recorded later by the SPA once a real session/page title exists.
+    if !is_generic_local_snapshot(backend_url, route, title) {
+        upsert_recent_snapshot(&snap, backend_url, route, title, hostname);
+    }
     let _ = install_app_menu(app);
     Ok(window)
 }
@@ -511,13 +771,19 @@ pub fn open_or_focus_window(
         .filter(|r| !r.is_empty())
         .unwrap_or("/")
         .to_string();
+    let hostname = args
+        .hostname
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
     let title = args
         .title
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty())
         .map(|t| t.to_string())
-        .unwrap_or_else(|| window_title_for_url(&url));
+        .unwrap_or_else(|| window_title_for_remote(&url, hostname.as_deref()));
     let snapshot_id = args
         .snapshot_id
         .as_deref()
@@ -541,7 +807,7 @@ pub fn open_or_focus_window(
                 .clone()
                 .or_else(|| snapshot_id_for_label(existing.label()))
                 .unwrap_or_else(new_snapshot_id);
-            upsert_recent_snapshot(&id, &url, &route, &title);
+            upsert_recent_snapshot(&id, &url, &route, &title, hostname.as_deref());
             let _ = install_app_menu(app);
             return Ok(existing.label().to_string());
         }
@@ -560,6 +826,7 @@ pub fn open_or_focus_window(
         &title,
         Some(&route),
         snapshot_id.as_deref(),
+        hostname.as_deref(),
         false,
         is_spa_route,
         apply_glass,
@@ -689,6 +956,7 @@ pub fn handle_menu_event(
                     title: None,
                     route: Some("/".into()),
                     snapshot_id: None,
+                    hostname: None,
                     focus_existing: false,
                 },
                 fallback_url,
@@ -705,6 +973,7 @@ pub fn handle_menu_event(
                     route: None,
                     title: None,
                     snapshot_id: None,
+                    hostname: None,
                 },
             );
         }
@@ -717,6 +986,7 @@ pub fn handle_menu_event(
                     route: None,
                     title: None,
                     snapshot_id: None,
+                    hostname: None,
                 },
             );
         }
@@ -741,6 +1011,7 @@ pub fn handle_menu_event(
             } else {
                 row.route.clone()
             };
+            let hostname = row.hostname.trim().to_string();
             emit_menu_action(
                 app,
                 MenuActionPayload {
@@ -749,6 +1020,7 @@ pub fn handle_menu_event(
                     route: Some(route),
                     title: Some(title),
                     snapshot_id: Some(row.id),
+                    hostname: (!hostname.is_empty()).then_some(hostname),
                 },
             );
         }
@@ -833,6 +1105,7 @@ pub fn desktop_upsert_window_snapshot(
     url: String,
     route: String,
     title: String,
+    hostname: Option<String>,
 ) -> Result<String, String> {
     let label = window.label().to_string();
     let id = snapshot_id
@@ -843,7 +1116,7 @@ pub fn desktop_upsert_window_snapshot(
         .or_else(|| snapshot_id_for_label(&label))
         .unwrap_or_else(new_snapshot_id);
     register_window_backend_with_snapshot(&label, &url, Some(&id));
-    upsert_recent_snapshot(&id, &url, &route, &title);
+    upsert_recent_snapshot(&id, &url, &route, &title, hostname.as_deref());
     install_app_menu(&app)?;
     Ok(id)
 }
@@ -857,7 +1130,7 @@ pub fn desktop_remember_window_recent(app: AppHandle, url: String) -> Result<(),
         .find(|(_, w)| w.is_focused().unwrap_or(false))
     {
         if let Some(id) = snapshot_id_for_label(label.as_str()) {
-            upsert_recent_snapshot(&id, &url, "/", &window_title_for_url(&url));
+            upsert_recent_snapshot(&id, &url, "/", "Sandwalk", None);
             return install_app_menu(&app);
         }
     }

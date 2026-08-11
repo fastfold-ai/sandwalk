@@ -1,6 +1,17 @@
-import { Check, Copy, Loader2, Lock, Network, RefreshCw, Terminal } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import {
+  Check,
+  Copy,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Network,
+  RefreshCw,
+  Terminal
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { LanTopologyScan } from '@/components/agents/lan-topology-scan'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,7 +31,7 @@ import {
   type LanDesktopServer
 } from '@/lib/desktop'
 import { persistRememberedApiKey, readRememberedApiKey } from '@/lib/remembered-auth'
-import { cn } from '@/lib/utils'
+import { rememberRemoteHostname } from '@/lib/remote-hostname'
 
 const CLI_REMOTE_SNIPPET = [
   '# Security — API key',
@@ -31,6 +42,20 @@ const CLI_REMOTE_SNIPPET = [
   '# Network — Allow Remote Connections',
   'sandwalk serve --host 0.0.0.0 --port 8787'
 ].join('\n')
+
+function splitDeviceLabel(label: string, hostname: string) {
+  const parts = label
+    .split('·')
+    .map(part => part.trim())
+    .filter(Boolean)
+  if (parts.length === 0) {
+    return { title: hostname || 'Sandwalk', detail: '' }
+  }
+  return {
+    title: parts[0],
+    detail: parts.slice(1).join(' · ')
+  }
+}
 
 export function OpenRemoteWindowDialog({
   open,
@@ -51,21 +76,26 @@ export function OpenRemoteWindowDialog({
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null)
   const [showCli, setShowCli] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showKey, setShowKey] = useState(false)
+  const scanGen = useRef(0)
 
   const runScan = useCallback(async () => {
     if (!isTauri()) return
+    const gen = ++scanGen.current
     setScanning(true)
     setScanError(null)
     try {
       const rows = await scanLanDesktopServers()
+      if (gen !== scanGen.current) return
       setHits(rows)
     } catch (err) {
+      if (gen !== scanGen.current) return
       setHits([])
       setScanError(
         err instanceof Error ? err.message : 'Could not scan the local network'
       )
     } finally {
-      setScanning(false)
+      if (gen === scanGen.current) setScanning(false)
     }
   }, [])
 
@@ -81,21 +111,43 @@ export function OpenRemoteWindowDialog({
     setScanError(null)
     setShowCli(false)
     setCopied(false)
-    void runScan()
+    setShowKey(false)
+    // Paint the dialog first; discover runs in the background (async Tauri cmd).
+    setScanning(isTauri())
+    const timer = window.setTimeout(() => {
+      void runScan()
+    }, 0)
+    return () => {
+      window.clearTimeout(timer)
+      scanGen.current += 1
+    }
   }, [initialUrl, open, runScan])
 
   const pickHit = (hit: LanDesktopServer) => {
+    // Prefer LAN IP in the URL field (hit.url) — more reliable than .local mDNS.
     const url = normalizeBackendUrl(hit.url)
     setDraftUrl(url)
     setSelectedUrl(url)
+    setError(null)
     const remembered = readRememberedApiKey(url)
     if (remembered) setDraftKey(remembered)
-    setError(
-      hit.authRequired && !remembered
-        ? 'This server requires an API key'
-        : null
-    )
   }
+
+  const topologyNodes = useMemo(
+    () =>
+      hits.map(hit => {
+        const url = normalizeBackendUrl(hit.url)
+        const { title, detail } = splitDeviceLabel(hit.deviceLabel, hit.hostname)
+        return {
+          ...hit,
+          url,
+          title,
+          detail,
+          hostLine: url.replace(/^https?:\/\//, '')
+        }
+      }),
+    [hits]
+  )
 
   const copyCli = async () => {
     const ok = await copyText(CLI_REMOTE_SNIPPET)
@@ -110,15 +162,22 @@ export function OpenRemoteWindowDialog({
       setError('Enter a server URL')
       return
     }
+    const key = draftKey.trim()
+    const selected = hits.find(hit => normalizeBackendUrl(hit.url) === url)
+    if (selected?.authRequired && !key) {
+      setError('This server requires an API key')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
-      const key = draftKey.trim()
       if (key) persistRememberedApiKey(url, key)
+      const hostname = selected?.hostname?.trim() || null
+      if (hostname) rememberRemoteHostname(url, hostname)
       await openDesktopWindow({
         backendUrl: url,
         apiKey: key || null,
-        // Explicit Remote always opens a window; Open Recent uses focusExisting.
+        hostname,
         focusExisting: false
       })
       onOpenChange(false)
@@ -205,7 +264,10 @@ export function OpenRemoteWindowDialog({
                   size="sm"
                   className="h-7 px-2"
                   disabled={scanning}
-                  onClick={() => void runScan()}
+                  onClick={() => {
+                    setHits([])
+                    void runScan()
+                  }}
                 >
                   {scanning ? (
                     <Loader2 className="size-3.5 animate-spin" />
@@ -215,52 +277,20 @@ export function OpenRemoteWindowDialog({
                   Rescan
                 </Button>
               </div>
-              {scanning && hits.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  Scanning local network…
-                </p>
-              ) : null}
+
               {scanError ? (
                 <p className="text-destructive text-sm" role="alert">
                   {scanError}
                 </p>
               ) : null}
-              {!scanning && !scanError && hits.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No servers found on this network.
-                </p>
-              ) : null}
-              {hits.length > 0 ? (
-                <ul className="max-h-40 space-y-1 overflow-y-auto">
-                  {hits.map(hit => {
-                    const url = normalizeBackendUrl(hit.url)
-                    const active = selectedUrl === url || draftUrl === url
-                    return (
-                      <li key={hit.url}>
-                        <button
-                          type="button"
-                          onClick={() => pickHit(hit)}
-                          className={cn(
-                            'w-full rounded-md border px-3 py-2 text-left transition-colors',
-                            active
-                              ? 'border-foreground/30 bg-muted'
-                              : 'border-border hover:bg-muted/60'
-                          )}
-                        >
-                          <div className="text-sm font-medium">
-                            {hit.deviceLabel}
-                          </div>
-                          <div className="text-muted-foreground truncate text-xs">
-                            {hit.hostname}
-                            {hit.authRequired ? ' · API key required' : ''}
-                            {' · '}
-                            {url.replace(/^https?:\/\//, '')}
-                          </div>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
+
+              {!scanError ? (
+                <LanTopologyScan
+                  active={scanning}
+                  nodes={topologyNodes}
+                  selectedUrl={selectedUrl || draftUrl}
+                  onSelect={node => pickHit(node)}
+                />
               ) : null}
             </div>
           ) : null}
@@ -279,13 +309,33 @@ export function OpenRemoteWindowDialog({
             autoComplete="url"
             spellCheck={false}
           />
-          <Input
-            type="password"
-            value={draftKey}
-            onChange={event => setDraftKey(event.target.value)}
-            placeholder="API key (if the server requires auth)"
-            autoComplete="off"
-          />
+          <div className="relative">
+            <Input
+              type={showKey ? 'text' : 'password'}
+              value={draftKey}
+              onChange={event => {
+                setDraftKey(event.target.value)
+                if (error) setError(null)
+              }}
+              placeholder="API key (if the server requires auth)"
+              autoComplete="off"
+              className="pr-10"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground absolute top-1/2 right-1 size-8 -translate-y-1/2"
+              onClick={() => setShowKey(v => !v)}
+              aria-label={showKey ? 'Hide API key' : 'Show API key'}
+            >
+              {showKey ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
+            </Button>
+          </div>
           {error ? (
             <p className="text-destructive text-sm" role="alert">
               {error}

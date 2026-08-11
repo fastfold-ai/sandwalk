@@ -13,7 +13,8 @@ import {
 import {
   DEFAULT_BACKEND_URL,
   normalizeBackendUrl,
-  persistBackendUrl
+  persistBackendUrl,
+  pinDesktopBackendBind
 } from '@/lib/backend-url'
 import {
   clearRememberedApiKey,
@@ -229,6 +230,7 @@ export function useAppBootstrapAuth({
   const changeBackend = useCallback(
     async (nextUrl: string, nextApiKey?: string) => {
       const normalized = normalizeBackendUrl(nextUrl || DEFAULT_BACKEND_URL)
+      pinDesktopBackendBind(normalized, nextApiKey)
       persistBackendUrl(normalized)
       setConnectionPaused(false)
       clearBackendSession()

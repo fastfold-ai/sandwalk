@@ -332,32 +332,14 @@ fn apply_glass_cb(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
 #[tauri::command]
 fn desktop_open_window(
     app: tauri::AppHandle,
-    backend_url: Option<String>,
-    api_key: Option<String>,
-    title: Option<String>,
-    route: Option<String>,
-    snapshot_id: Option<String>,
-    focus_existing: Option<bool>,
+    payload: multi_window::OpenWindowArgs,
 ) -> Result<String, String> {
     let fallback = multi_window::focused_backend_url(&app, &control_plane_api_base());
     #[cfg(target_os = "macos")]
     let glass = Some(apply_glass_cb as multi_window::ApplyGlassFn);
     #[cfg(not(target_os = "macos"))]
     let glass = None;
-    multi_window::open_or_focus_window(
-        &app,
-        multi_window::OpenWindowArgs {
-            backend_url,
-            api_key,
-            title,
-            route,
-            snapshot_id,
-            focus_existing: focus_existing.unwrap_or(false),
-        },
-        &fallback,
-        is_spa_route,
-        glass,
-    )
+    multi_window::open_or_focus_window(&app, payload, &fallback, is_spa_route, glass)
 }
 
 /// Keep the native window map / title / Open Recent in sync after in-app Change server.
@@ -371,7 +353,7 @@ fn desktop_bind_window_backend(
     let id = multi_window::register_window_backend(window.label(), &normalized);
     let title = multi_window::window_title_for_url(&normalized);
     let _ = window.set_title(&title);
-    multi_window::upsert_recent_snapshot(&id, &normalized, "/", &title);
+    multi_window::upsert_recent_snapshot(&id, &normalized, "/", "Sandwalk", None);
     multi_window::install_app_menu(&app)
 }
 
@@ -882,6 +864,7 @@ pub fn run() {
                 "Sandwalk",
                 cold_route.as_deref(),
                 Some("main"),
+                None,
                 true,
                 is_spa_route,
                 glass,
