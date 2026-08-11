@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
@@ -87,7 +87,7 @@ def copy_cell_inputs(pack: Pack, cell: MatrixCell, workspace: Path) -> None:
 
 
 def default_project_name(pack_id: str, matrix_name: str, when: datetime | None = None) -> str:
-    ts = (when or datetime.now(timezone.utc)).strftime("%Y-%m-%d %H%M")
+    ts = (when or datetime.now(UTC)).strftime("%Y-%m-%d %H%M")
     return f"bench · {pack_id} · {matrix_name} · {ts}"
 
 
@@ -100,7 +100,7 @@ def build_project_description(
     models = sorted({f"{c.provider}:{c.model_id}" for c in cells})
     qids = [c.question_id for c in cells]
     lines = [
-        f"sandwalk-bench batch",
+        "sandwalk-bench batch",
         f"pack: {pack.id} v{pack.version}",
         f"matrix: {matrix_name}",
         f"sessions: {len(cells)}",

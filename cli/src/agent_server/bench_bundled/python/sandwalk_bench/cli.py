@@ -58,7 +58,7 @@ def packs_cmd() -> None:
 @app.command("show")
 def show_cmd(
     pack: str = typer.Argument(..., help="Pack path or filename in packs/"),
-    question: Optional[str] = typer.Option(None, "--question", "-q"),
+    question: str | None = typer.Option(None, "--question", "-q"),
 ) -> None:
     """Show pack questions (or one question)."""
     p = load_pack(pack)
@@ -103,20 +103,20 @@ def spawn_cmd(
     pack: str = typer.Argument(...),
     matrix: str = typer.Argument(...),
     base_url: str = typer.Option("http://127.0.0.1:8787", "--base-url"),
-    api_key: Optional[str] = typer.Option(None, "--api-key", envvar="SANDWALK_API_KEY"),
+    api_key: str | None = typer.Option(None, "--api-key", envvar="SANDWALK_API_KEY"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    out: Optional[Path] = typer.Option(None, "--out", help="Write run manifest JSON"),
-    project_name: Optional[str] = typer.Option(
+    out: Path | None = typer.Option(None, "--out", help="Write run manifest JSON"),
+    project_name: str | None = typer.Option(
         None,
         "--project-name",
         help="Project name (default: bench · <pack> · <matrix> · <utc timestamp>)",
     ),
-    project_description: Optional[str] = typer.Option(
+    project_description: str | None = typer.Option(
         None,
         "--project-description",
         help="Override auto description (pack/matrix/models/question ids)",
     ),
-    project_id: Optional[str] = typer.Option(
+    project_id: str | None = typer.Option(
         None,
         "--project-id",
         help="Reuse an existing project instead of creating one",
@@ -179,7 +179,7 @@ def grade_cmd(
 @bix_app.command("download")
 def bix_download(
     force: bool = typer.Option(False, "--force"),
-    token: Optional[str] = typer.Option(None, "--token", envvar="HF_TOKEN"),
+    token: str | None = typer.Option(None, "--token", envvar="HF_TOKEN"),
 ) -> None:
     """Download BixBench-Verified-50.jsonl into .cache/ (needs HF_TOKEN)."""
     path = download_jsonl(token=token, force=force)

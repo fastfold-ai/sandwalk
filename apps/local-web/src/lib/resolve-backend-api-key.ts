@@ -32,7 +32,7 @@ export async function resolveBackendApiKey(
   try {
     const auth = await desktopGetAuth()
     const key = auth?.api_key?.trim()
-    if (!key) return undefined
+    if (!auth || !key) return undefined
     // Only auto-apply when the local server actually requires auth.
     if (!auth.auth_enabled && !auth.api_key_configured) return undefined
     persistRememberedApiKey(url, key)
