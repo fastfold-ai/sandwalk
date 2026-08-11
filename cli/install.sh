@@ -20,8 +20,10 @@ YELLOW='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-info()  { printf "${CYAN}%s${NC}\n" "$*"; }
-ok()    { printf "${GREEN}%s${NC}\n" "$*"; }
+# Status goes to stderr so command substitutions (e.g. REF="$(resolve_ref)")
+# only capture the intended return value — never progress text.
+info()  { printf "${CYAN}%s${NC}\n" "$*" >&2; }
+ok()    { printf "${GREEN}%s${NC}\n" "$*" >&2; }
 warn()  { printf "${YELLOW}%s${NC}\n" "$*" >&2; }
 fail()  { printf "${RED}Error: %s${NC}\n" "$*" >&2; exit 1; }
 
@@ -192,6 +194,11 @@ GIT_SPEC="git+${REPO_GIT}@${REF}#subdirectory=cli"
 UV_SPEC="${PACKAGE} @ ${GIT_SPEC}"
 
 # ── Install ────────────────────────────────────────────────────
+# Prefer uv (isolated tool env, fast, works on PEP 668 distros). Then pipx.
+# If neither is present, bootstrap uv from astral.sh before falling back to
+# pip --user (which often fails on modern Debian/Ubuntu "externally managed"
+# Python). Goal: one curl | bash that works on a stock Linux/macOS with
+# Python 3.11+ and network access.
 
 install_failed_hint() {
   warn ""
@@ -201,7 +208,32 @@ install_failed_hint() {
   warn ""
 }
 
-if command -v uv >/dev/null 2>&1; then
+ensure_uv_on_path() {
+  command -v uv >/dev/null 2>&1 && return 0
+  local dir
+  for dir in "${HOME}/.local/bin" "${HOME}/.cargo/bin"; do
+    if [[ -x "${dir}/uv" ]]; then
+      export PATH="${dir}:${PATH}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+bootstrap_uv() {
+  info "uv not found — bootstrapping uv (https://astral.sh/uv)…"
+  if ! curl -LsSf https://astral.sh/uv/install.sh | sh; then
+    return 1
+  fi
+  ensure_uv_on_path || return 1
+  ok "Bootstrapped uv ($(uv --version 2>/dev/null || echo ok))"
+}
+
+if ! ensure_uv_on_path && ! command -v pipx >/dev/null 2>&1; then
+  bootstrap_uv || warn "Could not bootstrap uv — will try pip next"
+fi
+
+if ensure_uv_on_path; then
   info "Installing ${PACKAGE} via uv tool…"
   if ! uv tool install "$UV_SPEC" && ! uv tool install --force "$UV_SPEC"; then
     install_failed_hint
@@ -219,7 +251,7 @@ else
   warn "uv/pipx not found — falling back to pip install --user"
   if ! "$PYTHON" -m pip install --user --upgrade "$UV_SPEC"; then
     install_failed_hint
-    fail "pip install failed"
+    fail "pip install failed (on Debian/Ubuntu try: curl -LsSf https://astral.sh/uv/install.sh | sh)"
   fi
   ok "Installed with pip"
   USER_BIN=$("$PYTHON" -m site --user-base)/bin
