@@ -157,8 +157,11 @@ function TabBackground() {
       ref={ref}
       className="chrome-tab-background pointer-events-none absolute inset-0"
     >
+      {/* Hover-only shape: rounded rectangle (visible only on inactive hover) */}
+      <div className="chrome-tab-hover-shape" />
+      {/* Active-only shape: SVG with curved ears (visible only when active) */}
       <svg
-        className="block h-full w-full"
+        className="chrome-tab-active-shape block h-full w-full"
         width={width}
         height="36"
         viewBox={`0 0 ${width} 36`}

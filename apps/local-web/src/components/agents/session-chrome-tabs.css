@@ -55,13 +55,12 @@
 }
 
 /*
- * No overlap: each tab lives in its own box, separated by just the 1 px
- * vertical divider (0 air + 1 px divider + 0 air). The divider is drawn as
- * an ::after on every tab except the last, and hides next to the active /
- * hovered tab so the eye lands on the important tab.
+ * 14 px overlap: each tab slides under its left neighbor by 14 px so the ears
+ * tuck (Chrome-classic look). Z-index in SessionTab lifts active > hover >
+ * idle, so the important tab always paints on top of the overlap.
  */
 .sandwalk-chrome-tabs .chrome-tab + .chrome-tab {
-  margin-left: 1px;
+  margin-left: -14px;
 }
 
 .sandwalk-chrome-tabs .chrome-tab::after {
@@ -115,6 +114,40 @@
   .sandwalk-chrome-tabs
   .chrome-tab:not([data-active='true']):hover {
   --tab-fill: color-mix(in srgb, hsl(var(--muted)) 70%, #fff);
+}
+
+/* Two shapes stacked in the background; only one is visible per state.
+ * - Hover (not active) → rounded-rect div, radius 6.
+ * - Active            → SVG with the curved-ear silhouette.
+ * Both share --tab-fill so the color is defined once. */
+.sandwalk-chrome-tabs .chrome-tab .chrome-tab-hover-shape {
+  position: absolute;
+  /* 10 px side air + 6 px bottom so the chip lifts off the strip floor. */
+  inset: 0 10px 6px 10px;
+  /* Same hue as --tab-fill at 30 % alpha for a soft, quiet hover wash. */
+  background: color-mix(in srgb, var(--tab-fill) 30%, transparent);
+  border-radius: 8px;
+  opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.sandwalk-chrome-tabs
+  .chrome-tab:not([data-active='true']):hover
+  .chrome-tab-hover-shape {
+  opacity: 1;
+}
+
+.sandwalk-chrome-tabs .chrome-tab .chrome-tab-active-shape {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.sandwalk-chrome-tabs
+  .chrome-tab[data-active='true']
+  .chrome-tab-active-shape {
+  opacity: 1;
 }
 
 .sandwalk-chrome-tabs .chrome-tab .chrome-tab-geometry {
