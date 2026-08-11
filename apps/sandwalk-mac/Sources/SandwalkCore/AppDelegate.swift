@@ -14,6 +14,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
+        // Never run two helpers: the loser would supervise a second agent server
+        // that fights for the SQLite lock ("database is locked by another
+        // process") and repeatedly kills the healthy one.
+        if let existing = SingleInstanceGuard.otherRunningHelperPid() {
+            NSLog("Sandwalk: another helper is running (pid \(existing)); exiting")
+            SandwalkRuntime.allowTerminate = true
+            NSApp.terminate(nil)
+            return
+        }
+
         let config = AppConfig.load()
         let supervisor = SandwalkSupervisor(config: config)
         self.supervisor = supervisor
@@ -83,12 +93,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         if SandwalkRuntime.allowTerminate {
             return .terminateNow
         }
-        if AppConfig.load().keepMenubarOnCmdQ {
-            // App menu Quit / other terminate paths — cancel and repair the
-            // status item (click handling often breaks after cancel).
-            dismissToMenubarOnly()
-            return .terminateCancel
-        }
+        // ⌘Q keep-alive is handled by the local key monitor above, which swallows
+        // the event before AppKit ever asks us. Canceling here as well would also
+        // cancel *programmatic* terminate — AppleScript `quit`, logout, and the
+        // packaging script's quit — leaving an orphaned helper that keeps the
+        // agent database locked and collides with the next launch.
         return .terminateNow
     }
 

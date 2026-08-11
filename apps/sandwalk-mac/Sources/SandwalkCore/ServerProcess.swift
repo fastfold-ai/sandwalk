@@ -130,17 +130,27 @@ final class ServerProcess: @unchecked Sendable {
 
         if let proc = process, proc.isRunning {
             let pid = proc.processIdentifier
-            kill(pid, SIGTERM)
+            // Signal the whole group: `sandwalk serve` is uvicorn, which forks a
+            // worker. Signaling only the parent can leave that worker holding the
+            // port and the SQLite lock, which then blocks the next start.
+            PortSupport.signalProcessGroup(pid: pid, signal: SIGTERM)
             let deadline = Date().addingTimeInterval(stopGraceSeconds)
             while Date() < deadline {
                 if !proc.isRunning { break }
                 try? await Task.sleep(for: .milliseconds(150))
             }
             if proc.isRunning {
-                kill(pid, SIGKILL)
+                PortSupport.signalProcessGroup(pid: pid, signal: SIGKILL)
             }
         } else if let pid = adoptedPid ?? PortSupport.listenerPid(port: config.port) {
             PortSupport.killProcessTree(pid: pid)
+            PortSupport.freePort(config.port)
+        }
+        // The worker can spawn into its own process group, so a group signal
+        // aimed at the parent misses it. Whoever still holds the API port is
+        // authoritative — leaving it alive is what produced "database is locked
+        // by another process" on the next launch.
+        if PortSupport.listenerPid(port: config.port) != nil {
             PortSupport.freePort(config.port)
         }
 
@@ -155,24 +165,31 @@ final class ServerProcess: @unchecked Sendable {
     }
 
     /// Synchronous stop for app termination / signal paths.
-    func reapSync(timeout: TimeInterval = 5) {
+    ///
+    /// Kept short: AppKit force-terminates the app if `applicationWillTerminate`
+    /// runs long, and being killed mid-reap is exactly how an orphaned agent
+    /// keeps holding the port and database lock.
+    func reapSync(timeout: TimeInterval = 3) {
         expectingExit = true
         cancelRecovery()
         cancelHealthLoop()
         if let proc = process, proc.isRunning {
             let pid = proc.processIdentifier
-            kill(pid, SIGTERM)
+            PortSupport.signalProcessGroup(pid: pid, signal: SIGTERM)
             let deadline = Date().addingTimeInterval(timeout)
             while Date() < deadline {
                 if kill(pid, 0) != 0 { break }
                 usleep(100_000)
             }
             if kill(pid, 0) == 0 {
-                kill(pid, SIGKILL)
+                PortSupport.signalProcessGroup(pid: pid, signal: SIGKILL)
             }
         } else if let pid = adoptedPid ?? PortSupport.listenerPid(port: config.port) {
             PortSupport.killProcessTree(pid: pid)
-            PortSupport.freePort(config.port)
+        }
+        // Authoritative check — see stop(). Short grace: AppKit is waiting on us.
+        if PortSupport.listenerPid(port: config.port) != nil {
+            PortSupport.freePort(config.port, graceSteps: 3)
         }
         process = nil
         adoptedPid = nil
