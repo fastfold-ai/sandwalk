@@ -51,7 +51,7 @@ export function ChatSplitContainer({
   return (
     <ResizablePanelGroup
       direction="horizontal"
-      className="min-h-0 min-w-0 flex-1"
+      className="min-h-0 min-w-0 flex-1 gap-2 p-2"
       autoSaveId={`fastfold.split-group-${group.id}`}
     >
       {chatIds.map((chatId, index) => {
@@ -105,37 +105,46 @@ function SplitFragment({
       >
         <div
           className={cn(
-            'relative flex h-full min-w-0 flex-col transition-shadow',
             /*
-             * Focused panel indicator (research-recommended: subtle inset ring +
-             * accent hairline, do NOT dim inactive panels).
+             * Cada panel del split es una tarjeta independiente (patrón
+             * Chrome dual-view). Border + rounded + bg-background lo envuelven
+             * como un cuadro propio; el focused sube el borde a `primary/60`
+             * + shadow para dejar clarísimo en cuál chat está el usuario
+             * mientras los otros quedan legibles pero secundarios.
              */
+            /*
+             * `duration-300 ease-out` para el paso focused/no-focused: el
+             * border/shadow crecen suave en vez de aparecer de golpe cuando el
+             * usuario clickea otro panel. El ring del hover se mantiene con
+             * su timing corto (150 ms default de Tailwind) para que reaccione
+             * inmediato al mouse.
+             */
+            'bg-background relative flex h-full min-w-0 flex-col overflow-hidden rounded-lg border transition-[border-color,box-shadow] duration-300 ease-out',
             isFocused
-              ? 'ring-primary/40 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.4)] ring-1 ring-inset'
-              : ''
+              ? 'border-primary/60 shadow-md'
+              : 'border-border/50 shadow-none hover:ring-2 hover:ring-inset hover:ring-muted-foreground/25'
           )}
           onMouseDownCapture={onFocus}
           onFocusCapture={onFocus}
         >
           {/*
-            Composer visibility: focused panel shows a real composer; others
-            keep it mounted but invisible so typing / IME / file chips survive.
+            El composer del panel se pinta como barra embedded (pegada al
+            bottom con animación slide) — la visibilidad y la animación las
+            maneja `SessionChatBody` a partir de `splitMode`. Acá solo se le
+            pasa el flag; el composer sigue mounted siempre para preservar
+            el texto que estaba escribiendo el usuario en cada panel.
           */}
           <div
-            className={cn(
-              'flex h-full min-w-0 flex-1 flex-col',
-              !isFocused &&
-                '[&_[data-composer-slot]]:pointer-events-none [&_[data-composer-slot]]:opacity-0'
-            )}
+            className="flex h-full min-w-0 flex-1 flex-col"
             aria-label={`Chat panel for ${chatSession?.title || 'session'}`}
           >
-            <SessionChatMount {...props} />
+            <SessionChatMount {...props} splitMode={{ focused: isFocused }} />
           </div>
         </div>
       </ResizablePanel>
       {!isLast ? (
         <ResizableHandle
-          className="w-px bg-transparent after:bg-transparent"
+          className="w-0 bg-transparent after:bg-transparent"
         />
       ) : null}
     </>

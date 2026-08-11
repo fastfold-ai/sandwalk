@@ -59,11 +59,18 @@ type SharedGlobals = {
 export type SessionChatMountProps = {
   perSessionArgs: PerSessionChatStateArgs
   shared: SharedGlobals
+  /**
+   * Modo split view del panel. `undefined` = chat normal single-tab (composer
+   * flotante centrado). Cuando existe, activa el composer "embedded" pegado
+   * al bottom del panel con animación slide up/down según `focused`.
+   */
+  splitMode?: { focused: boolean }
 }
 
 export function SessionChatMount({
   perSessionArgs,
-  shared
+  shared,
+  splitMode
 }: SessionChatMountProps) {
   const perSession = usePerSessionChatState(perSessionArgs)
   const {
@@ -122,6 +129,7 @@ export function SessionChatMount({
       setFilesPanelCollapsed={perSessionArgs.setFilesPanelCollapsed}
       setPendingOpenPath={perSessionArgs.setPendingOpenPath}
       error={shared.error}
+      splitMode={splitMode}
     />
   )
 }
