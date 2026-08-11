@@ -387,6 +387,23 @@ final class ControlPlane {
             || next.dashboardServeMode != supervisor.config.dashboardServeMode
             || next.dbAutoHeal != supervisor.config.dbAutoHeal
 
+        // `sandwalk serve` exits(2) on a non-loopback bind without an enabled API
+        // key. Reject here so a remote toggle cannot take the agent down.
+        if next.apiExposesRemote {
+            let auth = AuthSettingsStore.load()
+            if !(auth.authEnabled && auth.apiKeyConfigured) {
+                return .init(
+                    status: 400,
+                    json: [
+                        "error": "Remote access requires an API key. Generate one and "
+                            + "enable auth (Security / `sandwalk auth enable`) before "
+                            + "binding to 0.0.0.0.",
+                        "needs_api_key": true,
+                    ]
+                )
+            }
+        }
+
         do {
             if networkChanged {
                 try await supervisor.applyNetworkConfig(next)

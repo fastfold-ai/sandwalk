@@ -27,6 +27,15 @@ struct NetworkSettingsView: View {
         return draft.port != draft.dashboardPort
     }
 
+    /// `sandwalk serve` refuses a non-loopback bind without an enabled API key,
+    /// exiting with code 2. Catch that here so Apply explains it instead of
+    /// leaving the menubar in "Exited with code 2 — stopped auto-restart".
+    private var remoteNeedsAuth: Bool {
+        guard draft.apiExposesRemote else { return false }
+        let auth = AuthSettingsStore.load()
+        return !(auth.authEnabled && auth.apiKeyConfigured)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SettingsSectionHeader(
@@ -50,9 +59,23 @@ struct NetworkSettingsView: View {
                     SettingsRow(
                         label: "LAN hint",
                         sublabel: "http://\(localLANHint()):\(draft.port)",
-                        isLast: true
+                        isLast: !remoteNeedsAuth
                     ) {
                         EmptyView()
+                    }
+                }
+                if remoteNeedsAuth {
+                    SettingsRow(
+                        label: "API key required",
+                        sublabel: "Remote access exposes shell, file, and credential endpoints to your network, so the agent requires auth.",
+                        isLast: true
+                    ) {
+                        Button(busy ? "Enabling…" : "Generate & enable") {
+                            Task { await enableAuthForRemote() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(busy)
                     }
                 }
             }
@@ -161,10 +184,38 @@ struct NetworkSettingsView: View {
         return host.isEmpty ? "your-mac.local" : host
     }
 
+    /// Generate + enable an API key so a remote bind can start.
+    ///
+    /// Keeps the requirement (remote exposes shell / file / credential endpoints)
+    /// but makes satisfying it one click instead of a trip to Security.
+    @MainActor
+    private func enableAuthForRemote() async {
+        busy = true
+        defer { busy = false }
+        var auth = AuthSettingsStore.load()
+        if !auth.apiKeyConfigured {
+            auth.apiKey = AuthSettingsStore.generateAPIKey()
+        }
+        auth.authEnabled = true
+        do {
+            try AuthSettingsStore.save(auth)
+            statusMessage = "API key enabled. Apply to bind for remote access."
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
     @MainActor
     private func apply() async {
         guard portsValid else {
             statusMessage = "Ports must be 1–65535 and different from each other."
+            return
+        }
+        if remoteNeedsAuth {
+            statusMessage = """
+            Remote access needs an API key — use Generate & enable above. \
+            Without it the agent refuses to bind to 0.0.0.0 and exits.
+            """
             return
         }
         busy = true
