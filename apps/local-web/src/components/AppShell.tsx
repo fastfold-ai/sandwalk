@@ -65,7 +65,6 @@ export function AppShell(props: AppShellProps) {
           setBatchDeletePending={props.setBatchDeletePending}
           onBatchSplitView={props.createSplitFromSidebar}
           canBatchSplitView={props.canSplitFromSidebar}
-          tabGroups={props.tabGroups}
           onSelectTabGroup={props.onSelectTabGroup}
           onDissolveTabGroup={props.dissolveTabGroup}
           setCollapsedSidebarSections={props.setCollapsedSidebarSections}

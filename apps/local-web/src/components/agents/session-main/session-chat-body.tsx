@@ -169,6 +169,17 @@ export function SessionChatBody({
     })
     return () => window.cancelAnimationFrame(raf)
   }, [isSplit, splitFocused])
+
+  /*
+   * "Sticky bottom" en split view: no hace falta lógica local — el hook
+   * `useChatScroll` ya tiene memoria por-chat (posición + stickToBottom)
+   * y un ResizeObserver que auto-scrollea al bottom cuando LLEGA nuevo
+   * contenido con el usuario pegado al bottom. Ese observer fue
+   * modificado para NO disparar cuando el viewport solo se achica por
+   * cambio de padding (nuestro caso al recuperar focus): solo se activa
+   * si el `scrollHeight` REALMENTE creció. Con eso el caso de uso
+   * funciona sin pisar la memoria de posición del sistema existente.
+   */
   // Stable callbacks: memoized transcript rows must not re-render per stream
   // delta because a lambda got a new identity. Composer props change every
   // render, so reach them through a ref.
@@ -258,17 +269,30 @@ export function SessionChatBody({
           className={cn(
             'flex min-h-0 flex-col overflow-hidden',
             !layoutInstant &&
-              'transition-[flex-grow,opacity] duration-500 ease-out'
+              'transition-[flex-grow,opacity,padding-bottom] duration-500 ease-out',
+            // En split, el padding-bottom se anima a 300 ms — mismo timing
+            // que el slide del composer — para que ambos movimientos se
+            // vean como uno solo.
+            isSplit && !layoutInstant && 'transition-[padding-bottom] duration-300 ease-out'
           )}
           style={{
             flexGrow: showTranscript ? 1 : 0,
             flexShrink: 1,
             flexBasis: 0,
             opacity: showTranscript ? 1 : 0,
-            // En modo split el composer flota `absolute` al bottom del panel;
-            // dejar padding-bottom equivalente para que el último mensaje del
-            // transcript no quede tapado por la barra.
-            paddingBottom: isSplit ? composerBarHeight : undefined
+            /*
+             * En modo split reservamos el hueco del composer SOLO cuando el
+             * panel está focused. Cuando pierde focus el composer se
+             * desliza hacia abajo (translate-y-full + opacity 0), y con
+             * padding-bottom en 0 el transcript ocupa todo el alto del
+             * panel — sin dejar el hueco negro vacío donde vivía el
+             * composer. Los dos paneles del split cambian al unísono.
+             */
+            paddingBottom: isSplit
+              ? splitFocused
+                ? composerBarHeight
+                : 0
+              : undefined
           }}
         >
           {showTranscript ? (
@@ -341,7 +365,7 @@ export function SessionChatBody({
                * inferiores las hereda del `rounded-lg` del panel gracias
                * al `overflow-hidden` del ChatSplitContainer.
                */
-              'bg-muted/40 border-border/50 absolute inset-x-0 bottom-0 z-10 border-t',
+              'bg-muted/40 border-border/50 absolute inset-x-0 bottom-0 z-10 border-t will-change-transform',
               'transition-[transform,opacity] duration-300 ease-out',
               splitFocused
                 ? 'translate-y-0 opacity-100'

@@ -144,10 +144,16 @@ function SplitFragment({
              * su timing corto (150 ms default de Tailwind) para que reaccione
              * inmediato al mouse.
              */
-            'bg-background relative flex h-full min-w-0 flex-col overflow-hidden rounded-lg border transition-[border-color,box-shadow] duration-300 ease-out',
+            /*
+             * Panel del split: solo el `border-color` distingue focused vs
+             * no-focused (más el ring en hover cuando no está focused).
+             * Antes había `shadow-md` acompañando pero era imperceptible
+             * y encarecía el paint frame a frame.
+             */
+            'bg-background relative flex h-full min-w-0 flex-col overflow-hidden rounded-lg border transition-[border-color] duration-300 ease-out',
             isFocused
-              ? 'border-primary/60 shadow-md'
-              : 'border-border/50 shadow-none hover:ring-2 hover:ring-inset hover:ring-muted-foreground/25'
+              ? 'border-primary/60'
+              : 'border-border/50 hover:ring-2 hover:ring-inset hover:ring-muted-foreground/25'
           )}
           onMouseDownCapture={onFocus}
           onFocusCapture={onFocus}

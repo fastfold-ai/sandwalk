@@ -380,6 +380,7 @@ export default function App() {
 
   const { sections, openTabs } = buildSessionSidebarModel({
     sessions: bootstrap.sessions,
+    tabGroups: tabGroupsStore.tabGroups,
     activeProjectId: context.activeProjectId,
     openTabIds: tabs.openTabIds,
     activeSessionId: route.sessionId

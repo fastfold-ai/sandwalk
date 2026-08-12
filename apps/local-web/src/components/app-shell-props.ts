@@ -29,7 +29,7 @@ import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import type { CreateDraftSession } from '@/lib/draft-agent'
-import { groupSessions,type SessionChatState } from '@/lib/sessions'
+import { type SessionChatState, type TabItem, type TabItemSection } from '@/lib/sessions'
 import { type parseCatalogSkillId,type SkillsViewMode } from '@/lib/skills-catalog'
 
 export type AppShellProps = {
@@ -44,7 +44,7 @@ export type AppShellProps = {
   backendUrl: string
   projects: AgentProject[]
   activeProjectId: string | null
-  sections: ReturnType<typeof groupSessions>
+  sections: TabItemSection[]
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
   chatBySessionId: Record<string, SessionChatState>
@@ -165,7 +165,7 @@ export type AppShellProps = {
   refreshSessionSandbox: DashboardMainViewsProps['refreshSessionSandbox']
   togglePinProject: DashboardMainViewsProps['togglePinProject']
   deleteProject: DashboardMainViewsProps['deleteProject']
-  openTabs: AgentSession[]
+  openTabs: TabItem[]
   openTabIds: string[]
   session: AgentSession | null
   closeSessionTab: (sessionId: string) => void

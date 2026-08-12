@@ -128,7 +128,7 @@ export type AppShellMainProps = {
   setNewProjectOpen: (value: boolean | ((current: boolean) => boolean)) => void
   setProjectScopeId: (value: string | null | ((current: string | null) => string | null)) => void
   createSession: CreateDraftSession
-  openTabs: AgentSession[]
+  openTabs: import('@/lib/sessions').TabItem[]
   openTabIds: string[]
   sessionId: string | null
   session: AgentSession | null

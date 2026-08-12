@@ -52,7 +52,7 @@ export type AgentSessionMainPanelProps = {
   navigate: NavigateFunction
   sidebarCollapsed: boolean
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>
-  openTabs: AgentSession[]
+  openTabs: import('@/lib/sessions').TabItem[]
   openTabIds: string[]
   sessionId: string | null
   session: AgentSession | null
@@ -320,7 +320,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
       <SessionMainHeader
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
-        openTabs={openTabs}
+        openTabs={openTabs
+          .filter((item): item is Extract<typeof item, { kind: 'chat' }> => item.kind === 'chat')
+          .map(item => item.session)}
         openTabIds={openTabIds}
         sessionId={sessionId}
         session={session}
@@ -415,6 +417,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                     Boolean(chatSession) &&
                     !isDraftAgentSessionId(chatId),
                   onExport: target => void exportTranscript(target),
+                  onRename: target => openRenameDialog(target),
                   onInspect: target =>
                     navigate(`/agents/${target.id}?inspect=1`),
                   onArchive: target =>

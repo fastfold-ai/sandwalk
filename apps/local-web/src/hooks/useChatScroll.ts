@@ -19,6 +19,16 @@ type SessionScrollMemory = {
 }
 
 const NEAR_BOTTOM_PX = 96
+/*
+ * Umbral chico para detectar "el usuario está PEGADO al bottom".
+ * Diferente de `NEAR_BOTTOM_PX` que gobierna sticky-on-content (SSE) y el
+ * botón scroll-to-bottom. Este solo lo usa el ResizeObserver para decidir
+ * si mantener al usuario al bottom cuando el viewport SE ACHICA sin llegar
+ * contenido nuevo (típico en split view: el composer aparece al recuperar
+ * focus y sube el padding-bottom del transcript). Si estaba dentro de
+ * 24 px del bottom real ANTES del resize, seguimos ahí después.
+ */
+const PINNED_TO_BOTTOM_PX = 24
 
 function getChatViewport(root: HTMLElement | null) {
   if (!root) return null
@@ -46,6 +56,13 @@ export function useChatScroll({
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const memoryRef = useRef<Record<string, SessionScrollMemory>>({})
   const stickToBottomRef = useRef(true)
+  /*
+   * `pinnedToBottomRef` refleja "distance < PINNED_TO_BOTTOM_PX" al último
+   * scroll event conocido. El ResizeObserver lo consulta cuando el viewport
+   * se achica sin contenido nuevo (padding grew) para saber si el usuario
+   * estaba REALMENTE pegado al bottom antes del resize.
+   */
+  const pinnedToBottomRef = useRef(true)
   const activeSessionRef = useRef<string | null>(null)
   const appliedForRef = useRef<string | null>(null)
 
@@ -56,6 +73,7 @@ export function useChatScroll({
     const distance = distanceFromBottom(viewport)
     const stick = distance < NEAR_BOTTOM_PX
     stickToBottomRef.current = stick
+    pinnedToBottomRef.current = distance <= PINNED_TO_BOTTOM_PX
     memoryRef.current[id] = {
       stickToBottom: stick,
       scrollTop: viewport.scrollTop
@@ -148,15 +166,64 @@ export function useChatScroll({
 
     rememberActive()
     viewport.addEventListener('scroll', rememberActive, { passive: true })
+    /*
+     * El observer distingue tres causas de resize:
+     *
+     *   1. `scrollHeight` creció → llegó contenido nuevo (SSE, mensaje
+     *      recién enviado, tool card expandida). Si el usuario estaba
+     *      sticky (dentro de `NEAR_BOTTOM_PX`), mantenemos su vista al fondo.
+     *   2. `clientHeight` se ACHICÓ sin content growth → cambio de layout
+     *      externo que come espacio abajo (típico: composer aparece en
+     *      split view al recuperar focus, sube el padding-bottom). Si el
+     *      usuario estaba PEGADO al bottom real (dentro de
+     *      `PINNED_TO_BOTTOM_PX` = 24 px, medido justo antes del resize
+     *      vía `pinnedToBottomRef`), lo mantenemos ahí — así el composer
+     *      entrante no le tapa los últimos mensajes. Si no estaba pegado,
+     *      respetamos su posición.
+     *   3. Cualquier otro caso (viewport creció, o cero cambios) → solo
+     *      refrescamos la memoria.
+     *
+     * Sin este split, cualquier cambio de padding disparaba
+     * `scrollChatToBottom` si el usuario estaba dentro de `NEAR_BOTTOM_PX`
+     * (96 px), y en split view veíamos un "mini scroll" cada vez que se
+     * cambiaba el focus aunque el usuario estuviera leyendo un mensaje
+     * reciente pero no pegado al fondo.
+     */
+    const lastScrollHeightRef = { current: viewport.scrollHeight }
+    const lastClientHeightRef = { current: viewport.clientHeight }
+    /*
+     * Debounce del observer vía `requestAnimationFrame`: durante una
+     * transición de padding (~300 ms en split view) el ResizeObserver
+     * puede dispararse ~18 veces (una por frame). Con este dedup se
+     * procesa como máximo una vez por frame; si el navegador nos
+     * saltea frames por carga, se procesa el próximo. Efecto: menos
+     * trabajo redundante en cada `layout tick`, misma UX final.
+     */
+    let rafId: number | null = null
     const observer = new ResizeObserver(() => {
-      if (
-        activeSessionRef.current === sessionId &&
-        stickToBottomRef.current
-      ) {
-        scrollChatToBottom()
-      } else {
+      if (rafId != null) return
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null
+        if (activeSessionRef.current !== sessionId) return
+        const currentScrollHeight = viewport.scrollHeight
+        const currentClientHeight = viewport.clientHeight
+        const contentGrew = currentScrollHeight > lastScrollHeightRef.current
+        const viewportShrunk =
+          currentClientHeight < lastClientHeightRef.current
+        lastScrollHeightRef.current = currentScrollHeight
+        lastClientHeightRef.current = currentClientHeight
+
+        if (contentGrew) {
+          if (stickToBottomRef.current) scrollChatToBottom()
+          else rememberActive()
+          return
+        }
+        if (viewportShrunk && pinnedToBottomRef.current) {
+          scrollChatToBottom()
+          return
+        }
         rememberActive()
-      }
+      })
     })
     observer.observe(viewport)
     const content = viewport.firstElementChild
@@ -166,6 +233,10 @@ export function useChatScroll({
       rememberActive()
       viewport.removeEventListener('scroll', rememberActive)
       observer.disconnect()
+      if (rafId != null) {
+        window.cancelAnimationFrame(rafId)
+        rafId = null
+      }
     }
   }, [
     conversationTimelineLength,

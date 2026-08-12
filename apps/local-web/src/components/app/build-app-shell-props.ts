@@ -1,4 +1,3 @@
-import type { AgentSession } from '@sandwalk/agent-ui-core'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
 import type { TranscriptEntry } from '@/components/agents/transcript'
@@ -13,7 +12,7 @@ import type { useChatScroll } from '@/hooks/useChatScroll'
 import type { useSessionActions } from '@/hooks/useSessionActions'
 import type { useSessionChatState } from '@/hooks/useSessionChatState'
 import type { useSessionSandbox } from '@/hooks/useSessionSandbox'
-import type { groupSessions } from '@/lib/sessions'
+import type { TabItem, TabItemSection } from '@/lib/sessions'
 
 type AppShellBridgeInput = {
   ui: ReturnType<typeof useAppUiState>
@@ -35,8 +34,8 @@ type AppShellBridgeInput = {
   scroll: ReturnType<typeof useChatScroll>
   location: Location
   navigate: NavigateFunction
-  sections: ReturnType<typeof groupSessions>
-  openTabs: AgentSession[]
+  sections: TabItemSection[]
+  openTabs: TabItem[]
   openTabIds: string[]
   orderedVisibleSessionIds: string[]
   showSessionTabs: boolean

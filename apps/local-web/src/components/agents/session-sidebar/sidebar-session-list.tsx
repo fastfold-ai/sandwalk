@@ -4,7 +4,8 @@ import {
   Check,
   ChevronDown,
   MoreHorizontal,
-  Pin
+  Pin,
+  X
 } from 'lucide-react'
 import {
   type Dispatch,
@@ -30,7 +31,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { navigateToSession } from '@/lib/navigate-session'
-import { groupSessions, relativeTime, type SessionChatState } from '@/lib/sessions'
+import { relativeTime, type SessionChatState, type TabItemSection } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 /** Same Blue pastel as the tab color tag — marks unread notification sessions. */
@@ -145,7 +146,7 @@ function SidebarMarqueeTitle({ text }: { text: string }) {
   )
 }
 
-type SessionSection = ReturnType<typeof groupSessions>[number]
+type SessionSection = TabItemSection
 
 export type SidebarSessionListProps = {
   sections: SessionSection[]
@@ -174,6 +175,8 @@ export type SidebarSessionListProps = {
   exportTranscript: (target: AgentSession) => void | Promise<void>
   setDeleteTarget: Dispatch<SetStateAction<AgentSession | null>>
   onClearSessionSelection: () => void
+  onSelectTabGroup?: (groupId: string) => void
+  onDissolveTabGroup?: (groupId: string) => void
 }
 
 export function SidebarSessionList({
@@ -196,7 +199,9 @@ export function SidebarSessionList({
   openRenameDialog,
   updateSession,
   exportTranscript,
-  setDeleteTarget
+  setDeleteTarget,
+  onSelectTabGroup,
+  onDissolveTabGroup
 }: SidebarSessionListProps) {
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
@@ -309,6 +314,32 @@ export function SidebarSessionList({
                 {!collapsed ? (
                   <ul className="space-y-px">
                     {visibleItems.map(item => {
+                      if (item.kind === 'group') {
+                        return (
+                          <SidebarGroupItem
+                            key={item.id}
+                            group={item.group}
+                            chats={item.children}
+                            activeId={sessionId}
+                            chatBySessionId={chatBySessionId}
+                            tabColors={tabColors}
+                            selectedSessionIds={selectedSessionIds}
+                            attentionIds={attentionIds}
+                            onSelectGroup={onSelectTabGroup}
+                            onDissolveGroup={onDissolveTabGroup}
+                            onSelectChat={chatId => {
+                              setSelectionAnchorId(chatId)
+                              void navigateToSession({
+                                id: chatId,
+                                openSessionTab,
+                                prefetchSessionMessages,
+                                navigate
+                              })
+                            }}
+                          />
+                        )
+                      }
+                      const chat = item.session
                       const isSelected = selectedSessionIds.has(item.id)
                       const selecting = selectedSessionIds.size > 0
                       const tabColor = tabColors[item.id]
@@ -342,8 +373,8 @@ export function SidebarSessionList({
                                 )}
                                 aria-label={
                                   isSelected
-                                    ? `Deselect ${item.title || 'chat'}`
-                                    : `Select ${item.title || 'chat'}`
+                                    ? `Deselect ${chat.title || 'chat'}`
+                                    : `Select ${chat.title || 'chat'}`
                                 }
                                 aria-pressed={isSelected}
                                 onClick={(
@@ -369,12 +400,12 @@ export function SidebarSessionList({
                                 ) : selecting ? null : (
                                   <SessionStatusIcon
                                     status={
-                                      item.status === 'awaiting_approval' ||
+                                      chat.status === 'awaiting_approval' ||
                                       chatBySessionId[item.id]?.pendingApproval
                                         ? 'awaiting_approval'
                                         : chatBySessionId[item.id]?.runActive
                                           ? 'running'
-                                          : item.status
+                                          : chat.status
                                     }
                                   />
                                 )}
@@ -412,10 +443,10 @@ export function SidebarSessionList({
                                 }}
                               >
                               <SessionSourceIcon
-                                source={item.source}
-                                label={item.sourceLabel}
+                                source={chat.source}
+                                label={chat.sourceLabel}
                               />
-                              {item.organizeLabel === 'pinned' ? (
+                              {chat.organizeLabel === 'pinned' ? (
                                 <Pin className="text-muted-foreground/70 size-3 shrink-0" />
                               ) : null}
                               {attentionIds.has(item.id) ? (
@@ -433,7 +464,7 @@ export function SidebarSessionList({
                                 />
                               ) : null}
                               <SidebarMarqueeTitle
-                                text={item.title || 'Untitled'}
+                                text={chat.title || 'Untitled'}
                               />
                               </button>
                             </div>
@@ -447,7 +478,7 @@ export function SidebarSessionList({
                                 )}
                               >
                                 {relativeTime(
-                                  item.lastMessageAt || item.updatedAt
+                                  chat.lastMessageAt || chat.updatedAt
                                 )}
                               </span>
                               <Popover
@@ -475,25 +506,25 @@ export function SidebarSessionList({
                                   className="w-52 p-1.5"
                                 >
                                   <SessionActionsMenu
-                                    session={item}
+                                    session={chat}
                                     projects={projects}
                                     tabColor={tabColor || null}
                                     onRename={() => {
                                       setThreadMenuOpenId(null)
-                                      openRenameDialog(item)
+                                      openRenameDialog(chat)
                                     }}
                                     onTogglePin={() => {
                                       setThreadMenuOpenId(null)
-                                      void updateSession(item, {
+                                      void updateSession(chat, {
                                         organizeLabel:
-                                          item.organizeLabel === 'pinned'
+                                          chat.organizeLabel === 'pinned'
                                             ? null
                                             : 'pinned'
                                       })
                                     }}
                                     onMoveToProject={projectId => {
                                       setThreadMenuOpenId(null)
-                                      void updateSession(item, { projectId })
+                                      void updateSession(chat, { projectId })
                                     }}
                                     onSetTabColor={color => {
                                       setTabColor(item.id, color)
@@ -501,7 +532,7 @@ export function SidebarSessionList({
                                     }}
                                     onExport={() => {
                                       setThreadMenuOpenId(null)
-                                      void exportTranscript(item)
+                                      void exportTranscript(chat)
                                     }}
                                     onInspect={() => {
                                       setThreadMenuOpenId(null)
@@ -512,10 +543,10 @@ export function SidebarSessionList({
                                     onArchive={() => {
                                       setThreadMenuOpenId(null)
                                       const nextLabel =
-                                        item.organizeLabel === 'archive'
+                                        chat.organizeLabel === 'archive'
                                           ? null
                                           : 'archive'
-                                      void updateSession(item, {
+                                      void updateSession(chat, {
                                         organizeLabel: nextLabel
                                       })
                                       if (nextLabel === 'archive') {
@@ -529,7 +560,7 @@ export function SidebarSessionList({
                                     }}
                                     onDelete={() => {
                                       setThreadMenuOpenId(null)
-                                      setDeleteTarget(item)
+                                      setDeleteTarget(chat)
                                     }}
                                   />
                                 </PopoverContent>
@@ -567,5 +598,169 @@ export function SidebarSessionList({
         )}
       </div>
     </ScrollArea>
+  )
+}
+
+/**
+ * Item de grupo de split view en el sidebar. Se pinta como una fila con
+ * chevron collapsible; los chats hijos aparecen anidados debajo con una
+ * indent y una línea vertical sutil (Arc/Notion style). La memoria de
+ * expand/collapse es local — cada grupo recuerda si está abierto o
+ * cerrado durante la vida del componente.
+ */
+function SidebarGroupItem({
+  group,
+  chats,
+  activeId,
+  chatBySessionId,
+  tabColors,
+  selectedSessionIds,
+  attentionIds,
+  onSelectGroup,
+  onDissolveGroup,
+  onSelectChat
+}: {
+  group: import('@sandwalk/agent-ui-core').SessionGroup
+  chats: AgentSession[]
+  activeId: string | null
+  chatBySessionId: Record<string, SessionChatState>
+  tabColors: Record<string, string>
+  selectedSessionIds: Set<string>
+  attentionIds: ReadonlySet<string>
+  onSelectGroup?: (groupId: string) => void
+  onDissolveGroup?: (groupId: string) => void
+  onSelectChat: (chatId: string) => void
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const label = group.name || `${group.chatIds.length} chats`
+  const groupActive = group.id === activeId
+  const activeInside = chats.some(chat => chat.id === activeId)
+
+  return (
+    <li>
+      <div
+        className={cn(
+          'hover:bg-sidebar-accent/45 group/gr grid grid-cols-[minmax(0,1fr)_2.5rem] items-center rounded-md px-2 py-1.5',
+          groupActive && 'bg-sidebar-accent/55'
+        )}
+      >
+        <div className="flex min-w-0 items-center gap-1">
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground -ml-1 grid size-4 shrink-0 place-items-center rounded"
+            aria-expanded={expanded}
+            aria-label={expanded ? 'Collapse group' : 'Expand group'}
+            onClick={event => {
+              event.stopPropagation()
+              setExpanded(v => !v)
+            }}
+          >
+            <ChevronDown
+              className={cn(
+                'size-3.5 transition-transform',
+                !expanded && '-rotate-90'
+              )}
+            />
+          </button>
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+            onClick={() => onSelectGroup?.(group.id)}
+          >
+            <span className="flex size-4 shrink-0 items-center justify-center">
+              <svg
+                viewBox="0 0 24 24"
+                className="size-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="3" y="4" width="7" height="16" rx="1" />
+                <rect x="14" y="4" width="7" height="16" rx="1" />
+              </svg>
+            </span>
+            {group.color ? (
+              <span
+                className="size-2 shrink-0 rounded-full border border-black/10"
+                style={{ backgroundColor: group.color }}
+                aria-hidden
+              />
+            ) : null}
+            <SidebarMarqueeTitle text={label} />
+            <span className="bg-black/10 text-foreground/70 dark:bg-white/15 shrink-0 rounded-md px-1 text-[10px] font-semibold tabular-nums leading-none">
+              {group.chatIds.length}
+            </span>
+          </button>
+        </div>
+        {onDissolveGroup ? (
+          <button
+            type="button"
+            aria-label={`Dissolve group ${label}`}
+            className="text-muted-foreground hover:text-foreground justify-self-end opacity-0 transition-opacity group-hover/gr:opacity-100"
+            onClick={event => {
+              event.stopPropagation()
+              onDissolveGroup(group.id)
+            }}
+          >
+            <X className="size-3.5" />
+          </button>
+        ) : null}
+      </div>
+      {expanded ? (
+        <ul
+          className={cn(
+            'border-border/40 ml-3 mt-0.5 space-y-px border-l pl-2',
+            (groupActive || activeInside) && 'border-border/70'
+          )}
+        >
+          {chats.map(chat => {
+            const active = chat.id === activeId
+            const isSelected = selectedSessionIds.has(chat.id)
+            const tabColor = tabColors[chat.id]
+            return (
+              <li key={chat.id}>
+                <button
+                  type="button"
+                  className={cn(
+                    'hover:bg-sidebar-accent/45 flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-left text-[12.5px]',
+                    active && !isSelected && 'bg-sidebar-accent/55',
+                    isSelected && 'bg-sidebar-accent'
+                  )}
+                  onClick={() => onSelectChat(chat.id)}
+                >
+                  <span className="grid size-3.5 shrink-0 place-items-center">
+                    <SessionStatusIcon
+                      status={
+                        chat.status === 'awaiting_approval' ||
+                        chatBySessionId[chat.id]?.pendingApproval
+                          ? 'awaiting_approval'
+                          : chatBySessionId[chat.id]?.runActive
+                            ? 'running'
+                            : chat.status
+                      }
+                    />
+                  </span>
+                  {attentionIds.has(chat.id) ? (
+                    <span
+                      className="size-1.5 shrink-0 rounded-full border border-black/10"
+                      style={{ backgroundColor: UNREAD_DOT_COLOR }}
+                      aria-label="Unread"
+                    />
+                  ) : null}
+                  {tabColor ? (
+                    <span
+                      className="size-1.5 shrink-0 rounded-full border border-black/10"
+                      style={{ backgroundColor: tabColor }}
+                      aria-hidden
+                    />
+                  ) : null}
+                  <SidebarMarqueeTitle text={chat.title || 'Untitled'} />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+    </li>
   )
 }

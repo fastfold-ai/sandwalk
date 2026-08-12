@@ -17,7 +17,7 @@ import { ShellNavStrip } from '@/components/ShellNavStrip'
 import { ResizablePanel } from '@/components/ui/resizable'
 import { useSidebarPixelWidth } from '@/hooks/useSidebarPixelWidth'
 import type { CreateDraftSession } from '@/lib/draft-agent'
-import { groupSessions, type SessionChatState } from '@/lib/sessions'
+import { type SessionChatState, type TabItemSection } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 export type AppShellSidebarProps = {
@@ -35,7 +35,7 @@ export type AppShellSidebarProps = {
   backendUrl: string
   projects: AgentProject[]
   activeProjectId: string | null
-  sections: ReturnType<typeof groupSessions>
+  sections: TabItemSection[]
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
   chatBySessionId: Record<string, SessionChatState>
@@ -68,7 +68,6 @@ export type AppShellSidebarProps = {
   ) => void
   onBatchSplitView?: () => void
   canBatchSplitView?: boolean
-  tabGroups?: import('@sandwalk/agent-ui-core').SessionGroup[]
   onSelectTabGroup?: (groupId: string) => void
   onDissolveTabGroup?: (groupId: string) => void
   setCollapsedSidebarSections: (
@@ -140,7 +139,6 @@ export function AppShellSidebar({
   setBatchDeletePending,
   onBatchSplitView,
   canBatchSplitView,
-  tabGroups,
   onSelectTabGroup,
   onDissolveTabGroup,
   setCollapsedSidebarSections,
@@ -236,7 +234,6 @@ export function AppShellSidebar({
             onBatchDeletePending={() => setBatchDeletePending(true)}
             onBatchSplitView={onBatchSplitView}
             canBatchSplitView={canBatchSplitView}
-            tabGroups={tabGroups}
             onSelectTabGroup={onSelectTabGroup}
             onDissolveTabGroup={onDissolveTabGroup}
             setCollapsedSidebarSections={setCollapsedSidebarSections}

@@ -107,8 +107,15 @@ export function SessionChatMount({
       selectAllProjects={shared.selectAllProjects}
       selectProjectScope={shared.selectProjectScope}
       updateSession={shared.updateSession}
-      chatScrollRef={shared.chatScrollRef}
-      chatEndRef={shared.chatEndRef}
+      /*
+       * Refs del scroll PROPIOS de cada mount (`perSession.scroll.*`) —
+       * NO los del shell. Con N paneles, si todos escribieran al mismo
+       * ref del shell, React solo conservaría el último — el "sticky
+       * bottom" y el botón scroll-to-bottom apuntarían a un panel al
+       * azar en vez de al que los originó.
+       */
+      chatScrollRef={perSession.scroll.chatScrollRef}
+      chatEndRef={perSession.scroll.chatEndRef}
       conversationTimeline={conversationTimeline}
       expandedToolRunKeys={shared.expandedToolRunKeys}
       patchChat={shared.patchChat}
@@ -124,8 +131,8 @@ export function SessionChatMount({
       pendingApproval={chat.pendingApproval}
       approvalSubmitting={chat.approvalSubmitting}
       onSubmitApprovals={submitApprovals}
-      showScrollToBottom={shared.showScrollToBottom}
-      scrollChatToBottom={shared.scrollChatToBottom}
+      showScrollToBottom={perSession.scroll.showScrollToBottom}
+      scrollChatToBottom={perSession.scroll.scrollChatToBottom}
       setFilesPanelCollapsed={perSessionArgs.setFilesPanelCollapsed}
       setPendingOpenPath={perSessionArgs.setPendingOpenPath}
       error={shared.error}

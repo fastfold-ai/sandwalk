@@ -1,16 +1,25 @@
 import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import {
   Archive,
+  ChevronDown,
   CircleX,
   Download,
   Folder,
   MoreVertical,
+  Pencil,
   Search,
   Terminal,
   Trash2,
   X
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+import { ProjectMark } from '@/components/agents/ProjectMark'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover'
 
 import {
   DropdownMenu,
@@ -73,6 +82,7 @@ export type ChatSplitPanelHeaderProps = {
   showCli: boolean
   onExport?: (session: AgentSession) => void | Promise<void>
   // Ellipsis
+  onRename?: (session: AgentSession) => void
   onInspect?: (session: AgentSession) => void
   onArchive?: (session: AgentSession) => void | Promise<void>
   onClose?: (sessionId: string) => void
@@ -85,7 +95,7 @@ export function ChatSplitPanelHeader({
   focused,
   onFocusPanel,
   projects,
-  onSelectProjectScope,
+  onSelectProjectScope: _onSelectProjectScope,
   showFiles,
   showTerminal,
   showPreview,
@@ -97,6 +107,7 @@ export function ChatSplitPanelHeader({
   onOpenPreview,
   showCli,
   onExport,
+  onRename,
   onInspect,
   onArchive,
   onClose,
@@ -122,7 +133,7 @@ export function ChatSplitPanelHeader({
   return (
     <div
       className={cn(
-        'flex h-10 shrink-0 items-center gap-2 border-b px-3 text-[12px] transition-colors',
+        'flex h-[52px] shrink-0 items-center gap-2 border-b px-3 text-[12px] transition-colors',
         focused
           ? 'bg-muted/60 border-border/60 text-foreground'
           : 'bg-muted/25 border-border/30 text-muted-foreground'
@@ -141,25 +152,13 @@ export function ChatSplitPanelHeader({
           />
         ) : null}
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span
-            className={cn(
-              'truncate text-[13px]',
-              focused ? 'font-medium' : 'font-normal'
-            )}
-          >
+          <span className="truncate text-[13px] font-medium">
             {title}
           </span>
-          {project ? (
-            <button
-              type="button"
-              onClick={() => onSelectProjectScope(project.id)}
-              className="text-muted-foreground hover:text-foreground -ml-0.5 mt-0.5 inline-flex w-fit max-w-full items-center gap-1 truncate rounded-sm text-[11px] transition-colors"
-              title={project.name}
-            >
-              <Folder className="size-3 shrink-0" aria-hidden />
-              <span className="truncate">{project.name}</span>
-            </button>
-          ) : null}
+          {/* Proyecto: solo lectura + popover en hover con la ficha
+              del proyecto. `onSelectProjectScope` queda en la firma por
+              compatibilidad con el shell — se limpia cuando iteremos. */}
+          <ProjectMetaHover project={project} />
         </div>
       </div>
 
@@ -278,6 +277,15 @@ export function ChatSplitPanelHeader({
                 className="w-56 p-1"
                 onCloseAutoFocus={event => event.preventDefault()}
               >
+                {onRename ? (
+                  <DropdownMenuItem
+                    className="gap-2 text-[13px]"
+                    onSelect={() => onRename(session)}
+                  >
+                    <Pencil className="size-3.5" />
+                    Rename…
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenu open={colorOpen} onOpenChange={setColorOpen}>
                   <div className="px-2 py-1.5">
                     <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">
@@ -358,6 +366,298 @@ export function ChatSplitPanelHeader({
       </TooltipProvider>
     </div>
   )
+}
+
+/**
+ * Chip apagado con el proyecto del chat + ficha informativa al hover.
+ * Ya no navega: es texto de contexto puro. El hover abre una ficha
+ * organizada por secciones (nombre + icono al tope, luego descripción,
+ * carpeta local, contexto del agente, y metadata en el pie). Las
+ * secciones vacías desaparecen — solo se muestra lo que el proyecto
+ * tiene configurado. Cuando el chat no tiene proyecto asociado, se
+ * muestra un fallback discreto con su propia explicación.
+ */
+function ProjectMetaHover({ project }: { project: AgentProject | null }) {
+  /*
+   * Popover con hover-para-abrir + click-para-pinnear.
+   *
+   * Comportamiento:
+   *   - Hover sobre el chip abre la ficha con 300 ms de delay.
+   *   - Sacar el mouse sin interactuar cierra con 120 ms de delay.
+   *   - Cualquier click DENTRO del popover (Ver más/menos, botones, etc.)
+   *     lo pinnea: a partir de ahí ya no cierra por hover leave.
+   *   - Solo cierra por click fuera (onPointerDownOutside del Popover),
+   *     lo cual también resetea el pin.
+   *
+   * `HoverCard` no servía porque cerraba al colapsar el contenido
+   * (mouse queda fuera del popover recién achicado). Este patrón es el
+   * mismo que usa GitHub con las user cards y Linear con los previews.
+   */
+  const [open, setOpen] = useState(false)
+  const [pinned, setPinned] = useState(false)
+  const openTimerRef = useRef<number | null>(null)
+  const closeTimerRef = useRef<number | null>(null)
+
+  const clearTimers = () => {
+    if (openTimerRef.current != null) {
+      window.clearTimeout(openTimerRef.current)
+      openTimerRef.current = null
+    }
+    if (closeTimerRef.current != null) {
+      window.clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }
+  useEffect(() => () => clearTimers(), [])
+
+  const scheduleOpen = () => {
+    clearTimers()
+    openTimerRef.current = window.setTimeout(() => setOpen(true), 300)
+  }
+  const scheduleClose = () => {
+    if (pinned) return
+    clearTimers()
+    closeTimerRef.current = window.setTimeout(() => setOpen(false), 120)
+  }
+  const cancelClose = () => {
+    if (closeTimerRef.current != null) {
+      window.clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={next => {
+        if (!next) {
+          setOpen(false)
+          setPinned(false)
+        } else {
+          setOpen(true)
+        }
+      }}
+    >
+      <PopoverTrigger asChild>
+        {project ? (
+          <span
+            className="text-muted-foreground hover:text-foreground -mx-1 mt-0.5 inline-flex w-fit max-w-full cursor-default items-center gap-1.5 truncate rounded-md px-1 py-0.5 text-[11px] transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
+            onMouseEnter={scheduleOpen}
+            onMouseLeave={scheduleClose}
+          >
+            <ProjectMark
+              icon={project.icon}
+              color={project.color}
+              className="size-4"
+              iconClassName="size-2.5"
+            />
+            <span className="truncate">{project.name}</span>
+          </span>
+        ) : (
+          <span
+            className="text-muted-foreground/70 hover:text-muted-foreground -mx-1 mt-0.5 inline-flex w-fit max-w-full cursor-default items-center gap-1 rounded-md px-1 py-0.5 text-[11px] italic transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
+            onMouseEnter={scheduleOpen}
+            onMouseLeave={scheduleClose}
+          >
+            Sin proyecto asociado
+          </span>
+        )}
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        sideOffset={8}
+        className="bg-popover text-popover-foreground flex max-h-[480px] w-[340px] max-w-[92vw] flex-col overflow-hidden rounded-xl border p-0 shadow-lg"
+        onOpenAutoFocus={event => event.preventDefault()}
+        onMouseEnter={cancelClose}
+        onMouseLeave={scheduleClose}
+        onClick={() => setPinned(true)}
+      >
+        {project ? (
+          <ProjectFicha project={project} />
+        ) : (
+          <NoProjectFicha />
+        )}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function ProjectFicha({ project }: { project: AgentProject }) {
+  /*
+   * Layout de 3 zonas:
+   *   - Header fijo arriba (icono + nombre, hasta 3 líneas).
+   *   - Zona central con `overflow-y-auto` — todas las secciones scrollean
+   *     juntas si la ficha excede los 480px del popover.
+   *   - Footer fijo abajo (metadata en muted). Nunca se pierde al scrollear.
+   * Descripción y contexto se colapsan a 3 líneas por default con "Ver más".
+   */
+  return (
+    <>
+      {/* Header fijo */}
+      <div className="flex shrink-0 items-start gap-3 p-4">
+        <ProjectMark
+          icon={project.icon}
+          color={project.color}
+          className="size-10 shrink-0"
+          iconClassName="size-4"
+        />
+        <div className="min-w-0 flex-1">
+          <h3 className="text-foreground line-clamp-3 text-[14px] font-semibold leading-snug">
+            {project.name}
+          </h3>
+        </div>
+      </div>
+
+      {/* Zona scrolleable */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {project.description ? (
+          <FichaSection title="Descripción">
+            <CollapsibleText text={project.description} />
+          </FichaSection>
+        ) : null}
+
+        {project.folderPath ? (
+          <FichaSection title="Carpeta local">
+            <p
+              className="text-foreground/90 break-all font-mono text-[11.5px] leading-relaxed"
+              title={project.folderPath}
+            >
+              {project.folderPath}
+            </p>
+          </FichaSection>
+        ) : null}
+
+        {project.agentContext ? (
+          <FichaSection title="Contexto para el agente">
+            <CollapsibleText text={project.agentContext} />
+          </FichaSection>
+        ) : null}
+      </div>
+
+      {/* Footer fijo */}
+      <div className="border-border/60 text-muted-foreground/80 shrink-0 border-t px-4 py-2.5 text-[11px]">
+        {formatSessionCount(project.sessionCount)}
+        {project.createdAt ? (
+          <>
+            {' · creado '}
+            {formatCreatedAt(project.createdAt)}
+          </>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
+/**
+ * Bloque de texto colapsable a 3 líneas con toggle "Ver más / Ver menos".
+ * El toggle solo aparece cuando el texto realmente pasa de 3 líneas —
+ * comparamos `scrollHeight` vs `clientHeight` en modo colapsado con un
+ * ResizeObserver por si el ancho del popover cambia.
+ */
+function CollapsibleText({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const [overflows, setOverflows] = useState(false)
+  const ref = useRef<HTMLParagraphElement | null>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      if (expanded) return
+      setOverflows(el.scrollHeight - el.clientHeight > 1)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [text, expanded])
+
+  return (
+    <div>
+      <p
+        ref={ref}
+        className={cn(
+          'text-foreground/90 whitespace-pre-wrap text-[12px] leading-relaxed',
+          !expanded && 'line-clamp-3'
+        )}
+      >
+        {text}
+      </p>
+      {overflows || expanded ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="text-muted-foreground hover:text-foreground mt-1 inline-flex items-center gap-1 text-[11px] font-medium"
+        >
+          {expanded ? (
+            <>
+              <ChevronDown className="size-3 rotate-180" aria-hidden />
+              Ver menos
+            </>
+          ) : (
+            <>
+              <ChevronDown className="-rotate-90 size-3" aria-hidden />
+              Ver más
+            </>
+          )}
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+function NoProjectFicha() {
+  return (
+    <div className="flex items-start gap-3 p-4">
+      <span className="bg-muted text-muted-foreground inline-flex size-10 shrink-0 items-center justify-center rounded-md">
+        <Folder className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-foreground text-[13px] font-semibold">
+          Sin proyecto asociado
+        </h3>
+        <p className="text-muted-foreground mt-1 text-[12px] leading-relaxed">
+          Este chat no está vinculado a ningún proyecto. Podés asociarlo
+          desde el selector de proyecto del composer.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function FichaSection({
+  title,
+  children
+}: {
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="border-border/60 border-t px-4 py-3">
+      <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-wider">
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function formatSessionCount(count: number): string {
+  if (count === 0) return 'Sin chats'
+  if (count === 1) return '1 chat'
+  return `${count} chats`
+}
+
+function formatCreatedAt(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('es-ES', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
 }
 
 function IconBtn({
