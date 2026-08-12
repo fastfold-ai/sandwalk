@@ -60,7 +60,7 @@ jobs:
           uv pip install --reinstall dist/*.whl
           uv run sandwalk --version
 
-  # ── Pytest: 4 matrix shards × xdist (8 oversubscribed free GHA runners) ───
+  # ── Pytest: 4 matrix shards × xdist workers ───────────────────────────────
   agent-cli-tests:
     name: Agent CLI tests (${{ matrix.group }}/4)
     runs-on: ubuntu-latest
@@ -91,11 +91,10 @@ jobs:
           # Opt-in lanes (network / live chat / Modal / data smoke / pexpect)
           # are auto-deselected in tests/conftest.py unless their env gate is set.
           # Coverage gates run in agent-cli-coverage after shards combine.
-          # .test_durations keeps least_duration splits balanced across groups.
+          # Equal-count splits (no .test_durations): local Mac timings mis-rank
+          # CI+coverage cost and made least_duration shards much slower.
           uv run pytest tests/ -q \
             --splits 4 --group ${{ matrix.group }} \
-            --splitting-algorithm least_duration \
-            --durations-path=.test_durations \
             -n auto \
             --dist worksteal \
             --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models \
