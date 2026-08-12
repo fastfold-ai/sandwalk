@@ -6,7 +6,13 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::menu::{MenuBuilder, MenuEvent, PredefinedMenuItem, SubmenuBuilder};
+use tauri::image::Image;
+use tauri::menu::{
+    AboutMetadata, MenuBuilder, MenuEvent, PredefinedMenuItem, SubmenuBuilder,
+};
+
+/// Default dark Dock tile (1024×1024 squircle + border) — same asset as dark theme.
+static ABOUT_ICON_PNG: &[u8] = include_bytes!("../icons/dock/dock-dark.png");
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const MAX_RECENTS: usize = 12;
@@ -990,9 +996,26 @@ pub fn install_app_menu(app: &AppHandle) -> Result<(), String> {
 
     // First submenu becomes the macOS app menu (named "Sandwalk" by the OS).
     // Without this, File is absorbed and disappears from the menu bar.
+    // Native About panel (orderFrontStandardAboutPanel) — same window chrome
+    // Unsloth uses (traffic lights), not an in-webview modal.
+    let about_icon = Image::from_bytes(ABOUT_ICON_PNG)
+        .ok()
+        .or_else(|| app.default_window_icon().cloned());
+    // ApplicationVersion shows as the main line; Version (build) is the
+    // parenthetical. Leaving short_version unset falls back to Info.plist
+    // CFBundleVersion and duplicates the same number — pass "" to hide it.
+    let about = AboutMetadata {
+        name: Some("Sandwalk".into()),
+        version: Some(format!("Version {}", env!("CARGO_PKG_VERSION"))),
+        short_version: Some(String::new()),
+        copyright: Some("© 2026 Fastfold AI Labs. All rights reserved.".into()),
+        authors: Some(vec!["Fastfold AI Labs".into()]),
+        icon: about_icon,
+        ..Default::default()
+    };
     let app_menu = SubmenuBuilder::new(app, "Sandwalk")
         .item(
-            &PredefinedMenuItem::about(app, Some("Sandwalk"), None)
+            &PredefinedMenuItem::about(app, Some("About Sandwalk"), Some(about))
                 .map_err(|e| e.to_string())?,
         )
         .text("check-updates", "Check for Updates…")

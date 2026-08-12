@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sandwalk"
-version = "0.0.1"
+version = "0.0.2"
 description = "Sandwalk — a thinking path for open science"
 readme = "README.md"
 license = "Apache-2.0"

@@ -5,39 +5,51 @@
     <img alt="sandwalk" src="images/sandwalk-logo-light.svg" height="64" style="max-width:100%;">
   </picture></a>
 </h1>
-<h3 align="center" style="margin: 0; margin-top: 0.5rem;">
-A thinking path for open science.
-</h3>
+<p align="center"><b>Sandwalk is a self-hosted science agent for researchers.</b></p>
 
 <p align="center">
-  <a href="https://github.com/fastfold-ai/sandwalk/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fastfold-ai/sandwalk/ci.yml?branch=main&label=CI&logo=github" alt="CI status" /></a>
-  <a href="https://codecov.io/gh/fastfold-ai/sandwalk"><img src="https://img.shields.io/codecov/c/github/fastfold-ai/sandwalk?branch=main&logo=codecov&label=coverage" alt="Codecov coverage" /></a>
-</p>
-
-<p align="center">
+  <a href="#-get-started">Get started</a> •
   <a href="#features">Features</a> •
-  <a href="#install">Install</a> •
   <a href="#quickstart">Quickstart</a> •
-  <a href="#web-dashboard">Web Dashboard</a> •
-  <a href="#usage">Usage</a> •
-  <a href="#documentation">Documentation</a> •
-  <a href="#contributing--from-source">Contributing / from source</a>
+  <a href="#documentation">Documentation</a>
 </p>
-<br>
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="images/showcase-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="images/showcase-light.png">
-    <img alt="sandwalk dashboard: chat, structure viewers, skills, and terminal" src="images/showcase-light.png" style="max-width:100%; border-radius:8px;">
-  </picture>
-</p>
-<br>
 
-**sandwalk** is a self-hosted science agent for researchers. Ask a question, attach files, install skills, and let the agent walk the research path with you: multi-step workflows, sandboxes, and results in one place. Built for biology and drug discovery, and happy to stretch beyond them.
+## ⚡ Get started
 
-Use the CLI, the web dashboard, or the macOS desktop app: same sessions, workspace, and history. On Mac, **Sandwalk.app** is the client UI and a nested **Sandwalk Server** menubar helper keeps the agent warm. Run on your machine by default; send heavy jobs to cloud GPUs when you need them.
+Download the native Sandwalk Desktop app for your operating system:
+
+| Platform | Link |
+|----------|------|
+| macOS (Apple Silicon) | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) |
+
+Download from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases).
+
+Open **Sandwalk.app** — the nested menubar helper starts the agent and installs a `sandwalk` command into `~/.local/bin` (open a new terminal, then `sandwalk --version`). Same sessions as the CLI and web dashboard.
+
+If you already installed the CLI via curl/uv, that install is left alone (the app does not overwrite it).
+
+### Or if you prefer to install the CLI manually
+
+#### macOS, Linux
+
+```bash
+curl -fsSL https://sandwalk.sh/install | bash
+sandwalk --version
+```
+
+This installs the **Python CLI only** (via uv / pipx / pip). It does **not** download or install `Sandwalk.app` — use the Desktop DMG above for the native Mac app.
+
+Tracks the latest **stable** [GitHub Release](https://github.com/fastfold-ai/sandwalk/releases). For pre-releases:
+
+```bash
+curl -fsSL https://sandwalk.sh/install | bash -s -- --pre
+```
+
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/) (or pipx / pip).
 
 ## Features
+
+**sandwalk** takes natural-language research questions, attaches files, installs skills, and runs multi-step workflows with sandboxes and results in one place. Built for biology and drug discovery; happy to stretch beyond them. CLI, web dashboard, and macOS desktop share the same sessions and workspace.
 
 - **CLI ↔ web**: one agent session, two surfaces (terminal and dashboard).
 - **Plan mode**: draft `plans/*.md` with todos and a Mermaid flowchart, then **Build** when ready.
@@ -65,94 +77,7 @@ We ship a curated toolkit out of the box (targets and genetics, chemistry, prote
 
 **MCP catalog** (seeded in Dashboard → MCPs): Tamarind Bio, Paperclip, Latch Bio, Neurosnap, plus Linear, Lucid, and any custom URL.
 
-## Install
-
-### CLI
-
-```bash
-curl -fsSL https://sandwalk.sh/install | bash
-sandwalk --version
-```
-
-Tracks the latest **stable** [GitHub Release](https://github.com/fastfold-ai/sandwalk/releases). For pre-releases:
-
-```bash
-curl -fsSL https://sandwalk.sh/install | bash -s -- --pre
-```
-
-Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/) (or pipx / pip). While the repo is private, GitHub auth is required (`gh auth login` or `GITHUB_TOKEN`).
-
-### Install from source
-
-Clone once, then pick **macOS** or **CLI + Web UI**.
-
-```bash
-git clone https://github.com/fastfold-ai/sandwalk.git
-cd sandwalk
-pnpm install
-```
-
-Prerequisites: [uv](https://docs.astral.sh/uv/), Python 3.11+, Node 20+, pnpm. For the macOS desktop build also: Xcode CLT and Rust (`rustup`).
-
-#### macOS
-
-| Piece | Role |
-|-------|------|
-| **Sandwalk.app** | Tauri desktop client (Dock / Launchpad) |
-| **Sandwalk Server** | Nested menubar helper (no Dock icon): Start / Stop / Restart, Server Settings |
-
-From the repo root after `pnpm install`.
-
-**1. Packaged Mac app** — build, install to `~/Applications`, and open (Apple Silicon, ad-hoc signed):
-
-```bash
-osascript -e 'quit app "Sandwalk"' 2>/dev/null || true
-pkill -x sandwalk-desktop 2>/dev/null || true
-INSTALL=1 pnpm --filter @sandwalk/agent-local-web package:dmg && open ~/Applications/Sandwalk.app
-```
-
-DMG also lands at `apps/packaging/dist/Sandwalk-<version>-macos-arm64.dmg`. Details: [`apps/packaging/README.md`](apps/packaging/README.md). Releases: [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases).
-
-**2. Tauri + agent server (hot reload)** — two terminals; Tauri does **not** start the API.
-
-```bash
-# Terminal 1 — agent API
-cd cli && uv sync && uv run sandwalk serve --host 127.0.0.1 --port 8787
-
-# Terminal 2 — Tauri desktop UI (hot reload) against that API
-pnpm --filter @sandwalk/agent-local-web tauri:dev
-```
-
-Optional menubar helper only: `cd apps/sandwalk-mac && ./scripts/package-app.sh && open ~/Applications/Sandwalk\ Server.app`.
-
-#### CLI + Web UI
-
-Use this when you want the terminal CLI and browser dashboard without the macOS desktop app.
-
-```bash
-# Terminal 1 — agent API (dashboard also on :8969 when configured)
-cd cli && uv sync && uv run sandwalk serve
-
-# Terminal 2 — Vite web UI (hot reload) against that API
-pnpm --filter @sandwalk/agent-local-web dev
-# → http://127.0.0.1:5173 (or the port Vite prints)
-```
-
-Point the UI at the API if needed (default `http://127.0.0.1:8787`). Optional science stacks: `uv sync --extra all` in `cli/`. Use `uv run sandwalk …` for CLI commands from this checkout.
-
 ## Quickstart
-
-### macOS desktop
-
-Launch **Sandwalk.app**. The nested menubar helper starts / stops the agent, **Open Sandwalk** focuses the client, and **Server Settings…** covers ports, auth, and process prefs. Closing the client window does not stop the agent — use **Quit Sandwalk Server** in the menu bar.
-
-<p align="center">
-  <img src="images/showcase-mac-app-1.png" alt="Sandwalk macOS menu bar" width="280" />
-  &nbsp;&nbsp;
-  <img src="images/showcase-mac-app-2.png" alt="Sandwalk macOS Settings status" width="420" />
-</p>
-
-### CLI
 
 ```bash
 sandwalk setup          # models, keys, skills
@@ -408,16 +333,39 @@ Apache License 2.0. Copyright © 2026 Fastfold AI Labs. See [LICENSE](LICENSE).
 
 ## Contributing / from source
 
-Monorepo: `cli/`, `apps/local-web/` (+ Tauri in `src-tauri/`), `apps/sandwalk-mac/`, `apps/packaging/`. Day-to-day use [Install](#install); to hack on the repo see [CONTRIBUTING.md](CONTRIBUTING.md).
+Monorepo: `cli/`, `apps/local-web/` (+ Tauri in `src-tauri/`), `apps/sandwalk-mac/`, `apps/packaging/`. Day-to-day use [Get started](#-get-started); to hack on the repo see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Prerequisites: [uv](https://docs.astral.sh/uv/), Python 3.11+, Node 20+, pnpm. For the macOS desktop build also: Xcode CLT and Rust (`rustup`).
 
 ```bash
+git clone https://github.com/fastfold-ai/sandwalk.git
+cd sandwalk
 pnpm install
 cd cli && uv sync && uv run sandwalk serve          # agent API (:8787)
 # another terminal:
 pnpm --filter @sandwalk/agent-local-web dev         # web UI (Vite)
 # optional science stacks:
 # cd cli && uv sync --extra all
-# macOS packaged app / Tauri+server one-liners: see Install → macOS above
+```
+
+**Packaged Mac app** (Apple Silicon, ad-hoc signed) — build, install to `~/Applications`, and open:
+
+```bash
+osascript -e 'quit app "Sandwalk"' 2>/dev/null || true
+pkill -x sandwalk-desktop 2>/dev/null || true
+INSTALL=1 pnpm --filter @sandwalk/agent-local-web package:dmg && open ~/Applications/Sandwalk.app
+```
+
+DMG lands at `apps/packaging/dist/Sandwalk-<version>-macos-arm64.dmg`. Details: [`apps/packaging/README.md`](apps/packaging/README.md).
+
+**Tauri + agent server (hot reload)** — two terminals; Tauri does **not** start the API:
+
+```bash
+# Terminal 1 — agent API
+cd cli && uv sync && uv run sandwalk serve --host 127.0.0.1 --port 8787
+
+# Terminal 2 — Tauri desktop UI
+pnpm --filter @sandwalk/agent-local-web tauri:dev
 ```
 
 `uv sync` installs the CLI, Local Sandbox, and agent server. `--extra all` adds chemistry / single-cell / ML / DuckDB.

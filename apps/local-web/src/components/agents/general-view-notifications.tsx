@@ -1,4 +1,5 @@
 import { Check, ChevronDown } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -65,111 +66,24 @@ function NotifyToggle({
   )
 }
 
-function CompletionModeRow({ mode }: { mode: NotifyCompletionMode }) {
-  const current =
-    NOTIFY_COMPLETION_OPTIONS.find(item => item.id === mode) ??
-    NOTIFY_COMPLETION_OPTIONS[1]
-  return (
-    <div className="border-border/70 flex items-center justify-between gap-3 rounded-xl border p-4">
-      <div>
-        <div className="text-sm font-medium">Completion notifications</div>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          Notify when an agent finishes or fails a run.
-        </p>
-      </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="border-border bg-card text-foreground focus-visible:ring-ring flex h-9 min-w-48 shrink-0 items-center justify-between gap-2 rounded-md border px-3 text-sm outline-none focus-visible:ring-1"
-          >
-            <span className="truncate">{current.label}</span>
-            <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          {NOTIFY_COMPLETION_OPTIONS.map(item => {
-            const selected = item.id === mode
-            return (
-              <DropdownMenuItem
-                key={item.id}
-                onSelect={() => applyNotifyCompletion(item.id)}
-                className={cn(selected && 'text-primary')}
-              >
-                <Check
-                  className={cn('size-3.5 shrink-0', !selected && 'invisible')}
-                />
-                <span className="truncate">{item.label}</span>
-              </DropdownMenuItem>
-            )
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  )
-}
-
-function ApprovalToggleRow({ enabled }: { enabled: boolean }) {
-  return (
-    <div className="border-border/70 flex items-center justify-between gap-3 rounded-xl border p-4">
-      <div>
-        <div className="text-sm font-medium">Permission notifications</div>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          Notify when an agent needs your approval (e.g. installing or removing
-          skills).
-        </p>
-      </div>
-      <NotifyToggle
-        enabled={enabled}
-        label="Permission notifications"
-        onToggle={() => applyNotifyApproval(!enabled)}
-      />
-    </div>
-  )
-}
-
-function MacPermissionRow({
-  permission,
-  requesting,
-  onEnable
+function SettingsRow({
+  label,
+  description,
+  children
 }: {
-  permission: 'granted' | 'denied' | 'default' | 'unsupported'
-  requesting: boolean
-  onEnable: () => void
+  label: string
+  description: string
+  children: ReactNode
 }) {
-  const statusLabel =
-    permission === 'granted'
-      ? 'Enabled'
-      : permission === 'denied'
-        ? 'Blocked in System Settings'
-        : permission === 'unsupported'
-          ? 'Unavailable'
-          : 'Not enabled'
-
   return (
-    <div className="border-border/70 flex items-center justify-between gap-3 rounded-xl border p-4">
-      <div>
-        <div className="text-sm font-medium">macOS Notification Center</div>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          Status: {statusLabel}. Allow Sandwalk to show banners when the app is
-          in the background.
+    <div className="flex items-center justify-between gap-6 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
+          {description}
         </p>
       </div>
-      {permission === 'granted' ? (
-        <span className="text-muted-foreground shrink-0 text-xs font-medium">
-          Allowed
-        </span>
-      ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={requesting || permission === 'unsupported'}
-          onClick={onEnable}
-        >
-          {requesting ? 'Requesting…' : 'Enable'}
-        </Button>
-      )}
+      <div className="shrink-0">{children}</div>
     </div>
   )
 }
@@ -221,26 +135,101 @@ export function GeneralViewNotificationsSection() {
     }
   }
 
+  const current =
+    NOTIFY_COMPLETION_OPTIONS.find(item => item.id === completion) ??
+    NOTIFY_COMPLETION_OPTIONS[1]
+
+  const macStatus =
+    permission === 'granted'
+      ? 'Allowed'
+      : permission === 'denied'
+        ? 'Blocked in System Settings'
+        : permission === 'unsupported'
+          ? 'Unavailable'
+          : 'Not enabled'
+
   return (
-    <section className="space-y-4">
+    <section className="space-y-3">
       <div>
         <h3 className="text-base font-semibold">Notifications</h3>
         <p className="text-muted-foreground mt-1 text-sm">
-          macOS Notification Center alerts, a Dock badge, and a blue unread
-          dot on sessions that need attention.
+          Alerts, Dock badge, and unread dots on sessions that need attention.
         </p>
       </div>
 
-      <CompletionModeRow mode={completion} />
-      <ApprovalToggleRow enabled={approval} />
+      <div className="divide-border/60 border-border/60 divide-y border-y">
+        <SettingsRow
+          label="Completion notifications"
+          description="Notify when an agent finishes or fails a run."
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="border-border bg-card text-foreground focus-visible:ring-ring flex h-8 min-w-[8.5rem] shrink-0 items-center justify-between gap-2 rounded-md border px-3 text-sm outline-none focus-visible:ring-1"
+              >
+                <span className="truncate">{current.label}</span>
+                <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {NOTIFY_COMPLETION_OPTIONS.map(item => {
+                const selected = item.id === completion
+                return (
+                  <DropdownMenuItem
+                    key={item.id}
+                    onSelect={() => applyNotifyCompletion(item.id)}
+                    className={cn(selected && 'text-primary')}
+                  >
+                    <Check
+                      className={cn(
+                        'size-3.5 shrink-0',
+                        !selected && 'invisible'
+                      )}
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SettingsRow>
 
-      {macDesktop ? (
-        <MacPermissionRow
-          permission={permission}
-          requesting={requesting}
-          onEnable={() => void enableNative()}
-        />
-      ) : null}
+        <SettingsRow
+          label="Permission notifications"
+          description="Notify when an agent needs approval (e.g. installing skills)."
+        >
+          <NotifyToggle
+            enabled={approval}
+            label="Permission notifications"
+            onToggle={() => applyNotifyApproval(!approval)}
+          />
+        </SettingsRow>
+
+        {macDesktop ? (
+          <SettingsRow
+            label="macOS Notification Center"
+            description={`Status: ${macStatus}. Allow banners when the app is in the background.`}
+          >
+            {permission === 'granted' ? (
+              <span className="text-muted-foreground text-xs font-medium">
+                Allowed
+              </span>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-w-[8.5rem]"
+                disabled={requesting || permission === 'unsupported'}
+                onClick={() => void enableNative()}
+              >
+                {requesting ? 'Requesting…' : 'Enable'}
+              </Button>
+            )}
+          </SettingsRow>
+        ) : null}
+      </div>
     </section>
   )
 }

@@ -1,6 +1,6 @@
 [package]
 name = "sandwalk-desktop"
-version = "0.0.1"
+version = "0.0.2"
 description = "Sandwalk macOS client (Tauri; Sandwalk Server helper owns the agent)"
 authors = ["Fastfold AI Labs"]
 edition = "2021"
@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # macos-private-api: transparent window + liquid glass (NSGlassEffectView / vibrancy)
-tauri = { version = "2", features = ["macos-private-api"] }
+tauri = { version = "2", features = ["macos-private-api", "image-png"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-liquid-glass = "0.1"
 tauri-plugin-notification = "2"
@@ -26,6 +26,8 @@ dirs = "5"
 base64 = "0.22"
 sandwalk-stt = { path = "../stt" }
 tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Replaces the deprecated `cocoa`/`objc` crates for the Dock icon swap below.

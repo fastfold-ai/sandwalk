@@ -164,6 +164,28 @@ export const desktopTailLogs = (name?: string, lines?: number) =>
 export const desktopRebuildDashboard = () =>
   invokeStrict<{ ok?: boolean }>('desktop_rebuild_dashboard')
 
+export type DesktopCliPathStatus = {
+  state: 'ready' | 'missing' | 'foreign' | 'unavailable' | string
+  command?: string
+  shim_path?: string
+  shim_exists?: boolean
+  managed?: boolean
+  foreign?: boolean
+  bundled_runtime?: boolean
+  path_ready?: boolean
+  message?: string
+  version?: string
+  python_path?: string
+  outcome?: string
+  error?: string
+}
+
+export const desktopCliPathStatus = () =>
+  invoke<DesktopCliPathStatus>('desktop_cli_path_status')
+
+export const desktopCliPathInstall = (force = false) =>
+  invokeStrict<DesktopCliPathStatus>('desktop_cli_path_install', { force })
+
 export const desktopAppVersion = () => invoke<string>('desktop_app_version')
 
 /** Begin native window dragging from a custom title/header region. */

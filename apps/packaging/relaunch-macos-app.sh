@@ -27,6 +27,12 @@ TIMEOUT="${TIMEOUT:-90}"
 port_pids() { lsof -nP -tiTCP:"${PORT}" -sTCP:LISTEN 2>/dev/null || true; }
 db_pids() { [[ -f "${DB}" ]] && lsof -t "${DB}" 2>/dev/null || true; }
 helper_pid() { pgrep -f "Helpers/Sandwalk Server.app/Contents/MacOS/Sandwalk" 2>/dev/null | head -n 1 || true; }
+# Packaged apps spawn ``python -m cli serve``; checkout installs use ``sandwalk serve``.
+agent_pids() {
+  pgrep -f "bin/sandwalk serve" 2>/dev/null || true
+  pgrep -f "agent-runtime/.*/python.*/-m cli serve" 2>/dev/null || true
+  pgrep -f "python.* -m cli serve" 2>/dev/null || true
+}
 
 # Stop the client, the helper, and the agent, then verify nothing still holds the
 # API port or the database. Runs twice: once up front, and again right before launch
@@ -39,6 +45,7 @@ stop_all() {
   pkill -x sandwalk-desktop 2>/dev/null || true
   pkill -x Sandwalk 2>/dev/null || true
   pkill -f "bin/sandwalk serve" 2>/dev/null || true
+  pkill -f "python.* -m cli serve" 2>/dev/null || true
 
   # Give the agent a moment to shut down gracefully, then force what is left.
   for _ in $(seq 1 10); do
@@ -51,6 +58,7 @@ stop_all() {
   if [[ -n "${leftover}" ]]; then
     echo "    forcing orphans: $(echo ${leftover} | tr '\n' ' ')"
     pkill -9 -f "bin/sandwalk serve" 2>/dev/null || true
+    pkill -9 -f "python.* -m cli serve" 2>/dev/null || true
     local pid
     for pid in $(port_pids) $(db_pids); do kill -9 "${pid}" 2>/dev/null || true; done
     sleep 1
@@ -104,10 +112,10 @@ open "${APP}"
 healthy=0
 for i in $(seq 1 "${TIMEOUT}"); do
   hp="$(helper_pid)"
-  code="$(curl -s -m 2 -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT}/api/health" || true)"
+  code="$(curl -s -m 2 -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT}/v1/health" || true)"
   if [[ -n "${hp}" && "${code}" == "200" ]]; then
     orphan=0
-    for pid in $(pgrep -f "bin/sandwalk serve" 2>/dev/null || true); do
+    for pid in $(agent_pids); do
       [[ "$(ps -o ppid= -p "${pid}" 2>/dev/null | xargs)" == "1" ]] && orphan=1
     done
     if [[ "${orphan}" == "0" ]]; then
@@ -122,7 +130,9 @@ done
 echo "==> Process chain:"
 pgrep -fl "Sandwalk.app/Contents/MacOS/sandwalk-desktop" || echo "    client NOT running"
 pgrep -fl "Helpers/Sandwalk Server.app/Contents/MacOS/Sandwalk" || echo "    helper NOT running"
-pgrep -fl "bin/sandwalk serve" || echo "    agent NOT running"
+if ! pgrep -fl "bin/sandwalk serve" && ! pgrep -fl "python.* -m cli serve"; then
+  echo "    agent NOT running"
+fi
 
 if [[ "${healthy}" != "1" ]]; then
   echo ""

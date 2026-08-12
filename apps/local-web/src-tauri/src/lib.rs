@@ -448,6 +448,17 @@ fn desktop_rebuild_dashboard() -> Result<Value, String> {
 }
 
 #[tauri::command]
+fn desktop_cli_path_status() -> Result<Value, String> {
+    control_request("GET", "/v1/control/cli-path", None)
+}
+
+#[tauri::command]
+fn desktop_cli_path_install(force: Option<bool>) -> Result<Value, String> {
+    let body = serde_json::json!({ "force": force.unwrap_or(false) });
+    control_request("POST", "/v1/control/cli-path", Some(body))
+}
+
+#[tauri::command]
 fn desktop_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
@@ -812,6 +823,8 @@ pub fn run() {
         .plugin(tauri_plugin_liquid_glass::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             desktop_server_status,
             desktop_server_start,
@@ -825,6 +838,8 @@ pub fn run() {
             desktop_put_desktop,
             desktop_tail_logs,
             desktop_rebuild_dashboard,
+            desktop_cli_path_status,
+            desktop_cli_path_install,
             desktop_app_version,
             desktop_menubar_available,
             desktop_open_window,

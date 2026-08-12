@@ -107,7 +107,13 @@ export function SandwalkServerCard({
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold tracking-tight">
-            sandwalk{version ? ` ${version}` : ''}
+            {title?.trim() || 'Agent Server'}
+            {version ? (
+              <span className="text-muted-foreground font-mono text-xs font-medium">
+                {' '}
+                {version}
+              </span>
+            ) : null}
           </h3>
           {statusBadge}
         </div>

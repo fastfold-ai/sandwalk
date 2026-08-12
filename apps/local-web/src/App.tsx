@@ -312,7 +312,6 @@ export default function App() {
       hideLauncherAfterOpen={hideLauncherAfterOpen}
     />
   )
-
   if (gate) {
     return (
       <>
