@@ -95,6 +95,7 @@ struct GeneralSettingsView: View {
         }
     }
 
+    @MainActor
     private func reloadFromLive() {
         draft = SandwalkRuntime.config
         openAtLogin = LoginItemSupport.isEnabled

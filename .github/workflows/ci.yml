@@ -295,6 +295,10 @@ jobs:
         working-directory: apps/sandwalk-mac
         run: ./scripts/test.sh
 
+      - name: Release compile
+        working-directory: apps/sandwalk-mac
+        run: swift build -c release
+
       - name: Upload Mac App coverage to Codecov
         uses: codecov/codecov-action@v7
         if: always()
