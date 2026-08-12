@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import secrets
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from agent_server.auth_settings.paths import SESSION_COOKIE
 from agent_server.auth_settings.session import verify_session_token
