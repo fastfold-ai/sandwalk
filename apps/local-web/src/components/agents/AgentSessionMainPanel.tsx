@@ -358,6 +358,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         onToggleSelectChat={toggleSelectChat}
         onClearSelection={clearSelectChats}
         onCreateSplitFromSelection={createSplitFromSelection}
+        inSplitGroup={Boolean(activeGroup)}
       />
       <ResizablePanelGroup
         direction="horizontal"
@@ -376,8 +377,57 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             <ChatSplitContainer
               group={activeGroup}
               sessions={allSessions}
+              projects={projects}
               onFocusChat={chatId => {
                 setTabGroupActiveChat(activeGroup.id, chatId)
+              }}
+              buildHeaderProps={(chatId, focused, onFocusPanel) => {
+                const chatSession =
+                  allSessions.find(item => item.id === chatId) || null
+                return {
+                  session: chatSession,
+                  focused,
+                  onFocusPanel,
+                  projects,
+                  onSelectProjectScope: selectProjectScope,
+                  showFiles:
+                    Boolean(chatSession) &&
+                    !isDraftAgentSessionId(chatId),
+                  showTerminal: Boolean(chatSession),
+                  showPreview:
+                    Boolean(chatSession) &&
+                    !isDraftAgentSessionId(chatId),
+                  filesPanelCollapsed,
+                  terminalOpen,
+                  panelView,
+                  onToggleFiles: () => {
+                    setFilesPanelCollapsed(collapsed => !collapsed)
+                    if (panelView !== 'files') setPanelView('files')
+                  },
+                  onToggleTerminal: () => {
+                    setTerminalOpen(open => !open)
+                  },
+                  onOpenPreview: () => {
+                    setPanelView('preview')
+                    setFilesPanelCollapsed(false)
+                  },
+                  showCli:
+                    Boolean(chatSession) &&
+                    !isDraftAgentSessionId(chatId),
+                  onExport: target => void exportTranscript(target),
+                  onInspect: target =>
+                    navigate(`/agents/${target.id}?inspect=1`),
+                  onArchive: target =>
+                    void updateSession(target, {
+                      organizeLabel:
+                        target.organizeLabel === 'archive'
+                          ? null
+                          : 'archive'
+                    }),
+                  onClose: id => closeSessionTab(id),
+                  onCloseOthers: id => closeOtherSessionTabs(id),
+                  onDelete: target => setDeleteTarget(target)
+                }
               }}
               buildMountProps={chatId => {
                 const chatSession =

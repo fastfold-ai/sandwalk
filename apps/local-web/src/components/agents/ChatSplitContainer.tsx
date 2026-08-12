@@ -1,5 +1,13 @@
-import type { AgentSession, SessionGroup } from '@sandwalk/agent-ui-core'
+import type {
+  AgentProject,
+  AgentSession,
+  SessionGroup
+} from '@sandwalk/agent-ui-core'
 
+import {
+  ChatSplitPanelHeader,
+  type ChatSplitPanelHeaderProps
+} from '@/components/agents/ChatSplitPanelHeader'
 import {
   SessionChatMount,
   type SessionChatMountProps
@@ -35,13 +43,25 @@ export type ChatSplitContainerProps = {
     perSessionArgs: SessionChatMountProps['perSessionArgs']
   }
   onFocusChat: (chatId: string) => void
+  /**
+   * Recibe los props del header por panel (files/terminal/preview/CLI/
+   * ellipsis + estado + callbacks) para el chatId dado. Se aplica al slot
+   * del header de cada `SplitFragment`.
+   */
+  buildHeaderProps: (
+    chatId: string,
+    focused: boolean,
+    onFocusPanel: () => void
+  ) => ChatSplitPanelHeaderProps
+  projects: AgentProject[]
 }
 
 export function ChatSplitContainer({
   group,
   sessions,
   buildMountProps,
-  onFocusChat
+  onFocusChat,
+  buildHeaderProps
 }: ChatSplitContainerProps) {
   const chatIds = group.chatIds
   const activeChatId = group.activeChatId
@@ -59,6 +79,10 @@ export function ChatSplitContainer({
         const isLast = index === chatIds.length - 1
         const props = buildMountProps(chatId)
         const chatSession = sessions.find(s => s.id === chatId) || null
+        const focusPanel = () => {
+          if (!isFocused) onFocusChat(chatId)
+        }
+        const headerProps = buildHeaderProps(chatId, isFocused, focusPanel)
         return (
           <SplitFragment
             key={chatId}
@@ -67,9 +91,8 @@ export function ChatSplitContainer({
             isLast={isLast}
             chatSession={chatSession}
             props={props}
-            onFocus={() => {
-              if (!isFocused) onFocusChat(chatId)
-            }}
+            headerProps={headerProps}
+            onFocus={focusPanel}
           />
         )
       })}
@@ -83,6 +106,7 @@ function SplitFragment({
   isLast,
   chatSession,
   props,
+  headerProps,
   onFocus
 }: {
   chatId: string
@@ -92,6 +116,7 @@ function SplitFragment({
   props: Omit<SessionChatMountProps, 'perSessionArgs'> & {
     perSessionArgs: SessionChatMountProps['perSessionArgs']
   }
+  headerProps: ChatSplitPanelHeaderProps
   onFocus: () => void
 }) {
   return (
@@ -127,6 +152,7 @@ function SplitFragment({
           onMouseDownCapture={onFocus}
           onFocusCapture={onFocus}
         >
+          <ChatSplitPanelHeader {...headerProps} />
           {/*
             El composer del panel se pinta como barra embedded (pegada al
             bottom con animación slide) — la visibilidad y la animación las

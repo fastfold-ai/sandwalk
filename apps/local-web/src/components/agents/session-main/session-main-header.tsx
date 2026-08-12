@@ -78,6 +78,13 @@ export type SessionMainHeaderProps = {
   groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
+  /**
+   * Cuando la ruta activa apunta a un grupo, el shell oculta su fila de
+   * acciones flotantes (folder / files / terminal / preview / CLI): cada
+   * panel del split muestra sus propios controles arriba (evita duplicar
+   * y quitar la ambigüedad de "a qué chat aplica").
+   */
+  inSplitGroup?: boolean
   selectedChatIds?: Set<string>
   onToggleSelectChat?: (id: string) => void
   onClearSelection?: () => void
@@ -122,7 +129,8 @@ export function SessionMainHeader({
   selectedChatIds,
   onToggleSelectChat,
   onClearSelection,
-  onCreateSplitFromSelection
+  onCreateSplitFromSelection,
+  inSplitGroup
 }: SessionMainHeaderProps) {
   const overlay = useMacDesktopOverlay()
   // Collapse: reveal after panel closes. Expand: keep briefly so icons don't gap.
@@ -293,8 +301,11 @@ export function SessionMainHeader({
         />
       </DesktopDragRegion>
 
-      {/* Folder + actions float over the session content (no dedicated bar) */}
-      {showFloatingActions || projectName ? (
+      {/* Folder + actions float over the session content (no dedicated bar).
+          En split view el header de cada panel absorbe estos controles —
+          apagamos esta fila para no duplicar y evitar la ambigüedad de
+          "cuál chat operan". */}
+      {!inSplitGroup && (showFloatingActions || projectName) ? (
         <div className="pointer-events-none absolute inset-x-0 top-full z-30 flex h-0 items-start justify-between px-2.5 pt-1.5">
           {projectName && session?.projectId ? (
             <button
