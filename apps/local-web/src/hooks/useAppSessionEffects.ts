@@ -45,6 +45,13 @@ type UseAppSessionEffectsArgs = {
   setComposerFiles: Dispatch<SetStateAction<string[]>>
   /** Returns true if the chat lives inside a split-view group in this scope. */
   chatIsInsideAnyGroup?: (chatId: string) => boolean
+  /**
+   * Todos los grupos activos (union de todos los scopes) — el effect que
+   * limpia `openTabsByProject` los consulta para no borrar los `grp_xxx`
+   * como si fueran "chats desconocidos". Un grupo se conserva en la lista
+   * si al menos uno de sus chats pertenece al proyecto activo.
+   */
+  tabGroups?: import('@sandwalk/agent-ui-core').SessionGroup[]
 }
 
 export function useAppSessionEffects({
@@ -71,7 +78,8 @@ export function useAppSessionEffects({
   pendingMentionRef,
   setComposer,
   setComposerFiles,
-  chatIsInsideAnyGroup
+  chatIsInsideAnyGroup,
+  tabGroups = []
 }: UseAppSessionEffectsArgs) {
   useEffect(() => {
     setIntegrationValues({})
@@ -117,6 +125,19 @@ export function useAppSessionEffects({
       const ids = current[activeProjectId]
       if (!ids || ids.length === 0) return current
       const filtered = ids.filter(id => {
+        // Grupos: se conservan si al menos un chat interno pertenece al
+        // proyecto activo. Antes este filtro borraba TODOS los `grp_xxx`
+        // (no aparecen en `sessions`), y el chip del grupo desaparecía
+        // de la strip después del primer click aunque el user lo tuviera
+        // marcado como abierto.
+        if (id.startsWith('grp_')) {
+          const group = tabGroups.find(g => g.id === id)
+          if (!group) return false
+          return group.chatIds.some(chatId => {
+            const chat = sessions.find(s => s.id === chatId)
+            return Boolean(chat && chat.projectId === activeProjectId)
+          })
+        }
         const item = sessions.find(session => session.id === id)
         return Boolean(item && item.projectId === activeProjectId)
       })
@@ -127,7 +148,7 @@ export function useAppSessionEffects({
       writeOpenTabsByProject(next)
       return next
     })
-  }, [activeProjectId, sessions])
+  }, [activeProjectId, sessions, tabGroups])
 
   useEffect(() => {
     if (!sessionId || isDraftAgentSessionId(sessionId)) return

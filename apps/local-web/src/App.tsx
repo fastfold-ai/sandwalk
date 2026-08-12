@@ -379,7 +379,8 @@ export default function App() {
     setComposer: layer.chat.setComposer,
     setComposerFiles: layer.chat.setComposerFiles,
     chatIsInsideAnyGroup: (chatId: string) =>
-      tabGroupsStore.allTabGroups.some(g => g.chatIds.includes(chatId))
+      tabGroupsStore.allTabGroups.some(g => g.chatIds.includes(chatId)),
+    tabGroups: tabGroupsStore.allTabGroups
   })
 
   // Bench sessions are omitted from the global list (sidebar noise). When a
