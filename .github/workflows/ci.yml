@@ -33,25 +33,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      # Restore-only on most jobs; this job saves once so 8 shards do not each
-      # pay a multi-minute cache upload after torch-heavy uv sync.
-      - name: Restore uv download cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.cache/uv
-          key: uv-all-${{ runner.os }}-${{ hashFiles('cli/uv.lock') }}
-          restore-keys: |
-            uv-all-${{ runner.os }}-
-
       - name: Install package + test deps
         run: uv sync --extra all --extra dev
-
-      - name: Save uv download cache
-        if: success()
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/uv
-          key: uv-all-${{ runner.os }}-${{ hashFiles('cli/uv.lock') }}
 
       - name: Ruff lint
         run: uv run ruff check src
@@ -99,14 +82,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Restore uv download cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.cache/uv
-          key: uv-all-${{ runner.os }}-${{ hashFiles('cli/uv.lock') }}
-          restore-keys: |
-            uv-all-${{ runner.os }}-
 
       - name: Install package + test deps
         run: uv sync --extra all --extra dev
