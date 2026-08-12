@@ -77,14 +77,14 @@ jobs:
           uv pip install --reinstall dist/*.whl
           uv run sandwalk --version
 
-  # ── Pytest: 8 matrix shards × xdist workers (balanced via .test_durations) ─
+  # ── Pytest: 4 matrix shards × xdist (8 oversubscribed free GHA runners) ───
   agent-cli-tests:
-    name: Agent CLI tests (${{ matrix.group }}/8)
+    name: Agent CLI tests (${{ matrix.group }}/4)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        group: [1, 2, 3, 4, 5, 6, 7, 8]
+        group: [1, 2, 3, 4]
     defaults:
       run:
         working-directory: cli
@@ -111,14 +111,14 @@ jobs:
       - name: Install package + test deps
         run: uv sync --extra all --extra dev
 
-      - name: Run CI pytest suite (shard ${{ matrix.group }}/8)
+      - name: Run CI pytest suite (shard ${{ matrix.group }}/4)
         run: |
           # Opt-in lanes (network / live chat / Modal / data smoke / pexpect)
           # are auto-deselected in tests/conftest.py unless their env gate is set.
           # Coverage gates run in agent-cli-coverage after shards combine.
-          # .test_durations keeps least_duration splits balanced across 8 groups.
+          # .test_durations keeps least_duration splits balanced across groups.
           uv run pytest tests/ -q \
-            --splits 8 --group ${{ matrix.group }} \
+            --splits 4 --group ${{ matrix.group }} \
             --splitting-algorithm least_duration \
             --durations-path=.test_durations \
             -n auto \
