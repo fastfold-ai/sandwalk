@@ -105,14 +105,26 @@ jobs:
             --cov=reports --cov=skills --cov=tools --cov=ui \
             --cov-report=term-missing:skip-covered
 
+      - name: Stage shard coverage for upload
+        if: always()
+        run: |
+          # .coverage* is gitignored; hashFiles / some artifact globs skip it.
+          # Copy into a tracked-friendly path so the combine job can download it.
+          mkdir -p ci-coverage
+          shopt -s nullglob
+          for f in .coverage .coverage.*; do
+            cp -f "$f" "ci-coverage/"
+          done
+          ls -la ci-coverage/ || true
+
       - name: Upload shard coverage data
         uses: actions/upload-artifact@v4
-        if: always() && hashFiles('cli/.coverage.shard*') != ''
+        if: always()
         with:
           name: coverage-data-${{ matrix.group }}
-          path: cli/.coverage.shard*
+          path: cli/ci-coverage/
           retention-days: 7
-          if-no-files-found: warn
+          if-no-files-found: error
 
   # ── Combine coverage + gates + Codecov ────────────────────────────────────
   agent-cli-coverage:
@@ -152,8 +164,14 @@ jobs:
           # mirrors local-web / Mac unit-testable coverage gates.
           # Coverage gate at 75%: interactive TUI packages are omitted; buffer
           # avoids flakes when new lightly-tested helpers land.
-          ls -la coverage-shards/ || true
-          uv run coverage combine coverage-shards
+          ls -laR coverage-shards/
+          # download-artifact may nest per-artifact dirs; combine all data files.
+          mapfile -t files < <(find coverage-shards -type f -name '.coverage*' -print)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "Error: no shard coverage data files downloaded." >&2
+            exit 1
+          fi
+          uv run coverage combine "${files[@]}"
           uv run coverage report --fail-under=75
           uv run coverage xml -o coverage-full.xml
           # Matches measured agent_server coverage after package splits / omits.
