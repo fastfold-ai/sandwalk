@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version without leading v (e.g. 0.0.2). Leave blank to use apps/local-web/package.json.'
+        description: 'Release version without leading v (e.g. 0.1.0-beta.1). Leave blank to use apps/local-web/package.json.'
         type: string
         required: false
       draft:
@@ -82,10 +82,12 @@ jobs:
             t = t.replace(/^version = "[^"]+"/m, `version = "${v}"`);
             fs.writeFileSync(cargo, t);
           '
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" \
+          # Apple marketing version is digits-only (0.1.0); prerelease stays in the app/CLI version.
+          MARKETING="${VERSION%%-*}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${MARKETING}" \
             apps/sandwalk-mac/Resources/Info.plist 2>/dev/null \
             || true
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" \
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${MARKETING}" \
             apps/sandwalk-mac/Resources/Info.plist 2>/dev/null \
             || true
 
@@ -142,7 +144,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: Sandwalk ${{ steps.ver.outputs.tag }}
+          name: Sandwalk Desktop ${{ steps.ver.outputs.tag }}
           draft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
           fail_on_unmatched_files: false
@@ -153,14 +155,20 @@ jobs:
             apps/packaging/dist/Sandwalk.app.tar.gz.sig
             apps/packaging/dist/latest.json
           body: |
-            ## Sandwalk Desktop ${{ steps.ver.outputs.tag }}
+            [Sandwalk](https://sandwalk.sh) is a self-hosted science agent for researchers. Chat, CLI, and the macOS desktop app share the same sessions and workspace.
 
-            **macOS (Apple Silicon)** — download `Sandwalk-macos-arm64.dmg` (or the versioned DMG).
+            **[Download Sandwalk Desktop for macOS (Apple Silicon)](https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.tag }}/Sandwalk-macos-arm64.dmg)**
 
-            ### Notes
-            - Codesign: **ad-hoc** (self-signed). Gatekeeper may warn until Apple Developer ID + notarization are enabled.
-            - In-app updates use `latest.json` + `Sandwalk.app.tar.gz` (minisign).
+            Here's what you can do with Sandwalk Desktop:
 
-            See `apps/packaging/README.md` for Apple notarization when the Developer ID is ready.
+            - Run a **local agent server** from the menubar — one install covers the app, API, and `sandwalk` CLI on your PATH.
+            - Ask research questions with **plan mode**, multimodal attachments, and human-in-the-loop skill approvals.
+            - Use curated tools for **chemistry, targets, structures, omics, clinical, and literature**, plus live databases (PubChem, ChEMBL, UniProt, PDB, …).
+            - Connect **Anthropic, OpenAI, Gemini, Grok, local models** (Ollama, Unsloth, oMLX, llama.cpp, LM Studio), skills, and MCPs.
+            - Run compute **locally or on Modal / Lambda / Fastfold Cloud**.
+
+            macOS builds are **ad-hoc signed** until Apple Developer ID + notarization are enabled (right-click → Open the first time). In-app updates use `latest.json` + `Sandwalk.app.tar.gz`.
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A classic PAT (repo scope) as RELEASE_GITHUB_TOKEN publishes as you,
+          # not github-actions[bot].
+          GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

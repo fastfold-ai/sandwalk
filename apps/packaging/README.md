@@ -144,12 +144,13 @@ CODESIGN_IDENTITY=- ./apps/packaging/package-macos-dmg.sh
 CI: [`.github/workflows/release-desktop.yml`](../../.github/workflows/release-desktop.yml)  
 (`workflow_dispatch` → builds DMG + updater artifacts → GitHub Release).
 
-**Repo secret to set for in-app updates:**
+**Repo secrets:**
 
 | Secret | Value |
 |--------|--------|
 | `TAURI_SIGNING_PRIVATE_KEY` | Full contents of `apps/local-web/src-tauri/.updater-key` |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Empty if the key was generated with `-p ""` |
+| `RELEASE_GITHUB_TOKEN` | Optional classic PAT (`repo` scope) so the GitHub Release is attributed to you, not `github-actions`. |
 
 Do **not** commit the private key. The public key already lives in
 `apps/local-web/src-tauri/tauri.conf.json` → `plugins.updater.pubkey`.
