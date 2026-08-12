@@ -64,15 +64,9 @@ export function GeneralViewServerSection({
   }
 
   return (
-    <section className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold">Agent server</h3>
-        <p className="text-muted-foreground mt-1 text-sm">
-          URL of the local or remote sandwalk API this dashboard talks to.
-        </p>
-      </div>
-
+    <section>
       <SandwalkServerCard
+        title="Agent Server"
         version={backendVersion}
         running={connected}
         subtitle={listenSubtitle({

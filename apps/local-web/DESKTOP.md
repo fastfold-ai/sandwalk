@@ -28,6 +28,13 @@ pnpm --filter @sandwalk/agent-local-web tauri:dev
 
 Vite for Tauri uses port **1420** (menubar Development mode still uses **8969**).
 
+## Updates
+
+Desktop builds use `tauri-plugin-updater` against GitHub Releases
+`…/releases/latest/download/latest.json`. General → **Check again** / **Update now**
+downloads the signed nested `.app.tar.gz` and relaunches. Packaging details:
+[`apps/packaging/README.md`](../packaging/README.md).
+
 ## Build (DMG)
 
 One script builds the Tauri client, nests Sandwalk Server, and writes a DMG:

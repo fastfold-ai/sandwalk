@@ -3,6 +3,8 @@
 <!-- Merged into the bundle's Info.plist by Tauri. -->
 <plist version="1.0">
 <dict>
+  <key>NSHumanReadableCopyright</key>
+  <string>© 2026 Fastfold AI Labs. All rights reserved.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Sandwalk records only while you use the composer microphone to turn your spoken prompt into editable text. Audio is transcribed locally and is not uploaded.</string>
   <key>NSLocalNetworkUsageDescription</key>

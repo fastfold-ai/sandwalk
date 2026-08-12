@@ -301,9 +301,31 @@ final class ControlPlane {
             } catch {
                 return .init(status: 500, json: ["error": error.localizedDescription])
             }
+        case ("GET", "/v1/control/cli-path"):
+            return .init(status: 200, json: CliPathInstaller.status())
+        case ("POST", "/v1/control/cli-path"):
+            return installCliPath(body: body)
         default:
             return .init(status: 404, json: ["error": "not found"])
         }
+    }
+
+    private func installCliPath(body: Data) -> DispatchResult {
+        var force = false
+        if let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
+            if let flag = obj["force"] as? Bool {
+                force = flag
+            } else if let flag = obj["force"] as? NSNumber {
+                force = flag.boolValue
+            }
+        }
+        let outcome = CliPathInstaller.ensureInstalled(force: force)
+        var json = CliPathInstaller.outcomePayload(outcome)
+        if case .failed(let message) = outcome {
+            json["error"] = message
+            return .init(status: 500, json: json)
+        }
+        return .init(status: 200, json: json)
     }
 
     private func statusPayload() -> [String: Any] {

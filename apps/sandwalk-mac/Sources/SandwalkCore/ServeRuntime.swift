@@ -1,12 +1,13 @@
 import Foundation
 
-/// Resolves how to spawn `sandwalk serve` (dev-friendly; bundled Python later).
+/// Resolves how to spawn `sandwalk serve`.
 ///
 /// Resolution order:
 /// 1. `SANDWALK_SERVE_BIN` — absolute path to an executable (args: serve --host --port)
-/// 2. `<agentCliRoot>/.venv/bin/sandwalk` (or legacy `fastfold`)
-/// 3. `uv run --directory <agentCliRoot> sandwalk serve …`
-/// 4. `sandwalk` / `fastfold` on PATH
+/// 2. Bundled `Contents/Resources/agent-runtime` CPython (`python -m cli`)
+/// 3. `<agentCliRoot>/.venv/bin/sandwalk` (or legacy `fastfold`)
+/// 4. `uv run --directory <agentCliRoot> sandwalk serve …`
+/// 5. `sandwalk` / `fastfold` on PATH
 struct ServeRuntime {
     let executable: URL
     let argumentsPrefix: [String]
@@ -27,6 +28,20 @@ struct ServeRuntime {
         }
     }
 
+    /// Packaged helper ships CPython under Resources/agent-runtime.
+    static func bundledPythonURL(bundle: Bundle = .main) -> URL? {
+        guard let resources = bundle.resourceURL else { return nil }
+        let bin = resources.appendingPathComponent("agent-runtime/bin", isDirectory: true)
+        let fm = FileManager.default
+        for name in ["python3.12", "python3.11", "python3", "python"] {
+            let url = bin.appendingPathComponent(name)
+            if fm.isExecutableFile(atPath: url.path) {
+                return url
+            }
+        }
+        return nil
+    }
+
     static func resolve(config: AppConfig) throws -> ServeRuntime {
         let env = ProcessInfo.processInfo.environment
         let fm = FileManager.default
@@ -41,6 +56,15 @@ struct ServeRuntime {
                     venvBinDirectory: url.deletingLastPathComponent()
                 )
             }
+        }
+
+        if let python = bundledPythonURL() {
+            return ServeRuntime(
+                executable: python,
+                argumentsPrefix: ["-m", "cli"],
+                workingDirectory: nil,
+                venvBinDirectory: python.deletingLastPathComponent()
+            )
         }
 
         // Prefer the monorepo cli checkout (venv or uv) over a global shim.

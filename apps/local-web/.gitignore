@@ -15,6 +15,9 @@ dist-ssr
 # Tauri
 src-tauri/target
 src-tauri/gen
+# Updater minisign private key (pubkey lives in tauri.conf.json)
+src-tauri/.updater-key
+src-tauri/.updater-key.pub
 
 # Editor directories and files
 .vscode/*
