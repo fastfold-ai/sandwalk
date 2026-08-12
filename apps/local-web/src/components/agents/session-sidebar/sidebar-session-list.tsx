@@ -177,6 +177,12 @@ export type SidebarSessionListProps = {
   onClearSessionSelection: () => void
   onSelectTabGroup?: (groupId: string) => void
   onDissolveTabGroup?: (groupId: string) => void
+  /**
+   * ID del chat focused dentro del grupo activo (si hay). Sirve para
+   * pintar en el sidebar cuál chat del split está activo — no solo el
+   * grupo. Cuando no estás en un grupo, es null.
+   */
+  activeGroupChildId?: string | null
 }
 
 export function SidebarSessionList({
@@ -201,7 +207,8 @@ export function SidebarSessionList({
   exportTranscript,
   setDeleteTarget,
   onSelectTabGroup,
-  onDissolveTabGroup
+  onDissolveTabGroup,
+  activeGroupChildId
 }: SidebarSessionListProps) {
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
@@ -325,6 +332,7 @@ export function SidebarSessionList({
                             tabColors={tabColors}
                             selectedSessionIds={selectedSessionIds}
                             attentionIds={attentionIds}
+                            activeChildId={activeGroupChildId ?? null}
                             onSelectGroup={onSelectTabGroup}
                             onDissolveGroup={onDissolveTabGroup}
                             onSelectChat={chatId => {
@@ -612,6 +620,7 @@ function SidebarGroupItem({
   group,
   chats,
   activeId,
+  activeChildId,
   chatBySessionId,
   tabColors,
   selectedSessionIds,
@@ -623,6 +632,7 @@ function SidebarGroupItem({
   group: import('@sandwalk/agent-ui-core').SessionGroup
   chats: AgentSession[]
   activeId: string | null
+  activeChildId: string | null
   chatBySessionId: Record<string, SessionChatState>
   tabColors: Record<string, string>
   selectedSessionIds: Set<string>
@@ -714,7 +724,12 @@ function SidebarGroupItem({
           )}
         >
           {chats.map(chat => {
-            const active = chat.id === activeId
+            // El chat "activo" dentro del grupo puede ser el `activeChildId`
+            // (si estás en la ruta del grupo con foco en este chat) o el
+            // `activeId` global si por alguna razón la ruta apunta al chat
+            // suelto — ambos escenarios se marcan igual visualmente.
+            const active =
+              chat.id === activeChildId || chat.id === activeId
             const isSelected = selectedSessionIds.has(chat.id)
             const tabColor = tabColors[chat.id]
             return (

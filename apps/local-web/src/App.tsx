@@ -75,9 +75,10 @@ export default function App() {
   const activeGroup = useMemo(
     () =>
       route.sessionId
-        ? tabGroupsStore.tabGroups.find(g => g.id === route.sessionId) || null
+        ? tabGroupsStore.allTabGroups.find(g => g.id === route.sessionId) ||
+          null
         : null,
-    [route.sessionId, tabGroupsStore.tabGroups]
+    [route.sessionId, tabGroupsStore.allTabGroups]
   )
   const effectiveSessionId = activeGroup
     ? activeGroup.activeChatId
@@ -365,7 +366,7 @@ export default function App() {
     setComposer: layer.chat.setComposer,
     setComposerFiles: layer.chat.setComposerFiles,
     chatIsInsideAnyGroup: (chatId: string) =>
-      tabGroupsStore.tabGroups.some(g => g.chatIds.includes(chatId))
+      tabGroupsStore.allTabGroups.some(g => g.chatIds.includes(chatId))
   })
 
   // Bench sessions are omitted from the global list (sidebar noise). When a
@@ -378,11 +379,40 @@ export default function App() {
     })
   }, [bootstrap.loadSessions, ui.projectScopeId])
 
+  /*
+   * `openTabIds` puede tener chatIds sueltos que en realidad ya viven
+   * dentro de un grupo (residuos de storage viejo, o carreras al crear
+   * un grupo). Los filtramos aquí para que nunca se vean afuera del
+   * grupo — el grupo es la única representación válida. Excepción: si
+   * el usuario está navegando explícitamente al chat suelto
+   * (`route.sessionId`), lo dejamos pasar para no ocultarlo en su misma
+   * cara.
+   */
+  const chatsInsideGroupIds = useMemo(() => {
+    const set = new Set<string>()
+    for (const g of tabGroupsStore.allTabGroups) {
+      for (const id of g.chatIds) set.add(id)
+    }
+    return set
+  }, [tabGroupsStore.allTabGroups])
+  const cleanedOpenTabIds = useMemo(
+    () =>
+      tabs.openTabIds.filter(
+        id => id === route.sessionId || !chatsInsideGroupIds.has(id)
+      ),
+    [tabs.openTabIds, route.sessionId, chatsInsideGroupIds]
+  )
+
   const { sections, openTabs } = buildSessionSidebarModel({
     sessions: bootstrap.sessions,
-    tabGroups: tabGroupsStore.tabGroups,
+    // Pasamos los grupos GLOBALES (todos los scopes) para que el modelo
+    // pueda resolver un `grp_xxx` aunque el proyecto activo no coincida
+    // con el scope donde el grupo se creó. `buildSessionSidebarModel`
+    // internamente filtra por lo aplicable al scope actual — pero puede
+    // reconocer un grupo que atraviesa scopes en `openTabIds`.
+    tabGroups: tabGroupsStore.allTabGroups,
     activeProjectId: context.activeProjectId,
-    openTabIds: tabs.openTabIds,
+    openTabIds: cleanedOpenTabIds,
     activeSessionId: route.sessionId
   })
   const orderedVisibleSessionIds = useMemo(
@@ -501,7 +531,7 @@ export default function App() {
           navigate,
           sections,
           openTabs,
-          openTabIds: tabs.openTabIds,
+          openTabIds: cleanedOpenTabIds,
           orderedVisibleSessionIds,
           showSessionTabs,
           activeTitle,

@@ -67,6 +67,7 @@ export function AppShell(props: AppShellProps) {
           canBatchSplitView={props.canSplitFromSidebar}
           onSelectTabGroup={props.onSelectTabGroup}
           onDissolveTabGroup={props.dissolveTabGroup}
+          activeGroupChildId={props.activeGroup?.activeChatId ?? null}
           setCollapsedSidebarSections={props.setCollapsedSidebarSections}
           selectSessionRange={props.selectSessionRange}
           toggleSessionSelected={props.toggleSessionSelected}

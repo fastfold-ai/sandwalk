@@ -67,6 +67,7 @@ type AgentSessionSidebarProps = {
   canBatchSplitView?: boolean
   onSelectTabGroup?: (groupId: string) => void
   onDissolveTabGroup?: (groupId: string) => void
+  activeGroupChildId?: string | null
   setCollapsedSidebarSections: Dispatch<SetStateAction<Record<string, boolean>>>
   selectSessionRange: (orderedIds: string[], targetId: string) => void
   toggleSessionSelected: (targetId: string) => void
@@ -118,6 +119,7 @@ export function AgentSessionSidebar({
   canBatchSplitView,
   onSelectTabGroup,
   onDissolveTabGroup,
+  activeGroupChildId,
   setCollapsedSidebarSections,
   selectSessionRange,
   toggleSessionSelected,
@@ -271,6 +273,7 @@ export function AgentSessionSidebar({
         onClearSessionSelection={onClearSessionSelection}
         onSelectTabGroup={onSelectTabGroup}
         onDissolveTabGroup={onDissolveTabGroup}
+        activeGroupChildId={activeGroupChildId}
       />
       <div className="relative shrink-0 p-2">
         <SidebarBatchBar

@@ -1,5 +1,10 @@
 import type { SessionGroup } from '@sandwalk/agent-ui-core'
-import { type Dispatch, type SetStateAction, useCallback } from 'react'
+import {
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useMemo
+} from 'react'
 
 import {
   projectTabsKey,
@@ -274,9 +279,24 @@ export function useAppTabGroups(
     [setTabGroupsByProject]
   )
 
+  /*
+   * Grupos de TODOS los scopes (unificados). Sirve para consultas globales
+   * (por ejemplo `chatIsInsideAnyGroup` en App.tsx, o resolver un `grp_xxx`
+   * cuando el proyecto activo no coincide con el scope donde se creó).
+   * Las mutaciones siguen sobre el scope activo (`tabGroups`).
+   */
+  const allTabGroups = useMemo(() => {
+    const out: SessionGroup[] = []
+    for (const key of Object.keys(tabGroupsByProject)) {
+      for (const g of tabGroupsByProject[key] || []) out.push(g)
+    }
+    return out
+  }, [tabGroupsByProject])
+
   return {
     scopeKey,
     tabGroups,
+    allTabGroups,
     createGroup,
     dissolveGroup,
     addToGroup,

@@ -70,6 +70,7 @@ export type AppShellSidebarProps = {
   canBatchSplitView?: boolean
   onSelectTabGroup?: (groupId: string) => void
   onDissolveTabGroup?: (groupId: string) => void
+  activeGroupChildId?: string | null
   setCollapsedSidebarSections: (
     value:
       | Record<string, boolean>
@@ -141,6 +142,7 @@ export function AppShellSidebar({
   canBatchSplitView,
   onSelectTabGroup,
   onDissolveTabGroup,
+  activeGroupChildId,
   setCollapsedSidebarSections,
   selectSessionRange,
   toggleSessionSelected,
@@ -236,6 +238,7 @@ export function AppShellSidebar({
             canBatchSplitView={canBatchSplitView}
             onSelectTabGroup={onSelectTabGroup}
             onDissolveTabGroup={onDissolveTabGroup}
+            activeGroupChildId={activeGroupChildId}
             setCollapsedSidebarSections={setCollapsedSidebarSections}
             selectSessionRange={selectSessionRange}
             toggleSessionSelected={toggleSessionSelected}

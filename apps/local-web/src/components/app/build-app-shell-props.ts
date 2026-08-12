@@ -261,7 +261,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     confirmDelete: input.actions.confirmDelete,
     batchDeletePending: input.actions.batchDeletePending,
     confirmBatchDelete: input.actions.confirmBatchDelete,
-    tabGroups: input.tabGroupsStore.tabGroups,
+    tabGroups: input.tabGroupsStore.allTabGroups,
     createTabGroup: input.tabGroupsStore.createGroup,
     dissolveTabGroup: input.tabGroupsStore.dissolveGroup,
     addChatToGroup: input.tabGroupsStore.addToGroup,
