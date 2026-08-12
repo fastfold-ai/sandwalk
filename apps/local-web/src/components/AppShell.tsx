@@ -52,7 +52,6 @@ export function AppShell(props: AppShellProps) {
           setProjectScopeId={props.setProjectScopeId}
           selectAllProjects={props.selectAllProjects}
           selectProjectScope={props.selectProjectScope}
-          setProjectSettingsOpen={props.setProjectSettingsOpen}
           setNewProjectOpen={props.setNewProjectOpen}
           setGlobalSearchOpen={props.setGlobalSearchOpen}
           loadProjects={props.loadProjects}
