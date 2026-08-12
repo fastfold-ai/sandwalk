@@ -47,6 +47,11 @@ import {
 } from './defaults'
 import { colSpanClass } from './grid'
 import type { WidgetSurface, WidgetType } from './types'
+import {
+  formatFileBytes,
+  useProjectAssetStats,
+  type ProjectAssetStats
+} from './useProjectAssetStats'
 import { useUsageOverview } from './useUsageOverview'
 import { ActivityHeatmapWidget } from './widgets/ActivityHeatmapWidget'
 import {
@@ -55,7 +60,14 @@ import {
 } from './widgets/MetricStatWidget'
 import { ModelsChartWidget } from './widgets/ModelsChartWidget'
 import { ModelsTopListWidget } from './widgets/ModelsTopListWidget'
+import { ProjectTextWidget } from './widgets/ProjectTextWidget'
 import { UsageHeroWidget } from './widgets/UsageHeroWidget'
+
+const ASSET_STAT_TYPES = new Set([
+  'stat-files-count',
+  'stat-sites-count',
+  'stat-files-size'
+])
 
 type BoardClient = LocalAgentClient & {
   baseUrl?: string
@@ -101,6 +113,11 @@ export function WidgetBoard({
     () => new Set(layout.widgets.map(item => item.type)),
     [layout.widgets]
   )
+  const needsAssetStats = useMemo(
+    () => [...presentTypes].some(type => ASSET_STAT_TYPES.has(type)),
+    [presentTypes]
+  )
+  const assetStats = useProjectAssetStats(client, projectId, needsAssetStats)
   const sortableIds = useMemo(
     () => layout.widgets.map(item => item.id),
     [layout.widgets]
@@ -221,6 +238,7 @@ export function WidgetBoard({
                 onGrainChange={setGrain}
                 client={client}
                 project={project}
+                assetStats={assetStats}
                 formatters={formatters}
                 surface={surface}
                 onSizeChange={size => updateItem(item.id, { size })}
@@ -248,7 +266,8 @@ export function WidgetBoard({
                       onGrainChange={setGrain}
                       client={client}
                       project={project}
-                            formatters={formatters}
+                      assetStats={assetStats}
+                      formatters={formatters}
                       surface={surface}
                     />
                   </div>
@@ -270,6 +289,7 @@ function SortableWidget({
   onGrainChange,
   client,
   project,
+  assetStats,
   formatters,
   surface,
   onSizeChange,
@@ -282,6 +302,7 @@ function SortableWidget({
   onGrainChange: (grain: UsageGrain) => void
   client: BoardClient
   project?: AgentProject | null
+  assetStats: ProjectAssetStats
   formatters: Formatters
   surface: WidgetSurface
   onSizeChange: (size: WidgetSize) => void
@@ -369,11 +390,37 @@ function SortableWidget({
         onGrainChange={onGrainChange}
         client={client}
         project={project}
+        assetStats={assetStats}
         formatters={formatters}
         surface={surface}
       />
     </div>
   )
+}
+
+function assetMetricValue(
+  type: string,
+  stats: ProjectAssetStats
+): { label: string; value: string } | null {
+  if (type === 'stat-files-count') {
+    return {
+      label: 'Files count',
+      value: stats.fileCount.toLocaleString()
+    }
+  }
+  if (type === 'stat-sites-count') {
+    return {
+      label: 'Sites count',
+      value: stats.siteCount.toLocaleString()
+    }
+  }
+  if (type === 'stat-files-size') {
+    return {
+      label: 'File size',
+      value: formatFileBytes(stats.fileBytes)
+    }
+  }
+  return null
 }
 
 function WidgetBody({
@@ -384,6 +431,7 @@ function WidgetBody({
   onGrainChange,
   client,
   project,
+  assetStats,
   formatters,
   surface
 }: {
@@ -394,9 +442,30 @@ function WidgetBody({
   onGrainChange: (grain: UsageGrain) => void
   client: BoardClient
   project?: AgentProject | null
+  assetStats: ProjectAssetStats
   formatters: Formatters
   surface: WidgetSurface
 }) {
+  if (item.type === 'project-description') {
+    return (
+      <ProjectTextWidget
+        label="Description"
+        text={project?.description}
+        size={item.size}
+        empty="No description"
+      />
+    )
+  }
+  if (item.type === 'project-agent-context') {
+    return (
+      <ProjectTextWidget
+        label="Agent context"
+        text={project?.agentContext}
+        size={item.size}
+        empty="No agent context"
+      />
+    )
+  }
   if (item.type === 'usage-hero') {
     return (
       <UsageHeroWidget
@@ -444,12 +513,24 @@ function WidgetBody({
       />
     )
   }
+  const assetMetric = assetMetricValue(item.type, assetStats)
+  if (assetMetric) {
+    return (
+      <MetricStatWidget
+        label={assetMetric.label}
+        value={assetMetric.value}
+        size={item.size}
+        loading={assetStats.loading}
+      />
+    )
+  }
   const metric = metricValueForType(item.type, overview, formatters)
   if (metric) {
     return (
       <MetricStatWidget
         label={metric.label}
         value={metric.value}
+        detail={metric.detail}
         size={item.size}
         loading={!overview && !error}
       />

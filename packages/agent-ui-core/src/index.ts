@@ -285,6 +285,8 @@ export type LibraryPagination = {
 export type LibraryItemList = {
   data: LibraryItem[]
   pagination: LibraryPagination
+  /** Sum of `bytes` for the filtered Library set (all pages). */
+  totalBytes?: number
 }
 
 export type UseLibraryInChatResult = {

@@ -260,9 +260,12 @@ def test_library_pagination(tmp_path: Path) -> None:
     assert len(first.data) == 2
     assert first.pagination.total == 5
     assert first.pagination.has_more is True
+    expected_bytes = sum(len(f"page-body-{index}".encode()) for index in range(5))
+    assert first.total_bytes == expected_bytes
     second = library.list_items(page=1, per_page=2)
     assert len(second.data) == 2
     assert second.pagination.has_more is True
+    assert second.total_bytes == expected_bytes
     third = library.list_items(page=2, per_page=2)
     assert len(third.data) == 1
     assert third.pagination.has_more is False

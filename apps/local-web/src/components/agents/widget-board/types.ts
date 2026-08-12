@@ -5,6 +5,8 @@ export type { WidgetLayout, WidgetSize }
 export type WidgetSurface = 'project' | 'overview'
 
 export type WidgetType =
+  | 'project-description'
+  | 'project-agent-context'
   | 'usage-hero'
   | 'stat-longest-agent'
   | 'stat-chats'
@@ -19,6 +21,9 @@ export type WidgetType =
   | 'stat-cache-hit'
   | 'stat-avg-tokens-chat'
   | 'stat-runs'
+  | 'stat-files-count'
+  | 'stat-sites-count'
+  | 'stat-files-size'
   | 'models-chart'
   | 'models-top-list'
   | 'bench-results'

@@ -7,8 +7,8 @@ import uuid
 from typing import Any
 
 WidgetSize = str  # "sm" | "md" | "lg"
-LAYOUT_VERSION = 5
-OVERVIEW_LAYOUT_VERSION = 6
+LAYOUT_VERSION = 6
+OVERVIEW_LAYOUT_VERSION = 7
 
 
 def _item(widget_type: str, size: WidgetSize = "sm") -> dict[str, str]:
@@ -16,10 +16,11 @@ def _item(widget_type: str, size: WidgetSize = "sm") -> dict[str, str]:
 
 
 def default_project_home_layout() -> dict[str, Any]:
-    """Compact seed: usage → streak metrics → activity → bench."""
+    """Seed: description → usage → streak metrics → activity → bench."""
     return {
         "version": LAYOUT_VERSION,
         "widgets": [
+            _item("project-description", "lg"),
             _item("usage-hero", "lg"),
             _item("stat-longest-agent", "sm"),
             _item("stat-chats", "sm"),
@@ -49,7 +50,7 @@ def default_overview_layout() -> dict[str, Any]:
             _item("stat-tokens-out", "sm"),
             _item("stat-cache-hit", "sm"),
             _item("stat-avg-tokens-chat", "sm"),
-            _item("stat-runs", "sm"),
+            _item("stat-files-size", "sm"),
             _item("models-chart", "lg"),
             _item("models-top-list", "lg"),
         ],

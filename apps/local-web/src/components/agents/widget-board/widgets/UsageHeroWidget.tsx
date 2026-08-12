@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 import { formatTokenCount } from '../../usage-overview-utils'
-import { valueTextClass, widgetShellClass } from '../grid'
+import { heroShellClass, valueTextClass } from '../grid'
 
 export function UsageHeroWidget({
   overview,
@@ -18,7 +18,12 @@ export function UsageHeroWidget({
   scopeLabel?: string
 }) {
   return (
-    <div className={widgetShellClass(size)}>
+    <div
+      className={heroShellClass(
+        size,
+        size === 'lg' ? 'justify-center' : undefined
+      )}
+    >
       <div>
         <p className="text-muted-foreground text-xs font-light tracking-wide">
           Usage{scopeLabel ? ` · ${scopeLabel}` : ''}

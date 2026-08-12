@@ -6,6 +6,26 @@ const PROJECT = ['project'] as const
 
 export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   {
+    type: 'project-description',
+    title: 'Project description',
+    description: 'Project description text',
+    kind: 'project',
+    visual: 'card',
+    defaultSize: 'lg',
+    allowedSizes: [...ALL_SIZES],
+    surfaces: [...PROJECT]
+  },
+  {
+    type: 'project-agent-context',
+    title: 'Agent context',
+    description: 'Extra context for the agent',
+    kind: 'project',
+    visual: 'card',
+    defaultSize: 'sm',
+    allowedSizes: [...ALL_SIZES],
+    surfaces: [...PROJECT]
+  },
+  {
     type: 'usage-hero',
     title: 'Usage',
     description: 'Lifetime tokens',
@@ -139,6 +159,36 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
     type: 'stat-runs',
     title: 'Runs',
     description: 'Agent run count',
+    kind: 'metric',
+    visual: 'card',
+    defaultSize: 'sm',
+    allowedSizes: [...ALL_SIZES],
+    surfaces: [...BOTH]
+  },
+  {
+    type: 'stat-files-count',
+    title: 'Files count',
+    description: 'Library + project folder files',
+    kind: 'metric',
+    visual: 'card',
+    defaultSize: 'sm',
+    allowedSizes: [...ALL_SIZES],
+    surfaces: [...PROJECT]
+  },
+  {
+    type: 'stat-sites-count',
+    title: 'Sites count',
+    description: 'Sites linked to this project',
+    kind: 'metric',
+    visual: 'card',
+    defaultSize: 'sm',
+    allowedSizes: [...ALL_SIZES],
+    surfaces: [...PROJECT]
+  },
+  {
+    type: 'stat-files-size',
+    title: 'File size',
+    description: 'Total Library artifacts size',
     kind: 'metric',
     visual: 'card',
     defaultSize: 'sm',
