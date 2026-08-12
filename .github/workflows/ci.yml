@@ -95,7 +95,6 @@ jobs:
           # Opt-in lanes (network / live chat / Modal / data smoke / pexpect)
           # are auto-deselected in tests/conftest.py unless their env gate is set.
           # Coverage gates run in agent-cli-coverage after shards combine.
-          export COVERAGE_FILE=".coverage.shard${{ matrix.group }}"
           uv run pytest tests/ -q \
             --splits 4 --group ${{ matrix.group }} \
             --splitting-algorithm least_duration \
@@ -104,22 +103,15 @@ jobs:
             --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models \
             --cov=reports --cov=skills --cov=tools --cov=ui \
             --cov-report=term-missing:skip-covered
-
-      - name: Stage shard coverage for upload
-        if: always()
-        run: |
-          # .coverage* is gitignored; hashFiles / some artifact globs skip it.
-          # Copy into a tracked-friendly path so the combine job can download it.
+          # Collapse xdist worker fragments into one data file for this shard.
+          uv run coverage combine
           mkdir -p ci-coverage
-          shopt -s nullglob
-          for f in .coverage .coverage.*; do
-            cp -f "$f" "ci-coverage/"
-          done
-          ls -la ci-coverage/ || true
+          cp -f .coverage "ci-coverage/shard-${{ matrix.group }}.coverage"
+          ls -la ci-coverage/
 
       - name: Upload shard coverage data
         uses: actions/upload-artifact@v4
-        if: always()
+        if: success()
         with:
           name: coverage-data-${{ matrix.group }}
           path: cli/ci-coverage/
@@ -166,7 +158,7 @@ jobs:
           # avoids flakes when new lightly-tested helpers land.
           ls -laR coverage-shards/
           # download-artifact may nest per-artifact dirs; combine all data files.
-          mapfile -t files < <(find coverage-shards -type f -name '.coverage*' -print)
+          mapfile -t files < <(find coverage-shards -type f -name '*.coverage' -print)
           if [ "${#files[@]}" -eq 0 ]; then
             echo "Error: no shard coverage data files downloaded." >&2
             exit 1
