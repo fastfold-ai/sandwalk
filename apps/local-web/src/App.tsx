@@ -554,6 +554,7 @@ export default function App() {
           sections,
           openTabs,
           openTabIds: cleanedOpenTabIds,
+          effectiveSessionId,
           orderedVisibleSessionIds,
           showSessionTabs,
           activeTitle,

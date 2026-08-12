@@ -361,6 +361,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         onClearSelection={clearSelectChats}
         onCreateSplitFromSelection={createSplitFromSelection}
         inSplitGroup={Boolean(activeGroup)}
+        activeGroupId={activeGroup?.id ?? null}
       />
       <ResizablePanelGroup
         direction="horizontal"

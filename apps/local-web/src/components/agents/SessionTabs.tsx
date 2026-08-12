@@ -265,13 +265,24 @@ export function SessionTabs({
     didScrollOnceRef.current = true
   }, [activeId, sortableIds, orderedTabs])
 
-  const filteredSearchTabs = useMemo(() => {
+  /*
+   * Lista del dropdown "All tabs" — mezcla chats y grupos en el mismo
+   * orden que la strip (respetando openTabIds), con búsqueda unificada.
+   * Antes había una sección aparte "Split view groups" que aislaba a los
+   * grupos con sub-items; se eliminó — un grupo aparece como una fila
+   * igual a un chat, con su propio título y conteo.
+   */
+  const filteredSearchItems = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase()
-    if (!needle) return orderedTabs
-    return orderedTabs.filter(tab =>
-      (tab.title || 'Untitled').toLowerCase().includes(needle)
-    )
-  }, [orderedTabs, searchQuery])
+    if (!needle) return orderedItems
+    return orderedItems.filter(item => {
+      const title =
+        item.kind === 'chat'
+          ? item.session.title || 'Untitled'
+          : item.group.name || `${item.group.chatIds.length} chats`
+      return title.toLowerCase().includes(needle)
+    })
+  }, [orderedItems, searchQuery])
 
   useEffect(() => {
     if (!searchOpen) {
@@ -550,20 +561,30 @@ export function SessionTabs({
             </div>
             <div className="max-h-[32rem] overflow-y-auto overscroll-contain">
               <div className="p-1.5" role="listbox" aria-label="Session tabs">
-                {filteredSearchTabs.length === 0 ? (
+                {filteredSearchItems.length === 0 ? (
                   <p className="text-muted-foreground px-2 py-6 text-center text-xs">
                     No matches
                   </p>
                 ) : (
-                  filteredSearchTabs.map(tab => {
-                    const active = tab.id === activeId
-                    const title = tab.title || 'Untitled'
-                    const stamp = relativeTime(
-                      tab.lastMessageAt || tab.updatedAt || tab.createdAt
-                    )
+                  filteredSearchItems.map(item => {
+                    const active = item.id === activeId
+                    const isGroup = item.kind === 'group'
+                    const tab = isGroup ? null : item.session
+                    const group = isGroup ? item.group : null
+                    const title = isGroup
+                      ? group!.name || `${group!.chatIds.length} chats`
+                      : tab!.title || 'Untitled'
+                    const stamp = isGroup
+                      ? ''
+                      : relativeTime(
+                          tab!.lastMessageAt ||
+                            tab!.updatedAt ||
+                            tab!.createdAt
+                        )
+                    const color = isGroup ? group!.color : tabColors[item.id]
                     return (
                       <div
-                        key={tab.id}
+                        key={item.id}
                         role="option"
                         aria-selected={active}
                         tabIndex={0}
@@ -573,71 +594,87 @@ export function SessionTabs({
                         )}
                         onClick={event => {
                           if (
+                            !isGroup &&
                             onToggleSelectChat &&
                             (event.shiftKey || event.metaKey)
                           ) {
-                            onToggleSelectChat(tab.id)
+                            onToggleSelectChat(item.id)
                             return
                           }
-                          onSelect(tab.id)
+                          onSelect(item.id)
                         }}
                         onKeyDown={event => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault()
-                            onSelect(tab.id)
+                            onSelect(item.id)
                           }
                         }}
-                        onContextMenu={event => {
-                          event.preventDefault()
-                          openContextMenu(tab.id, event)
-                        }}
+                        onContextMenu={
+                          isGroup
+                            ? undefined
+                            : event => {
+                                event.preventDefault()
+                                openContextMenu(item.id, event)
+                              }
+                        }
                         data-selected={
-                          selectedChatIds?.has(tab.id) ? 'true' : undefined
+                          selectedChatIds?.has(item.id) ? 'true' : undefined
                         }
                       >
                         <span className="bg-muted/80 flex size-7 shrink-0 items-center justify-center rounded-md">
-                          <SessionStatusIcon status={tab.status} />
+                          {isGroup ? (
+                            <Columns2 className="size-3.5" />
+                          ) : (
+                            <SessionStatusIcon status={tab!.status} />
+                          )}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-2">
-                            {tabColors[tab.id] ? (
+                            {color ? (
                               <span
                                 className="size-2 shrink-0 rounded-full border border-black/10"
-                                style={{
-                                  backgroundColor: tabColors[tab.id]
-                                }}
+                                style={{ backgroundColor: color }}
                                 aria-hidden
                               />
                             ) : null}
                             <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
                               {title}
                             </span>
-                            {/*
-                              Stamp and close X share the same slot: the stamp
-                              fades out on item hover while the X fades in in
-                              its place. Fixed min-width keeps the layout stable.
-                            */}
+                            {isGroup ? (
+                              <span
+                                className="bg-black/10 text-foreground/70 dark:bg-white/15 shrink-0 rounded-md px-1 text-[10px] font-semibold tabular-nums leading-none"
+                                aria-hidden
+                              >
+                                {group!.chatIds.length}
+                              </span>
+                            ) : null}
                             <span
                               className="relative block h-4 shrink-0"
                               style={{ width: 28 }}
                             >
-                              <span className="text-muted-foreground absolute inset-0 inline-flex items-center justify-center text-[11px] tabular-nums transition-opacity group-hover/item:opacity-0">
-                                {stamp}
-                              </span>
+                              {!isGroup ? (
+                                <span className="text-muted-foreground absolute inset-0 inline-flex items-center justify-center text-[11px] tabular-nums transition-opacity group-hover/item:opacity-0">
+                                  {stamp}
+                                </span>
+                              ) : null}
                               <button
                                 type="button"
                                 className="text-muted-foreground hover:text-foreground absolute inset-0 inline-flex items-center justify-center rounded-md opacity-0 transition-opacity group-hover/item:opacity-100"
                                 aria-label={`Close ${title}`}
                                 onClick={event => {
                                   event.stopPropagation()
-                                  onClose(tab.id)
+                                  if (isGroup) {
+                                    onDissolveGroup?.(item.id)
+                                  } else {
+                                    onClose(item.id)
+                                  }
                                 }}
                               >
                                 <X className="size-3.5" />
                               </button>
                             </span>
                           </span>
-                          {tab.organizeLabel === 'pinned' ? (
+                          {!isGroup && tab!.organizeLabel === 'pinned' ? (
                             <span className="text-muted-foreground mt-0.5 flex items-center gap-1 text-[11px]">
                               <Pin
                                 className="size-3 shrink-0"
@@ -651,75 +688,6 @@ export function SessionTabs({
                     )
                   })
                 )}
-                {groups && groups.length > 0 ? (
-                  <>
-                    <div className="text-muted-foreground border-border/70 mt-1 border-t px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide">
-                      Split view groups
-                    </div>
-                    {groups.map(group => {
-                      const active = group.id === activeId
-                      const label =
-                        group.name || `${group.chatIds.length} chats`
-                      return (
-                        <div
-                          key={group.id}
-                          role="option"
-                          aria-selected={active}
-                          className={cn(
-                            'group/gr hover:bg-muted flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5',
-                            active && 'bg-muted'
-                          )}
-                          onClick={() => onSelect(group.id)}
-                        >
-                          <span className="bg-muted/80 flex size-7 shrink-0 items-center justify-center rounded-md">
-                            <Columns2 className="size-3.5" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="text-foreground text-sm font-medium">
-                              {label}
-                            </span>
-                            <ul className="text-muted-foreground mt-0.5 space-y-0.5 text-[11px]">
-                              {group.chatIds.slice(0, 4).map(chatId => {
-                                const chat = tabs.find(t => t.id === chatId)
-                                return (
-                                  <li
-                                    key={chatId}
-                                    className="flex items-center gap-1.5 truncate"
-                                  >
-                                    <span className="text-muted-foreground/60">
-                                      ├─
-                                    </span>
-                                    <span className="truncate">
-                                      {chat?.title || 'Untitled'}
-                                    </span>
-                                  </li>
-                                )
-                              })}
-                              {group.chatIds.length > 4 ? (
-                                <li className="text-muted-foreground/70 pl-4">
-                                  +{group.chatIds.length - 4} más
-                                </li>
-                              ) : null}
-                            </ul>
-                          </span>
-                          {onDissolveGroup ? (
-                            <button
-                              type="button"
-                              className="text-muted-foreground hover:text-foreground shrink-0 opacity-0 transition-opacity group-hover/gr:opacity-100"
-                              aria-label={`Dissolve ${label}`}
-                              onClick={event => {
-                                event.stopPropagation()
-                                onDissolveGroup(group.id)
-                              }}
-                            >
-                              <X className="size-3.5" />
-                            </button>
-                          ) : null}
-                        </div>
-                      )
-                    })}
-                  </>
-                ) : null}
               </div>
             </div>
           </PopoverContent>

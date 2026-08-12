@@ -85,6 +85,13 @@ export type SessionMainHeaderProps = {
    * y quitar la ambigüedad de "a qué chat aplica").
    */
   inSplitGroup?: boolean
+  /**
+   * Id del grupo activo (si el user está en un split). El activeId
+   * visual del strip usa `activeGroupId ?? sessionId` — sin este prop,
+   * `sessionId` (chatId real) no matchearía ningún tab porque el chat
+   * vive oculto dentro del grupo.
+   */
+  activeGroupId?: string | null
   selectedChatIds?: Set<string>
   onToggleSelectChat?: (id: string) => void
   onClearSelection?: () => void
@@ -130,7 +137,8 @@ export function SessionMainHeader({
   onToggleSelectChat,
   onClearSelection,
   onCreateSplitFromSelection,
-  inSplitGroup
+  inSplitGroup,
+  activeGroupId
 }: SessionMainHeaderProps) {
   const overlay = useMacDesktopOverlay()
   // Collapse: reveal after panel closes. Expand: keep briefly so icons don't gap.
@@ -260,7 +268,7 @@ export function SessionMainHeader({
         <SessionTabs
           tabs={openTabs}
           openTabIds={openTabIds}
-          activeId={sessionId}
+          activeId={activeGroupId ?? sessionId}
           onSelect={id => {
             void navigateToSession({
               id,

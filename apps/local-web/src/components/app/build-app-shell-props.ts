@@ -37,6 +37,7 @@ type AppShellBridgeInput = {
   sections: TabItemSection[]
   openTabs: TabItem[]
   openTabIds: string[]
+  effectiveSessionId: string | null
   orderedVisibleSessionIds: string[]
   showSessionTabs: boolean
   activeTitle: string
@@ -81,7 +82,15 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     activeProjectId: input.context.activeProjectId,
     sections: input.sections,
     collapsedSidebarSections: input.ui.collapsedSidebarSections,
-    sessionId: input.route.sessionId,
+    /*
+     * `sessionId` que recibe el shell es el chatId REAL (activeChatId
+     * del grupo cuando estás en un split, o el chatId de la ruta cuando
+     * es un chat suelto). El server no reconoce los `grp_xxx` — todas
+     * las queries de files/messages/etc. usan este id. Para el activeId
+     * visual del strip/sidebar (que sí quiere señalar el chip del grupo
+     * cuando estás en él) se usa `input.route.sessionId` derivado.
+     */
+    sessionId: input.effectiveSessionId,
     chatBySessionId: input.chat.chatBySessionId,
     orderedVisibleSessionIds: input.orderedVisibleSessionIds,
     selectedSessionIds: input.actions.selectedSessionIds,
