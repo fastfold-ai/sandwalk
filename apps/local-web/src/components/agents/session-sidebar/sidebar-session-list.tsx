@@ -183,6 +183,12 @@ export type SidebarSessionListProps = {
    * grupo. Cuando no estás en un grupo, es null.
    */
   activeGroupChildId?: string | null
+  /**
+   * Setea el chat activo dentro de un grupo. Se llama cuando el usuario
+   * clickea un chat hijo desde el sidebar: en vez de navegar al chat como
+   * tab individual, abrimos el grupo con ese chat enfocado en el split.
+   */
+  setTabGroupActiveChat?: (groupId: string, chatId: string) => void
 }
 
 export function SidebarSessionList({
@@ -208,7 +214,8 @@ export function SidebarSessionList({
   setDeleteTarget,
   onSelectTabGroup,
   onDissolveTabGroup,
-  activeGroupChildId
+  activeGroupChildId,
+  setTabGroupActiveChat
 }: SidebarSessionListProps) {
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
@@ -336,13 +343,18 @@ export function SidebarSessionList({
                             onSelectGroup={onSelectTabGroup}
                             onDissolveGroup={onDissolveTabGroup}
                             onSelectChat={chatId => {
+                              /*
+                               * Chat hijo del split: en vez de abrir el
+                               * chat como tab individual, seteamos ese
+                               * chat como el activo del grupo y navegamos
+                               * al grupo. Así el split se abre con ese
+                               * panel enfocado — no un tab suelto.
+                               */
                               setSelectionAnchorId(chatId)
-                              void navigateToSession({
-                                id: chatId,
-                                openSessionTab,
-                                prefetchSessionMessages,
-                                navigate
-                              })
+                              if (setTabGroupActiveChat) {
+                                setTabGroupActiveChat(item.group.id, chatId)
+                              }
+                              navigate(`/agents/${item.group.id}`)
                             }}
                           />
                         )

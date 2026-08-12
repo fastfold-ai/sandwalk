@@ -71,6 +71,7 @@ export type AppShellSidebarProps = {
   onSelectTabGroup?: (groupId: string) => void
   onDissolveTabGroup?: (groupId: string) => void
   activeGroupChildId?: string | null
+  setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   setCollapsedSidebarSections: (
     value:
       | Record<string, boolean>
@@ -143,6 +144,7 @@ export function AppShellSidebar({
   onSelectTabGroup,
   onDissolveTabGroup,
   activeGroupChildId,
+  setTabGroupActiveChat,
   setCollapsedSidebarSections,
   selectSessionRange,
   toggleSessionSelected,
@@ -239,6 +241,7 @@ export function AppShellSidebar({
             onSelectTabGroup={onSelectTabGroup}
             onDissolveTabGroup={onDissolveTabGroup}
             activeGroupChildId={activeGroupChildId}
+            setTabGroupActiveChat={setTabGroupActiveChat}
             setCollapsedSidebarSections={setCollapsedSidebarSections}
             selectSessionRange={selectSessionRange}
             toggleSessionSelected={toggleSessionSelected}

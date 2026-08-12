@@ -68,6 +68,7 @@ export function AppShell(props: AppShellProps) {
           onSelectTabGroup={props.onSelectTabGroup}
           onDissolveTabGroup={props.dissolveTabGroup}
           activeGroupChildId={props.activeGroup?.activeChatId ?? null}
+          setTabGroupActiveChat={props.setTabGroupActiveChat}
           setCollapsedSidebarSections={props.setCollapsedSidebarSections}
           selectSessionRange={props.selectSessionRange}
           toggleSessionSelected={props.toggleSessionSelected}

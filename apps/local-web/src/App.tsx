@@ -84,6 +84,19 @@ export default function App() {
     ? activeGroup.activeChatId
     : route.sessionId
 
+  /*
+   * Al navegar a un grupo (`route.sessionId === grp_xxx`), persistimos su
+   * id en `openTabsByProject` del scope activo — mismo patrón que ya usa
+   * `useAppSessionEffects` con chats individuales via `openSessionTab`.
+   * Efecto: el chip del grupo aparece en la strip del proyecto donde el
+   * user navegó, y al recargar se restaura. Si el user visita el mismo
+   * grupo desde otro proyecto, se persiste ahí también, sin duplicar.
+   */
+  useEffect(() => {
+    if (!activeGroup) return
+    tabs.openSessionTab(activeGroup.id)
+  }, [activeGroup, tabs.openSessionTab])
+
   const context = useAppRouteContext({
     decodedIntegrationRouteName: route.decodedIntegrationRouteName,
     normalizedIntegrationRouteName: route.normalizedIntegrationRouteName,
