@@ -189,6 +189,19 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     chat.patchChat
   )
 
+  // Prefetch al montar: cada mount carga el historial de SU chatId una sola
+  // vez. Crítico para split view — sin esto los paneles no-activos del grupo
+  // solo verían los mensajes nuevos que llegan por SSE, no la conversación
+  // previa. `usePrefetchSessionMessages` ya hace early-return si el chat
+  // está `messagesLoaded`, así que llamarlo múltiples veces es idempotente.
+  useEffect(() => {
+    const id = args.sessionId
+    if (!id) return
+    const controller = new AbortController()
+    void prefetchSessionMessages(id, controller.signal)
+    return () => controller.abort()
+  }, [args.sessionId, prefetchSessionMessages])
+
   const sandbox = useSessionSandbox({
     client: args.client,
     health: args.health,
