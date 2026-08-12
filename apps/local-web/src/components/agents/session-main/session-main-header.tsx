@@ -170,10 +170,10 @@ export function SessionMainHeader({
     showPreviewAction
 
   const openTerminal = () => {
-    if (terminalOpen) {
-      setTerminalOpen(false)
-      return
-    }
+    // Por ahora la terminal queda siempre abierta y no se puede cerrar.
+    // El shortcut ⌘⇧T garantiza que el panel Files se vea (para exponer
+    // la terminal si estaba oculto por Files collapsed), pero nunca hace
+    // toggle-off — hasta que definamos la UX final.
     if (isDraft && inProject) {
       void (async () => {
         await onPrepareDraftWorkspace?.()
@@ -427,54 +427,11 @@ export function SessionMainHeader({
               </DropdownMenu>
             ) : null}
             <TooltipProvider delayDuration={300}>
-              {showTerminalAction ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        floatBtn,
-                        terminalOpen &&
-                          'text-foreground bg-background dark:bg-zinc-800'
-                      )}
-                      onClick={openTerminal}
-                      aria-label={
-                        terminalOpen ? 'Hide terminal' : 'Show terminal'
-                      }
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="size-4"
-                        aria-hidden
-                      >
-                        <rect width="18" height="18" x="3" y="3" rx="2" />
-                        <path d="m8 10 2 2-2 2" />
-                        <path d="M12 14h4" />
-                      </svg>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    className="flex items-center gap-2"
-                  >
-                    <span>
-                      {terminalOpen
-                        ? 'Hide terminal'
-                        : isDraft && !inProject
-                          ? 'Open terminal in home'
-                          : 'Show terminal'}
-                    </span>
-                    <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
-                      ⌘⇧T
-                    </kbd>
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
+              {/*
+                Botón Terminal oculto por ahora — la terminal queda siempre
+                abierta por defecto y no se puede cerrar hasta que
+                definamos su UX final.
+              */}
               {showFilesAction ? (
                 <Tooltip>
                   <TooltipTrigger asChild>

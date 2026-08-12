@@ -402,23 +402,55 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                   showFiles:
                     Boolean(chatSession) &&
                     !isDraftAgentSessionId(chatId),
-                  showTerminal: Boolean(chatSession),
+                  // Terminal se muestra siempre por debajo de Files y no
+                  // ofrece control de cerrarla — el botón queda oculto por
+                  // ahora hasta que definamos la UX del terminal en split.
+                  showTerminal: false,
                   showPreview:
                     Boolean(chatSession) &&
                     !isDraftAgentSessionId(chatId),
                   filesPanelCollapsed,
                   terminalOpen,
                   panelView,
+                  /*
+                   * Toggles "smart" — cada click en Files/Preview/Terminal
+                   * de un panel del split debe hacer que el sidebar derecho
+                   * quede apuntando al chat que se clickeó, sin importar en
+                   * cuál estaba antes. `withFocus` en el header ya movió el
+                   * foco (activeChatId → chatId), así que acá solo decidimos
+                   * si el usuario quiso CERRAR (segundo click sobre lo ya
+                   * abierto de este chat) o ABRIR/CAMBIAR (todo lo demás).
+                   */
                   onToggleFiles: () => {
-                    setFilesPanelCollapsed(collapsed => !collapsed)
-                    if (panelView !== 'files') setPanelView('files')
+                    const showingFilesHere =
+                      focused &&
+                      panelView === 'files' &&
+                      !filesPanelCollapsed
+                    if (showingFilesHere) {
+                      setFilesPanelCollapsed(true)
+                    } else {
+                      setPanelView('files')
+                      setFilesPanelCollapsed(false)
+                    }
                   },
                   onToggleTerminal: () => {
-                    setTerminalOpen(open => !open)
+                    if (focused && terminalOpen) {
+                      setTerminalOpen(false)
+                    } else {
+                      setTerminalOpen(true)
+                    }
                   },
                   onOpenPreview: () => {
-                    setPanelView('preview')
-                    setFilesPanelCollapsed(false)
+                    const showingPreviewHere =
+                      focused &&
+                      panelView === 'preview' &&
+                      !filesPanelCollapsed
+                    if (showingPreviewHere) {
+                      setFilesPanelCollapsed(true)
+                    } else {
+                      setPanelView('preview')
+                      setFilesPanelCollapsed(false)
+                    }
                   },
                   showCli:
                     Boolean(chatSession) &&
@@ -555,13 +587,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           >
             {activeGroup && workspaceSessionId ? (
               <div className="border-border/60 bg-background/95 flex items-center gap-1.5 border-b px-3 py-1.5 text-[11px]">
-                <span className="text-muted-foreground">Split view ·</span>
                 <span className="text-foreground truncate font-medium">
                   {allSessions.find(s => s.id === workspaceSessionId)?.title ||
                     'Untitled'}
-                </span>
-                <span className="text-muted-foreground/60 ml-auto">
-                  ({activeGroup.chatIds.length} chats)
                 </span>
               </div>
             ) : null}
@@ -640,13 +668,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           >
             {activeGroup ? (
               <div className="border-border/60 bg-background/95 flex items-center gap-1.5 border-b px-3 py-1.5 text-[11px]">
-                <span className="text-muted-foreground">Split view ·</span>
                 <span className="text-foreground truncate font-medium">
                   {allSessions.find(s => s.id === workspaceSessionId)?.title ||
                     'Untitled'}
-                </span>
-                <span className="text-muted-foreground/60 ml-auto">
-                  ({activeGroup.chatIds.length} chats)
                 </span>
               </div>
             ) : null}

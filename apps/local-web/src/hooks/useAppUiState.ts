@@ -43,13 +43,11 @@ export function useAppUiState() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [copiedResumeCommand, setCopiedResumeCommand] = useState(false)
   const [cliMenuOpen, setCliMenuOpen] = useState(false)
-  const [terminalOpen, setTerminalOpen] = useState(() => {
-    try {
-      return localStorage.getItem(TERMINAL_OPEN_STORAGE_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
+  // Por ahora la terminal queda siempre abierta y no se puede cerrar.
+  // El estado sigue siendo un `useState` para no cascadear typings del
+  // shell, pero se inicializa en `true` y se ignoran los `setTerminalOpen(false)`
+  // que vienen de handlers ya deshabilitados en la UI.
+  const [terminalOpen, setTerminalOpen] = useState(true)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1'
