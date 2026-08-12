@@ -168,6 +168,5 @@ jobs:
             macOS builds are **ad-hoc signed** until Apple Developer ID + notarization are enabled (right-click → Open the first time). In-app updates use `latest.json` + `Sandwalk.app.tar.gz`.
         env:
           # A classic PAT (repo scope) as RELEASE_GITHUB_TOKEN publishes as you,
-          # not github-actions[bot]. Unsloth does the same by creating the
-          # GitHub Release from a person; Actions only attaches the binaries.
+          # not github-actions[bot].
           GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

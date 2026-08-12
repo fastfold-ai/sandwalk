@@ -150,7 +150,7 @@ CI: [`.github/workflows/release-desktop.yml`](../../.github/workflows/release-de
 |--------|--------|
 | `TAURI_SIGNING_PRIVATE_KEY` | Full contents of `apps/local-web/src-tauri/.updater-key` |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Empty if the key was generated with `-p ""` |
-| `RELEASE_GITHUB_TOKEN` | Optional classic PAT (`repo` scope) so the GitHub Release is attributed to **you**, not `github-actions`. Unsloth’s “danielhanchen released this” works the same way: a person token creates the release; CI attaches the DMG. |
+| `RELEASE_GITHUB_TOKEN` | Optional classic PAT (`repo` scope) so the GitHub Release is attributed to you, not `github-actions`. |
 
 Do **not** commit the private key. The public key already lives in
 `apps/local-web/src-tauri/tauri.conf.json` → `plugins.updater.pubkey`.

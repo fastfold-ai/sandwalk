@@ -176,7 +176,7 @@ export function GeneralView({
     }
   }, [refreshCliPath])
 
-  // Auto-check once on desktop a few seconds after mount (Unsloth-style).
+  // Auto-check once on desktop a few seconds after mount.
   // Quiet on network/404 until a Release exists — manual Check still surfaces errors.
   useEffect(() => {
     if (!useDesktopUpdater) return
