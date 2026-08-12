@@ -289,6 +289,7 @@ export default function App() {
     setBackendApiKey: bootstrap.setBackendApiKey,
     error: bootstrap.error,
     errorStack: bootstrap.errorStack,
+    localStarting: bootstrap.localStarting,
     setError: bootstrap.setError,
     onOnboardingPath: route.onOnboardingPath,
     onboardingStep: route.onboardingStep,

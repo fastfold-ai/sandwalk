@@ -25,9 +25,9 @@ import {
   isLocalBackendUrl,
   persistBackendUrl
 } from '@/lib/backend-url'
-import { isTauri, listenDesktopApplyAuth } from '@/lib/desktop'
-import { dedupeAsync, invalidateDedupe } from '@/lib/dedupe-async'
 import { normalizeBackendUrl } from '@/lib/backend-url'
+import { dedupeAsync, invalidateDedupe } from '@/lib/dedupe-async'
+import { isTauri, listenDesktopApplyAuth } from '@/lib/desktop'
 import {
   clampOnboardingStep,
   isOnboardingPath,
@@ -37,6 +37,7 @@ import { clearRememberedApiKey, persistRememberedApiKey } from '@/lib/remembered
 import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 
 import type { useAppBootstrapLoaders } from './useAppBootstrapLoaders'
+import { useLocalServerWait } from './useLocalServerWait'
 
 type LoaderBundle = ReturnType<typeof useAppBootstrapLoaders>
 
@@ -362,6 +363,16 @@ export function useAppBootstrapConnect({
 
   connectRef.current = connect
 
+  const localStarting = useLocalServerWait({
+    backendUrl,
+    connecting,
+    error,
+    health,
+    connectionPaused,
+    needsAuthLogin,
+    connect
+  })
+
   useEffect(() => {
     if (!isTauri()) return
     let cancelled = false
@@ -420,25 +431,6 @@ export function useAppBootstrapConnect({
   }, [connectionPaused, health, loadSessions, needsAuthLogin, setAuthLoginError])
 
   useEffect(() => {
-    if (needsAuthLogin || connectionPaused || health || connecting) return
-    if (!error) return
-    if (!isLocalBackendUrl(backendUrl)) return
-    if (!isBackendUnavailableError(error)) return
-    const timer = window.setInterval(() => {
-      void connect()
-    }, 5000)
-    return () => window.clearInterval(timer)
-  }, [
-    backendUrl,
-    connect,
-    connecting,
-    connectionPaused,
-    error,
-    health,
-    needsAuthLogin
-  ])
-
-  useEffect(() => {
     if (isDashboardModels || !health) return
     void loadModelOptions()
   }, [health, isDashboardModels, loadModelOptions])
@@ -456,6 +448,7 @@ export function useAppBootstrapConnect({
     setConnectionPaused,
     error,
     errorStack,
+    localStarting,
     setError,
     connect
   }

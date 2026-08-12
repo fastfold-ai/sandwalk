@@ -39,6 +39,7 @@ type AppGatesProps = {
   setBackendApiKey: (value: string) => void
   error: string | null
   errorStack: string | null
+  localStarting?: boolean
   setError: (value: string | null) => void
   onOnboardingPath: boolean
   onboardingStep: number
@@ -72,6 +73,7 @@ export function AppGates({
   setBackendApiKey,
   error,
   errorStack,
+  localStarting = false,
   setError,
   onOnboardingPath,
   onboardingStep,
@@ -139,6 +141,7 @@ export function AppGates({
 
   if (!health) {
     const backendDown = Boolean(error) && isBackendUnavailableError(error)
+    const starting = localStarting || (connecting && !backendDown)
     const connectError = error
       ? errorStack
         ? Object.assign(new Error(error), { stack: errorStack })
@@ -149,7 +152,8 @@ export function AppGates({
       return (
         <DesktopGateFrame>
           <AppGatesLocalWaiting
-            backendDown={backendDown}
+            backendDown={backendDown && !starting}
+            starting={starting}
             connecting={connecting}
             connectError={connectError}
             connect={connect}

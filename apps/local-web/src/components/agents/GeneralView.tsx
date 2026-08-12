@@ -13,19 +13,15 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useDesktopUpdate } from '@/hooks/useDesktopUpdate'
 import {
   desktopCliPathInstall,
+  type DesktopCliPathStatus,
   desktopCliPathStatus,
   desktopMenubarAvailable,
-  type DesktopCliPathStatus,
   isTauri,
   platformOS
 } from '@/lib/desktop'
-import {
-  checkDesktopUpdate,
-  desktopUpdaterAvailable,
-  installDesktopUpdate
-} from '@/lib/desktop-updater'
 
 import { GeneralViewAccountSection } from './general-view-account'
 import { GeneralViewNotificationsSection } from './general-view-notifications'
@@ -57,21 +53,21 @@ export function GeneralView({
   const [searchParams, setSearchParams] = useSearchParams()
   const [account, setAccount] = useState<AccountSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [checkingUpdates, setCheckingUpdates] = useState(false)
-  const [installingUpdate, setInstallingUpdate] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const [hasCheckedUpdates, setHasCheckedUpdates] = useState(false)
-  const [desktopUpToDate, setDesktopUpToDate] = useState<boolean | null>(null)
-  const [desktopLatest, setDesktopLatest] = useState<string | null>(null)
-  const [checkError, setCheckError] = useState<string | null>(null)
+  const [advisoryUpToDate, setAdvisoryUpToDate] = useState<boolean | null>(null)
+  const [advisoryLatest, setAdvisoryLatest] = useState<string | null>(null)
+  const [advisoryError, setAdvisoryError] = useState<string | null>(null)
+  const [checkingAdvisory, setCheckingAdvisory] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cliPath, setCliPath] = useState<DesktopCliPathStatus | null>(null)
   const [checkingCliPath, setCheckingCliPath] = useState(false)
   const [installingCliPath, setInstallingCliPath] = useState(false)
   const [cliPathError, setCliPathError] = useState<string | null>(null)
   const [showCliPath, setShowCliPath] = useState(false)
-  const useDesktopUpdater = desktopUpdaterAvailable()
+  const desktopUpdate = useDesktopUpdate()
+  const useDesktopUpdater = isTauri()
 
   const refreshCliPath = useCallback(async () => {
     if (!isTauri() || platformOS() !== 'macos') return
@@ -125,36 +121,25 @@ export function GeneralView({
   )
 
   const runUpdateCheck = useCallback(async () => {
-    setCheckingUpdates(true)
-    setCheckError(null)
-    try {
-      if (useDesktopUpdater) {
-        const result = await checkDesktopUpdate()
-        setHasCheckedUpdates(true)
-        if (result.kind === 'available') {
-          setDesktopUpToDate(false)
-          setDesktopLatest(result.info.version)
-        } else if (result.kind === 'current') {
-          setDesktopUpToDate(true)
-          setDesktopLatest(null)
-        } else if (result.kind === 'error') {
-          setCheckError(result.message)
-        }
-        return
-      }
+    if (useDesktopUpdater) {
+      await desktopUpdate.checkForUpdate()
+      return
+    }
 
-      // Browser / non-desktop: advisory PyPI compare via account API.
+    setCheckingAdvisory(true)
+    setAdvisoryError(null)
+    try {
       const next = await onLoadAccount({ checkUpdates: true })
       setAccount(next)
       setHasCheckedUpdates(true)
-      setDesktopUpToDate(next.about.upToDate)
-      setDesktopLatest(next.about.latestVersion)
+      setAdvisoryUpToDate(next.about.upToDate)
+      setAdvisoryLatest(next.about.latestVersion)
     } catch (err) {
-      setCheckError(err instanceof Error ? err.message : String(err))
+      setAdvisoryError(err instanceof Error ? err.message : String(err))
     } finally {
-      setCheckingUpdates(false)
+      setCheckingAdvisory(false)
     }
-  }, [onLoadAccount, useDesktopUpdater])
+  }, [desktopUpdate, onLoadAccount, useDesktopUpdater])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -176,33 +161,6 @@ export function GeneralView({
     }
   }, [refreshCliPath])
 
-  // Auto-check once on desktop a few seconds after mount.
-  // Quiet on network/404 until a Release exists — manual Check still surfaces errors.
-  useEffect(() => {
-    if (!useDesktopUpdater) return
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        setCheckingUpdates(true)
-        try {
-          const result = await checkDesktopUpdate()
-          setHasCheckedUpdates(true)
-          if (result.kind === 'available') {
-            setDesktopUpToDate(false)
-            setDesktopLatest(result.info.version)
-          } else if (result.kind === 'current') {
-            setDesktopUpToDate(true)
-            setDesktopLatest(null)
-          }
-        } catch {
-          // ignore background failures
-        } finally {
-          setCheckingUpdates(false)
-        }
-      })()
-    }, 5000)
-    return () => window.clearTimeout(timer)
-  }, [useDesktopUpdater])
-
   // Sandwalk menu → Check for Updates… lands here with ?checkUpdates=1
   useEffect(() => {
     if (searchParams.get('checkUpdates') !== '1') return
@@ -211,17 +169,6 @@ export function GeneralView({
     setSearchParams(next, { replace: true })
     void runUpdateCheck()
   }, [runUpdateCheck, searchParams, setSearchParams])
-
-  const runInstall = async () => {
-    setInstallingUpdate(true)
-    setCheckError(null)
-    const result = await installDesktopUpdate()
-    if (!result.ok) {
-      setCheckError(result.message || 'Update failed')
-      setInstallingUpdate(false)
-    }
-    // On success the app relaunches; no need to clear installing.
-  }
 
   const signOut = async () => {
     setConfirmSignOut(false)
@@ -237,10 +184,19 @@ export function GeneralView({
   }
 
   const about = account?.about
-  const upToDate = useDesktopUpdater ? desktopUpToDate : (about?.upToDate ?? null)
+  const upToDate = useDesktopUpdater
+    ? desktopUpdate.upToDate
+    : (advisoryUpToDate ?? about?.upToDate ?? null)
   const latestVersion = useDesktopUpdater
-    ? desktopLatest
-    : (about?.latestVersion ?? null)
+    ? desktopUpdate.latestVersion
+    : (advisoryLatest ?? about?.latestVersion ?? null)
+  const checkingUpdates = useDesktopUpdater
+    ? desktopUpdate.checking
+    : checkingAdvisory
+  const checkError = useDesktopUpdater ? desktopUpdate.error : advisoryError
+  const hasChecked = useDesktopUpdater
+    ? desktopUpdate.hasChecked
+    : hasCheckedUpdates
 
   return (
     <ScrollArea className="flex-1">
@@ -261,14 +217,14 @@ export function GeneralView({
         <GeneralViewVersionSection
           sandwalkVersion={__UI_VERSION__}
           checkingUpdates={checkingUpdates}
-          installingUpdate={installingUpdate}
-          hasChecked={hasCheckedUpdates}
+          installingUpdate={desktopUpdate.installing}
+          hasChecked={hasChecked}
           upToDate={upToDate}
           latestVersion={latestVersion}
           checkError={checkError}
           onCheckUpdates={() => void runUpdateCheck()}
           onInstallUpdate={
-            useDesktopUpdater ? () => void runInstall() : undefined
+            useDesktopUpdater ? () => void desktopUpdate.installUpdate() : undefined
           }
           showCliPath={showCliPath}
           cliPath={cliPath}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { useDesktopUpdate } from '@/hooks/useDesktopUpdate'
 import { isLocalBackendUrl, normalizeBackendUrl } from '@/lib/backend-url'
 import {
   hideDesktopWindow,
@@ -22,6 +23,7 @@ export function useDesktopWindowMenu(options?: {
   hideLauncherAfterOpen?: boolean
 }) {
   const navigate = useNavigate()
+  const { checkForUpdate } = useDesktopUpdate()
   const [remoteOpen, setRemoteOpen] = useState(false)
   const [remoteInitialUrl, setRemoteInitialUrl] = useState<string | null>(null)
   const hideLauncherRef = useRef(Boolean(options?.hideLauncherAfterOpen))
@@ -39,6 +41,7 @@ export function useDesktopWindowMenu(options?: {
         return
       }
       if (payload.action === 'check-updates') {
+        void checkForUpdate()
         navigate('/dashboard/general?checkUpdates=1')
         return
       }
@@ -80,7 +83,7 @@ export function useDesktopWindowMenu(options?: {
       cancelled = true
       unlisten?.()
     }
-  }, [navigate])
+  }, [checkForUpdate, navigate])
 
   return {
     remoteOpen,

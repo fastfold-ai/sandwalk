@@ -107,6 +107,17 @@ if [[ "${SKIP_AGENT_RUNTIME:-0}" != "1" ]]; then
   cp -a "${RUNTIME_STAGE}" "${HELPER_RESOURCES}/agent-runtime"
 else
   echo "==> Skipping agent runtime (SKIP_AGENT_RUNTIME=1)"
+  if [[ ! -d "${HELPER_RESOURCES}/agent-runtime" ]]; then
+    for src in \
+      "${OUT_DIR}/agent-runtime" \
+      "${HOME}/Applications/Sandwalk.app/Contents/Helpers/Sandwalk Server.app/Contents/Resources/agent-runtime"; do
+      if [[ -d "${src}" ]]; then
+        cp -a "${src}" "${HELPER_RESOURCES}/agent-runtime"
+        echo "    reused ${src}"
+        break
+      fi
+    done
+  fi
 fi
 
 UI_DIST="${LOCAL_WEB}/dist"

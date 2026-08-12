@@ -10,6 +10,7 @@ import { DEFAULT_BACKEND_URL } from '@/lib/backend-url'
 
 export function AppGatesLocalWaiting({
   backendDown,
+  starting,
   connecting,
   connectError,
   connect,
@@ -20,6 +21,7 @@ export function AppGatesLocalWaiting({
   onBackHome
 }: {
   backendDown: boolean
+  starting?: boolean
   connecting: boolean
   connectError: unknown | null
   connect: () => void | Promise<void>
@@ -61,20 +63,22 @@ export function AppGatesLocalWaiting({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">sandwalk</h1>
             <p className="text-muted-foreground mt-1 text-sm">
-              {backendDown
-                ? 'Local agent API error'
-                : connecting
-                  ? 'Waiting for the local agent API…'
-                  : 'Connecting…'}
+              {starting
+                ? 'Server is starting. Please wait.'
+                : backendDown
+                  ? 'Local agent API error'
+                  : connecting
+                    ? 'Waiting for the local agent API…'
+                    : 'Connecting…'}
             </p>
           </div>
-          {connecting && !connectError ? (
+          {starting || (connecting && !connectError) ? (
             <Loader2 className="text-muted-foreground size-5 animate-spin" />
           ) : null}
         </div>
 
         <div className="flex flex-col gap-3">
-          {connectError ? (
+          {starting ? null : connectError ? (
             <ErrorPage
               variant="inline"
               error={connectError}
@@ -95,7 +99,7 @@ export function AppGatesLocalWaiting({
             type="button"
             variant="ghost"
             className="text-muted-foreground w-full"
-            disabled={connecting}
+            disabled={connecting && !starting}
             onClick={() => setShowRemote(true)}
           >
             Open remote
@@ -105,7 +109,7 @@ export function AppGatesLocalWaiting({
               type="button"
               variant="ghost"
               className="text-muted-foreground w-full"
-              disabled={connecting}
+              disabled={connecting && !starting}
               onClick={onBackHome}
             >
               Back to home

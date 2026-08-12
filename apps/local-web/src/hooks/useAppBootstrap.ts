@@ -157,6 +157,7 @@ export function useAppBootstrap({
     autoRestoring,
     error: connectBundle.error,
     errorStack: connectBundle.errorStack,
+    localStarting: connectBundle.localStarting,
     setError: connectBundle.setError,
     sessions: loaders.sessions,
     setSessions: loaders.setSessions,

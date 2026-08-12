@@ -18,6 +18,7 @@ import { type NavigateFunction, useLocation } from 'react-router-dom'
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { DesktopDragRegion } from '@/components/DesktopDragRegion'
+import { DesktopUpdateBanner } from '@/components/DesktopUpdateBanner'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import { Button } from '@/components/ui/button'
 import {
@@ -268,6 +269,7 @@ export function AgentSessionSidebar({
           onBatchExport={() => void onBatchExportSelected()}
           onBatchDelete={onBatchDeletePending}
         />
+        <DesktopUpdateBanner />
         <SidebarUserMenu
           userName={sidebarUserName}
           onLogout={onLogout}

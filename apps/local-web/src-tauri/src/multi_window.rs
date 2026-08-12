@@ -524,6 +524,19 @@ pub fn clear_recents() {
     let _ = write_recents(&[]);
 }
 
+pub fn remove_recent(id: &str) {
+    let id = id.trim();
+    if id.is_empty() {
+        return;
+    }
+    let mut rows = read_recents();
+    let before = rows.len();
+    rows.retain(|row| row.id != id);
+    if rows.len() != before {
+        let _ = write_recents(&rows);
+    }
+}
+
 pub fn window_title_for_url(url: &str) -> String {
     window_title_for_remote(url, None)
 }
@@ -1242,6 +1255,13 @@ pub fn desktop_list_window_recents() -> Result<Vec<WindowRecent>, String> {
 #[tauri::command]
 pub fn desktop_clear_window_recents(app: AppHandle) -> Result<(), String> {
     clear_recents();
+    emit_recents_changed(&app);
+    install_app_menu(&app)
+}
+
+#[tauri::command]
+pub fn desktop_remove_window_recent(app: AppHandle, id: String) -> Result<(), String> {
+    remove_recent(&id);
     emit_recents_changed(&app);
     install_app_menu(&app)
 }

@@ -1,13 +1,12 @@
-import { Loader2, Monitor, Network, Trash2 } from 'lucide-react'
+import { Loader2, Monitor, Network, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { OsPlatformIcon } from '@/components/agents/os-platform-icon'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { DEFAULT_BACKEND_URL, isLocalBackendUrl } from '@/lib/backend-url'
 import {
-  clearDesktopWindowRecents,
   desktopLocalHostname,
   type DesktopWindowRecent,
   hideDesktopWindow,
@@ -15,7 +14,8 @@ import {
   listDesktopWindowRecents,
   listenDesktopWindowRecentsChanged,
   openDesktopServerSettings,
-  platformOS
+  platformOS,
+  removeDesktopWindowRecent
 } from '@/lib/desktop'
 import { openDesktopRecent } from '@/lib/open-desktop-recent'
 import { readCachedRemotePlatform } from '@/lib/remote-hostname'
@@ -198,14 +198,17 @@ export function WelcomeHome({
     }
   }
 
-  const clearRecents = async () => {
-    if (!isTauri()) return
+  const removeRecent = async (row: DesktopWindowRecent) => {
+    const id = (row.id || '').trim()
+    setRecents(prev =>
+      prev.filter(item => (item.id || item.url) !== (row.id || row.url))
+    )
+    if (!isTauri() || !id) return
     try {
-      await clearDesktopWindowRecents()
+      await removeDesktopWindowRecent(id)
     } catch {
-      // ignore
+      void refreshRecents({ silent: true })
     }
-    setRecents([])
   }
 
   const localCardDetail =
@@ -225,10 +228,10 @@ export function WelcomeHome({
   }
 
   return (
-    <main className="bg-background relative grid h-full place-items-center overflow-auto p-8">
+    <main className="bg-background relative flex h-full min-h-0 flex-col overflow-hidden px-8 pb-6 pt-10">
       <ThemeToggle placement="top-right" />
-      <div className="flex w-full max-w-xl flex-col items-stretch gap-10">
-        <div className="flex items-center gap-3">
+      <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-8">
+        <div className="flex shrink-0 items-center gap-3">
           <SandwalkMark className="text-foreground h-11 w-11" />
           <div className="flex flex-col items-start leading-tight">
             <h1 className="text-2xl font-semibold tracking-tight">sandwalk</h1>
@@ -246,7 +249,7 @@ export function WelcomeHome({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
             disabled={connecting}
@@ -291,24 +294,10 @@ export function WelcomeHome({
           </button>
         </div>
 
-        <section className="min-h-[8rem]">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              Recent
-            </h2>
-            {recents.length > 0 ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground h-7 px-2 text-xs"
-                onClick={() => void clearRecents()}
-              >
-                <Trash2 className="size-3.5" />
-                Clear
-              </Button>
-            ) : null}
-          </div>
+        <section className="flex min-h-0 flex-1 flex-col">
+          <h2 className="text-muted-foreground mb-2 shrink-0 text-xs font-medium tracking-wide uppercase">
+            Recent
+          </h2>
 
           {loadingRecents ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -320,40 +309,61 @@ export function WelcomeHome({
               No recent workspaces yet. Connect locally or open a remote server.
             </p>
           ) : (
-            <ul className="divide-border divide-y">
-              {recents.map(row => {
-                const { title, detail } = formatRecent(row, localHostname)
-                const key = row.id || row.url
-                const busy = openingId === key
-                return (
-                  <li key={row.id || `${row.url}:${row.route}:${row.lastOpenedAt}`}>
-                    <button
-                      type="button"
-                      disabled={connecting || Boolean(openingId)}
-                      onClick={() => void openRecent(row)}
-                      className="hover:bg-muted/40 flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors disabled:opacity-50"
+            <ScrollArea className="h-full min-h-0 flex-1">
+              <ul className="pr-2">
+                {recents.map(row => {
+                  const { title, detail } = formatRecent(row, localHostname)
+                  const key = row.id || row.url
+                  const busy = openingId === key
+                  return (
+                    <li
+                      key={
+                        row.id || `${row.url}:${row.route}:${row.lastOpenedAt}`
+                      }
+                      className="group hover:bg-muted/60 relative flex items-center rounded-lg transition-colors"
                     >
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                        {title}
-                      </span>
-                      <span className="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs">
-                        {busy ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <>
-                            <OsPlatformIcon
-                              platform={recentPlatform(row)}
-                              dense
-                            />
-                            <span>{detail}</span>
-                          </>
+                      <button
+                        type="button"
+                        disabled={connecting || Boolean(openingId)}
+                        onClick={() => void openRecent(row)}
+                        className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pr-8 pl-2 text-left disabled:opacity-50"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                          {title}
+                        </span>
+                        <span className="text-muted-foreground flex min-w-0 shrink-0 items-center gap-1.5 text-xs">
+                          {busy ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <span className="max-w-[14rem] truncate">
+                                {detail}
+                              </span>
+                              <OsPlatformIcon
+                                platform={recentPlatform(row)}
+                                dense
+                              />
+                            </>
+                          )}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${title}`}
+                        disabled={connecting || Boolean(openingId)}
+                        onClick={() => void removeRecent(row)}
+                        className={cn(
+                          'text-muted-foreground hover:bg-background/80 hover:text-foreground absolute right-1 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md',
+                          'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100'
                         )}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </ScrollArea>
           )}
         </section>
       </div>

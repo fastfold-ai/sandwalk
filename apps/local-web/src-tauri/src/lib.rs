@@ -850,6 +850,7 @@ pub fn run() {
             desktop_open_server_settings,
             multi_window::desktop_list_window_recents,
             multi_window::desktop_clear_window_recents,
+            multi_window::desktop_remove_window_recent,
             multi_window::desktop_upsert_window_snapshot,
             multi_window::desktop_remember_window_recent,
             lan_scan::desktop_scan_lan_servers,

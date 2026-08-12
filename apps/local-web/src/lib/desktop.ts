@@ -496,6 +496,9 @@ export const rememberDesktopWindowRecent = (url: string) =>
 export const clearDesktopWindowRecents = () =>
   invokeStrict<void>('desktop_clear_window_recents')
 
+export const removeDesktopWindowRecent = (id: string) =>
+  invokeStrict<void>('desktop_remove_window_recent', { id })
+
 export type DesktopWindowRecent = {
   id: string
   url: string
