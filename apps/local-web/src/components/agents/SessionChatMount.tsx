@@ -127,7 +127,14 @@ export function SessionChatMount({
       activeRunTodos={activeRunTodos}
       activeBuildPlan={activeBuildPlan}
       builtPlanPaths={builtPlanPaths}
-      liveDelta={shared.liveDelta}
+      /*
+       * `liveDelta` PROPIO del chatId del mount — antes se usaba
+       * `shared.liveDelta` (del shell/chat activo del grupo), lo cual
+       * hacía que el streaming SSE del panel focused apareciera también
+       * en los otros paneles del split view. Cada mount debe leer su
+       * delta específico del store por-sesión.
+       */
+      liveDelta={chat.liveDelta}
       pendingApproval={chat.pendingApproval}
       approvalSubmitting={chat.approvalSubmitting}
       onSubmitApprovals={submitApprovals}

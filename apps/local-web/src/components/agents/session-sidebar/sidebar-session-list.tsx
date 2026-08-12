@@ -3,9 +3,9 @@ import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import {
   Check,
   ChevronDown,
+  Columns2,
   MoreHorizontal,
-  Pin,
-  X
+  Pin
 } from 'lucide-react'
 import {
   type Dispatch,
@@ -295,38 +295,27 @@ export function SidebarSessionList({
           </p>
         ) : (
           displayedSections.map(section => {
-            const collapsed = Boolean(collapsedSidebarSections[section.id])
             const limit = visibleBySection[section.id] ?? SECTION_PAGE_SIZE
             const visibleItems = section.items.slice(0, limit)
             const remaining = Math.max(0, section.items.length - visibleItems.length)
             return (
               <div key={section.id} className="space-y-0.5">
-                <button
-                  type="button"
-                  className="text-muted-foreground/80 hover:text-foreground flex w-full items-center gap-1 rounded-md px-2 py-0.5 text-left text-[12px]"
-                  aria-expanded={!collapsed}
-                  onClick={() =>
-                    setCollapsedSidebarSections(current => ({
-                      ...current,
-                      [section.id]: !current[section.id]
-                    }))
-                  }
-                >
-                  <ChevronDown
-                    className={cn(
-                      'size-3.5 shrink-0 transition-transform',
-                      collapsed && '-rotate-90'
-                    )}
-                  />
+                {/*
+                 * Header de sección sin chevron: los headers de tramo
+                 * (Today / Yesterday / …) siempre están expandidos, así
+                 * los únicos chevrones visibles en el sidebar son los de
+                 * los split view groups — se destacan más y no compiten
+                 * con los chevrones de sección.
+                 */}
+                <div className="text-muted-foreground/80 flex w-full items-center gap-1 rounded-md px-2 py-0.5 text-left text-[12px]">
                   <span className="min-w-0 flex-1 truncate">
                     {section.title}
                   </span>
                   <span className="sandwalk-notification-count text-muted-foreground/60 shrink-0 text-[11px] tabular-nums">
                     {section.items.length}
                   </span>
-                </button>
-                {!collapsed ? (
-                  <ul className="space-y-px">
+                </div>
+                <ul className="space-y-px">
                     {visibleItems.map(item => {
                       if (item.kind === 'group') {
                         return (
@@ -611,7 +600,6 @@ export function SidebarSessionList({
                       </li>
                     ) : null}
                   </ul>
-                ) : null}
               </div>
             )
           })
@@ -689,18 +677,7 @@ function SidebarGroupItem({
             className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
             onClick={() => onSelectGroup?.(group.id)}
           >
-            <span className="flex size-4 shrink-0 items-center justify-center">
-              <svg
-                viewBox="0 0 24 24"
-                className="size-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <rect x="3" y="4" width="7" height="16" rx="1" />
-                <rect x="14" y="4" width="7" height="16" rx="1" />
-              </svg>
-            </span>
+            <Columns2 className="size-3.5 shrink-0" aria-hidden />
             {group.color ? (
               <span
                 className="size-2 shrink-0 rounded-full border border-black/10"
@@ -709,23 +686,33 @@ function SidebarGroupItem({
               />
             ) : null}
             <SidebarMarqueeTitle text={label} />
-            <span className="bg-black/10 text-foreground/70 dark:bg-white/15 shrink-0 rounded-md px-1 text-[10px] font-semibold tabular-nums leading-none">
-              {group.chatIds.length}
-            </span>
           </button>
         </div>
         {onDissolveGroup ? (
-          <button
-            type="button"
-            aria-label={`Dissolve group ${label}`}
-            className="text-muted-foreground hover:text-foreground justify-self-end opacity-0 transition-opacity group-hover/gr:opacity-100"
-            onClick={event => {
-              event.stopPropagation()
-              onDissolveGroup(group.id)
-            }}
-          >
-            <X className="size-3.5" />
-          </button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label={`Options for ${label}`}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted justify-self-end rounded-md p-0.5 opacity-0 transition-opacity group-hover/gr:opacity-100"
+                onClick={event => event.stopPropagation()}
+              >
+                <MoreHorizontal className="size-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-40 p-1">
+              <button
+                type="button"
+                className="hover:bg-muted text-destructive flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                onClick={event => {
+                  event.stopPropagation()
+                  onDissolveGroup(group.id)
+                }}
+              >
+                Dissolve split
+              </button>
+            </PopoverContent>
+          </Popover>
         ) : null}
       </div>
       {expanded ? (

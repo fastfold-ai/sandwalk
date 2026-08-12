@@ -246,7 +246,7 @@ export function SessionTabs({
     const idx = orderedTabs.findIndex(tab => tab.id === activeId)
     if (idx < 0) return
     const isFirst = idx === 0
-    const isLast = idx === orderedTabs.length - 1
+    const isLast = idx === orderedItems.length - 1
 
     let targetLeft: number
     if (isFirst) {
@@ -501,12 +501,12 @@ export function SessionTabs({
                       searchOpen &&
                         'bg-black/[0.12] text-foreground dark:bg-white/[0.18] dark:text-white'
                     )}
-                    aria-label={`All tabs (${orderedTabs.length})`}
+                    aria-label={`All tabs (${orderedItems.length})`}
                   >
                     <ChevronDown className="size-3.5 shrink-0 stroke-[2.25]" />
-                    {orderedTabs.length > 0 ? (
+                    {orderedItems.length > 0 ? (
                       <span className="text-[11px] font-semibold tabular-nums leading-none">
-                        {orderedTabs.length}
+                        {orderedItems.length}
                       </span>
                     ) : null}
                   </button>

@@ -186,8 +186,7 @@ export function SessionTab({
   onClose,
   onContextMenu,
   selected,
-  variant = 'session',
-  groupCount
+  variant = 'session'
 }: SessionTabProps) {
   const isGroup = variant === 'group'
   const [hovering, setHovering] = useState(false)
@@ -263,20 +262,10 @@ export function SessionTab({
       <TabBackground width={tabWidth} />
       <div className="chrome-tab-content">
         {isGroup ? (
-          <>
-            <Columns2
-              className="text-muted-foreground size-3.5 shrink-0"
-              aria-hidden
-            />
-            {typeof groupCount === 'number' ? (
-              <span
-                className="bg-black/10 text-foreground/70 dark:bg-white/15 shrink-0 rounded-md px-1 text-[10px] font-semibold tabular-nums leading-none"
-                aria-label={`${groupCount} chats in group`}
-              >
-                {groupCount}
-              </span>
-            ) : null}
-          </>
+          <Columns2
+            className="text-muted-foreground size-3.5 shrink-0"
+            aria-hidden
+          />
         ) : (
           <>
             <SessionStatusIcon status={tab.status} />
