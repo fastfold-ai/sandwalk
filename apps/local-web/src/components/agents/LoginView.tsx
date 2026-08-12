@@ -143,7 +143,7 @@ export function LoginView({
 
           <div className="mt-10 flex flex-col items-center gap-2.5">
             <p className="text-foreground/80 text-center text-sm font-medium [text-shadow:0_1px_6px_hsl(var(--background)/0.95),0_0_14px_hsl(var(--background)/0.85)]">
-              Great ideas need a path. This one is yours.
+              An agent harness for ambitious work.
             </p>
             <p className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
               <span>by</span>

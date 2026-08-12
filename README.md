@@ -6,7 +6,7 @@
   </picture></a>
 </p>
 <p align="center">
-  <small>Great ideas need a path. This one is yours.</small>
+  <small>An agent harness for ambitious work.</small>
 </p>
 
 <p align="center">

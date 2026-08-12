@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "sandwalk"
 version = "0.1.0-beta.1"
-description = "Great ideas need a path. This one is yours."
+description = "An agent harness for ambitious work."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
