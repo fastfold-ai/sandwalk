@@ -67,6 +67,9 @@ type AgentSessionSidebarProps = {
   canBatchSplitView?: boolean
   onSelectTabGroup?: (groupId: string) => void
   onDissolveTabGroup?: (groupId: string) => void
+  onSetTabGroupColor?: (groupId: string, color: string | null) => void
+  onCloseTabGroup?: (groupId: string) => void
+  onDeleteTabGroup?: (groupId: string) => void
   activeGroupChildId?: string | null
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   setCollapsedSidebarSections: Dispatch<SetStateAction<Record<string, boolean>>>
@@ -120,6 +123,9 @@ export function AgentSessionSidebar({
   canBatchSplitView,
   onSelectTabGroup,
   onDissolveTabGroup,
+  onSetTabGroupColor,
+  onCloseTabGroup,
+  onDeleteTabGroup,
   activeGroupChildId,
   setTabGroupActiveChat,
   setCollapsedSidebarSections,
@@ -275,6 +281,9 @@ export function AgentSessionSidebar({
         onClearSessionSelection={onClearSessionSelection}
         onSelectTabGroup={onSelectTabGroup}
         onDissolveTabGroup={onDissolveTabGroup}
+        onSetTabGroupColor={onSetTabGroupColor}
+        onCloseTabGroup={onCloseTabGroup}
+        onDeleteTabGroup={onDeleteTabGroup}
         activeGroupChildId={activeGroupChildId}
         setTabGroupActiveChat={setTabGroupActiveChat}
       />

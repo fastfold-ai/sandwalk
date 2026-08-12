@@ -22,7 +22,19 @@ import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
 import { SessionSourceIcon } from '@/components/agents/SessionSourceIcon'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
-import { TAB_INLINE_COLORS } from '@/components/agents/tab-context-menu'
+import {
+  TAB_INLINE_COLORS,
+  TabInlineColorRow
+} from '@/components/agents/tab-context-menu'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import {
   Popover,
   PopoverContent,
@@ -177,6 +189,9 @@ export type SidebarSessionListProps = {
   onClearSessionSelection: () => void
   onSelectTabGroup?: (groupId: string) => void
   onDissolveTabGroup?: (groupId: string) => void
+  onSetTabGroupColor?: (groupId: string, color: string | null) => void
+  onCloseTabGroup?: (groupId: string) => void
+  onDeleteTabGroup?: (groupId: string) => void
   /**
    * ID del chat focused dentro del grupo activo (si hay). Sirve para
    * pintar en el sidebar cuál chat del split está activo — no solo el
@@ -214,6 +229,9 @@ export function SidebarSessionList({
   setDeleteTarget,
   onSelectTabGroup,
   onDissolveTabGroup,
+  onSetTabGroupColor,
+  onCloseTabGroup,
+  onDeleteTabGroup,
   activeGroupChildId,
   setTabGroupActiveChat
 }: SidebarSessionListProps) {
@@ -331,6 +349,16 @@ export function SidebarSessionList({
                             activeChildId={activeGroupChildId ?? null}
                             onSelectGroup={onSelectTabGroup}
                             onDissolveGroup={onDissolveTabGroup}
+                            onSetGroupColor={onSetTabGroupColor}
+                            onCloseGroup={onCloseTabGroup}
+                            onDeleteGroup={onDeleteTabGroup}
+                            projects={projects}
+                            navigate={navigate}
+                            setTabColor={setTabColor}
+                            openRenameDialog={openRenameDialog}
+                            updateSession={updateSession}
+                            exportTranscript={exportTranscript}
+                            setDeleteTarget={setDeleteTarget}
                             onSelectChat={chatId => {
                               /*
                                * Chat hijo del split: en vez de abrir el
@@ -627,7 +655,17 @@ function SidebarGroupItem({
   attentionIds,
   onSelectGroup,
   onDissolveGroup,
-  onSelectChat
+  onSelectChat,
+  onSetGroupColor,
+  onCloseGroup,
+  onDeleteGroup,
+  projects,
+  navigate,
+  setTabColor,
+  openRenameDialog,
+  updateSession,
+  exportTranscript,
+  setDeleteTarget
 }: {
   group: import('@sandwalk/agent-ui-core').SessionGroup
   chats: AgentSession[]
@@ -640,7 +678,25 @@ function SidebarGroupItem({
   onSelectGroup?: (groupId: string) => void
   onDissolveGroup?: (groupId: string) => void
   onSelectChat: (chatId: string) => void
+  onSetGroupColor?: (groupId: string, color: string | null) => void
+  onCloseGroup?: (groupId: string) => void
+  onDeleteGroup?: (groupId: string) => void
+  projects: AgentProject[]
+  navigate: NavigateFunction
+  setTabColor: (id: string, color: string | null) => void
+  openRenameDialog: (target: AgentSession) => void
+  updateSession: (
+    target: AgentSession,
+    changes: Parameters<LocalAgentClient['updateSession']>[1]
+  ) => void | Promise<void>
+  exportTranscript: (target: AgentSession) => void | Promise<void>
+  setDeleteTarget: Dispatch<SetStateAction<AgentSession | null>>
 }) {
+  const [openChildMenuId, setOpenChildMenuId] = useState<string | null>(null)
+  const [confirmMode, setConfirmMode] = useState<'close' | 'delete' | null>(
+    null
+  )
+  const [menuOpen, setMenuOpen] = useState(false)
   const [expanded, setExpanded] = useState(true)
   const label = group.name || `${group.chatIds.length} chats`
   const groupActive = group.id === activeId
@@ -688,33 +744,91 @@ function SidebarGroupItem({
             <SidebarMarqueeTitle text={label} />
           </button>
         </div>
-        {onDissolveGroup ? (
-          <Popover>
-            <PopoverTrigger asChild>
+        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Options for ${label}`}
+              className={cn(
+                'text-muted-foreground hover:text-foreground hover:bg-muted justify-self-end rounded-md p-0.5 transition-opacity',
+                menuOpen ? 'opacity-100' : 'opacity-0 group-hover/gr:opacity-100'
+              )}
+              onClick={event => event.stopPropagation()}
+            >
+              <MoreHorizontal className="size-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-52 p-1">
+            {onSetGroupColor ? (
+              <div className="px-2 py-1.5">
+                <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">
+                  Color
+                </div>
+                <TabInlineColorRow
+                  value={group.color}
+                  onSelect={value => onSetGroupColor(group.id, value)}
+                  onClear={() => onSetGroupColor(group.id, null)}
+                />
+              </div>
+            ) : null}
+            {(onSetGroupColor && (onDissolveGroup || onCloseGroup || onDeleteGroup)) ? (
+              <div className="border-border/60 my-1 border-t" />
+            ) : null}
+            {onDissolveGroup ? (
               <button
                 type="button"
-                aria-label={`Options for ${label}`}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted justify-self-end rounded-md p-0.5 opacity-0 transition-opacity group-hover/gr:opacity-100"
-                onClick={event => event.stopPropagation()}
-              >
-                <MoreHorizontal className="size-3.5" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-40 p-1">
-              <button
-                type="button"
-                className="hover:bg-muted text-destructive flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
-                onClick={event => {
-                  event.stopPropagation()
+                className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                onClick={() => {
+                  setMenuOpen(false)
                   onDissolveGroup(group.id)
                 }}
               >
                 Dissolve split
               </button>
-            </PopoverContent>
-          </Popover>
-        ) : null}
+            ) : null}
+            {onCloseGroup ? (
+              <button
+                type="button"
+                className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setConfirmMode('close')
+                }}
+              >
+                Close split
+              </button>
+            ) : null}
+            {onDeleteGroup ? (
+              <>
+                <div className="border-border/60 my-1 border-t" />
+                <button
+                  type="button"
+                  className="hover:bg-muted text-destructive flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setConfirmMode('delete')
+                  }}
+                >
+                  Delete split
+                </button>
+              </>
+            ) : null}
+          </PopoverContent>
+        </Popover>
       </div>
+      <GroupConfirmDialog
+        open={confirmMode !== null}
+        mode={confirmMode ?? 'close'}
+        label={label}
+        chats={chats}
+        onCancel={() => setConfirmMode(null)}
+        onConfirm={() => {
+          const mode = confirmMode
+          setConfirmMode(null)
+          if (mode === 'close') onCloseGroup?.(group.id)
+          else if (mode === 'delete') onDeleteGroup?.(group.id)
+        }}
+      />
       {expanded ? (
         <ul
           className={cn(
@@ -731,50 +845,188 @@ function SidebarGroupItem({
               chat.id === activeChildId || chat.id === activeId
             const isSelected = selectedSessionIds.has(chat.id)
             const tabColor = tabColors[chat.id]
+            const menuOpenForChat = openChildMenuId === chat.id
             return (
               <li key={chat.id}>
-                <button
-                  type="button"
+                <div
                   className={cn(
-                    'hover:bg-sidebar-accent/45 flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-left text-[12.5px]',
+                    'group/child hover:bg-sidebar-accent/45 flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px]',
                     active && !isSelected && 'bg-sidebar-accent/55',
                     isSelected && 'bg-sidebar-accent'
                   )}
-                  onClick={() => onSelectChat(chat.id)}
                 >
-                  <span className="grid size-3.5 shrink-0 place-items-center">
-                    <SessionStatusIcon
-                      status={
-                        chat.status === 'awaiting_approval' ||
-                        chatBySessionId[chat.id]?.pendingApproval
-                          ? 'awaiting_approval'
-                          : chatBySessionId[chat.id]?.runActive
-                            ? 'running'
-                            : chat.status
-                      }
-                    />
-                  </span>
-                  {attentionIds.has(chat.id) ? (
-                    <span
-                      className="size-1.5 shrink-0 rounded-full border border-black/10"
-                      style={{ backgroundColor: UNREAD_DOT_COLOR }}
-                      aria-label="Unread"
-                    />
-                  ) : null}
-                  {tabColor ? (
-                    <span
-                      className="size-1.5 shrink-0 rounded-full border border-black/10"
-                      style={{ backgroundColor: tabColor }}
-                      aria-hidden
-                    />
-                  ) : null}
-                  <SidebarMarqueeTitle text={chat.title || 'Untitled'} />
-                </button>
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                    onClick={() => onSelectChat(chat.id)}
+                  >
+                    <span className="grid size-3.5 shrink-0 place-items-center">
+                      <SessionStatusIcon
+                        status={
+                          chat.status === 'awaiting_approval' ||
+                          chatBySessionId[chat.id]?.pendingApproval
+                            ? 'awaiting_approval'
+                            : chatBySessionId[chat.id]?.runActive
+                              ? 'running'
+                              : chat.status
+                        }
+                      />
+                    </span>
+                    {attentionIds.has(chat.id) ? (
+                      <span
+                        className="size-1.5 shrink-0 rounded-full border border-black/10"
+                        style={{ backgroundColor: UNREAD_DOT_COLOR }}
+                        aria-label="Unread"
+                      />
+                    ) : null}
+                    {tabColor ? (
+                      <span
+                        className="size-1.5 shrink-0 rounded-full border border-black/10"
+                        style={{ backgroundColor: tabColor }}
+                        aria-hidden
+                      />
+                    ) : null}
+                    <SidebarMarqueeTitle text={chat.title || 'Untitled'} />
+                  </button>
+                  <Popover
+                    open={menuOpenForChat}
+                    onOpenChange={open =>
+                      setOpenChildMenuId(open ? chat.id : null)
+                    }
+                  >
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Chat options"
+                        className={cn(
+                          'text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded-md p-0.5 transition-opacity',
+                          menuOpenForChat
+                            ? 'opacity-100'
+                            : 'opacity-0 group-hover/child:opacity-100'
+                        )}
+                        onClick={event => event.stopPropagation()}
+                      >
+                        <MoreHorizontal className="size-3.5" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="start"
+                      className="w-52 p-1.5"
+                    >
+                      <SessionActionsMenu
+                        session={chat}
+                        projects={projects}
+                        tabColor={tabColor || null}
+                        onRename={() => {
+                          setOpenChildMenuId(null)
+                          openRenameDialog(chat)
+                        }}
+                        onTogglePin={() => {
+                          setOpenChildMenuId(null)
+                          void updateSession(chat, {
+                            organizeLabel:
+                              chat.organizeLabel === 'pinned'
+                                ? null
+                                : 'pinned'
+                          })
+                        }}
+                        onMoveToProject={projectId => {
+                          setOpenChildMenuId(null)
+                          void updateSession(chat, { projectId })
+                        }}
+                        onSetTabColor={color => {
+                          setTabColor(chat.id, color)
+                          setOpenChildMenuId(null)
+                        }}
+                        onExport={() => {
+                          setOpenChildMenuId(null)
+                          void exportTranscript(chat)
+                        }}
+                        onInspect={() => {
+                          setOpenChildMenuId(null)
+                          navigate(`/agents/${chat.id}?inspect=1`)
+                        }}
+                        onArchive={() => {
+                          setOpenChildMenuId(null)
+                          void updateSession(chat, {
+                            organizeLabel:
+                              chat.organizeLabel === 'archive'
+                                ? null
+                                : 'archive'
+                          })
+                        }}
+                        onDelete={() => {
+                          setOpenChildMenuId(null)
+                          setDeleteTarget(chat)
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </li>
             )
           })}
         </ul>
       ) : null}
     </li>
+  )
+}
+
+/**
+ * Modal para confirmar close/delete de un split. Lista los chats que
+ * están dentro del grupo para que el usuario los vea antes de decidir.
+ * Los dos modos comparten UI; solo cambia el título, la copy y la
+ * acción destructiva o no del botón principal.
+ */
+function GroupConfirmDialog({
+  open,
+  mode,
+  label,
+  chats,
+  onCancel,
+  onConfirm
+}: {
+  open: boolean
+  mode: 'close' | 'delete'
+  label: string
+  chats: AgentSession[]
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const isDelete = mode === 'delete'
+  const title = isDelete ? 'Delete split' : 'Close split'
+  const body = isDelete
+    ? `Eliminar el split "${label}" borra también todos los chats que viven dentro. Esta acción no se puede deshacer.`
+    : `Cerrar el split "${label}" quita la pestaña. Los chats de adentro no se borran — solo dejan de estar abiertos.`
+  return (
+    <Dialog open={open} onOpenChange={next => (next ? null : onCancel())}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{body}</DialogDescription>
+        </DialogHeader>
+        <div className="border-border/60 max-h-56 overflow-y-auto rounded-md border">
+          <ul className="divide-border/60 divide-y text-[13px]">
+            {chats.map(chat => (
+              <li key={chat.id} className="truncate px-3 py-2">
+                {chat.title || 'Untitled'}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant={isDelete ? 'destructive' : 'default'}
+            onClick={onConfirm}
+          >
+            {isDelete ? 'Delete' : 'Close'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

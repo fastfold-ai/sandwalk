@@ -86,6 +86,9 @@ export function SessionTabs({
   openTabIds,
   onSplitWith,
   onDissolveGroup,
+  onSetGroupColor,
+  onCloseGroup,
+  onDeleteGroup,
   selectedChatIds,
   onToggleSelectChat,
   onClearSelection,
@@ -119,6 +122,9 @@ export function SessionTabs({
   /** Creates a new split-view group from `sourceId` + the next open tab. */
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
+  onSetGroupColor?: (groupId: string, color: string | null) => void
+  onCloseGroup?: (groupId: string) => void
+  onDeleteGroup?: (groupId: string) => void
   selectedChatIds?: Set<string>
   onToggleSelectChat?: (id: string) => void
   onClearSelection?: () => void
@@ -306,6 +312,9 @@ export function SessionTabs({
 
   const menuSession = menu
     ? tabs.find(tab => tab.id === menu.sessionId) || null
+    : null
+  const menuGroup = menu
+    ? (groups ?? []).find(g => g.id === menu.sessionId) || null
     : null
 
   const runAction = (action: () => void) => {
@@ -609,14 +618,10 @@ export function SessionTabs({
                             onSelect(item.id)
                           }
                         }}
-                        onContextMenu={
-                          isGroup
-                            ? undefined
-                            : event => {
-                                event.preventDefault()
-                                openContextMenu(item.id, event)
-                              }
-                        }
+                        onContextMenu={event => {
+                          event.preventDefault()
+                          openContextMenu(item.id, event)
+                        }}
                         data-selected={
                           selectedChatIds?.has(item.id) ? 'true' : undefined
                         }
@@ -769,6 +774,60 @@ export function SessionTabs({
             destructive
             onClick={() => runAction(() => onDelete(menuSession))}
           />
+        </TabContextMenuShell>
+      ) : null}
+
+      {menu && menuGroup ? (
+        <TabContextMenuShell
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+        >
+          {onSetGroupColor ? (
+            <>
+              <TabInlineColorRow
+                value={menuGroup.color}
+                onSelect={color => {
+                  onSetGroupColor(menuGroup.id, color)
+                  setMenu(null)
+                }}
+                onClear={() => {
+                  onSetGroupColor(menuGroup.id, null)
+                  setMenu(null)
+                }}
+              />
+              <TabContextSeparator />
+            </>
+          ) : null}
+          {onDissolveGroup ? (
+            <TabContextItem
+              icon={<Columns2 className="size-3.5" />}
+              label="Dissolve split"
+              onClick={() =>
+                runAction(() => onDissolveGroup(menuGroup.id))
+              }
+            />
+          ) : null}
+          {onCloseGroup ? (
+            <TabContextItem
+              icon={<X className="size-3.5" />}
+              label="Close split"
+              onClick={() => runAction(() => onCloseGroup(menuGroup.id))}
+            />
+          ) : null}
+          {onDeleteGroup ? (
+            <>
+              <TabContextSeparator />
+              <TabContextItem
+                icon={<Trash2 className="size-3.5" />}
+                label="Delete split"
+                destructive
+                onClick={() =>
+                  runAction(() => onDeleteGroup(menuGroup.id))
+                }
+              />
+            </>
+          ) : null}
         </TabContextMenuShell>
       ) : null}
     </div>

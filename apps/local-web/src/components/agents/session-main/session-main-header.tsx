@@ -78,6 +78,9 @@ export type SessionMainHeaderProps = {
   groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
+  onSetGroupColor?: (groupId: string, color: string | null) => void
+  onCloseGroup?: (groupId: string) => void
+  onDeleteGroup?: (groupId: string) => void
   /**
    * Cuando la ruta activa apunta a un grupo, el shell oculta su fila de
    * acciones flotantes (folder / files / terminal / preview / CLI): cada
@@ -133,6 +136,9 @@ export function SessionMainHeader({
   groups,
   onSplitWith,
   onDissolveGroup,
+  onSetGroupColor,
+  onCloseGroup,
+  onDeleteGroup,
   selectedChatIds,
   onToggleSelectChat,
   onClearSelection,
@@ -302,6 +308,9 @@ export function SessionMainHeader({
           groups={groups}
           onSplitWith={onSplitWith}
           onDissolveGroup={onDissolveGroup}
+          onSetGroupColor={onSetGroupColor}
+          onCloseGroup={onCloseGroup}
+          onDeleteGroup={onDeleteGroup}
           selectedChatIds={selectedChatIds}
           onToggleSelectChat={onToggleSelectChat}
           onClearSelection={onClearSelection}
