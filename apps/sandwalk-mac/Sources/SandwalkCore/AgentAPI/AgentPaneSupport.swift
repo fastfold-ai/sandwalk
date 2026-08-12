@@ -47,6 +47,7 @@ struct AgentAPIGate<Content: View>: View {
         }
     }
 
+    @MainActor
     private func refresh() {
         overall = SandwalkRuntime.supervisor?.overall ?? .stopped
     }
