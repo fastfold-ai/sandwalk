@@ -1,13 +1,13 @@
-<h1 align="center" style="margin:0;">
+<p align="center">
   <a href="https://github.com/fastfold-ai/sandwalk"><picture>
     <source media="(prefers-color-scheme: dark)" srcset="images/sandwalk-logo-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="images/sandwalk-logo-light.svg">
     <img alt="sandwalk" src="images/sandwalk-logo-light.svg" height="64" style="max-width:100%;">
   </picture></a>
-</h1>
-<h3 align="center" style="margin: 0; margin-top: 0;">
-Great ideas need a path. This one is yours.
-</h3>
+</p>
+<p align="center">
+  <small>Great ideas need a path. This one is yours.</small>
+</p>
 
 <p align="center">
   <a href="#install">Install</a> ·
@@ -16,8 +16,6 @@ Great ideas need a path. This one is yours.
   <a href="#cli">CLI</a> ·
   <a href="#documentation">Docs</a>
 </p>
-
----
 
 <p align="center">
   <img alt="Sandwalk desktop: chat, files, and terminal" src="images/showcase.png" style="max-width:100%; border-radius:8px;">
