@@ -8,15 +8,19 @@ import { Button } from '@/components/ui/button'
 import { DEFAULT_BACKEND_URL, isLocalBackendUrl } from '@/lib/backend-url'
 import {
   clearDesktopWindowRecents,
+  desktopLocalHostname,
   type DesktopWindowRecent,
+  hideDesktopWindow,
   isTauri,
   listDesktopWindowRecents,
   listenDesktopWindowRecentsChanged,
+  openDesktopServerSettings,
   platformOS
 } from '@/lib/desktop'
 import { openDesktopRecent } from '@/lib/open-desktop-recent'
 import { readCachedRemotePlatform } from '@/lib/remote-hostname'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 function hostport(url: string): string {
   try {
@@ -36,23 +40,32 @@ function shortHostname(raw: string): string {
   return noLocal.split('.')[0] || noLocal
 }
 
-function formatRecent(row: DesktopWindowRecent): { title: string; detail: string } {
+/** `hostname · host:port` when hostname differs from the address host. */
+function hostDetail(hostname: string | null | undefined, address: string): string {
+  const host = shortHostname(hostname || '')
+  const ip = address.split(':')[0] || address
+  if (host && host.toLowerCase() !== ip.toLowerCase()) {
+    return `${host} · ${address}`
+  }
+  return address
+}
+
+function formatRecent(
+  row: DesktopWindowRecent,
+  localHostname?: string | null
+): { title: string; detail: string } {
   const rawTitle = (row.title || row.label || 'Sandwalk').trim() || 'Sandwalk'
   if (isLocalBackendUrl(row.url)) {
     return {
       title:
         rawTitle === 'Sandwalk' || rawTitle === 'Local' ? 'Local' : rawTitle,
-      detail: hostport(row.url)
+      detail: hostDetail(localHostname, hostport(row.url))
     }
   }
-  const short = shortHostname(row.hostname || '')
-  const port = hostport(row.url)
-  const ip = port.split(':')[0] || port
-  const detail =
-    short && short.toLowerCase() !== ip.toLowerCase()
-      ? `${short} · ${port}`
-      : port
-  return { title: rawTitle, detail }
+  return {
+    title: rawTitle,
+    detail: hostDetail(row.hostname, hostport(row.url))
+  }
 }
 
 function localPlatformHint(): string {
@@ -95,6 +108,18 @@ export function WelcomeHome({
   const [recents, setRecents] = useState<DesktopWindowRecent[]>([])
   const [loadingRecents, setLoadingRecents] = useState(isTauri())
   const [openingId, setOpeningId] = useState<string | null>(null)
+  const [localHostname, setLocalHostname] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isTauri()) return
+    let cancelled = false
+    void desktopLocalHostname().then(name => {
+      if (!cancelled) setLocalHostname(name)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const refreshRecents = useCallback(async (options?: { silent?: boolean }) => {
     if (!isTauri()) {
@@ -155,7 +180,17 @@ export function WelcomeHome({
         hostname: row.hostname,
         platform: row.platform
       })
-      if (!result.opened) onOpenRemote(result.url)
+      if (!result.opened) {
+        onOpenRemote(result.url)
+        return
+      }
+      // Remote (and other-window) opens leave this launcher empty — hide it.
+      // Connect locally uses the same window via onConnectLocal instead.
+      if (!isLocalBackendUrl(row.url) && isTauri()) {
+        void hideDesktopWindow().catch(() => {
+          // ignore
+        })
+      }
     } catch {
       onOpenRemote(row.url)
     } finally {
@@ -173,16 +208,40 @@ export function WelcomeHome({
     setRecents([])
   }
 
+  const localCardDetail =
+    (localHostname || '').trim() ||
+    DEFAULT_BACKEND_URL.replace(/^https?:\/\//, '')
+
+  const openSettings = () => {
+    if (!isTauri()) {
+      toast.error('Server Settings is available in the Sandwalk desktop app.')
+      return
+    }
+    void openDesktopServerSettings().catch((err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Unable to open Server Settings'
+      toast.error(message)
+    })
+  }
+
   return (
     <main className="bg-background relative grid h-full place-items-center overflow-auto p-8">
       <ThemeToggle placement="top-right" />
       <div className="flex w-full max-w-xl flex-col items-stretch gap-10">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <SandwalkMark className="text-foreground h-12 w-12" />
-          <div>
+        <div className="flex items-center gap-3">
+          <SandwalkMark className="text-foreground h-11 w-11" />
+          <div className="flex flex-col items-start leading-tight">
             <h1 className="text-2xl font-semibold tracking-tight">sandwalk</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Choose a local or remote agent workspace
+            <p className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-sm">
+              <span>{__UI_VERSION__}</span>
+              <span aria-hidden>·</span>
+              <button
+                type="button"
+                onClick={openSettings}
+                className="text-sky-500 hover:text-sky-400 transition-colors"
+              >
+                Settings
+              </button>
             </p>
           </div>
         </div>
@@ -193,21 +252,21 @@ export function WelcomeHome({
             disabled={connecting}
             onClick={() => void onConnectLocal()}
             className={cn(
-              'border-border hover:bg-muted/40 flex items-center gap-3 rounded-xl border px-4 py-4 text-left transition-colors',
+              'bg-muted/50 hover:bg-muted/70 flex items-center gap-3 rounded-xl px-4 py-4 text-left transition-colors',
               'disabled:pointer-events-none disabled:opacity-50'
             )}
           >
-            <span className="bg-muted text-foreground grid size-10 place-items-center rounded-lg">
+            <span className="text-foreground shrink-0">
               {connecting ? (
                 <Loader2 className="size-5 animate-spin" />
               ) : (
                 <Monitor className="size-5" />
               )}
             </span>
-            <span>
+            <span className="min-w-0">
               <span className="block text-sm font-medium">Connect locally</span>
-              <span className="text-muted-foreground block text-xs">
-                {DEFAULT_BACKEND_URL.replace(/^https?:\/\//, '')}
+              <span className="text-muted-foreground block truncate text-xs">
+                {localCardDetail}
               </span>
             </span>
           </button>
@@ -216,16 +275,16 @@ export function WelcomeHome({
             disabled={connecting}
             onClick={() => onOpenRemote(null)}
             className={cn(
-              'border-border hover:bg-muted/40 flex items-center gap-3 rounded-xl border px-4 py-4 text-left transition-colors',
+              'bg-muted/50 hover:bg-muted/70 flex items-center gap-3 rounded-xl px-4 py-4 text-left transition-colors',
               'disabled:pointer-events-none disabled:opacity-50'
             )}
           >
-            <span className="bg-muted text-foreground grid size-10 place-items-center rounded-lg">
+            <span className="text-foreground shrink-0">
               <Network className="size-5" />
             </span>
-            <span>
-              <span className="block text-sm font-medium">Open remote…</span>
-              <span className="text-muted-foreground block text-xs">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">Open remote</span>
+              <span className="text-muted-foreground block truncate text-xs">
                 LAN scan or paste a URL
               </span>
             </span>
@@ -263,7 +322,7 @@ export function WelcomeHome({
           ) : (
             <ul className="divide-border divide-y">
               {recents.map(row => {
-                const { title, detail } = formatRecent(row)
+                const { title, detail } = formatRecent(row, localHostname)
                 const key = row.id || row.url
                 const busy = openingId === key
                 return (
@@ -274,20 +333,20 @@ export function WelcomeHome({
                       onClick={() => void openRecent(row)}
                       className="hover:bg-muted/40 flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors disabled:opacity-50"
                     >
-                      <OsPlatformIcon
-                        platform={recentPlatform(row)}
-                        className="size-7"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
-                          {title}
-                        </span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                        {title}
                       </span>
-                      <span className="text-muted-foreground shrink-0 text-xs">
+                      <span className="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs">
                         {busy ? (
                           <Loader2 className="size-3.5 animate-spin" />
                         ) : (
-                          detail
+                          <>
+                            <OsPlatformIcon
+                              platform={recentPlatform(row)}
+                              dense
+                            />
+                            <span>{detail}</span>
+                          </>
                         )}
                       </span>
                     </button>

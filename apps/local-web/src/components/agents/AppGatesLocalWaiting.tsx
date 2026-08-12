@@ -98,7 +98,7 @@ export function AppGatesLocalWaiting({
             disabled={connecting}
             onClick={() => setShowRemote(true)}
           >
-            Open remote…
+            Open remote
           </Button>
           {onBackHome ? (
             <Button

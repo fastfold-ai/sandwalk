@@ -21,13 +21,29 @@ const SRC: Record<Exclude<OsPlatformKind, 'unknown'>, string> = {
 /** Simple Icons (CC0) Apple / Windows / Linux marks. */
 export function OsPlatformIcon({
   platform,
-  className
+  className,
+  dense = false
 }: {
   platform: string | null | undefined
   className?: string
+  /** Bare mark (no circle) for inline use next to hostnames. */
+  dense?: boolean
 }) {
   const kind = osPlatformKind(platform)
   if (kind === 'unknown') {
+    if (dense) {
+      return (
+        <span
+          className={cn(
+            'text-muted-foreground inline-flex size-3.5 shrink-0 items-center justify-center text-[10px] font-medium',
+            className
+          )}
+          aria-hidden
+        >
+          ?
+        </span>
+      )
+    }
     return (
       <span
         className={cn(
@@ -38,6 +54,28 @@ export function OsPlatformIcon({
       >
         ?
       </span>
+    )
+  }
+  if (dense) {
+    return (
+      <span
+        className={cn(
+          'bg-current text-muted-foreground size-3.5 shrink-0',
+          className
+        )}
+        aria-hidden
+        title={kind === 'mac' ? 'macOS' : kind === 'windows' ? 'Windows' : 'Linux'}
+        style={{
+          maskImage: `url(${SRC[kind]})`,
+          WebkitMaskImage: `url(${SRC[kind]})`,
+          maskSize: 'contain',
+          WebkitMaskSize: 'contain',
+          maskRepeat: 'no-repeat',
+          WebkitMaskRepeat: 'no-repeat',
+          maskPosition: 'center',
+          WebkitMaskPosition: 'center'
+        }}
+      />
     )
   }
   return (

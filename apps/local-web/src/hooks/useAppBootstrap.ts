@@ -1,7 +1,15 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
+import { hasDesktopBackendInject, isLocalBackendUrl } from '@/lib/backend-url'
+import {
+  hideDesktopWindow,
+  isMainDesktopWindow,
+  isTauri,
+  listDesktopWindowRecents
+} from '@/lib/desktop'
+import { openDesktopRecent } from '@/lib/open-desktop-recent'
 import type { SessionChatState } from '@/lib/sessions'
 
 import { useAppBootstrapAuth } from './useAppBootstrapAuth'
@@ -16,6 +24,10 @@ type UseAppBootstrapArgs = {
     SetStateAction<Record<string, SessionChatState>>
   >
   isDashboardModels: boolean
+}
+
+function shouldAttemptColdRestore(): boolean {
+  return isTauri() && isMainDesktopWindow() && !hasDesktopBackendInject()
 }
 
 export function useAppBootstrap({
@@ -60,6 +72,68 @@ export function useAppBootstrap({
     setAuthLoginError
   })
 
+  const skipAutoRestoreRef = useRef(false)
+  const autoRestoreStartedRef = useRef(false)
+  const changeBackendRef = useRef(auth.changeBackend)
+  changeBackendRef.current = auth.changeBackend
+  const [autoRestoring, setAutoRestoring] = useState(shouldAttemptColdRestore)
+
+  const disconnectBackend = useCallback(async () => {
+    skipAutoRestoreRef.current = true
+    setAutoRestoring(false)
+    await auth.disconnectBackend()
+  }, [auth])
+
+  // Cold-start main window: reopen the most recent local/remote session.
+  // Disconnect skips this so Welcome Home stays up. New Window still uses the chooser.
+  useEffect(() => {
+    if (!connectBundle.connectionPaused) {
+      setAutoRestoring(false)
+      return
+    }
+    if (!shouldAttemptColdRestore()) {
+      setAutoRestoring(false)
+      return
+    }
+    if (skipAutoRestoreRef.current || autoRestoreStartedRef.current) {
+      setAutoRestoring(false)
+      return
+    }
+    autoRestoreStartedRef.current = true
+
+    void (async () => {
+      try {
+        const rows = (await listDesktopWindowRecents()) ?? []
+        const last = rows[0]
+        if (!last?.url) {
+          setAutoRestoring(false)
+          return
+        }
+        if (isLocalBackendUrl(last.url)) {
+          await changeBackendRef.current(last.url)
+          setAutoRestoring(false)
+          return
+        }
+        const result = await openDesktopRecent({
+          url: last.url,
+          route: last.route,
+          title: last.title,
+          id: last.id,
+          hostname: last.hostname,
+          platform: last.platform
+        })
+        if (result.opened) {
+          void hideDesktopWindow().catch(() => {
+            // ignore
+          })
+        }
+        setAutoRestoring(false)
+      } catch {
+        setAutoRestoring(false)
+      }
+    })()
+  }, [connectBundle.connectionPaused])
+
   return {
     backendUrl: clientBundle.backendUrl,
     setBackendUrl: clientBundle.setBackendUrl,
@@ -79,6 +153,7 @@ export function useAppBootstrap({
     connecting: connectBundle.connecting,
     connectionPaused: connectBundle.connectionPaused,
     setConnectionPaused: connectBundle.setConnectionPaused,
+    autoRestoring,
     error: connectBundle.error,
     errorStack: connectBundle.errorStack,
     setError: connectBundle.setError,
@@ -120,7 +195,7 @@ export function useAppBootstrap({
     connect: connectBundle.connect,
     submitAuthLogin: auth.submitAuthLogin,
     logoutSession: auth.logoutSession,
-    disconnectBackend: auth.disconnectBackend,
+    disconnectBackend,
     changeBackend: auth.changeBackend
   }
 }

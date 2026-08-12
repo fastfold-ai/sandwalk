@@ -82,6 +82,13 @@ export const platformOS = (): string => {
   return 'linux'
 }
 
+/** Primary app window (`main`) vs spawned client windows. */
+export const isMainDesktopWindow = (): boolean => {
+  const kind = (globalThis as { __SANDWALK_WINDOW_KIND__?: unknown })
+    .__SANDWALK_WINDOW_KIND__
+  return kind !== 'client'
+}
+
 /** Overlay title bar (traffic lights over content) — macOS Tauri only. */
 export const isMacDesktopOverlay = (): boolean => {
   // Our shell injects platform before SPA load — treat that as desktop even if
@@ -409,6 +416,10 @@ export const setDesktopWindowTitle = (title: string) =>
 export const closeDesktopWindow = () =>
   invokeStrict<void>('desktop_close_current_window')
 
+/** Hide the current desktop WebView (launcher after opening a remote window). */
+export const hideDesktopWindow = () =>
+  invokeStrict<void>('desktop_hide_current_window')
+
 /** Persist / update Open Recent for this window (route + title snapshot). */
 export const upsertDesktopWindowSnapshot = (args: {
   snapshotId?: string | null
@@ -492,6 +503,13 @@ export type LanDesktopServer = {
 /** Probe local /24 (+ localhost) for Sandwalk servers on :8787/:8789/:8790. */
 export const scanLanDesktopServers = () =>
   invokeStrict<LanDesktopServer[]>('desktop_scan_lan_servers')
+
+/** This machine’s short hostname (e.g. `Julios-MacBook-Pro`), or null. */
+export const desktopLocalHostname = () =>
+  invoke<string>('desktop_local_hostname').then(name => {
+    const trimmed = (name || '').trim()
+    return trimmed || null
+  })
 
 /** Native directory picker (desktop). Returns null when canceled or unavailable. */
 export async function pickDirectory(): Promise<string | null> {

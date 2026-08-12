@@ -31,6 +31,7 @@ type AppGatesProps = {
   changeBackend: (url: string, apiKey?: string) => void | Promise<void>
   health: BackendHealth | null
   connectionPaused: boolean
+  autoRestoring?: boolean
   setConnectionPaused: (value: boolean) => void
   backendUrl: string
   setBackendUrl: (value: string) => void
@@ -63,6 +64,7 @@ export function AppGates({
   changeBackend,
   health,
   connectionPaused,
+  autoRestoring = false,
   setConnectionPaused,
   backendUrl,
   setBackendUrl,
@@ -98,6 +100,17 @@ export function AppGates({
         backendUrl={backendUrl}
         onChangeBackend={url => changeBackend(url)}
       />
+    )
+  }
+
+  // Desktop cold start — briefly restore last recent before showing Welcome.
+  if (connectionPaused && !health && autoRestoring) {
+    return (
+      <DesktopGateFrame>
+        <main className="grid h-full min-h-full place-items-center bg-[#f5f5f5] dark:bg-neutral-950">
+          <AuraIconPulse className="text-muted-foreground/50 h-12 w-12" />
+        </main>
+      </DesktopGateFrame>
     )
   }
 

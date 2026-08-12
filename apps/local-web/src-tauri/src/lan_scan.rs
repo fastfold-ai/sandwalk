@@ -251,6 +251,50 @@ pub fn scan_lan_servers() -> Vec<LanServerHit> {
     scan_targets(targets)
 }
 
+/// Friendly short hostname for this machine (Welcome Home “Connect locally”).
+pub fn local_hostname_display() -> String {
+    let mut candidates: Vec<String> = Vec::new();
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(out) = std::process::Command::new("scutil")
+            .args(["--get", "LocalHostName"])
+            .output()
+        {
+            if out.status.success() {
+                let raw = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !raw.is_empty() {
+                    candidates.push(raw);
+                }
+            }
+        }
+    }
+    if let Ok(out) = std::process::Command::new("hostname").output() {
+        if out.status.success() {
+            let raw = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !raw.is_empty() {
+                candidates.push(raw);
+            }
+        }
+    }
+    for raw in candidates {
+        let trimmed = raw.trim().trim_end_matches('.');
+        let no_local = trimmed
+            .strip_suffix(".local")
+            .or_else(|| trimmed.strip_suffix(".LOCAL"))
+            .unwrap_or(trimmed);
+        let short = no_local.split('.').next().unwrap_or(no_local).trim();
+        if !short.is_empty() {
+            return short.to_string();
+        }
+    }
+    String::new()
+}
+
+#[tauri::command]
+pub fn desktop_local_hostname() -> String {
+    local_hostname_display()
+}
+
 /// Run the LAN probe off the async runtime so the dialog can open immediately.
 #[tauri::command]
 pub async fn desktop_scan_lan_servers() -> Result<Vec<LanServerHit>, String> {

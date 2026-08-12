@@ -54,7 +54,10 @@ export default function App() {
     [bootstrap.loadSessions]
   )
   useDesktopNavigate(navigate, onDesktopRoute)
-  const windowMenu = useDesktopWindowMenu()
+  const hideLauncherAfterOpen = Boolean(
+    bootstrap.connectionPaused && !bootstrap.health
+  )
+  const windowMenu = useDesktopWindowMenu({ hideLauncherAfterOpen })
 
   const tabs = useAppOpenTabs(
     ui.projectScopeId,
@@ -278,6 +281,7 @@ export default function App() {
     changeBackend: bootstrap.changeBackend,
     health: bootstrap.health,
     connectionPaused: bootstrap.connectionPaused,
+    autoRestoring: bootstrap.autoRestoring,
     setConnectionPaused: bootstrap.setConnectionPaused,
     backendUrl: bootstrap.backendUrl,
     setBackendUrl: bootstrap.setBackendUrl,
@@ -305,6 +309,7 @@ export default function App() {
       open={windowMenu.remoteOpen}
       onOpenChange={windowMenu.setRemoteOpen}
       initialUrl={windowMenu.remoteInitialUrl}
+      hideLauncherAfterOpen={hideLauncherAfterOpen}
     />
   )
 

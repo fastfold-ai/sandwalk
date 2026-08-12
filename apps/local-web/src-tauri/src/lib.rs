@@ -373,6 +373,12 @@ fn desktop_close_current_window(window: tauri::WebviewWindow) -> Result<(), Stri
     window.close().map_err(|e| e.to_string())
 }
 
+/// Hide this WebView without destroying it (Welcome Home after spawning a remote).
+#[tauri::command]
+fn desktop_hide_current_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.hide().map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn desktop_open_server_settings() -> Result<(), String> {
     multi_window::open_server_settings_app()
@@ -825,12 +831,14 @@ pub fn run() {
             desktop_bind_window_backend,
             desktop_set_window_title,
             desktop_close_current_window,
+            desktop_hide_current_window,
             desktop_open_server_settings,
             multi_window::desktop_list_window_recents,
             multi_window::desktop_clear_window_recents,
             multi_window::desktop_upsert_window_snapshot,
             multi_window::desktop_remember_window_recent,
             lan_scan::desktop_scan_lan_servers,
+            lan_scan::desktop_local_hostname,
             start_window_drag,
             toggle_maximize,
             window_is_fullscreen,

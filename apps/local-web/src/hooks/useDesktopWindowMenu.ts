@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { normalizeBackendUrl } from '@/lib/backend-url'
-import { isTauri, listenDesktopMenu, openDesktopWindow } from '@/lib/desktop'
+import { isLocalBackendUrl, normalizeBackendUrl } from '@/lib/backend-url'
+import {
+  hideDesktopWindow,
+  isTauri,
+  listenDesktopMenu,
+  openDesktopWindow
+} from '@/lib/desktop'
 import { openDesktopRecent } from '@/lib/open-desktop-recent'
 import { persistRememberedApiKey } from '@/lib/remembered-auth'
 import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
@@ -12,10 +17,14 @@ import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
  * Remote opens a dialog; Open Recent opens directly when a key is remembered,
  * otherwise opens the dialog prefilled with that URL.
  */
-export function useDesktopWindowMenu() {
+export function useDesktopWindowMenu(options?: {
+  hideLauncherAfterOpen?: boolean
+}) {
   const navigate = useNavigate()
   const [remoteOpen, setRemoteOpen] = useState(false)
   const [remoteInitialUrl, setRemoteInitialUrl] = useState<string | null>(null)
+  const hideLauncherRef = useRef(Boolean(options?.hideLauncherAfterOpen))
+  hideLauncherRef.current = Boolean(options?.hideLauncherAfterOpen)
 
   useEffect(() => {
     if (!isTauri()) return
@@ -45,6 +54,15 @@ export function useDesktopWindowMenu() {
             if (!result.opened) {
               setRemoteInitialUrl(result.url)
               setRemoteOpen(true)
+              return
+            }
+            if (
+              hideLauncherRef.current &&
+              !isLocalBackendUrl(result.url)
+            ) {
+              void hideDesktopWindow().catch(() => {
+                // ignore
+              })
             }
           })
           .catch(() => {
