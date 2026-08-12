@@ -191,7 +191,7 @@ jobs:
           ls -la ci-coverage/
 
       - name: Upload Agent CLI coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         if: always()
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -201,7 +201,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Upload Agent Server coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         if: always()
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -238,7 +238,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.14.0
 
@@ -263,7 +263,7 @@ jobs:
         run: pnpm --filter @sandwalk/agent-local-web test:coverage
 
       - name: Upload Local Web coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         if: always() && hashFiles('apps/local-web/coverage/lcov.info') != ''
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -296,7 +296,7 @@ jobs:
         run: ./scripts/test.sh
 
       - name: Upload Mac App coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         if: always()
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
