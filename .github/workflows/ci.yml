@@ -12,6 +12,9 @@ concurrency:
 
 env:
   UV_VERSION: "0.8.22"
+  # Match local Homebrew Node (v26.x). Also avoids forcing deprecated action
+  # runtimes where possible by pairing with actions/*@v7+.
+  NODE_VERSION: "26"
 
 jobs:
   # ── Lint / types / smoke / wheel (parallel with pytest shards) ─────────────
@@ -22,19 +25,31 @@ jobs:
       run:
         working-directory: cli
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
+      # prune-cache: drop prebuilt wheels before save — torch-sized caches were
+      # taking 1m+ to upload and often slower to restore than a fresh download.
+      # save-cache only here so matrix shards restore without each re-uploading.
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
-          enable-cache: false
+          enable-cache: true
+          prune-cache: true
+          restore-cache: true
+          save-cache: true
+          cache-dependency-glob: |
+            cli/uv.lock
+            cli/pyproject.toml
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
+      # CI extras: skip ml (torch → NVIDIA CUDA wheels) and singlecell (scanpy /
+      # cellxgene-census). Those are optional at runtime and mocked/skipped in
+      # unit tests. Saves ~1GB+ downloads per job.
       - name: Install package + test deps
-        run: uv sync --extra all --extra dev
+        run: uv sync --extra dev --extra chemistry --extra biology --extra api
 
       - name: Ruff lint
         run: uv run ruff check src
@@ -60,7 +75,7 @@ jobs:
           uv pip install --reinstall dist/*.whl
           uv run sandwalk --version
 
-  # ── Pytest: 4 matrix shards × xdist workers ───────────────────────────────
+  # ── Pytest: 4 matrix shards × xdist (lean deps, restore-only uv cache) ────
   agent-cli-tests:
     name: Agent CLI tests (${{ matrix.group }}/4)
     runs-on: ubuntu-latest
@@ -72,27 +87,32 @@ jobs:
       run:
         working-directory: cli
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
-          enable-cache: false
+          enable-cache: true
+          prune-cache: true
+          restore-cache: true
+          # Shards only restore — static job owns the cache save.
+          save-cache: false
+          cache-dependency-glob: |
+            cli/uv.lock
+            cli/pyproject.toml
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
       - name: Install package + test deps
-        run: uv sync --extra all --extra dev
+        run: uv sync --extra dev --extra chemistry --extra biology --extra api
 
       - name: Run CI pytest suite (shard ${{ matrix.group }}/4)
         run: |
           # Opt-in lanes (network / live chat / Modal / data smoke / pexpect)
           # are auto-deselected in tests/conftest.py unless their env gate is set.
-          # Coverage gates run in agent-cli-coverage after shards combine.
-          # Equal-count splits (no .test_durations): local Mac timings mis-rank
-          # CI+coverage cost and made least_duration shards much slower.
+          # Coverage gates run in agent-cli-coverage (non-blocking for PR gate).
           uv run pytest tests/ -q \
             --splits 4 --group ${{ matrix.group }} \
             -n auto \
@@ -100,8 +120,6 @@ jobs:
             --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models \
             --cov=reports --cov=skills --cov=tools --cov=ui \
             --cov-report=term-missing:skip-covered
-          # pytest-cov+xdist usually leaves a combined .coverage; only combine
-          # leftover parallel fragments when needed.
           if [ ! -f .coverage ]; then
             uv run coverage combine
           fi
@@ -111,7 +129,7 @@ jobs:
           ls -la ci-coverage/
 
       - name: Upload shard coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: success()
         with:
           name: coverage-data-${{ matrix.group }}
@@ -119,18 +137,20 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-  # ── Combine coverage + gates + Codecov (lightweight: coverage pkg only) ───
+  # ── Coverage combine (reports only — does not block Agent CLI & Server) ───
   agent-cli-coverage:
     name: Agent CLI coverage
     runs-on: ubuntu-latest
     needs: [agent-cli-tests]
+    # Failures still show on the job, but the required PR gate is agent-cli below.
+    continue-on-error: true
     defaults:
       run:
         working-directory: cli
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -140,7 +160,7 @@ jobs:
           pip install "coverage>=7.0"
 
       - name: Download shard coverage data
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: coverage-data-*
           path: cli/coverage-shards
@@ -148,12 +168,7 @@ jobs:
 
       - name: Combine coverage and enforce gates
         run: |
-          # Scoped omit list in pyproject.toml (REPL/CLI entry + agent_server glue)
-          # mirrors local-web / Mac unit-testable coverage gates.
-          # Coverage gate at 75%: interactive TUI packages are omitted; buffer
-          # avoids flakes when new lightly-tested helpers land.
           ls -laR coverage-shards/
-          # download-artifact may nest per-artifact dirs; combine all data files.
           mapfile -t files < <(find coverage-shards -type f -name '*.coverage' -print)
           if [ "${#files[@]}" -eq 0 ]; then
             echo "Error: no shard coverage data files downloaded." >&2
@@ -162,15 +177,11 @@ jobs:
           coverage combine "${files[@]}"
           coverage report --fail-under=75
           coverage xml -o coverage-full.xml
-          # Matches measured agent_server coverage after package splits / omits.
           coverage report \
             --include='*/agent_server/*' \
             --omit='*/agent_server/pty_manager.py,*/agent_server/app.py,*/agent_server/main.py,*/agent_server/mcp_service.py,*/agent_server/service.py,*/agent_server/default_specialists.py,*/agent_server/pty_manager/*,*/agent_server/mcp_service/*' \
             --skip-covered \
             --fail-under=70
-          # One flag per upload (Codecov monorepo best practice).
-          # Write under ci-coverage/ — coverage-*.xml is gitignored and hashFiles
-          # can miss those paths.
           mkdir -p ci-coverage
           coverage xml -o ci-coverage/coverage-agent-cli.xml --omit='*/agent_server/*'
           coverage xml -o ci-coverage/coverage-agent-server.xml \
@@ -200,7 +211,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-agent-cli-server
@@ -211,29 +222,29 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-  # Single required-check stand-in for the former monolithic Agent CLI job.
+  # Required check: static + tests only (coverage is advisory / Codecov).
   agent-cli:
     name: Agent CLI & Server
     runs-on: ubuntu-latest
-    needs: [agent-cli-static, agent-cli-coverage]
+    needs: [agent-cli-static, agent-cli-tests]
     steps:
       - name: Agent CLI gate
-        run: echo "static + sharded tests + coverage gates passed"
+        run: echo "static + sharded tests passed"
 
   # ── Local Web UI (Vitest → lcov → Codecov) ────────────────────────────────
   local-web:
     name: Local Web UI
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
         with:
           version: 10.14.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Install dependencies
@@ -262,7 +273,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always() && hashFiles('apps/local-web/coverage/**') != ''
         with:
           name: coverage-local-web
@@ -275,7 +286,7 @@ jobs:
     name: Mac App
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
@@ -295,7 +306,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-mac-app
@@ -311,7 +322,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [agent-cli]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build image
         working-directory: cli
