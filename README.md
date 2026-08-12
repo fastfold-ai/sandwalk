@@ -59,6 +59,9 @@ Invention, not just automation. Novel ideas come from people with better tools. 
 
 - **CLI ↔ Mac ↔ iOS**: one agent session across terminal, desktop, and phone.
 - **Remote sessions**: run the agent on a Mac Mini or a university cluster; open it from wherever you are.
+- **Benchmarking**: automate evals, score results, and run LLM judges. Dashboard → Bench, or `sandwalk eval`.
+- **Split view and chats**: several sessions in tabs. Chat, files, and terminal side by side in one working UI.
+- **Working terminal**: a real shell next to the chat. Use Codex, Claude, OpenCode, Pi, or any other CLI you already run.
 - **Plan mode**: draft `plans/*.md` with todos and a Mermaid flowchart, then **Build** when ready.
 - **Multimodal**: `@`-attach images, PDFs, audio, and video (Gemini takes the full set).
 - **Tools you can grow**: install as many as you want. We ship a deep science starter set (chemistry, targets, structures, omics, clinical, literature) and you add whatever your field needs.
@@ -276,7 +279,7 @@ When the agent produces structures, plots, or reports, open them in **Artifacts*
   </picture>
 </p>
 
-Below the workspace, a multi-tab terminal follows your theme. The CLI tab mirrors interactive `sandwalk` (`/` autocomplete; status bar shows model, specialist, sandbox, cwd, and context usage).
+Below the workspace, a multi-tab terminal follows your theme. It is a real shell: run Codex, Claude, OpenCode, Pi, or any other CLI in the same working UI. The CLI tab mirrors interactive `sandwalk` (`/` autocomplete; status bar shows model, specialist, sandbox, cwd, and context usage).
 
 <p align="center">
   <picture>
