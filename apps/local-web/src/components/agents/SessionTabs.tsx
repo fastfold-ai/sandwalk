@@ -83,6 +83,7 @@ export function SessionTabs({
   onDelete,
   onCreateSession,
   groups,
+  openTabIds,
   onSplitWith,
   onDissolveGroup,
   selectedChatIds,
@@ -92,6 +93,14 @@ export function SessionTabs({
 }: {
   tabs: AgentSession[]
   activeId: string | null
+  /**
+   * Orden real de la strip (`openTabIds`) mezclando IDs de sesión y de
+   * grupo. Cuando se provee, la strip lo usa como fuente de verdad y
+   * renderiza cada item (chat o grupo) en el lugar exacto que le
+   * corresponde. Sin él, cae al comportamiento anterior (chats primero,
+   * grupos al final).
+   */
+  openTabIds?: string[]
   onSelect: (id: string) => void
   onClose: (id: string) => void
   onCloseOthers: (id: string) => void
@@ -131,20 +140,90 @@ export function SessionTabs({
     })
   )
 
-  // Pinned first, then the rest (Chrome pin cluster).
-  const orderedTabs = useMemo(() => {
-    const pinned: AgentSession[] = []
-    const rest: AgentSession[] = []
-    for (const tab of tabs) {
-      if (tab.organizeLabel === 'pinned') pinned.push(tab)
-      else rest.push(tab)
-    }
-    return [...pinned, ...rest]
+  /*
+   * Modelo unificado de la strip: cada item es un chat (sesión) o un grupo
+   * (split view). Los dos se renderizan con el mismo <SessionTab>, comparten
+   * el mismo SortableContext y respetan el orden real de `openTabIds`.
+   * Los pinned se agrupan al frente (Chrome pin cluster) sean chats o grupos.
+   */
+  type TabItem =
+    | { kind: 'chat'; id: string; session: AgentSession; pinned: boolean }
+    | {
+        kind: 'group'
+        id: string
+        group: SessionGroup
+        pinned: boolean
+      }
+
+  const tabsById = useMemo(() => {
+    const map = new Map<string, AgentSession>()
+    for (const tab of tabs) map.set(tab.id, tab)
+    return map
   }, [tabs])
 
+  const groupsById = useMemo(() => {
+    const map = new Map<string, SessionGroup>()
+    for (const g of groups ?? []) map.set(g.id, g)
+    return map
+  }, [groups])
+
+  const orderedItems = useMemo<TabItem[]>(() => {
+    // Cuando el caller nos pasa openTabIds, respetamos ese orden exacto,
+    // mezclando chats y grupos. Cuando no, hacemos el fallback antiguo
+    // (chats primero por orden, grupos al final) para no romper otros usos.
+    const items: TabItem[] = []
+    if (openTabIds && openTabIds.length > 0) {
+      for (const id of openTabIds) {
+        const group = groupsById.get(id)
+        if (group) {
+          items.push({
+            kind: 'group',
+            id: group.id,
+            group,
+            pinned: group.pinned
+          })
+          continue
+        }
+        const session = tabsById.get(id)
+        if (session) {
+          items.push({
+            kind: 'chat',
+            id: session.id,
+            session,
+            pinned: session.organizeLabel === 'pinned'
+          })
+        }
+      }
+    } else {
+      for (const tab of tabs) {
+        items.push({
+          kind: 'chat',
+          id: tab.id,
+          session: tab,
+          pinned: tab.organizeLabel === 'pinned'
+        })
+      }
+      for (const g of groups ?? []) {
+        items.push({ kind: 'group', id: g.id, group: g, pinned: g.pinned })
+      }
+    }
+    // Pin cluster: los pinned mantienen su orden relativo pero saltan al frente.
+    const pinned = items.filter(item => item.pinned)
+    const rest = items.filter(item => !item.pinned)
+    return [...pinned, ...rest]
+  }, [openTabIds, tabs, tabsById, groupsById, groups])
+
+  const orderedTabs = useMemo(
+    () =>
+      orderedItems
+        .filter((item): item is TabItem & { kind: 'chat' } => item.kind === 'chat')
+        .map(item => item.session),
+    [orderedItems]
+  )
+
   const sortableIds = useMemo(
-    () => orderedTabs.map(tab => tab.id),
-    [orderedTabs]
+    () => orderedItems.map(item => item.id),
+    [orderedItems]
   )
 
 
@@ -231,14 +310,14 @@ export function SessionTabs({
     const toIndex = sortableIds.indexOf(String(over.id))
     if (fromIndex < 0 || toIndex < 0) return
     const nextIds = arrayMove(sortableIds, fromIndex, toIndex)
-    // Pinned cluster is always kept at the front.
-    const byId = new Map(orderedTabs.map(tab => [tab.id, tab]))
-    const pinned = nextIds.filter(
-      id => byId.get(id)?.organizeLabel === 'pinned'
+    // Pin cluster: pinneados adelante, respetando su nuevo orden relativo.
+    // Aplica tanto a chats pinned como a grupos pinned — todo item que se
+    // marque como pinned salta al frente por igual.
+    const pinnedById = new Map(
+      orderedItems.map(item => [item.id, item.pinned])
     )
-    const rest = nextIds.filter(
-      id => byId.get(id)?.organizeLabel !== 'pinned'
-    )
+    const pinned = nextIds.filter(id => pinnedById.get(id))
+    const rest = nextIds.filter(id => !pinnedById.get(id))
     onReorder([...pinned, ...rest])
   }
 
@@ -285,65 +364,66 @@ export function SessionTabs({
             strategy={horizontalListSortingStrategy}
           >
             <div className="sandwalk-chrome-tabs">
-              {orderedTabs.map(tab => (
-                <SessionTab
-                  key={tab.id}
-                  tab={tab}
-                  active={tab.id === activeId}
-                  color={tabColors[tab.id]}
-                  unread={attentionIds.has(tab.id)}
-                  draggable={draggable}
-                  onSelect={(id, event) => {
-                    if (
-                      onToggleSelectChat &&
-                      event &&
-                      (event.shiftKey || event.metaKey)
-                    ) {
-                      onToggleSelectChat(id)
-                      return
-                    }
-                    onSelect(id)
-                  }}
-                  onClose={onClose}
-                  onContextMenu={openContextMenu}
-                  selected={selectedChatIds?.has(tab.id) ?? false}
-                />
-              ))}
-              {groups && groups.length > 0
-                ? groups.map(group => {
-                    const pseudoTab: AgentSession = {
-                      id: group.id,
-                      title: group.name || `${group.chatIds.length} chats`,
-                      status: 'idle',
-                      source: 'local',
-                      sourceLabel: 'Split view',
-                      organizeLabel:
-                        group.pinned ? 'pinned' : null,
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString(),
-                      lastMessageAt: null,
-                      projectId: null,
-                      titleSource: null,
-                      workspacePath: null
-                    } as unknown as AgentSession
-                    return (
-                      <SessionTab
-                        key={group.id}
-                        tab={pseudoTab}
-                        active={group.id === activeId}
-                        color={group.color || undefined}
-                        unread={false}
-                        draggable={false}
-                        onSelect={onSelect}
-                        onClose={onDissolveGroup || (() => {})}
-                        onContextMenu={openContextMenu}
-                        selected={selectedChatIds?.has(group.id) ?? false}
-                        variant="group"
-                        groupCount={group.chatIds.length}
-                      />
-                    )
-                  })
-                : null}
+              {orderedItems.map(item => {
+                if (item.kind === 'chat') {
+                  const tab = item.session
+                  return (
+                    <SessionTab
+                      key={tab.id}
+                      tab={tab}
+                      active={tab.id === activeId}
+                      color={tabColors[tab.id]}
+                      unread={attentionIds.has(tab.id)}
+                      draggable={draggable}
+                      onSelect={(id, event) => {
+                        if (
+                          onToggleSelectChat &&
+                          event &&
+                          (event.shiftKey || event.metaKey)
+                        ) {
+                          onToggleSelectChat(id)
+                          return
+                        }
+                        onSelect(id)
+                      }}
+                      onClose={onClose}
+                      onContextMenu={openContextMenu}
+                      selected={selectedChatIds?.has(tab.id) ?? false}
+                    />
+                  )
+                }
+                const group = item.group
+                const pseudoTab: AgentSession = {
+                  id: group.id,
+                  title: group.name || `${group.chatIds.length} chats`,
+                  status: 'idle',
+                  source: 'local',
+                  sourceLabel: 'Split view',
+                  organizeLabel: group.pinned ? 'pinned' : null,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  lastMessageAt: null,
+                  projectId: null,
+                  titleSource: null,
+                  workspacePath: null
+                } as unknown as AgentSession
+                return (
+                  <SessionTab
+                    key={group.id}
+                    tab={pseudoTab}
+                    active={group.id === activeId}
+                    color={group.color || undefined}
+                    unread={false}
+                    draggable={draggable}
+                    onSelect={onSelect}
+                    onClose={onDissolveGroup || (() => {})}
+                    onContextMenu={openContextMenu}
+                    selected={selectedChatIds?.has(group.id) ?? false}
+                    variant="group"
+                    groupCount={group.chatIds.length}
+                  />
+                )
+              })}
             </div>
           </SortableContext>
         </DndContext>

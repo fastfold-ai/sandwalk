@@ -150,7 +150,7 @@ export function ComposerDraftTextPart({
         onKeyDown={handleKeyDown}
         placeholder={emptyLastText ? showPlaceholder || undefined : undefined}
         className={cn(
-          'placeholder:text-muted-foreground/70 col-start-1 row-start-1 m-0 min-h-0 min-w-0 resize-none overflow-hidden border-0 bg-transparent p-0 text-[15px] leading-7 outline-none',
+          'placeholder:text-muted-foreground/50 col-start-1 row-start-1 m-0 min-h-0 min-w-0 resize-none overflow-hidden border-0 bg-transparent p-0 text-[15px] leading-7 outline-none',
           // Match mirror width; only stretch when showing the empty placeholder.
           growForPlaceholder ? 'w-full' : 'w-full max-w-full'
         )}

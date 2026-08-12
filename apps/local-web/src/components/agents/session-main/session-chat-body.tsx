@@ -152,6 +152,23 @@ export function SessionChatBody({
     ro.observe(el)
     return () => ro.disconnect()
   }, [isSplit])
+
+  // Cuando el panel gana foco en split view, mover el cursor al textarea del
+  // composer embedded para que el usuario pueda tipear inmediatamente sin
+  // clickear el input. Espera un rAF a que la animación de slide-up arranque
+  // así el focus no se pisa con el layout inicial.
+  useLayoutEffect(() => {
+    if (!isSplit || !splitFocused) return
+    const bar = composerBarRef.current
+    if (!bar) return
+    const raf = window.requestAnimationFrame(() => {
+      const ta = bar.querySelector('textarea')
+      if (ta instanceof HTMLTextAreaElement) {
+        ta.focus({ preventScroll: true })
+      }
+    })
+    return () => window.cancelAnimationFrame(raf)
+  }, [isSplit, splitFocused])
   // Stable callbacks: memoized transcript rows must not re-render per stream
   // delta because a lambda got a new identity. Composer props change every
   // render, so reach them through a ref.
@@ -324,7 +341,7 @@ export function SessionChatBody({
                * inferiores las hereda del `rounded-lg` del panel gracias
                * al `overflow-hidden` del ChatSplitContainer.
                */
-              'bg-background border-border/50 absolute inset-x-0 bottom-0 z-10 border-t',
+              'bg-muted/40 border-border/50 absolute inset-x-0 bottom-0 z-10 border-t',
               'transition-[transform,opacity] duration-300 ease-out',
               splitFocused
                 ? 'translate-y-0 opacity-100'

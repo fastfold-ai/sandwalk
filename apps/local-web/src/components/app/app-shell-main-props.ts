@@ -129,6 +129,7 @@ export type AppShellMainProps = {
   setProjectScopeId: (value: string | null | ((current: string | null) => string | null)) => void
   createSession: CreateDraftSession
   openTabs: AgentSession[]
+  openTabIds: string[]
   sessionId: string | null
   session: AgentSession | null
   openSessionTab: (id: string, scopeKey?: string) => void

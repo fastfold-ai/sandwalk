@@ -166,6 +166,7 @@ export type AppShellProps = {
   togglePinProject: DashboardMainViewsProps['togglePinProject']
   deleteProject: DashboardMainViewsProps['deleteProject']
   openTabs: AgentSession[]
+  openTabIds: string[]
   session: AgentSession | null
   closeSessionTab: (sessionId: string) => void
   closeOtherSessionTabs: (sessionId: string) => void

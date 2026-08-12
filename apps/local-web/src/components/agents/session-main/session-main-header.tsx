@@ -42,6 +42,8 @@ export type SessionMainHeaderProps = {
   sidebarCollapsed: boolean
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>
   openTabs: AgentSession[]
+  /** Mezcla real de IDs de sesión y grupo en el orden de la strip. */
+  openTabIds?: string[]
   sessionId: string | null
   session: AgentSession | null
   navigate: NavigateFunction
@@ -86,6 +88,7 @@ export function SessionMainHeader({
   sidebarCollapsed,
   setSidebarCollapsed,
   openTabs,
+  openTabIds,
   sessionId,
   session,
   navigate,
@@ -248,6 +251,7 @@ export function SessionMainHeader({
         />
         <SessionTabs
           tabs={openTabs}
+          openTabIds={openTabIds}
           activeId={sessionId}
           onSelect={id => {
             void navigateToSession({

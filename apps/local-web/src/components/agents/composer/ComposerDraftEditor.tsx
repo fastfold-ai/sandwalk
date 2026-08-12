@@ -48,7 +48,8 @@ export function ComposerDraftEditor({
   atOpen,
   slashOpen,
   atMenuRef,
-  slashMenuRef
+  slashMenuRef,
+  embedded = false
 }: {
   draft: string
   running: boolean
@@ -77,6 +78,13 @@ export function ComposerDraftEditor({
   slashOpen: boolean
   atMenuRef: MutableRefObject<ComposerAtMenuHandle | null>
   slashMenuRef: MutableRefObject<ComposerSlashMenuHandle | null>
+  /**
+   * Cuando true (split view), quita el `pt` interno del scroll y deja solo
+   * `pb`. El aire con el separator de arriba lo aporta el `pt-3` externo del
+   * Composer embedded — así el usuario nunca ve el texto pegado al border
+   * al scrollear, porque ese aire vive fuera del área scrolleable.
+   */
+  embedded?: boolean
 }) {
   const hasInlineChips = useMemo(
     () => composerParts.some(part => part.type !== 'text'),
@@ -105,9 +113,14 @@ export function ComposerDraftEditor({
   return (
     <div
       className={cn(
-        // Inline chips + text segments share one line box; keep height tight.
-        'max-h-32 overflow-y-auto px-2 py-1.5 text-[15px] leading-7',
-        hasInlineChips ? 'min-h-9' : 'min-h-12'
+        // El padding interno al scroll: en single-tab (`py-1.5`) el editor
+        // conserva su aire arriba y abajo. En split view (`embedded`) el
+        // `pt` interno pasa a 0 — el aire con el separator superior lo
+        // aporta el `pt-3` del Composer, afuera del área scrolleable, así
+        // no se pierde con el overflow.
+        'max-h-32 overflow-y-auto px-2 text-[15px] leading-7',
+        embedded ? 'pt-0 pb-1.5' : 'py-1.5',
+        hasInlineChips ? 'min-h-9' : 'min-h-8'
       )}
       onClick={event => {
         if (event.target !== event.currentTarget) return

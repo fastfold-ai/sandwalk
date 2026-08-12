@@ -92,6 +92,7 @@ export function AppShellMain(props: AppShellMainProps) {
             sidebarCollapsed={props.sidebarCollapsed}
             setSidebarCollapsed={props.setSidebarCollapsed}
             openTabs={props.openTabs}
+            openTabIds={props.openTabIds}
             sessionId={props.sessionId}
             session={props.session}
             createSession={props.createSession}

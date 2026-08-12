@@ -37,6 +37,7 @@ type AppShellBridgeInput = {
   navigate: NavigateFunction
   sections: ReturnType<typeof groupSessions>
   openTabs: AgentSession[]
+  openTabIds: string[]
   orderedVisibleSessionIds: string[]
   showSessionTabs: boolean
   activeTitle: string
@@ -196,6 +197,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     togglePinProject: input.actions.togglePinProject,
     deleteProject: input.actions.deleteProject,
     openTabs: input.openTabs,
+    openTabIds: input.openTabIds,
     session: input.context.session,
     closeSessionTab: input.actions.closeSessionTab,
     closeOtherSessionTabs: input.actions.closeOtherSessionTabs,

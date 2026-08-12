@@ -183,6 +183,7 @@ export function AppShell(props: AppShellProps) {
           setProjectScopeId={props.setProjectScopeId}
           createSession={props.createSession}
           openTabs={props.openTabs}
+          openTabIds={props.openTabIds}
           sessionId={props.sessionId}
           session={props.session}
           openSessionTab={props.openSessionTab}

@@ -500,6 +500,7 @@ export default function App() {
           navigate,
           sections,
           openTabs,
+          openTabIds: tabs.openTabIds,
           orderedVisibleSessionIds,
           showSessionTabs,
           activeTitle,

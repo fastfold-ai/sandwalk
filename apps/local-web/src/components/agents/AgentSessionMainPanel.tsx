@@ -53,6 +53,7 @@ export type AgentSessionMainPanelProps = {
   sidebarCollapsed: boolean
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>
   openTabs: AgentSession[]
+  openTabIds: string[]
   sessionId: string | null
   session: AgentSession | null
   openSessionTab: (sessionId: string) => void
@@ -150,6 +151,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     sidebarCollapsed,
     setSidebarCollapsed,
     openTabs,
+    openTabIds,
     sessionId,
     session,
     openSessionTab,
@@ -319,6 +321,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
         openTabs={openTabs}
+        openTabIds={openTabIds}
         sessionId={sessionId}
         session={session}
         navigate={navigate}

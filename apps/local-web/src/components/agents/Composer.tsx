@@ -270,7 +270,7 @@ export function Composer({
              * su look de "chip flotante" clásico.
              */
             embedded
-              ? 'bg-transparent border-0 rounded-none shadow-none px-4 pt-2 pb-3'
+              ? 'bg-transparent border-0 rounded-none shadow-none px-4 pt-3 pb-4'
               : 'bg-card hover:border-muted-foreground/25 focus-within:border-muted-foreground/40 border-border rounded-3xl border pt-1.5 pr-2 pb-3 pl-3',
             !embedded &&
               (voice.active
@@ -316,6 +316,7 @@ export function Composer({
               <ComposerDraftEditor
                 draft={draftState.draft}
                 running={running}
+                embedded={embedded}
                 autoFocus={autoFocus}
                 focusKey={focusKey}
                 composerParts={composerParts}
@@ -342,6 +343,7 @@ export function Composer({
               />
               <ComposerToolbar
                 running={running}
+                embedded={embedded}
                 showStopButton={showStopButton}
                 sendDisabled={isUploading || (!hasDraft && !running)}
                 modelOptions={modelOptions}
