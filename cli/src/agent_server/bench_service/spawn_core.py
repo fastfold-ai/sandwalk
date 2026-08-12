@@ -58,6 +58,7 @@ def run_agent_suite(
         )
 
     from sandwalk_bench.spawn import (
+        bench_kickoff_message,
         build_project_description,
         default_project_name,
     )
@@ -296,7 +297,11 @@ def run_agent_suite(
             if ws:
                 _copy_inputs(pack, cell, ws)
                 (ws / "BENCH_PROMPT.md").write_text(cell.prompt, encoding="utf-8")
-            deps.service.submit_message(session_id=sid, content=cell.prompt)
+            # Chat stores only a short kickoff — full text stays in BENCH_PROMPT.md.
+            deps.service.submit_message(
+                session_id=sid,
+                content=bench_kickoff_message(question_id=cell.question_id),
+            )
             _wait_until_settled(deps, sid, stop_check=_reason, timeout_s=3600)
             reason = _reason()
             if reason:

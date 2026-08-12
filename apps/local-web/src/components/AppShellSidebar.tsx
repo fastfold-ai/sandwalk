@@ -49,9 +49,6 @@ export type AppShellSidebarProps = {
   ) => void
   selectAllProjects: () => void
   selectProjectScope: (projectId: string) => void
-  setProjectSettingsOpen: (
-    value: boolean | ((current: boolean) => boolean)
-  ) => void
   setNewProjectOpen: (value: boolean | ((current: boolean) => boolean)) => void
   setGlobalSearchOpen: (
     value: boolean | ((current: boolean) => boolean)
@@ -122,7 +119,6 @@ export function AppShellSidebar({
   navigate,
   selectAllProjects,
   selectProjectScope,
-  setProjectSettingsOpen,
   setNewProjectOpen,
   setGlobalSearchOpen,
   loadProjects,
@@ -213,7 +209,6 @@ export function AppShellSidebar({
             }}
             onSelectAllProjects={selectAllProjects}
             onSelectProject={selectProjectScope}
-            onOpenProjectSettings={() => setProjectSettingsOpen(true)}
             onNewProject={() => setNewProjectOpen(true)}
             onRefreshProjects={loadProjects}
             onOpenGlobalSearch={() => setGlobalSearchOpen(true)}

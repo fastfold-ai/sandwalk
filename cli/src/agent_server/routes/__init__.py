@@ -9,6 +9,7 @@ from agent_server.routes.account import register_account_routes
 from agent_server.routes.auth import register_auth_routes
 from agent_server.routes.bench import register_bench_routes
 from agent_server.routes.connectors import register_connector_routes
+from agent_server.routes.dashboard_layout import register_dashboard_layout_routes
 from agent_server.routes.datasets_tools import register_dataset_tool_routes
 from agent_server.routes.health import register_health_routes
 from agent_server.routes.integrations import register_integration_routes
@@ -64,6 +65,7 @@ def register_all_routes(app: FastAPI, deps: AppDeps) -> None:
     register_specialist_routes(app, deps)
     register_session_routes(app, deps)
     register_usage_routes(app, deps)
+    register_dashboard_layout_routes(app, deps)
     register_session_sandbox_routes(app, deps)
     register_session_sandbox_stream_routes(app, deps)
     register_message_routes(app, deps)

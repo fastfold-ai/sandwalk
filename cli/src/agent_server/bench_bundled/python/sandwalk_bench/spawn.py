@@ -98,14 +98,14 @@ def build_project_description(
     cells: list[MatrixCell],
 ) -> str:
     models = sorted({f"{c.provider}:{c.model_id}" for c in cells})
-    qids = [c.question_id for c in cells]
+    question_count = len({c.question_id for c in cells})
     lines = [
         "sandwalk-bench batch",
         f"pack: {pack.id} v{pack.version}",
         f"matrix: {matrix_name}",
         f"sessions: {len(cells)}",
+        f"questions: {question_count}",
         f"models: {', '.join(models)}",
-        f"questions: {', '.join(qids)}",
     ]
     if pack.description:
         lines.append("")
@@ -121,6 +121,15 @@ def build_project_agent_context(pack: Pack, matrix_name: str) -> str:
     """
     del pack, matrix_name
     return ""
+
+
+def bench_kickoff_message(*, question_id: str) -> str:
+    """Short chat kickoff. Full prompt is only written to BENCH_PROMPT.md."""
+    qid = (question_id or "").strip() or "unknown"
+    return (
+        f"Complete benchmark question `{qid}`.\n"
+        "Read `BENCH_PROMPT.md` in the workspace and follow it exactly."
+    )
 
 
 def spawn_matrix(
@@ -225,7 +234,7 @@ def spawn_matrix(
                 api_key,
                 "POST",
                 f"/v1/sessions/{sid}/messages",
-                {"content": cell.prompt},
+                {"content": bench_kickoff_message(question_id=cell.question_id)},
             )
             status = "idle"
             for _ in range(40):

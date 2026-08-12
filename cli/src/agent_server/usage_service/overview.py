@@ -77,8 +77,11 @@ def _longest_contiguous_seconds(
     return max(best, _span_seconds(start, prev))
 
 
-def _longest_agent_seconds(store: AgentStore) -> int:
+def _longest_agent_seconds(
+    store: AgentStore, *, session_ids: set[str] | None = None
+) -> int:
     """Longest contiguous agent activity window (gap-tolerant), not idle age."""
+    allow = session_ids
     by_session: dict[str, list[datetime]] = defaultdict(list)
     try:
         with store._connect() as connection:  # type: ignore[attr-defined]
@@ -94,6 +97,8 @@ def _longest_agent_seconds(store: AgentStore) -> int:
             ).fetchall()
         for row in rows:
             sid = str(row["session_id"] or "").strip()
+            if allow is not None and sid not in allow:
+                continue
             stamp = _as_datetime(row["timestamp"])
             if sid and stamp is not None:
                 by_session[sid].append(stamp)
@@ -109,13 +114,27 @@ def _longest_agent_seconds(store: AgentStore) -> int:
     # Fallback: densest run.usage span per session from the ledger.
     try:
         with store._connect() as connection:  # type: ignore[attr-defined]
-            rows = connection.execute(
-                """
-                SELECT session_id, MIN(updated_at) AS t0, MAX(updated_at) AS t1
-                FROM usage_runs
-                GROUP BY session_id
-                """
-            ).fetchall()
+            if allow is not None:
+                if not allow:
+                    return 0
+                ph = ",".join("?" for _ in allow)
+                rows = connection.execute(
+                    f"""
+                    SELECT session_id, MIN(updated_at) AS t0, MAX(updated_at) AS t1
+                    FROM usage_runs
+                    WHERE session_id IN ({ph})
+                    GROUP BY session_id
+                    """,
+                    tuple(allow),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT session_id, MIN(updated_at) AS t0, MAX(updated_at) AS t1
+                    FROM usage_runs
+                    GROUP BY session_id
+                    """
+                ).fetchall()
         for row in rows:
             secs = _span_seconds(
                 _as_datetime(row["t0"]), _as_datetime(row["t1"])
@@ -233,9 +252,12 @@ def _build_model_chart(
     return model_days, chart_models
 
 
-def build_usage_overview(store: AgentStore) -> UsageOverview:
+def build_usage_overview(
+    store: AgentStore, *, project_id: str | None = None
+) -> UsageOverview:
     backfilled = ensure_backfill(store)
-    rows = store.list_usage_runs()
+    scoped = (project_id or "").strip() or None
+    rows = store.list_usage_runs(project_id=scoped)
     if not rows:
         return UsageOverview(
             days=[], top_models=[], model_days=[], chart_models=[], backfilled=backfilled
@@ -366,7 +388,10 @@ def build_usage_overview(store: AgentStore) -> UsageOverview:
         sessions=sessions,
         messages=messages,
         avg_tokens_per_session=(lifetime // sessions) if sessions else 0,
-        longest_agent_seconds=_longest_agent_seconds(store),
+        longest_agent_seconds=_longest_agent_seconds(
+            store,
+            session_ids={sid for sid in session_ids if sid} if scoped else None,
+        ),
         longest_streak_days=longest_streak,
         current_streak_days=current_streak,
         cli_tokens=surface_totals["cli"],

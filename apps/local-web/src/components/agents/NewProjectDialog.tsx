@@ -20,9 +20,9 @@ import { ProjectAppearancePicker } from './ProjectAppearancePicker'
 import { ProjectFolderField } from './ProjectFolderField'
 
 const PROJECT_DIALOG_OVERLAY =
-  'bg-black/10 data-[state=open]:backdrop-blur-none'
+  'bg-black/65 backdrop-blur-[2px] data-[state=open]:backdrop-blur-[2px]'
 const PROJECT_DIALOG_CONTENT =
-  'border-0 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.35)] sm:rounded-2xl'
+  'border-border/80 bg-popover ring-border/40 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.75),0_0_0_1px_rgba(255,255,255,0.06)] ring-1 sm:rounded-2xl'
 
 export function NewProjectDialog({
   open,

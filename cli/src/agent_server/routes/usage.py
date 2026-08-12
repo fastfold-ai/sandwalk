@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 
 from agent_server import ttl_cache
 from agent_server.app_deps import AppDeps
@@ -15,16 +15,27 @@ _USAGE_OVERVIEW_TTL_S = 30.0
 _USAGE_CACHE_KEY = "usage:overview"
 
 
+def _cache_key(project_id: str | None) -> str:
+    scoped = (project_id or "").strip()
+    if scoped:
+        return f"{_USAGE_CACHE_KEY}:project:{scoped}"
+    return _USAGE_CACHE_KEY
+
+
 def register_usage_routes(app: FastAPI, deps: AppDeps) -> None:
     store = deps.store
 
     @app.get("/v1/usage/overview", response_model=UsageOverview)
-    async def usage_overview() -> UsageOverview:
+    async def usage_overview(
+        project_id: str | None = Query(default=None, alias="projectId"),
+    ) -> UsageOverview:
+        scoped = (project_id or "").strip() or None
+
         def _build() -> UsageOverview:
             return ttl_cache.cached(
-                _USAGE_CACHE_KEY,
+                _cache_key(scoped),
                 _USAGE_OVERVIEW_TTL_S,
-                lambda: build_usage_overview(store),
+                lambda: build_usage_overview(store, project_id=scoped),
             )
 
         return await asyncio.to_thread(_build)

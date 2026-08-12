@@ -197,6 +197,8 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
         connection.execute(
             "ALTER TABLE projects ADD COLUMN color TEXT NOT NULL DEFAULT 'neutral'"
         )
+    if "home_layout" not in project_columns:
+        connection.execute("ALTER TABLE projects ADD COLUMN home_layout TEXT")
 
     connection.executescript(
         """

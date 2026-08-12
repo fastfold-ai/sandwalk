@@ -80,18 +80,50 @@ class UsageMixin:
                 ),
             )
 
-    def list_usage_runs(self) -> list[dict[str, Any]]:
+    def list_usage_runs(
+        self, *, project_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        scoped = (project_id or "").strip() or None
+        with self._connect() as connection:
+            if scoped:
+                rows = connection.execute(
+                    """
+                    SELECT u.run_id, u.session_id, u.day, u.surface, u.model_id,
+                           u.provider, u.input_tokens, u.output_tokens,
+                           u.cache_read_tokens, u.cache_creation_tokens,
+                           u.updated_at
+                    FROM usage_runs u
+                    INNER JOIN sessions s ON s.id = u.session_id
+                    WHERE s.project_id = ?
+                    ORDER BY u.day ASC, u.run_id ASC
+                    """,
+                    (scoped,),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT run_id, session_id, day, surface, model_id, provider,
+                           input_tokens, output_tokens, cache_read_tokens,
+                           cache_creation_tokens, updated_at
+                    FROM usage_runs
+                    ORDER BY day ASC, run_id ASC
+                    """
+                ).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_session_ids_for_project(self, project_id: str) -> list[str]:
+        scoped = (project_id or "").strip()
+        if not scoped:
+            return []
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT run_id, session_id, day, surface, model_id, provider,
-                       input_tokens, output_tokens, cache_read_tokens,
-                       cache_creation_tokens, updated_at
-                FROM usage_runs
-                ORDER BY day ASC, run_id ASC
-                """
+                SELECT id FROM sessions
+                WHERE project_id = ?
+                """,
+                (scoped,),
             ).fetchall()
-        return [dict(row) for row in rows]
+        return [str(row["id"]) for row in rows if row["id"]]
 
     def usage_run_count(self) -> int:
         with self._connect() as connection:

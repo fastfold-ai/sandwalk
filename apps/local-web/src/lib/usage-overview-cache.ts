@@ -2,25 +2,38 @@ import type { UsageOverview } from '@sandwalk/agent-ui-core'
 
 const TTL_MS = 45_000
 
-let cached: { at: number; baseUrl: string; overview: UsageOverview } | null =
+type CacheKey = string
+
+function scopeKey(baseUrl: string, projectId?: string | null): CacheKey {
+  const scoped = (projectId || '').trim()
+  return scoped ? `${baseUrl}::project:${scoped}` : `${baseUrl}::global`
+}
+
+let cached: { at: number; key: CacheKey; overview: UsageOverview } | null =
   null
 let inflight: Promise<UsageOverview> | null = null
-let inflightBaseUrl: string | null = null
+let inflightKey: CacheKey | null = null
 
 export function readUsageOverviewCache(
-  baseUrl: string
+  baseUrl: string,
+  projectId?: string | null
 ): UsageOverview | null {
   if (!cached) return null
-  if (cached.baseUrl !== baseUrl) return null
+  if (cached.key !== scopeKey(baseUrl, projectId)) return null
   if (Date.now() - cached.at > TTL_MS) return null
   return cached.overview
 }
 
 export function writeUsageOverviewCache(
   baseUrl: string,
-  overview: UsageOverview
+  overview: UsageOverview,
+  projectId?: string | null
 ): void {
-  cached = { at: Date.now(), baseUrl, overview }
+  cached = {
+    at: Date.now(),
+    key: scopeKey(baseUrl, projectId),
+    overview
+  }
 }
 
 export function invalidateUsageOverviewCache(): void {
@@ -30,16 +43,18 @@ export function invalidateUsageOverviewCache(): void {
 /** Warm Overview before the user opens it (fire-and-forget from bootstrap). */
 export function prefetchUsageOverview(
   baseUrl: string,
-  fetch: (signal?: AbortSignal) => Promise<UsageOverview>
+  fetch: (signal?: AbortSignal) => Promise<UsageOverview>,
+  projectId?: string | null
 ): void {
-  const existing = readUsageOverviewCache(baseUrl)
+  const key = scopeKey(baseUrl, projectId)
+  const existing = readUsageOverviewCache(baseUrl, projectId)
   if (existing) return
-  if (inflight && inflightBaseUrl === baseUrl) return
+  if (inflight && inflightKey === key) return
   const controller = new AbortController()
-  inflightBaseUrl = baseUrl
+  inflightKey = key
   inflight = fetch(controller.signal)
     .then(overview => {
-      writeUsageOverviewCache(baseUrl, overview)
+      writeUsageOverviewCache(baseUrl, overview, projectId)
       return overview
     })
     .catch(() => {
@@ -47,9 +62,9 @@ export function prefetchUsageOverview(
       return null as unknown as UsageOverview
     })
     .finally(() => {
-      if (inflightBaseUrl === baseUrl) {
+      if (inflightKey === key) {
         inflight = null
-        inflightBaseUrl = null
+        inflightKey = null
       }
     })
 }

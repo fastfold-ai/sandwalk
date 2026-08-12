@@ -1066,13 +1066,14 @@ pub fn handle_menu_event(
     let id = event.id().as_ref();
     match id {
         "new-window" => {
-            let url = focused_backend_url(app, fallback_url);
+            // Welcome / connection chooser — do not bind to the focused
+            // window's backend. Cold start on `main` still restores last session.
             let _ = open_or_focus_window(
                 app,
                 OpenWindowArgs {
-                    backend_url: Some(url),
+                    backend_url: Some(normalize_url(fallback_url)),
                     api_key: None,
-                    title: None,
+                    title: Some("Sandwalk".into()),
                     route: Some("/".into()),
                     snapshot_id: None,
                     hostname: None,

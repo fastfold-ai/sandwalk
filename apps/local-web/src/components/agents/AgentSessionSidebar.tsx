@@ -52,7 +52,6 @@ type AgentSessionSidebarProps = {
   onNavigateHome: () => void
   onSelectAllProjects: () => void
   onSelectProject: (projectId: string) => void
-  onOpenProjectSettings: () => void
   onNewProject: () => void
   onRefreshProjects?: () => void | Promise<void>
   onOpenGlobalSearch: () => void
@@ -99,7 +98,6 @@ export function AgentSessionSidebar({
   onNavigateHome,
   onSelectAllProjects,
   onSelectProject,
-  onOpenProjectSettings,
   onNewProject,
   onRefreshProjects,
   onOpenGlobalSearch,
@@ -152,7 +150,6 @@ export function AgentSessionSidebar({
             value={activeProjectId}
             onSelectAll={onSelectAllProjects}
             onSelectProject={onSelectProject}
-            onOpenSettings={onOpenProjectSettings}
             onNewProject={onNewProject}
             onRefresh={onRefreshProjects}
           />
