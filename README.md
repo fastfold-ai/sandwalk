@@ -5,7 +5,9 @@
     <img alt="sandwalk" src="images/sandwalk-logo-light.svg" height="64" style="max-width:100%;">
   </picture></a>
 </h1>
-<p align="center"><b>Sandwalk is a self-hosted science agent for researchers.</b></p>
+<h3 align="center" style="margin: 0; margin-top: 0;">
+Great ideas need a path. This one is yours.
+</h3>
 
 <p align="center">
   <a href="#-get-started">Get started</a> •
@@ -24,7 +26,7 @@ Download the native Sandwalk Desktop app for your operating system:
 
 Download from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases).
 
-Open **Sandwalk.app** — the nested menubar helper starts the agent and installs a `sandwalk` command into `~/.local/bin` (open a new terminal, then `sandwalk --version`). Same sessions as the CLI and web dashboard.
+Open **Sandwalk.app**. The nested menubar helper starts the agent and installs a `sandwalk` command into `~/.local/bin` (open a new terminal, then `sandwalk --version`). Same sessions as the CLI and web dashboard.
 
 If you already installed the CLI via curl/uv, that install is left alone (the app does not overwrite it).
 
@@ -37,7 +39,7 @@ curl -fsSL https://sandwalk.sh/install | bash
 sandwalk --version
 ```
 
-This installs the **Python CLI only** (via uv / pipx / pip). It does **not** download or install `Sandwalk.app` — use the Desktop DMG above for the native Mac app.
+This installs the **Python CLI only** (via uv / pipx / pip). It does **not** download or install `Sandwalk.app`. Use the Desktop DMG above for the native Mac app.
 
 Tracks the latest **stable** [GitHub Release](https://github.com/fastfold-ai/sandwalk/releases). For pre-releases:
 
@@ -49,27 +51,32 @@ Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/) (or pipx / pip).
 
 ## Features
 
-**sandwalk** takes natural-language research questions, attaches files, installs skills, and runs multi-step workflows with sandboxes and results in one place. Built for biology and drug discovery; happy to stretch beyond them. CLI, web dashboard, and macOS desktop share the same sessions and workspace.
+**sandwalk** runs agents 24/7 on your compute or in the cloud: OpenRouter, frontier APIs, or local models. You decide what they work on: a hard scientific question, a company, a craft, a line of inquiry nobody has funded yet.
 
-- **CLI ↔ web**: one agent session, two surfaces (terminal and dashboard).
+Leave a session on a Mac Mini at home or a university cluster, and control it remotely from the CLI, the Mac app, and iOS.
+
+Invention, not just automation. Novel ideas come from people with better tools. As those tools get more powerful, each person becomes more able to shape the work. Sandwalk is open source and self-hosted, so you keep the keys.
+
+- **CLI ↔ Mac ↔ iOS**: one agent session across terminal, desktop, and phone.
+- **Remote sessions**: run the agent on a Mac Mini or a university cluster; open it from wherever you are.
 - **Plan mode**: draft `plans/*.md` with todos and a Mermaid flowchart, then **Build** when ready.
 - **Multimodal**: `@`-attach images, PDFs, audio, and video (Gemini takes the full set).
-- **Tools you can grow**: install as many as you want; we curate a starter set for chemistry, targets, structures, omics, clinical, literature, and more.
+- **Tools you can grow**: install as many as you want. We ship a deep science starter set (chemistry, targets, structures, omics, clinical, literature) and you add whatever your field needs.
 - **Live databases**: PubChem, ChEMBL, UniProt, PDB, Open Targets, ClinicalTrials.gov, GTEx, STRING, Ensembl, NCBI, …
 - **Local datasets**: optional DepMap, PRISM, L1000, proteomics, MSigDB, STRING (`sandwalk data pull-all`).
 - **Local + cloud compute**: Local Sandbox on your machine, or Modal / Lambda / Fastfold Cloud for GPU jobs.
 - **Skills & MCPs**: install from GitHub or [skills.sh](https://skills.sh); connect remote MCPs via Cursor-compatible `~/.sandwalk/mcp.json`.
 - **Find skills**: ask the agent to search the Fastfold catalog and the [skills.sh](https://skills.sh) ecosystem (`skill-find` / `skills.manage find`), try a skill once without installing, or install what you pick.
-- **Create skills with the agent**: scaffold, author, validate, and install new skills via `skill-creator` — they land under **Created by Me** and show up in the composer `/` menu.
+- **Create skills with the agent**: scaffold, author, validate, and install new skills via `skill-creator`. They land under **Created by Me** and show up in the composer `/` menu.
 - **Human-in-the-loop approvals**: skill install/remove (and related lifecycle actions) pause for **Approve / Edit / Reject** in the desktop chat or interactive CLI; one approve can cover the rest of a run.
-- **Specialists**: reusable skill + MCP + instruction packs for focused research modes.
+- **Specialists**: reusable skill + MCP + instruction packs for focused modes.
 - **Voice input (desktop)**: dictate into the composer with on-device Whisper.
-- **Slack**: talk to Sandwalk from Slack DMs or `@mentions` — one-click via Fastfold Cloud, or manual Socket Mode with your own app tokens.
+- **Slack**: talk to Sandwalk from Slack DMs or `@mentions`. One-click via Fastfold Cloud, or manual Socket Mode with your own app tokens.
 - **Viewers**: structures, plots, and artifacts beside the chat.
 
 ### Tools, data, and models
 
-We ship a curated toolkit out of the box (targets and genetics, chemistry, protein structure and design, expression / single-cell, clinical and translational, literature, safety / PK / stats), and you can keep installing more. Browse what you have with `sandwalk tool list` and `sandwalk data list`.
+We ship a deep science toolkit out of the box (targets and genetics, chemistry, protein structure and design, expression / single-cell, clinical and translational, literature, safety / PK / stats). That is a starting point, not a ceiling. Install more for any domain. Browse what you have with `sandwalk tool list` and `sandwalk data list`.
 
 **Models** (via `sandwalk setup`, the dashboard, or `sandwalk config`): Anthropic, OpenAI, Google Gemini, xAI (Grok), Kimi (Moonshot), NVIDIA, OpenCode Zen, DeepSeek, MiniMax, Mistral, Qwen Cloud, Together AI, OpenRouter, plus local OpenAI-compatible endpoints like Ollama, Unsloth, oMLX, DS4, llama.cpp, and LM Studio.
 
@@ -170,7 +177,7 @@ The composer drives every turn: model and effort, specialist, sandbox, plus `@` 
 
 **Multimodal.** `@`-attach workspace files in the same composer. Gemini models accept image, PDF, audio, and video natively; Dashboard → **Models** → **Multimodal support** lists what each model can take.
 
-**Voice input (desktop).** In Sandwalk.app, Dashboard → **Voice** installs OpenAI Whisper Base (English) locally, then a mic check unlocks dictation in the composer. Speak, confirm, and the transcript lands in the draft (nothing is auto-sent). Capture and transcription run in the Tauri process; model weights live under Sandwalk app data `models/` (also listed on Dashboard → **Storage**). Browser builds show a desktop-only notice — no Web Speech / cloud STT fallback. Supported on macOS 12+ Apple Silicon and Windows 10 22H2 / 11 x64.
+**Voice input (desktop).** In Sandwalk.app, Dashboard → **Voice** installs OpenAI Whisper Base (English) locally, then a mic check unlocks dictation in the composer. Speak, confirm, and the transcript lands in the draft (nothing is auto-sent). Capture and transcription run in the Tauri process; model weights live under Sandwalk app data `models/` (also listed on Dashboard → **Storage**). Browser builds show a desktop-only notice. No Web Speech / cloud STT fallback. Supported on macOS 12+ Apple Silicon and Windows 10 22H2 / 11 x64.
 
 ### Skills and MCPs
 
@@ -202,7 +209,7 @@ When the agent installs, removes, or otherwise changes skill lifecycle in a way 
 - **Interactive CLI**: a terminal HITL prompt with the same decisions.
 - Notifications can surface pending approvals when the window is in the background.
 
-This is separate from chat “yes/no” — the primary gate is the approval UI so installs don’t proceed on a casual confirmation alone.
+This is separate from chat “yes/no”. The primary gate is the approval UI so installs don’t proceed on a casual confirmation alone.
 
 Manage MCP servers under Dashboard → **MCPs**: toggle catalog entries, connect when auth is required, or add a custom URL. Credentials live under Integrations / keys.
 
@@ -244,18 +251,18 @@ Open a skill for the install command, enable/disable toggle, links to Skills.sh 
   </picture>
 </p>
 
-### Integrations — Slack
+### Integrations: Slack
 
 Connect Slack from Dashboard → **Integrations** → **Slack** on the desktop (or local web UI). Two modes:
 
 | Mode | How it works |
 |------|----------------|
-| **One-click** | Sign in to Fastfold Cloud, authorize Slack, and Sandwalk receives Events API traffic over a cloud relay — no bot/app tokens to paste. After OAuth, the browser returns to a local success page and the desktop imports the workspace automatically. |
+| **One-click** | Sign in to Fastfold Cloud, authorize Slack, and Sandwalk receives Events API traffic over a cloud relay. No bot/app tokens to paste. After OAuth, the browser returns to a local success page and the desktop imports the workspace automatically. |
 | **Manual Socket Mode** | Paste bot + app-level tokens for your own Slack app; Sandwalk opens a Socket Mode connection locally. |
 
 Both modes support DMs and channel `@mentions`, Slack’s **Agents & AI Apps** messaging container, and Block Kit replies (not a single text blob). Pause or resume a workspace to stop/start the agent without disconnecting; Disconnect removes the connection. You can run different workspaces in different modes at once (one mode per workspace).
 
-Fastfold Cloud → Integrations → **Sandwalk** is view/revoke only — connect and manage live status from the Sandwalk desktop.
+Fastfold Cloud → Integrations → **Sandwalk** is view/revoke only. Connect and manage live status from the Sandwalk desktop.
 
 ### Artifacts and terminal
 
@@ -348,7 +355,7 @@ pnpm --filter @sandwalk/agent-local-web dev         # web UI (Vite)
 # cd cli && uv sync --extra all
 ```
 
-**Packaged Mac app** (Apple Silicon, ad-hoc signed) — build, install to `~/Applications`, and open:
+**Packaged Mac app** (Apple Silicon, ad-hoc signed). Build, install to `~/Applications`, and open:
 
 ```bash
 osascript -e 'quit app "Sandwalk"' 2>/dev/null || true
@@ -358,13 +365,13 @@ INSTALL=1 pnpm --filter @sandwalk/agent-local-web package:dmg && open ~/Applicat
 
 DMG lands at `apps/packaging/dist/Sandwalk-<version>-macos-arm64.dmg`. Details: [`apps/packaging/README.md`](apps/packaging/README.md).
 
-**Tauri + agent server (hot reload)** — two terminals; Tauri does **not** start the API:
+**Tauri + agent server (hot reload).** Two terminals; Tauri does **not** start the API:
 
 ```bash
-# Terminal 1 — agent API
+# Terminal 1: agent API
 cd cli && uv sync && uv run sandwalk serve --host 127.0.0.1 --port 8787
 
-# Terminal 2 — Tauri desktop UI
+# Terminal 2: Tauri desktop UI
 pnpm --filter @sandwalk/agent-local-web tauri:dev
 ```
 
