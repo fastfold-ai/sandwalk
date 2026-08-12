@@ -1,5 +1,5 @@
 import {
-  injectedDesktopApiKey,
+  injectedDesktopApiKeyFor,
   isLocalBackendUrl,
   normalizeBackendUrl
 } from '@/lib/backend-url'
@@ -11,7 +11,10 @@ import {
 
 /**
  * Resolve an API key for a backend URL without prompting.
- * Order: window inject → remembered localStorage → local desktop control plane.
+ * Order: explicit → remembered for this URL → inject only if this
+ * window is bound to the same URL → local desktop control plane.
+ *
+ * Never reuse another host’s injected key (Welcome → Open Recent).
  */
 export async function resolveBackendApiKey(
   backendUrl: string,
@@ -21,11 +24,12 @@ export async function resolveBackendApiKey(
   if (trimmed) return trimmed
 
   const url = normalizeBackendUrl(backendUrl)
-  const injected = injectedDesktopApiKey()?.trim()
-  if (injected) return injected
 
   const remembered = readRememberedApiKey(url)?.trim()
   if (remembered) return remembered
+
+  const injected = injectedDesktopApiKeyFor(url)?.trim()
+  if (injected) return injected
 
   if (!isTauri() || !isLocalBackendUrl(url)) return undefined
 

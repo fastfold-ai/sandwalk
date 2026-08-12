@@ -46,6 +46,12 @@ describe('resolveBackendApiKey', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-26T12:00:00Z'))
     delete (globalThis as { __SANDWALK_API_KEY__?: string }).__SANDWALK_API_KEY__
+    delete (globalThis as { __SANDWALK_HTTP__?: string }).__SANDWALK_HTTP__
+    try {
+      window.name = ''
+    } catch {
+      // ignore
+    }
   })
 
   afterEach(() => {
@@ -69,5 +75,32 @@ describe('resolveBackendApiKey', () => {
     expect(localStorage.getItem(REMEMBERED_AUTH_STORAGE_KEY)).toContain(
       'sk-remembered'
     )
+  })
+
+  it('does not reuse another host’s injected key', async () => {
+    ;(globalThis as { __SANDWALK_HTTP__?: string }).__SANDWALK_HTTP__ =
+      'http://192.168.2.200:8789'
+    ;(globalThis as { __SANDWALK_API_KEY__?: string }).__SANDWALK_API_KEY__ =
+      'sk-from-ai-server'
+    persistRememberedApiKey(
+      'http://192.168.2.178:8787',
+      'sk-mac-mini'
+    )
+    await expect(
+      resolveBackendApiKey('http://192.168.2.178:8787')
+    ).resolves.toBe('sk-mac-mini')
+    await expect(
+      resolveBackendApiKey('http://10.0.0.5:8787')
+    ).resolves.toBeUndefined()
+  })
+
+  it('uses inject only when bound to the same URL', async () => {
+    ;(globalThis as { __SANDWALK_HTTP__?: string }).__SANDWALK_HTTP__ =
+      'http://192.168.2.178:8787'
+    ;(globalThis as { __SANDWALK_API_KEY__?: string }).__SANDWALK_API_KEY__ =
+      'sk-bound'
+    await expect(
+      resolveBackendApiKey('http://192.168.2.178:8787')
+    ).resolves.toBe('sk-bound')
   })
 })

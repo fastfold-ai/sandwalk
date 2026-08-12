@@ -24,8 +24,10 @@ from agent_server.auth_settings.persistence import (
     save_settings,
 )
 from agent_server.auth_settings.request_auth import (
+    any_key_matches,
     extract_bearer_or_header_key,
     key_matches,
+    normalize_api_keys,
     request_is_authenticated,
 )
 from agent_server.auth_settings.session import create_session_token, verify_session_token
@@ -50,5 +52,7 @@ __all__ = [
     "verify_session_token",
     "extract_bearer_or_header_key",
     "key_matches",
+    "normalize_api_keys",
+    "any_key_matches",
     "request_is_authenticated",
 ]

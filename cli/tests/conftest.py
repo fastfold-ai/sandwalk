@@ -132,6 +132,13 @@ def _isolate_cli_config(tmp_path, monkeypatch):
     # Keep Modal token probes hermetic even when the host shell has tokens.
     monkeypatch.delenv("MODAL_TOKEN_ID", raising=False)
     monkeypatch.delenv("MODAL_TOKEN_SECRET", raising=False)
+    # Re-pin provider keys every test so pytest-xdist workers cannot leak a
+    # sibling test's setenv/os.environ mutation into validate/probe paths.
+    if not any(
+        _env_flag(gate) for gate in ("RUN_CLI_NETWORK", "RUN_CLI_E2E", "RUN_MODAL_E2E")
+    ):
+        for var in _PROVIDER_KEY_ENV_VARS:
+            monkeypatch.setenv(var, "")
     yield
 
 

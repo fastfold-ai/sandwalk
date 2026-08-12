@@ -34,12 +34,29 @@ def register_settings_routes(app: FastAPI, deps: AppDeps) -> None:
     ) -> PromptBudgetResponse:
         from agent_server.prompt_budget_service import PromptBudgetService
 
-        return await PromptBudgetService(deps.store).estimate(
-            specialist_id=specialist_id,
-            project_id=project_id,
-            sample_query=sample_query,
-            token_count_method=token_count_method,
-        )
+        try:
+            return await asyncio.wait_for(
+                PromptBudgetService(deps.store).estimate(
+                    specialist_id=specialist_id,
+                    project_id=project_id,
+                    sample_query=sample_query,
+                    token_count_method=token_count_method,
+                ),
+                timeout=45.0,
+            )
+        except TimeoutError as exc:
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    "Context estimate timed out while building prompts/tool schemas. "
+                    "Disable hung MCP servers (e.g. Latch Bio) and retry."
+                ),
+            ) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=500,
+                detail=f"Context estimate failed: {exc}",
+            ) from exc
 
     @app.get("/v1/settings/runtime", response_model=RuntimeSettings)
     async def get_runtime_settings() -> RuntimeSettings:

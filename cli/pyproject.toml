@@ -112,6 +112,8 @@ all = [
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "pytest-xdist>=3.6",
+    "pytest-split>=0.9",
     "ruff>=0.8.5",
     "mypy>=1.14.1",
     "types-requests>=2.32.0",
@@ -126,6 +128,8 @@ dev = [
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "pytest-xdist>=3.6",
+    "pytest-split>=0.9",
     "ruff>=0.8.5",
     "mypy>=1.14.1",
     "types-requests>=2.32.0",
@@ -246,6 +250,9 @@ markers = [
 
 [tool.coverage.run]
 relative_files = true
+# pytest-xdist workers write parallel data files; pytest-cov / coverage combine merge them.
+parallel = true
+concurrency = ["multiprocessing", "thread"]
 # Statement coverage for the unit-test gate; branch coverage is tracked in reports
 # but makes an 80% threshold unrealistic for Typer/CLI-heavy code.
 branch = false

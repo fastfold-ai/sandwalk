@@ -1,10 +1,7 @@
 import {
   Check,
   Copy,
-  Eye,
-  EyeOff,
   Loader2,
-  Lock,
   Network,
   RefreshCw,
   Terminal
@@ -12,6 +9,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { LanTopologyScan } from '@/components/agents/lan-topology-scan'
+import { SandwalkMark } from '@/components/SandwalkMark'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -25,23 +23,19 @@ import { Input } from '@/components/ui/input'
 import { normalizeBackendUrl } from '@/lib/backend-url'
 import { copyText } from '@/lib/clipboard'
 import {
+  hideDesktopWindow,
   isTauri,
   type LanDesktopServer,
   openDesktopWindow,
   scanLanDesktopServers
 } from '@/lib/desktop'
-import { persistRememberedApiKey, readRememberedApiKey } from '@/lib/remembered-auth'
-import { rememberRemoteHostname } from '@/lib/remote-hostname'
+import {
+  rememberRemoteHostname,
+  rememberRemotePlatform
+} from '@/lib/remote-hostname'
+import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 
-const CLI_REMOTE_SNIPPET = [
-  '# Security — API key',
-  'sandwalk auth generate',
-  'sandwalk auth enable',
-  'sandwalk auth show',
-  '',
-  '# Network — Allow Remote Connections',
-  'sandwalk serve --host 0.0.0.0 --port 8787'
-].join('\n')
+const CLI_REMOTE_SNIPPET = 'sandwalk serve --host 0.0.0.0 --port 8787'
 
 function splitDeviceLabel(label: string, hostname: string) {
   const parts = label
@@ -60,23 +54,24 @@ function splitDeviceLabel(label: string, hostname: string) {
 export function OpenRemoteWindowDialog({
   open,
   onOpenChange,
-  initialUrl
+  initialUrl,
+  hideLauncherAfterOpen = false
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialUrl?: string | null
+  /** When true (Welcome Home), hide this window after a remote opens. */
+  hideLauncherAfterOpen?: boolean
 }) {
   const [draftUrl, setDraftUrl] = useState('')
-  const [draftKey, setDraftKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const [hits, setHits] = useState<LanDesktopServer[]>([])
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null)
-  const [showCli, setShowCli] = useState(false)
+  const [showCli, setShowCli] = useState(true)
   const [copied, setCopied] = useState(false)
-  const [showKey, setShowKey] = useState(false)
   const scanGen = useRef(0)
 
   const runScan = useCallback(async () => {
@@ -105,15 +100,13 @@ export function OpenRemoteWindowDialog({
       ? normalizeBackendUrl(initialUrl)
       : ''
     setDraftUrl(url)
-    setDraftKey(url ? readRememberedApiKey(url) || '' : '')
     setError(null)
     setBusy(false)
     setSelectedUrl(null)
     setHits([])
     setScanError(null)
-    setShowCli(false)
+    setShowCli(true)
     setCopied(false)
-    setShowKey(false)
     // Paint the dialog first; discover runs in the background (async Tauri cmd).
     setScanning(isTauri())
     const timer = window.setTimeout(() => {
@@ -131,8 +124,6 @@ export function OpenRemoteWindowDialog({
     setDraftUrl(url)
     setSelectedUrl(url)
     setError(null)
-    const remembered = readRememberedApiKey(url)
-    if (remembered) setDraftKey(remembered)
   }
 
   const topologyNodes = useMemo(
@@ -164,25 +155,29 @@ export function OpenRemoteWindowDialog({
       return
     }
     const url = normalizeBackendUrl(draftUrl)
-    const key = draftKey.trim()
     const selected = hits.find(hit => normalizeBackendUrl(hit.url) === url)
-    if (selected?.authRequired && !key) {
-      setError('This server requires an API key')
-      return
-    }
     setBusy(true)
     setError(null)
     try {
-      if (key) persistRememberedApiKey(url, key)
+      // Auth is LoginView's job; only pass a remembered key silently.
+      const key = (await resolveBackendApiKey(url)) || null
       const hostname = selected?.hostname?.trim() || null
+      const platform = selected?.platform?.trim() || null
       if (hostname) rememberRemoteHostname(url, hostname)
+      if (platform) rememberRemotePlatform(url, platform)
       await openDesktopWindow({
         backendUrl: url,
-        apiKey: key || null,
+        apiKey: key,
         hostname,
-        focusExisting: false
+        platform,
+        focusExisting: true
       })
       onOpenChange(false)
+      if (hideLauncherAfterOpen && isTauri()) {
+        void hideDesktopWindow().catch(() => {
+          // Launcher may already be gone.
+        })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open window')
     } finally {
@@ -198,17 +193,17 @@ export function OpenRemoteWindowDialog({
           <DialogDescription asChild>
             <div className="text-muted-foreground space-y-2 text-sm">
               <p>
-                On the other machine: Server Settings →{' '}
+                On the other machine:{' '}
+                <span className="text-foreground/90 inline-flex items-center gap-1">
+                  <SandwalkMark className="size-3.5 shrink-0" />
+                  Server Settings
+                </span>{' '}
+                →{' '}
                 <span className="text-foreground/90 inline-flex items-center gap-1">
                   <Network className="size-3.5 shrink-0" aria-hidden />
                   Network
                 </span>{' '}
-                → Allow Remote Connections;{' '}
-                <span className="text-foreground/90 inline-flex items-center gap-1">
-                  <Lock className="size-3.5 shrink-0" aria-hidden />
-                  Security
-                </span>{' '}
-                for the API key.
+                → Allow Remote Connections.
               </p>
               <div>
                 <button
@@ -222,12 +217,15 @@ export function OpenRemoteWindowDialog({
                 </button>
                 {showCli ? (
                   <div className="border-border bg-muted/40 mt-2 overflow-hidden rounded-md border">
-                    <div className="flex items-center justify-end border-b px-2 py-1">
+                    <div className="flex items-center justify-between gap-2 border-b px-2 py-1">
+                      <span className="text-muted-foreground truncate px-1 text-[11px] font-medium">
+                        Network — Allow Remote Connections
+                      </span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-7 gap-1 px-2"
+                        className="h-7 shrink-0 gap-1 px-2"
                         onClick={() => void copyCli()}
                       >
                         {copied ? (
@@ -299,45 +297,15 @@ export function OpenRemoteWindowDialog({
           <Input
             value={draftUrl}
             onChange={event => {
-              const next = event.target.value
-              setDraftUrl(next)
+              setDraftUrl(event.target.value)
               setSelectedUrl(null)
-              const normalized = normalizeBackendUrl(next)
-              const remembered = readRememberedApiKey(normalized)
-              if (remembered && !draftKey) setDraftKey(remembered)
+              if (error) setError(null)
             }}
             placeholder="http://<Local or remote>"
             autoFocus
             autoComplete="url"
             spellCheck={false}
           />
-          <div className="relative">
-            <Input
-              type={showKey ? 'text' : 'password'}
-              value={draftKey}
-              onChange={event => {
-                setDraftKey(event.target.value)
-                if (error) setError(null)
-              }}
-              placeholder="API key (if the server requires auth)"
-              autoComplete="off"
-              className="pr-10"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground absolute top-1/2 right-1 size-8 -translate-y-1/2"
-              onClick={() => setShowKey(v => !v)}
-              aria-label={showKey ? 'Hide API key' : 'Show API key'}
-            >
-              {showKey ? (
-                <EyeOff className="size-4" />
-              ) : (
-                <Eye className="size-4" />
-              )}
-            </Button>
-          </div>
           {error ? (
             <p className="text-destructive text-sm" role="alert">
               {error}

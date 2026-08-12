@@ -30,5 +30,8 @@
     "test:cli:all": "cd cli && RUN_CLI_NETWORK=1 RUN_CLI_E2E=1 .venv/bin/python -m pytest tests/integration_cli -q --tb=short",
     "test:cli:coverage": "cd cli && .venv/bin/python -m pytest tests/ -q --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models --cov=reports --cov=skills --cov=tools --cov=ui --cov-report=term-missing:skip-covered --cov-fail-under=80",
     "test:all": "pnpm test:coverage && pnpm test:cli:coverage && pnpm test:mac"
+  },
+  "engines": {
+    "node": ">=26"
   }
 }

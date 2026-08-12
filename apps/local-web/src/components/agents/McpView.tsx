@@ -195,6 +195,11 @@ export function McpView({
                 Catalog templates seed here by default; connect credentials under
                 Integrations / keys.
               </p>
+              <p className="text-muted-foreground mt-2 text-xs">
+                Tip: keep dead remotes off, and prefer HTTP / streamable HTTP over
+                stdio when a hosted MCP URL exists — discovery stays fast when
+                some connectors are down.
+              </p>
             </div>
             {headerActions}
           </div>

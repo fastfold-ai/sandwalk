@@ -10,9 +10,9 @@ from agent_server.auth_settings import (
     AUTH_EXEMPT_PATHS,
     SESSION_COOKIE,
     AuthSettingsError,
+    any_key_matches,
     create_session_token,
     ensure_api_key,
-    key_matches,
     load_settings,
     request_is_authenticated,
     save_settings,
@@ -37,13 +37,25 @@ def _is_site_preview_path(path: str) -> bool:
     )
 
 
+def _is_loopback_host(host: str) -> bool:
+    import ipaddress
+
+    trimmed = (host or "").strip().lower()
+    if trimmed in {"localhost", "testclient"}:
+        return True
+    try:
+        return ipaddress.ip_address(trimmed).is_loopback
+    except ValueError:
+        return False
+
+
 def register_auth_middleware(app: FastAPI, deps: AppDeps) -> None:
     @app.middleware("http")
     async def require_api_key(request: Request, call_next):
         path = request.url.path
-        key = deps.current_api_key()
+        keys = deps.accepted_api_keys()
         if (
-            key
+            keys
             and path.startswith("/v1/")
             and path not in AUTH_EXEMPT_PATHS
             and not _is_site_preview_path(path)
@@ -51,10 +63,8 @@ def register_auth_middleware(app: FastAPI, deps: AppDeps) -> None:
             ok = request_is_authenticated(
                 headers=request.headers,
                 cookies=request.cookies,
-                api_key=key,
+                api_keys=keys,
                 secret_key=deps.current_secret(),
-                # EventSource cannot set headers; SSE consumers pass ?token=
-                # (same pattern as the sandbox/PTY WebSockets).
                 query_token=request.query_params.get("token"),
             )
             if not ok:
@@ -70,15 +80,15 @@ def register_auth_routes(app: FastAPI, deps: AppDeps) -> None:
     async def auth_status(request: Request) -> AuthStatusResponse:
         settings = load_settings()
         app.state.auth_settings = settings
-        key = deps.current_api_key()
+        keys = deps.accepted_api_keys()
         authenticated = False
         if not settings.auth_enabled:
             authenticated = True
-        elif key:
+        elif keys:
             authenticated = request_is_authenticated(
                 headers=request.headers,
                 cookies=request.cookies,
-                api_key=key,
+                api_keys=keys,
                 secret_key=settings.secret_key,
             )
         return AuthStatusResponse(
@@ -91,14 +101,22 @@ def register_auth_routes(app: FastAPI, deps: AppDeps) -> None:
     async def auth_login(payload: AuthLoginRequest) -> JSONResponse:
         settings = load_settings()
         app.state.auth_settings = settings
-        expected = settings.api_key
-        if not expected or not key_matches(payload.api_key.strip(), expected):
+        keys = deps.accepted_api_keys()
+        candidate = payload.api_key.strip()
+        if not keys or not any_key_matches(candidate, keys):
             raise HTTPException(status_code=401, detail="Invalid API key.")
         token, max_age = create_session_token(
             secret_key=settings.secret_key,
             remember=payload.remember,
         )
-        response = JSONResponse(content={"ok": True, "authEnabled": settings.auth_enabled})
+        # sessionToken: Tauri cannot store cross-origin Set-Cookie from a LAN host.
+        response = JSONResponse(
+            content={
+                "ok": True,
+                "authEnabled": settings.auth_enabled,
+                "sessionToken": token,
+            }
+        )
         response.set_cookie(
             key=SESSION_COOKIE,
             value=token,
@@ -115,16 +133,32 @@ def register_auth_routes(app: FastAPI, deps: AppDeps) -> None:
         response.delete_cookie(SESSION_COOKIE, path="/", httponly=True, samesite="lax")
         return response
 
+    @app.post("/v1/auth/reload")
+    async def auth_reload(request: Request) -> JSONResponse:
+        """Reload auth from disk into the running process (loopback only)."""
+        host = (request.client.host if request.client else "") or ""
+        if not _is_loopback_host(host):
+            raise HTTPException(status_code=403, detail="Auth reload is loopback-only.")
+        deps.reload_auth_state()
+        settings = load_settings()
+        return JSONResponse(
+            content={
+                "ok": True,
+                "authEnabled": bool(settings.auth_enabled),
+                "apiKeyConfigured": settings.api_key_configured,
+            }
+        )
+
     @app.get("/v1/auth/settings", response_model=AuthSettingsResponse)
     async def get_auth_settings(request: Request) -> AuthSettingsResponse:
         settings = load_settings()
         app.state.auth_settings = settings
-        key = deps.current_api_key()
-        if key:
+        keys = deps.accepted_api_keys()
+        if keys:
             ok = request_is_authenticated(
                 headers=request.headers,
                 cookies=request.cookies,
-                api_key=key,
+                api_keys=keys,
                 secret_key=settings.secret_key,
             )
             if not ok:
@@ -141,12 +175,12 @@ def register_auth_routes(app: FastAPI, deps: AppDeps) -> None:
         payload: UpdateAuthSettingsRequest,
     ) -> AuthSettingsResponse:
         settings = load_settings()
-        key = deps.current_api_key()
-        if key:
+        keys = deps.accepted_api_keys()
+        if keys:
             ok = request_is_authenticated(
                 headers=request.headers,
                 cookies=request.cookies,
-                api_key=key,
+                api_keys=keys,
                 secret_key=settings.secret_key,
             )
             if not ok:

@@ -1,4 +1,7 @@
-import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import {
+  LocalAgentClient,
+  readSessionToken
+} from '@sandwalk/agent-local-client'
 import type {
   BackendHealth,
   RuntimeSettings,
@@ -22,8 +25,9 @@ import {
   isLocalBackendUrl,
   persistBackendUrl
 } from '@/lib/backend-url'
-import { isTauri } from '@/lib/desktop'
-import { dedupeAsync } from '@/lib/dedupe-async'
+import { isTauri, listenDesktopApplyAuth } from '@/lib/desktop'
+import { dedupeAsync, invalidateDedupe } from '@/lib/dedupe-async'
+import { normalizeBackendUrl } from '@/lib/backend-url'
 import {
   clampOnboardingStep,
   isOnboardingPath,
@@ -50,6 +54,22 @@ type UseAppBootstrapConnectArgs = {
   loaders: LoaderBundle
   connectRef: MutableRefObject<(() => Promise<void>) | null>
   setClientApiKey: (value: string | undefined) => void
+  setAuthLoginError: (value: unknown | null) => void
+}
+
+/** Prefer the raw API error so ErrorPage can title it "Invalid API key". */
+function credentialLoginError(cause?: unknown): unknown {
+  if (cause != null) return cause
+  return {
+    title: 'Invalid API key',
+    detail:
+      'That key was rejected by this server. Copy it from Security (or run sandwalk auth show) on the machine you are connecting to.',
+    hint: 'Sign in again with the correct API key. A remembered key that no longer matches will keep failing until you replace it.',
+    status: 401,
+    raw: 'Missing or invalid backend API key.',
+    stack: null,
+    name: null
+  }
 }
 
 export function useAppBootstrapConnect({
@@ -60,7 +80,8 @@ export function useAppBootstrapConnect({
   isDashboardModels,
   loaders,
   connectRef,
-  setClientApiKey
+  setClientApiKey,
+  setAuthLoginError
 }: UseAppBootstrapConnectArgs) {
   const [health, setHealth] = useState<BackendHealth | null>(null)
   const [needsAuthLogin, setNeedsAuthLogin] = useState(false)
@@ -102,20 +123,25 @@ export function useAppBootstrapConnect({
     const loc = locationRef.current
     const scope = backendUrl
 
-    const goToLogin = () => {
+    const goToLogin = (options?: {
+      clearRemembered?: boolean
+      reason?: unknown
+    }) => {
       const alreadyNext = nextFromSearch(loc.search)
       const deepLink =
         loc.pathname === '/'
           ? null
           : sanitizeAuthReturnTo(`${loc.pathname}${loc.search}${loc.hash}`)
-      // Drop a stale remembered key so we don't immediately re-fail auth.
-      if (client.apiKey) {
+      if (options?.clearRemembered !== false && client.apiKey) {
         clearRememberedApiKey(backendUrl)
         setClientApiKey(undefined)
       }
       needsAuthLoginRef.current = true
       setHealth(null)
       setNeedsAuthLogin(true)
+      if (options?.reason !== undefined) {
+        setAuthLoginError(credentialLoginError(options.reason))
+      }
       const target = loginPathWithNext(alreadyNext || deepLink)
       if (`${loc.pathname}${loc.search}` !== target) {
         navigate(target, { replace: true })
@@ -126,8 +152,24 @@ export function useAppBootstrapConnect({
       if (needsAuthLoginRef.current) {
         return
       }
+      let sessionKey =
+        client.apiKey?.trim() ||
+        (await resolveBackendApiKey(backendUrl)) ||
+        ''
+      if (sessionKey && sessionKey !== (client.apiKey || '')) {
+        persistRememberedApiKey(backendUrl, sessionKey)
+        setClientApiKey(sessionKey)
+      }
+      const active = sessionKey
+        ? new LocalAgentClient({
+            baseUrl: backendUrl,
+            apiKey: sessionKey,
+            sessionToken: readSessionToken(backendUrl)
+          })
+        : client
+
       const nextHealth = await dedupeAsync(`health:${scope}`, () =>
-        client.health()
+        active.health()
       )
       if (needsAuthLoginRef.current) return
       persistBackendUrl(backendUrl)
@@ -145,8 +187,10 @@ export function useAppBootstrapConnect({
       let authEnabled = false
       let authenticated: boolean | null = null
       try {
-        const status = await dedupeAsync(`auth-status:${scope}`, () =>
-          client.authStatus()
+        const status = await dedupeAsync(
+          `auth-status:${scope}`,
+          () => active.authStatus(),
+          { force: true }
         )
         authEnabled = Boolean(status.authEnabled)
         authenticated =
@@ -161,28 +205,43 @@ export function useAppBootstrapConnect({
 
       if (authEnabled) {
         if (authenticated === false) {
-          // Cookie sessions do not stick in Tauri. If we have no Authorization
-          // header yet, pull the local server key (or remembered) and retry
-          // instead of wiping credentials and forcing the login modal.
-          if (!client.apiKey) {
+          if (!sessionKey) {
             const recovered = await resolveBackendApiKey(backendUrl)
             if (recovered) {
               persistRememberedApiKey(backendUrl, recovered)
               setClientApiKey(recovered)
               return
             }
+            goToLogin({ clearRemembered: false })
+            return
           }
-          goToLogin()
-          return
+          try {
+            await active.login(sessionKey, { remember: true })
+            invalidateDedupe(`auth-status:${scope}`)
+          } catch (cause) {
+            if (isAuthCredentialError(cause)) {
+              goToLogin({ clearRemembered: true, reason: cause })
+              return
+            }
+            try {
+              await active.getRuntimeSettings()
+            } catch (probe) {
+              if (isAuthCredentialError(probe)) {
+                goToLogin({ clearRemembered: false, reason: probe })
+                return
+              }
+              throw probe
+            }
+          }
         }
         if (authenticated === null) {
           try {
             await dedupeAsync(`runtime:${scope}`, () =>
-              client.getRuntimeSettings()
+              active.getRuntimeSettings()
             )
           } catch (cause) {
             if (isAuthCredentialError(cause)) {
-              if (!client.apiKey) {
+              if (!sessionKey) {
                 const recovered = await resolveBackendApiKey(backendUrl)
                 if (recovered) {
                   persistRememberedApiKey(backendUrl, recovered)
@@ -190,7 +249,10 @@ export function useAppBootstrapConnect({
                   return
                 }
               }
-              goToLogin()
+              goToLogin({
+                clearRemembered: Boolean(sessionKey),
+                reason: cause
+              })
               return
             }
             throw cause
@@ -199,8 +261,18 @@ export function useAppBootstrapConnect({
       }
       if (needsAuthLoginRef.current) return
 
+      // Wait for React client to carry the key before keyless loaders run.
+      if (sessionKey && sessionKey !== (client.apiKey || '')) {
+        setClientApiKey(sessionKey)
+        needsAuthLoginRef.current = false
+        setNeedsAuthLogin(false)
+        setHealth(nextHealth)
+        return
+      }
+
       needsAuthLoginRef.current = false
       setNeedsAuthLogin(false)
+      setAuthLoginError(null)
       setHealth(nextHealth)
       const [, , , , , , , settings, sandbox] = await Promise.all([
         loadSessions({ force: true }),
@@ -210,9 +282,9 @@ export function useAppBootstrapConnect({
         loadMcpServers(),
         loadMcpCatalog(),
         loadSpecialists(),
-        dedupeAsync(`runtime:${scope}`, () => client.getRuntimeSettings()),
+        dedupeAsync(`runtime:${scope}`, () => active.getRuntimeSettings()),
         dedupeAsync(`sandbox:${scope}`, () =>
-          client.getSandboxSettings().catch(() => null)
+          active.getSandboxSettings().catch(() => null)
         ),
         loadModelOptions()
       ])
@@ -247,7 +319,8 @@ export function useAppBootstrapConnect({
         try {
           const status = await client.authStatus()
           if (status.authEnabled) {
-            goToLogin()
+            // Keep typed/remembered key so Login shows a clear error, not an empty loop.
+            goToLogin({ clearRemembered: false, reason: cause })
             return
           }
         } catch {
@@ -279,6 +352,7 @@ export function useAppBootstrapConnect({
     loadProjects,
     loadSessions,
     setClientApiKey,
+    setAuthLoginError,
     loadSkills,
     loadSpecialists,
     navigate,
@@ -287,6 +361,30 @@ export function useAppBootstrapConnect({
   ])
 
   connectRef.current = connect
+
+  useEffect(() => {
+    if (!isTauri()) return
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+    void listenDesktopApplyAuth(payload => {
+      if (cancelled) return
+      const url = normalizeBackendUrl(payload.url)
+      if (normalizeBackendUrl(backendUrl) !== url) return
+      const key = payload.apiKey.trim()
+      if (!key) return
+      persistRememberedApiKey(url, key)
+      needsAuthLoginRef.current = false
+      setNeedsAuthLogin(false)
+      setClientApiKey(key)
+    }).then(fn => {
+      if (cancelled) fn()
+      else unlisten = fn
+    })
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [backendUrl, setClientApiKey])
 
   useEffect(() => {
     if (needsAuthLogin || connectionPaused) return
@@ -303,7 +401,13 @@ export function useAppBootstrapConnect({
     if (needsAuthLogin || connectionPaused || !health) return
     const refresh = () => {
       if (document.visibilityState !== 'visible') return
-      void loadSessions()
+      void loadSessions().catch(cause => {
+        if (!isAuthCredentialError(cause)) return
+        needsAuthLoginRef.current = true
+        setHealth(null)
+        setNeedsAuthLogin(true)
+        setAuthLoginError(credentialLoginError(cause))
+      })
     }
     const timer = window.setInterval(refresh, SESSION_LIST_REFRESH_MS)
     window.addEventListener('focus', refresh)
@@ -313,7 +417,7 @@ export function useAppBootstrapConnect({
       window.removeEventListener('focus', refresh)
       document.removeEventListener('visibilitychange', refresh)
     }
-  }, [connectionPaused, health, loadSessions, needsAuthLogin])
+  }, [connectionPaused, health, loadSessions, needsAuthLogin, setAuthLoginError])
 
   useEffect(() => {
     if (needsAuthLogin || connectionPaused || health || connecting) return

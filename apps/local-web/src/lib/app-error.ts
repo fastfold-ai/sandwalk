@@ -133,10 +133,16 @@ export function normalizeAppError(
   }
 
   if (status === 401 || status === 403) {
+    const authDetail = jsonDetail || 'The backend rejected this request.'
+    const invalidKey =
+      /invalid api key/i.test(authDetail) ||
+      /missing or invalid/i.test(authDetail)
     return {
-      title: 'Authentication failed',
-      detail: jsonDetail || 'The backend rejected this request.',
-      hint: 'Check your API key or sign in again.',
+      title: invalidKey ? 'Invalid API key' : 'Authentication failed',
+      detail: invalidKey
+        ? 'That key was rejected by this server. Copy it from Security (or run sandwalk auth show) on the machine you are connecting to.'
+        : authDetail,
+      hint: 'Sign in again with the correct API key. A remembered key that no longer matches will keep failing until you replace it.',
       status,
       raw,
       stack: stack || raw,

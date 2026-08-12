@@ -1,7 +1,15 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
+import { hasDesktopBackendInject, isLocalBackendUrl } from '@/lib/backend-url'
+import {
+  hideDesktopWindow,
+  isMainDesktopWindow,
+  isTauri,
+  listDesktopWindowRecents
+} from '@/lib/desktop'
+import { openDesktopRecent } from '@/lib/open-desktop-recent'
 import type { SessionChatState } from '@/lib/sessions'
 
 import { useAppBootstrapAuth } from './useAppBootstrapAuth'
@@ -18,6 +26,10 @@ type UseAppBootstrapArgs = {
   isDashboardModels: boolean
 }
 
+function shouldAttemptColdRestore(): boolean {
+  return isTauri() && isMainDesktopWindow() && !hasDesktopBackendInject()
+}
+
 export function useAppBootstrap({
   navigate,
   location,
@@ -25,6 +37,7 @@ export function useAppBootstrap({
   isDashboardModels
 }: UseAppBootstrapArgs) {
   const clientBundle = useAppBootstrapClient()
+  const [authLoginError, setAuthLoginError] = useState<unknown>(null)
   const loaders = useAppBootstrapLoaders({
     client: clientBundle.client,
     setChatBySessionId
@@ -38,7 +51,8 @@ export function useAppBootstrap({
     isDashboardModels,
     loaders,
     connectRef,
-    setClientApiKey: clientBundle.setClientApiKey
+    setClientApiKey: clientBundle.setClientApiKey,
+    setAuthLoginError
   })
   const auth = useAppBootstrapAuth({
     client: clientBundle.client,
@@ -54,8 +68,71 @@ export function useAppBootstrap({
     needsAuthLoginRef: connectBundle.needsAuthLoginRef,
     setNeedsAuthLogin: connectBundle.setNeedsAuthLogin,
     setAuthBootstrapped: connectBundle.setAuthBootstrapped,
-    setConnectionPaused: connectBundle.setConnectionPaused
+    setConnectionPaused: connectBundle.setConnectionPaused,
+    setAuthLoginError
   })
+
+  const skipAutoRestoreRef = useRef(false)
+  const autoRestoreStartedRef = useRef(false)
+  const changeBackendRef = useRef(auth.changeBackend)
+  changeBackendRef.current = auth.changeBackend
+  const [autoRestoring, setAutoRestoring] = useState(shouldAttemptColdRestore)
+
+  const disconnectBackend = useCallback(async () => {
+    skipAutoRestoreRef.current = true
+    setAutoRestoring(false)
+    await auth.disconnectBackend()
+  }, [auth])
+
+  // Cold-start main window: reopen the most recent local/remote session.
+  // Disconnect skips this so Welcome Home stays up. New Window still uses the chooser.
+  useEffect(() => {
+    if (!connectBundle.connectionPaused) {
+      setAutoRestoring(false)
+      return
+    }
+    if (!shouldAttemptColdRestore()) {
+      setAutoRestoring(false)
+      return
+    }
+    if (skipAutoRestoreRef.current || autoRestoreStartedRef.current) {
+      setAutoRestoring(false)
+      return
+    }
+    autoRestoreStartedRef.current = true
+
+    void (async () => {
+      try {
+        const rows = (await listDesktopWindowRecents()) ?? []
+        const last = rows[0]
+        if (!last?.url) {
+          setAutoRestoring(false)
+          return
+        }
+        if (isLocalBackendUrl(last.url)) {
+          await changeBackendRef.current(last.url)
+          setAutoRestoring(false)
+          return
+        }
+        const result = await openDesktopRecent({
+          url: last.url,
+          route: last.route,
+          title: last.title,
+          id: last.id,
+          hostname: last.hostname,
+          platform: last.platform
+        })
+        if (result.opened) {
+          void hideDesktopWindow().catch(() => {
+            // ignore
+          })
+        }
+        setAutoRestoring(false)
+      } catch {
+        setAutoRestoring(false)
+      }
+    })()
+  }, [connectBundle.connectionPaused])
 
   return {
     backendUrl: clientBundle.backendUrl,
@@ -71,11 +148,12 @@ export function useAppBootstrap({
     needsAuthLogin: connectBundle.needsAuthLogin,
     authBootstrapped: connectBundle.authBootstrapped,
     authLoggingIn: auth.authLoggingIn,
-    authLoginError: auth.authLoginError,
-    setAuthLoginError: auth.setAuthLoginError,
+    authLoginError,
+    setAuthLoginError,
     connecting: connectBundle.connecting,
     connectionPaused: connectBundle.connectionPaused,
     setConnectionPaused: connectBundle.setConnectionPaused,
+    autoRestoring,
     error: connectBundle.error,
     errorStack: connectBundle.errorStack,
     setError: connectBundle.setError,
@@ -117,7 +195,7 @@ export function useAppBootstrap({
     connect: connectBundle.connect,
     submitAuthLogin: auth.submitAuthLogin,
     logoutSession: auth.logoutSession,
-    disconnectBackend: auth.disconnectBackend,
+    disconnectBackend,
     changeBackend: auth.changeBackend
   }
 }

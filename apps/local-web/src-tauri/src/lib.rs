@@ -353,7 +353,7 @@ fn desktop_bind_window_backend(
     let id = multi_window::register_window_backend(window.label(), &normalized);
     let title = multi_window::window_title_for_url(&normalized);
     let _ = window.set_title(&title);
-    multi_window::upsert_recent_snapshot(&id, &normalized, "/", "Sandwalk", None);
+    multi_window::upsert_recent_snapshot(&id, &normalized, "/", "Sandwalk", None, None);
     multi_window::install_app_menu(&app)
 }
 
@@ -365,6 +365,18 @@ fn desktop_set_window_title(window: tauri::WebviewWindow, title: String) -> Resu
         return Ok(());
     }
     window.set_title(trimmed).map_err(|e| e.to_string())
+}
+
+/// Close this WebView (remote client windows destroy; main may hide-on-close).
+#[tauri::command]
+fn desktop_close_current_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
+}
+
+/// Hide this WebView without destroying it (Welcome Home after spawning a remote).
+#[tauri::command]
+fn desktop_hide_current_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.hide().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -818,12 +830,15 @@ pub fn run() {
             desktop_open_window,
             desktop_bind_window_backend,
             desktop_set_window_title,
+            desktop_close_current_window,
+            desktop_hide_current_window,
             desktop_open_server_settings,
             multi_window::desktop_list_window_recents,
             multi_window::desktop_clear_window_recents,
             multi_window::desktop_upsert_window_snapshot,
             multi_window::desktop_remember_window_recent,
             lan_scan::desktop_scan_lan_servers,
+            lan_scan::desktop_local_hostname,
             start_window_drag,
             toggle_maximize,
             window_is_fullscreen,
@@ -864,6 +879,7 @@ pub fn run() {
                 "Sandwalk",
                 cold_route.as_deref(),
                 Some("main"),
+                None,
                 None,
                 true,
                 is_spa_route,

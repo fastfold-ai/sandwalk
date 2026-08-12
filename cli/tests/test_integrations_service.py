@@ -236,7 +236,11 @@ def test_update_requires_value():
         svc.update("missing-provider", {"ANTHROPIC_API_KEY": "x"})
 
 
-def test_validate_integration():
+def test_validate_integration(monkeypatch):
+    # Hermetic under pytest-xdist: clear provider env so a sibling worker's
+    # monkeypatch cannot leave a probeable Anthropic key in this process.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
     svc = IntegrationsService()
     result = svc.validate("anthropic")
     assert result.ok is False

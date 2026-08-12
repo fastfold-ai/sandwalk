@@ -87,6 +87,11 @@ def register_mcp_catalog_connect_routes(app: FastAPI, deps: AppDeps) -> None:
                 catalog_id,
                 payload.enabled,
             )
+            from agent.deepagents_runtime.mcp_tools import clear_mcp_tool_caches
+            from agent_server import ttl_cache
+
+            clear_mcp_tool_caches()
+            ttl_cache.invalidate("mcp:")
             return ConnectMcpCatalogResponse(
                 ok=bool(result.get("ok")),
                 catalog_id=catalog_id,

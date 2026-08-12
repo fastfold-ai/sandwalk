@@ -11,6 +11,7 @@ import {
 import { onboardingStepDef } from '@/lib/onboarding'
 import {
   readCachedRemoteHostname,
+  readCachedRemotePlatform,
   remoteDockSuffix,
   resolveRemoteHostname
 } from '@/lib/remote-hostname'
@@ -141,7 +142,8 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
         route: path,
         // Page title only — native Open Recent appends hostname · IP.
         title: label,
-        hostname: hostname
+        hostname: hostname,
+        platform: readCachedRemotePlatform(backendUrl)
       })
         .then(id => persistDesktopSnapshotId(id))
         .catch(() => {

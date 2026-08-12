@@ -88,6 +88,31 @@ import type {
 export type LocalAgentClientOptions = {
   baseUrl: string
   apiKey?: string
+  /** Session cookie value from /auth/login (Tauri cannot store cross-origin Set-Cookie). */
+  sessionToken?: string
+}
+
+const SESSION_COOKIE = 'sandwalk_session'
+
+const sessionTokensByUrl = new Map<string, string>()
+
+function normalizeClientBaseUrl(url: string): string {
+  return url.replace(/\/+$/, '')
+}
+
+export function rememberSessionToken(baseUrl: string, token: string) {
+  const key = normalizeClientBaseUrl(baseUrl)
+  const trimmed = token.trim()
+  if (!key || !trimmed) return
+  sessionTokensByUrl.set(key, trimmed)
+}
+
+export function clearSessionToken(baseUrl: string) {
+  sessionTokensByUrl.delete(normalizeClientBaseUrl(baseUrl))
+}
+
+export function readSessionToken(baseUrl: string): string | undefined {
+  return sessionTokensByUrl.get(normalizeClientBaseUrl(baseUrl))
 }
 
 export type BenchSuiteCard = {
@@ -321,10 +346,14 @@ export class LocalAgentClient
 {
   readonly baseUrl: string
   readonly apiKey?: string
+  readonly sessionToken?: string
 
   constructor(options: LocalAgentClientOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/+$/, '')
+    this.baseUrl = normalizeClientBaseUrl(options.baseUrl)
     this.apiKey = options.apiKey
+    const token = options.sessionToken?.trim()
+    this.sessionToken = token || readSessionToken(this.baseUrl)
+    if (token) rememberSessionToken(this.baseUrl, token)
   }
 
   private headers(extra?: HeadersInit): Headers {
@@ -332,6 +361,9 @@ export class LocalAgentClient
     headers.set('accept', 'application/json')
     headers.set('x-sandwalk-client', 'ui')
     if (this.apiKey) headers.set('authorization', `Bearer ${this.apiKey}`)
+    const session =
+      this.sessionToken?.trim() || readSessionToken(this.baseUrl) || ''
+    if (session) headers.set('cookie', `${SESSION_COOKIE}=${session}`)
     return headers
   }
 
@@ -411,8 +443,12 @@ export class LocalAgentClient
   async login(
     apiKey: string,
     options?: { remember?: boolean; signal?: AbortSignal }
-  ): Promise<{ ok: boolean; authEnabled?: boolean }> {
-    return this.request('/auth/login', {
+  ): Promise<{ ok: boolean; authEnabled?: boolean; sessionToken?: string }> {
+    const result = await this.request<{
+      ok: boolean
+      authEnabled?: boolean
+      sessionToken?: string
+    }>('/auth/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -421,10 +457,17 @@ export class LocalAgentClient
       }),
       signal: options?.signal
     })
+    const token = result?.sessionToken?.trim()
+    if (token) rememberSessionToken(this.baseUrl, token)
+    return result
   }
 
-  logout(signal?: AbortSignal): Promise<{ ok: boolean }> {
-    return this.request('/auth/logout', { method: 'POST', signal })
+  async logout(signal?: AbortSignal): Promise<{ ok: boolean }> {
+    try {
+      return await this.request('/auth/logout', { method: 'POST', signal })
+    } finally {
+      clearSessionToken(this.baseUrl)
+    }
   }
 
   health(signal?: AbortSignal): Promise<BackendHealth> {

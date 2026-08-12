@@ -86,6 +86,18 @@ class AppDeps:
     def current_api_key(self) -> str | None:
         return getattr(self.app.state, "runtime_api_key", None)
 
+    def accepted_api_keys(self) -> list[str]:
+        """Keys that authorize Bearer / x-api-key (runtime override + settings).
+
+        Settings key is only accepted while auth is enabled — otherwise
+        ``sandwalk auth disable`` would keep enforcing the stored key.
+        """
+        from agent_server.auth_settings import normalize_api_keys
+
+        settings = getattr(self.app.state, "auth_settings", None) or load_settings()
+        settings_key = settings.api_key if settings.auth_enabled else None
+        return normalize_api_keys(self.current_api_key(), settings_key)
+
     def current_secret(self) -> str:
         settings = getattr(self.app.state, "auth_settings", None) or load_settings()
         return settings.secret_key or ""

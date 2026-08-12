@@ -1,8 +1,11 @@
-import { LocalAgentClient } from '@sandwalk/agent-local-client'
+import {
+  LocalAgentClient,
+  readSessionToken
+} from '@sandwalk/agent-local-client'
 import { useMemo, useState } from 'react'
 
 import {
-  injectedDesktopApiKey,
+  injectedDesktopApiKeyFor,
   normalizeBackendUrl,
   readStoredBackendUrl
 } from '@/lib/backend-url'
@@ -15,18 +18,19 @@ export function useAppBootstrapClient() {
   }
   const initialUrl = readStoredBackendUrl()
   const [backendApiKey, setBackendApiKey] = useState(
-    () => injectedDesktopApiKey() || ''
+    () => injectedDesktopApiKeyFor(initialUrl) || ''
   )
   // Cookie sessions do not stick in the Tauri shell (cross-origin). Prefer the
-  // window inject key, then remembered Authorization for this backend URL.
+  // window inject key for *this* URL, then remembered Authorization.
   const [clientApiKey, setClientApiKey] = useState<string | undefined>(() =>
-    injectedDesktopApiKey() || readRememberedApiKey(initialUrl)
+    injectedDesktopApiKeyFor(initialUrl) || readRememberedApiKey(initialUrl)
   )
   const client = useMemo(
     () =>
       new LocalAgentClient({
         baseUrl: backendUrl,
-        apiKey: clientApiKey || backendApiKey || undefined
+        apiKey: clientApiKey || backendApiKey || undefined,
+        sessionToken: readSessionToken(backendUrl)
       }),
     [backendApiKey, backendUrl, clientApiKey]
   )

@@ -7,8 +7,17 @@ import {
   SessionActivityHeatmapLegend
 } from '@/components/agents/session-activity-heatmap-grid'
 import { UsageModelStackedChart } from '@/components/agents/UsageModelStackedChart'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  readUsageOverviewCache,
+  writeUsageOverviewCache
+} from '@/lib/usage-overview-cache'
 import { cn } from '@/lib/utils'
 
+import {
+  UsageHeroSkeleton,
+  UsageModelsSkeleton
+} from './usage-overview-skeletons'
 import {
   buildUsageHeatmapModel,
   cacheHitPercent,
@@ -91,10 +100,16 @@ export function UsageOverviewSection({
   client,
   className
 }: {
-  client: { getUsageOverview?: (signal?: AbortSignal) => Promise<UsageOverview> }
+  client: {
+    baseUrl?: string
+    getUsageOverview?: (signal?: AbortSignal) => Promise<UsageOverview>
+  }
   className?: string
 }) {
-  const [overview, setOverview] = useState<UsageOverview | null>(null)
+  const cacheKey = client.baseUrl || 'default'
+  const [overview, setOverview] = useState<UsageOverview | null>(() =>
+    readUsageOverviewCache(cacheKey)
+  )
   const [error, setError] = useState<string | null>(null)
   const [grain, setGrain] = useState<UsageGrain>('daily')
   const [hovered, setHovered] = useState<string | null>(null)
@@ -103,19 +118,24 @@ export function UsageOverviewSection({
 
   useEffect(() => {
     if (!client.getUsageOverview) return
+    const warm = readUsageOverviewCache(cacheKey)
+    if (warm && reloadToken === 0) setOverview(warm)
     const controller = new AbortController()
     void client
       .getUsageOverview(controller.signal)
       .then(next => {
+        writeUsageOverviewCache(cacheKey, next)
         setOverview(next)
         setError(null)
       })
       .catch(err => {
         if (controller.signal.aborted) return
-        setError(err instanceof Error ? err.message : 'Failed to load usage')
+        if (!warm && !readUsageOverviewCache(cacheKey)) {
+          setError(err instanceof Error ? err.message : 'Failed to load usage')
+        }
       })
     return () => controller.abort()
-  }, [client, reloadToken])
+  }, [cacheKey, client, reloadToken])
 
   // One retry if chart data arrived before the server exposed modelDays.
   useEffect(() => {
@@ -148,13 +168,17 @@ export function UsageOverviewSection({
             <p className="text-muted-foreground text-xs font-light tracking-wide">
               Usage
             </p>
-            <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">
-              {overview
-                ? formatTokenCount(overview.lifetimeTokens)
-                : error
-                  ? '—'
-                  : '…'}
-            </p>
+            {overview ? (
+              <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">
+                {formatTokenCount(overview.lifetimeTokens)}
+              </p>
+            ) : error ? (
+              <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">
+                —
+              </p>
+            ) : (
+              <Skeleton className="mt-2 h-9 w-28" />
+            )}
             <p className="text-muted-foreground mt-1 text-[11px]">
               Lifetime tokens
             </p>
@@ -275,7 +299,9 @@ export function UsageOverviewSection({
               </div>
             </div>
           </>
-        ) : null}
+        ) : error ? null : (
+          <UsageHeroSkeleton />
+        )}
       </div>
 
       <div className="bg-card rounded-xl border p-5 sm:p-6">
@@ -308,10 +334,10 @@ export function UsageOverviewSection({
               </div>
             </div>
           </>
+        ) : error ? (
+          <p className="text-muted-foreground mt-6 text-sm">{error}</p>
         ) : (
-          <p className="text-muted-foreground mt-6 text-sm">
-            {error ? error : 'Loading model usage…'}
-          </p>
+          <UsageModelsSkeleton />
         )}
       </div>
     </div>

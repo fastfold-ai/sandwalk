@@ -5,15 +5,14 @@ import type { NavigateFunction } from 'react-router-dom'
 
 import { AppGatesLocalWaiting } from '@/components/agents/AppGatesLocalWaiting'
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
-import { BackendConnectFields } from '@/components/agents/BackendConnectFields'
 import { LoginView } from '@/components/agents/LoginView'
 import { OnboardingWizardHost } from '@/components/agents/OnboardingWizardHost'
+import { RemoteBackendConnectForm } from '@/components/agents/RemoteBackendConnectForm'
 import { WelcomeHome } from '@/components/agents/WelcomeHome'
 import { DesktopGateFrame } from '@/components/DesktopGateFrame'
-import { ErrorPage } from '@/components/ErrorPage'
-import { SandwalkMark } from '@/components/SandwalkMark'
 import { isBackendUnavailableError } from '@/lib/app-error'
 import { DEFAULT_BACKEND_URL, isLocalBackendUrl } from '@/lib/backend-url'
+import { closeDesktopWindow, isTauri } from '@/lib/desktop'
 import {
   clampOnboardingStep,
   ONBOARDING_MAX_STEP,
@@ -32,6 +31,7 @@ type AppGatesProps = {
   changeBackend: (url: string, apiKey?: string) => void | Promise<void>
   health: BackendHealth | null
   connectionPaused: boolean
+  autoRestoring?: boolean
   setConnectionPaused: (value: boolean) => void
   backendUrl: string
   setBackendUrl: (value: string) => void
@@ -64,6 +64,7 @@ export function AppGates({
   changeBackend,
   health,
   connectionPaused,
+  autoRestoring = false,
   setConnectionPaused,
   backendUrl,
   setBackendUrl,
@@ -92,10 +93,24 @@ export function AppGates({
           setAuthLoginError(null)
           void connect()
         }}
-        onSubmit={submitAuthLogin}
+        onSubmit={async (apiKey, remember) => {
+          setAuthLoginError(null)
+          await submitAuthLogin(apiKey, remember)
+        }}
         backendUrl={backendUrl}
         onChangeBackend={url => changeBackend(url)}
       />
+    )
+  }
+
+  // Desktop cold start — briefly restore last recent before showing Welcome.
+  if (connectionPaused && !health && autoRestoring) {
+    return (
+      <DesktopGateFrame>
+        <main className="grid h-full min-h-full place-items-center bg-[#f5f5f5] dark:bg-neutral-950">
+          <AuraIconPulse className="text-muted-foreground/50 h-12 w-12" />
+        </main>
+      </DesktopGateFrame>
     )
   }
 
@@ -153,45 +168,26 @@ export function AppGates({
 
     return (
       <DesktopGateFrame>
-        <main className="bg-background grid h-full place-items-center p-6">
-          <form
-            className="bg-card w-full max-w-lg rounded-xl border p-6"
-            onSubmit={event => {
-              event.preventDefault()
-              void connect()
-            }}
-          >
-            <div className="mb-6 flex items-center gap-3">
-              <div className="bg-primary text-primary-foreground grid size-10 place-items-center rounded-lg">
-                <SandwalkMark className="h-6 w-6" />
-              </div>
-              <div>
-                <h1 className="font-semibold">sandwalk</h1>
-                <p className="text-muted-foreground text-sm">
-                  Connect to an agent backend
-                </p>
-              </div>
-            </div>
-            <BackendConnectFields
-              backendUrl={backendUrl}
-              setBackendUrl={setBackendUrl}
-              backendApiKey={backendApiKey}
-              setBackendApiKey={setBackendApiKey}
-              connecting={connecting}
-            />
-            {error ? (
-              <ErrorPage
-                className="mt-3"
-                variant="inline"
-                error={
-                  errorStack
-                    ? Object.assign(new Error(error), { stack: errorStack })
-                    : error
-                }
-              />
-            ) : null}
-          </form>
-        </main>
+        <RemoteBackendConnectForm
+          backendUrl={backendUrl}
+          setBackendUrl={setBackendUrl}
+          backendApiKey={backendApiKey}
+          setBackendApiKey={setBackendApiKey}
+          connecting={connecting}
+          connect={connect}
+          connectError={connectError}
+          dismissLabel="Close"
+          onDismiss={() => {
+            setError(null)
+            if (isTauri()) {
+              void closeDesktopWindow().catch(() => {
+                setConnectionPaused(true)
+              })
+              return
+            }
+            setConnectionPaused(true)
+          }}
+        />
       </DesktopGateFrame>
     )
   }
