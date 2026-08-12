@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> ·
+  <a href="#get-started">Get started</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="#features">Features</a> ·
   <a href="#cli">CLI</a> ·
@@ -23,38 +23,27 @@
 
 > Sandwalk is an open, self-hosted agent you run on your own compute. Direct it toward hard scientific research, or any ambitious work. Chat, CLI, and the macOS app share the same sessions. Leave one running on a Mac Mini or a cluster and open it from wherever you are.
 
-## Install
+## Get started
 
-### macOS App
-
-Download the `.dmg` from [Releases](https://github.com/fastfold-ai/sandwalk/releases), open **Sandwalk.app**, done. The nested helper starts the agent and puts `sandwalk` on your PATH (`~/.local/bin`). Same sessions as the CLI and web dashboard.
+Download the native Sandwalk app for your operating system:
 
 | Platform | Link |
 |----------|------|
-| macOS (Apple Silicon) | [Download Sandwalk.app](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) |
+| macOS (Apple Silicon) | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) |
 
-macOS builds are ad-hoc signed until Developer ID and notarization are enabled (right-click → Open the first time).
+Download from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases).
 
-### CLI
-
-Python CLI only. Does not install `Sandwalk.app`.
+Or if you prefer to install the CLI:
 
 ```bash
 curl -fsSL https://sandwalk.sh/install | bash
-sandwalk --version
 ```
-
-Pre-release: `curl -fsSL https://sandwalk.sh/install | bash -s -- --pre`. Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/) (or pipx / pip).
-
-### From Source
-
-See [Contributing](#contributing).
 
 ## Quickstart
 
 ### macOS App
 
-Launch Sandwalk from Applications. Pick **Local** or **Remote**, then start a session. The menubar helper keeps the agent running.
+Launch Sandwalk from Applications. Pick **Local** or **Remote**, then start a session.
 
 <!-- screenshot: images/welcome.png — Welcome: Local vs Remote -->
 <p align="center"><em>Placeholder: Welcome (Local vs Remote). Save as <code>images/welcome.png</code></em></p>
@@ -65,10 +54,9 @@ Launch Sandwalk from Applications. Pick **Local** or **Remote**, then start a se
 ### CLI
 
 ```bash
-sandwalk setup          # models, keys, skills
-sandwalk                # interactive (same sessions as the app)
+sandwalk setup
+sandwalk
 sandwalk "What is known about KRAS G12C inhibitors?"
-sandwalk serve          # API :8787, dashboard :8969
 ```
 
 ## Features
