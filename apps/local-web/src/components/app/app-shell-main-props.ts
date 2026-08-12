@@ -124,6 +124,7 @@ export type AppShellMainProps = {
   togglePinProject: DashboardMainViewsProps['togglePinProject']
   deleteProject: DashboardMainViewsProps['deleteProject']
   setNewProjectOpen: (value: boolean | ((current: boolean) => boolean)) => void
+  setProjectSettingsOpen: (value: boolean | ((current: boolean) => boolean)) => void
   setProjectScopeId: (value: string | null | ((current: string | null) => string | null)) => void
   createSession: CreateDraftSession
   openTabs: AgentSession[]

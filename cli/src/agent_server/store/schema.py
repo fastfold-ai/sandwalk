@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS projects (
     icon TEXT NOT NULL DEFAULT 'folder',
     color TEXT NOT NULL DEFAULT 'neutral',
     pinned INTEGER NOT NULL DEFAULT 0,
+    home_layout TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

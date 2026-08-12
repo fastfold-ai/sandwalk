@@ -26,6 +26,7 @@ import type { NavigateFunction } from 'react-router-dom'
 
 import { structureFormat } from '@/components/agents/artifact-grid-thumb-utils'
 import { LibraryPreviewDialog } from '@/components/agents/LibraryPreviewDialog'
+import { LibraryProjectFolderSection } from '@/components/agents/LibraryProjectFolderSection'
 import { PdfFirstPagePreview } from '@/components/agents/PdfFirstPagePreview'
 import { Py2dMolMiniPreview } from '@/components/agents/py2dmol/Py2dMolMiniPreview'
 import {
@@ -318,6 +319,7 @@ export function LibraryView({
       const result = await client.listLibrary({
         kind: filter === 'all' ? null : filter,
         q: debouncedQuery || null,
+        projectId: projectId || null,
         page: 0,
         perPage: PAGE_SIZE
       })
@@ -336,7 +338,7 @@ export function LibraryView({
     } finally {
       setLoading(false)
     }
-  }, [client, debouncedQuery, filter])
+  }, [client, debouncedQuery, filter, projectId])
 
   const loadMore = useCallback(async () => {
     if (
@@ -354,6 +356,7 @@ export function LibraryView({
       const result = await client.listLibrary({
         kind: filter === 'all' ? null : filter,
         q: debouncedQuery || null,
+        projectId: projectId || null,
         page: nextPage,
         perPage: PAGE_SIZE
       })
@@ -372,7 +375,7 @@ export function LibraryView({
       loadMoreInFlight.current = false
       setLoadingMore(false)
     }
-  }, [client, debouncedQuery, filter, loading, loadingMore])
+  }, [client, debouncedQuery, filter, loading, loadingMore, projectId])
 
   useEffect(() => {
     void reload()
@@ -676,21 +679,36 @@ export function LibraryView({
           ref={listSectionRef}
           className="mx-auto w-full max-w-6xl px-6 pb-10 md:px-10"
         >
+          {projectId ? (
+            <LibraryProjectFolderSection
+              client={client}
+              projectId={projectId}
+              filter={filter}
+              query={debouncedQuery}
+              navigate={navigate}
+              pendingAttachmentsRef={pendingAttachmentsRef}
+              openSessionTab={openSessionTab}
+              loadSessions={loadSessions}
+            />
+          ) : null}
+
           {loading && items.length === 0 ? (
             <div className="text-muted-foreground flex items-center gap-2 py-16 text-[13px]">
               <Loader2 className="size-4 animate-spin" />
               Loading library…
             </div>
           ) : items.length === 0 ? (
-            <div className="text-muted-foreground flex flex-col items-center gap-3 py-20 text-center">
+            <div className="text-muted-foreground flex flex-col items-center gap-3 py-16 text-center">
               <LibraryBig className="size-10 opacity-40" />
               <div>
                 <p className="text-foreground text-[14px] font-medium">
-                  No files yet
+                  No Library files yet
                 </p>
                 <p className="mt-1 max-w-sm text-[13px]">
-                  Library indexes files from every chat (uploads, outputs,
-                  artifacts). Upload here or attach something in a session.
+                  Library indexes chat uploads, outputs, and artifacts.
+                  {projectId
+                    ? ' Project folder files stay in the section above.'
+                    : ' Upload here or attach something in a session.'}
                 </p>
               </div>
               <Button
@@ -704,6 +722,12 @@ export function LibraryView({
               </Button>
             </div>
           ) : layout === 'grid' ? (
+            <>
+              {projectId ? (
+                <div className="text-muted-foreground mb-3 text-[12px] font-medium tracking-wide uppercase">
+                  Chat uploads
+                </div>
+              ) : null}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {items.map(item => {
                 const name = item.displayName || item.originalName
@@ -814,7 +838,14 @@ export function LibraryView({
                 )
               })}
             </div>
+            </>
           ) : (
+            <>
+              {projectId ? (
+                <div className="text-muted-foreground mb-3 text-[12px] font-medium tracking-wide uppercase">
+                  Chat uploads
+                </div>
+              ) : null}
             <div className="divide-border/70 border-border/70 divide-y rounded-xl border">
               {items.map(item => {
                 const name = item.displayName || item.originalName
@@ -917,6 +948,7 @@ export function LibraryView({
                 )
               })}
             </div>
+            </>
           )}
           {selectMode && selectedItems.length > 0 ? (
             <p className="sr-only">{selectedItems.length} items selected</p>

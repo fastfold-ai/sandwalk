@@ -175,6 +175,7 @@ export function AppShell(props: AppShellProps) {
           togglePinProject={props.togglePinProject}
           deleteProject={props.deleteProject}
           setNewProjectOpen={props.setNewProjectOpen}
+          setProjectSettingsOpen={props.setProjectSettingsOpen}
           setProjectScopeId={props.setProjectScopeId}
           createSession={props.createSession}
           openTabs={props.openTabs}

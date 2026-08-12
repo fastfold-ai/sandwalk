@@ -229,3 +229,55 @@ def test_backfill_recovers_model_from_session_title(tmp_path: Path, monkeypatch)
     rows = store.list_usage_runs()
     assert len(rows) == 1
     assert rows[0]["model_id"] == "deepseek-v4-flash-0731"
+
+
+def test_usage_overview_filters_by_project(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "auth.json"))
+    monkeypatch.setattr(
+        "agent_server.usage_service.backfill._trajectory_paths",
+        lambda: [],
+    )
+    store = AgentStore(tmp_path / "usage.db", exclusive=True)
+    for key in (
+        "usage_backfill_v1",
+        "usage_model_repair_v1",
+        "usage_provider_repair_v1",
+        "usage_alias_repair_v1",
+    ):
+        store.set_usage_meta(key, "done")
+    project_a = store.create_project(name="A", folder_path=None)
+    project_b = store.create_project(name="B", folder_path=None)
+    session_a = store.create_session(
+        title="in-a", workspace_path=None, project_id=project_a.id
+    )
+    session_b = store.create_session(
+        title="in-b", workspace_path=None, project_id=project_b.id
+    )
+    today = __import__("datetime").date.today().isoformat()
+    store.upsert_usage_run(
+        run_id="r-a",
+        session_id=session_a.id,
+        day=today,
+        surface="ui",
+        model_id="model-a",
+        provider="openai",
+        input_tokens=100,
+        output_tokens=0,
+    )
+    store.upsert_usage_run(
+        run_id="r-b",
+        session_id=session_b.id,
+        day=today,
+        surface="ui",
+        model_id="model-b",
+        provider="openai",
+        input_tokens=50,
+        output_tokens=0,
+    )
+    global_overview = build_usage_overview(store)
+    assert global_overview.lifetime_tokens == 150
+    scoped = build_usage_overview(store, project_id=project_a.id)
+    assert scoped.lifetime_tokens == 100
+    assert scoped.models_used == 1
+    empty = build_usage_overview(store, project_id="missing-project")
+    assert empty.lifetime_tokens == 0

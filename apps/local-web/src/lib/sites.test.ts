@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   filterSites,
+  filterSitesByProject,
   formatSiteBytes,
   isPublishedSite,
   siteChatPath,
@@ -39,6 +40,34 @@ describe('site view helpers', () => {
     expect(filterSites([site], 'example.test')).toEqual([site])
     expect(filterSites([site], 'dist')).toEqual([site])
     expect(filterSites([site], 'missing')).toEqual([])
+  })
+
+  it('scopes sites to the selected project via source project or chat', () => {
+    const other: Site = {
+      ...site,
+      id: 'site-2',
+      name: 'Other',
+      sourceSessionId: 'session-2',
+      sourceProjectId: 'proj-b'
+    }
+    const sessions = [
+      { id: 'session-1', projectId: 'proj-a' },
+      { id: 'session-2', projectId: 'proj-b' }
+    ] as never[]
+    expect(filterSitesByProject([site, other], null, sessions)).toEqual([
+      site,
+      other
+    ])
+    expect(filterSitesByProject([site, other], 'proj-a', sessions)).toEqual([
+      site
+    ])
+    expect(
+      filterSitesByProject(
+        [{ ...site, sourceProjectId: 'proj-a', sourceSessionId: null }, other],
+        'proj-a',
+        sessions
+      )
+    ).toHaveLength(1)
   })
 
   it('formats sizes for the list', () => {

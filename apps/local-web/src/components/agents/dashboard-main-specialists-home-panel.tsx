@@ -86,6 +86,7 @@ export function DashboardMainHomePanel({
   onCreateProject,
   createSession,
   onOpenProject,
+  onOpenProjectSettings,
   togglePinProject,
   deleteProject
 }: Pick<
@@ -101,24 +102,28 @@ export function DashboardMainHomePanel({
   | 'onCreateProject'
   | 'createSession'
   | 'onOpenProject'
+  | 'onOpenProjectSettings'
   | 'togglePinProject'
   | 'deleteProject'
 >) {
   return (
-    <HomeView
-      client={client}
-      projects={projects}
-      sessions={sessions}
-      previews={sessionPreviews}
-      userName={health?.userName ?? null}
-      activeProjectId={activeProjectId}
-      onLoadPreviews={loadSessionPreviews}
-      onCreateProject={onCreateProject}
-      onCreateSession={projectId => void createSession(projectId)}
-      onOpenProject={onOpenProject}
-      onOpenSession={id => navigate(`/agents/${id}`)}
-      onTogglePinProject={project => void togglePinProject(project)}
-      onDeleteProject={project => void deleteProject(project)}
-    />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <HomeView
+        client={client}
+        projects={projects}
+        sessions={sessions}
+        previews={sessionPreviews}
+        userName={health?.userName ?? null}
+        activeProjectId={activeProjectId}
+        onLoadPreviews={loadSessionPreviews}
+        onCreateProject={onCreateProject}
+        onCreateSession={projectId => void createSession(projectId)}
+        onOpenProject={onOpenProject}
+        onOpenProjectSettings={onOpenProjectSettings}
+        onOpenSession={id => navigate(`/agents/${id}`)}
+        onTogglePinProject={project => void togglePinProject(project)}
+        onDeleteProject={project => void deleteProject(project)}
+      />
+    </div>
   )
 }

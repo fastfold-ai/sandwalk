@@ -213,7 +213,6 @@ export function AppShellSidebar({
             }}
             onSelectAllProjects={selectAllProjects}
             onSelectProject={selectProjectScope}
-            onOpenProjectSettings={() => setProjectSettingsOpen(true)}
             onNewProject={() => setNewProjectOpen(true)}
             onRefreshProjects={loadProjects}
             onOpenGlobalSearch={() => setGlobalSearchOpen(true)}

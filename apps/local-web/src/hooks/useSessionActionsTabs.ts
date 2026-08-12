@@ -116,7 +116,7 @@ export function useSessionActionsTabs({
   }
 
   const selectProjectScope = (projectId: string) => {
-    // Scope filter only — do not open `/projects/:id` when picking a project.
+    // Always land on Project Home when picking a project from the selector.
     retainActiveTabInScope(projectId)
     setRecentProjectIds(current => {
       const next = [
@@ -129,6 +129,7 @@ export function useSessionActionsTabs({
     startTransition(() => {
       setProjectScopeId(projectId)
     })
+    navigate(`/projects/${projectId}`)
   }
 
   return {

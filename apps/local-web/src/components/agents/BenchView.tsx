@@ -1082,6 +1082,15 @@ export function BenchView({
             <div className="space-y-2">
               {results.map(r => {
                 const pct = Math.round((r.accuracy || 0) * 1000) / 10
+                const running = ['running', 'paused', 'interrupted'].includes(
+                  (r.status || '').toLowerCase()
+                )
+                const statusLabel =
+                  (r.status || '').toLowerCase() === 'paused'
+                    ? 'Paused'
+                    : (r.status || '').toLowerCase() === 'interrupted'
+                      ? 'Interrupted'
+                      : 'Running'
                 const picked = compareSelection.includes(r.runId)
                 return (
                   <div
@@ -1110,17 +1119,23 @@ export function BenchView({
                           <span
                             className={cn(
                               'flex size-8 items-center justify-center rounded-md transition-opacity',
-                              pct >= 70
-                                ? 'bg-emerald-500/15 text-emerald-600'
-                                : pct >= 40
-                                  ? 'bg-amber-500/15 text-amber-600'
-                                  : 'bg-red-500/15 text-red-600',
+                              running
+                                ? 'bg-sky-500/15 text-sky-600'
+                                : pct >= 70
+                                  ? 'bg-emerald-500/15 text-emerald-600'
+                                  : pct >= 40
+                                    ? 'bg-amber-500/15 text-amber-600'
+                                    : 'bg-red-500/15 text-red-600',
                               picked
                                 ? 'opacity-30'
                                 : 'group-hover:opacity-30'
                             )}
                           >
-                            <Target className="size-3.5" />
+                            {running ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Target className="size-3.5" />
+                            )}
                           </span>
                           <span
                             className={cn(
@@ -1171,18 +1186,24 @@ export function BenchView({
                           </p>
                         </button>
                       </div>
-                      <p
-                        className={cn(
-                          'text-lg font-semibold tabular-nums',
-                          pct >= 70
-                            ? 'text-emerald-600'
-                            : pct >= 40
-                              ? 'text-amber-600'
-                              : 'text-red-600'
-                        )}
-                      >
-                        {pct.toFixed(1)}%
-                      </p>
+                      {running ? (
+                        <p className="text-sky-600 text-sm font-semibold">
+                          {statusLabel}
+                        </p>
+                      ) : (
+                        <p
+                          className={cn(
+                            'text-lg font-semibold tabular-nums',
+                            pct >= 70
+                              ? 'text-emerald-600'
+                              : pct >= 40
+                                ? 'text-amber-600'
+                                : 'text-red-600'
+                          )}
+                        >
+                          {pct.toFixed(1)}%
+                        </p>
+                      )}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-3 text-xs">
                       <button

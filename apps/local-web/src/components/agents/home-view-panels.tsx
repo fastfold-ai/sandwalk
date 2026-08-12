@@ -1,21 +1,25 @@
-import type {
-  BenchResultSummary,
-  LocalAgentClient
-} from '@sandwalk/agent-local-client'
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import {
-  ExternalLink,
+  Folder,
   MoreHorizontal,
   Pin,
   Plus,
-  Target,
+  Settings,
   Trash2
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ProjectMark } from '@/components/agents/ProjectMark'
+import {
+  AddWidgetButton,
+  catalogEntry,
+  createDefaultProjectHomeLayout,
+  normalizeLayout,
+  WidgetBoard,
+  type WidgetType
+} from '@/components/agents/widget-board'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +38,6 @@ import {
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { relativeTime } from '@/lib/sessions'
-import { cn } from '@/lib/utils'
 
 export function HomeEmptySessions({
   onCreateSession,
@@ -59,191 +62,81 @@ export function HomeEmptySessions({
   )
 }
 
-export function HomeProjectSessions({
-  sessions,
-  previews,
-  onOpenSession,
-  onCreateSession,
-  projectId
-}: {
-  sessions: AgentSession[]
-  previews: Record<string, string>
-  onOpenSession: (id: string) => void
-  onCreateSession: (projectId: string | null) => void
-  projectId: string | null
-}) {
-  if (sessions.length === 0) {
-    return (
-      <HomeEmptySessions
-        onCreateSession={onCreateSession}
-        projectId={projectId}
-      />
-    )
-  }
-
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {sessions.map(item => (
-        <button
-          key={item.id}
-          type="button"
-          className="bg-card sandwalk-surface-shadow hover:bg-muted/40 flex min-h-[8.5rem] flex-col rounded-xl p-4 text-left transition-colors"
-          onClick={() => onOpenSession(item.id)}
-          title={previews[item.id] || undefined}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <span className="line-clamp-2 text-sm font-medium">
-              {item.title || 'Untitled'}
-            </span>
-            <span className="text-muted-foreground shrink-0 text-xs">
-              {relativeTime(item.lastMessageAt || item.updatedAt)}
-            </span>
-          </div>
-          <p className="text-muted-foreground mt-2 line-clamp-3 flex-1 text-xs leading-relaxed">
-            {previews[item.id] || 'No messages yet'}
-          </p>
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function HomeProjectBenchLinks({
-  client,
-  projectId
-}: {
-  client: LocalAgentClient
-  projectId: string
-}) {
-  const navigate = useNavigate()
-  const [rows, setRows] = useState<BenchResultSummary[]>([])
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoaded(false)
-    void client
-      .listBenchResults()
-      .then(items => {
-        if (cancelled) return
-        setRows(items.filter(item => item.projectId === projectId))
-      })
-      .catch(() => {
-        if (!cancelled) setRows([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [client, projectId])
-
-  if (!loaded || rows.length === 0) return null
-
-  return (
-    <section className="mb-8">
-      <h3 className="mb-3 text-sm font-medium">Bench results</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {rows.map(row => {
-          const pct = Math.round((row.accuracy || 0) * 1000) / 10
-          return (
-            <button
-              key={row.runId}
-              type="button"
-              className="bg-card sandwalk-surface-shadow hover:bg-muted/40 flex min-h-[6.5rem] flex-col rounded-xl p-4 text-left transition-colors"
-              onClick={() =>
-                navigate(`/dashboard/bench/${encodeURIComponent(row.runId)}`)
-              }
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-2.5">
-                  <span
-                    className={cn(
-                      'flex size-8 shrink-0 items-center justify-center rounded-md',
-                      pct >= 70
-                        ? 'bg-emerald-500/15 text-emerald-600'
-                        : pct >= 40
-                          ? 'bg-amber-500/15 text-amber-600'
-                          : 'bg-red-500/15 text-red-600'
-                    )}
-                  >
-                    <Target className="size-3.5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {row.benchmark}
-                    </p>
-                    <p className="text-muted-foreground mt-0.5 truncate text-xs">
-                      {row.modelId}
-                    </p>
-                  </div>
-                </div>
-                <p
-                  className={cn(
-                    'text-lg font-semibold tabular-nums',
-                    pct >= 70
-                      ? 'text-emerald-600'
-                      : pct >= 40
-                        ? 'text-amber-600'
-                        : 'text-red-600'
-                  )}
-                >
-                  {pct.toFixed(1)}%
-                </p>
-              </div>
-              <div className="text-muted-foreground mt-auto flex items-center justify-between gap-2 pt-3 text-xs">
-                <span className="tabular-nums">
-                  {row.correct}/{row.total}
-                  {row.timeS ? ` · ${row.timeS}s` : ''}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  Open result
-                  <ExternalLink className="size-3" />
-                </span>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
 
 export function HomeProjectView({
   project,
-  sessions,
-  previews,
   client,
-  onCreateSession,
-  onOpenSession,
+  onOpenProjectSettings,
   onDeleteProject
 }: {
   project: AgentProject
-  sessions: AgentSession[]
-  previews: Record<string, string>
   client: LocalAgentClient
-  onCreateSession: (projectId: string | null) => void
-  onOpenSession: (id: string) => void
+  onCreateSession?: (projectId: string | null) => void
+  onOpenProjectSettings: () => void
   onDeleteProject: (project: AgentProject) => void
 }) {
   const [confirmRemove, setConfirmRemove] = useState(false)
-  const description =
-    project.description?.trim() ||
-    'Pick up where you left off or start something new.'
-  const isDenseMeta =
-    description.includes('\n') ||
-    /sandwalk-bench|matrix:|sessions:/i.test(description)
-  const sessionCount = Math.max(sessions.length, project.sessionCount || 0)
+  const sessionCount = project.sessionCount || 0
   const sessionLabel =
     sessionCount === 1 ? '1 session' : `${sessionCount} sessions`
+  const folderPath = project.folderPath?.trim() || ''
+  const [layout, setLayout] = useState(() =>
+    normalizeLayout(project.homeLayout, createDefaultProjectHomeLayout)
+  )
+  const presentTypes = useMemo(
+    () => new Set(layout.widgets.map(widget => widget.type)),
+    [layout.widgets]
+  )
+
+  useEffect(() => {
+    const next = normalizeLayout(
+      project.homeLayout,
+      createDefaultProjectHomeLayout
+    )
+    setLayout(next)
+    // Persist catalog migrations (e.g. removed Description / Agent Context cards).
+    const prevTypes = (project.homeLayout?.widgets || []).map(w => w.type)
+    const nextTypes = next.widgets.map(w => w.type)
+    const migrated = prevTypes.join('|') !== nextTypes.join('|')
+    if (migrated) {
+      void client.updateProject(project.id, { homeLayout: next })
+    }
+  }, [client, project.homeLayout, project.id, project.updatedAt])
+
+  const persistLayout = async (
+    next: ReturnType<typeof createDefaultProjectHomeLayout>
+  ) => {
+    setLayout(next)
+    await client.updateProject(project.id, { homeLayout: next })
+  }
+
+  const addWidget = (type: WidgetType) => {
+    const entry = catalogEntry(type)
+    if (!entry) return
+    void persistLayout({
+      ...layout,
+      widgets: [
+        ...layout.widgets,
+        {
+          id: crypto.randomUUID(),
+          type,
+          size: entry.defaultSize
+        }
+      ]
+    })
+  }
+
+  const resetLayout = () => {
+    void persistLayout(createDefaultProjectHomeLayout())
+  }
 
   return (
-    <>
-      <ScrollArea className="flex-1">
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Same height chain as BenchView — Radix ScrollArea needs a bounded flex child. */}
+      <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto w-full max-w-6xl px-6 pt-8 pb-8 md:px-10">
-          <div className="mb-8 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex min-w-0 items-center gap-3">
                 <ProjectMark
                   icon={project.icon}
@@ -251,49 +144,61 @@ export function HomeProjectView({
                   className="size-9 shrink-0"
                   iconClassName="size-4"
                 />
-                <h2 className="truncate text-xl font-semibold">{project.name}</h2>
+                <h2 className="truncate text-xl font-semibold">
+                  {project.name}
+                </h2>
               </div>
-              <div className="flex flex-wrap items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onCreateSession(project.id)}
-                >
-                  <Plus className="size-3.5" />
-                  New Agent
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
-                  onClick={() => setConfirmRemove(true)}
-                >
-                  <Trash2 className="size-3.5" />
-                  Remove
-                </Button>
-              </div>
+              <button
+                type="button"
+                onClick={onOpenProjectSettings}
+                className="text-muted-foreground hover:text-foreground ml-12 flex max-w-full items-center gap-1.5 text-left text-xs transition-colors"
+                title="Open project settings"
+              >
+                <Folder className="size-3.5 shrink-0 opacity-70" />
+                {folderPath ? (
+                  <span className="min-w-0 truncate font-mono">
+                    {folderPath}
+                  </span>
+                ) : (
+                  <span className="min-w-0 truncate">No project folder</span>
+                )}
+              </button>
             </div>
-            {isDenseMeta ? (
-              <pre className="bg-muted/35 text-muted-foreground max-w-3xl overflow-x-auto rounded-xl px-4 py-3 font-sans text-xs leading-relaxed whitespace-pre-wrap">
-                {description}
-              </pre>
-            ) : (
-              <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-                {description}
-              </p>
-            )}
+            <div className="flex flex-wrap items-center gap-1">
+              <AddWidgetButton
+                surface="project"
+                presentTypes={presentTypes}
+                onAdd={addWidget}
+                onReset={resetLayout}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onOpenProjectSettings}
+              >
+                <Settings className="size-3.5" />
+                Settings
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
+                onClick={() => setConfirmRemove(true)}
+                aria-label="Remove project"
+                title="Remove project"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
           </div>
-          <HomeProjectBenchLinks client={client} projectId={project.id} />
-          <section>
-            <h3 className="mb-3 text-sm font-medium">Recent sessions</h3>
-            <HomeProjectSessions
-              sessions={sessions}
-              previews={previews}
-              onOpenSession={onOpenSession}
-              onCreateSession={onCreateSession}
-              projectId={project.id}
-            />
-          </section>
+          <WidgetBoard
+            client={client}
+            surface="project"
+            layout={layout}
+            project={project}
+            showAddBar={false}
+            onLayoutChange={persistLayout}
+          />
         </div>
       </ScrollArea>
 
@@ -332,7 +237,7 @@ export function HomeProjectView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   )
 }
 

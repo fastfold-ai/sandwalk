@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import uuid
+from typing import Any
 
 from agent_server.models import AgentProject
 from agent_server.project_folder import (
@@ -13,6 +15,19 @@ from agent_server.project_folder import (
 )
 from agent_server.store.rows import project_from_row
 from agent_server.store.util import utc_now
+from agent_server.widget_layout import (
+    default_project_home_layout,
+    default_project_home_layout_json,
+)
+
+
+def _layout_json(layout: dict[str, Any] | None) -> str:
+    if layout is None:
+        return default_project_home_layout_json()
+    if not isinstance(layout, dict) or not isinstance(layout.get("widgets"), list):
+        raise ValueError("home_layout must be an object with a widgets array.")
+    payload = {"version": int(layout.get("version") or 1), "widgets": layout["widgets"]}
+    return json.dumps(payload, separators=(",", ":"))
 
 
 class ProjectMixin:
@@ -30,6 +45,7 @@ class ProjectMixin:
         icon: str | None = None,
         color: str | None = None,
         pinned: bool = False,
+        home_layout: dict[str, Any] | None = None,
     ) -> AgentProject:
         normalized = name.strip()
         if not normalized:
@@ -37,6 +53,9 @@ class ProjectMixin:
         next_folder = validate_project_folder_path(folder_path)
         next_icon = normalize_project_icon(icon)
         next_color = normalize_project_color(color)
+        layout_raw = _layout_json(
+            home_layout if home_layout is not None else default_project_home_layout()
+        )
         now = utc_now()
         project_id = str(uuid.uuid4())
         with self._write_lock, self._connect() as connection:
@@ -44,9 +63,9 @@ class ProjectMixin:
                 """
                 INSERT INTO projects(
                     id, name, description, agent_context, folder_path, icon, color,
-                    pinned, created_at, updated_at
+                    pinned, home_layout, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     project_id,
@@ -57,6 +76,7 @@ class ProjectMixin:
                     next_icon,
                     next_color,
                     1 if pinned else 0,
+                    layout_raw,
                     now.isoformat(),
                     now.isoformat(),
                 ),
@@ -120,6 +140,8 @@ class ProjectMixin:
         icon: str | None = None,
         color: str | None = None,
         pinned: bool | None = None,
+        home_layout: dict[str, Any] | None = None,
+        update_home_layout: bool = False,
     ) -> AgentProject | None:
         current = self.get_project(project_id)
         if current is None:
@@ -145,13 +167,23 @@ class ProjectMixin:
         if color is not None:
             next_color = normalize_project_color(color)
         next_pinned = current.pinned if pinned is None else bool(pinned)
+        if update_home_layout:
+            next_layout_raw = (
+                None if home_layout is None else _layout_json(home_layout)
+            )
+        else:
+            next_layout_raw = (
+                json.dumps(current.home_layout, separators=(",", ":"))
+                if current.home_layout
+                else None
+            )
         now = utc_now()
         with self._write_lock, self._connect() as connection:
             connection.execute(
                 """
                 UPDATE projects
                 SET name = ?, description = ?, agent_context = ?, folder_path = ?,
-                    icon = ?, color = ?, pinned = ?, updated_at = ?
+                    icon = ?, color = ?, pinned = ?, home_layout = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -162,6 +194,7 @@ class ProjectMixin:
                     next_icon,
                     next_color,
                     1 if next_pinned else 0,
+                    next_layout_raw,
                     now.isoformat(),
                     project_id,
                 ),

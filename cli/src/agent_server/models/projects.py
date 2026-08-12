@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import Field
 
@@ -19,6 +20,7 @@ class AgentProject(ApiModel):
     icon: str = DEFAULT_PROJECT_ICON
     color: str = DEFAULT_PROJECT_COLOR
     pinned: bool = False
+    home_layout: dict[str, Any] | None = None
     session_count: int = 0
     created_at: datetime
     updated_at: datetime
@@ -32,6 +34,7 @@ class CreateProjectRequest(ApiModel):
     icon: str | None = None
     color: str | None = None
     pinned: bool = False
+    home_layout: dict[str, Any] | None = None
 
 
 class UpdateProjectRequest(ApiModel):
@@ -42,9 +45,11 @@ class UpdateProjectRequest(ApiModel):
     icon: str | None = None
     color: str | None = None
     pinned: bool | None = None
+    home_layout: dict[str, Any] | None = None
     clear_description: bool = False
     clear_agent_context: bool = False
     clear_folder_path: bool = False
+    clear_home_layout: bool = False
 
 
 class ProjectList(ApiModel):
@@ -52,4 +57,34 @@ class ProjectList(ApiModel):
 
 
 class DeleteProjectResponse(ApiModel):
+    deleted: bool = True
+
+
+class ProjectFolderFile(ApiModel):
+    """A file under the project's linked folder (not a Library blob)."""
+
+    path: str
+    name: str
+    kind: str = "other"
+    size: int | None = None
+    mtime: datetime | None = None
+
+
+class ProjectFolderListing(ApiModel):
+    folder_path: str
+    truncated: bool = False
+    data: list[ProjectFolderFile]
+
+
+class RenameProjectFolderFileRequest(ApiModel):
+    path: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+
+
+class UseProjectFolderInChatRequest(ApiModel):
+    paths: list[str] = Field(min_length=1)
+    title: str | None = None
+
+
+class DeleteProjectFolderFileResponse(ApiModel):
     deleted: bool = True

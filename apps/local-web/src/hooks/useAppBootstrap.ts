@@ -85,7 +85,8 @@ export function useAppBootstrap({
   }, [auth])
 
   // Cold-start main window: reopen the most recent local/remote session.
-  // Disconnect skips this so Welcome Home stays up. New Window still uses the chooser.
+  // Disconnect skips this so Welcome Home stays up. File → New Window opens a
+  // client window on the chooser (no cold restore; no focused-backend bind).
   useEffect(() => {
     if (!connectBundle.connectionPaused) {
       setAutoRestoring(false)
