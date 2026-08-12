@@ -397,10 +397,10 @@ export default function App() {
    * `openTabIds` puede tener chatIds sueltos que en realidad ya viven
    * dentro de un grupo (residuos de storage viejo, o carreras al crear
    * un grupo). Los filtramos aquí para que nunca se vean afuera del
-   * grupo — el grupo es la única representación válida. Excepción: si
-   * el usuario está navegando explícitamente al chat suelto
-   * (`route.sessionId`), lo dejamos pasar para no ocultarlo en su misma
-   * cara.
+   * grupo — el grupo es la única representación válida. Antes teníamos
+   * una excepción para el chat activo pero eso causaba render duplicado
+   * (chat suelto + chat como children del grupo → React keys duplicadas
+   * → todo el estado del sidebar/strip se rompía).
    */
   const chatsInsideGroupIds = useMemo(() => {
     const set = new Set<string>()
@@ -410,12 +410,31 @@ export default function App() {
     return set
   }, [tabGroupsStore.allTabGroups])
   const cleanedOpenTabIds = useMemo(
-    () =>
-      tabs.openTabIds.filter(
-        id => id === route.sessionId || !chatsInsideGroupIds.has(id)
-      ),
-    [tabs.openTabIds, route.sessionId, chatsInsideGroupIds]
+    () => tabs.openTabIds.filter(id => !chatsInsideGroupIds.has(id)),
+    [tabs.openTabIds, chatsInsideGroupIds]
   )
+
+  /*
+   * Si el user navega a la ruta individual de un chat que en realidad
+   * vive dentro de un grupo, redirigimos a la ruta del grupo con ese
+   * chat como activo. Así la representación del chat sigue siendo la
+   * del split, no un tab suelto que ya no existe.
+   */
+  useEffect(() => {
+    if (!route.sessionId) return
+    if (!chatsInsideGroupIds.has(route.sessionId)) return
+    const group = tabGroupsStore.allTabGroups.find(g =>
+      g.chatIds.includes(route.sessionId!)
+    )
+    if (!group) return
+    tabGroupsStore.setGroupActiveChat(group.id, route.sessionId)
+    navigate(`/agents/${group.id}`, { replace: true })
+  }, [
+    route.sessionId,
+    chatsInsideGroupIds,
+    tabGroupsStore,
+    navigate
+  ])
 
   const { sections, openTabs } = buildSessionSidebarModel({
     sessions: bootstrap.sessions,
