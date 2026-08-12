@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version without leading v (e.g. 0.0.2). Leave blank to use apps/local-web/package.json.'
+        description: 'Release version without leading v (e.g. 0.1.0-beta.1). Leave blank to use apps/local-web/package.json.'
         type: string
         required: false
       draft:
@@ -82,10 +82,12 @@ jobs:
             t = t.replace(/^version = "[^"]+"/m, `version = "${v}"`);
             fs.writeFileSync(cargo, t);
           '
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" \
+          # Apple marketing version is digits-only (0.1.0); prerelease stays in the app/CLI version.
+          MARKETING="${VERSION%%-*}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${MARKETING}" \
             apps/sandwalk-mac/Resources/Info.plist 2>/dev/null \
             || true
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" \
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${MARKETING}" \
             apps/sandwalk-mac/Resources/Info.plist 2>/dev/null \
             || true
 
