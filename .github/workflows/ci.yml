@@ -24,11 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Cache restore helps; cache *save* of the torch-heavy [all] env added
+      # 1–2 min to wall time on successful jobs, so keep caching off here.
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          cache-dependency-glob: "cli/uv.lock"
+          enable-cache: false
 
       - uses: actions/setup-python@v5
         with:
@@ -75,11 +76,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Cache restore helps; cache *save* of the torch-heavy [all] env added
+      # 1–2 min to wall time on successful jobs, so keep caching off here.
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          cache-dependency-glob: "cli/uv.lock"
+          enable-cache: false
 
       - uses: actions/setup-python@v5
         with:
@@ -123,11 +125,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Cache restore helps; cache *save* of the torch-heavy [all] env added
+      # 1–2 min to wall time on successful jobs, so keep caching off here.
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          cache-dependency-glob: "cli/uv.lock"
+          enable-cache: false
 
       - uses: actions/setup-python@v5
         with:

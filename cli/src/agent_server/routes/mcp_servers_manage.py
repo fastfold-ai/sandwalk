@@ -104,4 +104,9 @@ def register_mcp_server_manage_routes(app: FastAPI, deps: AppDeps) -> None:
 
         if not await asyncio.to_thread(_delete):
             raise HTTPException(status_code=404, detail="MCP server not found.")
+        from agent.deepagents_runtime.mcp_tools import clear_mcp_tool_caches
+        from agent_server import ttl_cache
+
+        clear_mcp_tool_caches()
+        ttl_cache.invalidate("mcp:")
         return DeleteSessionResponse()
