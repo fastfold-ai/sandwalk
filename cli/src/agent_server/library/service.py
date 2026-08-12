@@ -113,6 +113,9 @@ class LibraryService:
         total = self.store.count_library_items(
             kind=kind, query=query, project_id=project_id
         )
+        total_bytes = self.store.sum_library_bytes(
+            kind=kind, query=query, project_id=project_id
+        )
         data = self.store.list_library_items(
             kind=kind,
             query=query,
@@ -129,6 +132,7 @@ class LibraryService:
                 total=total,
                 has_more=has_more,
             ),
+            total_bytes=total_bytes,
         )
 
     def ensure_workspace_backfill(self) -> None:

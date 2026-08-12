@@ -6,14 +6,22 @@ import { cn } from '@/lib/utils'
 export function MetricStatWidget({
   label,
   value,
+  detail,
   size,
   loading
 }: {
   label: string
   value: string
+  /** Secondary line/suffix (e.g. peak-day date) — smaller muted text. */
+  detail?: string | null
   size: WidgetSize
   loading?: boolean
 }) {
+  const title = loading
+    ? undefined
+    : detail
+      ? `${value} · ${detail}`
+      : value
   return (
     <div className={widgetShellClass(size)}>
       <p className="text-muted-foreground truncate text-xs font-light tracking-wide">
@@ -21,14 +29,25 @@ export function MetricStatWidget({
       </p>
       <p
         className={cn(
-          'min-w-0',
-          size === 'sm' ? 'truncate' : 'line-clamp-2',
-          valueTextClass(size),
-          loading && 'text-muted-foreground'
+          'flex min-w-0 items-baseline gap-1.5',
+          size === 'sm' ? 'truncate' : 'flex-wrap'
         )}
-        title={loading ? undefined : value}
+        title={title}
       >
-        {loading ? '—' : value}
+        <span
+          className={cn(
+            'min-w-0 truncate',
+            valueTextClass(size),
+            loading && 'text-muted-foreground'
+          )}
+        >
+          {loading ? '—' : value}
+        </span>
+        {!loading && detail ? (
+          <span className="text-muted-foreground truncate text-[11px] font-normal tracking-normal">
+            {detail}
+          </span>
+        ) : null}
       </p>
     </div>
   )
@@ -44,7 +63,7 @@ export function metricValueForType(
     peakDayLabel: (o: UsageOverview) => string
     cacheHitPercent: (o: UsageOverview) => number
   }
-): { label: string; value: string } | null {
+): { label: string; value: string; detail?: string } | null {
   if (!overview) return null
   switch (type) {
     case 'stat-longest-agent':
@@ -72,8 +91,12 @@ export function metricValueForType(
         label: 'Peak day',
         value:
           overview.peakDayTokens > 0
-            ? `${formatters.formatTokenCount(overview.peakDayTokens)} · ${formatters.peakDayLabel(overview)}`
-            : '—'
+            ? formatters.formatTokenCount(overview.peakDayTokens)
+            : '—',
+        detail:
+          overview.peakDayTokens > 0
+            ? formatters.peakDayLabel(overview)
+            : undefined
       }
     case 'stat-models-used':
       return {

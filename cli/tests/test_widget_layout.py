@@ -17,11 +17,12 @@ from agent_server.widget_layout import (
 def test_default_layouts_include_expected_widgets():
     home = default_project_home_layout()
     overview = default_overview_layout()
-    assert home["version"] == 5
-    assert overview["version"] == 6
+    assert home["version"] == 6
+    assert overview["version"] == 7
     home_types = [w["type"] for w in home["widgets"]]
     overview_types = [w["type"] for w in overview["widgets"]]
     assert home_types == [
+        "project-description",
         "usage-hero",
         "stat-longest-agent",
         "stat-chats",
@@ -30,7 +31,7 @@ def test_default_layouts_include_expected_widgets():
         "activity-heatmap",
         "bench-results",
     ]
-    assert "project-description" not in home_types
+    assert home["widgets"][0]["size"] == "lg"
     assert "bench-results" not in overview_types
     assert overview_types == [
         "usage-hero",
@@ -46,10 +47,11 @@ def test_default_layouts_include_expected_widgets():
         "stat-tokens-out",
         "stat-cache-hit",
         "stat-avg-tokens-chat",
-        "stat-runs",
+        "stat-files-size",
         "models-chart",
         "models-top-list",
     ]
+    assert "stat-runs" not in overview_types
     assert all("size" in w for w in home["widgets"])
     assert all("size" in w for w in overview["widgets"])
 
@@ -60,8 +62,9 @@ def test_resolve_overview_layout_reseeds_stale_version():
         "widgets": [{"id": "a", "type": "usage-hero", "size": "lg"}],
     }
     resolved = resolve_overview_layout(__import__("json").dumps(stale))
-    assert resolved["version"] == 6
-    assert "stat-runs" in [w["type"] for w in resolved["widgets"]]
+    assert resolved["version"] == 7
+    assert "stat-files-size" in [w["type"] for w in resolved["widgets"]]
+    assert "stat-runs" not in [w["type"] for w in resolved["widgets"]]
     assert "models-chart" in [w["type"] for w in resolved["widgets"]]
 
 
@@ -69,8 +72,10 @@ def test_create_project_sets_default_home_layout(tmp_path: Path):
     store = AgentStore(tmp_path / "layout.db", exclusive=True)
     project = store.create_project(name="Widgets", folder_path=None)
     assert project.home_layout is not None
-    assert project.home_layout["version"] == 5
-    assert project.home_layout["widgets"][0]["type"] == "usage-hero"
+    assert project.home_layout["version"] == 6
+    assert project.home_layout["widgets"][0]["type"] == "project-description"
+    assert project.home_layout["widgets"][0]["size"] == "lg"
+    assert project.home_layout["widgets"][1]["type"] == "usage-hero"
     assert [w["type"] for w in project.home_layout["widgets"]][-1] == (
         "bench-results"
     )

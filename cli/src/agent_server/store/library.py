@@ -157,6 +157,23 @@ class LibraryMixin:
             ).fetchone()
         return int(row["n"] if row else 0)
 
+    def sum_library_bytes(
+        self,
+        *,
+        kind: LibraryKind | None = None,
+        query: str | None = None,
+        project_id: str | None = None,
+    ) -> int:
+        where, params = self._library_filter_sql(
+            kind=kind, query=query, project_id=project_id
+        )
+        with self._connect() as connection:
+            row = connection.execute(
+                f"SELECT COALESCE(SUM(bytes), 0) AS n FROM library_items {where}",
+                params,
+            ).fetchone()
+        return int(row["n"] if row else 0)
+
     def list_library_items(
         self,
         *,

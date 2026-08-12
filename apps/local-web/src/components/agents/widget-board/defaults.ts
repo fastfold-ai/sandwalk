@@ -4,14 +4,9 @@ import { catalogEntry } from './catalog'
 import type { WidgetType } from './types'
 
 /** Bumped when Project Home default seed changes. */
-export const LAYOUT_VERSION = 5
+export const LAYOUT_VERSION = 6
 /** Bumped when Dashboard Overview default seed changes. */
-export const OVERVIEW_LAYOUT_VERSION = 6
-
-const REMOVED_TYPES = new Set([
-  'project-description',
-  'project-agent-context'
-])
+export const OVERVIEW_LAYOUT_VERSION = 7
 
 function item(type: WidgetType, size?: WidgetSize): WidgetLayoutItem {
   const entry = catalogEntry(type)
@@ -22,11 +17,12 @@ function item(type: WidgetType, size?: WidgetSize): WidgetLayoutItem {
   }
 }
 
-/** Compact Project Home seed: usage → streak metrics → activity → bench. */
+/** Project Home seed: description → usage → streak metrics → activity → bench. */
 export function createDefaultProjectHomeLayout(): WidgetLayout {
   return {
     version: LAYOUT_VERSION,
     widgets: [
+      item('project-description', 'lg'),
       item('usage-hero', 'lg'),
       item('stat-longest-agent', 'sm'),
       item('stat-chats', 'sm'),
@@ -56,7 +52,7 @@ export function createDefaultOverviewLayout(): WidgetLayout {
       item('stat-tokens-out', 'sm'),
       item('stat-cache-hit', 'sm'),
       item('stat-avg-tokens-chat', 'sm'),
-      item('stat-runs', 'sm'),
+      item('stat-files-size', 'sm'),
       item('models-chart', 'lg'),
       item('models-top-list', 'lg')
     ]
@@ -72,7 +68,6 @@ export function normalizeLayout(
   }
 
   const widgets = layout.widgets
-    .filter(widget => !REMOVED_TYPES.has(widget.type))
     .filter(widget => catalogEntry(widget.type))
     .map(widget => ({
       id: widget.id || crypto.randomUUID(),
@@ -86,6 +81,21 @@ export function normalizeLayout(
     version: Math.max(layout.version || 1, LAYOUT_VERSION),
     widgets
   }
+}
+
+/** Reseed Project Home when the stored seed version is older than the current default. */
+export function normalizeProjectHomeLayout(
+  layout: WidgetLayout | null | undefined
+): WidgetLayout {
+  if (
+    !layout ||
+    !Array.isArray(layout.widgets) ||
+    layout.widgets.length === 0 ||
+    (layout.version || 1) < LAYOUT_VERSION
+  ) {
+    return createDefaultProjectHomeLayout()
+  }
+  return normalizeLayout(layout, createDefaultProjectHomeLayout)
 }
 
 /** Reseed Overview when the stored seed version is older than the current default. */

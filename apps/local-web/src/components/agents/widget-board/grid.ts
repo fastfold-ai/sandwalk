@@ -33,3 +33,17 @@ export function widgetShellClass(size: WidgetSize, className?: string): string {
     className
   )
 }
+
+/**
+ * Shared shell for full-width hero cards (Usage + Project description) so LG
+ * rows match in height whether the body is a big number or scrollable text.
+ */
+export function heroShellClass(size: WidgetSize, className?: string): string {
+  return widgetShellClass(
+    size,
+    cn(
+      size === 'lg' && 'h-[8.25rem] min-h-[8.25rem]',
+      className
+    )
+  )
+}

@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { formatFileBytes } from '@/components/agents/widget-board/useProjectAssetStats'
 import { getFileIcon } from '@/lib/file-icons'
 import { cn } from '@/lib/utils'
 
@@ -271,6 +272,7 @@ export function LibraryView({
 }) {
   const [items, setItems] = useState<LibraryItem[]>([])
   const [total, setTotal] = useState(0)
+  const [totalBytes, setTotalBytes] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -325,6 +327,7 @@ export function LibraryView({
       })
       setItems(result.data)
       setTotal(result.pagination.total)
+      setTotalBytes(result.totalBytes ?? 0)
       setHasMore(result.pagination.hasMore)
       hasMoreRef.current = result.pagination.hasMore
       pageRef.current = result.pagination.page
@@ -333,6 +336,7 @@ export function LibraryView({
       setError(cause instanceof Error ? cause.message : 'Unable to load library')
       setItems([])
       setTotal(0)
+      setTotalBytes(0)
       setHasMore(false)
       hasMoreRef.current = false
     } finally {
@@ -366,6 +370,7 @@ export function LibraryView({
         return [...current, ...appended]
       })
       setTotal(result.pagination.total)
+      setTotalBytes(result.totalBytes ?? 0)
       setHasMore(result.pagination.hasMore)
       hasMoreRef.current = result.pagination.hasMore
       pageRef.current = result.pagination.page
@@ -539,8 +544,8 @@ export function LibraryView({
             <LibraryBig className="text-muted-foreground size-5 shrink-0" />
             <h1 className="text-lg font-semibold tracking-tight">Library</h1>
             {!loading ? (
-              <span className="text-muted-foreground text-sm leading-none tabular-nums">
-                {formatFileCount(total)}
+              <span className="text-muted-foreground text-xs font-normal leading-none tracking-wide">
+                {`${formatFileCount(total)} · ${formatFileBytes(totalBytes)}`}
               </span>
             ) : null}
           </div>

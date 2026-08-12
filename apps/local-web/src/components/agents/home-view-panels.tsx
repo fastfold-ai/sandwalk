@@ -16,7 +16,7 @@ import {
   AddWidgetButton,
   catalogEntry,
   createDefaultProjectHomeLayout,
-  normalizeLayout,
+  normalizeProjectHomeLayout,
   WidgetBoard,
   type WidgetType
 } from '@/components/agents/widget-board'
@@ -81,7 +81,7 @@ export function HomeProjectView({
     sessionCount === 1 ? '1 session' : `${sessionCount} sessions`
   const folderPath = project.folderPath?.trim() || ''
   const [layout, setLayout] = useState(() =>
-    normalizeLayout(project.homeLayout, createDefaultProjectHomeLayout)
+    normalizeProjectHomeLayout(project.homeLayout)
   )
   const presentTypes = useMemo(
     () => new Set(layout.widgets.map(widget => widget.type)),
@@ -89,15 +89,14 @@ export function HomeProjectView({
   )
 
   useEffect(() => {
-    const next = normalizeLayout(
-      project.homeLayout,
-      createDefaultProjectHomeLayout
-    )
+    const next = normalizeProjectHomeLayout(project.homeLayout)
     setLayout(next)
-    // Persist catalog migrations (e.g. removed Description / Agent Context cards).
+    // Persist seed reseeds / catalog migrations.
+    const prevVersion = project.homeLayout?.version || 0
     const prevTypes = (project.homeLayout?.widgets || []).map(w => w.type)
     const nextTypes = next.widgets.map(w => w.type)
-    const migrated = prevTypes.join('|') !== nextTypes.join('|')
+    const migrated =
+      prevVersion !== next.version || prevTypes.join('|') !== nextTypes.join('|')
     if (migrated) {
       void client.updateProject(project.id, { homeLayout: next })
     }
