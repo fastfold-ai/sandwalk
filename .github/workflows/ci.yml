@@ -103,8 +103,12 @@ jobs:
             --cov=agent --cov=agent_server --cov=api --cov=cli --cov=data --cov=kb --cov=models \
             --cov=reports --cov=skills --cov=tools --cov=ui \
             --cov-report=term-missing:skip-covered
-          # Collapse xdist worker fragments into one data file for this shard.
-          uv run coverage combine
+          # pytest-cov+xdist usually leaves a combined .coverage; only combine
+          # leftover parallel fragments when needed.
+          if [ ! -f .coverage ]; then
+            uv run coverage combine
+          fi
+          test -f .coverage
           mkdir -p ci-coverage
           cp -f .coverage "ci-coverage/shard-${{ matrix.group }}.coverage"
           ls -la ci-coverage/
