@@ -215,7 +215,6 @@ export type AppShellMainProps = {
   dissolveTabGroup: (groupId: string) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
   closeTabGroup: (groupId: string) => void
-  deleteTabGroup: (groupId: string) => Promise<void>
   selectedChatIds: Set<string>
   toggleSelectChat: (id: string) => void
   clearSelectChats: () => void

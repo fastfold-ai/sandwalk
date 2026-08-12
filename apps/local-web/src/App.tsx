@@ -215,49 +215,15 @@ export default function App() {
   )
 
   /*
-   * Close split: quita el chip de la strip (openTabsByProject) del scope
-   * activo. Los chats hijos no se borran — sólo dejan de tener la pestaña
-   * del split abierta.
+   * Close split (strip only): quita el chip de la strip del scope activo.
+   * El grupo sigue existiendo — sólo desaparece la pestaña. Se puede
+   * volver a abrir desde el sidebar.
    */
   const handleCloseTabGroup = useCallback(
     (groupId: string) => {
       layer.actions.closeSessionTab(groupId)
     },
     [layer.actions]
-  )
-
-  /*
-   * Delete split: borra los chats del grupo del server y disuelve el
-   * grupo. Es irreversible — el UI ya pide confirmación con la lista de
-   * chats antes de llamar acá.
-   */
-  const handleDeleteTabGroup = useCallback(
-    async (groupId: string) => {
-      const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
-      if (!group) return
-      const chatsInGroup = bootstrap.sessions.filter(s =>
-        group.chatIds.includes(s.id)
-      )
-      for (const chat of chatsInGroup) {
-        try {
-          await bootstrap.client.deleteSession(chat.id)
-        } catch (cause) {
-          bootstrap.setError(
-            cause instanceof Error
-              ? cause.message
-              : `Unable to delete chat ${chat.title || chat.id}`
-          )
-        }
-      }
-      tabGroupsStore.dissolveGroup(groupId)
-      // Quitar el grp_id de las tabs abiertas del scope actual.
-      layer.actions.closeSessionTab(groupId)
-      await Promise.all([
-        bootstrap.loadSessions({ force: true }),
-        bootstrap.loadProjects()
-      ])
-    },
-    [tabGroupsStore, bootstrap, layer.actions]
   )
 
   // Args comunes que todo `SessionChatMount` de split view va a instanciar
@@ -620,7 +586,6 @@ export default function App() {
           allSessions: bootstrap.sessions,
           onSplitWithNextTab: handleSplitWithNextTab,
           closeTabGroup: handleCloseTabGroup,
-          deleteTabGroup: handleDeleteTabGroup,
           selectedChatIds,
           toggleSelectChat,
           clearSelectChats,

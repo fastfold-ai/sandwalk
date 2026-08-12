@@ -31,6 +31,15 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   Popover,
@@ -88,7 +97,6 @@ export function SessionTabs({
   onDissolveGroup,
   onSetGroupColor,
   onCloseGroup,
-  onDeleteGroup,
   selectedChatIds,
   onToggleSelectChat,
   onClearSelection,
@@ -124,13 +132,18 @@ export function SessionTabs({
   onDissolveGroup?: (groupId: string) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
   onCloseGroup?: (groupId: string) => void
-  onDeleteGroup?: (groupId: string) => void
   selectedChatIds?: Set<string>
   onToggleSelectChat?: (id: string) => void
   onClearSelection?: () => void
   onCreateSplitFromSelection?: () => void
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
+  // Modal de confirmación para "Delete Split View": la acción disuelve el
+  // grupo (los chats vuelven a ser conversaciones sueltas) — irreversible
+  // en tanto la agrupación se pierde, pero ningún chat se borra.
+  const [dissolveConfirm, setDissolveConfirm] = useState<SessionGroup | null>(
+    null
+  )
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const { tabColors, setTabColor } = useSessionTabColors()
@@ -645,14 +658,6 @@ export function SessionTabs({
                             <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
                               {title}
                             </span>
-                            {isGroup ? (
-                              <span
-                                className="bg-black/10 text-foreground/70 dark:bg-white/15 shrink-0 rounded-md px-1 text-[10px] font-semibold tabular-nums leading-none"
-                                aria-hidden
-                              >
-                                {group!.chatIds.length}
-                              </span>
-                            ) : null}
                             <span
                               className="relative block h-4 shrink-0"
                               style={{ width: 28 }}
@@ -669,7 +674,7 @@ export function SessionTabs({
                                 onClick={event => {
                                   event.stopPropagation()
                                   if (isGroup) {
-                                    onDissolveGroup?.(item.id)
+                                    onCloseGroup?.(item.id)
                                   } else {
                                     onClose(item.id)
                                   }
@@ -716,6 +721,9 @@ export function SessionTabs({
             onClick={() => runAction(() => onTogglePin(menuSession))}
           />
           <TabContextSeparator />
+          <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
+            Color
+          </div>
           <TabInlineColorRow
             value={tabColors[menuSession.id] || null}
             onSelect={color => {
@@ -785,6 +793,9 @@ export function SessionTabs({
         >
           {onSetGroupColor ? (
             <>
+              <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
+                Color
+              </div>
               <TabInlineColorRow
                 value={menuGroup.color}
                 onSelect={color => {
@@ -799,37 +810,105 @@ export function SessionTabs({
               <TabContextSeparator />
             </>
           ) : null}
-          {onDissolveGroup ? (
-            <TabContextItem
-              icon={<Columns2 className="size-3.5" />}
-              label="Dissolve split"
-              onClick={() =>
-                runAction(() => onDissolveGroup(menuGroup.id))
-              }
-            />
-          ) : null}
           {onCloseGroup ? (
             <TabContextItem
               icon={<X className="size-3.5" />}
-              label="Close split"
+              label="Close"
               onClick={() => runAction(() => onCloseGroup(menuGroup.id))}
             />
           ) : null}
-          {onDeleteGroup ? (
+          <TabContextItem
+            icon={<CircleX className="size-3.5" />}
+            label="Close others"
+            disabled={orderedItems.length <= 1}
+            onClick={() => runAction(() => onCloseOthers(menuGroup.id))}
+          />
+          {onDissolveGroup ? (
             <>
               <TabContextSeparator />
               <TabContextItem
                 icon={<Trash2 className="size-3.5" />}
-                label="Delete split"
+                label="Delete Split View"
                 destructive
-                onClick={() =>
-                  runAction(() => onDeleteGroup(menuGroup.id))
-                }
+                onClick={() => {
+                  setDissolveConfirm(menuGroup)
+                  setMenu(null)
+                }}
               />
             </>
           ) : null}
         </TabContextMenuShell>
       ) : null}
+      <GroupDissolveDialog
+        group={dissolveConfirm}
+        chats={
+          dissolveConfirm
+            ? tabs.filter(t => dissolveConfirm.chatIds.includes(t.id))
+            : []
+        }
+        onCancel={() => setDissolveConfirm(null)}
+        onConfirm={() => {
+          if (dissolveConfirm && onDissolveGroup) {
+            onDissolveGroup(dissolveConfirm.id)
+          }
+          setDissolveConfirm(null)
+        }}
+      />
     </div>
+  )
+}
+
+/**
+ * Modal de confirmación para el "Delete Split View" (strip) o
+ * "Dissolve split" (sidebar). Se enfatiza que los chats de adentro
+ * NO se borran — sólo se liberan como conversaciones individuales.
+ * Esa distinción es clave: la acción es destructiva sobre la
+ * agrupación, no sobre las conversaciones.
+ */
+export function GroupDissolveDialog({
+  group,
+  chats,
+  onCancel,
+  onConfirm
+}: {
+  group: SessionGroup | null
+  chats: AgentSession[]
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const open = group !== null
+  const label = group?.name || `${group?.chatIds.length ?? 0} chats`
+  return (
+    <Dialog open={open} onOpenChange={next => (next ? null : onCancel())}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete Split View</DialogTitle>
+          <DialogDescription>
+            El split view <span className="text-foreground font-medium">{label}</span>{' '}
+            desaparece. Los chats que viven dentro se quedan sueltos como
+            conversaciones individuales — ninguna se borra.
+          </DialogDescription>
+        </DialogHeader>
+        {chats.length > 0 ? (
+          <div className="border-border/60 max-h-56 overflow-y-auto rounded-md border">
+            <ul className="divide-border/60 divide-y text-[13px]">
+              {chats.map(chat => (
+                <li key={chat.id} className="truncate px-3 py-2">
+                  {chat.title || 'Untitled'}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button size="sm" variant="destructive" onClick={onConfirm}>
+            Delete Split View
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

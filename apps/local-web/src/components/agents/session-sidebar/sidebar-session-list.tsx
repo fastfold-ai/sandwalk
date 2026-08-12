@@ -20,21 +20,13 @@ import type { NavigateFunction } from 'react-router-dom'
 
 import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
+import { GroupDissolveDialog } from '@/components/agents/SessionTabs'
 import { SessionSourceIcon } from '@/components/agents/SessionSourceIcon'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
 import {
   TAB_INLINE_COLORS,
   TabInlineColorRow
 } from '@/components/agents/tab-context-menu'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
 import {
   Popover,
   PopoverContent,
@@ -190,8 +182,6 @@ export type SidebarSessionListProps = {
   onSelectTabGroup?: (groupId: string) => void
   onDissolveTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
-  onCloseTabGroup?: (groupId: string) => void
-  onDeleteTabGroup?: (groupId: string) => void
   /**
    * ID del chat focused dentro del grupo activo (si hay). Sirve para
    * pintar en el sidebar cuál chat del split está activo — no solo el
@@ -230,8 +220,6 @@ export function SidebarSessionList({
   onSelectTabGroup,
   onDissolveTabGroup,
   onSetTabGroupColor,
-  onCloseTabGroup,
-  onDeleteTabGroup,
   activeGroupChildId,
   setTabGroupActiveChat
 }: SidebarSessionListProps) {
@@ -350,8 +338,6 @@ export function SidebarSessionList({
                             onSelectGroup={onSelectTabGroup}
                             onDissolveGroup={onDissolveTabGroup}
                             onSetGroupColor={onSetTabGroupColor}
-                            onCloseGroup={onCloseTabGroup}
-                            onDeleteGroup={onDeleteTabGroup}
                             projects={projects}
                             navigate={navigate}
                             setTabColor={setTabColor}
@@ -657,8 +643,6 @@ function SidebarGroupItem({
   onDissolveGroup,
   onSelectChat,
   onSetGroupColor,
-  onCloseGroup,
-  onDeleteGroup,
   projects,
   navigate,
   setTabColor,
@@ -679,8 +663,6 @@ function SidebarGroupItem({
   onDissolveGroup?: (groupId: string) => void
   onSelectChat: (chatId: string) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
-  onCloseGroup?: (groupId: string) => void
-  onDeleteGroup?: (groupId: string) => void
   projects: AgentProject[]
   navigate: NavigateFunction
   setTabColor: (id: string, color: string | null) => void
@@ -693,10 +675,9 @@ function SidebarGroupItem({
   setDeleteTarget: Dispatch<SetStateAction<AgentSession | null>>
 }) {
   const [openChildMenuId, setOpenChildMenuId] = useState<string | null>(null)
-  const [confirmMode, setConfirmMode] = useState<'close' | 'delete' | null>(
-    null
-  )
   const [menuOpen, setMenuOpen] = useState(false)
+  // Dispara el modal destructivo compartido con la strip.
+  const [dissolveConfirmOpen, setDissolveConfirmOpen] = useState(false)
   const [expanded, setExpanded] = useState(true)
   const label = group.name || `${group.chatIds.length} chats`
   const groupActive = group.id === activeId
@@ -709,6 +690,10 @@ function SidebarGroupItem({
           'hover:bg-sidebar-accent/45 group/gr grid grid-cols-[minmax(0,1fr)_2.5rem] items-center rounded-md px-2 py-1.5',
           groupActive && 'bg-sidebar-accent/55'
         )}
+        onContextMenu={event => {
+          event.preventDefault()
+          setMenuOpen(true)
+        }}
       >
         <div className="flex min-w-0 items-center gap-1">
           <button
@@ -771,62 +756,31 @@ function SidebarGroupItem({
                 />
               </div>
             ) : null}
-            {(onSetGroupColor && (onDissolveGroup || onCloseGroup || onDeleteGroup)) ? (
+            {onSetGroupColor && onDissolveGroup ? (
               <div className="border-border/60 my-1 border-t" />
             ) : null}
             {onDissolveGroup ? (
               <button
                 type="button"
-                className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                className="hover:bg-destructive/10 text-destructive flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
                 onClick={() => {
                   setMenuOpen(false)
-                  onDissolveGroup(group.id)
+                  setDissolveConfirmOpen(true)
                 }}
               >
-                Dissolve split
+                Dissolve
               </button>
-            ) : null}
-            {onCloseGroup ? (
-              <button
-                type="button"
-                className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
-                onClick={() => {
-                  setMenuOpen(false)
-                  setConfirmMode('close')
-                }}
-              >
-                Close split
-              </button>
-            ) : null}
-            {onDeleteGroup ? (
-              <>
-                <div className="border-border/60 my-1 border-t" />
-                <button
-                  type="button"
-                  className="hover:bg-muted text-destructive flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    setConfirmMode('delete')
-                  }}
-                >
-                  Delete split
-                </button>
-              </>
             ) : null}
           </PopoverContent>
         </Popover>
       </div>
-      <GroupConfirmDialog
-        open={confirmMode !== null}
-        mode={confirmMode ?? 'close'}
-        label={label}
+      <GroupDissolveDialog
+        group={dissolveConfirmOpen ? group : null}
         chats={chats}
-        onCancel={() => setConfirmMode(null)}
+        onCancel={() => setDissolveConfirmOpen(false)}
         onConfirm={() => {
-          const mode = confirmMode
-          setConfirmMode(null)
-          if (mode === 'close') onCloseGroup?.(group.id)
-          else if (mode === 'delete') onDeleteGroup?.(group.id)
+          setDissolveConfirmOpen(false)
+          onDissolveGroup?.(group.id)
         }}
       />
       {expanded ? (
@@ -854,6 +808,10 @@ function SidebarGroupItem({
                     active && !isSelected && 'bg-sidebar-accent/55',
                     isSelected && 'bg-sidebar-accent'
                   )}
+                  onContextMenu={event => {
+                    event.preventDefault()
+                    setOpenChildMenuId(chat.id)
+                  }}
                 >
                   <button
                     type="button"
@@ -972,61 +930,3 @@ function SidebarGroupItem({
   )
 }
 
-/**
- * Modal para confirmar close/delete de un split. Lista los chats que
- * están dentro del grupo para que el usuario los vea antes de decidir.
- * Los dos modos comparten UI; solo cambia el título, la copy y la
- * acción destructiva o no del botón principal.
- */
-function GroupConfirmDialog({
-  open,
-  mode,
-  label,
-  chats,
-  onCancel,
-  onConfirm
-}: {
-  open: boolean
-  mode: 'close' | 'delete'
-  label: string
-  chats: AgentSession[]
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  const isDelete = mode === 'delete'
-  const title = isDelete ? 'Delete split' : 'Close split'
-  const body = isDelete
-    ? `Eliminar el split "${label}" borra también todos los chats que viven dentro. Esta acción no se puede deshacer.`
-    : `Cerrar el split "${label}" quita la pestaña. Los chats de adentro no se borran — solo dejan de estar abiertos.`
-  return (
-    <Dialog open={open} onOpenChange={next => (next ? null : onCancel())}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{body}</DialogDescription>
-        </DialogHeader>
-        <div className="border-border/60 max-h-56 overflow-y-auto rounded-md border">
-          <ul className="divide-border/60 divide-y text-[13px]">
-            {chats.map(chat => (
-              <li key={chat.id} className="truncate px-3 py-2">
-                {chat.title || 'Untitled'}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            variant={isDelete ? 'destructive' : 'default'}
-            onClick={onConfirm}
-          >
-            {isDelete ? 'Delete' : 'Close'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}

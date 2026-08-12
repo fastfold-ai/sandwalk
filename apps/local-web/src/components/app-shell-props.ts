@@ -254,7 +254,6 @@ export type AppShellProps = {
   ) => string | null
   dissolveTabGroup: (groupId: string) => void
   closeTabGroup: (groupId: string) => void
-  deleteTabGroup: (groupId: string) => Promise<void>
   addChatToGroup: (groupId: string, chatId: string) => void
   removeChatFromGroup: (groupId: string, chatId: string) => number
   renameTabGroup: (groupId: string, name: string) => void

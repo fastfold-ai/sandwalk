@@ -53,7 +53,6 @@ type AppShellBridgeInput = {
   showChatSkeleton: boolean
   tabGroupsStore: ReturnType<typeof useAppTabGroups>
   closeTabGroup: (groupId: string) => void
-  deleteTabGroup: (groupId: string) => Promise<void>
   activeGroup: AppShellProps['activeGroup']
   perSessionBaseArgs: AppShellProps['perSessionBaseArgs']
   allSessions: AppShellProps['allSessions']
@@ -276,7 +275,6 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     createTabGroup: input.tabGroupsStore.createGroup,
     dissolveTabGroup: input.tabGroupsStore.dissolveGroup,
     closeTabGroup: input.closeTabGroup,
-    deleteTabGroup: input.deleteTabGroup,
     addChatToGroup: input.tabGroupsStore.addToGroup,
     removeChatFromGroup: input.tabGroupsStore.removeFromGroup,
     renameTabGroup: input.tabGroupsStore.renameGroup,

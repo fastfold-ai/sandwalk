@@ -139,7 +139,6 @@ export type AgentSessionMainPanelProps = {
   dissolveTabGroup: (groupId: string) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
   closeTabGroup: (groupId: string) => void
-  deleteTabGroup: (groupId: string) => Promise<void>
   selectedChatIds: Set<string>
   toggleSelectChat: (id: string) => void
   clearSelectChats: () => void
@@ -225,7 +224,6 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     dissolveTabGroup,
     setTabGroupColor,
     closeTabGroup,
-    deleteTabGroup,
     selectedChatIds,
     toggleSelectChat,
     clearSelectChats,
@@ -364,7 +362,6 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         onDissolveGroup={dissolveTabGroup}
         onSetGroupColor={setTabGroupColor}
         onCloseGroup={closeTabGroup}
-        onDeleteGroup={deleteTabGroup}
         selectedChatIds={selectedChatIds}
         onToggleSelectChat={toggleSelectChat}
         onClearSelection={clearSelectChats}

@@ -68,8 +68,6 @@ export function AppShell(props: AppShellProps) {
           onSelectTabGroup={props.onSelectTabGroup}
           onDissolveTabGroup={props.dissolveTabGroup}
           onSetTabGroupColor={props.setTabGroupColor}
-          onCloseTabGroup={props.closeTabGroup}
-          onDeleteTabGroup={props.deleteTabGroup}
           activeGroupChildId={props.activeGroup?.activeChatId ?? null}
           setTabGroupActiveChat={props.setTabGroupActiveChat}
           setCollapsedSidebarSections={props.setCollapsedSidebarSections}
@@ -257,7 +255,6 @@ export function AppShell(props: AppShellProps) {
           dissolveTabGroup={props.dissolveTabGroup}
           setTabGroupColor={props.setTabGroupColor}
           closeTabGroup={props.closeTabGroup}
-          deleteTabGroup={props.deleteTabGroup}
           selectedChatIds={props.selectedChatIds}
           toggleSelectChat={props.toggleSelectChat}
           clearSelectChats={props.clearSelectChats}
