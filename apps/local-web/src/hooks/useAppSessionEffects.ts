@@ -167,11 +167,17 @@ export function useAppSessionEffects({
   useEffect(() => {
     if (sessions.length === 0) return
     const existing = new Set(sessions.map(item => item.id))
+    const validGroupIds = new Set(tabGroups.map(g => g.id))
     setOpenTabsByProject(current => {
       let changed = false
       const next: Record<string, string[]> = {}
       for (const [key, ids] of Object.entries(current)) {
-        const filtered = ids.filter(id => existing.has(id))
+        // Un id se conserva si es un chat válido O un grp_ conocido.
+        // Antes este cleanup borraba TODOS los `grp_xxx` (no están en
+        // `sessions`) y los grupos desaparecían al primer render.
+        const filtered = ids.filter(
+          id => existing.has(id) || validGroupIds.has(id)
+        )
         if (filtered.length !== ids.length) changed = true
         if (filtered.length > 0) next[key] = filtered
         else if (ids.length > 0) changed = true
@@ -194,7 +200,7 @@ export function useAppSessionEffects({
       writeLastSessionByScope(next)
       return next
     })
-  }, [sessions])
+  }, [sessions, tabGroups])
 
   useEffect(() => {
     const listId =

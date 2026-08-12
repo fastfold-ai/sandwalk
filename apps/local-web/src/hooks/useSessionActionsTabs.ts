@@ -38,6 +38,10 @@ export function useSessionActionsTabs({
   const closeSessionTab = (id: string) => {
     const scopeProjectId = activeProjectId
     const tabIsInScope = (tabId: string) => {
+      // Los `grp_xxx` no son sesiones; se conservan siempre en el filtro
+      // por-scope (el filtrado real por proyecto de un grupo se hace más
+      // arriba en el `buildSessionSidebarModel`).
+      if (tabId.startsWith('grp_')) return true
       const item = sessions.find(session => session.id === tabId)
       if (!item) return false
       if (!scopeProjectId) return true
