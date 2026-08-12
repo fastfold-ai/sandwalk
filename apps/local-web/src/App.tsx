@@ -415,26 +415,15 @@ export default function App() {
   )
 
   /*
-   * Si el user navega a la ruta individual de un chat que en realidad
-   * vive dentro de un grupo, redirigimos a la ruta del grupo con ese
-   * chat como activo. Así la representación del chat sigue siendo la
-   * del split, no un tab suelto que ya no existe.
+   * Auto-redirect eliminado: causaba loop infinito de "Maximum update
+   * depth exceeded" porque `tabGroupsStore` re-referenciaba en cada
+   * render (efecto se auto-disparaba). El comportamiento equivalente
+   * ahora se maneja pasivamente: el chat suelto queda filtrado del
+   * strip y del sidebar, y `effectiveSessionId` sigue mostrando el
+   * grupo si `activeGroup` se resuelve. Si el user tiene la URL
+   * directa al chat individual, ve el split del grupo con ese chat
+   * activo — sin redirect.
    */
-  useEffect(() => {
-    if (!route.sessionId) return
-    if (!chatsInsideGroupIds.has(route.sessionId)) return
-    const group = tabGroupsStore.allTabGroups.find(g =>
-      g.chatIds.includes(route.sessionId!)
-    )
-    if (!group) return
-    tabGroupsStore.setGroupActiveChat(group.id, route.sessionId)
-    navigate(`/agents/${group.id}`, { replace: true })
-  }, [
-    route.sessionId,
-    chatsInsideGroupIds,
-    tabGroupsStore,
-    navigate
-  ])
 
   const { sections, openTabs } = buildSessionSidebarModel({
     sessions: bootstrap.sessions,
