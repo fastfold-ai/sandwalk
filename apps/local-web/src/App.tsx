@@ -213,33 +213,54 @@ export default function App() {
     }
   }, [selectedChatIds, createSplitGroup, navigate])
 
-  // Punto de entrada MVP para crear un grupo: "Split with next tab" agrupa
-  // el chat sobre el que se hizo click con el siguiente tab abierto (o el
-  // anterior, si es el último). Los pickers ricos (multi-select) vienen en
-  // Fase 3 completa; esto habilita testear el flujo end-to-end mientras
-  // tanto.
-  const handleSplitWithNextTab = useCallback(
+  /*
+   * "Create split view" desde el context menu de un chat: crea un grupo
+   * REAL con isPending=true (un solo chat + placeholder). El
+   * `ChatSplitContainer` pinta el chat A en el panel izquierdo y el
+   * picker en el derecho. Al elegir un compañero → promotePendingGroup
+   * agrega el chat y limpia el flag. Al cancelar (X del picker) →
+   * dissolveGroup elimina el grupo (chat A vuelve suelto).
+   */
+  const handleCreateSplitFromChat = useCallback(
     (sourceId: string) => {
-      const ids = tabs.openTabIds
-      const idx = ids.indexOf(sourceId)
-      if (idx < 0) return
-      // Prefer next; wrap to previous if the source is the last tab.
-      const partnerId =
-        ids
-          .slice(idx + 1)
-          .find(id => id !== sourceId && !id.startsWith('grp_')) ||
-        ids
-          .slice(0, idx)
-          .reverse()
-          .find(id => id !== sourceId && !id.startsWith('grp_'))
-      if (!partnerId) return
-      const groupId = createSplitGroup([sourceId, partnerId])
-      if (groupId) {
-        navigate(`/agents/${groupId}`)
-      }
+      const groupId = tabGroupsStore.createPendingGroup(sourceId)
+      if (groupId) navigate(`/agents/${groupId}`)
     },
-    [tabs.openTabIds, createSplitGroup, navigate]
+    [tabGroupsStore, navigate]
   )
+
+  const handlePickSplitPartner = useCallback(
+    (partnerId: string) => {
+      const groupId = route.sessionId
+      if (!groupId || !groupId.startsWith('grp_')) return
+      const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
+      if (!group || !group.isPending) return
+      const sourceId = group.chatIds[0]
+      if (sourceId === partnerId) return
+      // Boost la fecha del compañero como si el split se hubiera creado
+      // con los dos desde el principio — así el chat entrante también
+      // sube a Today (mismo comportamiento que createSplitGroup).
+      const now = new Date().toISOString()
+      setChatDateBoosts([partnerId], now)
+      bootstrap.setSessions(current =>
+        current.map(s =>
+          s.id === partnerId ? { ...s, lastMessageAt: now } : s
+        )
+      )
+      tabGroupsStore.promotePendingGroup(groupId, partnerId)
+    },
+    [route.sessionId, tabGroupsStore, bootstrap]
+  )
+
+  const handleCancelPendingSplit = useCallback(() => {
+    const groupId = route.sessionId
+    if (!groupId || !groupId.startsWith('grp_')) return
+    const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
+    if (!group || !group.isPending) return
+    const sourceId = group.chatIds[0]
+    tabGroupsStore.dissolveGroup(groupId)
+    if (sourceId) navigate(`/agents/${sourceId}`)
+  }, [route.sessionId, tabGroupsStore, navigate])
 
   /*
    * Close split (strip only): quita el chip de la strip del scope activo.
@@ -630,7 +651,9 @@ export default function App() {
           activeGroup,
           perSessionBaseArgs,
           allSessions: bootstrap.sessions,
-          onSplitWithNextTab: handleSplitWithNextTab,
+          onSplitWithNextTab: handleCreateSplitFromChat,
+          onPickSplitPartner: handlePickSplitPartner,
+          onCancelPendingSplit: handleCancelPendingSplit,
           closeTabGroup: handleCloseTabGroup,
           renameGroupTarget,
           renameGroupValue,

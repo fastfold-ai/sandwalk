@@ -62,6 +62,8 @@ type AppShellBridgeInput = {
   perSessionBaseArgs: AppShellProps['perSessionBaseArgs']
   allSessions: AppShellProps['allSessions']
   onSplitWithNextTab: AppShellProps['onSplitWithNextTab']
+  onPickSplitPartner: AppShellProps['onPickSplitPartner']
+  onCancelPendingSplit: AppShellProps['onCancelPendingSplit']
   selectedChatIds: AppShellProps['selectedChatIds']
   toggleSelectChat: AppShellProps['toggleSelectChat']
   clearSelectChats: AppShellProps['clearSelectChats']
@@ -297,6 +299,8 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     perSessionBaseArgs: input.perSessionBaseArgs,
     allSessions: input.allSessions,
     onSplitWithNextTab: input.onSplitWithNextTab,
+    onPickSplitPartner: input.onPickSplitPartner,
+    onCancelPendingSplit: input.onCancelPendingSplit,
     selectedChatIds: input.selectedChatIds,
     toggleSelectChat: input.toggleSelectChat,
     clearSelectChats: input.clearSelectChats,

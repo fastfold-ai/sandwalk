@@ -136,6 +136,8 @@ export type AgentSessionMainPanelProps = {
   setTabGroupActiveChat: (groupId: string, chatId: string) => void
   tabGroups: SessionGroup[]
   onSplitWithNextTab: (sourceId: string) => void
+  onPickSplitPartner: (partnerId: string) => void
+  onCancelPendingSplit: () => void
   dissolveTabGroup: (groupId: string) => void
   renameTabGroup: (group: SessionGroup) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
@@ -222,6 +224,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     setTabGroupActiveChat,
     tabGroups,
     onSplitWithNextTab,
+    onPickSplitPartner,
+    onCancelPendingSplit,
     dissolveTabGroup,
     renameTabGroup,
     setTabGroupColor,
@@ -316,6 +320,163 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   const showWorkspaceFiles =
     canShowFilesPanel && Boolean(workspaceSessionId) && (!isDraft || inProject)
 
+  // El picker vive DENTRO del ChatSplitContainer cuando el grupo activo
+  // está en modo pending (recién creado desde "Create split view").
+  // Ya no hay flow paralelo: el layout es el mismo del split real, sólo
+  // que un panel se pinta como picker en vez de un chat mount.
+
+  /*
+   * Builders del header/mount del panel de un split. Se extraen a
+   * callbacks reutilizables porque los usa tanto `ChatSplitContainer`
+   * (cuando ya hay un grupo real) como el modo picker (cuando armamos
+   * el layout visual del split antes de que exista el grupo). Reusarlos
+   * garantiza que Chat A se vea idéntico en ambos casos (mismo header,
+   * mismo composer embebido, mismos toggles smart).
+   */
+  const buildSplitHeaderProps = useCallback(
+    (chatId: string, focused: boolean, onFocusPanel: () => void) => {
+      const chatSession =
+        allSessions.find(item => item.id === chatId) || null
+      return {
+        session: chatSession,
+        focused,
+        onFocusPanel,
+        projects,
+        onSelectProjectScope: selectProjectScope,
+        showFiles: Boolean(chatSession) && !isDraftAgentSessionId(chatId),
+        showTerminal: false,
+        showPreview: Boolean(chatSession) && !isDraftAgentSessionId(chatId),
+        filesPanelCollapsed,
+        terminalOpen,
+        panelView,
+        onToggleFiles: () => {
+          const showingFilesHere =
+            focused && panelView === 'files' && !filesPanelCollapsed
+          if (showingFilesHere) {
+            setFilesPanelCollapsed(true)
+          } else {
+            setPanelView('files')
+            setFilesPanelCollapsed(false)
+          }
+        },
+        onToggleTerminal: () => {
+          if (focused && terminalOpen) {
+            setTerminalOpen(false)
+          } else {
+            setTerminalOpen(true)
+          }
+        },
+        onOpenPreview: () => {
+          const showingPreviewHere =
+            focused && panelView === 'preview' && !filesPanelCollapsed
+          if (showingPreviewHere) {
+            setFilesPanelCollapsed(true)
+          } else {
+            setPanelView('preview')
+            setFilesPanelCollapsed(false)
+          }
+        },
+        showCli: Boolean(chatSession) && !isDraftAgentSessionId(chatId),
+        onExport: (target: AgentSession) => void exportTranscript(target),
+        onRename: (target: AgentSession) => openRenameDialog(target),
+        onInspect: (target: AgentSession) =>
+          navigate(`/agents/${target.id}?inspect=1`),
+        onArchive: (target: AgentSession) =>
+          void updateSession(target, {
+            organizeLabel:
+              target.organizeLabel === 'archive' ? null : 'archive'
+          }),
+        onClose: (id: string) => closeSessionTab(id),
+        onCloseOthers: (id: string) => closeOtherSessionTabs(id),
+        onDelete: (target: AgentSession) => setDeleteTarget(target)
+      }
+    },
+    [
+      allSessions,
+      projects,
+      selectProjectScope,
+      filesPanelCollapsed,
+      terminalOpen,
+      panelView,
+      setFilesPanelCollapsed,
+      setTerminalOpen,
+      setPanelView,
+      exportTranscript,
+      openRenameDialog,
+      navigate,
+      updateSession,
+      closeSessionTab,
+      closeOtherSessionTabs,
+      setDeleteTarget
+    ]
+  )
+
+  const buildSplitMountProps = useCallback(
+    (chatId: string) => {
+      const chatSession =
+        allSessions.find(item => item.id === chatId) || null
+      return {
+        perSessionArgs: {
+          ...perSessionBaseArgs,
+          sessionId: chatId,
+          session: chatSession
+        },
+        shared: {
+          isInspect,
+          showChatSkeleton,
+          projects,
+          recentProjectIds,
+          onNewProject,
+          selectAllProjects,
+          selectProjectScope,
+          updateSession,
+          chatScrollRef,
+          chatEndRef,
+          expandedToolRunKeys,
+          runIdByMessageId,
+          usageByRunId,
+          copiedMessageId,
+          setCopiedMessageId,
+          liveDelta,
+          showScrollToBottom,
+          scrollChatToBottom,
+          patchChat,
+          ensureWorkspaceForMentions,
+          navigate,
+          client,
+          error
+        }
+      }
+    },
+    [
+      allSessions,
+      perSessionBaseArgs,
+      isInspect,
+      showChatSkeleton,
+      projects,
+      recentProjectIds,
+      onNewProject,
+      selectAllProjects,
+      selectProjectScope,
+      updateSession,
+      chatScrollRef,
+      chatEndRef,
+      expandedToolRunKeys,
+      runIdByMessageId,
+      usageByRunId,
+      copiedMessageId,
+      setCopiedMessageId,
+      liveDelta,
+      showScrollToBottom,
+      scrollChatToBottom,
+      patchChat,
+      ensureWorkspaceForMentions,
+      navigate,
+      client,
+      error
+    ]
+  )
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       {/*
@@ -393,122 +554,14 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
               onFocusChat={chatId => {
                 setTabGroupActiveChat(activeGroup.id, chatId)
               }}
-              buildHeaderProps={(chatId, focused, onFocusPanel) => {
-                const chatSession =
-                  allSessions.find(item => item.id === chatId) || null
-                return {
-                  session: chatSession,
-                  focused,
-                  onFocusPanel,
-                  projects,
-                  onSelectProjectScope: selectProjectScope,
-                  showFiles:
-                    Boolean(chatSession) &&
-                    !isDraftAgentSessionId(chatId),
-                  // Terminal se muestra siempre por debajo de Files y no
-                  // ofrece control de cerrarla — el botón queda oculto por
-                  // ahora hasta que definamos la UX del terminal en split.
-                  showTerminal: false,
-                  showPreview:
-                    Boolean(chatSession) &&
-                    !isDraftAgentSessionId(chatId),
-                  filesPanelCollapsed,
-                  terminalOpen,
-                  panelView,
-                  /*
-                   * Toggles "smart" — cada click en Files/Preview/Terminal
-                   * de un panel del split debe hacer que el sidebar derecho
-                   * quede apuntando al chat que se clickeó, sin importar en
-                   * cuál estaba antes. `withFocus` en el header ya movió el
-                   * foco (activeChatId → chatId), así que acá solo decidimos
-                   * si el usuario quiso CERRAR (segundo click sobre lo ya
-                   * abierto de este chat) o ABRIR/CAMBIAR (todo lo demás).
-                   */
-                  onToggleFiles: () => {
-                    const showingFilesHere =
-                      focused &&
-                      panelView === 'files' &&
-                      !filesPanelCollapsed
-                    if (showingFilesHere) {
-                      setFilesPanelCollapsed(true)
-                    } else {
-                      setPanelView('files')
-                      setFilesPanelCollapsed(false)
-                    }
-                  },
-                  onToggleTerminal: () => {
-                    if (focused && terminalOpen) {
-                      setTerminalOpen(false)
-                    } else {
-                      setTerminalOpen(true)
-                    }
-                  },
-                  onOpenPreview: () => {
-                    const showingPreviewHere =
-                      focused &&
-                      panelView === 'preview' &&
-                      !filesPanelCollapsed
-                    if (showingPreviewHere) {
-                      setFilesPanelCollapsed(true)
-                    } else {
-                      setPanelView('preview')
-                      setFilesPanelCollapsed(false)
-                    }
-                  },
-                  showCli:
-                    Boolean(chatSession) &&
-                    !isDraftAgentSessionId(chatId),
-                  onExport: target => void exportTranscript(target),
-                  onRename: target => openRenameDialog(target),
-                  onInspect: target =>
-                    navigate(`/agents/${target.id}?inspect=1`),
-                  onArchive: target =>
-                    void updateSession(target, {
-                      organizeLabel:
-                        target.organizeLabel === 'archive'
-                          ? null
-                          : 'archive'
-                    }),
-                  onClose: id => closeSessionTab(id),
-                  onCloseOthers: id => closeOtherSessionTabs(id),
-                  onDelete: target => setDeleteTarget(target)
-                }
-              }}
-              buildMountProps={chatId => {
-                const chatSession =
-                  allSessions.find(item => item.id === chatId) || null
-                return {
-                  perSessionArgs: {
-                    ...perSessionBaseArgs,
-                    sessionId: chatId,
-                    session: chatSession
-                  },
-                  shared: {
-                    isInspect,
-                    showChatSkeleton,
-                    projects,
-                    recentProjectIds,
-                    onNewProject,
-                    selectAllProjects,
-                    selectProjectScope,
-                    updateSession,
-                    chatScrollRef,
-                    chatEndRef,
-                    expandedToolRunKeys,
-                    runIdByMessageId,
-                    usageByRunId,
-                    copiedMessageId,
-                    setCopiedMessageId,
-                    liveDelta,
-                    showScrollToBottom,
-                    scrollChatToBottom,
-                    patchChat,
-                    ensureWorkspaceForMentions,
-                    navigate,
-                    client,
-                    error
-                  }
-                }
+              buildHeaderProps={buildSplitHeaderProps}
+              buildMountProps={buildSplitMountProps}
+              pickerContext={{
+                client,
+                activeProjectId,
+                allTabGroups: tabGroups,
+                onPickPartner: onPickSplitPartner,
+                onCancelPending: onCancelPendingSplit
               }}
             />
           ) : (

@@ -788,12 +788,20 @@ function SidebarGroupItem({
             onClick={() => onSelectGroup?.(group.id)}
           >
             <Columns2 className="size-3.5 shrink-0" aria-hidden />
-            <span
-              className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
-              aria-label={`${chatCount} chats`}
-            >
-              {chatCount}
-            </span>
+            {/*
+              Badge de conteo solo cuando el split ya está armado.
+              Mientras está pending (1 chat + picker abierto), no lo
+              mostramos — decir "1" confunde: el split todavía se está
+              creando.
+            */}
+            {!group.isPending ? (
+              <span
+                className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
+                aria-label={`${chatCount} chats`}
+              >
+                {chatCount}
+              </span>
+            ) : null}
             {group.color ? (
               <span
                 className="size-2 shrink-0 rounded-full border border-black/10"

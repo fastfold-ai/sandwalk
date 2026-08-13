@@ -182,13 +182,19 @@ export function readTabGroups(): SessionGroup[] {
     if (raw) {
       const parsed = JSON.parse(raw) as unknown
       if (Array.isArray(parsed)) {
-        return parsed.filter(
-          (item): item is SessionGroup =>
-            !!item &&
-            typeof item === 'object' &&
-            typeof (item as SessionGroup).id === 'string' &&
-            Array.isArray((item as SessionGroup).chatIds)
-        )
+        return parsed
+          .filter(
+            (item): item is SessionGroup =>
+              !!item &&
+              typeof item === 'object' &&
+              typeof (item as SessionGroup).id === 'string' &&
+              Array.isArray((item as SessionGroup).chatIds)
+          )
+          // Los pending groups son estado UI efímero (mientras el usuario
+          // arma el split desde el picker). No los persistimos entre
+          // sesiones — al recargar se descartan y el chat de origen
+          // vuelve suelto naturalmente.
+          .filter(g => !g.isPending)
       }
     }
     // Fallback: migrar desde el schema por-proyecto (aplanado + dedupe).

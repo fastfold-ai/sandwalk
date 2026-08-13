@@ -560,6 +560,13 @@ export type SessionGroup = {
   chatIds: string[]
   /** Which chat inside the split has focus (composer visible, side panel bound). */
   activeChatId: string
+  /**
+   * Pending group: recién creado desde "Create split view", todavía sólo
+   * tiene 1 chatId (el de origen). El segundo panel se pinta como picker
+   * hasta que el usuario elige el chat compañero. Al elegirlo, el flag
+   * se limpia y el grupo pasa a ser un split real de 2+ chats.
+   */
+  isPending?: boolean
 }
 
 /** True for tab-strip ids that identify a group instead of a chat session. */

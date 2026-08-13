@@ -273,6 +273,8 @@ export type AppShellProps = {
   >
   allSessions: AgentSession[]
   onSplitWithNextTab: (sourceId: string) => void
+  onPickSplitPartner: (partnerId: string) => void
+  onCancelPendingSplit: () => void
   selectedChatIds: Set<string>
   toggleSelectChat: (id: string) => void
   clearSelectChats: () => void

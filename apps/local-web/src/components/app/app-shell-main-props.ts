@@ -212,6 +212,8 @@ export type AppShellMainProps = {
   setTabGroupActiveChat: (groupId: string, chatId: string) => void
   tabGroups: SessionGroup[]
   onSplitWithNextTab: (sourceId: string) => void
+  onPickSplitPartner: (partnerId: string) => void
+  onCancelPendingSplit: () => void
   dissolveTabGroup: (groupId: string) => void
   renameTabGroup: (group: SessionGroup) => void
   setTabGroupColor: (groupId: string, color: string | null) => void

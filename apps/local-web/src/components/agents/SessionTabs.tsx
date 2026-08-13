@@ -465,7 +465,9 @@ export function SessionTabs({
                     onContextMenu={openContextMenu}
                     selected={selectedChatIds?.has(group.id) ?? false}
                     variant="group"
-                    groupCount={group.chatIds.length}
+                    groupCount={
+                      group.isPending ? undefined : group.chatIds.length
+                    }
                   />
                 )
               })}
@@ -667,7 +669,7 @@ export function SessionTabs({
                                 aria-hidden
                               />
                             ) : null}
-                            {isGroup ? (
+                            {isGroup && !group!.isPending ? (
                               <span
                                 className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
                                 aria-label={`${group!.chatIds.length} chats`}
@@ -793,12 +795,12 @@ export function SessionTabs({
             }
             onClick={() => runAction(() => onArchive(menuSession))}
           />
-          {onSplitWith && tabs.length >= 2 ? (
+          {onSplitWith ? (
             <>
               <TabContextSeparator />
               <TabContextItem
                 icon={<Columns2 className="size-3.5" />}
-                label="Split with next tab"
+                label="Create split view"
                 onClick={() => runAction(() => onSplitWith(menuSession.id))}
               />
             </>

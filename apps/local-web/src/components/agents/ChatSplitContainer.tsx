@@ -1,8 +1,11 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentProject,
   AgentSession,
   SessionGroup
 } from '@sandwalk/agent-ui-core'
+import { X } from 'lucide-react'
+import { useState } from 'react'
 
 import {
   ChatSplitPanelHeader,
@@ -12,6 +15,7 @@ import {
   SessionChatMount,
   type SessionChatMountProps
 } from '@/components/agents/SessionChatMount'
+import { SplitChatPickerPanel } from '@/components/agents/SplitChatPickerPanel'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -54,6 +58,19 @@ export type ChatSplitContainerProps = {
     onFocusPanel: () => void
   ) => ChatSplitPanelHeaderProps
   projects: AgentProject[]
+  /**
+   * Contexto y callbacks del picker — sólo se usa cuando el grupo está en
+   * modo pending (creado desde "Create split view", falta elegir el
+   * segundo chat). Cuando falta, un panel del split se pinta como el
+   * `SplitChatPickerPanel` en vez de un chat.
+   */
+  pickerContext?: {
+    client: LocalAgentClient
+    activeProjectId: string | null
+    allTabGroups: SessionGroup[]
+    onPickPartner: (chatId: string) => void
+    onCancelPending: () => void
+  }
 }
 
 export function ChatSplitContainer({
@@ -61,26 +78,48 @@ export function ChatSplitContainer({
   sessions,
   buildMountProps,
   onFocusChat,
-  buildHeaderProps
+  buildHeaderProps,
+  projects,
+  pickerContext
 }: ChatSplitContainerProps) {
   const chatIds = group.chatIds
   const activeChatId = group.activeChatId
+  const isPending = Boolean(group.isPending)
+
+  // Cuando el usuario está armando un split, la card del picker se
+  // comporta como un panel más: hover ring cuando pasa el mouse,
+  // border-primary/60 cuando la clickea (pasa a "focused"). Al hacer
+  // click en el chat A el picker pierde el foco. Sólo puede haber una
+  // card focused a la vez, como en un split real.
+  const [pickerFocused, setPickerFocused] = useState(false)
 
   if (chatIds.length === 0) return null
+
+  // En modo pending, agregamos un slot "picker" al final del split.
+  // Ese slot NO es un chat — es el SplitChatPickerPanel para elegir el
+  // segundo compañero. Al elegir, `promotePendingGroup` en el store
+  // agrega el chat al grupo y limpia el flag, y este mismo layout
+  // renderiza los dos paneles de chat sin salto visual.
+  const totalPanels = isPending ? chatIds.length + 1 : chatIds.length
 
   return (
     <ResizablePanelGroup
       direction="horizontal"
       className="min-h-0 min-w-0 flex-1 gap-2 p-2"
-      autoSaveId={`fastfold.split-group-${group.id}`}
+      autoSaveId={
+        isPending ? undefined : `fastfold.split-group-${group.id}`
+      }
     >
       {chatIds.map((chatId, index) => {
-        const isFocused = chatId === activeChatId
-        const isLast = index === chatIds.length - 1
+        // El chat es focused si es el activeChatId Y el picker no está
+        // focused (solo puede haber uno con foco visual).
+        const isFocused = chatId === activeChatId && !pickerFocused
+        const isLast = index === totalPanels - 1
         const props = buildMountProps(chatId)
         const chatSession = sessions.find(s => s.id === chatId) || null
         const focusPanel = () => {
-          if (!isFocused) onFocusChat(chatId)
+          if (pickerFocused) setPickerFocused(false)
+          if (chatId !== activeChatId) onFocusChat(chatId)
         }
         const headerProps = buildHeaderProps(chatId, isFocused, focusPanel)
         return (
@@ -96,11 +135,72 @@ export function ChatSplitContainer({
           />
         )
       })}
+      {isPending && pickerContext ? (
+        <ResizablePanel
+          id={`split-picker-${group.id}`}
+          order={999}
+          defaultSize={100}
+          minSize={20}
+          className="min-w-0"
+        >
+          {/*
+            Card EXTERIOR del picker: mismos estados visuales que un
+            SplitFragment — focused (border-primary/60) cuando el usuario
+            está interactuando con el picker, hover ring en otro caso.
+            Sólo puede haber una card focused a la vez: al clickear el
+            picker, el chat A pierde el focus y viceversa. La X arriba
+            a la derecha cancela el pending group entero.
+          */}
+          <div
+            className={cn(
+              'bg-background relative flex h-full min-w-0 flex-col overflow-hidden rounded-lg border transition-[border-color] duration-300 ease-out',
+              pickerFocused
+                ? 'border-primary/60'
+                : 'border-border/50 hover:ring-2 hover:ring-inset hover:ring-muted-foreground/25'
+            )}
+            onMouseDownCapture={() => {
+              if (!pickerFocused) setPickerFocused(true)
+            }}
+            onFocusCapture={() => {
+              if (!pickerFocused) setPickerFocused(true)
+            }}
+          >
+            <button
+              type="button"
+              onClick={pickerContext.onCancelPending}
+              aria-label="Cancel split"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted absolute right-2 top-2 z-10 inline-flex size-7 items-center justify-center rounded-md"
+            >
+              <X className="size-4" />
+            </button>
+            {/*
+              Layout centrado: título "Elegí un chat…" arriba libre
+              (fuera de la caja del widget) y el picker debajo. Ambos
+              centrados horizontalmente en la card exterior. Un gap
+              vertical los mantiene alineados como un mensaje +
+              formulario.
+            */}
+            <div className="flex h-full min-h-0 min-w-0 flex-col items-center justify-center gap-3 overflow-hidden p-4">
+              <h2 className="text-foreground shrink-0 text-center text-[14px] font-medium">
+                Pick a chat for the split
+              </h2>
+              <SplitChatPickerPanel
+                client={pickerContext.client}
+                sourceChatId={chatIds[0]}
+                activeProjectId={pickerContext.activeProjectId}
+                projects={projects}
+                allTabGroups={pickerContext.allTabGroups}
+                onPick={pickerContext.onPickPartner}
+              />
+            </div>
+          </div>
+        </ResizablePanel>
+      ) : null}
     </ResizablePanelGroup>
   )
 }
 
-function SplitFragment({
+export function SplitFragment({
   chatId,
   isFocused,
   isLast,

@@ -109,7 +109,10 @@ export function useAppTabGroups(
 
   const createGroup = useCallback(
     (chatIds: string[], overrides?: Partial<SessionGroup>): string | null => {
-      if (chatIds.length < 2) return null
+      // Un grupo pending puede arrancar con 1 chat (el picker ocupa el
+      // segundo panel); un grupo normal necesita al menos 2.
+      const minSize = overrides?.isPending ? 1 : 2
+      if (chatIds.length < minSize) return null
       const id = overrides?.id ?? generateGroupId()
       const name =
         overrides?.name && overrides.name.trim().length > 0
@@ -121,7 +124,8 @@ export function useAppTabGroups(
         color: overrides?.color ?? null,
         pinned: overrides?.pinned ?? false,
         chatIds,
-        activeChatId: overrides?.activeChatId ?? chatIds[0]
+        activeChatId: overrides?.activeChatId ?? chatIds[0],
+        isPending: overrides?.isPending
       }
       patchGroups(current => [...current, group])
       setOpenTabIds(current => {
@@ -134,6 +138,61 @@ export function useAppTabGroups(
       return id
     },
     [patchGroups, setOpenTabIds, allTabGroups]
+  )
+
+  /**
+   * "Create split view" desde un chat: crea un grupo pending con ese
+   * único chat. El segundo panel se pinta como picker hasta que el
+   * usuario elija su compañero (ver `promotePendingGroup`) o cancele
+   * (ver `dissolveGroup`).
+   *
+   * Antes de crear, se cancelan los pending anteriores — solo puede
+   * haber uno "en armado" a la vez. Los pending son estado UI efímero;
+   * dejar varios cargados confunde y ensucia la strip.
+   */
+  const createPendingGroup = useCallback(
+    (sourceChatId: string): string | null => {
+      const priorPending = allTabGroups.filter(g => g.isPending)
+      if (priorPending.length > 0) {
+        patchGroups(current => current.filter(g => !g.isPending))
+        setOpenTabIds(current =>
+          current.filter(id => !priorPending.some(g => g.id === id))
+        )
+      }
+      return createGroup([sourceChatId], { isPending: true })
+    },
+    [allTabGroups, patchGroups, setOpenTabIds, createGroup]
+  )
+
+  /**
+   * Cierra el estado pending del grupo: agrega el chat elegido y limpia
+   * el flag. Si el chat elegido ya vive en otro grupo, se lo saca de
+   * ahí primero (un chat solo puede estar en un grupo).
+   */
+  const promotePendingGroup = useCallback(
+    (groupId: string, partnerChatId: string) => {
+      patchGroups(current => {
+        // Sacar partnerChatId de cualquier otro grupo donde viva.
+        const scrubbed = current.map(g =>
+          g.id !== groupId && g.chatIds.includes(partnerChatId)
+            ? { ...g, chatIds: g.chatIds.filter(id => id !== partnerChatId) }
+            : g
+        )
+        return scrubbed.map(g => {
+          if (g.id !== groupId) return g
+          const nextChatIds = g.chatIds.includes(partnerChatId)
+            ? g.chatIds
+            : [...g.chatIds, partnerChatId]
+          return {
+            ...g,
+            chatIds: nextChatIds,
+            isPending: false
+          }
+        })
+      })
+      setOpenTabIds(current => current.filter(id => id !== partnerChatId))
+    },
+    [patchGroups, setOpenTabIds]
   )
 
   /**
@@ -323,6 +382,8 @@ export function useAppTabGroups(
     allTabGroups,
     chatProjectById,
     createGroup,
+    createPendingGroup,
+    promotePendingGroup,
     dissolveGroup,
     addToGroup,
     removeFromGroup,
