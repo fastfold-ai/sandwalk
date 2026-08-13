@@ -1009,8 +1009,8 @@ pub fn install_app_menu(app: &AppHandle) -> Result<(), String> {
 
     // First submenu becomes the macOS app menu (named "Sandwalk" by the OS).
     // Without this, File is absorbed and disappears from the menu bar.
-    // Native About panel (orderFrontStandardAboutPanel) — same window chrome
-    // Unsloth uses (traffic lights), not an in-webview modal.
+    // Native About panel (orderFrontStandardAboutPanel) — traffic-light
+    // window chrome, not an in-webview modal.
     let about_icon = Image::from_bytes(ABOUT_ICON_PNG)
         .ok()
         .or_else(|| app.default_window_icon().cloned());
