@@ -67,6 +67,7 @@ export function AppShell(props: AppShellProps) {
           canBatchSplitView={props.canSplitFromSidebar}
           onSelectTabGroup={props.onSelectTabGroup}
           onRenameTabGroup={props.onRenameTabGroup}
+          onGoToChatProject={props.onGoToChatProject}
           onDissolveTabGroup={props.dissolveTabGroup}
           onSetTabGroupColor={props.setTabGroupColor}
           activeGroupChildId={props.activeGroup?.activeChatId ?? null}

@@ -305,6 +305,10 @@ export function SessionMainHeader({
                 item.organizeLabel === 'archive' ? null : 'archive'
             })
           }
+          onMoveToProject={(item, projectId) =>
+            void updateSession(item, { projectId })
+          }
+          projects={projects}
           onDelete={item => setDeleteTarget(item)}
           onCreateSession={
             createSession ? () => void createSession(activeProjectId) : undefined

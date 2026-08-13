@@ -14,7 +14,8 @@ export const PROJECT_SCOPE_STORAGE_KEY = 'fastfold.project-scope-id'
 export const LAST_SESSION_BY_SCOPE_KEY = 'fastfold.last-session-by-scope'
 export const RECENT_PROJECT_IDS_STORAGE_KEY = 'fastfold.recent-project-ids'
 export const SIDEBAR_SECTIONS_COLLAPSED_KEY = 'fastfold.sidebar-sections-collapsed'
-export const TAB_GROUPS_STORAGE_KEY = 'fastfold.tab-groups-by-project'
+export const TAB_GROUPS_LEGACY_KEY = 'fastfold.tab-groups-by-project'
+export const TAB_GROUPS_STORAGE_KEY = 'fastfold.tab-groups'
 
 export function projectTabsKey(projectId: string | null | undefined) {
   return projectId || ALL_PROJECTS_TABS_KEY
@@ -165,42 +166,66 @@ export function writeCollapsedSidebarSections(value: Record<string, boolean>) {
 }
 
 /**
- * Read the persisted tab groups per project scope. Groups are strictly a UI
- * preference (how the user arranges tabs into split views), not chat data.
- * Chat sessions themselves live on the backend.
+ * Read the persisted tab groups. Groups are strictly a UI preference (how
+ * the user arranges tabs into split views), not chat data — los chats
+ * viven en el server. A partir de la migración multi-proyecto, los grupos
+ * viven en una lista plana única en vez de por scope de proyecto: el
+ * grupo se muestra en cada proyecto donde tenga al menos un chat.
+ *
+ * Compatibilidad: si existe la key vieja `tab-groups-by-project`, se
+ * aplana (unimos todos los grupos deduplicados por id) y se retorna. La
+ * migración efectiva a la nueva key ocurre al primer `writeTabGroups`.
  */
-export function readTabGroupsByProject(): Record<string, SessionGroup[]> {
+export function readTabGroups(): SessionGroup[] {
   try {
     const raw = localStorage.getItem(TAB_GROUPS_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as unknown
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (item): item is SessionGroup =>
+            !!item &&
+            typeof item === 'object' &&
+            typeof (item as SessionGroup).id === 'string' &&
+            Array.isArray((item as SessionGroup).chatIds)
+        )
+      }
+    }
+    // Fallback: migrar desde el schema por-proyecto (aplanado + dedupe).
+    const legacy = localStorage.getItem(TAB_GROUPS_LEGACY_KEY)
+    if (!legacy) return []
+    const parsed = JSON.parse(legacy) as unknown
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {}
+      return []
     }
-    const result: Record<string, SessionGroup[]> = {}
-    for (const [key, value] of Object.entries(
-      parsed as Record<string, unknown>
-    )) {
+    const seen = new Set<string>()
+    const flat: SessionGroup[] = []
+    for (const value of Object.values(parsed as Record<string, unknown>)) {
       if (!Array.isArray(value)) continue
-      result[key] = value.filter(
-        (item): item is SessionGroup =>
-          !!item &&
-          typeof item === 'object' &&
-          typeof (item as SessionGroup).id === 'string' &&
-          Array.isArray((item as SessionGroup).chatIds)
-      )
+      for (const item of value) {
+        if (
+          !item ||
+          typeof item !== 'object' ||
+          typeof (item as SessionGroup).id !== 'string' ||
+          !Array.isArray((item as SessionGroup).chatIds)
+        ) {
+          continue
+        }
+        const g = item as SessionGroup
+        if (seen.has(g.id)) continue
+        seen.add(g.id)
+        flat.push(g)
+      }
     }
-    return result
+    return flat
   } catch {
-    return {}
+    return []
   }
 }
 
-export function writeTabGroupsByProject(
-  map: Record<string, SessionGroup[]>
-) {
+export function writeTabGroups(groups: SessionGroup[]) {
   try {
-    localStorage.setItem(TAB_GROUPS_STORAGE_KEY, JSON.stringify(map))
+    localStorage.setItem(TAB_GROUPS_STORAGE_KEY, JSON.stringify(groups))
   } catch {
     // ignore storage failures
   }

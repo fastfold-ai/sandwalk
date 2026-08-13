@@ -70,6 +70,7 @@ type AppShellBridgeInput = {
   canSplitFromSidebar: AppShellProps['canSplitFromSidebar']
   onSelectTabGroup: AppShellProps['onSelectTabGroup']
   onRenameTabGroup: AppShellProps['onRenameTabGroup']
+  onGoToChatProject: AppShellProps['onGoToChatProject']
 }
 
 export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
@@ -303,6 +304,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     createSplitFromSidebar: input.createSplitFromSidebar,
     canSplitFromSidebar: input.canSplitFromSidebar,
     onSelectTabGroup: input.onSelectTabGroup,
-    onRenameTabGroup: input.onRenameTabGroup
+    onRenameTabGroup: input.onRenameTabGroup,
+    onGoToChatProject: input.onGoToChatProject
   }
 }

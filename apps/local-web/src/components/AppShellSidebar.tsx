@@ -73,8 +73,7 @@ export type AppShellSidebarProps = {
   onRenameTabGroup?: (group: SessionGroup) => void
   onDissolveTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
-  onCloseTabGroup?: (groupId: string) => void
-  onDeleteTabGroup?: (groupId: string) => void
+  onGoToChatProject?: (chat: AgentSession) => void
   activeGroupChildId?: string | null
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   setCollapsedSidebarSections: (
@@ -150,8 +149,7 @@ export function AppShellSidebar({
   onRenameTabGroup,
   onDissolveTabGroup,
   onSetTabGroupColor,
-  onCloseTabGroup,
-  onDeleteTabGroup,
+  onGoToChatProject,
   activeGroupChildId,
   setTabGroupActiveChat,
   setCollapsedSidebarSections,
@@ -251,8 +249,7 @@ export function AppShellSidebar({
             onRenameTabGroup={onRenameTabGroup}
             onDissolveTabGroup={onDissolveTabGroup}
             onSetTabGroupColor={onSetTabGroupColor}
-            onCloseTabGroup={onCloseTabGroup}
-            onDeleteTabGroup={onDeleteTabGroup}
+            onGoToChatProject={onGoToChatProject}
             activeGroupChildId={activeGroupChildId}
             setTabGroupActiveChat={setTabGroupActiveChat}
             setCollapsedSidebarSections={setCollapsedSidebarSections}

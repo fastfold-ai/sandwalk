@@ -70,8 +70,7 @@ type AgentSessionSidebarProps = {
   onRenameTabGroup?: (group: SessionGroup) => void
   onDissolveTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
-  onCloseTabGroup?: (groupId: string) => void
-  onDeleteTabGroup?: (groupId: string) => void
+  onGoToChatProject?: (chat: AgentSession) => void
   activeGroupChildId?: string | null
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   setCollapsedSidebarSections: Dispatch<SetStateAction<Record<string, boolean>>>
@@ -127,8 +126,7 @@ export function AgentSessionSidebar({
   onRenameTabGroup,
   onDissolveTabGroup,
   onSetTabGroupColor,
-  onCloseTabGroup,
-  onDeleteTabGroup,
+  onGoToChatProject,
   activeGroupChildId,
   setTabGroupActiveChat,
   setCollapsedSidebarSections,
@@ -286,8 +284,8 @@ export function AgentSessionSidebar({
         onRenameTabGroup={onRenameTabGroup}
         onDissolveTabGroup={onDissolveTabGroup}
         onSetTabGroupColor={onSetTabGroupColor}
-        onCloseTabGroup={onCloseTabGroup}
-        onDeleteTabGroup={onDeleteTabGroup}
+        activeProjectId={activeProjectId}
+        onGoToChatProject={onGoToChatProject}
         activeGroupChildId={activeGroupChildId}
         setTabGroupActiveChat={setTabGroupActiveChat}
       />

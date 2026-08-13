@@ -1,4 +1,8 @@
-import type { AgentSession, SessionGroup } from '@sandwalk/agent-ui-core'
+import type {
+  AgentProject,
+  AgentSession,
+  SessionGroup
+} from '@sandwalk/agent-ui-core'
 import {
   closestCenter,
   DndContext,
@@ -22,6 +26,7 @@ import {
   CircleX,
   Columns2,
   Download,
+  Folder,
   Pencil,
   Pin,
   Plus,
@@ -56,6 +61,7 @@ import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
+import { ProjectPicker } from './ProjectPicker'
 import { SessionStatusIcon } from './SessionStatusIcon'
 import { useSessionTabColors } from './session-tab-colors'
 import { SessionTab } from './SessionTab'
@@ -89,6 +95,8 @@ export function SessionTabs({
   onExport,
   onInspect,
   onArchive,
+  onMoveToProject,
+  projects,
   onDelete,
   onCreateSession,
   groups,
@@ -122,6 +130,8 @@ export function SessionTabs({
   onExport: (session: AgentSession) => void
   onInspect: (session: AgentSession) => void
   onArchive: (session: AgentSession) => void
+  onMoveToProject?: (session: AgentSession, projectId: string | null) => void
+  projects?: AgentProject[]
   onDelete: (session: AgentSession) => void
   /** Opens a fresh draft agent session (only persists on first message). */
   onCreateSession?: () => void
@@ -730,6 +740,26 @@ export function SessionTabs({
             label={menuSession.organizeLabel === 'pinned' ? 'Unpin' : 'Pin'}
             onClick={() => runAction(() => onTogglePin(menuSession))}
           />
+          {onMoveToProject && projects ? (
+            <ProjectPicker
+              projects={projects}
+              value={menuSession.projectId}
+              noneLabel="No project"
+              trigger={
+                <button
+                  type="button"
+                  className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                >
+                  <Folder className="size-3.5" />
+                  Move to project…
+                </button>
+              }
+              onChange={projectId => {
+                onMoveToProject(menuSession, projectId)
+                setMenu(null)
+              }}
+            />
+          ) : null}
           <TabContextSeparator />
           <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
             Color

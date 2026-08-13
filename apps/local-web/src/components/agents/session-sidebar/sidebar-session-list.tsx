@@ -1,11 +1,18 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import {
+  Archive,
+  ArrowUpRight,
   Check,
   ChevronDown,
   Columns2,
+  Download,
+  Folder,
   MoreHorizontal,
-  Pin
+  Pencil,
+  Pin,
+  Search,
+  Trash2
 } from 'lucide-react'
 import {
   type Dispatch,
@@ -18,6 +25,7 @@ import {
 } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
+import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
 import { GroupDissolveDialog } from '@/components/agents/SessionTabs'
@@ -137,7 +145,12 @@ function SidebarMarqueeTitle({ text }: { text: string }) {
     >
       <span
         ref={textRef}
-        className="text-foreground/90 group-hover:text-foreground inline-block whitespace-nowrap text-[13px] leading-snug will-change-transform"
+        // `leading-4` (16px) alinea la altura de la caja del título con la
+        // del ícono de status (size-3.5 = 14px) + timestamp: con items-center
+        // en el row, la diferencia visual entre las cajas queda mínima y el
+        // glifo del texto se percibe en la misma guía horizontal. Con
+        // `leading-snug` (1.375 = 17.9px) el texto se veía un pelo arriba.
+        className="text-foreground/90 group-hover:text-foreground inline-block whitespace-nowrap text-[13px] leading-4 will-change-transform"
         style={{
           transform:
             hovering && overflow > 0
@@ -188,6 +201,14 @@ export type SidebarSessionListProps = {
   onDissolveTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
   /**
+   * Proyecto activo en el shell. Sirve para clasificar los chats hijos
+   * de un split como "nativos" (mismo proyecto) o "invitados" (otro).
+   * En "All projects" (null) todos son nativos.
+   */
+  activeProjectId: string | null
+  /** Cambia el scope al proyecto natal del chat y navega hacia él. */
+  onGoToChatProject?: (chat: AgentSession) => void
+  /**
    * ID del chat focused dentro del grupo activo (si hay). Sirve para
    * pintar en el sidebar cuál chat del split está activo — no solo el
    * grupo. Cuando no estás en un grupo, es null.
@@ -226,6 +247,8 @@ export function SidebarSessionList({
   onRenameTabGroup,
   onDissolveTabGroup,
   onSetTabGroupColor,
+  activeProjectId,
+  onGoToChatProject,
   activeGroupChildId,
   setTabGroupActiveChat
 }: SidebarSessionListProps) {
@@ -319,11 +342,19 @@ export function SidebarSessionList({
                  * los split view groups — se destacan más y no compiten
                  * con los chevrones de sección.
                  */}
-                <div className="text-muted-foreground/80 flex w-full items-center gap-1 rounded-md px-2 py-0.5 text-left text-[12px]">
-                  <span className="min-w-0 flex-1 truncate">
+                <div className="text-muted-foreground/80 flex w-full items-center gap-1.5 rounded-md px-2 py-0.5 text-left text-[12px]">
+                  <span className="min-w-0 truncate">
                     {section.title}
                   </span>
-                  <span className="sandwalk-notification-count text-muted-foreground/60 shrink-0 text-[11px] tabular-nums">
+                  {/*
+                    Badge con el mismo estilo que el conteo de chats en los
+                    split-view tabs — pegado al título para que se lea como
+                    "cuántos hay en esta sección", no como una nota suelta.
+                  */}
+                  <span
+                    className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
+                    aria-label={`${section.items.length} items`}
+                  >
                     {section.items.length}
                   </span>
                 </div>
@@ -345,6 +376,8 @@ export function SidebarSessionList({
                             onRenameGroup={onRenameTabGroup}
                             onDissolveGroup={onDissolveTabGroup}
                             onSetGroupColor={onSetTabGroupColor}
+                            activeProjectId={activeProjectId}
+                            onGoToChatProject={onGoToChatProject}
                             projects={projects}
                             navigate={navigate}
                             setTabColor={setTabColor}
@@ -377,7 +410,7 @@ export function SidebarSessionList({
                         <li key={item.id}>
                           <div
                             className={cn(
-                              'hover:bg-sidebar-accent/45 group grid grid-cols-[minmax(0,1fr)_2.5rem] items-center rounded-md px-2 py-1.5',
+                              'hover:bg-sidebar-accent/45 group grid grid-cols-[minmax(0,1fr)_2rem] items-center rounded-md px-2 py-1.5',
                               item.id === sessionId &&
                                 !isSelected &&
                                 'bg-sidebar-accent/55',
@@ -498,7 +531,7 @@ export function SidebarSessionList({
                               />
                               </button>
                             </div>
-                            <div className="relative h-6 w-10 justify-self-end">
+                            <div className="relative h-6 w-8 justify-self-end">
                               <span
                                 className={cn(
                                   'text-muted-foreground/70 pointer-events-none absolute inset-0 flex items-center justify-end pr-0.5 text-[11px] transition-opacity',
@@ -521,7 +554,11 @@ export function SidebarSessionList({
                                   <button
                                     type="button"
                                     className={cn(
-                                      'text-muted-foreground hover:bg-muted absolute right-0 top-0 inline-flex size-6 items-center justify-center rounded-md',
+                                      // Mismo estilo que el ⋯ del grupo y del chat hijo:
+                                      // botón chico (~18px) con p-0.5, centrado vertical
+                                      // dentro del slot para alinearse con el ícono de status
+                                      // de la izquierda en la misma guía horizontal.
+                                      'text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5',
                                       threadMenuOpenId === item.id
                                         ? 'opacity-100'
                                         : 'opacity-0 group-hover:opacity-100'
@@ -651,6 +688,8 @@ function SidebarGroupItem({
   onDissolveGroup,
   onSelectChat,
   onSetGroupColor,
+  activeProjectId,
+  onGoToChatProject,
   projects,
   navigate,
   setTabColor,
@@ -672,6 +711,8 @@ function SidebarGroupItem({
   onDissolveGroup?: (groupId: string) => void
   onSelectChat: (chatId: string) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
+  activeProjectId: string | null
+  onGoToChatProject?: (chat: AgentSession) => void
   projects: AgentProject[]
   navigate: NavigateFunction
   setTabColor: (id: string, color: string | null) => void
@@ -711,7 +752,7 @@ function SidebarGroupItem({
     <li>
       <div
         className={cn(
-          'hover:bg-sidebar-accent/45 group/gr grid grid-cols-[minmax(0,1fr)_2.5rem] items-center rounded-md px-2 py-1.5',
+          'hover:bg-sidebar-accent/45 group/gr grid grid-cols-[minmax(0,1fr)_2rem] items-center rounded-md px-2 py-1.5',
           // El chip del grupo se ilumina tanto cuando el grupo es la ruta
           // directa (`groupActive`) como cuando el foco está en cualquier
           // chat hijo (`activeInside`). Así el usuario siempre tiene un
@@ -834,10 +875,11 @@ function SidebarGroupItem({
       />
       {expanded ? (
         <ul
-          className={cn(
-            'border-border/40 ml-3 mt-0.5 space-y-px border-l pl-2',
-            (groupActive || activeInside) && 'border-border/70'
-          )}
+          // Línea vertical de la sub-lista con contraste medio:
+          // `border-foreground/40` es un gris que se adapta al modo
+          // (dark/light) y contrasta más que `border-border` — que en dark
+          // queda casi invisible contra el fondo del sidebar.
+          className="border-foreground/20 ml-3 mt-0.5 space-y-px border-l pl-2"
         >
           {chats.map(chat => {
             // El chat "activo" dentro del grupo puede ser el `activeChildId`
@@ -853,7 +895,12 @@ function SidebarGroupItem({
               <li key={chat.id}>
                 <div
                   className={cn(
-                    'group/child hover:bg-sidebar-accent/45 flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px]',
+                    // Mismo layout que un chat suelto del sidebar: grid con
+                    // slot reservado a la derecha para el ⋯, px-2 py-1.5 y
+                    // gap-1.5. Así los hijos del split se leen con el mismo
+                    // peso visual que los chats libres, no como una
+                    // sub-lista comprimida.
+                    'group/child hover:bg-sidebar-accent/45 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_2rem] items-center rounded-md px-2 py-1.5',
                     active && !isSelected && 'bg-sidebar-accent/55',
                     isSelected && 'bg-sidebar-accent'
                   )}
@@ -864,7 +911,7 @@ function SidebarGroupItem({
                 >
                   <button
                     type="button"
-                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                    className="flex min-w-0 items-center gap-1.5 text-left"
                     onClick={() => onSelectChat(chat.id)}
                   >
                     <span className="grid size-3.5 shrink-0 place-items-center">
@@ -881,20 +928,21 @@ function SidebarGroupItem({
                     </span>
                     {attentionIds.has(chat.id) ? (
                       <span
-                        className="size-1.5 shrink-0 rounded-full border border-black/10"
+                        className="size-2 shrink-0 rounded-full border border-black/10"
                         style={{ backgroundColor: UNREAD_DOT_COLOR }}
                         aria-label="Unread"
                       />
                     ) : null}
                     {tabColor ? (
                       <span
-                        className="size-1.5 shrink-0 rounded-full border border-black/10"
+                        className="size-2 shrink-0 rounded-full border border-black/10"
                         style={{ backgroundColor: tabColor }}
                         aria-hidden
                       />
                     ) : null}
                     <SidebarMarqueeTitle text={chat.title || 'Untitled'} />
                   </button>
+                  <div className="relative h-6 w-8 justify-self-end">
                   <Popover
                     open={menuOpenForChat}
                     onOpenChange={open =>
@@ -906,7 +954,7 @@ function SidebarGroupItem({
                         type="button"
                         aria-label="Chat options"
                         className={cn(
-                          'text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded-md p-0.5 transition-opacity',
+                          'text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5 transition-opacity',
                           menuOpenForChat
                             ? 'opacity-100'
                             : 'opacity-0 group-hover/child:opacity-100'
@@ -920,55 +968,35 @@ function SidebarGroupItem({
                       align="start"
                       className="w-52 p-1.5"
                     >
-                      <SessionActionsMenu
-                        session={chat}
+                      <SplitChildActionsMenu
+                        chat={chat}
                         projects={projects}
                         tabColor={tabColor || null}
-                        onRename={() => {
-                          setOpenChildMenuId(null)
-                          openRenameDialog(chat)
-                        }}
-                        onTogglePin={() => {
-                          setOpenChildMenuId(null)
-                          void updateSession(chat, {
-                            organizeLabel:
-                              chat.organizeLabel === 'pinned'
-                                ? null
-                                : 'pinned'
-                          })
-                        }}
-                        onMoveToProject={projectId => {
-                          setOpenChildMenuId(null)
+                        activeProjectId={activeProjectId}
+                        onClose={() => setOpenChildMenuId(null)}
+                        onRename={() => openRenameDialog(chat)}
+                        onMoveToProject={projectId =>
                           void updateSession(chat, { projectId })
-                        }}
-                        onSetTabColor={color => {
-                          setTabColor(chat.id, color)
-                          setOpenChildMenuId(null)
-                        }}
-                        onExport={() => {
-                          setOpenChildMenuId(null)
-                          void exportTranscript(chat)
-                        }}
-                        onInspect={() => {
-                          setOpenChildMenuId(null)
+                        }
+                        onSetTabColor={color => setTabColor(chat.id, color)}
+                        onExport={() => void exportTranscript(chat)}
+                        onInspect={() =>
                           navigate(`/agents/${chat.id}?inspect=1`)
-                        }}
-                        onArchive={() => {
-                          setOpenChildMenuId(null)
+                        }
+                        onArchive={() =>
                           void updateSession(chat, {
                             organizeLabel:
                               chat.organizeLabel === 'archive'
                                 ? null
                                 : 'archive'
                           })
-                        }}
-                        onDelete={() => {
-                          setOpenChildMenuId(null)
-                          setDeleteTarget(chat)
-                        }}
+                        }
+                        onDelete={() => setDeleteTarget(chat)}
+                        onGoToProject={() => onGoToChatProject?.(chat)}
                       />
                     </PopoverContent>
                   </Popover>
+                  </div>
                 </div>
               </li>
             )
@@ -976,6 +1004,169 @@ function SidebarGroupItem({
         </ul>
       ) : null}
     </li>
+  )
+}
+
+/**
+ * Menú de acciones para un chat que vive dentro de un split view.
+ *
+ * Dos variantes según el proyecto activo:
+ *
+ *  - **Nativo** (el chat pertenece al proyecto activo, o estamos en
+ *    "All projects"): menú completo — Rename, Move to project, Color,
+ *    Export, Inspect, Archive, Delete. Se saca **Pin** porque dentro de
+ *    un split la jerarquía de pin no tiene sentido.
+ *
+ *  - **Invitado** (el chat pertenece a otro proyecto): menú limitado —
+ *    Rename, Color, Export, Inspect + "Go to project" (te lleva al
+ *    proyecto natal del chat). Se sacan las acciones que tocan la
+ *    jerarquía del chat (Move, Archive, Delete) porque son responsabilidad
+ *    del proyecto dueño; para hacerlas, ir al proyecto original.
+ */
+function SplitChildActionsMenu({
+  chat,
+  projects,
+  tabColor,
+  activeProjectId,
+  onClose,
+  onRename,
+  onMoveToProject,
+  onSetTabColor,
+  onExport,
+  onInspect,
+  onArchive,
+  onDelete,
+  onGoToProject
+}: {
+  chat: AgentSession
+  projects: AgentProject[]
+  tabColor: string | null
+  activeProjectId: string | null
+  onClose: () => void
+  onRename: () => void
+  onMoveToProject: (projectId: string | null) => void
+  onSetTabColor: (color: string | null) => void
+  onExport: () => void
+  onInspect: () => void
+  onArchive: () => void
+  onDelete: () => void
+  onGoToProject: () => void
+}) {
+  const isNative =
+    activeProjectId === null || chat.projectId === activeProjectId
+  const itemBase =
+    'hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]'
+  return (
+    <>
+      <button
+        type="button"
+        className={itemBase}
+        onClick={() => {
+          onClose()
+          onRename()
+        }}
+      >
+        <Pencil className="size-3.5" />
+        Rename…
+      </button>
+      {isNative ? (
+        <ProjectPicker
+          projects={projects}
+          value={chat.projectId}
+          noneLabel="No project"
+          trigger={
+            <button type="button" className={itemBase}>
+              <Folder className="size-3.5" />
+              Move to project…
+            </button>
+          }
+          onChange={projectId => {
+            onClose()
+            onMoveToProject(projectId)
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          className={itemBase}
+          onClick={() => {
+            onClose()
+            onGoToProject()
+          }}
+        >
+          <ArrowUpRight className="size-3.5" />
+          Go to project
+        </button>
+      )}
+      <div className="border-border/60 my-1 border-t" />
+      <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
+        Color
+      </div>
+      <TabInlineColorRow
+        value={tabColor}
+        onSelect={color => {
+          onClose()
+          onSetTabColor(color)
+        }}
+        onClear={() => {
+          onClose()
+          onSetTabColor(null)
+        }}
+      />
+      <div className="border-border/60 my-1 border-t" />
+      <button
+        type="button"
+        className={itemBase}
+        onClick={() => {
+          onClose()
+          onExport()
+        }}
+      >
+        <Download className="size-3.5" />
+        Export transcript
+      </button>
+      <button
+        type="button"
+        className={itemBase}
+        onClick={() => {
+          onClose()
+          onInspect()
+        }}
+      >
+        <Search className="size-3.5" />
+        Inspect chat
+      </button>
+      {isNative ? (
+        <>
+          <button
+            type="button"
+            className={itemBase}
+            onClick={() => {
+              onClose()
+              onArchive()
+            }}
+          >
+            <Archive className="size-3.5" />
+            {chat.organizeLabel === 'archive' ? 'Unarchive' : 'Archive'}
+          </button>
+          <div className="border-border/60 my-1 border-t" />
+          <button
+            type="button"
+            className={cn(
+              itemBase,
+              'hover:bg-destructive/10 text-destructive'
+            )}
+            onClick={() => {
+              onClose()
+              onDelete()
+            }}
+          >
+            <Trash2 className="size-3.5" />
+            Delete
+          </button>
+        </>
+      ) : null}
+    </>
   )
 }
 

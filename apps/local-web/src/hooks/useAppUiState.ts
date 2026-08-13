@@ -13,7 +13,7 @@ import {
   readOpenTabsByProject,
   readProjectScopeId,
   readRecentProjectIds,
-  readTabGroupsByProject,
+  readTabGroups,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   TERMINAL_OPEN_STORAGE_KEY
 } from '@/lib/app-storage'
@@ -70,9 +70,12 @@ export function useAppUiState() {
   const [openTabsByProject, setOpenTabsByProject] = useState<
     Record<string, string[]>
   >(() => readOpenTabsByProject())
-  const [tabGroupsByProject, setTabGroupsByProject] = useState<
-    Record<string, SessionGroup[]>
-  >(() => readTabGroupsByProject())
+  // Lista plana única de split-view groups. Un grupo es visible en un
+  // proyecto cuando alguno de sus chats pertenece a ese proyecto (el
+  // filtrado por scope vive en `useAppTabGroups`, no en el storage).
+  const [allTabGroups, setAllTabGroups] = useState<SessionGroup[]>(() =>
+    readTabGroups()
+  )
   const [workspaceVersion, setWorkspaceVersion] = useState(0)
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([])
   /** Materialized session used for Files/@ mentions while the route stays on /agents/new. */
@@ -123,8 +126,8 @@ export function useAppUiState() {
     setCollapsedSidebarSections,
     openTabsByProject,
     setOpenTabsByProject,
-    tabGroupsByProject,
-    setTabGroupsByProject,
+    allTabGroups,
+    setAllTabGroups,
     workspaceVersion,
     setWorkspaceVersion,
     workspaceFiles,

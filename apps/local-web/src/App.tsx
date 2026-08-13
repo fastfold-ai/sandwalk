@@ -66,8 +66,9 @@ export default function App() {
   )
   const tabGroupsStore = useAppTabGroups(
     ui.projectScopeId,
-    ui.tabGroupsByProject,
-    ui.setTabGroupsByProject,
+    bootstrap.sessions,
+    ui.allTabGroups,
+    ui.setAllTabGroups,
     tabs.setOpenTabIds
   )
 
@@ -659,7 +660,22 @@ export default function App() {
           onSelectTabGroup: (groupId: string) => {
             navigate(`/agents/${groupId}`)
           },
-          onRenameTabGroup: openRenameGroupDialog
+          onRenameTabGroup: openRenameGroupDialog,
+          /*
+           * "Go to project" desde el menú de un chat invitado del split:
+           * cambia el scope al proyecto natal del chat y navega al chat
+           * (no al split). El chat pasa a verse como una conversación
+           * suelta en su proyecto — para volver al split, el usuario
+           * regresa al scope original desde el sidebar.
+           */
+          onGoToChatProject: chat => {
+            if (chat.projectId) {
+              layer.actions.selectProjectScope(chat.projectId)
+            } else {
+              layer.actions.selectAllProjects()
+            }
+            navigate(`/agents/${chat.id}`)
+          }
         })}
       />
       {remoteDialog}

@@ -1,4 +1,4 @@
-import type { SessionGroup } from '@sandwalk/agent-ui-core'
+import type { AgentSession, SessionGroup } from '@sandwalk/agent-ui-core'
 import {
   type Dispatch,
   type SetStateAction,
@@ -6,28 +6,25 @@ import {
   useMemo
 } from 'react'
 
-import {
-  projectTabsKey,
-  writeTabGroupsByProject
-} from '@/lib/app-storage'
+import { writeTabGroups } from '@/lib/app-storage'
 
 /**
- * Store hook that mirrors `useAppOpenTabs` but for split-view groups.
+ * Store hook para split-view groups. A partir de la migración
+ * multi-proyecto, los grupos viven en UNA lista plana única — no por
+ * scope de proyecto — y se muestran en cada proyecto donde tienen al
+ * menos un chat. `activeProjectId` solo se usa para decidir qué grupos
+ * son visibles en el sidebar/strip/dropdown del scope actual.
  *
- * A group's lifecycle in relation to `openTabIds`:
- *   - createGroup([A, B, C]) removes A/B/C from openTabIds and inserts `grp_x`
- *     at the position of the first affected id.
- *   - dissolveGroup(grp_x) removes `grp_x` from openTabIds and re-inserts the
- *     group's chatIds at the same position.
- *   - addToGroup(grp_x, D) removes D from openTabIds (D now lives inside the
- *     group). If D was inside another group, it's removed there too.
- *   - removeFromGroup(grp_x, chatId) puts chatId back into openTabIds RIGHT
- *     AFTER the group's position, keeping the visual order intuitive. If the
- *     group is left with a single chat, the caller should dissolveGroup after
- *     confirming with the user.
+ * Ciclo de vida vs `openTabIds`:
+ *   - createGroup([A, B, C]) saca A/B/C de openTabIds e inserta `grp_x`.
+ *   - dissolveGroup(grp_x) saca `grp_x` de openTabIds y re-inserta los
+ *     chats NATIVOS del scope actual (los que pertenecen al proyecto
+ *     activo). Los invitados salen del grupo y vuelven libres a su
+ *     proyecto natal — no se insertan como tabs en este scope.
+ *   - addToGroup / removeFromGroup: análogos al patrón previo.
  *
- * `openTabIds` therefore always contains a MIX of chat ids and group ids —
- * `isSessionGroupId(id)` disambiguates.
+ * `openTabIds` sigue conteniendo una MEZCLA de chat ids y group ids;
+ * `isSessionGroupId(id)` desambigua.
  */
 
 type SetOpenTabIds = (
@@ -44,14 +41,11 @@ function generateGroupId(): string {
 
 /*
  * Nombre por defecto para un split recién creado: "Group N" con N libre
- * mirando *todos* los grupos existentes (todos los scopes). Se recicla:
- * si tenías Group 1, 2, 3 y borrás el 2, el próximo grupo se llama
- * "Group 2" — es el hueco más chico disponible. Al renombrar el
- * usuario, el nombre custom reemplaza este auto.
+ * mirando todos los grupos existentes. Se recicla: si tenías Group 1, 2, 3
+ * y borrás el 2, el próximo grupo se llama "Group 2". El nombre custom
+ * del usuario reemplaza este auto cuando renombra.
  */
-function nextAutoGroupName(
-  existingGroups: SessionGroup[]
-): string {
+function nextAutoGroupName(existingGroups: SessionGroup[]): string {
   const used = new Set<number>()
   const re = /^Group\s+(\d+)$/
   for (const g of existingGroups) {
@@ -63,46 +57,64 @@ function nextAutoGroupName(
   return `Group ${n}`
 }
 
+/**
+ * Un grupo es visible en el scope de un proyecto cuando alguno de sus
+ * chats pertenece a ese proyecto. En "All projects" (activeProjectId =
+ * null) se ven todos los grupos.
+ */
+function groupBelongsToScope(
+  group: SessionGroup,
+  activeProjectId: string | null,
+  chatProjectById: Map<string, string | null>
+): boolean {
+  if (activeProjectId === null) return true
+  return group.chatIds.some(
+    chatId => chatProjectById.get(chatId) === activeProjectId
+  )
+}
+
 export function useAppTabGroups(
   activeProjectId: string | null,
-  tabGroupsByProject: Record<string, SessionGroup[]>,
-  setTabGroupsByProject: Dispatch<
-    SetStateAction<Record<string, SessionGroup[]>>
-  >,
+  sessions: AgentSession[],
+  allTabGroups: SessionGroup[],
+  setAllTabGroups: Dispatch<SetStateAction<SessionGroup[]>>,
   setOpenTabIds: SetOpenTabIds
 ) {
-  const scopeKey = projectTabsKey(activeProjectId)
-  const tabGroups = tabGroupsByProject[scopeKey] || []
+  const chatProjectById = useMemo(() => {
+    const map = new Map<string, string | null>()
+    for (const s of sessions) map.set(s.id, s.projectId ?? null)
+    return map
+  }, [sessions])
+
+  // Grupos visibles en el proyecto activo (por regla multi-proyecto).
+  const tabGroups = useMemo(
+    () =>
+      allTabGroups.filter(g =>
+        groupBelongsToScope(g, activeProjectId, chatProjectById)
+      ),
+    [allTabGroups, activeProjectId, chatProjectById]
+  )
 
   const patchGroups = useCallback(
-    (
-      key: string,
-      updater: (current: SessionGroup[]) => SessionGroup[]
-    ) => {
-      setTabGroupsByProject(current => {
-        const prev = current[key] || []
-        const next = updater(prev)
-        if (next === prev) return current
-        const map = { ...current, [key]: next }
-        writeTabGroupsByProject(map)
-        return map
+    (updater: (current: SessionGroup[]) => SessionGroup[]) => {
+      setAllTabGroups(current => {
+        const next = updater(current)
+        if (next === current) return current
+        writeTabGroups(next)
+        return next
       })
     },
-    [setTabGroupsByProject]
+    [setAllTabGroups]
   )
 
   const createGroup = useCallback(
     (chatIds: string[], overrides?: Partial<SessionGroup>): string | null => {
       if (chatIds.length < 2) return null
       const id = overrides?.id ?? generateGroupId()
-      const allExisting: SessionGroup[] = []
-      for (const key of Object.keys(tabGroupsByProject)) {
-        for (const g of tabGroupsByProject[key] || []) allExisting.push(g)
-      }
       const name =
         overrides?.name && overrides.name.trim().length > 0
           ? overrides.name
-          : nextAutoGroupName(allExisting)
+          : nextAutoGroupName(allTabGroups)
       const group: SessionGroup = {
         id,
         name,
@@ -111,7 +123,7 @@ export function useAppTabGroups(
         chatIds,
         activeChatId: overrides?.activeChatId ?? chatIds[0]
       }
-      patchGroups(scopeKey, current => [...current, group])
+      patchGroups(current => [...current, group])
       setOpenTabIds(current => {
         const firstIdx = current.findIndex(tabId => chatIds.includes(tabId))
         const filtered = current.filter(tabId => !chatIds.includes(tabId))
@@ -121,35 +133,50 @@ export function useAppTabGroups(
       })
       return id
     },
-    [patchGroups, scopeKey, setOpenTabIds, tabGroupsByProject]
+    [patchGroups, setOpenTabIds, allTabGroups]
   )
 
+  /**
+   * Dissolve: liberación del grupo.
+   * - Se elimina el grupo del storage plano.
+   * - En la strip del scope activo, `grp_id` se reemplaza por los chats
+   *   NATIVOS del scope actual (chats cuyo projectId matchea). Los
+   *   invitados no se insertan como tabs acá — quedan libres en su
+   *   proyecto natal, donde ya aparecen por naturaleza.
+   */
   const dissolveGroup = useCallback(
     (groupId: string) => {
-      const group = tabGroups.find(g => g.id === groupId)
+      const group = allTabGroups.find(g => g.id === groupId)
       if (!group) return
-      patchGroups(scopeKey, current =>
-        current.filter(g => g.id !== groupId)
-      )
+      patchGroups(current => current.filter(g => g.id !== groupId))
+      const nativesInThisScope = group.chatIds.filter(chatId => {
+        if (activeProjectId === null) return true
+        return chatProjectById.get(chatId) === activeProjectId
+      })
       setOpenTabIds(current => {
         const idx = current.indexOf(groupId)
-        if (idx < 0) return [...current, ...group.chatIds]
+        if (idx < 0) return [...current, ...nativesInThisScope]
         return [
           ...current.slice(0, idx),
-          ...group.chatIds,
+          ...nativesInThisScope,
           ...current.slice(idx + 1)
         ]
       })
     },
-    [patchGroups, scopeKey, setOpenTabIds, tabGroups]
+    [
+      patchGroups,
+      setOpenTabIds,
+      allTabGroups,
+      activeProjectId,
+      chatProjectById
+    ]
   )
 
-  /** Add a chat to an existing group. If the chat is inside another group,
-   * it's removed from there first (a chat can only live in one group). */
+  /** Add a chat to an existing group. Si el chat vive en otro grupo, se
+   * remueve de ahí primero (un chat solo puede pertenecer a un grupo). */
   const addToGroup = useCallback(
     (groupId: string, chatId: string) => {
-      patchGroups(scopeKey, current => {
-        // Remove chatId from any other group.
+      patchGroups(current => {
         const scrubbed = current.map(g =>
           g.id === groupId
             ? g
@@ -157,7 +184,6 @@ export function useAppTabGroups(
               ? { ...g, chatIds: g.chatIds.filter(c => c !== chatId) }
               : g
         )
-        // Add chatId to target group (skip if already there).
         return scrubbed.map(g =>
           g.id === groupId && !g.chatIds.includes(chatId)
             ? { ...g, chatIds: [...g.chatIds, chatId] }
@@ -166,21 +192,19 @@ export function useAppTabGroups(
       })
       setOpenTabIds(current => current.filter(id => id !== chatId))
     },
-    [patchGroups, scopeKey, setOpenTabIds]
+    [patchGroups, setOpenTabIds]
   )
 
-  /** Take a chat out of its group. Returns the new group size so the caller
-   * can decide whether to prompt for dissolve when it drops to 1. */
   const removeFromGroup = useCallback(
     (groupId: string, chatId: string): number => {
-      const group = tabGroups.find(g => g.id === groupId)
+      const group = allTabGroups.find(g => g.id === groupId)
       if (!group || !group.chatIds.includes(chatId)) return -1
       const nextIds = group.chatIds.filter(id => id !== chatId)
       const nextActive =
         group.activeChatId === chatId
           ? nextIds[0] ?? group.activeChatId
           : group.activeChatId
-      patchGroups(scopeKey, current =>
+      patchGroups(current =>
         current.map(g =>
           g.id === groupId
             ? { ...g, chatIds: nextIds, activeChatId: nextActive }
@@ -198,39 +222,39 @@ export function useAppTabGroups(
       })
       return nextIds.length
     },
-    [patchGroups, scopeKey, setOpenTabIds, tabGroups]
+    [patchGroups, setOpenTabIds, allTabGroups]
   )
 
   const renameGroup = useCallback(
     (groupId: string, name: string) => {
-      patchGroups(scopeKey, current =>
+      patchGroups(current =>
         current.map(g => (g.id === groupId ? { ...g, name } : g))
       )
     },
-    [patchGroups, scopeKey]
+    [patchGroups]
   )
 
   const setGroupColor = useCallback(
     (groupId: string, color: string | null) => {
-      patchGroups(scopeKey, current =>
+      patchGroups(current =>
         current.map(g => (g.id === groupId ? { ...g, color } : g))
       )
     },
-    [patchGroups, scopeKey]
+    [patchGroups]
   )
 
   const setGroupPinned = useCallback(
     (groupId: string, pinned: boolean) => {
-      patchGroups(scopeKey, current =>
+      patchGroups(current =>
         current.map(g => (g.id === groupId ? { ...g, pinned } : g))
       )
     },
-    [patchGroups, scopeKey]
+    [patchGroups]
   )
 
   const setGroupActiveChat = useCallback(
     (groupId: string, chatId: string) => {
-      patchGroups(scopeKey, current =>
+      patchGroups(current =>
         current.map(g =>
           g.id === groupId && g.chatIds.includes(chatId)
             ? { ...g, activeChatId: chatId }
@@ -238,17 +262,14 @@ export function useAppTabGroups(
         )
       )
     },
-    [patchGroups, scopeKey]
+    [patchGroups]
   )
 
-  /** Reorder the chats inside a group (drag-reorder in split view or the
-   * dropdown / sidebar branches). */
   const reorderChatsInGroup = useCallback(
     (groupId: string, orderedChatIds: string[]) => {
-      patchGroups(scopeKey, current =>
+      patchGroups(current =>
         current.map(g => {
           if (g.id !== groupId) return g
-          // Only accept a permutation of the current chatIds.
           const currentSet = new Set(g.chatIds)
           const nextSet = new Set(orderedChatIds)
           if (
@@ -261,71 +282,46 @@ export function useAppTabGroups(
         })
       )
     },
-    [patchGroups, scopeKey]
+    [patchGroups]
   )
 
   /**
-   * Global cleanup — called when a chat session is deleted / detected as gone.
-   * Runs across ALL project scopes because a chat can appear anywhere.
-   * Auto-dissolves any group that drops below 2 chats.
+   * Global cleanup — llamado cuando una sesión se borra / se detecta como
+   * inexistente. Autodissolve cualquier grupo que quede con menos de 2 chats.
    */
   const pruneChatFromGroups = useCallback(
     (chatId: string) => {
-      setTabGroupsByProject(current => {
+      patchGroups(current => {
         let mutated = false
-        const nextMap: Record<string, SessionGroup[]> = {}
-        for (const [key, groups] of Object.entries(current)) {
-          const nextGroups: SessionGroup[] = []
-          for (const g of groups) {
-            if (!g.chatIds.includes(chatId)) {
-              nextGroups.push(g)
-              continue
-            }
-            const nextChatIds = g.chatIds.filter(id => id !== chatId)
-            if (nextChatIds.length < 2) {
-              // Auto-dissolve: caller should also insert the remaining chatId
-              // back into openTabIds if it wants the tab to stay visible.
-              mutated = true
-              continue
-            }
-            nextGroups.push({
-              ...g,
-              chatIds: nextChatIds,
-              activeChatId:
-                g.activeChatId === chatId
-                  ? nextChatIds[0]
-                  : g.activeChatId
-            })
-            mutated = true
+        const next: SessionGroup[] = []
+        for (const g of current) {
+          if (!g.chatIds.includes(chatId)) {
+            next.push(g)
+            continue
           }
-          nextMap[key] = nextGroups
+          const nextChatIds = g.chatIds.filter(id => id !== chatId)
+          if (nextChatIds.length < 2) {
+            mutated = true
+            continue
+          }
+          next.push({
+            ...g,
+            chatIds: nextChatIds,
+            activeChatId:
+              g.activeChatId === chatId ? nextChatIds[0] : g.activeChatId
+          })
+          mutated = true
         }
-        if (!mutated) return current
-        writeTabGroupsByProject(nextMap)
-        return nextMap
+        return mutated ? next : current
       })
     },
-    [setTabGroupsByProject]
+    [patchGroups]
   )
 
-  /*
-   * Grupos de TODOS los scopes (unificados). Sirve para consultas globales
-   * (por ejemplo `chatIsInsideAnyGroup` en App.tsx, o resolver un `grp_xxx`
-   * cuando el proyecto activo no coincide con el scope donde se creó).
-   * Las mutaciones siguen sobre el scope activo (`tabGroups`).
-   */
-  const allTabGroups = useMemo(() => {
-    const out: SessionGroup[] = []
-    for (const key of Object.keys(tabGroupsByProject)) {
-      for (const g of tabGroupsByProject[key] || []) out.push(g)
-    }
-    return out
-  }, [tabGroupsByProject])
-
   return {
-    scopeKey,
     tabGroups,
     allTabGroups,
+    chatProjectById,
     createGroup,
     dissolveGroup,
     addToGroup,

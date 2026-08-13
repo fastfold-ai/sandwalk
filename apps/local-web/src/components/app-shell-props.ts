@@ -281,4 +281,5 @@ export type AppShellProps = {
   canSplitFromSidebar: boolean
   onSelectTabGroup: (groupId: string) => void
   onRenameTabGroup: (group: SessionGroup) => void
+  onGoToChatProject: (chat: AgentSession) => void
 }
