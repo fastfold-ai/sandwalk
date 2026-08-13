@@ -42,6 +42,27 @@ function generateGroupId(): string {
   return `grp_${rand}`
 }
 
+/*
+ * Nombre por defecto para un split recién creado: "Group N" con N libre
+ * mirando *todos* los grupos existentes (todos los scopes). Se recicla:
+ * si tenías Group 1, 2, 3 y borrás el 2, el próximo grupo se llama
+ * "Group 2" — es el hueco más chico disponible. Al renombrar el
+ * usuario, el nombre custom reemplaza este auto.
+ */
+function nextAutoGroupName(
+  existingGroups: SessionGroup[]
+): string {
+  const used = new Set<number>()
+  const re = /^Group\s+(\d+)$/
+  for (const g of existingGroups) {
+    const match = re.exec(g.name || '')
+    if (match) used.add(Number(match[1]))
+  }
+  let n = 1
+  while (used.has(n)) n++
+  return `Group ${n}`
+}
+
 export function useAppTabGroups(
   activeProjectId: string | null,
   tabGroupsByProject: Record<string, SessionGroup[]>,
@@ -74,9 +95,17 @@ export function useAppTabGroups(
     (chatIds: string[], overrides?: Partial<SessionGroup>): string | null => {
       if (chatIds.length < 2) return null
       const id = overrides?.id ?? generateGroupId()
+      const allExisting: SessionGroup[] = []
+      for (const key of Object.keys(tabGroupsByProject)) {
+        for (const g of tabGroupsByProject[key] || []) allExisting.push(g)
+      }
+      const name =
+        overrides?.name && overrides.name.trim().length > 0
+          ? overrides.name
+          : nextAutoGroupName(allExisting)
       const group: SessionGroup = {
         id,
-        name: overrides?.name ?? '',
+        name,
         color: overrides?.color ?? null,
         pinned: overrides?.pinned ?? false,
         chatIds,
@@ -92,7 +121,7 @@ export function useAppTabGroups(
       })
       return id
     },
-    [patchGroups, scopeKey, setOpenTabIds]
+    [patchGroups, scopeKey, setOpenTabIds, tabGroupsByProject]
   )
 
   const dissolveGroup = useCallback(

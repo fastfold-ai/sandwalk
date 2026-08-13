@@ -36,6 +36,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { navigateToSession } from '@/lib/navigate-session'
 import { relativeTime, type SessionChatState, type TabItemSection } from '@/lib/sessions'
+import {
+  isSidebarGroupExpanded,
+  setSidebarGroupExpanded
+} from '@/lib/sidebar-group-expanded'
 import { cn } from '@/lib/utils'
 
 /** Same Blue pastel as the tab color tag — marks unread notification sessions. */
@@ -180,6 +184,7 @@ export type SidebarSessionListProps = {
   setDeleteTarget: Dispatch<SetStateAction<AgentSession | null>>
   onClearSessionSelection: () => void
   onSelectTabGroup?: (groupId: string) => void
+  onRenameTabGroup?: (group: import('@sandwalk/agent-ui-core').SessionGroup) => void
   onDissolveTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
   /**
@@ -218,6 +223,7 @@ export function SidebarSessionList({
   exportTranscript,
   setDeleteTarget,
   onSelectTabGroup,
+  onRenameTabGroup,
   onDissolveTabGroup,
   onSetTabGroupColor,
   activeGroupChildId,
@@ -336,6 +342,7 @@ export function SidebarSessionList({
                             attentionIds={attentionIds}
                             activeChildId={activeGroupChildId ?? null}
                             onSelectGroup={onSelectTabGroup}
+                            onRenameGroup={onRenameTabGroup}
                             onDissolveGroup={onDissolveTabGroup}
                             onSetGroupColor={onSetTabGroupColor}
                             projects={projects}
@@ -640,6 +647,7 @@ function SidebarGroupItem({
   selectedSessionIds,
   attentionIds,
   onSelectGroup,
+  onRenameGroup,
   onDissolveGroup,
   onSelectChat,
   onSetGroupColor,
@@ -660,6 +668,7 @@ function SidebarGroupItem({
   selectedSessionIds: Set<string>
   attentionIds: ReadonlySet<string>
   onSelectGroup?: (groupId: string) => void
+  onRenameGroup?: (group: import('@sandwalk/agent-ui-core').SessionGroup) => void
   onDissolveGroup?: (groupId: string) => void
   onSelectChat: (chatId: string) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
@@ -678,8 +687,23 @@ function SidebarGroupItem({
   const [menuOpen, setMenuOpen] = useState(false)
   // Dispara el modal destructivo compartido con la strip.
   const [dissolveConfirmOpen, setDissolveConfirmOpen] = useState(false)
-  const [expanded, setExpanded] = useState(true)
-  const label = group.name || `${group.chatIds.length} chats`
+  // Por defecto los splits arrancan CERRADOS en el sidebar (sin importar
+  // cuándo se crearon). Solo si el usuario abrió este grupo alguna vez,
+  // se restaura abierto en próximos renders. Ver `lib/sidebar-group-expanded`.
+  const [expanded, setExpandedState] = useState(() =>
+    isSidebarGroupExpanded(group.id)
+  )
+  const setExpanded = (next: boolean | ((current: boolean) => boolean)) => {
+    setExpandedState(current => {
+      const value = typeof next === 'function' ? next(current) : next
+      setSidebarGroupExpanded(group.id, value)
+      return value
+    })
+  }
+  // El name es siempre no-vacío ahora (auto "Group N" al crear, o custom
+  // tras rename). El badge con la cuenta de chats vive aparte, al lado.
+  const label = group.name || `Group`
+  const chatCount = group.chatIds.length
   const groupActive = group.id === activeId
   const activeInside = chats.some(chat => chat.id === activeId)
 
@@ -688,7 +712,11 @@ function SidebarGroupItem({
       <div
         className={cn(
           'hover:bg-sidebar-accent/45 group/gr grid grid-cols-[minmax(0,1fr)_2.5rem] items-center rounded-md px-2 py-1.5',
-          groupActive && 'bg-sidebar-accent/55'
+          // El chip del grupo se ilumina tanto cuando el grupo es la ruta
+          // directa (`groupActive`) como cuando el foco está en cualquier
+          // chat hijo (`activeInside`). Así el usuario siempre tiene un
+          // ancla visual en el sidebar sobre "dónde estoy".
+          (groupActive || activeInside) && 'bg-sidebar-accent/55'
         )}
         onContextMenu={event => {
           event.preventDefault()
@@ -719,6 +747,12 @@ function SidebarGroupItem({
             onClick={() => onSelectGroup?.(group.id)}
           >
             <Columns2 className="size-3.5 shrink-0" aria-hidden />
+            <span
+              className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
+              aria-label={`${chatCount} chats`}
+            >
+              {chatCount}
+            </span>
             {group.color ? (
               <span
                 className="size-2 shrink-0 rounded-full border border-black/10"
@@ -744,6 +778,21 @@ function SidebarGroupItem({
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-52 p-1">
+            {onRenameGroup ? (
+              <>
+                <button
+                  type="button"
+                  className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onRenameGroup(group)
+                  }}
+                >
+                  Rename…
+                </button>
+                <div className="border-border/60 my-1 border-t" />
+              </>
+            ) : null}
             {onSetGroupColor ? (
               <div className="px-2 py-1.5">
                 <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">

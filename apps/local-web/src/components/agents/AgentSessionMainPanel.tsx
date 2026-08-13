@@ -137,6 +137,7 @@ export type AgentSessionMainPanelProps = {
   tabGroups: SessionGroup[]
   onSplitWithNextTab: (sourceId: string) => void
   dissolveTabGroup: (groupId: string) => void
+  renameTabGroup: (group: SessionGroup) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
   closeTabGroup: (groupId: string) => void
   selectedChatIds: Set<string>
@@ -222,6 +223,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     tabGroups,
     onSplitWithNextTab,
     dissolveTabGroup,
+    renameTabGroup,
     setTabGroupColor,
     closeTabGroup,
     selectedChatIds,
@@ -360,6 +362,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         groups={tabGroups}
         onSplitWith={onSplitWithNextTab}
         onDissolveGroup={dissolveTabGroup}
+        onRenameGroup={renameTabGroup}
         onSetGroupColor={setTabGroupColor}
         onCloseGroup={closeTabGroup}
         selectedChatIds={selectedChatIds}

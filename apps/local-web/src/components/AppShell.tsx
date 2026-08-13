@@ -66,6 +66,7 @@ export function AppShell(props: AppShellProps) {
           onBatchSplitView={props.createSplitFromSidebar}
           canBatchSplitView={props.canSplitFromSidebar}
           onSelectTabGroup={props.onSelectTabGroup}
+          onRenameTabGroup={props.onRenameTabGroup}
           onDissolveTabGroup={props.dissolveTabGroup}
           onSetTabGroupColor={props.setTabGroupColor}
           activeGroupChildId={props.activeGroup?.activeChatId ?? null}
@@ -253,6 +254,7 @@ export function AppShell(props: AppShellProps) {
           tabGroups={props.tabGroups}
           onSplitWithNextTab={props.onSplitWithNextTab}
           dissolveTabGroup={props.dissolveTabGroup}
+          renameTabGroup={props.onRenameTabGroup}
           setTabGroupColor={props.setTabGroupColor}
           closeTabGroup={props.closeTabGroup}
           selectedChatIds={props.selectedChatIds}
@@ -292,6 +294,11 @@ export function AppShell(props: AppShellProps) {
         setRenameTarget={props.setRenameTarget}
         setRenameValue={props.setRenameValue}
         submitRename={props.submitRename}
+        renameGroupTarget={props.renameGroupTarget}
+        renameGroupValue={props.renameGroupValue}
+        setRenameGroupTarget={props.setRenameGroupTarget}
+        setRenameGroupValue={props.setRenameGroupValue}
+        submitRenameGroup={props.submitRenameGroup}
         deleteTarget={props.deleteTarget}
         setDeleteTarget={props.setDeleteTarget}
         confirmDelete={props.confirmDelete}

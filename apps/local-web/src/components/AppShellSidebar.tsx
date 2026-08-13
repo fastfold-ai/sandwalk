@@ -2,7 +2,8 @@ import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentProject,
   AgentSession,
-  BackendHealth
+  BackendHealth,
+  SessionGroup
 } from '@sandwalk/agent-ui-core'
 import type { RefObject } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
@@ -69,6 +70,7 @@ export type AppShellSidebarProps = {
   onBatchSplitView?: () => void
   canBatchSplitView?: boolean
   onSelectTabGroup?: (groupId: string) => void
+  onRenameTabGroup?: (group: SessionGroup) => void
   onDissolveTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
   onCloseTabGroup?: (groupId: string) => void
@@ -145,6 +147,7 @@ export function AppShellSidebar({
   onBatchSplitView,
   canBatchSplitView,
   onSelectTabGroup,
+  onRenameTabGroup,
   onDissolveTabGroup,
   onSetTabGroupColor,
   onCloseTabGroup,
@@ -245,6 +248,7 @@ export function AppShellSidebar({
             onBatchSplitView={onBatchSplitView}
             canBatchSplitView={canBatchSplitView}
             onSelectTabGroup={onSelectTabGroup}
+            onRenameTabGroup={onRenameTabGroup}
             onDissolveTabGroup={onDissolveTabGroup}
             onSetTabGroupColor={onSetTabGroupColor}
             onCloseTabGroup={onCloseTabGroup}

@@ -281,9 +281,18 @@ export function groupTabItems(
     item.kind === 'chat' && item.session.organizeLabel === 'archive'
   // Los grupos no tienen "archived" — solo chats pueden estar archivados.
 
-  const pinned = all.filter(isPinned)
-  const archived = all.filter(isArchived)
-  const ordinary = all.filter(item => !isPinned(item) && !isArchived(item))
+  // Dentro de cada sección, "más reciente primero" — sirve para que un
+  // chat/split recién creado aparezca arriba de todo en Today, y para que
+  // los grupos (que antes iban al final) se ordenen naturalmente por su
+  // actividad interna (max de sus chats hijos).
+  const sortByRecent = (a: TabItem, b: TabItem) =>
+    b.lastActivity - a.lastActivity
+
+  const pinned = all.filter(isPinned).sort(sortByRecent)
+  const archived = all.filter(isArchived).sort(sortByRecent)
+  const ordinary = all
+    .filter(item => !isPinned(item) && !isArchived(item))
+    .sort(sortByRecent)
 
   return [
     { id: 'pinned', title: 'Pinned', items: pinned },

@@ -1,5 +1,9 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
+import type {
+  AgentProject,
+  AgentSession,
+  SessionGroup
+} from '@sandwalk/agent-ui-core'
 import {
   Check,
   Copy,
@@ -78,6 +82,7 @@ export type SessionMainHeaderProps = {
   groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
+  onRenameGroup?: (group: SessionGroup) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
   onCloseGroup?: (groupId: string) => void
   /**
@@ -135,6 +140,7 @@ export function SessionMainHeader({
   groups,
   onSplitWith,
   onDissolveGroup,
+  onRenameGroup,
   onSetGroupColor,
   onCloseGroup,
   selectedChatIds,
@@ -306,6 +312,7 @@ export function SessionMainHeader({
           groups={groups}
           onSplitWith={onSplitWith}
           onDissolveGroup={onDissolveGroup}
+          onRenameGroup={onRenameGroup}
           onSetGroupColor={onSetGroupColor}
           onCloseGroup={onCloseGroup}
           selectedChatIds={selectedChatIds}

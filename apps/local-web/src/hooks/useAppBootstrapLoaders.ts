@@ -13,6 +13,7 @@ import type {
 import type { Dispatch, SetStateAction } from 'react'
 import { useCallback, useRef, useState } from 'react'
 
+import { applyChatDateBoosts } from '@/lib/chat-date-boost'
 import {
   type ComposerModelOption,
   toComposerModelOptions
@@ -107,9 +108,13 @@ export function useAppBootstrapLoaders({
           // Older servers without /sessions/revision fall through to full list.
         }
       }
-      const nextSessions = await dedupeAsync(key, () =>
+      const rawSessions = await dedupeAsync(key, () =>
         client.listSessions(projectId ? { projectId } : undefined)
       )
+      // Apply chat date boosts: chats agrupados en un split se muestran con
+      // la fecha del split (Today) hasta que reciban actividad real que
+      // supere ese boost — ver `lib/chat-date-boost.ts`.
+      const nextSessions = applyChatDateBoosts(rawSessions)
       if (!projectId) {
         try {
           sessionsRevisionRef.current = await client.getSessionsRevision()

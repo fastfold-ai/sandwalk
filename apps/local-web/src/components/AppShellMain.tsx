@@ -162,6 +162,7 @@ export function AppShellMain(props: AppShellMainProps) {
             tabGroups={props.tabGroups}
             onSplitWithNextTab={props.onSplitWithNextTab}
             dissolveTabGroup={props.dissolveTabGroup}
+            renameTabGroup={props.renameTabGroup}
             setTabGroupColor={props.setTabGroupColor}
             closeTabGroup={props.closeTabGroup}
             selectedChatIds={props.selectedChatIds}

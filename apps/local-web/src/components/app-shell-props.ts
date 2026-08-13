@@ -243,6 +243,11 @@ export type AppShellProps = {
   setRenameTarget: Dispatch<SetStateAction<AgentSession | null>>
   setRenameValue: Dispatch<SetStateAction<string>>
   submitRename: () => Promise<void>
+  renameGroupTarget: SessionGroup | null
+  renameGroupValue: string
+  setRenameGroupTarget: Dispatch<SetStateAction<SessionGroup | null>>
+  setRenameGroupValue: Dispatch<SetStateAction<string>>
+  submitRenameGroup: () => void
   deleteTarget: AgentSession | null
   confirmDelete: () => Promise<void>
   batchDeletePending: boolean
@@ -253,10 +258,10 @@ export type AppShellProps = {
     overrides?: Partial<SessionGroup>
   ) => string | null
   dissolveTabGroup: (groupId: string) => void
+  renameTabGroup: (group: SessionGroup) => void
   closeTabGroup: (groupId: string) => void
   addChatToGroup: (groupId: string, chatId: string) => void
   removeChatFromGroup: (groupId: string, chatId: string) => number
-  renameTabGroup: (groupId: string, name: string) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
   setTabGroupPinned: (groupId: string, pinned: boolean) => void
   setTabGroupActiveChat: (groupId: string, chatId: string) => void
@@ -275,4 +280,5 @@ export type AppShellProps = {
   createSplitFromSidebar: () => void
   canSplitFromSidebar: boolean
   onSelectTabGroup: (groupId: string) => void
+  onRenameTabGroup: (group: SessionGroup) => void
 }

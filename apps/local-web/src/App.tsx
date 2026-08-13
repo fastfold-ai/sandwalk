@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo } from 'react'
+import type { SessionGroup } from '@sandwalk/agent-ui-core'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
@@ -25,6 +26,7 @@ import { useAppUiState } from '@/hooks/useAppUiState'
 import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
 import { useDesktopWindowMenu } from '@/hooks/useDesktopWindowMenu'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
+import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { visibleSessionIds } from '@/lib/sessions'
 
@@ -174,17 +176,41 @@ export default function App() {
   const clearSelectChats = useCallback(() => {
     setSelectedChatIds(prev => (prev.size === 0 ? prev : new Set()))
   }, [])
+  /*
+   * Al crear un split view, "refrescamos" la fecha visible de cada chat
+   * hijo al momento actual — así los chats viejos suben a Today junto con
+   * el grupo nuevo (sin quedar dispersos en Yesterday/Older). El boost es
+   * local (localStorage) porque el server no acepta PATCH sobre
+   * `last_message_at`; se limpia solo cuando el chat recibe actividad real
+   * que iguala o supera el boost. Ver `lib/chat-date-boost.ts`.
+   */
+  const createSplitGroup = useCallback(
+    (chatIds: string[]): string | null => {
+      const groupId = tabGroupsStore.createGroup(chatIds)
+      if (!groupId) return null
+      const now = new Date().toISOString()
+      setChatDateBoosts(chatIds, now)
+      bootstrap.setSessions(current =>
+        current.map(s =>
+          chatIds.includes(s.id) ? { ...s, lastMessageAt: now } : s
+        )
+      )
+      return groupId
+    },
+    [tabGroupsStore, bootstrap]
+  )
+
   const createSplitFromSelection = useCallback(() => {
     const ids = Array.from(selectedChatIds).filter(
       id => !id.startsWith('grp_')
     )
     if (ids.length < 2) return
-    const groupId = tabGroupsStore.createGroup(ids)
+    const groupId = createSplitGroup(ids)
     if (groupId) {
       setSelectedChatIds(new Set())
       navigate(`/agents/${groupId}`)
     }
-  }, [selectedChatIds, tabGroupsStore, navigate])
+  }, [selectedChatIds, createSplitGroup, navigate])
 
   // Punto de entrada MVP para crear un grupo: "Split with next tab" agrupa
   // el chat sobre el que se hizo click con el siguiente tab abierto (o el
@@ -206,12 +232,12 @@ export default function App() {
           .reverse()
           .find(id => id !== sourceId && !id.startsWith('grp_'))
       if (!partnerId) return
-      const groupId = tabGroupsStore.createGroup([sourceId, partnerId])
+      const groupId = createSplitGroup([sourceId, partnerId])
       if (groupId) {
         navigate(`/agents/${groupId}`)
       }
     },
-    [tabs.openTabIds, tabGroupsStore, navigate]
+    [tabs.openTabIds, createSplitGroup, navigate]
   )
 
   /*
@@ -225,6 +251,25 @@ export default function App() {
     },
     [layer.actions]
   )
+
+  // Estado del dialog "Rename split view". Análogo a `renameTarget` de
+  // chats: el target guarda el grupo cuyo nombre se edita; el value es el
+  // input controlado. `submitRenameGroup` llama al store cuando el trim
+  // del value no queda vacío. La única validación es "no vacío".
+  const [renameGroupTarget, setRenameGroupTarget] =
+    useState<SessionGroup | null>(null)
+  const [renameGroupValue, setRenameGroupValue] = useState('')
+  const submitRenameGroup = useCallback(() => {
+    const name = renameGroupValue.trim()
+    if (!renameGroupTarget || !name) return
+    tabGroupsStore.renameGroup(renameGroupTarget.id, name)
+    setRenameGroupTarget(null)
+    setRenameGroupValue('')
+  }, [renameGroupTarget, renameGroupValue, tabGroupsStore])
+  const openRenameGroupDialog = useCallback((group: SessionGroup) => {
+    setRenameGroupTarget(group)
+    setRenameGroupValue(group.name || '')
+  }, [])
 
   // Args comunes que todo `SessionChatMount` de split view va a instanciar
   // combinándolos con su chatId + session propia. Se calcula una vez para que
@@ -586,6 +631,11 @@ export default function App() {
           allSessions: bootstrap.sessions,
           onSplitWithNextTab: handleSplitWithNextTab,
           closeTabGroup: handleCloseTabGroup,
+          renameGroupTarget,
+          renameGroupValue,
+          setRenameGroupTarget,
+          setRenameGroupValue,
+          submitRenameGroup,
           selectedChatIds,
           toggleSelectChat,
           clearSelectChats,
@@ -595,7 +645,7 @@ export default function App() {
               id => !id.startsWith('grp_')
             )
             if (ids.length < 2) return
-            const groupId = tabGroupsStore.createGroup(ids)
+            const groupId = createSplitGroup(ids)
             if (groupId) {
               layer.actions.clearSessionSelection()
               navigate(`/agents/${groupId}`)
@@ -608,7 +658,8 @@ export default function App() {
             ).length >= 2,
           onSelectTabGroup: (groupId: string) => {
             navigate(`/agents/${groupId}`)
-          }
+          },
+          onRenameTabGroup: openRenameGroupDialog
         })}
       />
       {remoteDialog}

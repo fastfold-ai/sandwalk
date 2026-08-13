@@ -2,7 +2,8 @@ import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentProject,
   AgentSession,
-  BackendHealth
+  BackendHealth,
+  SessionGroup
 } from '@sandwalk/agent-ui-core'
 import {
   Globe2,
@@ -66,6 +67,7 @@ type AgentSessionSidebarProps = {
   onBatchSplitView?: () => void
   canBatchSplitView?: boolean
   onSelectTabGroup?: (groupId: string) => void
+  onRenameTabGroup?: (group: SessionGroup) => void
   onDissolveTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
   onCloseTabGroup?: (groupId: string) => void
@@ -122,6 +124,7 @@ export function AgentSessionSidebar({
   onBatchSplitView,
   canBatchSplitView,
   onSelectTabGroup,
+  onRenameTabGroup,
   onDissolveTabGroup,
   onSetTabGroupColor,
   onCloseTabGroup,
@@ -280,6 +283,7 @@ export function AgentSessionSidebar({
         setDeleteTarget={setDeleteTarget}
         onClearSessionSelection={onClearSessionSelection}
         onSelectTabGroup={onSelectTabGroup}
+        onRenameTabGroup={onRenameTabGroup}
         onDissolveTabGroup={onDissolveTabGroup}
         onSetTabGroupColor={onSetTabGroupColor}
         onCloseTabGroup={onCloseTabGroup}

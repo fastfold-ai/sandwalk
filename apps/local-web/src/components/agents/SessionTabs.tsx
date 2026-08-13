@@ -95,6 +95,7 @@ export function SessionTabs({
   openTabIds,
   onSplitWith,
   onDissolveGroup,
+  onRenameGroup,
   onSetGroupColor,
   onCloseGroup,
   selectedChatIds,
@@ -130,6 +131,7 @@ export function SessionTabs({
   /** Creates a new split-view group from `sourceId` + the next open tab. */
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
+  onRenameGroup?: (group: SessionGroup) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
   onCloseGroup?: (groupId: string) => void
   selectedChatIds?: Set<string>
@@ -298,7 +300,7 @@ export function SessionTabs({
       const title =
         item.kind === 'chat'
           ? item.session.title || 'Untitled'
-          : item.group.name || `${item.group.chatIds.length} chats`
+          : item.group.name || 'Group'
       return title.toLowerCase().includes(needle)
     })
   }, [orderedItems, searchQuery])
@@ -428,7 +430,7 @@ export function SessionTabs({
                 const group = item.group
                 const pseudoTab: AgentSession = {
                   id: group.id,
-                  title: group.name || `${group.chatIds.length} chats`,
+                  title: group.name || 'Group',
                   status: 'idle',
                   source: 'local',
                   sourceLabel: 'Split view',
@@ -594,7 +596,7 @@ export function SessionTabs({
                     const tab = isGroup ? null : item.session
                     const group = isGroup ? item.group : null
                     const title = isGroup
-                      ? group!.name || `${group!.chatIds.length} chats`
+                      ? group!.name || 'Group'
                       : tab!.title || 'Untitled'
                     const stamp = isGroup
                       ? ''
@@ -654,6 +656,14 @@ export function SessionTabs({
                                 style={{ backgroundColor: color }}
                                 aria-hidden
                               />
+                            ) : null}
+                            {isGroup ? (
+                              <span
+                                className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
+                                aria-label={`${group!.chatIds.length} chats`}
+                              >
+                                {group!.chatIds.length}
+                              </span>
                             ) : null}
                             <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
                               {title}
@@ -791,6 +801,16 @@ export function SessionTabs({
           y={menu.y}
           onClose={() => setMenu(null)}
         >
+          {onRenameGroup ? (
+            <>
+              <TabContextItem
+                icon={<Pencil className="size-3.5" />}
+                label="Rename…"
+                onClick={() => runAction(() => onRenameGroup(menuGroup))}
+              />
+              <TabContextSeparator />
+            </>
+          ) : null}
           {onSetGroupColor ? (
             <>
               <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
@@ -877,7 +897,7 @@ export function GroupDissolveDialog({
   onConfirm: () => void
 }) {
   const open = group !== null
-  const label = group?.name || `${group?.chatIds.length ?? 0} chats`
+  const label = group?.name || 'Group'
   return (
     <Dialog open={open} onOpenChange={next => (next ? null : onCancel())}>
       <DialogContent className="max-w-md">

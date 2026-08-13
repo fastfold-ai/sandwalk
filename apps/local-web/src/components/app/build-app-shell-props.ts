@@ -53,6 +53,11 @@ type AppShellBridgeInput = {
   showChatSkeleton: boolean
   tabGroupsStore: ReturnType<typeof useAppTabGroups>
   closeTabGroup: (groupId: string) => void
+  renameGroupTarget: AppShellProps['renameGroupTarget']
+  renameGroupValue: AppShellProps['renameGroupValue']
+  setRenameGroupTarget: AppShellProps['setRenameGroupTarget']
+  setRenameGroupValue: AppShellProps['setRenameGroupValue']
+  submitRenameGroup: AppShellProps['submitRenameGroup']
   activeGroup: AppShellProps['activeGroup']
   perSessionBaseArgs: AppShellProps['perSessionBaseArgs']
   allSessions: AppShellProps['allSessions']
@@ -64,6 +69,7 @@ type AppShellBridgeInput = {
   createSplitFromSidebar: AppShellProps['createSplitFromSidebar']
   canSplitFromSidebar: AppShellProps['canSplitFromSidebar']
   onSelectTabGroup: AppShellProps['onSelectTabGroup']
+  onRenameTabGroup: AppShellProps['onRenameTabGroup']
 }
 
 export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
@@ -267,6 +273,11 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     setRenameTarget: input.actions.setRenameTarget,
     setRenameValue: input.actions.setRenameValue,
     submitRename: input.actions.submitRename,
+    renameGroupTarget: input.renameGroupTarget,
+    renameGroupValue: input.renameGroupValue,
+    setRenameGroupTarget: input.setRenameGroupTarget,
+    setRenameGroupValue: input.setRenameGroupValue,
+    submitRenameGroup: input.submitRenameGroup,
     deleteTarget: input.actions.deleteTarget,
     confirmDelete: input.actions.confirmDelete,
     batchDeletePending: input.actions.batchDeletePending,
@@ -277,7 +288,6 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     closeTabGroup: input.closeTabGroup,
     addChatToGroup: input.tabGroupsStore.addToGroup,
     removeChatFromGroup: input.tabGroupsStore.removeFromGroup,
-    renameTabGroup: input.tabGroupsStore.renameGroup,
     setTabGroupColor: input.tabGroupsStore.setGroupColor,
     setTabGroupPinned: input.tabGroupsStore.setGroupPinned,
     setTabGroupActiveChat: input.tabGroupsStore.setGroupActiveChat,
@@ -292,6 +302,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     createSplitFromSelection: input.createSplitFromSelection,
     createSplitFromSidebar: input.createSplitFromSidebar,
     canSplitFromSidebar: input.canSplitFromSidebar,
-    onSelectTabGroup: input.onSelectTabGroup
+    onSelectTabGroup: input.onSelectTabGroup,
+    onRenameTabGroup: input.onRenameTabGroup
   }
 }
