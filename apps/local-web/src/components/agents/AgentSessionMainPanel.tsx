@@ -138,6 +138,8 @@ export type AgentSessionMainPanelProps = {
   onSplitWithNextTab: (sourceId: string) => void
   onPickSplitPartner: (partnerId: string) => void
   onCancelPendingSplit: () => void
+  onAddChatToSplit: (chatId: string) => void
+  onRemoveChatFromSplit: (chatId: string) => void
   dissolveTabGroup: (groupId: string) => void
   renameTabGroup: (group: SessionGroup) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
@@ -226,6 +228,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     onSplitWithNextTab,
     onPickSplitPartner,
     onCancelPendingSplit,
+    onAddChatToSplit,
+    onRemoveChatFromSplit,
     dissolveTabGroup,
     renameTabGroup,
     setTabGroupColor,
@@ -386,9 +390,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             organizeLabel:
               target.organizeLabel === 'archive' ? null : 'archive'
           }),
-        onClose: (id: string) => closeSessionTab(id),
-        onCloseOthers: (id: string) => closeOtherSessionTabs(id),
-        onDelete: (target: AgentSession) => setDeleteTarget(target)
+        // "Close" desde el header de un chat dentro del split = sacar
+        // ese chat del grupo (no borra). El handler auto-disuelve si
+        // queda con < 2 chats.
+        onRemoveFromSplit: (id: string) => onRemoveChatFromSplit(id)
       }
     },
     [
@@ -403,11 +408,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
       setPanelView,
       exportTranscript,
       openRenameDialog,
+      onRemoveChatFromSplit,
       navigate,
-      updateSession,
-      closeSessionTab,
-      closeOtherSessionTabs,
-      setDeleteTarget
+      updateSession
     ]
   )
 
@@ -561,7 +564,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 activeProjectId,
                 allTabGroups: tabGroups,
                 onPickPartner: onPickSplitPartner,
-                onCancelPending: onCancelPendingSplit
+                onCancelPending: onCancelPendingSplit,
+                onAddChat: onAddChatToSplit
               }}
             />
           ) : (

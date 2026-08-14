@@ -263,6 +263,56 @@ export default function App() {
   }, [route.sessionId, tabGroupsStore, navigate])
 
   /*
+   * "Add chat to split" desde el botón "+" en la derecha del split ya
+   * armado: agrega el chat elegido al grupo existente (via `addToGroup`),
+   * boost su fecha para que suba a Today (mismo comportamiento que
+   * createSplitGroup), y setea ese chat como activo dentro del grupo
+   * (para que se vea en foco cuando el split se re-renderiza).
+   */
+  /*
+   * "Close" desde el header de un chat DENTRO del split: saca el chat
+   * del grupo (no lo borra). El chat vuelve a estar suelto en su
+   * proyecto. Si el grupo queda con menos de 2 chats, se auto-disuelve
+   * (no tiene sentido un split con 1 sólo chat) y navegamos al que
+   * queda.
+   */
+  const handleRemoveChatFromSplit = useCallback(
+    (chatId: string) => {
+      const groupId = route.sessionId
+      if (!groupId || !groupId.startsWith('grp_')) return
+      const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
+      if (!group) return
+      const survivor = group.chatIds.find(id => id !== chatId) ?? null
+      const nextSize = tabGroupsStore.removeFromGroup(groupId, chatId)
+      if (nextSize >= 0 && nextSize < 2) {
+        tabGroupsStore.dissolveGroup(groupId)
+        if (survivor) navigate(`/agents/${survivor}`)
+      }
+    },
+    [route.sessionId, tabGroupsStore, navigate]
+  )
+
+  const handleAddChatToSplit = useCallback(
+    (chatId: string) => {
+      const groupId = route.sessionId
+      if (!groupId || !groupId.startsWith('grp_')) return
+      const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
+      if (!group || group.isPending) return
+      if (group.chatIds.includes(chatId)) return
+      const now = new Date().toISOString()
+      setChatDateBoosts([chatId], now)
+      bootstrap.setSessions(current =>
+        current.map(s =>
+          s.id === chatId ? { ...s, lastMessageAt: now } : s
+        )
+      )
+      tabGroupsStore.addToGroup(groupId, chatId)
+      tabGroupsStore.setGroupActiveChat(groupId, chatId)
+    },
+    [route.sessionId, tabGroupsStore, bootstrap]
+  )
+
+  /*
    * Close split (strip only): quita el chip de la strip del scope activo.
    * El grupo sigue existiendo — sólo desaparece la pestaña. Se puede
    * volver a abrir desde el sidebar.
@@ -654,6 +704,8 @@ export default function App() {
           onSplitWithNextTab: handleCreateSplitFromChat,
           onPickSplitPartner: handlePickSplitPartner,
           onCancelPendingSplit: handleCancelPendingSplit,
+          onAddChatToSplit: handleAddChatToSplit,
+          onRemoveChatFromSplit: handleRemoveChatFromSplit,
           closeTabGroup: handleCloseTabGroup,
           renameGroupTarget,
           renameGroupValue,

@@ -275,6 +275,8 @@ export type AppShellProps = {
   onSplitWithNextTab: (sourceId: string) => void
   onPickSplitPartner: (partnerId: string) => void
   onCancelPendingSplit: () => void
+  onAddChatToSplit: (chatId: string) => void
+  onRemoveChatFromSplit: (chatId: string) => void
   selectedChatIds: Set<string>
   toggleSelectChat: (id: string) => void
   clearSelectChats: () => void

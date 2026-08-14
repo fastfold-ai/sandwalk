@@ -163,6 +163,8 @@ export function AppShellMain(props: AppShellMainProps) {
             onSplitWithNextTab={props.onSplitWithNextTab}
             onPickSplitPartner={props.onPickSplitPartner}
             onCancelPendingSplit={props.onCancelPendingSplit}
+            onAddChatToSplit={props.onAddChatToSplit}
+            onRemoveChatFromSplit={props.onRemoveChatFromSplit}
             dissolveTabGroup={props.dissolveTabGroup}
             renameTabGroup={props.renameTabGroup}
             setTabGroupColor={props.setTabGroupColor}

@@ -2,14 +2,12 @@ import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import {
   Archive,
   ChevronDown,
-  CircleX,
   Download,
   Folder,
   MoreVertical,
   Pencil,
   Search,
   Terminal,
-  Trash2,
   X
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -85,8 +83,12 @@ export type ChatSplitPanelHeaderProps = {
   onRename?: (session: AgentSession) => void
   onInspect?: (session: AgentSession) => void
   onArchive?: (session: AgentSession) => void | Promise<void>
-  onClose?: (sessionId: string) => void
-  onCloseOthers?: (sessionId: string) => void
+  /**
+   * Sacar el chat del split — no borra el chat, solo lo quita del
+   * grupo. El chat vuelve a estar suelto en su proyecto. Si el grupo
+   * queda con menos de 2 chats después, se auto-disuelve.
+   */
+  onRemoveFromSplit?: (sessionId: string) => void
   onDelete?: (session: AgentSession) => void
 }
 
@@ -110,8 +112,7 @@ export function ChatSplitPanelHeader({
   onRename,
   onInspect,
   onArchive,
-  onClose,
-  onCloseOthers,
+  onRemoveFromSplit,
   onDelete
 }: ChatSplitPanelHeaderProps) {
   const { tabColors, setTabColor } = useSessionTabColors()
@@ -328,37 +329,31 @@ export function ChatSplitPanelHeader({
                       : 'Archive'}
                   </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuSeparator />
-                {onClose ? (
-                  <DropdownMenuItem
-                    className="gap-2 text-[13px]"
-                    onSelect={() => onClose(session.id)}
-                  >
-                    <X className="size-3.5" />
-                    Close
-                  </DropdownMenuItem>
-                ) : null}
-                {onCloseOthers ? (
-                  <DropdownMenuItem
-                    className="gap-2 text-[13px]"
-                    onSelect={() => onCloseOthers(session.id)}
-                  >
-                    <CircleX className="size-3.5" />
-                    Close others
-                  </DropdownMenuItem>
-                ) : null}
-                {onDelete ? (
+                {onRemoveFromSplit ? (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      className="text-destructive focus:text-destructive gap-2 text-[13px]"
-                      onSelect={() => onDelete(session)}
+                      className="gap-2 text-[13px]"
+                      onSelect={() => onRemoveFromSplit(session.id)}
                     >
-                      <Trash2 className="size-3.5" />
-                      Delete
+                      <X className="size-3.5" />
+                      Close
                     </DropdownMenuItem>
                   </>
                 ) : null}
+                {/*
+                  "Close others" no vive acá — sí existe en la strip
+                  global sobre el split entero, pero acá cerrar los
+                  "otros" chats del split individualmente no es una
+                  operación natural. Si el usuario quiere quedarse con
+                  uno solo, mejor disolver el split.
+
+                  Delete tampoco vive acá — es destructivo y fácil
+                  confundir con Close en este contexto. La acción existe
+                  solo en el sidebar izquierdo, donde el usuario ya está
+                  en modo "organizar" y hay
+                  menos riesgo de accidente.
+                */}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}

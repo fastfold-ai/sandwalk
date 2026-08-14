@@ -817,13 +817,12 @@ export function SessionTabs({
             disabled={tabs.length <= 1}
             onClick={() => runAction(() => onCloseOthers(menuSession.id))}
           />
-          <TabContextSeparator />
-          <TabContextItem
-            icon={<Trash2 className="size-3.5" />}
-            label="Delete"
-            destructive
-            onClick={() => runAction(() => onDelete(menuSession))}
-          />
+          {/*
+            Delete queda fuera del context menu de la strip (y del
+            dropdown "All tabs" — mismo menú). Es destructiva y en la
+            strip se lee muy cerca de Close: fácil accidente. La acción
+            vive solo en el sidebar izquierdo, en modo "organizar".
+          */}
         </TabContextMenuShell>
       ) : null}
 

@@ -39,6 +39,14 @@ export type SplitChatPickerPanelProps = {
   projects: AgentProject[]
   /** Todos los grupos existentes — para excluir chats ya agrupados. */
   allTabGroups: SessionGroup[]
+  /**
+   * Sesiones del scope activo (las que ya vive en `bootstrap.sessions`
+   * del app). Evita fetch redundante al abrir el picker si el usuario
+   * elige el mismo proyecto que el activo — el estado global ya está
+   * cargado y hidratado con el ciclo de vida del bootstrap. Solo
+   * fetcheamos si el usuario cambia a otro proyecto.
+   */
+  cachedSessions: AgentSession[]
   onPick: (chatId: string) => void
 }
 
@@ -54,6 +62,7 @@ export function SplitChatPickerPanel({
   activeProjectId,
   projects,
   allTabGroups,
+  cachedSessions,
   onPick
 }: SplitChatPickerPanelProps) {
   const [projectId, setProjectId] = useState<string | null>(activeProjectId)
@@ -72,6 +81,16 @@ export function SplitChatPickerPanel({
   }, [allTabGroups])
 
   useEffect(() => {
+    // Fast path: si el proyecto elegido es el mismo que el activo del
+    // app, reusamos las sesiones ya cacheadas por el bootstrap — sin
+    // fetch. Elimina el race del boot (server aún arrancando) y el
+    // "loading eterno" cuando el usuario abre el picker apenas
+    // terminó el reset dev. El bootstrap se mantiene fresco solo por
+    // el ciclo de eventos SSE / loadSessions.
+    if (projectId === activeProjectId) {
+      setState({ kind: 'ready', sessions: cachedSessions })
+      return
+    }
     let cancelled = false
     setState({ kind: 'loading' })
     ;(async () => {
@@ -94,7 +113,7 @@ export function SplitChatPickerPanel({
     return () => {
       cancelled = true
     }
-  }, [client, projectId, reloadTick])
+  }, [client, projectId, activeProjectId, cachedSessions, reloadTick])
 
   useEffect(() => {
     // Foco al input al abrir para arrancar tipeando de una.
@@ -115,15 +134,13 @@ export function SplitChatPickerPanel({
   const activeProject = projects.find(p => p.id === projectId) || null
 
   return (
-    // Card INTERIOR — se pinta como un widget compacto centrado dentro de
-    // la card exterior (que sí tiene border y la X de cancelar arriba a
-    // la derecha). Máx-ancho para que se lea como un modal pequeño;
-    // máx-alto al 65% del padre para que nunca se estire a todo el
-    // panel — el scroll de la lista vive adentro del body.
+    // Card INTERIOR — widget compacto centrado dentro de la card
+    // exterior (que sí tiene border/focus y la X arriba a la derecha).
+    // Máx-ancho para que se lea como un modal pequeño; máx-alto al 65%
+    // del padre para que nunca se estire a todo el panel — el scroll
+    // de la lista vive adentro del body.
     <div className="bg-background flex w-full max-w-sm max-h-[65%] min-h-0 flex-col overflow-hidden rounded-lg border shadow-sm">
-      {/* Toolbar: proyecto + búsqueda (el título "Elegí un chat" vive
-          fuera de la caja, en la card exterior, para que se lea como
-          instrucción y no como header del widget). */}
+      {/* Toolbar: proyecto + búsqueda. */}
       <div className="flex shrink-0 flex-col gap-2 px-3 py-3">
         <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
