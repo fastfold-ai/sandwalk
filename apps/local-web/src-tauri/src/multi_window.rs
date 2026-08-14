@@ -6,7 +6,13 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::menu::{MenuBuilder, MenuEvent, PredefinedMenuItem, SubmenuBuilder};
+use tauri::image::Image;
+use tauri::menu::{
+    AboutMetadata, MenuBuilder, MenuEvent, PredefinedMenuItem, SubmenuBuilder,
+};
+
+/// Default dark Dock tile (1024×1024 squircle + border) — same asset as dark theme.
+static ABOUT_ICON_PNG: &[u8] = include_bytes!("../icons/dock/dock-dark.png");
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const MAX_RECENTS: usize = 12;
@@ -50,6 +56,9 @@ pub struct WindowRecent {
     /// Remote machine hostname from `/v1/discover` (e.g. `Julios-Mac-mini`).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub hostname: String,
+    /// OS family from LAN scan / discover (`Darwin`, `Linux`, `Windows`, …).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub platform: String,
     /// Legacy field — kept for older window-recents.json files.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -66,6 +75,8 @@ pub struct OpenWindowArgs {
     pub snapshot_id: Option<String>,
     /// Friendly remote hostname (from LAN scan / discover).
     pub hostname: Option<String>,
+    /// OS from LAN scan / discover — stored on the recent so WelcomeHome need not probe.
+    pub platform: Option<String>,
     /// When true, focus an existing window for this snapshot/url instead of opening another.
     #[serde(default)]
     pub focus_existing: bool,
@@ -85,6 +96,52 @@ struct MenuActionPayload {
     snapshot_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    platform: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ApplyAuthPayload {
+    url: String,
+    api_key: String,
+}
+
+fn apply_auth_script(backend_url: &str, api_key: &str) -> String {
+    let http = normalize_url(backend_url);
+    let http_js = serde_json::to_string(&http).unwrap_or_else(|_| "\"\"".into());
+    let key_js = serde_json::to_string(api_key).unwrap_or_else(|_| "\"\"".into());
+    format!(
+        r#"try{{
+  window.__SANDWALK_HTTP__={http_js};
+  window.__SANDWALK_API_KEY__={key_js};
+  var prev={{}};
+  try{{
+    var n=window.name||'';
+    if(n.indexOf('sandwalk-bind:')===0)prev=JSON.parse(n.slice(14))||{{}};
+  }}catch(e){{}}
+  prev.http={http_js};
+  prev.apiKey={key_js};
+  window.name='sandwalk-bind:'+JSON.stringify(prev);
+}}catch(e){{}}"#,
+        http_js = http_js,
+        key_js = key_js
+    )
+}
+
+fn apply_auth_to_window(window: &WebviewWindow, backend_url: &str, api_key: Option<&str>) {
+    let Some(key) = api_key.map(str::trim).filter(|k| !k.is_empty()) else {
+        return;
+    };
+    let url = normalize_url(backend_url);
+    let _ = window.eval(&apply_auth_script(&url, key));
+    let _ = window.emit(
+        "sandwalk-apply-auth",
+        ApplyAuthPayload {
+            url,
+            api_key: key.to_string(),
+        },
+    );
 }
 
 fn support_dir() -> PathBuf {
@@ -212,6 +269,11 @@ fn write_recents(rows: &[WindowRecent]) -> Result<(), String> {
     fs::write(recents_path(), raw).map_err(|e| e.to_string())
 }
 
+/// Notify every WebView that `window-recents.json` changed (WelcomeHome list).
+fn emit_recents_changed(app: &AppHandle) {
+    let _ = app.emit("sandwalk-window-recents-changed", ());
+}
+
 fn hostport_from_url(url: &str) -> Option<String> {
     let url = normalize_url(url);
     if url.contains("127.0.0.1") || url.to_lowercase().contains("localhost") {
@@ -313,6 +375,28 @@ fn recent_menu_label(row: &WindowRecent) -> String {
     format!("{title} — {hostport}")
 }
 
+fn normalize_platform(raw: Option<&str>) -> String {
+    raw.map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("")
+        .to_string()
+}
+
+fn local_platform() -> String {
+    match std::env::consts::OS {
+        "macos" => "Darwin".into(),
+        "windows" => "Windows".into(),
+        other => {
+            // "linux", etc. — match `/v1/discover` platform.system() style.
+            let mut chars = other.chars();
+            match chars.next() {
+                Some(c) => format!("{}{}", c.to_ascii_uppercase(), chars.as_str()),
+                None => other.into(),
+            }
+        }
+    }
+}
+
 /// Upsert a window snapshot into Open Recent (keyed by snapshot id).
 pub fn upsert_recent_snapshot(
     snapshot_id: &str,
@@ -320,6 +404,7 @@ pub fn upsert_recent_snapshot(
     route: &str,
     title: &str,
     hostname: Option<&str>,
+    platform: Option<&str>,
 ) {
     let url = normalize_url(url);
     let route = {
@@ -332,6 +417,7 @@ pub fn upsert_recent_snapshot(
         .filter(|s| !s.is_empty())
         .map(short_hostname)
         .unwrap_or_default();
+    let platform = normalize_platform(platform);
     let title = {
         let t = page_title_only(title, &url, &hostname);
         if t.is_empty() {
@@ -354,6 +440,7 @@ pub fn upsert_recent_snapshot(
                 route,
                 title: "Local".into(),
                 hostname: String::new(),
+                platform: local_platform(),
                 label: None,
                 last_opened_at: now_secs(),
             },
@@ -372,16 +459,34 @@ pub fn upsert_recent_snapshot(
         snapshot_id.trim().to_string()
     };
     let mut rows = read_recents();
-    // Keep a previously learned hostname when this upsert omits it.
-    let prior_host = rows
+    // Keep previously learned hostname / platform when this upsert omits them.
+    let prior = rows
         .iter()
-        .find(|r| r.id == id || (normalize_url(&r.url) == url && !r.hostname.is_empty()))
-        .map(|r| r.hostname.clone())
-        .filter(|h| !h.is_empty());
+        .find(|r| r.id == id || normalize_url(&r.url) == url)
+        .cloned();
     let hostname = if hostname.is_empty() {
-        prior_host.unwrap_or_default()
+        prior
+            .as_ref()
+            .map(|r| r.hostname.clone())
+            .filter(|h| !h.is_empty())
+            .unwrap_or_default()
     } else {
         hostname
+    };
+    let platform = if platform.is_empty() {
+        prior
+            .as_ref()
+            .map(|r| r.platform.clone())
+            .filter(|p| !p.is_empty())
+            .unwrap_or_else(|| {
+                if is_local_url(&url) {
+                    local_platform()
+                } else {
+                    String::new()
+                }
+            })
+    } else {
+        platform
     };
     rows.retain(|r| {
         r.id != id
@@ -396,6 +501,7 @@ pub fn upsert_recent_snapshot(
             route,
             title,
             hostname,
+            platform,
             label: None,
             last_opened_at: now_secs(),
         },
@@ -408,14 +514,27 @@ pub fn upsert_recent_snapshot(
 pub fn remember_recent(url: &str) {
     let url = normalize_url(url);
     if is_local_url(&url) {
-        upsert_recent_snapshot("local", &url, "/", "Local", None);
+        upsert_recent_snapshot("local", &url, "/", "Local", None, Some(&local_platform()));
         return;
     }
-    upsert_recent_snapshot(&new_snapshot_id(), &url, "/", "Sandwalk", None);
+    upsert_recent_snapshot(&new_snapshot_id(), &url, "/", "Sandwalk", None, None);
 }
 
 pub fn clear_recents() {
     let _ = write_recents(&[]);
+}
+
+pub fn remove_recent(id: &str) {
+    let id = id.trim();
+    if id.is_empty() {
+        return;
+    }
+    let mut rows = read_recents();
+    let before = rows.len();
+    rows.retain(|row| row.id != id);
+    if rows.len() != before {
+        let _ = write_recents(&rows);
+    }
 }
 
 pub fn window_title_for_url(url: &str) -> String {
@@ -691,6 +810,7 @@ pub fn build_sandwalk_window(
     initial_route: Option<&str>,
     snapshot_id: Option<&str>,
     hostname: Option<&str>,
+    platform: Option<&str>,
     hide_on_close: bool,
     is_spa_route: impl Fn(&str) -> bool,
     apply_glass: Option<ApplyGlassFn>,
@@ -745,7 +865,8 @@ pub fn build_sandwalk_window(
     // Only seed Open Recent for remotes (or non-generic titles). Blank local
     // windows are recorded later by the SPA once a real session/page title exists.
     if !is_generic_local_snapshot(backend_url, route, title) {
-        upsert_recent_snapshot(&snap, backend_url, route, title, hostname);
+        upsert_recent_snapshot(&snap, backend_url, route, title, hostname, platform);
+        emit_recents_changed(app);
     }
     let _ = install_app_menu(app);
     Ok(window)
@@ -777,6 +898,12 @@ pub fn open_or_focus_window(
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string());
+    let platform = args
+        .platform
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
     let title = args
         .title
         .as_deref()
@@ -803,11 +930,20 @@ pub fn open_or_focus_window(
             let _ = existing.unminimize();
             let _ = existing.show();
             let _ = existing.set_focus();
+            apply_auth_to_window(&existing, &url, args.api_key.as_deref());
             let id = snapshot_id
                 .clone()
                 .or_else(|| snapshot_id_for_label(existing.label()))
                 .unwrap_or_else(new_snapshot_id);
-            upsert_recent_snapshot(&id, &url, &route, &title, hostname.as_deref());
+            upsert_recent_snapshot(
+                &id,
+                &url,
+                &route,
+                &title,
+                hostname.as_deref(),
+                platform.as_deref(),
+            );
+            emit_recents_changed(app);
             let _ = install_app_menu(app);
             return Ok(existing.label().to_string());
         }
@@ -827,12 +963,14 @@ pub fn open_or_focus_window(
         Some(&route),
         snapshot_id.as_deref(),
         hostname.as_deref(),
+        platform.as_deref(),
         false,
         is_spa_route,
         apply_glass,
     )?;
     let _ = window.show();
     let _ = window.set_focus();
+    apply_auth_to_window(&window, &url, args.api_key.as_deref());
     Ok(label)
 }
 
@@ -871,9 +1009,26 @@ pub fn install_app_menu(app: &AppHandle) -> Result<(), String> {
 
     // First submenu becomes the macOS app menu (named "Sandwalk" by the OS).
     // Without this, File is absorbed and disappears from the menu bar.
+    // Native About panel (orderFrontStandardAboutPanel) — traffic-light
+    // window chrome, not an in-webview modal.
+    let about_icon = Image::from_bytes(ABOUT_ICON_PNG)
+        .ok()
+        .or_else(|| app.default_window_icon().cloned());
+    // ApplicationVersion shows as the main line; Version (build) is the
+    // parenthetical. Leaving short_version unset falls back to Info.plist
+    // CFBundleVersion and duplicates the same number — pass "" to hide it.
+    let about = AboutMetadata {
+        name: Some("Sandwalk".into()),
+        version: Some(format!("Version {}", env!("CARGO_PKG_VERSION"))),
+        short_version: Some(String::new()),
+        copyright: Some("© 2026 Fastfold AI Labs. All rights reserved.".into()),
+        authors: Some(vec!["Fastfold AI Labs".into()]),
+        icon: about_icon,
+        ..Default::default()
+    };
     let app_menu = SubmenuBuilder::new(app, "Sandwalk")
         .item(
-            &PredefinedMenuItem::about(app, Some("Sandwalk"), None)
+            &PredefinedMenuItem::about(app, Some("About Sandwalk"), Some(about))
                 .map_err(|e| e.to_string())?,
         )
         .text("check-updates", "Check for Updates…")
@@ -947,16 +1102,18 @@ pub fn handle_menu_event(
     let id = event.id().as_ref();
     match id {
         "new-window" => {
-            let url = focused_backend_url(app, fallback_url);
+            // Welcome / connection chooser — do not bind to the focused
+            // window's backend. Cold start on `main` still restores last session.
             let _ = open_or_focus_window(
                 app,
                 OpenWindowArgs {
-                    backend_url: Some(url),
+                    backend_url: Some(normalize_url(fallback_url)),
                     api_key: None,
-                    title: None,
+                    title: Some("Sandwalk".into()),
                     route: Some("/".into()),
                     snapshot_id: None,
                     hostname: None,
+                    platform: None,
                     focus_existing: false,
                 },
                 fallback_url,
@@ -974,6 +1131,7 @@ pub fn handle_menu_event(
                     title: None,
                     snapshot_id: None,
                     hostname: None,
+                    platform: None,
                 },
             );
         }
@@ -987,6 +1145,7 @@ pub fn handle_menu_event(
                     title: None,
                     snapshot_id: None,
                     hostname: None,
+                    platform: None,
                 },
             );
         }
@@ -995,6 +1154,7 @@ pub fn handle_menu_event(
         }
         "clear-recent" => {
             clear_recents();
+            emit_recents_changed(app);
             let _ = install_app_menu(app);
         }
         "recent-empty" => {}
@@ -1012,6 +1172,7 @@ pub fn handle_menu_event(
                 row.route.clone()
             };
             let hostname = row.hostname.trim().to_string();
+            let platform = row.platform.trim().to_string();
             emit_menu_action(
                 app,
                 MenuActionPayload {
@@ -1021,6 +1182,7 @@ pub fn handle_menu_event(
                     title: Some(title),
                     snapshot_id: Some(row.id),
                     hostname: (!hostname.is_empty()).then_some(hostname),
+                    platform: (!platform.is_empty()).then_some(platform),
                 },
             );
         }
@@ -1093,6 +1255,14 @@ pub fn desktop_list_window_recents() -> Result<Vec<WindowRecent>, String> {
 #[tauri::command]
 pub fn desktop_clear_window_recents(app: AppHandle) -> Result<(), String> {
     clear_recents();
+    emit_recents_changed(&app);
+    install_app_menu(&app)
+}
+
+#[tauri::command]
+pub fn desktop_remove_window_recent(app: AppHandle, id: String) -> Result<(), String> {
+    remove_recent(&id);
+    emit_recents_changed(&app);
     install_app_menu(&app)
 }
 
@@ -1106,6 +1276,7 @@ pub fn desktop_upsert_window_snapshot(
     route: String,
     title: String,
     hostname: Option<String>,
+    platform: Option<String>,
 ) -> Result<String, String> {
     let label = window.label().to_string();
     let id = snapshot_id
@@ -1116,7 +1287,15 @@ pub fn desktop_upsert_window_snapshot(
         .or_else(|| snapshot_id_for_label(&label))
         .unwrap_or_else(new_snapshot_id);
     register_window_backend_with_snapshot(&label, &url, Some(&id));
-    upsert_recent_snapshot(&id, &url, &route, &title, hostname.as_deref());
+    upsert_recent_snapshot(
+        &id,
+        &url,
+        &route,
+        &title,
+        hostname.as_deref(),
+        platform.as_deref(),
+    );
+    emit_recents_changed(&app);
     install_app_menu(&app)?;
     Ok(id)
 }
@@ -1130,10 +1309,12 @@ pub fn desktop_remember_window_recent(app: AppHandle, url: String) -> Result<(),
         .find(|(_, w)| w.is_focused().unwrap_or(false))
     {
         if let Some(id) = snapshot_id_for_label(label.as_str()) {
-            upsert_recent_snapshot(&id, &url, "/", "Sandwalk", None);
+            upsert_recent_snapshot(&id, &url, "/", "Sandwalk", None, None);
+            emit_recents_changed(&app);
             return install_app_menu(&app);
         }
     }
     remember_recent(&url);
+    emit_recents_changed(&app);
     install_app_menu(&app)
 }

@@ -19,6 +19,7 @@ import { type NavigateFunction, useLocation } from 'react-router-dom'
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { DesktopDragRegion } from '@/components/DesktopDragRegion'
+import { DesktopUpdateBanner } from '@/components/DesktopUpdateBanner'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import { Button } from '@/components/ui/button'
 import {
@@ -53,7 +54,6 @@ type AgentSessionSidebarProps = {
   onNavigateHome: () => void
   onSelectAllProjects: () => void
   onSelectProject: (projectId: string) => void
-  onOpenProjectSettings: () => void
   onNewProject: () => void
   onRefreshProjects?: () => void | Promise<void>
   onOpenGlobalSearch: () => void
@@ -109,7 +109,6 @@ export function AgentSessionSidebar({
   onNavigateHome,
   onSelectAllProjects,
   onSelectProject,
-  onOpenProjectSettings,
   onNewProject,
   onRefreshProjects,
   onOpenGlobalSearch,
@@ -171,7 +170,6 @@ export function AgentSessionSidebar({
             value={activeProjectId}
             onSelectAll={onSelectAllProjects}
             onSelectProject={onSelectProject}
-            onOpenSettings={onOpenProjectSettings}
             onNewProject={onNewProject}
             onRefresh={onRefreshProjects}
           />
@@ -303,6 +301,7 @@ export function AgentSessionSidebar({
           onBatchSplitView={onBatchSplitView}
           canSplitView={canBatchSplitView}
         />
+        <DesktopUpdateBanner />
         <SidebarUserMenu
           userName={sidebarUserName}
           onLogout={onLogout}

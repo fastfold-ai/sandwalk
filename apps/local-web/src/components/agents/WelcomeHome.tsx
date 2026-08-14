@@ -1,24 +1,26 @@
-import { Loader2, Monitor, Network, Trash2 } from 'lucide-react'
+import { Loader2, Monitor, Network, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { OsPlatformIcon } from '@/components/agents/os-platform-icon'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { DEFAULT_BACKEND_URL, isLocalBackendUrl } from '@/lib/backend-url'
 import {
-  DEFAULT_BACKEND_URL,
-  isLocalBackendUrl,
-  normalizeBackendUrl
-} from '@/lib/backend-url'
-import {
-  clearDesktopWindowRecents,
+  desktopLocalHostname,
   type DesktopWindowRecent,
+  hideDesktopWindow,
   isTauri,
   listDesktopWindowRecents,
-  platformOS
+  listenDesktopWindowRecentsChanged,
+  openDesktopServerSettings,
+  platformOS,
+  removeDesktopWindowRecent
 } from '@/lib/desktop'
 import { openDesktopRecent } from '@/lib/open-desktop-recent'
+import { readCachedRemotePlatform } from '@/lib/remote-hostname'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 function hostport(url: string): string {
   try {
@@ -38,23 +40,32 @@ function shortHostname(raw: string): string {
   return noLocal.split('.')[0] || noLocal
 }
 
-function formatRecent(row: DesktopWindowRecent): { title: string; detail: string } {
+/** `hostname · host:port` when hostname differs from the address host. */
+function hostDetail(hostname: string | null | undefined, address: string): string {
+  const host = shortHostname(hostname || '')
+  const ip = address.split(':')[0] || address
+  if (host && host.toLowerCase() !== ip.toLowerCase()) {
+    return `${host} · ${address}`
+  }
+  return address
+}
+
+function formatRecent(
+  row: DesktopWindowRecent,
+  localHostname?: string | null
+): { title: string; detail: string } {
   const rawTitle = (row.title || row.label || 'Sandwalk').trim() || 'Sandwalk'
   if (isLocalBackendUrl(row.url)) {
     return {
       title:
         rawTitle === 'Sandwalk' || rawTitle === 'Local' ? 'Local' : rawTitle,
-      detail: hostport(row.url)
+      detail: hostDetail(localHostname, hostport(row.url))
     }
   }
-  const short = shortHostname(row.hostname || '')
-  const port = hostport(row.url)
-  const ip = port.split(':')[0] || port
-  const detail =
-    short && short.toLowerCase() !== ip.toLowerCase()
-      ? `${short} · ${port}`
-      : port
-  return { title: rawTitle, detail }
+  return {
+    title: rawTitle,
+    detail: hostDetail(row.hostname, hostport(row.url))
+  }
 }
 
 function localPlatformHint(): string {
@@ -75,23 +86,14 @@ function hostnamePlatformHint(hostname: string | undefined): string {
   return ''
 }
 
-async function resolveRecentPlatform(
-  url: string,
-  hostname?: string
-): Promise<string> {
-  if (isLocalBackendUrl(url)) return localPlatformHint()
-  const hint = hostnamePlatformHint(hostname)
-  try {
-    const res = await fetch(`${normalizeBackendUrl(url)}/v1/discover`, {
-      method: 'GET',
-      headers: { Accept: 'application/json' }
-    })
-    if (!res.ok) return hint
-    const body = (await res.json()) as { platform?: string }
-    return (body.platform || '').trim() || hint
-  } catch {
-    return hint
-  }
+/** Icon OS from stored recent / cache only — never probes the network. */
+function recentPlatform(row: DesktopWindowRecent): string {
+  if (isLocalBackendUrl(row.url)) return localPlatformHint()
+  const stored = (row.platform || '').trim()
+  if (stored) return stored
+  const cached = readCachedRemotePlatform(row.url)
+  if (cached) return cached
+  return hostnamePlatformHint(row.hostname)
 }
 
 export function WelcomeHome({
@@ -104,45 +106,33 @@ export function WelcomeHome({
   onOpenRemote: (prefillUrl?: string | null) => void
 }) {
   const [recents, setRecents] = useState<DesktopWindowRecent[]>([])
-  const [platforms, setPlatforms] = useState<Record<string, string>>({})
   const [loadingRecents, setLoadingRecents] = useState(isTauri())
   const [openingId, setOpeningId] = useState<string | null>(null)
+  const [localHostname, setLocalHostname] = useState<string | null>(null)
 
-  const refreshRecents = useCallback(async () => {
+  useEffect(() => {
+    if (!isTauri()) return
+    let cancelled = false
+    void desktopLocalHostname().then(name => {
+      if (!cancelled) setLocalHostname(name)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const refreshRecents = useCallback(async (options?: { silent?: boolean }) => {
     if (!isTauri()) {
       setRecents([])
-      setPlatforms({})
       setLoadingRecents(false)
       return
     }
-    setLoadingRecents(true)
+    if (!options?.silent) setLoadingRecents(true)
     try {
       const rows = (await listDesktopWindowRecents()) ?? []
       setRecents(rows)
-      // Seed local / hostname hints immediately; refine via /v1/discover.
-      const seeded: Record<string, string> = {}
-      for (const row of rows) {
-        const key = row.id || row.url
-        const hint = isLocalBackendUrl(row.url)
-          ? localPlatformHint()
-          : hostnamePlatformHint(row.hostname)
-        if (hint) seeded[key] = hint
-      }
-      setPlatforms(seeded)
-      void Promise.all(
-        rows.map(async row => {
-          const key = row.id || row.url
-          const platform = await resolveRecentPlatform(row.url, row.hostname)
-          if (platform) {
-            setPlatforms(prev =>
-              prev[key] === platform ? prev : { ...prev, [key]: platform }
-            )
-          }
-        })
-      )
     } catch {
       setRecents([])
-      setPlatforms({})
     } finally {
       setLoadingRecents(false)
     }
@@ -150,6 +140,32 @@ export function WelcomeHome({
 
   useEffect(() => {
     void refreshRecents()
+  }, [refreshRecents])
+
+  // Other windows append Open Recent when they connect — refresh this list live.
+  useEffect(() => {
+    if (!isTauri()) return
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+    void listenDesktopWindowRecentsChanged(() => {
+      if (!cancelled) void refreshRecents({ silent: true })
+    }).then(fn => {
+      if (cancelled) fn()
+      else unlisten = fn
+    })
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshRecents({ silent: true })
+      }
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      cancelled = true
+      unlisten?.()
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
   }, [refreshRecents])
 
   const openRecent = async (row: DesktopWindowRecent) => {
@@ -161,9 +177,20 @@ export function WelcomeHome({
         route: row.route,
         title: row.title,
         id: row.id,
-        hostname: row.hostname
+        hostname: row.hostname,
+        platform: row.platform
       })
-      if (!result.opened) onOpenRemote(result.url)
+      if (!result.opened) {
+        onOpenRemote(result.url)
+        return
+      }
+      // Remote (and other-window) opens leave this launcher empty — hide it.
+      // Connect locally uses the same window via onConnectLocal instead.
+      if (!isLocalBackendUrl(row.url) && isTauri()) {
+        void hideDesktopWindow().catch(() => {
+          // ignore
+        })
+      }
     } catch {
       onOpenRemote(row.url)
     } finally {
@@ -171,51 +198,78 @@ export function WelcomeHome({
     }
   }
 
-  const clearRecents = async () => {
-    if (!isTauri()) return
+  const removeRecent = async (row: DesktopWindowRecent) => {
+    const id = (row.id || '').trim()
+    setRecents(prev =>
+      prev.filter(item => (item.id || item.url) !== (row.id || row.url))
+    )
+    if (!isTauri() || !id) return
     try {
-      await clearDesktopWindowRecents()
+      await removeDesktopWindowRecent(id)
     } catch {
-      // ignore
+      void refreshRecents({ silent: true })
     }
-    setRecents([])
+  }
+
+  const localCardDetail =
+    (localHostname || '').trim() ||
+    DEFAULT_BACKEND_URL.replace(/^https?:\/\//, '')
+
+  const openSettings = () => {
+    if (!isTauri()) {
+      toast.error('Server Settings is available in the Sandwalk desktop app.')
+      return
+    }
+    void openDesktopServerSettings().catch((err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Unable to open Server Settings'
+      toast.error(message)
+    })
   }
 
   return (
-    <main className="bg-background relative grid h-full place-items-center overflow-auto p-8">
+    <main className="bg-background relative flex h-full min-h-0 flex-col overflow-hidden px-8 pb-6 pt-10">
       <ThemeToggle placement="top-right" />
-      <div className="flex w-full max-w-xl flex-col items-stretch gap-10">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <SandwalkMark className="text-foreground h-12 w-12" />
-          <div>
+      <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-8">
+        <div className="flex shrink-0 items-center gap-3">
+          <SandwalkMark className="text-foreground h-11 w-11" />
+          <div className="flex flex-col items-start leading-tight">
             <h1 className="text-2xl font-semibold tracking-tight">sandwalk</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Choose a local or remote agent workspace
+            <p className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-sm">
+              <span>{__UI_VERSION__}</span>
+              <span aria-hidden>·</span>
+              <button
+                type="button"
+                onClick={openSettings}
+                className="text-sky-500 hover:text-sky-400 transition-colors"
+              >
+                Settings
+              </button>
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
             disabled={connecting}
             onClick={() => void onConnectLocal()}
             className={cn(
-              'border-border hover:bg-muted/40 flex items-center gap-3 rounded-xl border px-4 py-4 text-left transition-colors',
+              'bg-muted/50 hover:bg-muted/70 flex items-center gap-3 rounded-xl px-4 py-4 text-left transition-colors',
               'disabled:pointer-events-none disabled:opacity-50'
             )}
           >
-            <span className="bg-muted text-foreground grid size-10 place-items-center rounded-lg">
+            <span className="text-foreground shrink-0">
               {connecting ? (
                 <Loader2 className="size-5 animate-spin" />
               ) : (
                 <Monitor className="size-5" />
               )}
             </span>
-            <span>
+            <span className="min-w-0">
               <span className="block text-sm font-medium">Connect locally</span>
-              <span className="text-muted-foreground block text-xs">
-                {DEFAULT_BACKEND_URL.replace(/^https?:\/\//, '')}
+              <span className="text-muted-foreground block truncate text-xs">
+                {localCardDetail}
               </span>
             </span>
           </button>
@@ -224,40 +278,26 @@ export function WelcomeHome({
             disabled={connecting}
             onClick={() => onOpenRemote(null)}
             className={cn(
-              'border-border hover:bg-muted/40 flex items-center gap-3 rounded-xl border px-4 py-4 text-left transition-colors',
+              'bg-muted/50 hover:bg-muted/70 flex items-center gap-3 rounded-xl px-4 py-4 text-left transition-colors',
               'disabled:pointer-events-none disabled:opacity-50'
             )}
           >
-            <span className="bg-muted text-foreground grid size-10 place-items-center rounded-lg">
+            <span className="text-foreground shrink-0">
               <Network className="size-5" />
             </span>
-            <span>
-              <span className="block text-sm font-medium">Open remote…</span>
-              <span className="text-muted-foreground block text-xs">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">Open remote</span>
+              <span className="text-muted-foreground block truncate text-xs">
                 LAN scan or paste a URL
               </span>
             </span>
           </button>
         </div>
 
-        <section className="min-h-[8rem]">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              Recent
-            </h2>
-            {recents.length > 0 ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground h-7 px-2 text-xs"
-                onClick={() => void clearRecents()}
-              >
-                <Trash2 className="size-3.5" />
-                Clear
-              </Button>
-            ) : null}
-          </div>
+        <section className="flex min-h-0 flex-1 flex-col">
+          <h2 className="text-muted-foreground mb-2 shrink-0 text-xs font-medium tracking-wide uppercase">
+            Recent
+          </h2>
 
           {loadingRecents ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -269,45 +309,61 @@ export function WelcomeHome({
               No recent workspaces yet. Connect locally or open a remote server.
             </p>
           ) : (
-            <ul className="divide-border divide-y">
-              {recents.map(row => {
-                const { title, detail } = formatRecent(row)
-                const key = row.id || row.url
-                const busy = openingId === key
-                return (
-                  <li key={row.id || `${row.url}:${row.route}:${row.lastOpenedAt}`}>
-                    <button
-                      type="button"
-                      disabled={connecting || Boolean(openingId)}
-                      onClick={() => void openRecent(row)}
-                      className="hover:bg-muted/40 flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors disabled:opacity-50"
+            <ScrollArea className="h-full min-h-0 flex-1">
+              <ul className="pr-2">
+                {recents.map(row => {
+                  const { title, detail } = formatRecent(row, localHostname)
+                  const key = row.id || row.url
+                  const busy = openingId === key
+                  return (
+                    <li
+                      key={
+                        row.id || `${row.url}:${row.route}:${row.lastOpenedAt}`
+                      }
+                      className="group hover:bg-muted/60 relative flex items-center rounded-lg transition-colors"
                     >
-                      <OsPlatformIcon
-                        platform={
-                          platforms[key] ||
-                          (isLocalBackendUrl(row.url)
-                            ? localPlatformHint()
-                            : row.hostname)
-                        }
-                        className="size-7"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
+                      <button
+                        type="button"
+                        disabled={connecting || Boolean(openingId)}
+                        onClick={() => void openRecent(row)}
+                        className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pr-8 pl-2 text-left disabled:opacity-50"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
                           {title}
                         </span>
-                      </span>
-                      <span className="text-muted-foreground shrink-0 text-xs">
-                        {busy ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          detail
+                        <span className="text-muted-foreground flex min-w-0 shrink-0 items-center gap-1.5 text-xs">
+                          {busy ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <span className="max-w-[14rem] truncate">
+                                {detail}
+                              </span>
+                              <OsPlatformIcon
+                                platform={recentPlatform(row)}
+                                dense
+                              />
+                            </>
+                          )}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${title}`}
+                        disabled={connecting || Boolean(openingId)}
+                        onClick={() => void removeRecent(row)}
+                        className={cn(
+                          'text-muted-foreground hover:bg-background/80 hover:text-foreground absolute right-1 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md',
+                          'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100'
                         )}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </ScrollArea>
           )}
         </section>
       </div>

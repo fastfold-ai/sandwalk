@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
+import logging
+import shutil
+import tempfile
+import threading
 from pathlib import Path
+
+logger = logging.getLogger("runner")
+
+_STAGING_LOCK = threading.Lock()
 
 
 def skill_source_dirs() -> list[str]:
@@ -27,17 +36,42 @@ def skill_source_dirs() -> list[str]:
     return sources
 
 
+def _staging_complete(staging: Path, expected: set[str]) -> bool:
+    if not staging.is_dir():
+        return False
+    present = {p.name for p in staging.iterdir() if p.is_dir() or p.is_symlink()}
+    return expected <= present
+
+
+def _link_or_copy(directory: Path, link: Path) -> None:
+    """Install ``directory`` at ``link``; tolerate concurrent creators."""
+    if link.exists() or link.is_symlink():
+        return
+    try:
+        link.symlink_to(directory, target_is_directory=True)
+        return
+    except FileExistsError:
+        return
+    except OSError:
+        pass
+    if link.exists() or link.is_symlink():
+        return
+    try:
+        shutil.copytree(directory, link)
+    except FileExistsError:
+        return
+
+
 def skill_source_dirs_for_names(skill_names: list[str]) -> list[str]:
     """Stage only the named skills into a temp directory for deepagents ``skills=``.
 
     When a specialist scopes a run, deepagents still expects parent directories that
     contain skill folders — so we symlink the selected skill directories into a
     staging root and return that root alone.
-    """
-    import hashlib
-    import shutil
-    import tempfile
 
+    Staging is keyed by content hash and reused across concurrent callers so
+    Context estimates / bench cells / agent runs do not race on rmtree+mkdir.
+    """
     from agent.skills import skill_info
 
     names = [str(name).strip() for name in skill_names if str(name).strip()]
@@ -57,22 +91,47 @@ def skill_source_dirs_for_names(skill_names: list[str]) -> list[str]:
     if not resolved:
         return []
 
+    expected = {key for key, _ in resolved}
     stamp = hashlib.sha1(
         "|".join(sorted(f"{key}:{path}" for key, path in resolved)).encode()
     ).hexdigest()[:16]
-    staging = Path(tempfile.gettempdir()) / "sandwalk-specialist-skills" / stamp
-    if staging.exists():
-        shutil.rmtree(staging, ignore_errors=True)
-    staging.mkdir(parents=True, exist_ok=True)
-    for key, directory in resolved:
-        link = staging / key
-        if link.exists() or link.is_symlink():
-            link.unlink()
+    root = Path(tempfile.gettempdir()) / "sandwalk-specialist-skills"
+    staging = root / stamp
+
+    with _STAGING_LOCK:
+        if _staging_complete(staging, expected):
+            return [str(staging)]
+
+        root.mkdir(parents=True, exist_ok=True)
+        # Build atomically in a unique dir, then rename into place so concurrent
+        # callers never observe a half-deleted shared stamp directory.
+        work = Path(tempfile.mkdtemp(prefix=f"{stamp}-", dir=str(root)))
         try:
-            link.symlink_to(directory, target_is_directory=True)
-        except OSError:
-            shutil.copytree(directory, link)
-    return [str(staging)]
+            for key, directory in resolved:
+                _link_or_copy(directory, work / key)
+            if staging.exists() and not _staging_complete(staging, expected):
+                shutil.rmtree(staging, ignore_errors=True)
+            if not staging.exists():
+                work.rename(staging)
+            else:
+                shutil.rmtree(work, ignore_errors=True)
+        except Exception:  # noqa: BLE001
+            shutil.rmtree(work, ignore_errors=True)
+            logger.warning(
+                "skill staging failed for stamp=%s; falling back to empty list",
+                stamp,
+                exc_info=True,
+            )
+            return []
+
+        if not _staging_complete(staging, expected):
+            for key, directory in resolved:
+                _link_or_copy(directory, staging / key)
+
+        if not _staging_complete(staging, expected):
+            logger.warning("skill staging incomplete for stamp=%s", stamp)
+            return []
+        return [str(staging)]
 
 
 def resolve_skill_source_dirs(

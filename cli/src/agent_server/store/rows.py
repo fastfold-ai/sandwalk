@@ -100,7 +100,10 @@ def specialist_from_row(row: sqlite3.Row) -> Specialist:
 
 
 def project_from_row(row: sqlite3.Row, *, session_count: int = 0) -> AgentProject:
+    from agent_server.widget_layout import parse_layout
+
     keys = set(row.keys())
+    raw_layout = row["home_layout"] if "home_layout" in keys else None
     return AgentProject(
         id=row["id"],
         name=row["name"],
@@ -110,6 +113,9 @@ def project_from_row(row: sqlite3.Row, *, session_count: int = 0) -> AgentProjec
         icon=(row["icon"] if "icon" in keys and row["icon"] else "folder"),
         color=(row["color"] if "color" in keys and row["color"] else "neutral"),
         pinned=bool(row["pinned"]),
+        home_layout=parse_layout(
+            None if raw_layout is None else str(raw_layout)
+        ),
         session_count=session_count,
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"]),

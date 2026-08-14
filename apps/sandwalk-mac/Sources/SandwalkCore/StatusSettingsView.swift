@@ -172,6 +172,7 @@ struct StatusSettingsView: View {
         }
     }
 
+    @MainActor
     func refresh() {
         overall = SandwalkRuntime.supervisor?.overall ?? .stopped
         config = SandwalkRuntime.config

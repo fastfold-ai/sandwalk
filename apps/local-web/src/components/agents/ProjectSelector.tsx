@@ -5,8 +5,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
-  Search,
-  Settings
+  Search
 } from 'lucide-react'
 import { type UIEvent,useEffect, useMemo, useState } from 'react'
 
@@ -53,7 +52,6 @@ export function ProjectSelector({
   value,
   onSelectAll,
   onSelectProject,
-  onOpenSettings,
   onNewProject,
   onRefresh
 }: {
@@ -61,7 +59,6 @@ export function ProjectSelector({
   value: string | null
   onSelectAll: () => void
   onSelectProject: (projectId: string) => void
-  onOpenSettings: () => void
   onNewProject: () => void
   onRefresh?: () => void | Promise<void>
 }) {
@@ -196,31 +193,14 @@ export function ProjectSelector({
         </div>
 
         <div className="p-1.5">
-          {active ? (
-            <>
-              <DropdownMenuItem
-                className="gap-2"
-                onSelect={() => {
-                  setOpen(false)
-                  onOpenSettings()
-                }}
-              >
-                <Settings className="size-3.5" />
-                Project settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          ) : null}
-
           <DropdownMenuItem
-            className="gap-2"
+            className={cn('gap-2', value === null && 'bg-muted')}
             onSelect={() => {
               setOpen(false)
               onSelectAll()
             }}
           >
             <span className="min-w-0 flex-1 truncate">All</span>
-            {value === null ? <Check className="size-3.5 shrink-0" /> : null}
           </DropdownMenuItem>
 
           {benchCount > 0 ? (
@@ -258,7 +238,10 @@ export function ProjectSelector({
                   {visible.map(project => (
                     <DropdownMenuItem
                       key={project.id}
-                      className="items-start gap-2 py-2"
+                      className={cn(
+                        'items-center gap-2 py-2',
+                        value === project.id && 'bg-muted'
+                      )}
                       onSelect={() => {
                         setOpen(false)
                         onSelectProject(project.id)
@@ -267,30 +250,15 @@ export function ProjectSelector({
                       <ProjectMark
                         icon={project.icon}
                         color={project.color}
-                        className="mt-0.5 size-6"
+                        className="size-6"
                         iconClassName="size-3"
                       />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm">{project.name}</div>
-                        <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
-                          {project.description ? (
-                            <span className="min-w-0 flex-1 truncate">
-                              {project.description}
-                            </span>
-                          ) : (
-                            <span className="min-w-0 flex-1" />
-                          )}
-                          <span className="shrink-0 tabular-nums">
-                            {relativeTime(project.updatedAt)}
-                          </span>
-                        </div>
+                      <div className="min-w-0 flex-1 truncate text-sm">
+                        {project.name}
                       </div>
-                      <Check
-                        className={cn(
-                          'mt-0.5 size-3.5 shrink-0',
-                          value === project.id ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
+                      <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                        {relativeTime(project.updatedAt)}
+                      </span>
                     </DropdownMenuItem>
                   ))}
                   {hasMore ? (

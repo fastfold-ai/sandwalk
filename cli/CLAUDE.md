@@ -2,10 +2,10 @@
 
 ## What This Is
 
-Sandwalk is an autonomous agent for open science and drug discovery research —
-like Claude Code, but for biology. It takes natural language questions about
-compounds/targets/indications and executes multi-step research workflows using
-computational biology tools.
+Sandwalk is an open, self-hosted agent harness for ambitious work — hard
+scientific research and any other domain the user directs it toward. It ships a
+deep science toolkit (compounds, targets, structures, omics, clinical, literature)
+and grows via skills/MCPs. Natural language in; multi-step workflows out.
 
 ## Architecture
 

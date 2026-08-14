@@ -18,8 +18,12 @@ import {
   type ComposerModelOption,
   toComposerModelOptions
 } from '@/lib/composer-models'
-import { dedupeAsync } from '@/lib/dedupe-async'
+import { dedupeAsync, invalidateDedupe } from '@/lib/dedupe-async'
 import type { SessionChatState } from '@/lib/sessions'
+
+/** Short client TTL so remounts / StrictMode don't re-hit the API. */
+const LIST_TTL_MS = 20_000
+const MODEL_TTL_MS = 45_000
 
 type UseAppBootstrapLoadersArgs = {
   client: LocalAgentClient
@@ -209,21 +213,25 @@ export function useAppBootstrapLoaders({
   )
 
   const loadProjects = useCallback(async () => {
-    const items = await dedupeAsync(`projects:${client.baseUrl}`, () =>
-      client.listProjects()
+    const items = await dedupeAsync(
+      `projects:${client.baseUrl}`,
+      () => client.listProjects(),
+      { ttlMs: LIST_TTL_MS }
     )
     setProjects(items)
   }, [client])
 
   const loadSkills = useCallback(async () => {
+    // No client TTL — installs/toggles must see fresh rows; backend list is TTL'd.
+    invalidateDedupe(`skills:${client.baseUrl}`)
     const items = await dedupeAsync(`skills:${client.baseUrl}`, () =>
       client.listSkills()
     )
     const seen = new Set<string>()
     const unique = items.filter(skill => {
-      const key = skill.name.trim().toLowerCase()
-      if (!key || seen.has(key)) return false
-      seen.add(key)
+      const skillKey = skill.name.trim().toLowerCase()
+      if (!skillKey || seen.has(skillKey)) return false
+      seen.add(skillKey)
       return true
     })
     setSkills(unique)
@@ -233,13 +241,16 @@ export function useAppBootstrapLoaders({
 
   const loadIntegrations = useCallback(async () => {
     setIntegrations(
-      await dedupeAsync(`integrations:${client.baseUrl}`, () =>
-        client.listIntegrations()
+      await dedupeAsync(
+        `integrations:${client.baseUrl}`,
+        () => client.listIntegrations(),
+        { ttlMs: LIST_TTL_MS }
       )
     )
   }, [client])
 
   const loadMcpServers = useCallback(async () => {
+    invalidateDedupe(`mcp-servers:${client.baseUrl}`)
     setMcpServers(
       await dedupeAsync(`mcp-servers:${client.baseUrl}`, () =>
         client.listMcpServers()
@@ -250,6 +261,7 @@ export function useAppBootstrapLoaders({
   const loadMcpCatalog = useCallback(async () => {
     setMcpCatalogLoading(true)
     try {
+      invalidateDedupe(`mcp-catalog:${client.baseUrl}`)
       setMcpCatalog(
         await dedupeAsync(`mcp-catalog:${client.baseUrl}`, () =>
           client.listMcpCatalog()
@@ -269,8 +281,10 @@ export function useAppBootstrapLoaders({
     if (specialistsRef.current.length === 0) setSpecialistsLoading(true)
     try {
       setSpecialists(
-        await dedupeAsync(`specialists:${client.baseUrl}`, () =>
-          client.listSpecialists()
+        await dedupeAsync(
+          `specialists:${client.baseUrl}`,
+          () => client.listSpecialists(),
+          { ttlMs: LIST_TTL_MS }
         )
       )
     } catch {
@@ -291,7 +305,8 @@ export function useAppBootstrapLoaders({
               discover: true
             }),
             client.listModelProfiles().catch(() => [])
-          ])
+          ]),
+        { ttlMs: MODEL_TTL_MS }
       )
       const backendsByProfileId = Object.fromEntries(
         (profiles || []).map(profile => [profile.id, profile.backend])

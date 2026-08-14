@@ -18,6 +18,24 @@ export function filterSites(sites: Site[], query: string) {
   )
 }
 
+/** When a project is selected, only sites from chats in that project. */
+export function filterSitesByProject(
+  sites: Site[],
+  projectId: string | null | undefined,
+  sessions: AgentSession[]
+) {
+  const scoped = (projectId || '').trim()
+  if (!scoped) return sites
+  const sessionIds = new Set(
+    sessions.filter(session => session.projectId === scoped).map(s => s.id)
+  )
+  return sites.filter(
+    site =>
+      site.sourceProjectId === scoped ||
+      (site.sourceSessionId != null && sessionIds.has(site.sourceSessionId))
+  )
+}
+
 export function formatSiteBytes(bytes: number | null) {
   if (bytes == null) return '—'
   if (bytes < 1024) return `${bytes} B`

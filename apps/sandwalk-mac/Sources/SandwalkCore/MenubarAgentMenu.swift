@@ -97,16 +97,29 @@ extension MenubarController {
         showPin: Bool
     ) -> NSMenuItem {
         let item = NSMenuItem(
-            title: session.title,
+            title: truncatedAgentTitle(session.title),
             action: #selector(openRecentSession(_:)),
             keyEquivalent: ""
         )
         item.target = self
         item.representedObject = session.id
+        item.toolTip = session.title
         item.image = showPin
             ? NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Pinned")
             : nil
         item.isEnabled = true
         return item
     }
+}
+
+/// Caps agent titles so the status menu stays ~35% narrower than unbounded names.
+private enum MenubarAgentMenuMetrics {
+    static let titleLimit = 40
+}
+
+private func truncatedAgentTitle(_ title: String) -> String {
+    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    let limit = MenubarAgentMenuMetrics.titleLimit
+    guard trimmed.count > limit else { return trimmed }
+    return String(trimmed.prefix(limit - 1)).trimmingCharacters(in: .whitespaces) + "…"
 }

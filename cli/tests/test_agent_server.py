@@ -162,6 +162,7 @@ def test_agent_server_api_key_protects_v1_routes(tmp_path: Path, monkeypatch):
         assert discover.status_code == 200
         body = discover.json()
         assert body["service"] == "sandwalk"
+        assert isinstance(body.get("version"), str) and body["version"].strip()
         assert body["authRequired"] is True
         assert body.get("deviceLabel")
         assert client.get("/v1/sessions").status_code == 401
@@ -188,6 +189,7 @@ def test_auth_login_cookie_grants_access(tmp_path: Path, monkeypatch):
             json={"apiKey": "cookie-secret", "remember": True},
         )
         assert login.status_code == 200
+        assert login.json().get("sessionToken")
         assert client.get("/v1/sessions").status_code == 200
         status = client.get("/v1/auth/status").json()
         assert status["authEnabled"] is True
@@ -198,6 +200,39 @@ def test_auth_login_cookie_grants_access(tmp_path: Path, monkeypatch):
         status = client.get("/v1/auth/status").json()
         assert status["authEnabled"] is True
         assert status["authenticated"] is False
+
+
+def test_settings_key_bearer_works_when_cli_override_differs(tmp_path: Path, monkeypatch):
+    """Settings Security key must authorize Bearer even if serve used --api-key."""
+    monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "settings.json"))
+    from agent_server.auth_settings import AuthSettings, save_settings
+
+    save_settings(
+        AuthSettings(
+            api_key="sk-sandwalk-settingskey0000000001",
+            auth_enabled=True,
+            secret_key="unit-secret-key",
+        )
+    )
+    app = create_app(
+        store_path=tmp_path / "agent.db",
+        api_key="sk-sandwalk-clioverride00000000002",
+    )
+
+    with TestClient(app) as client:
+        status = client.get(
+            "/v1/auth/status",
+            headers={"authorization": "Bearer sk-sandwalk-settingskey0000000001"},
+        )
+        assert status.status_code == 200
+        assert status.json()["authenticated"] is True
+        assert (
+            client.get(
+                "/v1/sessions",
+                headers={"authorization": "Bearer sk-sandwalk-settingskey0000000001"},
+            ).status_code
+            == 200
+        )
 
 
 def test_workspace_service_confines_paths_and_detects_conflicts(tmp_path: Path):

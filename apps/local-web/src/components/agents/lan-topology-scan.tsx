@@ -8,11 +8,18 @@ export type LanTopologyNode = LanDesktopServer & {
   hostLine: string
 }
 
+function formatSandwalkVersion(version?: string | null): string {
+  const trimmed = version?.trim() || ''
+  if (!trimmed) return ''
+  return trimmed.startsWith('v') ? trimmed : `v${trimmed}`
+}
+
 function nodePosition(index: number, total: number) {
   // Spread around the ring; keep a slight top bias so labels stay readable.
   const angle = (-90 + (360 * index) / Math.max(total, 1)) * (Math.PI / 180)
-  // Keep nodes between the middle and outer rings.
-  const radius = 34 + (index % 3) * 4
+  // Stay inside the middle ring so taller version chips do not cover the
+  // "N nearby" status under the radar.
+  const radius = 28 + (index % 3) * 3
   return {
     left: `${50 + Math.cos(angle) * radius}%`,
     top: `${50 + Math.sin(angle) * radius}%`
@@ -44,11 +51,11 @@ export function LanTopologyScan({
 
   return (
     <div
-      className="border-border/60 bg-muted/15 relative overflow-hidden rounded-lg border px-3 py-4"
+      className="border-border/60 bg-muted/15 relative overflow-hidden rounded-lg border px-3 pt-4 pb-3"
       aria-busy={active}
       aria-live="polite"
     >
-      <div className="relative mx-auto aspect-square w-full max-w-[280px]">
+      <div className="relative mx-auto aspect-square w-full max-w-[280px] pb-2">
         <div className="border-border/40 absolute inset-[6%] rounded-full border" />
         <div className="border-border/30 absolute inset-[22%] rounded-full border" />
         <div className="border-border/25 absolute inset-[38%] rounded-full border" />
@@ -83,7 +90,13 @@ export function LanTopologyScan({
                 'focus-visible:ring-ring rounded-md outline-none focus-visible:ring-2'
               )}
               style={{ left: pos.left, top: pos.top }}
-              title={`${node.title} — ${node.hostLine}`}
+              title={[
+                node.title,
+                formatSandwalkVersion(node.version),
+                node.hostLine
+              ]
+                .filter(Boolean)
+                .join(' — ')}
             >
               <span
                 className={cn(
@@ -119,6 +132,11 @@ export function LanTopologyScan({
                     {node.detail}
                   </span>
                 ) : null}
+                {formatSandwalkVersion(node.version) ? (
+                  <span className="text-muted-foreground mt-0.5 block truncate font-mono text-[10px] leading-tight">
+                    sandwalk {formatSandwalkVersion(node.version)}
+                  </span>
+                ) : null}
                 <span className="text-muted-foreground mt-0.5 block truncate text-[10px] leading-tight">
                   {node.hostname !== node.hostLine.split(':')[0]
                     ? `${node.hostname} · `
@@ -134,7 +152,7 @@ export function LanTopologyScan({
 
       <p
         className={cn(
-          'text-muted-foreground mt-2 text-center text-xs',
+          'text-muted-foreground relative z-20 mt-2 bg-muted/15 text-center text-xs',
           active && nodes.length === 0 && 'animate-pulse'
         )}
       >

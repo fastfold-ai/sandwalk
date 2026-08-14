@@ -178,6 +178,24 @@ export function injectedDesktopApiKey(): string | null {
   return null
 }
 
+/** Backend URL this WebView is pinned to (inject / window.name), if any. */
+export function injectedDesktopBackendUrl(): string | null {
+  const url = injectedBackendUrl()
+  return url ? normalizeBackendUrl(url) : null
+}
+
+/**
+ * Injected key only when this window is bound to `backendUrl`.
+ * Prevents Welcome / sibling windows from leaking another host’s key.
+ */
+export function injectedDesktopApiKeyFor(
+  backendUrl: string
+): string | null {
+  const bound = injectedDesktopBackendUrl()
+  if (!bound || bound !== normalizeBackendUrl(backendUrl)) return null
+  return injectedDesktopApiKey()
+}
+
 export function isLocalBackendUrl(url: string): boolean {
   return /127\.0\.0\.1|localhost/i.test(url)
 }

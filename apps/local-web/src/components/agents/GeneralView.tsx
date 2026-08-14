@@ -1,5 +1,4 @@
 import type { AccountSummary } from '@sandwalk/agent-ui-core'
-import { WandSparkles } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -13,13 +12,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useDesktopUpdate } from '@/hooks/useDesktopUpdate'
+import {
+  desktopCliPathInstall,
+  type DesktopCliPathStatus,
+  desktopCliPathStatus,
+  desktopMenubarAvailable,
+  isTauri,
+  platformOS
+} from '@/lib/desktop'
 
-import { GeneralViewAboutSection } from './general-view-about'
 import { GeneralViewAccountSection } from './general-view-account'
 import { GeneralViewNotificationsSection } from './general-view-notifications'
 import { GeneralViewServerSection } from './general-view-server'
+import { GeneralViewVersionSection } from './general-view-version'
 
 export function GeneralView({
   backendUrl,
@@ -46,43 +53,113 @@ export function GeneralView({
   const [searchParams, setSearchParams] = useSearchParams()
   const [account, setAccount] = useState<AccountSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [checkingUpdates, setCheckingUpdates] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
-  const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null)
+  const [hasCheckedUpdates, setHasCheckedUpdates] = useState(false)
+  const [advisoryUpToDate, setAdvisoryUpToDate] = useState<boolean | null>(null)
+  const [advisoryLatest, setAdvisoryLatest] = useState<string | null>(null)
+  const [advisoryError, setAdvisoryError] = useState<string | null>(null)
+  const [checkingAdvisory, setCheckingAdvisory] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [cliPath, setCliPath] = useState<DesktopCliPathStatus | null>(null)
+  const [checkingCliPath, setCheckingCliPath] = useState(false)
+  const [installingCliPath, setInstallingCliPath] = useState(false)
+  const [cliPathError, setCliPathError] = useState<string | null>(null)
+  const [showCliPath, setShowCliPath] = useState(false)
+  const desktopUpdate = useDesktopUpdate()
+  const useDesktopUpdater = isTauri()
+
+  const refreshCliPath = useCallback(async () => {
+    if (!isTauri() || platformOS() !== 'macos') return
+    setCheckingCliPath(true)
+    setCliPathError(null)
+    try {
+      const next = await desktopCliPathStatus()
+      if (!next) {
+        setCliPathError('Sandwalk Server is not running.')
+        return
+      }
+      setCliPath(next)
+    } catch (err) {
+      setCliPathError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCheckingCliPath(false)
+    }
+  }, [])
+
+  const installCliPath = useCallback(async () => {
+    setInstallingCliPath(true)
+    setCliPathError(null)
+    try {
+      // Explicit Install/Reinstall may replace a curl/uv-owned sandwalk.
+      const next = await desktopCliPathInstall(true)
+      setCliPath(next)
+      if (next.error) setCliPathError(next.error)
+    } catch (err) {
+      setCliPathError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setInstallingCliPath(false)
+    }
+  }, [cliPath?.state])
 
   const loadAccount = useCallback(
-    async (checkUpdates = false, signal?: AbortSignal) => {
-      if (checkUpdates) setCheckingUpdates(true)
-      else setLoading(true)
+    async (signal?: AbortSignal) => {
+      setLoading(true)
       setError(null)
       try {
-        const next = await onLoadAccount({
-          checkUpdates,
-          signal
-        })
+        const next = await onLoadAccount({ signal })
         if (signal?.aborted) return
         setAccount(next)
-        if (checkUpdates) setLastCheckedAt(new Date())
       } catch (err) {
         if (signal?.aborted) return
         setError(err instanceof Error ? err.message : String(err))
       } finally {
-        if (!signal?.aborted) {
-          setLoading(false)
-          setCheckingUpdates(false)
-        }
+        if (!signal?.aborted) setLoading(false)
       }
     },
     [onLoadAccount]
   )
 
+  const runUpdateCheck = useCallback(async () => {
+    if (useDesktopUpdater) {
+      await desktopUpdate.checkForUpdate()
+      return
+    }
+
+    setCheckingAdvisory(true)
+    setAdvisoryError(null)
+    try {
+      const next = await onLoadAccount({ checkUpdates: true })
+      setAccount(next)
+      setHasCheckedUpdates(true)
+      setAdvisoryUpToDate(next.about.upToDate)
+      setAdvisoryLatest(next.about.latestVersion)
+    } catch (err) {
+      setAdvisoryError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCheckingAdvisory(false)
+    }
+  }, [desktopUpdate, onLoadAccount, useDesktopUpdater])
+
   useEffect(() => {
     const controller = new AbortController()
-    void loadAccount(false, controller.signal)
+    void loadAccount(controller.signal)
     return () => controller.abort()
   }, [loadAccount])
+
+  useEffect(() => {
+    if (!isTauri() || platformOS() !== 'macos') return
+    let cancelled = false
+    void (async () => {
+      const available = await desktopMenubarAvailable()
+      if (cancelled || !available) return
+      setShowCliPath(true)
+      await refreshCliPath()
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [refreshCliPath])
 
   // Sandwalk menu → Check for Updates… lands here with ?checkUpdates=1
   useEffect(() => {
@@ -90,8 +167,8 @@ export function GeneralView({
     const next = new URLSearchParams(searchParams)
     next.delete('checkUpdates')
     setSearchParams(next, { replace: true })
-    void loadAccount(true)
-  }, [loadAccount, searchParams, setSearchParams])
+    void runUpdateCheck()
+  }, [runUpdateCheck, searchParams, setSearchParams])
 
   const signOut = async () => {
     setConfirmSignOut(false)
@@ -106,14 +183,28 @@ export function GeneralView({
     }
   }
 
+  const about = account?.about
+  const upToDate = useDesktopUpdater
+    ? desktopUpdate.upToDate
+    : (advisoryUpToDate ?? about?.upToDate ?? null)
+  const latestVersion = useDesktopUpdater
+    ? desktopUpdate.latestVersion
+    : (advisoryLatest ?? about?.latestVersion ?? null)
+  const checkingUpdates = useDesktopUpdater
+    ? desktopUpdate.checking
+    : checkingAdvisory
+  const checkError = useDesktopUpdater ? desktopUpdate.error : advisoryError
+  const hasChecked = useDesktopUpdater
+    ? desktopUpdate.hasChecked
+    : hasCheckedUpdates
+
   return (
     <ScrollArea className="flex-1">
-      <div className="mx-auto w-full max-w-7xl space-y-10 px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8">
+      <div className="mx-auto w-full max-w-3xl space-y-8 px-4 pt-6 pb-10 md:px-6 md:pt-8">
         <div>
-          <h2 className="text-2xl font-semibold">General</h2>
-          <p className="text-muted-foreground mt-2 text-sm">
-            Account, agent server connection, and app details. Theme and
-            sidebar appearance live under Appearance.
+          <h2 className="text-2xl font-semibold tracking-tight">General</h2>
+          <p className="text-muted-foreground mt-1.5 text-sm">
+            Versions, agent server, account, and notifications.
           </p>
         </div>
 
@@ -122,6 +213,27 @@ export function GeneralView({
             {error}
           </div>
         ) : null}
+
+        <GeneralViewVersionSection
+          sandwalkVersion={__UI_VERSION__}
+          checkingUpdates={checkingUpdates}
+          installingUpdate={desktopUpdate.installing}
+          hasChecked={hasChecked}
+          upToDate={upToDate}
+          latestVersion={latestVersion}
+          checkError={checkError}
+          onCheckUpdates={() => void runUpdateCheck()}
+          onInstallUpdate={
+            useDesktopUpdater ? () => void desktopUpdate.installUpdate() : undefined
+          }
+          showCliPath={showCliPath}
+          cliPath={cliPath}
+          checkingCliPath={checkingCliPath}
+          installingCliPath={installingCliPath}
+          cliPathError={cliPathError}
+          onCheckCliPath={() => void refreshCliPath()}
+          onInstallCliPath={() => void installCliPath()}
+        />
 
         <GeneralViewServerSection
           backendUrl={backendUrl}
@@ -136,25 +248,10 @@ export function GeneralView({
           account={account}
           signingOut={signingOut}
           onSignOutClick={() => setConfirmSignOut(true)}
+          onOpenSetupWizard={onOpenSetupWizard}
         />
-
-        {onOpenSetupWizard ? (
-          <Button type="button" variant="outline" onClick={onOpenSetupWizard}>
-            <WandSparkles />
-            Run wizard
-          </Button>
-        ) : null}
 
         <GeneralViewNotificationsSection />
-
-        <GeneralViewAboutSection
-          backendVersion={backendVersion}
-          account={account}
-          lastCheckedAt={lastCheckedAt}
-          checkingUpdates={checkingUpdates}
-          loading={loading}
-          onCheckUpdates={() => void loadAccount(true)}
-        />
       </div>
 
       <AlertDialog

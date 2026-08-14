@@ -118,6 +118,7 @@ export type DashboardMainViewsProps = {
   onCreateProject: () => void
   createSession: CreateDraftSession
   onOpenProject: (projectId: string) => void
+  onOpenProjectSettings: () => void
   togglePinProject: (project: AgentProject) => void | Promise<void>
   deleteProject: (project: AgentProject) => void | Promise<void>
 }

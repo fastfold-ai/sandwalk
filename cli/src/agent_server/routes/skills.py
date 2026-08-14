@@ -27,12 +27,23 @@ from agent_server.models import (
 )
 
 
+def _invalidate_skills_list_cache() -> None:
+    from agent_server import ttl_cache
+
+    ttl_cache.invalidate("skills:")
+
+
 def register_skill_routes(app: FastAPI, deps: AppDeps) -> None:
     skills_service = deps.skills_service
 
     @app.get("/v1/skills", response_model=SkillList)
     async def list_skills() -> SkillList:
-        return SkillList(data=await asyncio.to_thread(skills_service.list))
+        from agent_server import ttl_cache
+
+        def _list() -> list:
+            return ttl_cache.cached("skills:list", 30.0, skills_service.list)
+
+        return SkillList(data=await asyncio.to_thread(_list))
 
     @app.get("/v1/skills/sources", response_model=SkillSourceList)
     async def list_skill_sources() -> SkillSourceList:
@@ -161,21 +172,25 @@ def register_skill_routes(app: FastAPI, deps: AppDeps) -> None:
         detail = await asyncio.to_thread(skills_service.get, skill_name)
         if detail is None:
             raise HTTPException(status_code=404, detail="Skill not found.")
+        _invalidate_skills_list_cache()
         return detail
 
     @app.post("/v1/skills/batch", response_model=SkillBatchActionResponse)
     async def batch_skills(payload: SkillBatchActionRequest) -> SkillBatchActionResponse:
-        return await asyncio.to_thread(
+        result = await asyncio.to_thread(
             skills_service.batch_action,
             payload.action,
             payload.names,
         )
+        _invalidate_skills_list_cache()
+        return result
 
     @app.post("/v1/skills", response_model=SkillMutationResponse)
     async def install_skill(payload: InstallSkillRequest) -> SkillMutationResponse:
         result = await asyncio.to_thread(skills_service.install, payload.source)
         if not result.ok:
             raise HTTPException(status_code=400, detail=result.summary)
+        _invalidate_skills_list_cache()
         return result
 
     @app.post("/v1/skills/upload", response_model=SkillMutationResponse)
@@ -188,6 +203,7 @@ def register_skill_routes(app: FastAPI, deps: AppDeps) -> None:
         )
         if not result.ok:
             raise HTTPException(status_code=400, detail=result.summary)
+        _invalidate_skills_list_cache()
         return result
 
     @app.delete("/v1/skills/{skill_name}", response_model=SkillMutationResponse)
@@ -195,8 +211,11 @@ def register_skill_routes(app: FastAPI, deps: AppDeps) -> None:
         result = await asyncio.to_thread(skills_service.remove, skill_name)
         if not result.ok:
             raise HTTPException(status_code=400, detail=result.summary)
+        _invalidate_skills_list_cache()
         return result
 
     @app.post("/v1/skills/upgrade", response_model=SkillMutationResponse)
     async def upgrade_skills() -> SkillMutationResponse:
-        return await asyncio.to_thread(skills_service.upgrade)
+        result = await asyncio.to_thread(skills_service.upgrade)
+        _invalidate_skills_list_cache()
+        return result

@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: 'sandwalk docs · %s',
   },
   description:
-    'sandwalk docs: a thinking path for open science. Self-hosted agent with CLI, web dashboard, and macOS app.',
+    'sandwalk docs: great ideas need a path. This one is yours. Self-hosted agent with CLI, web dashboard, and macOS app.',
   icons: {
     icon: [
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },

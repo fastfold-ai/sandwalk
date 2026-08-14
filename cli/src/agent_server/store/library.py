@@ -104,6 +104,7 @@ class LibraryMixin:
         *,
         kind: LibraryKind | None = None,
         query: str | None = None,
+        project_id: str | None = None,
     ) -> tuple[str, list[object]]:
         clauses: list[str] = []
         params: list[object] = []
@@ -115,6 +116,27 @@ class LibraryMixin:
             clauses.append("(display_name LIKE ? OR original_name LIKE ?)")
             like = f"%{needle}%"
             params.extend([like, like])
+        scoped = (project_id or "").strip()
+        if scoped:
+            # Items linked to a chat in the project, or ingested from one.
+            clauses.append(
+                """(
+                    EXISTS (
+                        SELECT 1
+                        FROM library_item_sessions lis
+                        INNER JOIN sessions s ON s.id = lis.session_id
+                        WHERE lis.item_id = library_items.id
+                          AND s.project_id = ?
+                    )
+                    OR EXISTS (
+                        SELECT 1
+                        FROM sessions s
+                        WHERE s.id = library_items.origin_session_id
+                          AND s.project_id = ?
+                    )
+                )"""
+            )
+            params.extend([scoped, scoped])
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         return where, params
 
@@ -123,11 +145,31 @@ class LibraryMixin:
         *,
         kind: LibraryKind | None = None,
         query: str | None = None,
+        project_id: str | None = None,
     ) -> int:
-        where, params = self._library_filter_sql(kind=kind, query=query)
+        where, params = self._library_filter_sql(
+            kind=kind, query=query, project_id=project_id
+        )
         with self._connect() as connection:
             row = connection.execute(
                 f"SELECT COUNT(*) AS n FROM library_items {where}",
+                params,
+            ).fetchone()
+        return int(row["n"] if row else 0)
+
+    def sum_library_bytes(
+        self,
+        *,
+        kind: LibraryKind | None = None,
+        query: str | None = None,
+        project_id: str | None = None,
+    ) -> int:
+        where, params = self._library_filter_sql(
+            kind=kind, query=query, project_id=project_id
+        )
+        with self._connect() as connection:
+            row = connection.execute(
+                f"SELECT COALESCE(SUM(bytes), 0) AS n FROM library_items {where}",
                 params,
             ).fetchone()
         return int(row["n"] if row else 0)
@@ -137,11 +179,14 @@ class LibraryMixin:
         *,
         kind: LibraryKind | None = None,
         query: str | None = None,
+        project_id: str | None = None,
         page: int = 0,
         per_page: int = 48,
         limit: int | None = None,
     ) -> list[LibraryItem]:
-        where, params = self._library_filter_sql(kind=kind, query=query)
+        where, params = self._library_filter_sql(
+            kind=kind, query=query, project_id=project_id
+        )
         # Legacy `limit` = first page size (used by older callers/tests).
         size = int(limit) if limit is not None else int(per_page)
         capped = max(1, min(size, 500))

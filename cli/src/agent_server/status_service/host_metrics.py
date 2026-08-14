@@ -128,12 +128,17 @@ def _ram_bytes() -> tuple[int, int]:
                     digits = re.sub(r"[^\d]", "", value)
                     if digits:
                         stats[key.strip()] = int(digits)
-                free_pages = stats.get("Pages free", 0) + stats.get(
-                    "Pages speculative", 0
+                # Match Activity Monitor / mactop "Memory Used": app-ish
+                # active + wired + compressor — not total-free (that counts
+                # reclaimable file cache / inactive as used).
+                used_pages = (
+                    stats.get("Pages active", 0)
+                    + stats.get("Pages wired down", 0)
+                    + stats.get("Pages occupied by compressor", 0)
                 )
-                free = free_pages * page_size
+                used = used_pages * page_size
                 if total > 0:
-                    used = max(0, total - free)
+                    used = min(used, total)
         elif system == "Linux":
             meminfo = Path("/proc/meminfo").read_text(encoding="utf-8")
             values: dict[str, int] = {}

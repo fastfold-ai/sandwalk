@@ -2,6 +2,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
+import { DesktopUpdateBanner } from '@/components/DesktopUpdateBanner'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { DRAFT_AGENT_SESSION_ID } from '@/lib/draft-agent'
@@ -78,6 +79,7 @@ export function DashboardSidebar({
       </ScrollArea>
 
       <div className="shrink-0 p-2">
+        <DesktopUpdateBanner />
         <SidebarUserMenu
           userName={userName}
           onLogout={onLogout}

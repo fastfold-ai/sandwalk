@@ -31,6 +31,7 @@ import { Input } from '@/components/ui/input'
 import { isTauri, openExternalUrl } from '@/lib/desktop'
 import {
   filterSites,
+  filterSitesByProject,
   formatSiteBytes,
   isPublishedSite,
   SITE_PREVIEW_SANDBOX,
@@ -128,6 +129,7 @@ export function SitesView({
   siteId,
   sessions,
   projects,
+  activeProjectId = null,
   onAddSite
 }: {
   client: LocalAgentClient
@@ -135,6 +137,7 @@ export function SitesView({
   siteId: string | null
   sessions: AgentSession[]
   projects: AgentProject[]
+  activeProjectId?: string | null
   onAddSite: () => void
 }) {
   const [sites, setSites] = useState<Site[]>([])
@@ -180,7 +183,10 @@ export function SitesView({
     }
   }, [layout])
 
-  const filtered = useMemo(() => filterSites(sites, query), [query, sites])
+  const filtered = useMemo(() => {
+    const scoped = filterSitesByProject(sites, activeProjectId, sessions)
+    return filterSites(scoped, query)
+  }, [activeProjectId, query, sessions, sites])
   const selected = siteId
     ? sites.find(site => site.id === siteId) ?? null
     : null
@@ -334,7 +340,7 @@ export function SitesView({
             </h1>
             {!selected ? (
               <span className="text-muted-foreground text-sm leading-none tabular-nums">
-                {formatSiteCount(sites.length)}
+                {formatSiteCount(filtered.length)}
               </span>
             ) : null}
           </div>

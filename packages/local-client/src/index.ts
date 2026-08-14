@@ -7,6 +7,9 @@ import type {
   AgentProject,
   AgentSession,
   UsageOverview,
+  WidgetLayout,
+  ProjectFolderFile,
+  ProjectFolderListing,
   LibraryItem,
   LibraryItemList,
   LibraryKind,
@@ -88,6 +91,31 @@ import type {
 export type LocalAgentClientOptions = {
   baseUrl: string
   apiKey?: string
+  /** Session cookie value from /auth/login (Tauri cannot store cross-origin Set-Cookie). */
+  sessionToken?: string
+}
+
+const SESSION_COOKIE = 'sandwalk_session'
+
+const sessionTokensByUrl = new Map<string, string>()
+
+function normalizeClientBaseUrl(url: string): string {
+  return url.replace(/\/+$/, '')
+}
+
+export function rememberSessionToken(baseUrl: string, token: string) {
+  const key = normalizeClientBaseUrl(baseUrl)
+  const trimmed = token.trim()
+  if (!key || !trimmed) return
+  sessionTokensByUrl.set(key, trimmed)
+}
+
+export function clearSessionToken(baseUrl: string) {
+  sessionTokensByUrl.delete(normalizeClientBaseUrl(baseUrl))
+}
+
+export function readSessionToken(baseUrl: string): string | undefined {
+  return sessionTokensByUrl.get(normalizeClientBaseUrl(baseUrl))
 }
 
 export type BenchSuiteCard = {
@@ -321,10 +349,14 @@ export class LocalAgentClient
 {
   readonly baseUrl: string
   readonly apiKey?: string
+  readonly sessionToken?: string
 
   constructor(options: LocalAgentClientOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/+$/, '')
+    this.baseUrl = normalizeClientBaseUrl(options.baseUrl)
     this.apiKey = options.apiKey
+    const token = options.sessionToken?.trim()
+    this.sessionToken = token || readSessionToken(this.baseUrl)
+    if (token) rememberSessionToken(this.baseUrl, token)
   }
 
   private headers(extra?: HeadersInit): Headers {
@@ -332,6 +364,9 @@ export class LocalAgentClient
     headers.set('accept', 'application/json')
     headers.set('x-sandwalk-client', 'ui')
     if (this.apiKey) headers.set('authorization', `Bearer ${this.apiKey}`)
+    const session =
+      this.sessionToken?.trim() || readSessionToken(this.baseUrl) || ''
+    if (session) headers.set('cookie', `${SESSION_COOKIE}=${session}`)
     return headers
   }
 
@@ -411,8 +446,12 @@ export class LocalAgentClient
   async login(
     apiKey: string,
     options?: { remember?: boolean; signal?: AbortSignal }
-  ): Promise<{ ok: boolean; authEnabled?: boolean }> {
-    return this.request('/auth/login', {
+  ): Promise<{ ok: boolean; authEnabled?: boolean; sessionToken?: string }> {
+    const result = await this.request<{
+      ok: boolean
+      authEnabled?: boolean
+      sessionToken?: string
+    }>('/auth/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -421,10 +460,17 @@ export class LocalAgentClient
       }),
       signal: options?.signal
     })
+    const token = result?.sessionToken?.trim()
+    if (token) rememberSessionToken(this.baseUrl, token)
+    return result
   }
 
-  logout(signal?: AbortSignal): Promise<{ ok: boolean }> {
-    return this.request('/auth/logout', { method: 'POST', signal })
+  async logout(signal?: AbortSignal): Promise<{ ok: boolean }> {
+    try {
+      return await this.request('/auth/logout', { method: 'POST', signal })
+    } finally {
+      clearSessionToken(this.baseUrl)
+    }
   }
 
   health(signal?: AbortSignal): Promise<BackendHealth> {
@@ -827,6 +873,7 @@ export class LocalAgentClient
   async listLibrary(options?: {
     kind?: LibraryKind | null
     q?: string | null
+    projectId?: string | null
     page?: number
     perPage?: number
     signal?: AbortSignal
@@ -834,6 +881,7 @@ export class LocalAgentClient
     const params = new URLSearchParams()
     if (options?.kind) params.set('kind', options.kind)
     if (options?.q) params.set('q', options.q)
+    if (options?.projectId) params.set('projectId', options.projectId)
     if (options?.page != null) params.set('page', String(options.page))
     if (options?.perPage != null)
       params.set('per_page', String(options.perPage))
@@ -1226,6 +1274,76 @@ export class LocalAgentClient
     )
   }
 
+  listProjectFolderFiles(
+    projectId: string,
+    signal?: AbortSignal
+  ): Promise<ProjectFolderListing> {
+    return this.request<ProjectFolderListing>(
+      `/projects/${encodeURIComponent(projectId)}/folder-files`,
+      { signal }
+    )
+  }
+
+  readProjectFolderFile(
+    projectId: string,
+    path: string,
+    signal?: AbortSignal
+  ): Promise<WorkspaceFileContent> {
+    const query = new URLSearchParams({ path })
+    return this.request<WorkspaceFileContent>(
+      `/projects/${encodeURIComponent(projectId)}/folder-files/content?${query}`,
+      { signal }
+    )
+  }
+
+  renameProjectFolderFile(
+    projectId: string,
+    path: string,
+    name: string,
+    signal?: AbortSignal
+  ): Promise<ProjectFolderFile> {
+    return this.request<ProjectFolderFile>(
+      `/projects/${encodeURIComponent(projectId)}/folder-files`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ path, name }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
+
+  deleteProjectFolderFile(
+    projectId: string,
+    path: string,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const query = new URLSearchParams({ path })
+    return this.request(
+      `/projects/${encodeURIComponent(projectId)}/folder-files?${query}`,
+      { method: 'DELETE', signal }
+    ).then(() => undefined)
+  }
+
+  useProjectFolderInChat(
+    projectId: string,
+    input: { paths: string[]; title?: string | null },
+    signal?: AbortSignal
+  ): Promise<{ sessionId: string; paths: string[] }> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectId)}/folder-files/use-in-chat`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          paths: input.paths,
+          title: input.title
+        }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
+
   createProject(
     input: {
       name: string
@@ -1235,6 +1353,7 @@ export class LocalAgentClient
       icon?: string | null
       color?: string | null
       pinned?: boolean
+      homeLayout?: WidgetLayout | null
     },
     signal?: AbortSignal
   ): Promise<AgentProject> {
@@ -1247,7 +1366,8 @@ export class LocalAgentClient
         folderPath: input.folderPath,
         icon: input.icon,
         color: input.color,
-        pinned: Boolean(input.pinned)
+        pinned: Boolean(input.pinned),
+        homeLayout: input.homeLayout
       }),
       headers: { 'content-type': 'application/json' },
       signal
@@ -1264,6 +1384,7 @@ export class LocalAgentClient
       icon?: string | null
       color?: string | null
       pinned?: boolean
+      homeLayout?: WidgetLayout | null
     },
     signal?: AbortSignal
   ): Promise<AgentProject> {
@@ -1286,6 +1407,13 @@ export class LocalAgentClient
         body.folderPath = input.folderPath
       }
     }
+    if (input.homeLayout !== undefined) {
+      if (input.homeLayout === null) {
+        body.clearHomeLayout = true
+      } else {
+        body.homeLayout = input.homeLayout
+      }
+    }
     return this.request<AgentProject>(
       `/projects/${encodeURIComponent(projectId)}`,
       {
@@ -1295,6 +1423,30 @@ export class LocalAgentClient
         signal
       }
     )
+  }
+
+  async getDashboardLayout(signal?: AbortSignal): Promise<WidgetLayout> {
+    const raw = await this.request<{ layout: WidgetLayout }>(
+      '/settings/dashboard-layout',
+      { signal }
+    )
+    return raw.layout
+  }
+
+  async updateDashboardLayout(
+    layout: WidgetLayout,
+    signal?: AbortSignal
+  ): Promise<WidgetLayout> {
+    const raw = await this.request<{ layout: WidgetLayout }>(
+      '/settings/dashboard-layout',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ layout }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+    return raw.layout
   }
 
   async deleteProject(projectId: string, signal?: AbortSignal): Promise<void> {
@@ -1482,10 +1634,25 @@ export class LocalAgentClient
     })
   }
 
-  async getUsageOverview(signal?: AbortSignal): Promise<UsageOverview> {
-    const raw = await this.request<Record<string, unknown>>('/usage/overview', {
-      signal
-    })
+  async getUsageOverview(
+    signalOrOpts?:
+      | AbortSignal
+      | { projectId?: string | null; signal?: AbortSignal }
+  ): Promise<UsageOverview> {
+    const opts =
+      signalOrOpts &&
+      typeof signalOrOpts === 'object' &&
+      !('aborted' in signalOrOpts)
+        ? signalOrOpts
+        : { signal: signalOrOpts as AbortSignal | undefined }
+    const projectId = opts.projectId?.trim() || ''
+    const query = projectId
+      ? `?projectId=${encodeURIComponent(projectId)}`
+      : ''
+    const raw = await this.request<Record<string, unknown>>(
+      `/usage/overview${query}`,
+      { signal: opts.signal }
+    )
     return normalizeUsageOverview(raw)
   }
 

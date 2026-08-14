@@ -8,6 +8,14 @@ auth_app = typer.Typer(help="Manage local API key auth for serve / web UI")
 app.add_typer(auth_app, name="auth")
 
 
+def _apply_runtime() -> None:
+    from cli.auth_runtime import apply_saved_auth_to_runtime
+
+    result = apply_saved_auth_to_runtime()
+    style = "green" if result.ok else "dim"
+    console.print(f"  [{style}]{result.message}[/{style}]")
+
+
 @auth_app.command("status")
 def auth_status_cmd():
     """Show whether API-key auth is enabled (does not print the secret)."""
@@ -54,7 +62,10 @@ def auth_generate_cmd():
     console.print("  [green]Generated new API key.[/green]")
     console.print(settings.api_key)
     if not settings.auth_enabled:
-        console.print("  [dim]Auth is still disabled — run `sandwalk auth enable` to require login.[/dim]")
+        console.print(
+            "  [dim]Auth is still disabled — run `sandwalk auth enable` to require login.[/dim]"
+        )
+    _apply_runtime()
 
 
 @auth_app.command("enable")
@@ -67,7 +78,7 @@ def auth_enable_cmd():
     save_settings(settings)
     console.print("  [green]Auth enabled.[/green]")
     console.print(f"  API key: {settings.api_key}")
-    console.print("  [dim]Restart `sandwalk serve` if it is already running, then open the web UI.[/dim]")
+    _apply_runtime()
 
 
 @auth_app.command("disable")
@@ -79,7 +90,7 @@ def auth_disable_cmd():
     settings.auth_enabled = False
     save_settings(settings)
     console.print("  [yellow]Auth disabled.[/yellow] Local requests no longer require an API key.")
-    console.print("  [dim]Restart `sandwalk serve` if it is already running.[/dim]")
+    _apply_runtime()
 
 
 @auth_app.command("set")
@@ -103,3 +114,4 @@ def auth_set_cmd(
     settings.api_key = value
     save_settings(settings)
     console.print("  [green]API key updated.[/green]")
+    _apply_runtime()

@@ -32,6 +32,7 @@ def register_library_routes(app: FastAPI, deps: AppDeps) -> None:
     async def list_library(
         kind: LibraryKindFilter | None = Query(default=None),
         q: str | None = Query(default=None),
+        projectId: str | None = Query(default=None),
         page: int = Query(default=0, ge=0),
         per_page: int = Query(default=48, ge=1, le=500),
     ) -> LibraryItemList:
@@ -39,6 +40,7 @@ def register_library_routes(app: FastAPI, deps: AppDeps) -> None:
             library.list_items,
             kind=kind,
             query=q,
+            project_id=projectId,
             page=page,
             per_page=per_page,
         )

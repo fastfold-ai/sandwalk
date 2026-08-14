@@ -37,6 +37,7 @@ class LibraryPagination(ApiModel):
 class LibraryItemList(ApiModel):
     data: list[LibraryItem]
     pagination: LibraryPagination
+    total_bytes: int = 0
 
 
 class UpdateLibraryItemRequest(ApiModel):

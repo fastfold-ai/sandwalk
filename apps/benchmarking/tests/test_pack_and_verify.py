@@ -4,6 +4,7 @@ from sandwalk_bench.bixbench import as_is_pack, jsonl_path, load_jsonl, summariz
 from sandwalk_bench.pack import expand_matrix, load_pack
 from sandwalk_bench.paths import PACKS_DIR
 from sandwalk_bench.spawn import (
+    bench_kickoff_message,
     build_project_description,
     default_project_name,
     spawn_matrix,
@@ -48,6 +49,21 @@ def test_spawn_dry_run_includes_project_plan():
         pack=pack, matrix_name="full-coverage-same-model", cells=cells
     )
     assert "sessions:" in desc
+    assert "questions:" in desc
+    # Count only — never dump every question id into the project blurb.
+    question_line = next(
+        line for line in desc.splitlines() if line.startswith("questions:")
+    )
+    assert "," not in question_line
+    assert question_line.split(":", 1)[1].strip().isdigit()
+
+
+def test_bench_kickoff_message_is_short():
+    # Full question text must never be the chat kickoff — only BENCH_PROMPT.md.
+    msg = bench_kickoff_message(question_id="mmlu-pro-123")
+    assert "mmlu-pro-123" in msg
+    assert "BENCH_PROMPT.md" in msg
+    assert len(msg) < 200
 
 
 def test_cached_bixbench_jsonl_schema():

@@ -52,7 +52,6 @@ export function AppShell(props: AppShellProps) {
           setProjectScopeId={props.setProjectScopeId}
           selectAllProjects={props.selectAllProjects}
           selectProjectScope={props.selectProjectScope}
-          setProjectSettingsOpen={props.setProjectSettingsOpen}
           setNewProjectOpen={props.setNewProjectOpen}
           setGlobalSearchOpen={props.setGlobalSearchOpen}
           loadProjects={props.loadProjects}
@@ -184,6 +183,7 @@ export function AppShell(props: AppShellProps) {
           togglePinProject={props.togglePinProject}
           deleteProject={props.deleteProject}
           setNewProjectOpen={props.setNewProjectOpen}
+          setProjectSettingsOpen={props.setProjectSettingsOpen}
           setProjectScopeId={props.setProjectScopeId}
           createSession={props.createSession}
           openTabs={props.openTabs}

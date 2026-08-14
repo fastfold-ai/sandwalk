@@ -1,8 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { normalizeBackendUrl } from '@/lib/backend-url'
-import { isTauri, listenDesktopMenu, openDesktopWindow } from '@/lib/desktop'
+import { useDesktopUpdate } from '@/hooks/useDesktopUpdate'
+import { isLocalBackendUrl, normalizeBackendUrl } from '@/lib/backend-url'
+import {
+  hideDesktopWindow,
+  isTauri,
+  listenDesktopMenu,
+  openDesktopWindow
+} from '@/lib/desktop'
 import { openDesktopRecent } from '@/lib/open-desktop-recent'
 import { persistRememberedApiKey } from '@/lib/remembered-auth'
 import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
@@ -11,11 +17,17 @@ import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
  * File → New Window (Remote) / Open Recent + Sandwalk → Check for Updates.
  * Remote opens a dialog; Open Recent opens directly when a key is remembered,
  * otherwise opens the dialog prefilled with that URL.
+ * About Sandwalk uses the native macOS About panel (handled in Rust).
  */
-export function useDesktopWindowMenu() {
+export function useDesktopWindowMenu(options?: {
+  hideLauncherAfterOpen?: boolean
+}) {
   const navigate = useNavigate()
+  const { checkForUpdate } = useDesktopUpdate()
   const [remoteOpen, setRemoteOpen] = useState(false)
   const [remoteInitialUrl, setRemoteInitialUrl] = useState<string | null>(null)
+  const hideLauncherRef = useRef(Boolean(options?.hideLauncherAfterOpen))
+  hideLauncherRef.current = Boolean(options?.hideLauncherAfterOpen)
 
   useEffect(() => {
     if (!isTauri()) return
@@ -29,6 +41,7 @@ export function useDesktopWindowMenu() {
         return
       }
       if (payload.action === 'check-updates') {
+        void checkForUpdate()
         navigate('/dashboard/general?checkUpdates=1')
         return
       }
@@ -38,12 +51,22 @@ export function useDesktopWindowMenu() {
           route: payload.route,
           title: payload.title,
           id: payload.snapshotId,
-          hostname: payload.hostname
+          hostname: payload.hostname,
+          platform: payload.platform
         })
           .then(result => {
             if (!result.opened) {
               setRemoteInitialUrl(result.url)
               setRemoteOpen(true)
+              return
+            }
+            if (
+              hideLauncherRef.current &&
+              !isLocalBackendUrl(result.url)
+            ) {
+              void hideDesktopWindow().catch(() => {
+                // ignore
+              })
             }
           })
           .catch(() => {
@@ -60,7 +83,7 @@ export function useDesktopWindowMenu() {
       cancelled = true
       unlisten?.()
     }
-  }, [navigate])
+  }, [checkForUpdate, navigate])
 
   return {
     remoteOpen,

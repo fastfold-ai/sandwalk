@@ -178,6 +178,42 @@ def test_session_upload_ingests_into_library(
         assert library["data"][0]["originSessionId"] == session["id"]
 
 
+def test_library_list_filters_by_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    app = create_app(store_path=tmp_path / "agent.db", allowed_hosts=["testserver"])
+    with TestClient(app) as client:
+        project_a = client.post("/v1/projects", json={"name": "Alpha"}).json()
+        project_b = client.post("/v1/projects", json={"name": "Beta"}).json()
+        session_a = client.post(
+            "/v1/sessions",
+            json={"title": "A chat", "projectId": project_a["id"]},
+        ).json()
+        session_b = client.post(
+            "/v1/sessions",
+            json={"title": "B chat", "projectId": project_b["id"]},
+        ).json()
+        client.post(
+            f"/v1/sessions/{session_a['id']}/files/upload",
+            files={"file": ("a.txt", b"alpha", "text/plain")},
+        )
+        client.post(
+            f"/v1/sessions/{session_b['id']}/files/upload",
+            files={"file": ("b.txt", b"beta", "text/plain")},
+        )
+
+        all_items = client.get("/v1/library").json()
+        assert all_items["pagination"]["total"] == 2
+
+        scoped = client.get(
+            "/v1/library", params={"projectId": project_a["id"]}
+        ).json()
+        assert scoped["pagination"]["total"] == 1
+        assert scoped["data"][0]["originalName"] == "a.txt"
+        assert scoped["data"][0]["originSessionId"] == session_a["id"]
+
+
 def test_backfill_indexes_existing_workspace_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -224,9 +260,12 @@ def test_library_pagination(tmp_path: Path) -> None:
     assert len(first.data) == 2
     assert first.pagination.total == 5
     assert first.pagination.has_more is True
+    expected_bytes = sum(len(f"page-body-{index}".encode()) for index in range(5))
+    assert first.total_bytes == expected_bytes
     second = library.list_items(page=1, per_page=2)
     assert len(second.data) == 2
     assert second.pagination.has_more is True
+    assert second.total_bytes == expected_bytes
     third = library.list_items(page=2, per_page=2)
     assert len(third.data) == 1
     assert third.pagination.has_more is False

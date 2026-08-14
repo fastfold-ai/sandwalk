@@ -29,6 +29,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         self.supervisor = supervisor
         SandwalkRuntime.supervisor = supervisor
 
+        // Packaged apps: put `sandwalk` on the user PATH (managed shim in
+        // ~/.local/bin). Skips if curl/uv already owns that name.
+        switch CliPathInstaller.ensureInstalled() {
+        case .installed(let path), .updated(let path):
+            NSLog("Sandwalk: CLI shim ready at \(path)")
+        case .skippedForeignInstall(let path):
+            NSLog("Sandwalk: left existing CLI at \(path) (not managed by the app)")
+        case .failed(let message):
+            NSLog("Sandwalk: CLI shim install failed — \(message)")
+        case .skippedNoBundledRuntime, .unchanged:
+            break
+        }
+
         let plane = ControlPlane()
         self.controlPlane = plane
         plane.start()

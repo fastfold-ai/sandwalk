@@ -29,7 +29,10 @@ class HealthResponse(ApiModel):
 
 
 class DiscoverResponse(ApiModel):
-    """Auth-exempt LAN probe payload (keep small — no RAM/GPU/pid)."""
+    """Auth-exempt LAN probe payload (keep small — no RAM/GPU/pid).
+
+    ``version`` is the sandwalk package/CLI version (same as ``/v1/health``).
+    """
 
     service: Literal["sandwalk"] = "sandwalk"
     version: str

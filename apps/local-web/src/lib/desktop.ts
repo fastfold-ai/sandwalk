@@ -82,6 +82,13 @@ export const platformOS = (): string => {
   return 'linux'
 }
 
+/** Primary app window (`main`) vs spawned client windows. */
+export const isMainDesktopWindow = (): boolean => {
+  const kind = (globalThis as { __SANDWALK_WINDOW_KIND__?: unknown })
+    .__SANDWALK_WINDOW_KIND__
+  return kind !== 'client'
+}
+
 /** Overlay title bar (traffic lights over content) — macOS Tauri only. */
 export const isMacDesktopOverlay = (): boolean => {
   // Our shell injects platform before SPA load — treat that as desktop even if
@@ -156,6 +163,28 @@ export const desktopTailLogs = (name?: string, lines?: number) =>
 
 export const desktopRebuildDashboard = () =>
   invokeStrict<{ ok?: boolean }>('desktop_rebuild_dashboard')
+
+export type DesktopCliPathStatus = {
+  state: 'ready' | 'missing' | 'foreign' | 'unavailable' | string
+  command?: string
+  shim_path?: string
+  shim_exists?: boolean
+  managed?: boolean
+  foreign?: boolean
+  bundled_runtime?: boolean
+  path_ready?: boolean
+  message?: string
+  version?: string
+  python_path?: string
+  outcome?: string
+  error?: string
+}
+
+export const desktopCliPathStatus = () =>
+  invoke<DesktopCliPathStatus>('desktop_cli_path_status')
+
+export const desktopCliPathInstall = (force = false) =>
+  invokeStrict<DesktopCliPathStatus>('desktop_cli_path_install', { force })
 
 export const desktopAppVersion = () => invoke<string>('desktop_app_version')
 
@@ -321,6 +350,7 @@ export type DesktopMenuAction = {
   title?: string | null
   snapshotId?: string | null
   hostname?: string | null
+  platform?: string | null
 }
 
 /** File menu actions that need SPA UI (Remote dialog / Open Recent with key). */
@@ -335,6 +365,40 @@ export async function listenDesktopMenu(
   })
 }
 
+export type DesktopApplyAuth = {
+  url: string
+  apiKey: string
+}
+
+/** Re-apply a remembered API key into an already-open remote WebView. */
+export async function listenDesktopApplyAuth(
+  handler: (payload: DesktopApplyAuth) => void
+): Promise<() => void> {
+  const listen = tauri()?.event?.listen
+  if (!listen) return () => {}
+  return listen('sandwalk-apply-auth', event => {
+    const payload = event.payload as {
+      url?: string
+      apiKey?: string
+      api_key?: string
+    } | null
+    const url = payload?.url?.trim()
+    const apiKey = (payload?.apiKey || payload?.api_key || '').trim()
+    if (url && apiKey) handler({ url, apiKey })
+  })
+}
+
+/** Open Recent list changed (`window-recents.json` rewritten). */
+export async function listenDesktopWindowRecentsChanged(
+  handler: () => void
+): Promise<() => void> {
+  const listen = tauri()?.event?.listen
+  if (!listen) return () => {}
+  return listen('sandwalk-window-recents-changed', () => {
+    handler()
+  })
+}
+
 export type OpenDesktopWindowArgs = {
   backendUrl?: string | null
   apiKey?: string | null
@@ -342,6 +406,7 @@ export type OpenDesktopWindowArgs = {
   route?: string | null
   snapshotId?: string | null
   hostname?: string | null
+  platform?: string | null
   focusExisting?: boolean
 }
 
@@ -356,6 +421,7 @@ export const openDesktopWindow = (args: OpenDesktopWindowArgs = {}) =>
       route: args.route ?? null,
       snapshotId: args.snapshotId ?? null,
       hostname: args.hostname ?? null,
+      platform: args.platform ?? null,
       focusExisting: Boolean(args.focusExisting)
     }
   })
@@ -368,6 +434,14 @@ export const bindDesktopWindowBackend = (url: string) =>
 export const setDesktopWindowTitle = (title: string) =>
   invoke<void>('desktop_set_window_title', { title })
 
+/** Close the current desktop WebView (remote windows quit; main may hide). */
+export const closeDesktopWindow = () =>
+  invokeStrict<void>('desktop_close_current_window')
+
+/** Hide the current desktop WebView (launcher after opening a remote window). */
+export const hideDesktopWindow = () =>
+  invokeStrict<void>('desktop_hide_current_window')
+
 /** Persist / update Open Recent for this window (route + title snapshot). */
 export const upsertDesktopWindowSnapshot = (args: {
   snapshotId?: string | null
@@ -375,13 +449,15 @@ export const upsertDesktopWindowSnapshot = (args: {
   route: string
   title: string
   hostname?: string | null
+  platform?: string | null
 }) =>
   invokeStrict<string>('desktop_upsert_window_snapshot', {
     snapshotId: args.snapshotId ?? null,
     url: args.url,
     route: args.route,
     title: args.title,
-    hostname: args.hostname ?? null
+    hostname: args.hostname ?? null,
+    platform: args.platform ?? null
   })
 
 /** Snapshot id injected when the native window was created. */
@@ -420,6 +496,9 @@ export const rememberDesktopWindowRecent = (url: string) =>
 export const clearDesktopWindowRecents = () =>
   invokeStrict<void>('desktop_clear_window_recents')
 
+export const removeDesktopWindowRecent = (id: string) =>
+  invokeStrict<void>('desktop_remove_window_recent', { id })
+
 export type DesktopWindowRecent = {
   id: string
   url: string
@@ -427,6 +506,8 @@ export type DesktopWindowRecent = {
   title?: string
   /** Remote machine hostname from discover / LAN scan. */
   hostname?: string
+  /** OS from LAN scan / discover (`Linux`, `Darwin`, …) — no live probe needed. */
+  platform?: string
   label?: string | null
   lastOpenedAt: number
 }
@@ -447,6 +528,13 @@ export type LanDesktopServer = {
 /** Probe local /24 (+ localhost) for Sandwalk servers on :8787/:8789/:8790. */
 export const scanLanDesktopServers = () =>
   invokeStrict<LanDesktopServer[]>('desktop_scan_lan_servers')
+
+/** This machine’s short hostname (e.g. `Julios-MacBook-Pro`), or null. */
+export const desktopLocalHostname = () =>
+  invoke<string>('desktop_local_hostname').then(name => {
+    const trimmed = (name || '').trim()
+    return trimmed || null
+  })
 
 /** Native directory picker (desktop). Returns null when canceled or unavailable. */
 export async function pickDirectory(): Promise<string | null> {

@@ -94,6 +94,7 @@ export function buildDashboardMainViewsProps(
       props.setProjectScopeId(id)
       props.navigate(`/projects/${id}`)
     },
+    onOpenProjectSettings: () => props.setProjectSettingsOpen(true),
     togglePinProject: props.togglePinProject,
     deleteProject: props.deleteProject
   }

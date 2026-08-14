@@ -99,6 +99,13 @@ final class SandwalkSupervisor {
     }
 
     private func prepareProductionDashboard() throws {
+        // Shipped DMG already embeds ui-dist next to the helper — no pnpm.
+        if let resources = Bundle.main.resourceURL {
+            let index = resources.appendingPathComponent("ui-dist/index.html")
+            if FileManager.default.fileExists(atPath: index.path) {
+                return
+            }
+        }
         guard let repoRoot = config.repoRoot else {
             throw DashboardBuilder.BuildError.missingRepo
         }

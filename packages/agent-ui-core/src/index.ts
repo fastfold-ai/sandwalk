@@ -217,6 +217,19 @@ export type PendingHitlApproval = {
   reviewConfigs: HitlReviewConfig[]
 }
 
+export type WidgetSize = 'sm' | 'md' | 'lg'
+
+export type WidgetLayoutItem = {
+  id: string
+  type: string
+  size: WidgetSize
+}
+
+export type WidgetLayout = {
+  version: number
+  widgets: WidgetLayoutItem[]
+}
+
 export type AgentProject = {
   id: string
   name: string
@@ -226,12 +239,28 @@ export type AgentProject = {
   icon: string
   color: string
   pinned: boolean
+  homeLayout?: WidgetLayout | null
   sessionCount: number
   createdAt: string
   updatedAt: string
 }
 
 export type LibraryKind = 'image' | 'document' | 'structure' | 'code' | 'other'
+
+/** Filesystem file under a project's linked folder (not a Library blob). */
+export type ProjectFolderFile = {
+  path: string
+  name: string
+  kind: LibraryKind | string
+  size: number | null
+  mtime: string | null
+}
+
+export type ProjectFolderListing = {
+  folderPath: string
+  truncated: boolean
+  data: ProjectFolderFile[]
+}
 
 export type LibraryItem = {
   id: string
@@ -256,6 +285,8 @@ export type LibraryPagination = {
 export type LibraryItemList = {
   data: LibraryItem[]
   pagination: LibraryPagination
+  /** Sum of `bytes` for the filtered Library set (all pages). */
+  totalBytes?: number
 }
 
 export type UseLibraryInChatResult = {
@@ -1664,6 +1695,7 @@ export interface AgentClient {
   listLibrary?(options?: {
     kind?: LibraryKind | null
     q?: string | null
+    projectId?: string | null
     page?: number
     perPage?: number
     signal?: AbortSignal
@@ -1751,6 +1783,7 @@ export interface AgentClient {
       icon?: string | null
       color?: string | null
       pinned?: boolean
+      homeLayout?: WidgetLayout | null
     },
     signal?: AbortSignal
   ): Promise<AgentProject>
@@ -1764,9 +1797,35 @@ export interface AgentClient {
       icon?: string | null
       color?: string | null
       pinned?: boolean
+      homeLayout?: WidgetLayout | null
     },
     signal?: AbortSignal
   ): Promise<AgentProject>
+  listProjectFolderFiles?(
+    projectId: string,
+    signal?: AbortSignal
+  ): Promise<ProjectFolderListing>
+  readProjectFolderFile?(
+    projectId: string,
+    path: string,
+    signal?: AbortSignal
+  ): Promise<WorkspaceFileContent>
+  renameProjectFolderFile?(
+    projectId: string,
+    path: string,
+    name: string,
+    signal?: AbortSignal
+  ): Promise<ProjectFolderFile>
+  deleteProjectFolderFile?(
+    projectId: string,
+    path: string,
+    signal?: AbortSignal
+  ): Promise<void>
+  useProjectFolderInChat?(
+    projectId: string,
+    input: { paths: string[]; title?: string | null },
+    signal?: AbortSignal
+  ): Promise<{ sessionId: string; paths: string[] }>
   deleteProject?(projectId: string, signal?: AbortSignal): Promise<void>
   searchSessions(query: string, signal?: AbortSignal): Promise<AgentSession[]>
   createSession(
@@ -1780,7 +1839,16 @@ export interface AgentClient {
     },
     signal?: AbortSignal
   ): Promise<AgentSession>
-  getUsageOverview?(signal?: AbortSignal): Promise<UsageOverview>
+  getUsageOverview?(
+    signalOrOpts?:
+      | AbortSignal
+      | { projectId?: string | null; signal?: AbortSignal }
+  ): Promise<UsageOverview>
+  getDashboardLayout?(signal?: AbortSignal): Promise<WidgetLayout>
+  updateDashboardLayout?(
+    layout: WidgetLayout,
+    signal?: AbortSignal
+  ): Promise<WidgetLayout>
   updateSession(
     sessionId: string,
     input: {

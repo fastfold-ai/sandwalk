@@ -26,6 +26,7 @@ export function HomeView({
   onCreateProject,
   onCreateSession,
   onOpenProject,
+  onOpenProjectSettings,
   onOpenSession,
   onTogglePinProject,
   onDeleteProject
@@ -43,6 +44,7 @@ export function HomeView({
   onCreateProject: () => void
   onCreateSession: (projectId: string | null) => void
   onOpenProject: (id: string) => void
+  onOpenProjectSettings: () => void
   onOpenSession: (id: string) => void
   onTogglePinProject: (project: AgentProject) => void
   onDeleteProject: (project: AgentProject) => void
@@ -64,17 +66,18 @@ export function HomeView({
             item.organizeLabel !== 'archive' &&
             (!scopedProjectId || item.projectId === scopedProjectId)
         )
-        .slice(0, scopedProjectId ? 20 : 8),
+        .slice(0, 8),
     [scopedProjectId, sessions]
   )
   const recentIdsKey = recent.map(item => item.id).join(',')
 
   useEffect(() => {
-    if (!recentIdsKey) return
+    // Project Home dropped the recent-sessions grid; only load previews for All home.
+    if (activeProject || !recentIdsKey) return
     // Do not AbortController here — React StrictMode remounts abort in-flight
     // previews and show noisy canceled requests. In-flight + cache dedupe is enough.
     void onLoadPreviews(recentIdsKey.split(',').filter(Boolean))
-  }, [onLoadPreviews, recentIdsKey])
+  }, [activeProject, onLoadPreviews, recentIdsKey])
 
   const projectNames = new Map(
     projects.map(project => [project.id, project.name])
@@ -90,10 +93,8 @@ export function HomeView({
       <HomeProjectView
         client={client}
         project={activeProject}
-        sessions={recent}
-        previews={previews}
         onCreateSession={onCreateSession}
-        onOpenSession={onOpenSession}
+        onOpenProjectSettings={onOpenProjectSettings}
         onDeleteProject={onDeleteProject}
       />
     )
@@ -101,7 +102,7 @@ export function HomeView({
 
   if (recent.length === 0 && orderedProjects.length === 0) {
     return (
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className={cn(pagePad, 'max-w-3xl')}>
           <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
             <div className="min-w-0">
@@ -133,7 +134,7 @@ export function HomeView({
   }
 
   return (
-    <ScrollArea className="flex-1">
+    <ScrollArea className="min-h-0 flex-1">
       <div className={cn(pagePad, 'max-w-6xl')}>
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>

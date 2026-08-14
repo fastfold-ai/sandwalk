@@ -67,7 +67,19 @@ struct AppConfig: Equatable, Sendable {
         dashboardServeMode == .production
     }
 
+    /// Packaged helper ships Vite output under Resources/ui-dist.
+    static func bundledUiDistURL(bundle: Bundle = .main) -> URL? {
+        guard let resources = bundle.resourceURL else { return nil }
+        let bundled = resources.appendingPathComponent("ui-dist", isDirectory: true)
+        let index = bundled.appendingPathComponent("index.html")
+        guard FileManager.default.fileExists(atPath: index.path) else { return nil }
+        return bundled
+    }
+
     var uiDistURL: URL? {
+        if let bundled = Self.bundledUiDistURL() {
+            return bundled
+        }
         guard let repoRoot else { return nil }
         return DashboardBuilder.distURL(repoRoot: repoRoot)
     }
@@ -166,7 +178,7 @@ struct AppConfig: Equatable, Sendable {
                 saved.healthCheckIntervalSeconds ?? defaultHealthCheckIntervalSeconds
             )
         }()
-        let serveMode: DashboardServeMode = {
+        var serveMode: DashboardServeMode = {
             if let raw = env["SANDWALK_DASHBOARD_MODE"]?.lowercased() {
                 if raw == "development" || raw == "dev" { return .development }
                 if raw == "production" || raw == "prod" { return .production }
@@ -192,6 +204,16 @@ struct AppConfig: Equatable, Sendable {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
         } ?? repoRoot?.appendingPathComponent("cli", isDirectory: true)
             ?? discoverAgentCliRoot()
+
+        // Self-contained DMG: agent-runtime + ui-dist mean Production. Ignore a
+        // leftover Development setting from a prior checkout (no Vite on :8969).
+        // Explicit SANDWALK_DASHBOARD_MODE still wins (handled above).
+        if env["SANDWALK_DASHBOARD_MODE"] == nil,
+           ServeRuntime.bundledPythonURL() != nil,
+           Self.bundledUiDistURL() != nil
+        {
+            serveMode = .production
+        }
 
         return AppConfig(
             bindHost: host,

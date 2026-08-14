@@ -6,6 +6,7 @@ import {
   AppShellMainDragStrip,
   AppShellTitleBar
 } from '@/components/app/app-shell-main-chrome'
+import { ConnectionStatusLabel } from '@/components/ConnectionStatusLabel'
 import {
   type AppShellMainProps,
   isDashboardMainView
@@ -58,6 +59,10 @@ export function AppShellMain(props: AppShellMainProps) {
       <div className="sandwalk-shell-main relative flex h-full min-w-0 flex-col bg-background">
         {/* Layout-neutral drag hit target — every main view, does not shift content. */}
         <AppShellMainDragStrip />
+        <ConnectionStatusLabel
+          backendUrl={props.backendUrl}
+          loadServerStatus={props.loadServerStatus}
+        />
         {showCollapsedNavStrip ? (
           <div className="relative z-20 fade-in animate-in duration-200">
             <ShellNavStrip
@@ -81,6 +86,7 @@ export function AppShellMain(props: AppShellMainProps) {
             siteId={props.siteId}
             sessions={props.sessions}
             projects={props.projects}
+            activeProjectId={props.activeProjectId}
             onAddSite={() => void addSite()}
           />
         ) : isDashboardMainView(props) ? (

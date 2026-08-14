@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils'
 
 import {
   buildModelChartDays,
-  colorForChartModel,
   formatTokenCount,
   modelSeriesKey,
   providerLabel,
@@ -40,11 +39,14 @@ function ModelSeriesLabel({
 export function UsageModelStackedChart({
   modelDays,
   chartModels,
-  className
+  className,
+  fill = false
 }: {
   modelDays: UsageModelDayPoint[]
   chartModels: UsageChartModel[]
   className?: string
+  /** Grow plot area to fill the parent card (matches side-by-side heatmap height). */
+  fill?: boolean
 }) {
   const days = useMemo(
     () => buildModelChartDays(modelDays ?? [], chartModels ?? []),
@@ -54,6 +56,7 @@ export function UsageModelStackedChart({
   const [hovered, setHovered] = useState<string | null>(null)
   const active = days.find(day => day.day === hovered) || null
   const hasData = days.some(day => day.total > 0)
+  const plotHeight = fill ? 'h-full min-h-[7.5rem]' : 'h-32'
 
   if (!hasData) {
     return (
@@ -69,16 +72,26 @@ export function UsageModelStackedChart({
   }))
 
   return (
-    <div className={cn('mt-6', className)}>
-      <div className="flex items-end gap-3">
-        <div className="text-muted-foreground flex h-48 w-10 shrink-0 flex-col justify-between text-right text-[10px] tabular-nums">
+    <div
+      className={cn(
+        fill ? 'flex min-h-0 flex-1 flex-col' : 'mt-3',
+        className
+      )}
+    >
+      <div className={cn('flex items-end gap-2', fill && 'min-h-0 flex-1')}>
+        <div
+          className={cn(
+            'text-muted-foreground flex w-9 shrink-0 flex-col justify-between text-right text-[10px] tabular-nums',
+            plotHeight
+          )}
+        >
           {[...ticks].reverse().map(tick => (
             <span key={tick.ratio}>{tick.label}</span>
           ))}
         </div>
 
         <TooltipProvider delayDuration={80}>
-          <div className="relative min-w-0 flex-1">
+          <div className={cn('relative min-w-0 flex-1', fill && 'h-full')}>
             <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
               {ticks.map(tick => (
                 <div
@@ -87,7 +100,12 @@ export function UsageModelStackedChart({
                 />
               ))}
             </div>
-            <div className="relative flex h-48 items-end gap-[3px]">
+            <div
+              className={cn(
+                'relative flex items-end gap-[3px]',
+                plotHeight
+              )}
+            >
               {days.map(day => {
                 const heightPct = Math.max(
                   0,
@@ -121,7 +139,8 @@ export function UsageModelStackedChart({
                                 height: `${Math.max(
                                   2,
                                   Math.round(
-                                    (100 * segment.tokens) / Math.max(1, day.total)
+                                    (100 * segment.tokens) /
+                                      Math.max(1, day.total)
                                   )
                                 )}%`
                               }}
@@ -176,7 +195,7 @@ export function UsageModelStackedChart({
         </TooltipProvider>
       </div>
 
-      <div className="text-muted-foreground mt-2 flex justify-between pl-[2.75rem] text-[10px]">
+      <div className="text-muted-foreground mt-1.5 flex justify-between pl-11 text-[10px]">
         <span>
           {days[0]?.date.toLocaleDateString(undefined, {
             month: 'short',
@@ -184,41 +203,17 @@ export function UsageModelStackedChart({
           })}
         </span>
         <span>
-          {days[days.length - 1]?.date.toLocaleDateString(undefined, {
-            month: 'short',
-            day: 'numeric'
-          })}
+          {active
+            ? `${formatTokenCount(active.total)} · ${active.date.toLocaleDateString(
+                undefined,
+                { month: 'short', day: 'numeric' }
+              )}`
+            : days[days.length - 1]?.date.toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric'
+              })}
         </span>
       </div>
-
-      <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1.5">
-        {chartModels.map(model => (
-          <div
-            key={modelSeriesKey(model)}
-            className="text-muted-foreground flex items-center gap-1.5 text-[11px]"
-          >
-            <span
-              className="size-2.5 shrink-0 rounded-[2px]"
-              style={{
-                backgroundColor: colorForChartModel(model, chartModels)
-              }}
-            />
-            <ModelSeriesLabel
-              modelId={model.modelId}
-              provider={model.provider}
-            />
-          </div>
-        ))}
-      </div>
-
-      <p className="text-muted-foreground mt-3 min-h-[1rem] text-[11px] tabular-nums">
-        {active
-          ? `${active.date.toLocaleDateString(undefined, {
-              month: 'short',
-              day: 'numeric'
-            })}: ${formatTokenCount(active.total)} tokens`
-          : '\u00a0'}
-      </p>
     </div>
   )
 }

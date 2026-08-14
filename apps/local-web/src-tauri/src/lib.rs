@@ -353,7 +353,7 @@ fn desktop_bind_window_backend(
     let id = multi_window::register_window_backend(window.label(), &normalized);
     let title = multi_window::window_title_for_url(&normalized);
     let _ = window.set_title(&title);
-    multi_window::upsert_recent_snapshot(&id, &normalized, "/", "Sandwalk", None);
+    multi_window::upsert_recent_snapshot(&id, &normalized, "/", "Sandwalk", None, None);
     multi_window::install_app_menu(&app)
 }
 
@@ -365,6 +365,18 @@ fn desktop_set_window_title(window: tauri::WebviewWindow, title: String) -> Resu
         return Ok(());
     }
     window.set_title(trimmed).map_err(|e| e.to_string())
+}
+
+/// Close this WebView (remote client windows destroy; main may hide-on-close).
+#[tauri::command]
+fn desktop_close_current_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
+}
+
+/// Hide this WebView without destroying it (Welcome Home after spawning a remote).
+#[tauri::command]
+fn desktop_hide_current_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.hide().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -433,6 +445,17 @@ fn desktop_tail_logs(name: Option<String>, lines: Option<u32>) -> Result<Value, 
 #[tauri::command]
 fn desktop_rebuild_dashboard() -> Result<Value, String> {
     control_request("POST", "/v1/control/rebuild-dashboard", None)
+}
+
+#[tauri::command]
+fn desktop_cli_path_status() -> Result<Value, String> {
+    control_request("GET", "/v1/control/cli-path", None)
+}
+
+#[tauri::command]
+fn desktop_cli_path_install(force: Option<bool>) -> Result<Value, String> {
+    let body = serde_json::json!({ "force": force.unwrap_or(false) });
+    control_request("POST", "/v1/control/cli-path", Some(body))
 }
 
 #[tauri::command]
@@ -800,6 +823,8 @@ pub fn run() {
         .plugin(tauri_plugin_liquid_glass::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             desktop_server_status,
             desktop_server_start,
@@ -813,17 +838,23 @@ pub fn run() {
             desktop_put_desktop,
             desktop_tail_logs,
             desktop_rebuild_dashboard,
+            desktop_cli_path_status,
+            desktop_cli_path_install,
             desktop_app_version,
             desktop_menubar_available,
             desktop_open_window,
             desktop_bind_window_backend,
             desktop_set_window_title,
+            desktop_close_current_window,
+            desktop_hide_current_window,
             desktop_open_server_settings,
             multi_window::desktop_list_window_recents,
             multi_window::desktop_clear_window_recents,
+            multi_window::desktop_remove_window_recent,
             multi_window::desktop_upsert_window_snapshot,
             multi_window::desktop_remember_window_recent,
             lan_scan::desktop_scan_lan_servers,
+            lan_scan::desktop_local_hostname,
             start_window_drag,
             toggle_maximize,
             window_is_fullscreen,
@@ -864,6 +895,7 @@ pub fn run() {
                 "Sandwalk",
                 cold_route.as_deref(),
                 Some("main"),
+                None,
                 None,
                 true,
                 is_spa_route,

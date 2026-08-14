@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
+from agent_server.app import create_app
 from agent_server.project_folder import (
     sync_project_folder_link,
     validate_project_folder_path,
@@ -153,6 +155,110 @@ def test_project_folder_crud_and_icon_persistence(tmp_path: Path):
     assert updated.icon == "brain"
     assert updated.color == "purple"
     assert updated.folder_path is None
+
+
+def test_list_and_read_project_folder_files(tmp_path: Path):
+    from agent_server.project_folder_listing import (
+        list_project_folder_files,
+        read_project_folder_file,
+    )
+
+    folder = tmp_path / "notes"
+    folder.mkdir()
+    (folder / "now.md").write_text("# now\n", encoding="utf-8")
+    (folder / "backlog.md").write_text("- item\n", encoding="utf-8")
+    nested = folder / "docs"
+    nested.mkdir()
+    (nested / "readme.md").write_text("hi\n", encoding="utf-8")
+    (folder / ".git").mkdir()
+    (folder / ".git" / "config").write_text("x", encoding="utf-8")
+    (folder / "node_modules").mkdir()
+    (folder / "node_modules" / "pkg.js").write_text("x", encoding="utf-8")
+
+    listing = list_project_folder_files(str(folder))
+    names = {item.name for item in listing.data}
+    assert names == {"now.md", "backlog.md", "readme.md"}
+    assert listing.truncated is False
+    assert all(item.kind == "document" for item in listing.data)
+
+    content = read_project_folder_file(str(folder), "docs/readme.md")
+    assert content.encoding == "text"
+    assert content.content == "hi\n"
+
+    with pytest.raises(ValueError, match="Invalid project folder path"):
+        read_project_folder_file(str(folder), "../outside.md")
+
+    from agent_server.project_folder_listing import (
+        delete_project_folder_file,
+        rename_project_folder_file,
+    )
+
+    renamed = rename_project_folder_file(str(folder), "now.md", "today.md")
+    assert renamed.name == "today.md"
+    assert renamed.path == "today.md"
+    assert (folder / "today.md").is_file()
+    assert not (folder / "now.md").exists()
+
+    delete_project_folder_file(str(folder), "today.md")
+    assert not (folder / "today.md").exists()
+
+
+def test_project_folder_files_http(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    folder = tmp_path / "shared"
+    folder.mkdir()
+    (folder / "release.md").write_text("ship\n", encoding="utf-8")
+
+    app = create_app(store_path=tmp_path / "agent.db", allowed_hosts=["testserver"])
+    with TestClient(app) as client:
+        created = client.post(
+            "/v1/projects",
+            json={"name": "Shared", "folderPath": str(folder)},
+        )
+        assert created.status_code == 201
+        project_id = created.json()["id"]
+
+        listed = client.get(f"/v1/projects/{project_id}/folder-files")
+        assert listed.status_code == 200
+        body = listed.json()
+        assert body["folderPath"] == str(folder.resolve())
+        assert [row["name"] for row in body["data"]] == ["release.md"]
+
+        content = client.get(
+            f"/v1/projects/{project_id}/folder-files/content",
+            params={"path": "release.md"},
+        )
+        assert content.status_code == 200
+        assert content.json()["content"] == "ship\n"
+
+        renamed = client.patch(
+            f"/v1/projects/{project_id}/folder-files",
+            json={"path": "release.md", "name": "shipped.md"},
+        )
+        assert renamed.status_code == 200
+        assert renamed.json()["name"] == "shipped.md"
+
+        used = client.post(
+            f"/v1/projects/{project_id}/folder-files/use-in-chat",
+            json={"paths": ["shipped.md"], "title": "Ship notes"},
+        )
+        assert used.status_code == 201
+        used_body = used.json()
+        assert used_body["sessionId"]
+        assert used_body["paths"] == ["project/shipped.md"]
+
+        deleted = client.delete(
+            f"/v1/projects/{project_id}/folder-files",
+            params={"path": "shipped.md"},
+        )
+        assert deleted.status_code == 200
+        assert deleted.json()["deleted"] is True
+        assert not (folder / "shipped.md").exists()
+
+        bare = client.post("/v1/projects", json={"name": "Bare"})
+        assert bare.status_code == 201
+        missing = client.get(f"/v1/projects/{bare.json()['id']}/folder-files")
+        assert missing.status_code == 404
 
 
 def test_ensure_workspace_mounts_project_folder(tmp_path: Path, monkeypatch):
