@@ -442,15 +442,14 @@ export function useSessionChatStream({
           }
         })
     }
-    // Full cleanup on real unmount: aborts every open stream and clears
-    // pending grace-abort timers. Without this, on a sessionId change the
-    // effect only kills the leaving id, but on component destruction
-    // (route change, logout) the surviving controllers and timers leak.
-    return () => {
-      for (const timer of streamCloseTimersRef.current.values()) {
-        window.clearTimeout(timer)
-      }
-      streamCloseTimersRef.current.clear()
-    }
+    // Nota: NO agregamos cleanup aquí. Un cleanup que limpia timers
+    // pendientes rompe el grace period — cuando el usuario navega rápido
+    // (sessionId cambia) el cleanup mata los timers ANTES de que aborten
+    // los streams del sessionId anterior, y como el body agenda NUEVOS
+    // timers para los mismos ids, los streams viejos quedan abiertos.
+    // Resultado: streams se acumulan → saturan el pool → nuevas requests
+    // se cuelgan (regresión del bug de thread pool que arreglamos en la
+    // Capa 1). Los timers son inofensivos: cuando finalmente disparen,
+    // el abort no hace nada si el controller ya fue reemplazado.
   }, [client, health, patchChat, sessionId])
 }
