@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from agent_server.models import AgentSession
 from agent_server.service.fork_import import import_shared_fork_files
 from agent_server.session_event_bus import SessionEventType, session_event_bus
 
+_LOG = logging.getLogger(__name__)
+
 
 def _publish_session_bus_event(event_type: str, session: AgentSession) -> None:
     """Fan out to `session_event_bus` — swallow errors so a broken subscriber
-    can never break the write path."""
+    can never break the write path. Log at DEBUG so a broken payload
+    contract or serializer bug is still discoverable in dev logs."""
     try:
         session_event_bus.publish(
             event_type,
@@ -21,7 +25,7 @@ def _publish_session_bus_event(event_type: str, session: AgentSession) -> None:
             },
         )
     except Exception:  # noqa: BLE001
-        pass
+        _LOG.debug("session_event_bus publish failed", exc_info=True)
 
 
 class _SessionCrudMixin:

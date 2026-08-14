@@ -442,5 +442,15 @@ export function useSessionChatStream({
           }
         })
     }
+    // Full cleanup on real unmount: aborts every open stream and clears
+    // pending grace-abort timers. Without this, on a sessionId change the
+    // effect only kills the leaving id, but on component destruction
+    // (route change, logout) the surviving controllers and timers leak.
+    return () => {
+      for (const timer of streamCloseTimersRef.current.values()) {
+        window.clearTimeout(timer)
+      }
+      streamCloseTimersRef.current.clear()
+    }
   }, [client, health, patchChat, sessionId])
 }

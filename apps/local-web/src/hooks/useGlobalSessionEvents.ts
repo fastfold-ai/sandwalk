@@ -54,9 +54,23 @@ type UseGlobalSessionEventsArgs = {
 function extractSession(payload: Record<string, unknown>): AgentSession | null {
   const raw = payload.session
   if (!raw || typeof raw !== 'object') return null
-  // Trust the backend's shape — it was serialized from the same
-  // AgentSession model the client already consumes elsewhere.
-  return raw as AgentSession
+  // Cheap runtime guard: the wire format could drift (backend rename,
+  // schema migration, older client version). Verifying the two fields
+  // the reducer downstream actually reads prevents propagating an
+  // undefined-shaped object into `sessions` state and crashing renders.
+  const candidate = raw as Record<string, unknown>
+  if (
+    typeof candidate.id !== 'string' ||
+    typeof candidate.status !== 'string'
+  ) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[useGlobalSessionEvents] dropping session payload with unexpected shape',
+      candidate
+    )
+    return null
+  }
+  return candidate as unknown as AgentSession
 }
 
 function extractSessionId(payload: Record<string, unknown>): string | null {
