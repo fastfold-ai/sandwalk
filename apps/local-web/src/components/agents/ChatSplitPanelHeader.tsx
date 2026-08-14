@@ -13,6 +13,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 
 import { ProjectMark } from '@/components/agents/ProjectMark'
+import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import {
   Popover,
   PopoverContent,
@@ -90,6 +91,16 @@ export type ChatSplitPanelHeaderProps = {
    */
   onRemoveFromSplit?: (sessionId: string) => void
   onDelete?: (session: AgentSession) => void
+  /**
+   * Reasignar el chat a otro proyecto (o quitárselo). Mismo comportamiento
+   * que "Move to project" del context menu del strip, expuesto también
+   * dentro del split para que el usuario pueda mover un chat sin cerrar
+   * el grupo primero.
+   */
+  onMoveToProject?: (
+    session: AgentSession,
+    projectId: string | null
+  ) => void | Promise<void>
 }
 
 export function ChatSplitPanelHeader({
@@ -110,6 +121,7 @@ export function ChatSplitPanelHeader({
   showCli,
   onExport,
   onRename,
+  onMoveToProject,
   onInspect,
   onArchive,
   onRemoveFromSplit,
@@ -286,6 +298,26 @@ export function ChatSplitPanelHeader({
                     <Pencil className="size-3.5" />
                     Rename…
                   </DropdownMenuItem>
+                ) : null}
+                {onMoveToProject && projects.length > 0 ? (
+                  <ProjectPicker
+                    projects={projects}
+                    value={session.projectId}
+                    noneLabel="No project"
+                    trigger={
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="hover:bg-muted flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px]"
+                      >
+                        <Folder className="size-3.5" />
+                        Move to project…
+                      </button>
+                    }
+                    onChange={projectId => {
+                      void onMoveToProject(session, projectId)
+                    }}
+                  />
                 ) : null}
                 <DropdownMenu open={colorOpen} onOpenChange={setColorOpen}>
                   <div className="px-2 py-1.5">

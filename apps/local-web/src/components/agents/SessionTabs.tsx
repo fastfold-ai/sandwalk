@@ -766,9 +766,10 @@ export function SessionTabs({
               trigger={
                 <button
                   type="button"
-                  className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                  role="menuitem"
+                  className="hover:bg-muted flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs [&_svg]:size-3"
                 >
-                  <Folder className="size-3.5" />
+                  <Folder />
                   Move to project…
                 </button>
               }
