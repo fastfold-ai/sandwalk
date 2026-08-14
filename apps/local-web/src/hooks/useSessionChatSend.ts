@@ -11,6 +11,35 @@ import { buildSendContent, finalizePendingTools } from '@/lib/chat-actions'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import type { SessionChatState } from '@/lib/sessions'
 
+/**
+ * Retries `client.sendMessage` on `409 SessionBusyError` with short
+ * backoff. Motivation: the backend's `_active_runs[sessionId]` entry is
+ * cleared by an asyncio done_callback that runs slightly after the SSE
+ * `run.completed` event reaches the UI. If the user hits send in that
+ * ~100ms window, the backend still sees a "busy" task and rejects.
+ * Retrying twice (300 ms + 600 ms) covers that gap without touching the
+ * run lifecycle. If it still fails after the retries, the original 409
+ * bubbles up as a real error.
+ */
+async function sendMessageWithBusyRetry(
+  client: LocalAgentClient,
+  sessionId: string,
+  content: string
+): Promise<void> {
+  const delaysMs = [300, 600]
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await client.sendMessage(sessionId, content)
+      return
+    } catch (cause) {
+      const isBusy =
+        cause instanceof Error && / 409:/.test(cause.message)
+      if (!isBusy || attempt >= delaysMs.length) throw cause
+      await new Promise(resolve => window.setTimeout(resolve, delaysMs[attempt]))
+    }
+  }
+}
+
 type UseSessionChatSendArgs = {
   client: LocalAgentClient
   sessionId: string | null
@@ -112,7 +141,14 @@ export function useSessionChatSend({
     )
     setError(null)
     try {
-      await client.sendMessage(targetSessionId, content)
+      // Retry on 409 SessionBusyError: when the user hits send right
+      // after a previous run completed, there's a small window where
+      // the SSE `run.completed` reached the UI (runActive is false in
+      // the sidebar) but the backend's asyncio.Task hasn't yet run its
+      // done_callback that clears `_active_runs[sessionId]`. Retries
+      // with short backoff cover that gap without changing anything
+      // about the run lifecycle.
+      await sendMessageWithBusyRetry(client, targetSessionId, content)
       const history = await client.listMessages(targetSessionId)
       patchChat(targetSessionId, prev => ({
         ...prev,
