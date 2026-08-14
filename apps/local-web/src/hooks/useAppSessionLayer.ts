@@ -10,7 +10,7 @@ import type {
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
 import { buildConversationTimeline } from '@/components/agents/transcript'

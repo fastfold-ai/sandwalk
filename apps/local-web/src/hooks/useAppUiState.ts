@@ -14,8 +14,7 @@ import {
   readProjectScopeId,
   readRecentProjectIds,
   readTabGroups,
-  SIDEBAR_COLLAPSED_STORAGE_KEY,
-  TERMINAL_OPEN_STORAGE_KEY
+  SIDEBAR_COLLAPSED_STORAGE_KEY
 } from '@/lib/app-storage'
 
 export function useAppUiState() {
