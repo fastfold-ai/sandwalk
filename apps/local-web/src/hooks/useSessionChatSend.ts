@@ -40,6 +40,15 @@ type UseSessionChatSendArgs = {
     projectId?: string | null,
     options?: { navigate?: boolean }
   ) => Promise<string | null>
+  /**
+   * Populated by `usePerSessionChatState` / `useAppSessionLayer` after
+   * `useChatScroll` runs (declaration-order forces this indirection). We
+   * call it right after the optimistic composer clear so the user's own
+   * message and the incoming stream stay in view — the auto-scroll
+   * ResizeObserver alone doesn't fire soon enough on a freshly-mounted
+   * split panel that lost `stickToBottom`.
+   */
+  scrollChatToBottomRef?: MutableRefObject<(() => void) | null>
 }
 
 export function useSessionChatSend({
@@ -59,7 +68,8 @@ export function useSessionChatSend({
   patchChat,
   setSessions,
   setError,
-  ensureAgentSession
+  ensureAgentSession,
+  scrollChatToBottomRef
 }: UseSessionChatSendArgs) {
   const sendMessage = async (composerOverride?: string) => {
     const composerText = composerOverride ?? composerLiveRef.current ?? composer
@@ -84,6 +94,15 @@ export function useSessionChatSend({
       runActive: true,
       messagesLoaded: true
     })
+    // Pin the transcript to the bottom on the next frame — the user's own
+    // message pushes the content past the fold, and if `stickToBottom` was
+    // false (common after split-mount when layout wasn't stable) the
+    // upcoming SSE deltas won't scroll on their own. Ref-based so send
+    // hook can be declared before scroll hook without a circular dep.
+    if (scrollChatToBottomRef?.current) {
+      const scroll = scrollChatToBottomRef.current
+      window.requestAnimationFrame(() => scroll())
+    }
     setSessions(current =>
       current.map(item =>
         item.id === targetSessionId

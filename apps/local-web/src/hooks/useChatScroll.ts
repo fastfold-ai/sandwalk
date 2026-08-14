@@ -137,17 +137,85 @@ export function useChatScroll({
       return
     }
 
+    /*
+     * Follow layout until it stabilizes. In split view the panel's viewport
+     * is still being sized when this effect fires — `scrollHeight` reads a
+     * stale (small) value and a single `viewport.scrollTop = scrollHeight`
+     * doesn't reach the real bottom. Before this fix we retried at fixed
+     * intervals (immediate + rAF + 40 ms) which was too short for the
+     * `ResizablePanelGroup` layout to settle → sticky flag lost, deltas
+     * never auto-scrolled.
+     *
+     * Now: a `ResizeObserver` re-applies scroll every time the viewport or
+     * its content resizes, until `applySessionScroll` succeeds AND the
+     * viewport reads a stable `scrollHeight` two consecutive frames. Both
+     * the observer and the safety timer disconnect once applied.
+     */
+    const SAFETY_MS = 750
+    let stableScrollHeight = -1
+    let stableRuns = 0
+    let observer: ResizeObserver | null = null
+    let safetyTimer: number | null = null
+
+    const cleanup = () => {
+      observer?.disconnect()
+      observer = null
+      if (safetyTimer !== null) {
+        window.clearTimeout(safetyTimer)
+        safetyTimer = null
+      }
+    }
+
     const run = () => {
-      if (activeSessionRef.current !== sessionId) return
-      if (applySessionScroll()) appliedForRef.current = sessionId
+      if (activeSessionRef.current !== sessionId) {
+        cleanup()
+        return
+      }
+      const viewport = getChatViewport(chatScrollRef.current)
+      if (!viewport) {
+        // Viewport not attached yet — the observer will fire once it is.
+        return
+      }
+      applySessionScroll()
+      // Consider it "applied" only when scrollHeight has stopped changing —
+      // otherwise the ResizablePanelGroup is still growing the panel and a
+      // later frame will grow the transcript past our current position.
+      if (viewport.scrollHeight === stableScrollHeight) {
+        stableRuns += 1
+      } else {
+        stableScrollHeight = viewport.scrollHeight
+        stableRuns = 1
+      }
+      if (stableRuns >= 2) {
+        appliedForRef.current = sessionId
+        cleanup()
+      }
     }
+
+    // First attempt (before layout may have settled — starts the loop).
     run()
-    const frame = window.requestAnimationFrame(run)
-    const timer = window.setTimeout(run, 40)
-    return () => {
-      window.cancelAnimationFrame(frame)
-      window.clearTimeout(timer)
+    if (appliedForRef.current === sessionId) {
+      // Stabilized on the first pass (single-tab, no split churn).
+      return
     }
+
+    const viewport = getChatViewport(chatScrollRef.current)
+    if (viewport) {
+      observer = new ResizeObserver(() => {
+        run()
+      })
+      observer.observe(viewport)
+      const content = viewport.firstElementChild
+      if (content) observer.observe(content)
+    }
+    // Hard stop so a viewport that never emits (unlikely but possible)
+    // doesn't leave the observer running forever.
+    safetyTimer = window.setTimeout(() => {
+      appliedForRef.current = sessionId
+      cleanup()
+    }, SAFETY_MS)
+
+    return cleanup
   }, [
     sessionId,
     messagesLoaded,

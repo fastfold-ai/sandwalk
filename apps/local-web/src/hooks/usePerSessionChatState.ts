@@ -163,6 +163,11 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     setTerminalOpen: args.setTerminalOpen
   })
 
+  // Forward-declared so `useSessionChatSend` (declared before `useChatScroll`
+  // due to conversationTimeline dep) can still trigger scroll-to-bottom on
+  // send. Populated below once `scroll.scrollChatToBottom` exists.
+  const scrollChatToBottomRef = useRef<(() => void) | null>(null)
+
   const send = useSessionChatSend({
     client: args.client,
     sessionId: args.sessionId,
@@ -180,7 +185,8 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     patchChat: chat.patchChat,
     setSessions: args.setSessions,
     setError: args.setError,
-    ensureAgentSession: actions.ensureAgentSession
+    ensureAgentSession: actions.ensureAgentSession,
+    scrollChatToBottomRef
   })
 
   const prefetchSessionMessages = usePrefetchSessionMessages(
@@ -241,6 +247,9 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     messagesLength: chat.messages.length,
     conversationTimelineLength: conversationTimeline.length
   })
+  // Close the loop: the send hook will now be able to pin the transcript
+  // to the bottom the frame after the user hits Enter.
+  scrollChatToBottomRef.current = scroll.scrollChatToBottom
 
   const agentComposerSlotProps = buildAgentComposerSlotProps({
     sessionId: args.sessionId,

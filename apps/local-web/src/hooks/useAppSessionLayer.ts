@@ -177,6 +177,10 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     setTerminalOpen: args.setTerminalOpen
   })
 
+  // Populated below after `useChatScroll` runs — see mirror pattern in
+  // `usePerSessionChatState`.
+  const scrollChatToBottomRef = useRef<(() => void) | null>(null)
+
   const send = useSessionChatSend({
     client: args.client,
     sessionId: args.sessionId,
@@ -194,7 +198,8 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     patchChat: chat.patchChat,
     setSessions: args.setSessions,
     setError: args.setError,
-    ensureAgentSession: actions.ensureAgentSession
+    ensureAgentSession: actions.ensureAgentSession,
+    scrollChatToBottomRef
   })
 
   const prefetchSessionMessages = usePrefetchSessionMessages(
@@ -242,6 +247,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     messagesLength: chat.messages.length,
     conversationTimelineLength: conversationTimeline.length
   })
+  scrollChatToBottomRef.current = scroll.scrollChatToBottom
 
   const agentComposerSlotProps = buildAgentComposerSlotProps({
     sessionId: args.sessionId,
