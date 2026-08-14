@@ -1,10 +1,43 @@
 import type { AgentSession } from '@sandwalk/agent-ui-core'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   applyChatDateBoosts,
   setChatDateBoosts
 } from './chat-date-boost'
+
+// CI runs vitest without a browser env, so `localStorage` isn't a
+// real global. Install a Map-backed shim (same pattern as
+// `remembered-auth.test.ts`) so the boost read/write paths exercise
+// their real code without needing --localstorage-file.
+function installMemoryLocalStorage() {
+  const store = new Map<string, string>()
+  const memory: Storage = {
+    get length() {
+      return store.size
+    },
+    clear() {
+      store.clear()
+    },
+    getItem(key: string) {
+      return store.has(key) ? store.get(key)! : null
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null
+    },
+    removeItem(key: string) {
+      store.delete(key)
+    },
+    setItem(key: string, value: string) {
+      store.set(key, String(value))
+    }
+  }
+  vi.stubGlobal('localStorage', memory)
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: memory
+  })
+}
 
 function session(
   id: string,
@@ -26,10 +59,10 @@ function session(
 }
 
 beforeEach(() => {
-  localStorage.clear()
+  installMemoryLocalStorage()
 })
 afterEach(() => {
-  localStorage.clear()
+  vi.unstubAllGlobals()
 })
 
 describe('setChatDateBoosts', () => {
