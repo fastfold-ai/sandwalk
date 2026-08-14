@@ -98,6 +98,7 @@ export function AppShellMain(props: AppShellMainProps) {
             sidebarCollapsed={props.sidebarCollapsed}
             setSidebarCollapsed={props.setSidebarCollapsed}
             openTabs={props.openTabs}
+            openTabIds={props.openTabIds}
             sessionId={props.sessionId}
             session={props.session}
             createSession={props.createSession}
@@ -160,6 +161,24 @@ export function AppShellMain(props: AppShellMainProps) {
             setPendingOpenPath={props.setPendingOpenPath}
             setComposer={props.setComposer}
             setComposerFiles={props.setComposerFiles}
+            activeGroup={props.activeGroup}
+            perSessionBaseArgs={props.perSessionBaseArgs}
+            allSessions={props.allSessions}
+            setTabGroupActiveChat={props.setTabGroupActiveChat}
+            tabGroups={props.tabGroups}
+            onSplitWithNextTab={props.onSplitWithNextTab}
+            onPickSplitPartner={props.onPickSplitPartner}
+            onCancelPendingSplit={props.onCancelPendingSplit}
+            onAddChatToSplit={props.onAddChatToSplit}
+            onRemoveChatFromSplit={props.onRemoveChatFromSplit}
+            dissolveTabGroup={props.dissolveTabGroup}
+            renameTabGroup={props.renameTabGroup}
+            setTabGroupColor={props.setTabGroupColor}
+            closeTabGroup={props.closeTabGroup}
+            selectedChatIds={props.selectedChatIds}
+            toggleSelectChat={props.toggleSelectChat}
+            clearSelectChats={props.clearSelectChats}
+            createSplitFromSelection={props.createSplitFromSelection}
           />
         )}
         </div>

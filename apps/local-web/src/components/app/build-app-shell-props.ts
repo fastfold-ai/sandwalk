@@ -1,4 +1,3 @@
-import type { AgentSession } from '@sandwalk/agent-ui-core'
 import type { Location, NavigateFunction } from 'react-router-dom'
 
 import type { TranscriptEntry } from '@/components/agents/transcript'
@@ -6,13 +5,14 @@ import type { buildAgentComposerSlotProps } from '@/components/app/build-agent-c
 import type { AppShellProps } from '@/components/app-shell-props'
 import type { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import type { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
+import type { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import type { useAppRouting } from '@/hooks/useAppRouting'
 import type { useAppUiState } from '@/hooks/useAppUiState'
 import type { useChatScroll } from '@/hooks/useChatScroll'
 import type { useSessionActions } from '@/hooks/useSessionActions'
 import type { useSessionChatState } from '@/hooks/useSessionChatState'
 import type { useSessionSandbox } from '@/hooks/useSessionSandbox'
-import type { groupSessions } from '@/lib/sessions'
+import type { TabItem, TabItemSection } from '@/lib/sessions'
 
 type AppShellBridgeInput = {
   ui: ReturnType<typeof useAppUiState>
@@ -34,8 +34,10 @@ type AppShellBridgeInput = {
   scroll: ReturnType<typeof useChatScroll>
   location: Location
   navigate: NavigateFunction
-  sections: ReturnType<typeof groupSessions>
-  openTabs: AgentSession[]
+  sections: TabItemSection[]
+  openTabs: TabItem[]
+  openTabIds: string[]
+  effectiveSessionId: string | null
   orderedVisibleSessionIds: string[]
   showSessionTabs: boolean
   activeTitle: string
@@ -49,6 +51,30 @@ type AppShellBridgeInput = {
   submitApprovals: AppShellProps['onSubmitApprovals']
   prefetchSessionMessages: AppShellProps['prefetchSessionMessages']
   showChatSkeleton: boolean
+  tabGroupsStore: ReturnType<typeof useAppTabGroups>
+  closeTabGroup: (groupId: string) => void
+  renameGroupTarget: AppShellProps['renameGroupTarget']
+  renameGroupValue: AppShellProps['renameGroupValue']
+  setRenameGroupTarget: AppShellProps['setRenameGroupTarget']
+  setRenameGroupValue: AppShellProps['setRenameGroupValue']
+  submitRenameGroup: AppShellProps['submitRenameGroup']
+  activeGroup: AppShellProps['activeGroup']
+  perSessionBaseArgs: AppShellProps['perSessionBaseArgs']
+  allSessions: AppShellProps['allSessions']
+  onSplitWithNextTab: AppShellProps['onSplitWithNextTab']
+  onPickSplitPartner: AppShellProps['onPickSplitPartner']
+  onCancelPendingSplit: AppShellProps['onCancelPendingSplit']
+  onAddChatToSplit: AppShellProps['onAddChatToSplit']
+  onRemoveChatFromSplit: AppShellProps['onRemoveChatFromSplit']
+  selectedChatIds: AppShellProps['selectedChatIds']
+  toggleSelectChat: AppShellProps['toggleSelectChat']
+  clearSelectChats: AppShellProps['clearSelectChats']
+  createSplitFromSelection: AppShellProps['createSplitFromSelection']
+  createSplitFromSidebar: AppShellProps['createSplitFromSidebar']
+  canSplitFromSidebar: AppShellProps['canSplitFromSidebar']
+  onSelectTabGroup: AppShellProps['onSelectTabGroup']
+  onRenameTabGroup: AppShellProps['onRenameTabGroup']
+  onGoToChatProject: AppShellProps['onGoToChatProject']
 }
 
 export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
@@ -68,7 +94,15 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     activeProjectId: input.context.activeProjectId,
     sections: input.sections,
     collapsedSidebarSections: input.ui.collapsedSidebarSections,
-    sessionId: input.route.sessionId,
+    /*
+     * `sessionId` que recibe el shell es el chatId REAL (activeChatId
+     * del grupo cuando estás en un split, o el chatId de la ruta cuando
+     * es un chat suelto). El server no reconoce los `grp_xxx` — todas
+     * las queries de files/messages/etc. usan este id. Para el activeId
+     * visual del strip/sidebar (que sí quiere señalar el chip del grupo
+     * cuando estás en él) se usa `input.route.sessionId` derivado.
+     */
+    sessionId: input.effectiveSessionId,
     chatBySessionId: input.chat.chatBySessionId,
     orderedVisibleSessionIds: input.orderedVisibleSessionIds,
     selectedSessionIds: input.actions.selectedSessionIds,
@@ -183,6 +217,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     togglePinProject: input.actions.togglePinProject,
     deleteProject: input.actions.deleteProject,
     openTabs: input.openTabs,
+    openTabIds: input.openTabIds,
     session: input.context.session,
     closeSessionTab: input.actions.closeSessionTab,
     closeOtherSessionTabs: input.actions.closeOtherSessionTabs,
@@ -243,9 +278,42 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     setRenameTarget: input.actions.setRenameTarget,
     setRenameValue: input.actions.setRenameValue,
     submitRename: input.actions.submitRename,
+    renameGroupTarget: input.renameGroupTarget,
+    renameGroupValue: input.renameGroupValue,
+    setRenameGroupTarget: input.setRenameGroupTarget,
+    setRenameGroupValue: input.setRenameGroupValue,
+    submitRenameGroup: input.submitRenameGroup,
     deleteTarget: input.actions.deleteTarget,
     confirmDelete: input.actions.confirmDelete,
     batchDeletePending: input.actions.batchDeletePending,
-    confirmBatchDelete: input.actions.confirmBatchDelete
+    confirmBatchDelete: input.actions.confirmBatchDelete,
+    tabGroups: input.tabGroupsStore.allTabGroups,
+    createTabGroup: input.tabGroupsStore.createGroup,
+    dissolveTabGroup: input.tabGroupsStore.dissolveGroup,
+    closeTabGroup: input.closeTabGroup,
+    addChatToGroup: input.tabGroupsStore.addToGroup,
+    removeChatFromGroup: input.tabGroupsStore.removeFromGroup,
+    setTabGroupColor: input.tabGroupsStore.setGroupColor,
+    setTabGroupPinned: input.tabGroupsStore.setGroupPinned,
+    setTabGroupActiveChat: input.tabGroupsStore.setGroupActiveChat,
+    reorderChatsInTabGroup: input.tabGroupsStore.reorderChatsInGroup,
+    activeGroup: input.activeGroup,
+    perSessionBaseArgs: input.perSessionBaseArgs,
+    allSessions: input.allSessions,
+    onSplitWithNextTab: input.onSplitWithNextTab,
+    onPickSplitPartner: input.onPickSplitPartner,
+    onCancelPendingSplit: input.onCancelPendingSplit,
+    onAddChatToSplit: input.onAddChatToSplit,
+    onRemoveChatFromSplit: input.onRemoveChatFromSplit,
+    selectedChatIds: input.selectedChatIds,
+    toggleSelectChat: input.toggleSelectChat,
+    clearSelectChats: input.clearSelectChats,
+    createSplitFromSelection: input.createSplitFromSelection,
+    createSplitFromSidebar: input.createSplitFromSidebar,
+    canSplitFromSidebar: input.canSplitFromSidebar,
+    onSelectTabGroup: input.onSelectTabGroup,
+    onRenameTabGroup: input.onRenameTabGroup,
+    renameTabGroup: input.onRenameTabGroup,
+    onGoToChatProject: input.onGoToChatProject
   }
 }

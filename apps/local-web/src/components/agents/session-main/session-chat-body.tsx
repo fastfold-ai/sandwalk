@@ -81,6 +81,13 @@ export type SessionChatBodyProps = {
   setFilesPanelCollapsed: Dispatch<SetStateAction<boolean>>
   setPendingOpenPath: Dispatch<SetStateAction<string | null>>
   error: string | null
+  /**
+   * Split view del panel. `undefined` → chat normal (composer flotante
+   * centrado). Cuando existe, el composer pasa a modo "embedded": barra
+   * fija al bottom del panel con animación slide up/down según `focused`
+   * y el transcript reserva padding-bottom = altura medida del composer.
+   */
+  splitMode?: { focused: boolean }
 }
 
 export function SessionChatBody({
@@ -123,8 +130,56 @@ export function SessionChatBody({
   scrollChatToBottom,
   setFilesPanelCollapsed,
   setPendingOpenPath,
-  error
+  error,
+  splitMode
 }: SessionChatBodyProps) {
+  const isSplit = Boolean(splitMode)
+  const splitFocused = splitMode?.focused ?? false
+  // Altura medida del composer embedded — el transcript la usa como
+  // padding-bottom para que el último mensaje no quede detrás de la barra.
+  // ResizeObserver corre solo en modo split; en single-tab el composer sigue
+  // en su lugar habitual y no hace falta reservar espacio.
+  const composerBarRef = useRef<HTMLDivElement | null>(null)
+  const [composerBarHeight, setComposerBarHeight] = useState(0)
+  useLayoutEffect(() => {
+    if (!isSplit) return
+    const el = composerBarRef.current
+    if (!el) return
+    const update = () => setComposerBarHeight(el.offsetHeight)
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [isSplit])
+
+  // Cuando el panel gana foco en split view, mover el cursor al textarea del
+  // composer embedded para que el usuario pueda tipear inmediatamente sin
+  // clickear el input. Espera un rAF a que la animación de slide-up arranque
+  // así el focus no se pisa con el layout inicial.
+  useLayoutEffect(() => {
+    if (!isSplit || !splitFocused) return
+    const bar = composerBarRef.current
+    if (!bar) return
+    const raf = window.requestAnimationFrame(() => {
+      const ta = bar.querySelector('textarea')
+      if (ta instanceof HTMLTextAreaElement) {
+        ta.focus({ preventScroll: true })
+      }
+    })
+    return () => window.cancelAnimationFrame(raf)
+  }, [isSplit, splitFocused])
+
+  /*
+   * "Sticky bottom" en split view: no hace falta lógica local — el hook
+   * `useChatScroll` ya tiene memoria por-chat (posición + stickToBottom)
+   * y un ResizeObserver que auto-scrollea al bottom cuando LLEGA nuevo
+   * contenido con el usuario pegado al bottom. Ese observer fue
+   * modificado para NO disparar cuando el viewport solo se achica por
+   * cambio de padding (nuestro caso al recuperar focus): solo se activa
+   * si el `scrollHeight` REALMENTE creció. Con eso el caso de uso
+   * funciona sin pisar la memoria de posición del sistema existente.
+   */
   // Stable callbacks: memoized transcript rows must not re-render per stream
   // delta because a lambda got a new identity. Composer props change every
   // render, so reach them through a ref.
@@ -206,7 +261,7 @@ export function SessionChatBody({
       ) : null}
       <div
         className={cn(
-          'flex min-h-0 flex-1 flex-col',
+          'relative flex min-h-0 flex-1 flex-col',
           isInspect && 'hidden'
         )}
       >
@@ -214,13 +269,30 @@ export function SessionChatBody({
           className={cn(
             'flex min-h-0 flex-col overflow-hidden',
             !layoutInstant &&
-              'transition-[flex-grow,opacity] duration-500 ease-out'
+              'transition-[flex-grow,opacity,padding-bottom] duration-500 ease-out',
+            // En split, el padding-bottom se anima a 300 ms — mismo timing
+            // que el slide del composer — para que ambos movimientos se
+            // vean como uno solo.
+            isSplit && !layoutInstant && 'transition-[padding-bottom] duration-300 ease-out'
           )}
           style={{
             flexGrow: showTranscript ? 1 : 0,
             flexShrink: 1,
             flexBasis: 0,
-            opacity: showTranscript ? 1 : 0
+            opacity: showTranscript ? 1 : 0,
+            /*
+             * En modo split reservamos el hueco del composer SOLO cuando el
+             * panel está focused. Cuando pierde focus el composer se
+             * desliza hacia abajo (translate-y-full + opacity 0), y con
+             * padding-bottom en 0 el transcript ocupa todo el alto del
+             * panel — sin dejar el hueco negro vacío donde vivía el
+             * composer. Los dos paneles del split cambian al unísono.
+             */
+            paddingBottom: isSplit
+              ? splitFocused
+                ? composerBarHeight
+                : 0
+              : undefined
           }}
         >
           {showTranscript ? (
@@ -261,51 +333,106 @@ export function SessionChatBody({
           ) : null}
         </div>
 
-        <div
-          className={cn(
-            'bg-background mx-auto flex w-full max-w-[44rem] flex-col px-5',
-            !layoutInstant &&
-              'transition-[flex-grow,padding] duration-500 ease-out',
-            showEmptyChrome ? 'justify-center' : 'justify-end'
-          )}
-          style={{
-            flexGrow: showEmptyChrome ? 1 : 0,
-            flexShrink: 0,
-            flexBasis: 'auto',
-            paddingBottom: showEmptyChrome ? '5rem' : '1.5rem',
-            paddingTop: showEmptyChrome ? 0 : '0.5rem'
-          }}
-        >
+        {isSplit ? (
+          /*
+           * Composer embedded del split view.
+           *
+           * `absolute inset-x-0 bottom-0`  → barra fija abajo, ancho completo
+           *                                  del panel, sin gutter lateral.
+           * `bg-background border-t`       → banda opaca separada del
+           *                                  transcript por 1 px del color
+           *                                  del border del panel.
+           * `translate-y-full opacity-0`   → cuando el panel no está en focus,
+           *                                  la barra se desliza hacia abajo
+           *                                  y desaparece (300 ms ease-out).
+           * `pointer-events-none`          → mientras está oculta, no captura
+           *                                  clicks (el composer sigue montado
+           *                                  para preservar el texto).
+           *
+           * El composer permanece montado siempre — solo se oculta visual y
+           * funcionalmente. Al volver el focus reaparece con el mismo texto,
+           * chips y estado de IME.
+           */
           <div
+            ref={composerBarRef}
+            data-composer-slot
             className={cn(
-              'flex flex-col items-center overflow-hidden',
-              !layoutInstant &&
-                'transition-[max-height,opacity,margin] duration-300 ease-out',
-              showEmptyChrome
-                ? 'mb-2 max-h-40 opacity-100'
-                : 'mb-0 max-h-0 opacity-0'
+              /*
+               * `inset-x-0 bottom-0`: la barra ES la parte inferior del
+               * panel. Cero padding: sin gutter lateral, sin banda vacía
+               * arriba/abajo. El único separador visual con el transcript
+               * es el `border-t border-border/50`. Las esquinas curvas
+               * inferiores las hereda del `rounded-lg` del panel gracias
+               * al `overflow-hidden` del ChatSplitContainer.
+               */
+              'bg-muted/40 border-border/50 absolute inset-x-0 bottom-0 z-10 border-t will-change-transform',
+              'transition-[transform,opacity] duration-300 ease-out',
+              splitFocused
+                ? 'translate-y-0 opacity-100'
+                : 'pointer-events-none translate-y-full opacity-0'
             )}
           >
-            <AuraIconPulse className="text-muted-foreground/70 mb-6 h-12 w-12" />
-            <div className="mb-2 flex w-full items-center px-1">
-              <ProjectPicker
-                projects={projects}
-                value={session?.projectId ?? activeProjectId}
-                recentIds={recentProjectIds}
-                noneLabel="All"
-                onNewProject={onNewProject}
-                onChange={projectId => {
-                  if (session) {
-                    void updateSession(session, { projectId })
-                  }
-                  if (projectId) selectProjectScope(projectId)
-                  else selectAllProjects()
-                }}
-              />
-            </div>
+            <AgentComposerSlot
+              {...agentComposerSlotProps}
+              embedded
+              /*
+               * Solo el panel focused del split autoenfoca su composer. Si
+               * los N paneles compitieran por el foco al montar, el último
+               * en autoenfocarse dispararía `onFocusCapture` del panel
+               * padre en `ChatSplitContainer`, llamando `onFocusChat` con
+               * el chatId equivocado — pisando la selección que el usuario
+               * hizo desde el sidebar (o desde otro punto).
+               */
+              autoFocus={splitFocused}
+            />
           </div>
-          <AgentComposerSlot {...agentComposerSlotProps} />
-        </div>
+        ) : (
+          <div
+            className={cn(
+              'bg-background mx-auto flex w-full max-w-[44rem] flex-col px-5',
+              !layoutInstant &&
+                'transition-[flex-grow,padding] duration-500 ease-out',
+              showEmptyChrome ? 'justify-center' : 'justify-end'
+            )}
+            style={{
+              flexGrow: showEmptyChrome ? 1 : 0,
+              flexShrink: 0,
+              flexBasis: 'auto',
+              paddingBottom: showEmptyChrome ? '5rem' : '1.5rem',
+              paddingTop: showEmptyChrome ? 0 : '0.5rem'
+            }}
+          >
+            <div
+              className={cn(
+                'flex flex-col items-center overflow-hidden',
+                !layoutInstant &&
+                  'transition-[max-height,opacity,margin] duration-300 ease-out',
+                showEmptyChrome
+                  ? 'mb-2 max-h-40 opacity-100'
+                  : 'mb-0 max-h-0 opacity-0'
+              )}
+            >
+              <AuraIconPulse className="text-muted-foreground/70 mb-6 h-12 w-12" />
+              <div className="mb-2 flex w-full items-center px-1">
+                <ProjectPicker
+                  projects={projects}
+                  value={session?.projectId ?? activeProjectId}
+                  recentIds={recentProjectIds}
+                  noneLabel="All"
+                  onNewProject={onNewProject}
+                  onChange={projectId => {
+                    if (session) {
+                      void updateSession(session, { projectId })
+                    }
+                    if (projectId) selectProjectScope(projectId)
+                    else selectAllProjects()
+                  }}
+                />
+              </div>
+            </div>
+            <AgentComposerSlot {...agentComposerSlotProps} />
+          </div>
+        )}
       </div>
       {error ? (
         <div className="bg-destructive text-destructive-foreground absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md px-3 py-1.5 text-xs">

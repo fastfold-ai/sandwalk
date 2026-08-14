@@ -66,6 +66,25 @@ class SessionQueryMixin:
             ).fetchone()
         return session_from_row(row) if row else None
 
+    def list_sessions_by_ids(self, ids: list[str]) -> list[AgentSession]:
+        """Bulk metadata fetch for a specific set of session ids.
+
+        Used to hydrate the frontend cache with sessions that live outside
+        the current project scope but appear inside cross-project split
+        groups (`grp_*` in localStorage). Silently skips ids that do not
+        resolve to a real row so a stale group doesn't break the response.
+        """
+        cleaned = [i for i in ids if i]
+        if not cleaned:
+            return []
+        placeholders = ",".join("?" for _ in cleaned)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM sessions WHERE id IN ({placeholders})",
+                cleaned,
+            ).fetchall()
+        return [session_from_row(row) for row in rows]
+
     def search_sessions(self, query: str, *, limit: int = 50) -> list[AgentSession]:
         normalized = query.strip()
         if not normalized:

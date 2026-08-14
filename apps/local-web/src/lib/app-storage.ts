@@ -1,3 +1,5 @@
+import type { SessionGroup } from '@sandwalk/agent-ui-core'
+
 export const SIDEBAR_COLLAPSED_STORAGE_KEY =
   'agent-ide-v2-assistant-ui-base-sidebar-collapsed'
 export const FILES_PANEL_COLLAPSED_STORAGE_KEY =
@@ -12,6 +14,8 @@ export const PROJECT_SCOPE_STORAGE_KEY = 'fastfold.project-scope-id'
 export const LAST_SESSION_BY_SCOPE_KEY = 'fastfold.last-session-by-scope'
 export const RECENT_PROJECT_IDS_STORAGE_KEY = 'fastfold.recent-project-ids'
 export const SIDEBAR_SECTIONS_COLLAPSED_KEY = 'fastfold.sidebar-sections-collapsed'
+export const TAB_GROUPS_LEGACY_KEY = 'fastfold.tab-groups-by-project'
+export const TAB_GROUPS_STORAGE_KEY = 'fastfold.tab-groups'
 
 export function projectTabsKey(projectId: string | null | undefined) {
   return projectId || ALL_PROJECTS_TABS_KEY
@@ -156,6 +160,78 @@ export function readCollapsedSidebarSections(): Record<string, boolean> {
 export function writeCollapsedSidebarSections(value: Record<string, boolean>) {
   try {
     localStorage.setItem(SIDEBAR_SECTIONS_COLLAPSED_KEY, JSON.stringify(value))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+/**
+ * Read the persisted tab groups. Groups are strictly a UI preference (how
+ * the user arranges tabs into split views), not chat data — los chats
+ * viven en el server. A partir de la migración multi-proyecto, los grupos
+ * viven en una lista plana única en vez de por scope de proyecto: el
+ * grupo se muestra en cada proyecto donde tenga al menos un chat.
+ *
+ * Compatibilidad: si existe la key vieja `tab-groups-by-project`, se
+ * aplana (unimos todos los grupos deduplicados por id) y se retorna. La
+ * migración efectiva a la nueva key ocurre al primer `writeTabGroups`.
+ */
+export function readTabGroups(): SessionGroup[] {
+  try {
+    const raw = localStorage.getItem(TAB_GROUPS_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter(
+            (item): item is SessionGroup =>
+              !!item &&
+              typeof item === 'object' &&
+              typeof (item as SessionGroup).id === 'string' &&
+              Array.isArray((item as SessionGroup).chatIds)
+          )
+          // Los pending groups son estado UI efímero (mientras el usuario
+          // arma el split desde el picker). No los persistimos entre
+          // sesiones — al recargar se descartan y el chat de origen
+          // vuelve suelto naturalmente.
+          .filter(g => !g.isPending)
+      }
+    }
+    // Fallback: migrar desde el schema por-proyecto (aplanado + dedupe).
+    const legacy = localStorage.getItem(TAB_GROUPS_LEGACY_KEY)
+    if (!legacy) return []
+    const parsed = JSON.parse(legacy) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return []
+    }
+    const seen = new Set<string>()
+    const flat: SessionGroup[] = []
+    for (const value of Object.values(parsed as Record<string, unknown>)) {
+      if (!Array.isArray(value)) continue
+      for (const item of value) {
+        if (
+          !item ||
+          typeof item !== 'object' ||
+          typeof (item as SessionGroup).id !== 'string' ||
+          !Array.isArray((item as SessionGroup).chatIds)
+        ) {
+          continue
+        }
+        const g = item as SessionGroup
+        if (seen.has(g.id)) continue
+        seen.add(g.id)
+        flat.push(g)
+      }
+    }
+    return flat
+  } catch {
+    return []
+  }
+}
+
+export function writeTabGroups(groups: SessionGroup[]) {
+  try {
+    localStorage.setItem(TAB_GROUPS_STORAGE_KEY, JSON.stringify(groups))
   } catch {
     // ignore storage failures
   }

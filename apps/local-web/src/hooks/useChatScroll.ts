@@ -19,6 +19,16 @@ type SessionScrollMemory = {
 }
 
 const NEAR_BOTTOM_PX = 96
+/*
+ * Umbral chico para detectar "el usuario está PEGADO al bottom".
+ * Diferente de `NEAR_BOTTOM_PX` que gobierna sticky-on-content (SSE) y el
+ * botón scroll-to-bottom. Este solo lo usa el ResizeObserver para decidir
+ * si mantener al usuario al bottom cuando el viewport SE ACHICA sin llegar
+ * contenido nuevo (típico en split view: el composer aparece al recuperar
+ * focus y sube el padding-bottom del transcript). Si estaba dentro de
+ * 24 px del bottom real ANTES del resize, seguimos ahí después.
+ */
+const PINNED_TO_BOTTOM_PX = 24
 
 function getChatViewport(root: HTMLElement | null) {
   if (!root) return null
@@ -46,6 +56,13 @@ export function useChatScroll({
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const memoryRef = useRef<Record<string, SessionScrollMemory>>({})
   const stickToBottomRef = useRef(true)
+  /*
+   * `pinnedToBottomRef` refleja "distance < PINNED_TO_BOTTOM_PX" al último
+   * scroll event conocido. El ResizeObserver lo consulta cuando el viewport
+   * se achica sin contenido nuevo (padding grew) para saber si el usuario
+   * estaba REALMENTE pegado al bottom antes del resize.
+   */
+  const pinnedToBottomRef = useRef(true)
   const activeSessionRef = useRef<string | null>(null)
   const appliedForRef = useRef<string | null>(null)
 
@@ -56,6 +73,7 @@ export function useChatScroll({
     const distance = distanceFromBottom(viewport)
     const stick = distance < NEAR_BOTTOM_PX
     stickToBottomRef.current = stick
+    pinnedToBottomRef.current = distance <= PINNED_TO_BOTTOM_PX
     memoryRef.current[id] = {
       stickToBottom: stick,
       scrollTop: viewport.scrollTop
@@ -119,17 +137,85 @@ export function useChatScroll({
       return
     }
 
+    /*
+     * Follow layout until it stabilizes. In split view the panel's viewport
+     * is still being sized when this effect fires — `scrollHeight` reads a
+     * stale (small) value and a single `viewport.scrollTop = scrollHeight`
+     * doesn't reach the real bottom. Before this fix we retried at fixed
+     * intervals (immediate + rAF + 40 ms) which was too short for the
+     * `ResizablePanelGroup` layout to settle → sticky flag lost, deltas
+     * never auto-scrolled.
+     *
+     * Now: a `ResizeObserver` re-applies scroll every time the viewport or
+     * its content resizes, until `applySessionScroll` succeeds AND the
+     * viewport reads a stable `scrollHeight` two consecutive frames. Both
+     * the observer and the safety timer disconnect once applied.
+     */
+    const SAFETY_MS = 750
+    let stableScrollHeight = -1
+    let stableRuns = 0
+    let observer: ResizeObserver | null = null
+    let safetyTimer: number | null = null
+
+    const cleanup = () => {
+      observer?.disconnect()
+      observer = null
+      if (safetyTimer !== null) {
+        window.clearTimeout(safetyTimer)
+        safetyTimer = null
+      }
+    }
+
     const run = () => {
-      if (activeSessionRef.current !== sessionId) return
-      if (applySessionScroll()) appliedForRef.current = sessionId
+      if (activeSessionRef.current !== sessionId) {
+        cleanup()
+        return
+      }
+      const viewport = getChatViewport(chatScrollRef.current)
+      if (!viewport) {
+        // Viewport not attached yet — the observer will fire once it is.
+        return
+      }
+      applySessionScroll()
+      // Consider it "applied" only when scrollHeight has stopped changing —
+      // otherwise the ResizablePanelGroup is still growing the panel and a
+      // later frame will grow the transcript past our current position.
+      if (viewport.scrollHeight === stableScrollHeight) {
+        stableRuns += 1
+      } else {
+        stableScrollHeight = viewport.scrollHeight
+        stableRuns = 1
+      }
+      if (stableRuns >= 2) {
+        appliedForRef.current = sessionId
+        cleanup()
+      }
     }
+
+    // First attempt (before layout may have settled — starts the loop).
     run()
-    const frame = window.requestAnimationFrame(run)
-    const timer = window.setTimeout(run, 40)
-    return () => {
-      window.cancelAnimationFrame(frame)
-      window.clearTimeout(timer)
+    if (appliedForRef.current === sessionId) {
+      // Stabilized on the first pass (single-tab, no split churn).
+      return
     }
+
+    const viewport = getChatViewport(chatScrollRef.current)
+    if (viewport) {
+      observer = new ResizeObserver(() => {
+        run()
+      })
+      observer.observe(viewport)
+      const content = viewport.firstElementChild
+      if (content) observer.observe(content)
+    }
+    // Hard stop so a viewport that never emits (unlikely but possible)
+    // doesn't leave the observer running forever.
+    safetyTimer = window.setTimeout(() => {
+      appliedForRef.current = sessionId
+      cleanup()
+    }, SAFETY_MS)
+
+    return cleanup
   }, [
     sessionId,
     messagesLoaded,
@@ -148,15 +234,64 @@ export function useChatScroll({
 
     rememberActive()
     viewport.addEventListener('scroll', rememberActive, { passive: true })
+    /*
+     * El observer distingue tres causas de resize:
+     *
+     *   1. `scrollHeight` creció → llegó contenido nuevo (SSE, mensaje
+     *      recién enviado, tool card expandida). Si el usuario estaba
+     *      sticky (dentro de `NEAR_BOTTOM_PX`), mantenemos su vista al fondo.
+     *   2. `clientHeight` se ACHICÓ sin content growth → cambio de layout
+     *      externo que come espacio abajo (típico: composer aparece en
+     *      split view al recuperar focus, sube el padding-bottom). Si el
+     *      usuario estaba PEGADO al bottom real (dentro de
+     *      `PINNED_TO_BOTTOM_PX` = 24 px, medido justo antes del resize
+     *      vía `pinnedToBottomRef`), lo mantenemos ahí — así el composer
+     *      entrante no le tapa los últimos mensajes. Si no estaba pegado,
+     *      respetamos su posición.
+     *   3. Cualquier otro caso (viewport creció, o cero cambios) → solo
+     *      refrescamos la memoria.
+     *
+     * Sin este split, cualquier cambio de padding disparaba
+     * `scrollChatToBottom` si el usuario estaba dentro de `NEAR_BOTTOM_PX`
+     * (96 px), y en split view veíamos un "mini scroll" cada vez que se
+     * cambiaba el focus aunque el usuario estuviera leyendo un mensaje
+     * reciente pero no pegado al fondo.
+     */
+    const lastScrollHeightRef = { current: viewport.scrollHeight }
+    const lastClientHeightRef = { current: viewport.clientHeight }
+    /*
+     * Debounce del observer vía `requestAnimationFrame`: durante una
+     * transición de padding (~300 ms en split view) el ResizeObserver
+     * puede dispararse ~18 veces (una por frame). Con este dedup se
+     * procesa como máximo una vez por frame; si el navegador nos
+     * saltea frames por carga, se procesa el próximo. Efecto: menos
+     * trabajo redundante en cada `layout tick`, misma UX final.
+     */
+    let rafId: number | null = null
     const observer = new ResizeObserver(() => {
-      if (
-        activeSessionRef.current === sessionId &&
-        stickToBottomRef.current
-      ) {
-        scrollChatToBottom()
-      } else {
+      if (rafId != null) return
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null
+        if (activeSessionRef.current !== sessionId) return
+        const currentScrollHeight = viewport.scrollHeight
+        const currentClientHeight = viewport.clientHeight
+        const contentGrew = currentScrollHeight > lastScrollHeightRef.current
+        const viewportShrunk =
+          currentClientHeight < lastClientHeightRef.current
+        lastScrollHeightRef.current = currentScrollHeight
+        lastClientHeightRef.current = currentClientHeight
+
+        if (contentGrew) {
+          if (stickToBottomRef.current) scrollChatToBottom()
+          else rememberActive()
+          return
+        }
+        if (viewportShrunk && pinnedToBottomRef.current) {
+          scrollChatToBottom()
+          return
+        }
         rememberActive()
-      }
+      })
     })
     observer.observe(viewport)
     const content = viewport.firstElementChild
@@ -166,6 +301,10 @@ export function useChatScroll({
       rememberActive()
       viewport.removeEventListener('scroll', rememberActive)
       observer.disconnect()
+      if (rafId != null) {
+        window.cancelAnimationFrame(rafId)
+        rafId = null
+      }
     }
   }, [
     conversationTimelineLength,

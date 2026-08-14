@@ -239,11 +239,16 @@ export function WorkspacePanel({
               onCollapse={() => onCloseTerminal?.()}
               onExpand={() => onOpenTerminal?.()}
             >
+              {/*
+                onClose se pasa `undefined` a propósito por ahora — el
+                TerminalPanel esconde su botón X cuando no hay handler,
+                así el usuario no puede cerrar la terminal hasta que
+                definamos la UX final.
+              */}
               <TerminalPanel
                 client={client}
                 sessionId={sessionId}
                 visible={terminalOpen}
-                onClose={onCloseTerminal}
               />
             </ResizablePanel>
           </ResizablePanelGroup>

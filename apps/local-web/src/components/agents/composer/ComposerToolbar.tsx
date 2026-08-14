@@ -62,7 +62,8 @@ export function ComposerToolbar({
   onLoadLocalSystem,
   onRefreshSandbox,
   onPlanModeChange,
-  onStop
+  onStop,
+  embedded = false
 }: {
   running: boolean
   showStopButton: boolean
@@ -115,12 +116,24 @@ export function ComposerToolbar({
   onRefreshSandbox?: () => void | Promise<void>
   onPlanModeChange?: (planMode: boolean) => Promise<void>
   onStop: () => void
+  /**
+   * Cuando true, agrega `mt-4` (16 px) al toolbar. En split view (embedded)
+   * ese aire garantiza el gap con la última línea del textarea AUNQUE el
+   * texto scrollee — el padding vive fuera del editor, no se pierde con el
+   * overflow interno.
+   */
+  embedded?: boolean
 }) {
   const uploadRef = useRef<HTMLInputElement | null>(null)
   const planMode = Boolean(runtimeSettings?.planMode)
 
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2 px-0.5">
+    <div
+      className={cn(
+        'flex min-w-0 items-center justify-between gap-2 px-0.5',
+        embedded && 'mt-4'
+      )}
+    >
       <div className="flex h-7 min-w-0 flex-1 items-center gap-1 overflow-hidden">
         <input
           ref={uploadRef}

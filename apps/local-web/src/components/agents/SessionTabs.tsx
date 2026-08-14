@@ -1,4 +1,8 @@
-import type { AgentSession } from '@sandwalk/agent-ui-core'
+import type {
+  AgentProject,
+  AgentSession,
+  SessionGroup
+} from '@sandwalk/agent-ui-core'
 import {
   closestCenter,
   DndContext,
@@ -20,7 +24,9 @@ import {
   Archive,
   ChevronDown,
   CircleX,
+  Columns2,
   Download,
+  Folder,
   Pencil,
   Pin,
   Plus,
@@ -30,6 +36,15 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   Popover,
@@ -46,6 +61,7 @@ import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
+import { ProjectPicker } from './ProjectPicker'
 import { SessionStatusIcon } from './SessionStatusIcon'
 import { useSessionTabColors } from './session-tab-colors'
 import { SessionTab } from './SessionTab'
@@ -79,11 +95,32 @@ export function SessionTabs({
   onExport,
   onInspect,
   onArchive,
-  onDelete,
-  onCreateSession
+  onMoveToProject,
+  projects,
+  onDelete: _onDelete,
+  onCreateSession,
+  groups,
+  openTabIds,
+  onSplitWith,
+  onDissolveGroup,
+  onRenameGroup,
+  onSetGroupColor,
+  onCloseGroup,
+  selectedChatIds,
+  onToggleSelectChat,
+  onClearSelection,
+  onCreateSplitFromSelection
 }: {
   tabs: AgentSession[]
   activeId: string | null
+  /**
+   * Orden real de la strip (`openTabIds`) mezclando IDs de sesión y de
+   * grupo. Cuando se provee, la strip lo usa como fuente de verdad y
+   * renderiza cada item (chat o grupo) en el lugar exacto que le
+   * corresponde. Sin él, cae al comportamiento anterior (chats primero,
+   * grupos al final).
+   */
+  openTabIds?: string[]
   onSelect: (id: string) => void
   onClose: (id: string) => void
   onCloseOthers: (id: string) => void
@@ -93,11 +130,33 @@ export function SessionTabs({
   onExport: (session: AgentSession) => void
   onInspect: (session: AgentSession) => void
   onArchive: (session: AgentSession) => void
+  onMoveToProject?: (session: AgentSession, projectId: string | null) => void
+  projects?: AgentProject[]
   onDelete: (session: AgentSession) => void
   /** Opens a fresh draft agent session (only persists on first message). */
   onCreateSession?: () => void
+  /** Split-view groups that live in this project scope. Rendered as
+   *  additional chip-tabs after the session tabs. */
+  groups?: SessionGroup[]
+  /** Creates a new split-view group from `sourceId` + the next open tab. */
+  onSplitWith?: (sourceId: string) => void
+  onDissolveGroup?: (groupId: string) => void
+  onRenameGroup?: (group: SessionGroup) => void
+  onSetGroupColor?: (groupId: string, color: string | null) => void
+  onCloseGroup?: (groupId: string) => void
+  selectedChatIds?: Set<string>
+  onToggleSelectChat?: (id: string) => void
+  onClearSelection?: () => void
+  onCreateSplitFromSelection?: () => void
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
+  // Confirmation modal for "Delete Split View": the action dissolves
+  // the group (chats become standalone conversations again) —
+  // irreversible in the sense that the grouping is lost, but no chat
+  // is deleted.
+  const [dissolveConfirm, setDissolveConfirm] = useState<SessionGroup | null>(
+    null
+  )
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const { tabColors, setTabColor } = useSessionTabColors()
@@ -113,20 +172,90 @@ export function SessionTabs({
     })
   )
 
-  // Pinned first, then the rest (Chrome pin cluster).
-  const orderedTabs = useMemo(() => {
-    const pinned: AgentSession[] = []
-    const rest: AgentSession[] = []
-    for (const tab of tabs) {
-      if (tab.organizeLabel === 'pinned') pinned.push(tab)
-      else rest.push(tab)
-    }
-    return [...pinned, ...rest]
+  /*
+   * Modelo unificado de la strip: cada item es un chat (sesión) o un grupo
+   * (split view). Los dos se renderizan con el mismo <SessionTab>, comparten
+   * el mismo SortableContext y respetan el orden real de `openTabIds`.
+   * Los pinned se agrupan al frente (Chrome pin cluster) sean chats o grupos.
+   */
+  type TabItem =
+    | { kind: 'chat'; id: string; session: AgentSession; pinned: boolean }
+    | {
+        kind: 'group'
+        id: string
+        group: SessionGroup
+        pinned: boolean
+      }
+
+  const tabsById = useMemo(() => {
+    const map = new Map<string, AgentSession>()
+    for (const tab of tabs) map.set(tab.id, tab)
+    return map
   }, [tabs])
 
+  const groupsById = useMemo(() => {
+    const map = new Map<string, SessionGroup>()
+    for (const g of groups ?? []) map.set(g.id, g)
+    return map
+  }, [groups])
+
+  const orderedItems = useMemo<TabItem[]>(() => {
+    // Cuando el caller nos pasa openTabIds, respetamos ese orden exacto,
+    // mezclando chats y grupos. Cuando no, hacemos el fallback antiguo
+    // (chats primero por orden, grupos al final) para no romper otros usos.
+    const items: TabItem[] = []
+    if (openTabIds && openTabIds.length > 0) {
+      for (const id of openTabIds) {
+        const group = groupsById.get(id)
+        if (group) {
+          items.push({
+            kind: 'group',
+            id: group.id,
+            group,
+            pinned: group.pinned
+          })
+          continue
+        }
+        const session = tabsById.get(id)
+        if (session) {
+          items.push({
+            kind: 'chat',
+            id: session.id,
+            session,
+            pinned: session.organizeLabel === 'pinned'
+          })
+        }
+      }
+    } else {
+      for (const tab of tabs) {
+        items.push({
+          kind: 'chat',
+          id: tab.id,
+          session: tab,
+          pinned: tab.organizeLabel === 'pinned'
+        })
+      }
+      for (const g of groups ?? []) {
+        items.push({ kind: 'group', id: g.id, group: g, pinned: g.pinned })
+      }
+    }
+    // Pin cluster: los pinned mantienen su orden relativo pero saltan al frente.
+    const pinned = items.filter(item => item.pinned)
+    const rest = items.filter(item => !item.pinned)
+    return [...pinned, ...rest]
+  }, [openTabIds, tabs, tabsById, groupsById, groups])
+
+  const orderedTabs = useMemo(
+    () =>
+      orderedItems
+        .filter((item): item is TabItem & { kind: 'chat' } => item.kind === 'chat')
+        .map(item => item.session),
+    [orderedItems]
+  )
+
   const sortableIds = useMemo(
-    () => orderedTabs.map(tab => tab.id),
-    [orderedTabs]
+    () => orderedItems.map(item => item.id),
+    [orderedItems]
   )
 
 
@@ -148,8 +277,24 @@ export function SessionTabs({
 
     const idx = orderedTabs.findIndex(tab => tab.id === activeId)
     if (idx < 0) return
+
+    // If the active tab is ALREADY fully visible in the strip's
+    // viewport, don't scroll: the user just clicked a tab they can
+    // already see, no point animating. Auto-centering only kicks in
+    // when the tab is off-viewport (typically because the user
+    // navigated from the sidebar or the "All tabs" dropdown to a tab
+    // that wasn't in view).
+    const stripRect = strip.getBoundingClientRect()
+    const tabRect = tabEl.getBoundingClientRect()
+    const isFullyVisible =
+      tabRect.left >= stripRect.left && tabRect.right <= stripRect.right
+    if (isFullyVisible) {
+      didScrollOnceRef.current = true
+      return
+    }
+
     const isFirst = idx === 0
-    const isLast = idx === orderedTabs.length - 1
+    const isLast = idx === orderedItems.length - 1
 
     let targetLeft: number
     if (isFirst) {
@@ -168,13 +313,24 @@ export function SessionTabs({
     didScrollOnceRef.current = true
   }, [activeId, sortableIds, orderedTabs])
 
-  const filteredSearchTabs = useMemo(() => {
+  /*
+   * Lista del dropdown "All tabs" — mezcla chats y grupos en el mismo
+   * orden que la strip (respetando openTabIds), con búsqueda unificada.
+   * Antes había una sección aparte "Split view groups" que aislaba a los
+   * grupos con sub-items; se eliminó — un grupo aparece como una fila
+   * igual a un chat, con su propio título y conteo.
+   */
+  const filteredSearchItems = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase()
-    if (!needle) return orderedTabs
-    return orderedTabs.filter(tab =>
-      (tab.title || 'Untitled').toLowerCase().includes(needle)
-    )
-  }, [orderedTabs, searchQuery])
+    if (!needle) return orderedItems
+    return orderedItems.filter(item => {
+      const title =
+        item.kind === 'chat'
+          ? item.session.title || 'Untitled'
+          : item.group.name || 'Group'
+      return title.toLowerCase().includes(needle)
+    })
+  }, [orderedItems, searchQuery])
 
   useEffect(() => {
     if (!searchOpen) {
@@ -199,6 +355,9 @@ export function SessionTabs({
   const menuSession = menu
     ? tabs.find(tab => tab.id === menu.sessionId) || null
     : null
+  const menuGroup = menu
+    ? (groups ?? []).find(g => g.id === menu.sessionId) || null
+    : null
 
   const runAction = (action: () => void) => {
     setMenu(null)
@@ -213,14 +372,14 @@ export function SessionTabs({
     const toIndex = sortableIds.indexOf(String(over.id))
     if (fromIndex < 0 || toIndex < 0) return
     const nextIds = arrayMove(sortableIds, fromIndex, toIndex)
-    // Pinned cluster is always kept at the front.
-    const byId = new Map(orderedTabs.map(tab => [tab.id, tab]))
-    const pinned = nextIds.filter(
-      id => byId.get(id)?.organizeLabel === 'pinned'
+    // Pin cluster: pinneados adelante, respetando su nuevo orden relativo.
+    // Aplica tanto a chats pinned como a grupos pinned — todo item que se
+    // marque como pinned salta al frente por igual.
+    const pinnedById = new Map(
+      orderedItems.map(item => [item.id, item.pinned])
     )
-    const rest = nextIds.filter(
-      id => byId.get(id)?.organizeLabel !== 'pinned'
-    )
+    const pinned = nextIds.filter(id => pinnedById.get(id))
+    const rest = nextIds.filter(id => !pinnedById.get(id))
     onReorder([...pinned, ...rest])
   }
 
@@ -228,8 +387,33 @@ export function SessionTabs({
     setMenu({ sessionId: id, x: event.clientX, y: event.clientY })
   }
 
+  const selectionCount = selectedChatIds?.size ?? 0
   return (
     <div className="relative z-[1] flex min-w-0 flex-1 items-end">
+      {selectionCount >= 2 &&
+      onCreateSplitFromSelection &&
+      onClearSelection ? (
+        <div className="border-primary/40 bg-primary/5 text-foreground absolute -top-[36px] left-2 z-10 flex items-center gap-2 rounded-md border px-2 py-1 text-[12px] shadow-sm">
+          <Columns2 className="text-primary size-3.5" />
+          <span className="font-medium">
+            {selectionCount} chats seleccionados
+          </span>
+          <button
+            type="button"
+            onClick={onCreateSplitFromSelection}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 ml-1 rounded-md px-2 py-0.5 text-[11px] font-semibold"
+          >
+            Split view
+          </button>
+          <button
+            type="button"
+            onClick={onClearSelection}
+            className="text-muted-foreground hover:text-foreground rounded-md px-1.5 py-0.5 text-[11px]"
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : null}
       <div ref={stripRef} className="sandwalk-tab-strip-main">
         <DndContext
           sensors={sensors}
@@ -242,19 +426,68 @@ export function SessionTabs({
             strategy={horizontalListSortingStrategy}
           >
             <div className="sandwalk-chrome-tabs">
-              {orderedTabs.map(tab => (
-                <SessionTab
-                  key={tab.id}
-                  tab={tab}
-                  active={tab.id === activeId}
-                  color={tabColors[tab.id]}
-                  unread={attentionIds.has(tab.id)}
-                  draggable={draggable}
-                  onSelect={onSelect}
-                  onClose={onClose}
-                  onContextMenu={openContextMenu}
-                />
-              ))}
+              {orderedItems.map(item => {
+                if (item.kind === 'chat') {
+                  const tab = item.session
+                  return (
+                    <SessionTab
+                      key={tab.id}
+                      tab={tab}
+                      active={tab.id === activeId}
+                      color={tabColors[tab.id]}
+                      unread={attentionIds.has(tab.id)}
+                      draggable={draggable}
+                      onSelect={(id, event) => {
+                        if (
+                          onToggleSelectChat &&
+                          event &&
+                          (event.shiftKey || event.metaKey)
+                        ) {
+                          onToggleSelectChat(id)
+                          return
+                        }
+                        onSelect(id)
+                      }}
+                      onClose={onClose}
+                      onContextMenu={openContextMenu}
+                      selected={selectedChatIds?.has(tab.id) ?? false}
+                    />
+                  )
+                }
+                const group = item.group
+                const pseudoTab: AgentSession = {
+                  id: group.id,
+                  title: group.name || 'Group',
+                  status: 'idle',
+                  source: 'local',
+                  sourceLabel: 'Split view',
+                  organizeLabel: group.pinned ? 'pinned' : null,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  lastMessageAt: null,
+                  projectId: null,
+                  titleSource: null,
+                  workspacePath: null
+                } as unknown as AgentSession
+                return (
+                  <SessionTab
+                    key={group.id}
+                    tab={pseudoTab}
+                    active={group.id === activeId}
+                    color={group.color || undefined}
+                    unread={false}
+                    draggable={draggable}
+                    onSelect={onSelect}
+                    onClose={onDissolveGroup || (() => {})}
+                    onContextMenu={openContextMenu}
+                    selected={selectedChatIds?.has(group.id) ?? false}
+                    variant="group"
+                    groupCount={
+                      group.isPending ? undefined : group.chatIds.length
+                    }
+                  />
+                )
+              })}
             </div>
           </SortableContext>
         </DndContext>
@@ -321,12 +554,12 @@ export function SessionTabs({
                       searchOpen &&
                         'bg-black/[0.12] text-foreground dark:bg-white/[0.18] dark:text-white'
                     )}
-                    aria-label={`All tabs (${orderedTabs.length})`}
+                    aria-label={`All tabs (${orderedItems.length})`}
                   >
                     <ChevronDown className="size-3.5 shrink-0 stroke-[2.25]" />
-                    {orderedTabs.length > 0 ? (
+                    {orderedItems.length > 0 ? (
                       <span className="text-[11px] font-semibold tabular-nums leading-none">
-                        {orderedTabs.length}
+                        {orderedItems.length}
                       </span>
                     ) : null}
                   </button>
@@ -381,20 +614,30 @@ export function SessionTabs({
             </div>
             <div className="max-h-[32rem] overflow-y-auto overscroll-contain">
               <div className="p-1.5" role="listbox" aria-label="Session tabs">
-                {filteredSearchTabs.length === 0 ? (
+                {filteredSearchItems.length === 0 ? (
                   <p className="text-muted-foreground px-2 py-6 text-center text-xs">
                     No matches
                   </p>
                 ) : (
-                  filteredSearchTabs.map(tab => {
-                    const active = tab.id === activeId
-                    const title = tab.title || 'Untitled'
-                    const stamp = relativeTime(
-                      tab.lastMessageAt || tab.updatedAt || tab.createdAt
-                    )
+                  filteredSearchItems.map(item => {
+                    const active = item.id === activeId
+                    const isGroup = item.kind === 'group'
+                    const tab = isGroup ? null : item.session
+                    const group = isGroup ? item.group : null
+                    const title = isGroup
+                      ? group!.name || 'Group'
+                      : tab!.title || 'Untitled'
+                    const stamp = isGroup
+                      ? ''
+                      : relativeTime(
+                          tab!.lastMessageAt ||
+                            tab!.updatedAt ||
+                            tab!.createdAt
+                        )
+                    const color = isGroup ? group!.color : tabColors[item.id]
                     return (
                       <div
-                        key={tab.id}
+                        key={item.id}
                         role="option"
                         aria-selected={active}
                         tabIndex={0}
@@ -402,61 +645,85 @@ export function SessionTabs({
                           'group/item hover:bg-muted flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                           active && 'bg-muted'
                         )}
-                        onClick={() => onSelect(tab.id)}
+                        onClick={event => {
+                          if (
+                            !isGroup &&
+                            onToggleSelectChat &&
+                            (event.shiftKey || event.metaKey)
+                          ) {
+                            onToggleSelectChat(item.id)
+                            return
+                          }
+                          onSelect(item.id)
+                        }}
                         onKeyDown={event => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault()
-                            onSelect(tab.id)
+                            onSelect(item.id)
                           }
                         }}
                         onContextMenu={event => {
                           event.preventDefault()
-                          openContextMenu(tab.id, event)
+                          openContextMenu(item.id, event)
                         }}
+                        data-selected={
+                          selectedChatIds?.has(item.id) ? 'true' : undefined
+                        }
                       >
                         <span className="bg-muted/80 flex size-7 shrink-0 items-center justify-center rounded-md">
-                          <SessionStatusIcon status={tab.status} />
+                          {isGroup ? (
+                            <Columns2 className="size-3.5" />
+                          ) : (
+                            <SessionStatusIcon status={tab!.status} />
+                          )}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-2">
-                            {tabColors[tab.id] ? (
+                            {color ? (
                               <span
                                 className="size-2 shrink-0 rounded-full border border-black/10"
-                                style={{
-                                  backgroundColor: tabColors[tab.id]
-                                }}
+                                style={{ backgroundColor: color }}
                                 aria-hidden
                               />
+                            ) : null}
+                            {isGroup && !group!.isPending ? (
+                              <span
+                                className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
+                                aria-label={`${group!.chatIds.length} chats`}
+                              >
+                                {group!.chatIds.length}
+                              </span>
                             ) : null}
                             <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
                               {title}
                             </span>
-                            {/*
-                              Stamp and close X share the same slot: the stamp
-                              fades out on item hover while the X fades in in
-                              its place. Fixed min-width keeps the layout stable.
-                            */}
                             <span
                               className="relative block h-4 shrink-0"
                               style={{ width: 28 }}
                             >
-                              <span className="text-muted-foreground absolute inset-0 inline-flex items-center justify-center text-[11px] tabular-nums transition-opacity group-hover/item:opacity-0">
-                                {stamp}
-                              </span>
+                              {!isGroup ? (
+                                <span className="text-muted-foreground absolute inset-0 inline-flex items-center justify-center text-[11px] tabular-nums transition-opacity group-hover/item:opacity-0">
+                                  {stamp}
+                                </span>
+                              ) : null}
                               <button
                                 type="button"
                                 className="text-muted-foreground hover:text-foreground absolute inset-0 inline-flex items-center justify-center rounded-md opacity-0 transition-opacity group-hover/item:opacity-100"
                                 aria-label={`Close ${title}`}
                                 onClick={event => {
                                   event.stopPropagation()
-                                  onClose(tab.id)
+                                  if (isGroup) {
+                                    onCloseGroup?.(item.id)
+                                  } else {
+                                    onClose(item.id)
+                                  }
                                 }}
                               >
                                 <X className="size-3.5" />
                               </button>
                             </span>
                           </span>
-                          {tab.organizeLabel === 'pinned' ? (
+                          {!isGroup && tab!.organizeLabel === 'pinned' ? (
                             <span className="text-muted-foreground mt-0.5 flex items-center gap-1 text-[11px]">
                               <Pin
                                 className="size-3 shrink-0"
@@ -492,7 +759,31 @@ export function SessionTabs({
             label={menuSession.organizeLabel === 'pinned' ? 'Unpin' : 'Pin'}
             onClick={() => runAction(() => onTogglePin(menuSession))}
           />
+          {onMoveToProject && projects ? (
+            <ProjectPicker
+              projects={projects}
+              value={menuSession.projectId}
+              noneLabel="No project"
+              trigger={
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="hover:bg-muted flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs [&_svg]:size-3"
+                >
+                  <Folder />
+                  Move to project…
+                </button>
+              }
+              onChange={projectId => {
+                onMoveToProject(menuSession, projectId)
+                setMenu(null)
+              }}
+            />
+          ) : null}
           <TabContextSeparator />
+          <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
+            Color
+          </div>
           <TabInlineColorRow
             value={tabColors[menuSession.id] || null}
             onSelect={color => {
@@ -522,6 +813,16 @@ export function SessionTabs({
             }
             onClick={() => runAction(() => onArchive(menuSession))}
           />
+          {onSplitWith ? (
+            <>
+              <TabContextSeparator />
+              <TabContextItem
+                icon={<Columns2 className="size-3.5" />}
+                label="Create split view"
+                onClick={() => runAction(() => onSplitWith(menuSession.id))}
+              />
+            </>
+          ) : null}
           <TabContextSeparator />
           <TabContextItem
             icon={<X className="size-3.5" />}
@@ -534,15 +835,149 @@ export function SessionTabs({
             disabled={tabs.length <= 1}
             onClick={() => runAction(() => onCloseOthers(menuSession.id))}
           />
-          <TabContextSeparator />
-          <TabContextItem
-            icon={<Trash2 className="size-3.5" />}
-            label="Delete"
-            destructive
-            onClick={() => runAction(() => onDelete(menuSession))}
-          />
+          {/*
+            Delete queda fuera del context menu de la strip (y del
+            dropdown "All tabs" — mismo menú). Es destructiva y en la
+            strip se lee muy cerca de Close: fácil accidente. La acción
+            vive solo en el sidebar izquierdo, en modo "organizar".
+          */}
         </TabContextMenuShell>
       ) : null}
+
+      {menu && menuGroup ? (
+        <TabContextMenuShell
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+        >
+          {onRenameGroup ? (
+            <>
+              <TabContextItem
+                icon={<Pencil className="size-3.5" />}
+                label="Rename…"
+                onClick={() => runAction(() => onRenameGroup(menuGroup))}
+              />
+              <TabContextSeparator />
+            </>
+          ) : null}
+          {onSetGroupColor ? (
+            <>
+              <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
+                Color
+              </div>
+              <TabInlineColorRow
+                value={menuGroup.color}
+                onSelect={color => {
+                  onSetGroupColor(menuGroup.id, color)
+                  setMenu(null)
+                }}
+                onClear={() => {
+                  onSetGroupColor(menuGroup.id, null)
+                  setMenu(null)
+                }}
+              />
+              <TabContextSeparator />
+            </>
+          ) : null}
+          {onCloseGroup ? (
+            <TabContextItem
+              icon={<X className="size-3.5" />}
+              label="Close"
+              onClick={() => runAction(() => onCloseGroup(menuGroup.id))}
+            />
+          ) : null}
+          <TabContextItem
+            icon={<CircleX className="size-3.5" />}
+            label="Close others"
+            disabled={orderedItems.length <= 1}
+            onClick={() => runAction(() => onCloseOthers(menuGroup.id))}
+          />
+          {onDissolveGroup ? (
+            <>
+              <TabContextSeparator />
+              <TabContextItem
+                icon={<Trash2 className="size-3.5" />}
+                label="Delete Split View"
+                destructive
+                onClick={() => {
+                  setDissolveConfirm(menuGroup)
+                  setMenu(null)
+                }}
+              />
+            </>
+          ) : null}
+        </TabContextMenuShell>
+      ) : null}
+      <GroupDissolveDialog
+        group={dissolveConfirm}
+        chats={
+          dissolveConfirm
+            ? tabs.filter(t => dissolveConfirm.chatIds.includes(t.id))
+            : []
+        }
+        onCancel={() => setDissolveConfirm(null)}
+        onConfirm={() => {
+          if (dissolveConfirm && onDissolveGroup) {
+            onDissolveGroup(dissolveConfirm.id)
+          }
+          setDissolveConfirm(null)
+        }}
+      />
     </div>
+  )
+}
+
+/**
+ * Modal de confirmación para el "Delete Split View" (strip) o
+ * "Dissolve split" (sidebar). Se enfatiza que los chats de adentro
+ * NO se borran — sólo se liberan como conversaciones individuales.
+ * Esa distinción es clave: la acción es destructiva sobre la
+ * agrupación, no sobre las conversaciones.
+ */
+export function GroupDissolveDialog({
+  group,
+  chats,
+  onCancel,
+  onConfirm
+}: {
+  group: SessionGroup | null
+  chats: AgentSession[]
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const open = group !== null
+  const label = group?.name || 'Group'
+  return (
+    <Dialog open={open} onOpenChange={next => (next ? null : onCancel())}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete Split View</DialogTitle>
+          <DialogDescription>
+            El split view <span className="text-foreground font-medium">{label}</span>{' '}
+            desaparece. Los chats que viven dentro se quedan sueltos como
+            conversaciones individuales — ninguna se borra.
+          </DialogDescription>
+        </DialogHeader>
+        {chats.length > 0 ? (
+          <div className="border-border/60 max-h-56 overflow-y-auto rounded-md border">
+            <ul className="divide-border/60 divide-y text-[13px]">
+              {chats.map(chat => (
+                <li key={chat.id} className="truncate px-3 py-2">
+                  {chat.title || 'Untitled'}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button size="sm" variant="destructive" onClick={onConfirm}>
+            Delete Split View
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

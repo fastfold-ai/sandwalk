@@ -13,6 +13,7 @@ import type {
   McpServer,
   RuntimeSettings,
   SandboxSettings,
+  SessionGroup,
   Specialist
 } from '@sandwalk/agent-ui-core'
 import type { ComponentProps, MutableRefObject, RefObject } from 'react'
@@ -23,6 +24,7 @@ import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import {
   type DashboardMainViewsProps
 } from '@/components/agents/DashboardMainViews'
+import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { type DashboardSection } from '@/components/agents/DashboardSidebar'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
@@ -127,7 +129,8 @@ export type AppShellMainProps = {
   setProjectSettingsOpen: (value: boolean | ((current: boolean) => boolean)) => void
   setProjectScopeId: (value: string | null | ((current: string | null) => string | null)) => void
   createSession: CreateDraftSession
-  openTabs: AgentSession[]
+  openTabs: import('@/lib/sessions').TabItem[]
+  openTabIds: string[]
   sessionId: string | null
   session: AgentSession | null
   openSessionTab: (id: string, scopeKey?: string) => void
@@ -201,6 +204,27 @@ export type AppShellMainProps = {
   setPendingOpenPath: (value: string | null | ((current: string | null) => string | null)) => void
   setComposer: (value: string | ((current: string) => string)) => void
   setComposerFiles: (value: string[] | ((current: string[]) => string[])) => void
+  activeGroup: SessionGroup | null
+  perSessionBaseArgs: Omit<
+    PerSessionChatStateArgs,
+    'sessionId' | 'session' | 'sessionIdRef'
+  >
+  allSessions: AgentSession[]
+  setTabGroupActiveChat: (groupId: string, chatId: string) => void
+  tabGroups: SessionGroup[]
+  onSplitWithNextTab: (sourceId: string) => void
+  onPickSplitPartner: (partnerId: string) => void
+  onCancelPendingSplit: () => void
+  onAddChatToSplit: (chatId: string) => void
+  onRemoveChatFromSplit: (chatId: string) => void
+  dissolveTabGroup: (groupId: string) => void
+  renameTabGroup: (group: SessionGroup) => void
+  setTabGroupColor: (groupId: string, color: string | null) => void
+  closeTabGroup: (groupId: string) => void
+  selectedChatIds: Set<string>
+  toggleSelectChat: (id: string) => void
+  clearSelectChats: () => void
+  createSplitFromSelection: () => void
 }
 
 export function isDashboardMainView(props: AppShellMainProps) {

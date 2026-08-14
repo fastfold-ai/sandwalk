@@ -4,6 +4,7 @@ import type {
   AgentSession,
   BackendHealth
 } from '@sandwalk/agent-ui-core'
+import { isSessionGroupId } from '@sandwalk/agent-ui-core'
 import { type Dispatch, type MutableRefObject, type SetStateAction,useEffect, useRef } from 'react'
 
 import { toolsFromEvents } from '@/components/agents/transcript'
@@ -70,6 +71,12 @@ export function useSessionChatStream({
   loadSkillsRef
 }: UseSessionChatStreamArgs) {
   const streamControllersRef = useRef<Map<string, AbortController>>(new Map())
+  // Grace period before an inactive stream is aborted. Prevents SSE churn on
+  // rapid tab switching — if the user comes back within STREAM_GRACE_MS, we
+  // reuse the still-open EventSource instead of tearing down + reconnecting
+  // (which drops the SSE cursor + rehydrates events from cache = latency).
+  const streamCloseTimersRef = useRef<Map<string, number>>(new Map())
+  const STREAM_GRACE_MS = 300
 
   // Perf probe (visible in devtools): time from last delta to run.completed
   // as *received* by JS — splits webview transport lag from render lag.
@@ -123,6 +130,10 @@ export function useSessionChatStream({
       )
       return
     }
+    // Group ids arrive here only via defensive paths (App shell passes
+    // `effectiveSessionId` which resolves to the group's activeChatId).
+    // Skip anyway so we never issue a 404 GET /sessions/grp_*/messages.
+    if (isSessionGroupId(sessionId)) return
     if (chatBySessionIdRef.current[sessionId]?.messagesLoaded) return
 
     // Empty/new sessions: show the empty composer immediately, hydrate in background.
@@ -190,6 +201,10 @@ export function useSessionChatStream({
 
   useEffect(() => {
     if (!health) {
+      for (const timer of streamCloseTimersRef.current.values()) {
+        window.clearTimeout(timer)
+      }
+      streamCloseTimersRef.current.clear()
       for (const [id, controller] of streamControllersRef.current) {
         controller.abort()
         dropDeltaBuffer(id)
@@ -207,20 +222,40 @@ export function useSessionChatStream({
     // poll. Opening a chat attaches SSE and catches up via afterSequence +
     // message history.
     // Draft /agents/new has no API session — never open a stream for it.
+    // Group ids (`grp_*`) aren't sessions; the group's child chats each
+    // mount their own `SessionChatMount` which opens SSE per real chat id.
     const wanted = new Set<string>()
-    if (sessionId && !isDraftAgentSessionId(sessionId)) {
+    if (
+      sessionId &&
+      !isDraftAgentSessionId(sessionId) &&
+      !isSessionGroupId(sessionId)
+    ) {
       wanted.add(sessionId)
     }
 
     for (const [id, controller] of [...streamControllersRef.current]) {
       if (!wanted.has(id)) {
-        controller.abort()
-        streamControllersRef.current.delete(id)
-        dropDeltaBuffer(id)
+        // Schedule delayed abort — a fast tab switch back to this session
+        // reuses the stream. See STREAM_GRACE_MS above.
+        if (!streamCloseTimersRef.current.has(id)) {
+          const timer = window.setTimeout(() => {
+            streamCloseTimersRef.current.delete(id)
+            controller.abort()
+            streamControllersRef.current.delete(id)
+            dropDeltaBuffer(id)
+          }, STREAM_GRACE_MS)
+          streamCloseTimersRef.current.set(id, timer)
+        }
       }
     }
 
     for (const id of wanted) {
+      // Cancel any pending delayed-abort for this session — we still want it.
+      const pending = streamCloseTimersRef.current.get(id)
+      if (pending !== undefined) {
+        window.clearTimeout(pending)
+        streamCloseTimersRef.current.delete(id)
+      }
       if (streamControllersRef.current.has(id)) continue
       const controller = new AbortController()
       streamControllersRef.current.set(id, controller)

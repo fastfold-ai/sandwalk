@@ -1,21 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import {
-  applyChatPatch,
-  normalizeSessionChatState
-} from '@/lib/chat-actions'
-import { emptySessionChatState, type SessionChatState } from '@/lib/sessions'
+import { useChatStore } from '@/hooks/chat-store-context'
+
+/**
+ * Hook por-sesión que expone el `chatBySessionId` global (vía el
+ * `ChatStoreProvider`) más los derivados del sessionId dado y los refs
+ * que sí son locales a cada mount (composer live ref, queue refs,
+ * editingQueuedId).
+ *
+ * Split view: N mounts consumen el mismo store global — ven el mismo
+ * `chatBySessionId`, se benefician del prefetch cruzado y el stream SSE
+ * que llegue por cualquiera actualiza la vista de todos. Los refs locales
+ * (composer live, pending immediate send, draining queue) se mantienen
+ * por mount porque son mecanismos de la vista de un panel, no del chat.
+ */
 
 export function useSessionChatState(sessionId: string | null) {
-  const [chatBySessionId, setChatBySessionId] = useState<
-    Record<string, SessionChatState>
-  >({})
+  const store = useChatStore()
+  const { chatBySessionId, setChatBySessionId, chatBySessionIdRef, patchChat } =
+    store
 
-  const chat = normalizeSessionChatState(
-    sessionId
-      ? chatBySessionId[sessionId] ?? emptySessionChatState()
-      : emptySessionChatState()
-  )
+  const chat = store.selectChat(sessionId)
   const {
     messages,
     tools,
@@ -54,26 +59,6 @@ export function useSessionChatState(sessionId: string | null) {
   useEffect(() => {
     setEditingQueuedId(null)
   }, [sessionId])
-
-  const patchChat = useCallback(
-    (
-      id: string,
-      patch:
-        | Partial<SessionChatState>
-        | ((prev: SessionChatState) => SessionChatState)
-    ) => {
-      setChatBySessionId(current => {
-        const prev = current[id] ?? emptySessionChatState()
-        const next = applyChatPatch(prev, patch)
-        if (next === prev) return current
-        return { ...current, [id]: next }
-      })
-    },
-    []
-  )
-
-  const chatBySessionIdRef = useRef(chatBySessionId)
-  chatBySessionIdRef.current = chatBySessionId
 
   const setComposer = useCallback(
     (value: string | ((current: string) => string)) => {

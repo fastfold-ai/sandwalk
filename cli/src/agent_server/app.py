@@ -31,6 +31,7 @@ from agent_server.routes.auth import register_auth_middleware
 from agent_server.sandbox_events import sandbox_event_bus
 from agent_server.sandbox_settings_service import SandboxSettingsService
 from agent_server.service import AgentService
+from agent_server.session_event_bus import session_event_bus
 from agent_server.settings_service import SettingsService
 from agent_server.sites_service import SitesService
 from agent_server.skills_service import SkillsService
@@ -147,6 +148,7 @@ def create_app(
         except Exception:
             pass
         sandbox_event_bus.bind_loop(asyncio.get_running_loop())
+        session_event_bus.bind_loop(asyncio.get_running_loop())
         # Inbound connectors are best-effort: a Slack outage must not stop the
         # server from booting.
         try:

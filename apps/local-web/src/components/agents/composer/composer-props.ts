@@ -100,4 +100,12 @@ export type ComposerProps = {
   onPlanModeChange?: (planMode: boolean) => Promise<void>
   editingQueued?: boolean
   onCancelEditQueued?: () => void
+  /**
+   * Cuando `true`, el composer se pinta sin chip propio: sin `bg-card`, sin
+   * `rounded-3xl`, sin `border` externo, sin `shadow`. Diseñado para
+   * embeberlo como parte inferior de un contenedor exterior (ej. un panel
+   * del split view) que ya aporta su propio borde y fondo. El separator
+   * arriba del composer lo dibuja el contenedor exterior.
+   */
+  embedded?: boolean
 }

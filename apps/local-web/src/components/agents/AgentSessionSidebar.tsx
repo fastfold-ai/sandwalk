@@ -2,7 +2,8 @@ import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentProject,
   AgentSession,
-  BackendHealth
+  BackendHealth,
+  SessionGroup
 } from '@sandwalk/agent-ui-core'
 import {
   Globe2,
@@ -27,13 +28,13 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip'
-import { groupSessions, type SessionChatState } from '@/lib/sessions'
+import { type SessionChatState, type TabItemSection } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 import { SidebarBatchBar } from './session-sidebar/sidebar-batch-bar'
 import { SidebarSessionList } from './session-sidebar/sidebar-session-list'
 
-type SessionSection = ReturnType<typeof groupSessions>[number]
+type SessionSection = TabItemSection
 
 type AgentSessionSidebarProps = {
   projects: AgentProject[]
@@ -63,6 +64,15 @@ type AgentSessionSidebarProps = {
   onBatchMoveSelected: (projectId: string | null) => void | Promise<void>
   onBatchExportSelected: () => void | Promise<void>
   onBatchDeletePending: () => void
+  onBatchSplitView?: () => void
+  canBatchSplitView?: boolean
+  onSelectTabGroup?: (groupId: string) => void
+  onRenameTabGroup?: (group: SessionGroup) => void
+  onDissolveTabGroup?: (groupId: string) => void
+  onSetTabGroupColor?: (groupId: string, color: string | null) => void
+  onGoToChatProject?: (chat: AgentSession) => void
+  activeGroupChildId?: string | null
+  setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   setCollapsedSidebarSections: Dispatch<SetStateAction<Record<string, boolean>>>
   selectSessionRange: (orderedIds: string[], targetId: string) => void
   toggleSessionSelected: (targetId: string) => void
@@ -109,6 +119,15 @@ export function AgentSessionSidebar({
   onBatchMoveSelected,
   onBatchExportSelected,
   onBatchDeletePending,
+  onBatchSplitView,
+  canBatchSplitView,
+  onSelectTabGroup,
+  onRenameTabGroup,
+  onDissolveTabGroup,
+  onSetTabGroupColor,
+  onGoToChatProject,
+  activeGroupChildId,
+  setTabGroupActiveChat,
   setCollapsedSidebarSections,
   selectSessionRange,
   toggleSessionSelected,
@@ -233,6 +252,9 @@ export function AgentSessionSidebar({
           Sites
         </button>
       </div>
+      {/* SidebarGroupsRow removido: los grupos ahora viven como items
+          dentro de las secciones (Pinned/Today/…) con chevron collapsible
+          en `SidebarSessionList`, mismo nivel que un chat. */}
       <SidebarSessionList
         sections={sections}
         scopeKey={activeProjectId}
@@ -256,6 +278,14 @@ export function AgentSessionSidebar({
         exportTranscript={exportTranscript}
         setDeleteTarget={setDeleteTarget}
         onClearSessionSelection={onClearSessionSelection}
+        onSelectTabGroup={onSelectTabGroup}
+        onRenameTabGroup={onRenameTabGroup}
+        onDissolveTabGroup={onDissolveTabGroup}
+        onSetTabGroupColor={onSetTabGroupColor}
+        activeProjectId={activeProjectId}
+        onGoToChatProject={onGoToChatProject}
+        activeGroupChildId={activeGroupChildId}
+        setTabGroupActiveChat={setTabGroupActiveChat}
       />
       <div className="relative shrink-0 p-2">
         <SidebarBatchBar
@@ -268,6 +298,8 @@ export function AgentSessionSidebar({
           onBatchMove={projectId => void onBatchMoveSelected(projectId)}
           onBatchExport={() => void onBatchExportSelected()}
           onBatchDelete={onBatchDeletePending}
+          onBatchSplitView={onBatchSplitView}
+          canSplitView={canBatchSplitView}
         />
         <DesktopUpdateBanner />
         <SidebarUserMenu
@@ -282,3 +314,4 @@ export function AgentSessionSidebar({
     </>
   )
 }
+

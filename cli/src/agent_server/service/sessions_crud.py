@@ -6,6 +6,22 @@ from pathlib import Path
 
 from agent_server.models import AgentSession
 from agent_server.service.fork_import import import_shared_fork_files
+from agent_server.session_event_bus import SessionEventType, session_event_bus
+
+
+def _publish_session_bus_event(event_type: str, session: AgentSession) -> None:
+    """Fan out to `session_event_bus` — swallow errors so a broken subscriber
+    can never break the write path."""
+    try:
+        session_event_bus.publish(
+            event_type,
+            {
+                "sessionId": session.id,
+                "session": session.model_dump(mode="json", by_alias=True),
+            },
+        )
+    except Exception:  # noqa: BLE001
+        pass
 
 
 class _SessionCrudMixin:
@@ -77,6 +93,7 @@ class _SessionCrudMixin:
             event_type="session.created",
             payload={"session": session.model_dump(mode="json", by_alias=True)},
         )
+        _publish_session_bus_event(SessionEventType.SESSION_CREATED, session)
         return session
 
     def update_session(
@@ -129,4 +146,5 @@ class _SessionCrudMixin:
             event_type="session.updated",
             payload={"session": session.model_dump(mode="json", by_alias=True)},
         )
+        _publish_session_bus_event(SessionEventType.SESSION_UPDATED, session)
         return session

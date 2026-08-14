@@ -1,4 +1,8 @@
-import type { AgentSkillDetail, WorkspaceFile } from '@sandwalk/agent-ui-core'
+import type {
+  AgentSkillDetail,
+  SessionGroup,
+  WorkspaceFile
+} from '@sandwalk/agent-ui-core'
 import { useRef, useState } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 
@@ -9,8 +13,8 @@ import {
   readOpenTabsByProject,
   readProjectScopeId,
   readRecentProjectIds,
-  SIDEBAR_COLLAPSED_STORAGE_KEY,
-  TERMINAL_OPEN_STORAGE_KEY
+  readTabGroups,
+  SIDEBAR_COLLAPSED_STORAGE_KEY
 } from '@/lib/app-storage'
 
 export function useAppUiState() {
@@ -38,13 +42,11 @@ export function useAppUiState() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [copiedResumeCommand, setCopiedResumeCommand] = useState(false)
   const [cliMenuOpen, setCliMenuOpen] = useState(false)
-  const [terminalOpen, setTerminalOpen] = useState(() => {
-    try {
-      return localStorage.getItem(TERMINAL_OPEN_STORAGE_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
+  // Por ahora la terminal queda siempre abierta y no se puede cerrar.
+  // El estado sigue siendo un `useState` para no cascadear typings del
+  // shell, pero se inicializa en `true` y se ignoran los `setTerminalOpen(false)`
+  // que vienen de handlers ya deshabilitados en la UI.
+  const [terminalOpen, setTerminalOpen] = useState(true)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1'
@@ -67,6 +69,12 @@ export function useAppUiState() {
   const [openTabsByProject, setOpenTabsByProject] = useState<
     Record<string, string[]>
   >(() => readOpenTabsByProject())
+  // Lista plana única de split-view groups. Un grupo es visible en un
+  // proyecto cuando alguno de sus chats pertenece a ese proyecto (el
+  // filtrado por scope vive en `useAppTabGroups`, no en el storage).
+  const [allTabGroups, setAllTabGroups] = useState<SessionGroup[]>(() =>
+    readTabGroups()
+  )
   const [workspaceVersion, setWorkspaceVersion] = useState(0)
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([])
   /** Materialized session used for Files/@ mentions while the route stays on /agents/new. */
@@ -117,6 +125,8 @@ export function useAppUiState() {
     setCollapsedSidebarSections,
     openTabsByProject,
     setOpenTabsByProject,
+    allTabGroups,
+    setAllTabGroups,
     workspaceVersion,
     setWorkspaceVersion,
     workspaceFiles,

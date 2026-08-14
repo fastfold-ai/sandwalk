@@ -74,6 +74,9 @@ export function SessionActionsMenu({
         {session.organizeLabel === 'pinned' ? 'Unpin' : 'Pin'}
       </button>
       <TabContextSeparator />
+      <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
+        Color
+      </div>
       <TabInlineColorRow
         value={tabColor || null}
         onSelect={color => onSetTabColor(color)}

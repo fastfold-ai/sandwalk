@@ -2,7 +2,8 @@ import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentMessage,
   AgentProject,
-  AgentSession
+  AgentSession,
+  SessionGroup
 } from '@sandwalk/agent-ui-core'
 import {
   type ComponentProps,
@@ -19,7 +20,11 @@ import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { type NavigateFunction,useLocation } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
+import { ChatSplitContainer } from '@/components/agents/ChatSplitContainer'
 import { fileChipToken } from '@/components/agents/composer-parts'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
+import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { useSessionSiteAutoPreview } from '@/components/agents/sites/use-session-site-auto-preview'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
@@ -47,7 +52,8 @@ export type AgentSessionMainPanelProps = {
   navigate: NavigateFunction
   sidebarCollapsed: boolean
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>
-  openTabs: AgentSession[]
+  openTabs: import('@/lib/sessions').TabItem[]
+  openTabIds: string[]
   sessionId: string | null
   session: AgentSession | null
   openSessionTab: (sessionId: string) => void
@@ -121,6 +127,27 @@ export type AgentSessionMainPanelProps = {
   ) => void
   /** Opens a draft session (draft only, not persisted). */
   createSession?: (projectId?: string | null) => void | Promise<void>
+  activeGroup: SessionGroup | null
+  perSessionBaseArgs: Omit<
+    PerSessionChatStateArgs,
+    'sessionId' | 'session' | 'sessionIdRef'
+  >
+  allSessions: AgentSession[]
+  setTabGroupActiveChat: (groupId: string, chatId: string) => void
+  tabGroups: SessionGroup[]
+  onSplitWithNextTab: (sourceId: string) => void
+  onPickSplitPartner: (partnerId: string) => void
+  onCancelPendingSplit: () => void
+  onAddChatToSplit: (chatId: string) => void
+  onRemoveChatFromSplit: (chatId: string) => void
+  dissolveTabGroup: (groupId: string) => void
+  renameTabGroup: (group: SessionGroup) => void
+  setTabGroupColor: (groupId: string, color: string | null) => void
+  closeTabGroup: (groupId: string) => void
+  selectedChatIds: Set<string>
+  toggleSelectChat: (id: string) => void
+  clearSelectChats: () => void
+  createSplitFromSelection: () => void
 }
 
 export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
@@ -131,6 +158,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     sidebarCollapsed,
     setSidebarCollapsed,
     openTabs,
+    openTabIds,
     sessionId,
     session,
     openSessionTab,
@@ -191,9 +219,31 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     pendingOpenPath,
     setPendingOpenPath,
     setComposer,
-    setComposerFiles
+    setComposerFiles,
+    activeGroup,
+    perSessionBaseArgs,
+    allSessions,
+    setTabGroupActiveChat,
+    tabGroups,
+    onSplitWithNextTab,
+    onPickSplitPartner,
+    onCancelPendingSplit,
+    onAddChatToSplit,
+    onRemoveChatFromSplit,
+    dissolveTabGroup,
+    renameTabGroup,
+    setTabGroupColor,
+    closeTabGroup,
+    selectedChatIds,
+    toggleSelectChat,
+    clearSelectChats,
+    createSplitFromSelection
   } = props
 
+  const isNarrow = useIsNarrowWindow(1280)
+  // En split view con ventana angosta, el side panel deja de ser una columna
+  // resizable (no cabe junto a N chats + composer) y pasa a modal overlay.
+  const asSheet = Boolean(activeGroup) && isNarrow
   const isDraft = isDraftAgentSessionId(sessionId)
   const inProject = Boolean(activeProjectId)
   const requestedSiteId = new URLSearchParams(location.search).get('site')
@@ -274,6 +324,164 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   const showWorkspaceFiles =
     canShowFilesPanel && Boolean(workspaceSessionId) && (!isDraft || inProject)
 
+  // El picker vive DENTRO del ChatSplitContainer cuando el grupo activo
+  // está en modo pending (recién creado desde "Create split view").
+  // Ya no hay flow paralelo: el layout es el mismo del split real, sólo
+  // que un panel se pinta como picker en vez de un chat mount.
+
+  /*
+   * Builders del header/mount del panel de un split. Se extraen a
+   * callbacks reutilizables porque los usa tanto `ChatSplitContainer`
+   * (cuando ya hay un grupo real) como el modo picker (cuando armamos
+   * el layout visual del split antes de que exista el grupo). Reusarlos
+   * garantiza que Chat A se vea idéntico en ambos casos (mismo header,
+   * mismo composer embebido, mismos toggles smart).
+   */
+  const buildSplitHeaderProps = useCallback(
+    (chatId: string, focused: boolean, onFocusPanel: () => void) => {
+      const chatSession =
+        allSessions.find(item => item.id === chatId) || null
+      return {
+        session: chatSession,
+        focused,
+        onFocusPanel,
+        projects,
+        onSelectProjectScope: selectProjectScope,
+        showFiles: Boolean(chatSession) && !isDraftAgentSessionId(chatId),
+        showTerminal: false,
+        showPreview: Boolean(chatSession) && !isDraftAgentSessionId(chatId),
+        filesPanelCollapsed,
+        terminalOpen,
+        panelView,
+        onToggleFiles: () => {
+          const showingFilesHere =
+            focused && panelView === 'files' && !filesPanelCollapsed
+          if (showingFilesHere) {
+            setFilesPanelCollapsed(true)
+          } else {
+            setPanelView('files')
+            setFilesPanelCollapsed(false)
+          }
+        },
+        onToggleTerminal: () => {
+          if (focused && terminalOpen) {
+            setTerminalOpen(false)
+          } else {
+            setTerminalOpen(true)
+          }
+        },
+        onOpenPreview: () => {
+          const showingPreviewHere =
+            focused && panelView === 'preview' && !filesPanelCollapsed
+          if (showingPreviewHere) {
+            setFilesPanelCollapsed(true)
+          } else {
+            setPanelView('preview')
+            setFilesPanelCollapsed(false)
+          }
+        },
+        showCli: Boolean(chatSession) && !isDraftAgentSessionId(chatId),
+        onExport: (target: AgentSession) => void exportTranscript(target),
+        onRename: (target: AgentSession) => openRenameDialog(target),
+        onInspect: (target: AgentSession) =>
+          navigate(`/agents/${target.id}?inspect=1`),
+        onArchive: (target: AgentSession) =>
+          void updateSession(target, {
+            organizeLabel:
+              target.organizeLabel === 'archive' ? null : 'archive'
+          }),
+        onMoveToProject: (target: AgentSession, projectId: string | null) =>
+          void updateSession(target, { projectId }),
+        // "Close" desde el header de un chat dentro del split = sacar
+        // ese chat del grupo (no borra). El handler auto-disuelve si
+        // queda con < 2 chats.
+        onRemoveFromSplit: (id: string) => onRemoveChatFromSplit(id)
+      }
+    },
+    [
+      allSessions,
+      projects,
+      selectProjectScope,
+      filesPanelCollapsed,
+      terminalOpen,
+      panelView,
+      setFilesPanelCollapsed,
+      setTerminalOpen,
+      setPanelView,
+      exportTranscript,
+      openRenameDialog,
+      onRemoveChatFromSplit,
+      navigate,
+      updateSession
+    ]
+  )
+
+  const buildSplitMountProps = useCallback(
+    (chatId: string) => {
+      const chatSession =
+        allSessions.find(item => item.id === chatId) || null
+      return {
+        perSessionArgs: {
+          ...perSessionBaseArgs,
+          sessionId: chatId,
+          session: chatSession
+        },
+        shared: {
+          isInspect,
+          showChatSkeleton,
+          projects,
+          recentProjectIds,
+          onNewProject,
+          selectAllProjects,
+          selectProjectScope,
+          updateSession,
+          chatScrollRef,
+          chatEndRef,
+          expandedToolRunKeys,
+          runIdByMessageId,
+          usageByRunId,
+          copiedMessageId,
+          setCopiedMessageId,
+          liveDelta,
+          showScrollToBottom,
+          scrollChatToBottom,
+          patchChat,
+          ensureWorkspaceForMentions,
+          navigate,
+          client,
+          error
+        }
+      }
+    },
+    [
+      allSessions,
+      perSessionBaseArgs,
+      isInspect,
+      showChatSkeleton,
+      projects,
+      recentProjectIds,
+      onNewProject,
+      selectAllProjects,
+      selectProjectScope,
+      updateSession,
+      chatScrollRef,
+      chatEndRef,
+      expandedToolRunKeys,
+      runIdByMessageId,
+      usageByRunId,
+      copiedMessageId,
+      setCopiedMessageId,
+      liveDelta,
+      showScrollToBottom,
+      scrollChatToBottom,
+      patchChat,
+      ensureWorkspaceForMentions,
+      navigate,
+      client,
+      error
+    ]
+  )
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       {/*
@@ -284,7 +492,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
       <SessionMainHeader
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
-        openTabs={openTabs}
+        openTabs={openTabs
+          .filter((item): item is Extract<typeof item, { kind: 'chat' }> => item.kind === 'chat')
+          .map(item => item.session)}
+        openTabIds={openTabIds}
         sessionId={sessionId}
         session={session}
         navigate={navigate}
@@ -314,6 +525,18 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           await prepareDraftWorkspace()
         }}
         createSession={props.createSession}
+        groups={tabGroups}
+        onSplitWith={onSplitWithNextTab}
+        onDissolveGroup={dissolveTabGroup}
+        onRenameGroup={renameTabGroup}
+        onSetGroupColor={setTabGroupColor}
+        onCloseGroup={closeTabGroup}
+        selectedChatIds={selectedChatIds}
+        onToggleSelectChat={toggleSelectChat}
+        onClearSelection={clearSelectChats}
+        onCreateSplitFromSelection={createSplitFromSelection}
+        inSplitGroup={Boolean(activeGroup)}
+        activeGroupId={activeGroup?.id ?? null}
       />
       <ResizablePanelGroup
         direction="horizontal"
@@ -328,6 +551,26 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           minSize={30}
           className="min-w-0"
         >
+          {activeGroup ? (
+            <ChatSplitContainer
+              group={activeGroup}
+              sessions={allSessions}
+              projects={projects}
+              onFocusChat={chatId => {
+                setTabGroupActiveChat(activeGroup.id, chatId)
+              }}
+              buildHeaderProps={buildSplitHeaderProps}
+              buildMountProps={buildSplitMountProps}
+              pickerContext={{
+                client,
+                activeProjectId,
+                allTabGroups: tabGroups,
+                onPickPartner: onPickSplitPartner,
+                onCancelPending: onCancelPendingSplit,
+                onAddChat: onAddChatToSplit
+              }}
+            />
+          ) : (
           <main className="relative flex h-full min-w-0 flex-col">
             <SessionChatBody
             client={client}
@@ -375,8 +618,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             error={error}
           />
         </main>
+          )}
       </ResizablePanel>
-      {canShowFilesPanel && showWorkspaceFiles ? (
+      {canShowFilesPanel && showWorkspaceFiles && !asSheet ? (
         <>
           <ResizableHandle
             className={cn(
@@ -403,9 +647,16 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             }}
             className="min-w-0"
           >
+            {activeGroup && workspaceSessionId ? (
+              <div className="border-border/60 bg-background/95 flex items-center gap-1.5 border-b px-3 py-1.5 text-[11px]">
+                <span className="text-foreground truncate font-medium">
+                  {allSessions.find(s => s.id === workspaceSessionId)?.title ||
+                    'Untitled'}
+                </span>
+              </div>
+            ) : null}
             {showWorkspaceFiles && workspaceSessionId ? (
               <WorkspacePanel
-                key={workspaceSessionId}
                 client={client}
                 sessionId={workspaceSessionId}
                 workspacePath={isDraft ? null : session?.workspacePath ?? null}
@@ -467,6 +718,59 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         </>
       ) : null}
       </ResizablePanelGroup>
+      {canShowFilesPanel && showWorkspaceFiles && asSheet && workspaceSessionId ? (
+        <Sheet
+          open={!filesPanelCollapsed}
+          onOpenChange={open => setFilesPanelCollapsed(!open)}
+        >
+          <SheetContent
+            side="right"
+            className="w-full max-w-[420px] overflow-hidden p-0"
+          >
+            {activeGroup ? (
+              <div className="border-border/60 bg-background/95 flex items-center gap-1.5 border-b px-3 py-1.5 text-[11px]">
+                <span className="text-foreground truncate font-medium">
+                  {allSessions.find(s => s.id === workspaceSessionId)?.title ||
+                    'Untitled'}
+                </span>
+              </div>
+            ) : null}
+            <WorkspacePanel
+              client={client}
+              sessionId={workspaceSessionId}
+              workspacePath={isDraft ? null : session?.workspacePath ?? null}
+              workspaceVersion={workspaceVersion}
+              runActive={runActive}
+              openPathRequest={pendingOpenPath}
+              onOpenPathRequestHandled={() => setPendingOpenPath(null)}
+              onAddToChat={(path, kind) => {
+                setComposer(
+                  current => `${current}${fileChipToken(path, kind)}`
+                )
+                setComposerFiles([])
+              }}
+              onBuildPlan={path => {
+                void startPlanBuild({
+                  sessionId: workspaceSessionId,
+                  plan: planCardFromPath(path),
+                  patchChat,
+                  client,
+                  setRuntimeSettings:
+                    agentComposerSlotProps.setRuntimeSettings,
+                  handleComposerSend:
+                    agentComposerSlotProps.handleComposerSend
+                })
+              }}
+              onTogglePanel={() => setFilesPanelCollapsed(true)}
+              panelView={panelView}
+              siteId={requestedSiteId}
+              terminalOpen={terminalOpen}
+              onCloseTerminal={() => setTerminalOpen(false)}
+              onOpenTerminal={() => setTerminalOpen(true)}
+            />
+          </SheetContent>
+        </Sheet>
+      ) : null}
     </div>
   )
 }

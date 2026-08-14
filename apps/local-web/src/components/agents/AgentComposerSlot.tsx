@@ -98,6 +98,17 @@ type AgentComposerSlotProps = {
   setRuntimeSettings: Dispatch<SetStateAction<RuntimeSettings | null>>
   onSessionUpdated?: (session: AgentSession) => void
   loadModelOptions: () => Promise<void>
+  /** Reenvía al `Composer` para que se pinte sin chip propio. */
+  embedded?: boolean
+  /**
+   * En split view, N paneles montan y cada uno tiene su propio slot. Si
+   * todos autofocean, el último "gana" y su focus bubblea por
+   * `onFocusCapture` del ChatSplitContainer, que llama `onFocusChat` con
+   * ese chatId — pisando el chat que el usuario acababa de elegir desde
+   * el sidebar. En single-tab siempre queremos autofocus; en split solo
+   * el panel focused.
+   */
+  autoFocus?: boolean
 }
 
 export function AgentComposerSlot({
@@ -147,7 +158,9 @@ export function AgentComposerSlot({
   refreshSessionSandbox,
   setRuntimeSettings,
   onSessionUpdated,
-  loadModelOptions
+  loadModelOptions,
+  embedded,
+  autoFocus = true
 }: AgentComposerSlotProps) {
   const [compactBusy, setCompactBusy] = useState(false)
   // Existing chats keep their own model; draft/new chats use global defaults.
@@ -178,6 +191,7 @@ export function AgentComposerSlot({
         key="session-composer"
         value={composer}
         running={runActive}
+        embedded={embedded}
         skills={skills}
         mcpServers={mcpServers}
         skillChips={composerSkills}
@@ -189,7 +203,7 @@ export function AgentComposerSlot({
         sandboxStatus={sessionSandboxStatus}
         sandboxPhase={sessionSandboxPhase}
         showAura={false}
-        autoFocus
+        autoFocus={autoFocus}
         focusKey={
           sessionId && !isDraftAgentSessionId(sessionId)
             ? sessionId

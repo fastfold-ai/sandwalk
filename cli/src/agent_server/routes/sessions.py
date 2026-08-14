@@ -32,7 +32,16 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
     @app.get("/v1/sessions", response_model=SessionList)
     async def list_sessions(
         project_id: str | None = Query(default=None, alias="projectId"),
+        ids: str | None = Query(default=None),
     ) -> SessionList:
+        # `?ids=a,b,c` fetches metadata for a specific set (bulk lookup for
+        # cross-project split groups). When present it overrides projectId
+        # so the caller can resolve foreign chats regardless of their scope.
+        if ids is not None:
+            id_list = [chunk for chunk in (part.strip() for part in ids.split(",")) if chunk]
+            return SessionList(
+                data=await asyncio.to_thread(store.list_sessions_by_ids, id_list)
+            )
         return SessionList(
             data=await asyncio.to_thread(store.list_sessions, project_id=project_id)
         )

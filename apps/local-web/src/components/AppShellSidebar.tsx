@@ -2,7 +2,8 @@ import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentProject,
   AgentSession,
-  BackendHealth
+  BackendHealth,
+  SessionGroup
 } from '@sandwalk/agent-ui-core'
 import type { RefObject } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
@@ -17,7 +18,7 @@ import { ShellNavStrip } from '@/components/ShellNavStrip'
 import { ResizablePanel } from '@/components/ui/resizable'
 import { useSidebarPixelWidth } from '@/hooks/useSidebarPixelWidth'
 import type { CreateDraftSession } from '@/lib/draft-agent'
-import { groupSessions, type SessionChatState } from '@/lib/sessions'
+import { type SessionChatState, type TabItemSection } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 export type AppShellSidebarProps = {
@@ -35,7 +36,7 @@ export type AppShellSidebarProps = {
   backendUrl: string
   projects: AgentProject[]
   activeProjectId: string | null
-  sections: ReturnType<typeof groupSessions>
+  sections: TabItemSection[]
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
   chatBySessionId: Record<string, SessionChatState>
@@ -63,6 +64,15 @@ export type AppShellSidebarProps = {
   setBatchDeletePending: (
     value: boolean | ((current: boolean) => boolean)
   ) => void
+  onBatchSplitView?: () => void
+  canBatchSplitView?: boolean
+  onSelectTabGroup?: (groupId: string) => void
+  onRenameTabGroup?: (group: SessionGroup) => void
+  onDissolveTabGroup?: (groupId: string) => void
+  onSetTabGroupColor?: (groupId: string, color: string | null) => void
+  onGoToChatProject?: (chat: AgentSession) => void
+  activeGroupChildId?: string | null
+  setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   setCollapsedSidebarSections: (
     value:
       | Record<string, boolean>
@@ -129,6 +139,15 @@ export function AppShellSidebar({
   batchMoveSelected,
   batchExportSelected,
   setBatchDeletePending,
+  onBatchSplitView,
+  canBatchSplitView,
+  onSelectTabGroup,
+  onRenameTabGroup,
+  onDissolveTabGroup,
+  onSetTabGroupColor,
+  onGoToChatProject,
+  activeGroupChildId,
+  setTabGroupActiveChat,
   setCollapsedSidebarSections,
   selectSessionRange,
   toggleSessionSelected,
@@ -219,6 +238,15 @@ export function AppShellSidebar({
             onBatchMoveSelected={batchMoveSelected}
             onBatchExportSelected={batchExportSelected}
             onBatchDeletePending={() => setBatchDeletePending(true)}
+            onBatchSplitView={onBatchSplitView}
+            canBatchSplitView={canBatchSplitView}
+            onSelectTabGroup={onSelectTabGroup}
+            onRenameTabGroup={onRenameTabGroup}
+            onDissolveTabGroup={onDissolveTabGroup}
+            onSetTabGroupColor={onSetTabGroupColor}
+            onGoToChatProject={onGoToChatProject}
+            activeGroupChildId={activeGroupChildId}
+            setTabGroupActiveChat={setTabGroupActiveChat}
             setCollapsedSidebarSections={setCollapsedSidebarSections}
             selectSessionRange={selectSessionRange}
             toggleSessionSelected={toggleSessionSelected}

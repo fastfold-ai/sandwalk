@@ -2,6 +2,7 @@ import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentProject,
   AgentSession,
+  SessionGroup,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
@@ -73,6 +74,11 @@ type AppDialogsProps = {
   setRenameTarget: Dispatch<SetStateAction<AgentSession | null>>
   setRenameValue: Dispatch<SetStateAction<string>>
   submitRename: () => Promise<void>
+  renameGroupTarget: SessionGroup | null
+  renameGroupValue: string
+  setRenameGroupTarget: Dispatch<SetStateAction<SessionGroup | null>>
+  setRenameGroupValue: Dispatch<SetStateAction<string>>
+  submitRenameGroup: () => void
   deleteTarget: AgentSession | null
   setDeleteTarget: Dispatch<SetStateAction<AgentSession | null>>
   confirmDelete: () => Promise<void>
@@ -112,6 +118,11 @@ export function AppDialogs({
   setRenameTarget,
   setRenameValue,
   submitRename,
+  renameGroupTarget,
+  renameGroupValue,
+  setRenameGroupTarget,
+  setRenameGroupValue,
+  submitRenameGroup,
   deleteTarget,
   setDeleteTarget,
   confirmDelete,
@@ -215,6 +226,57 @@ export function AppDialogs({
               size="sm"
               onClick={() => void submitRename()}
               disabled={!renameValue.trim()}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(renameGroupTarget)}
+        onOpenChange={open => {
+          if (!open) {
+            setRenameGroupTarget(null)
+            setRenameGroupValue('')
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename split view</DialogTitle>
+            <DialogDescription>
+              Give this split view a clearer name.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameGroupValue}
+            onChange={event => setRenameGroupValue(event.target.value)}
+            placeholder="Split view name"
+            autoFocus
+            maxLength={140}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                if (renameGroupValue.trim()) submitRenameGroup()
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setRenameGroupTarget(null)
+                setRenameGroupValue('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={submitRenameGroup}
+              disabled={!renameGroupValue.trim()}
             >
               Save
             </Button>
