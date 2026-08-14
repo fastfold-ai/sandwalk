@@ -276,6 +276,22 @@ export function SessionTabs({
 
     const idx = orderedTabs.findIndex(tab => tab.id === activeId)
     if (idx < 0) return
+
+    // Si el tab activo YA está totalmente visible en el viewport del
+    // strip, no scrolleamos: el usuario acaba de clickear un tab que
+    // ya ve, no tiene sentido animar. El centrado automático solo
+    // aplica cuando el tab está fuera del viewport (típicamente
+    // porque el usuario navegó desde el sidebar o el dropdown "All
+    // tabs" a un tab que no estaba a la vista).
+    const stripRect = strip.getBoundingClientRect()
+    const tabRect = tabEl.getBoundingClientRect()
+    const isFullyVisible =
+      tabRect.left >= stripRect.left && tabRect.right <= stripRect.right
+    if (isFullyVisible) {
+      didScrollOnceRef.current = true
+      return
+    }
+
     const isFirst = idx === 0
     const isLast = idx === orderedItems.length - 1
 
