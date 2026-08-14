@@ -28,13 +28,19 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(eq=False)
 class _AsyncWaiter:
     """Ties an ``asyncio.Event`` to the loop that created it.
 
     ``notify()`` may be called from any thread (writers hold ``_write_lock``
     on the SQLite side), so we can't touch the Event directly — we have to
     schedule ``event.set()`` on its owning loop with ``call_soon_threadsafe``.
+
+    ``eq=False`` preserves identity-based hashing so instances can live
+    in the ``self._async_waiters[session_id]`` set — the default
+    dataclass ``__eq__`` is field-based, which marks the class
+    unhashable and would crash the ``.add(waiter)`` on line ~128 the
+    first time an async waiter registers.
     """
 
     loop: asyncio.AbstractEventLoop
