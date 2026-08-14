@@ -126,7 +126,7 @@ export function ChatSplitPanelHeader({
   onInspect,
   onArchive,
   onRemoveFromSplit,
-  onDelete
+  onDelete: _onDelete
 }: ChatSplitPanelHeaderProps) {
   const { tabColors, setTabColor } = useSessionTabColors()
   const [cliOpen, setCliOpen] = useState(false)

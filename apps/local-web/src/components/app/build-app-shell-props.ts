@@ -313,6 +313,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     canSplitFromSidebar: input.canSplitFromSidebar,
     onSelectTabGroup: input.onSelectTabGroup,
     onRenameTabGroup: input.onRenameTabGroup,
+    renameTabGroup: input.onRenameTabGroup,
     onGoToChatProject: input.onGoToChatProject
   }
 }

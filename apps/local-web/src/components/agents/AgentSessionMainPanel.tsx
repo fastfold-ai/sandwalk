@@ -391,12 +391,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
               target.organizeLabel === 'archive' ? null : 'archive'
           }),
         onMoveToProject: (target: AgentSession, projectId: string | null) =>
-          void updateSession(
-            target,
-            projectId
-              ? { projectId }
-              : { clearProjectId: true }
-          ),
+          void updateSession(target, { projectId }),
         // "Close" desde el header de un chat dentro del split = sacar
         // ese chat del grupo (no borra). El handler auto-disuelve si
         // queda con < 2 chats.

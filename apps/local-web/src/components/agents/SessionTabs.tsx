@@ -97,7 +97,7 @@ export function SessionTabs({
   onArchive,
   onMoveToProject,
   projects,
-  onDelete,
+  onDelete: _onDelete,
   onCreateSession,
   groups,
   openTabIds,

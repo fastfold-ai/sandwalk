@@ -129,7 +129,7 @@ export function SessionMainHeader({
   setCliMenuOpen,
   copiedResumeCommand,
   setCopiedResumeCommand,
-  terminalOpen,
+  terminalOpen: _terminalOpen,
   setTerminalOpen,
   filesPanelCollapsed,
   setFilesPanelCollapsed,

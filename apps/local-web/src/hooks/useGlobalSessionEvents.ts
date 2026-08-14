@@ -35,13 +35,6 @@ import {
 } from '@/lib/browser-notifications'
 import { markSessionAttention } from '@/lib/session-attention'
 
-type GlobalSessionEvent = {
-  sequence: number
-  type: string
-  timestamp: number
-  payload: Record<string, unknown>
-}
-
 type UseGlobalSessionEventsArgs = {
   client: LocalAgentClient
   health: BackendHealth | null
