@@ -402,7 +402,7 @@ def _live_inflight_ids() -> set[str]:
 def live_run_statuses() -> dict[str, str]:
     """In-memory queue status keyed by run_id (running / queued / paused)."""
     with _state.lock:
-        statuses = {rid: "running" for rid in _state.inflight}
+        statuses = dict.fromkeys(_state.inflight, "running")
         for job in _state.queue:
             statuses[job.run_id] = "queued"
         for rid in _state.paused:

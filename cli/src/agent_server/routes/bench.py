@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from agent_server.app_deps import AppDeps
 from agent_server.bench_service import (
+    apply_live_status,
     bootstrap_resumable,
     cancel_run,
     clear_results,
@@ -17,7 +18,6 @@ from agent_server.bench_service import (
     enqueue,
     export_path,
     get_active_status,
-    apply_live_status,
     get_result,
     list_results_page,
     list_suite_cards,

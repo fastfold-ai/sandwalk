@@ -15,10 +15,10 @@ from agent_server.bench_service.queue_runner import (
     resume_run,
 )
 from agent_server.bench_service.results_store import (
+    apply_live_status,
     clear_results,
     delete_result,
     export_path,
-    apply_live_status,
     get_result,
     list_results,
     list_results_page,
