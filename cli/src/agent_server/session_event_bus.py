@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from collections.abc import AsyncIterator
 from typing import Any
@@ -41,7 +42,12 @@ class SessionEventBus:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._guard = asyncio.Lock()
         self._sequence: int = 0
-        self._sequence_lock = asyncio.Lock()
+        # Sync lock (not asyncio) because publish() is called from any
+        # thread — the store write path runs inside asyncio.to_thread and
+        # concurrent writes without a lock produce duplicate/lost
+        # sequence numbers, breaking subscriber ordering that keys on
+        # `event.sequence` as the SSE `id:` header.
+        self._sequence_lock = threading.Lock()
 
     def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Called at app startup so ``publish()`` from worker threads can
@@ -65,10 +71,13 @@ class SessionEventBus:
                 return
 
         # Sequence + timestamp assigned on the writer's clock so subscribers
-        # can order events without a per-loop trip.
-        self._sequence += 1
+        # can order events without a per-loop trip. Under the lock so
+        # concurrent publishes from worker threads can't collide.
+        with self._sequence_lock:
+            self._sequence += 1
+            seq = self._sequence
         event: dict[str, Any] = {
-            "sequence": self._sequence,
+            "sequence": seq,
             "type": event_type,
             "timestamp": time.time(),
             "payload": payload,

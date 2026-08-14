@@ -29,6 +29,12 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
     store = deps.store
     service = deps.service
 
+    # Cap on `?ids=` so an oversized request can't blow past SQLite's
+    # placeholder limit (~999 by default) or become an auth'd DoS. 200
+    # is far above realistic usage (foreign-chat hydration for split
+    # groups) but well under any driver ceiling.
+    max_ids_per_request = 200
+
     @app.get("/v1/sessions", response_model=SessionList)
     async def list_sessions(
         project_id: str | None = Query(default=None, alias="projectId"),
@@ -39,6 +45,14 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
         # so the caller can resolve foreign chats regardless of their scope.
         if ids is not None:
             id_list = [chunk for chunk in (part.strip() for part in ids.split(",")) if chunk]
+            if len(id_list) > max_ids_per_request:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Too many session ids in one request "
+                        f"(max {max_ids_per_request}, got {len(id_list)})."
+                    ),
+                )
             return SessionList(
                 data=await asyncio.to_thread(store.list_sessions_by_ids, id_list)
             )

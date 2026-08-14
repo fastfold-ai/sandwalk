@@ -364,8 +364,11 @@ export function useSessionChatStream({
                 )
               )
             } else if (event.type === 'session.updated') {
-              void loadSessionsRef.current?.()
-              // Compact (and similar) rewrites history — refresh the transcript.
+              // `useGlobalSessionEvents` (single global SSE) is the
+              // authoritative path for updating the `sessions` cache from
+              // session.updated — no need to double-fetch the full list
+              // here. We still refresh THIS chat's transcript because
+              // compact / auto-title rewrite the message history.
               void client.listMessages(id).then(history => {
                 patchChat(id, prev => ({
                   ...prev,
@@ -419,7 +422,8 @@ export function useSessionChatStream({
                   messagesLoaded: true
                 }))
               })
-              void loadSessionsRef.current?.()
+              // Global SSE handles sessions-list refresh; no manual reload
+              // needed here (would duplicate a fetch that already runs).
             }
           }
         })

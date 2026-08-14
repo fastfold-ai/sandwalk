@@ -72,11 +72,22 @@ export function useGlobalSessionEvents({
 }: UseGlobalSessionEventsArgs) {
   useEffect(() => {
     if (!health) return
-    const controller = new AbortController()
-    void client
-      .streamGlobalSessionEvents({
-        signal: controller.signal,
-        onEvent: event => {
+    let cancelled = false
+    let controller = new AbortController()
+    // Exponential backoff between reconnect attempts. Bounded so a
+    // permanently-down server doesn't spin, but low enough that a
+    // transient blip (uvicorn restart, wifi flap) recovers fast.
+    let reconnectDelayMs = 1000
+    const RECONNECT_MAX_MS = 30_000
+    let reconnectTimer: number | null = null
+
+    const connect = () => {
+      if (cancelled) return
+      controller = new AbortController()
+      void client
+        .streamGlobalSessionEvents({
+          signal: controller.signal,
+          onEvent: event => {
           const payload = event.payload
           const sessionId = extractSessionId(payload)
           const isActiveChat =
@@ -160,10 +171,37 @@ export function useGlobalSessionEvents({
           }
         }
       })
-      .catch(() => {
-        // Silent failure: safety poll in useAppBootstrapConnect (60s) is
-        // the fallback if the global stream can't stay connected.
-      })
-    return () => controller.abort()
+        .then(() => {
+          // Stream closed cleanly (server shutdown / graceful eof):
+          // reconnect immediately in case the server came back up. The
+          // safety poll in `useAppBootstrapConnect` (60s) reconciles
+          // whatever we miss in the meantime.
+          if (cancelled) return
+          reconnectDelayMs = 1000
+          reconnectTimer = window.setTimeout(connect, reconnectDelayMs)
+        })
+        .catch(cause => {
+          if (cancelled) return
+          // Surface in devtools so a broken channel isn't invisible.
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[useGlobalSessionEvents] stream disconnected, retrying:',
+            cause instanceof Error ? cause.message : cause
+          )
+          reconnectTimer = window.setTimeout(connect, reconnectDelayMs)
+          reconnectDelayMs = Math.min(reconnectDelayMs * 2, RECONNECT_MAX_MS)
+        })
+    }
+
+    connect()
+
+    return () => {
+      cancelled = true
+      controller.abort()
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+    }
   }, [client, health, sessionIdRef, setSessions])
 }
