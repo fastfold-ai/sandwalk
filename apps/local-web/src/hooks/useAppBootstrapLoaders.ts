@@ -86,6 +86,17 @@ export function useAppBootstrapLoaders({
   const specialistsRef = useRef(specialists)
   sessionPreviewsRef.current = sessionPreviews
   specialistsRef.current = specialists
+  // Cross-project split groups (`grp_*` in localStorage) can reference chats
+  // that live outside the current project scope. `loadSessions` only fetches
+  // the scoped list, so those "foreign" chats are absent from `sessions`,
+  // which breaks split panel headers (Untitled + missing actions) and hides
+  // them in the sidebar. `foreignInFlightRef` dedupes concurrent fetches for
+  // the same ids; `sessionsRef` mirrors `sessions` so the merger can dedupe
+  // without adding `sessions` as a callback dep (which would rebuild the
+  // resolver on every render).
+  const foreignInFlightRef = useRef(new Set<string>())
+  const sessionsRef = useRef<AgentSession[]>([])
+  sessionsRef.current = sessions
 
   const loadSessions = useCallback(
     async (options?: { force?: boolean; projectId?: string | null }) => {
@@ -129,9 +140,29 @@ export function useAppBootstrapLoaders({
       }
       // Keep the previous array when nothing moved, so a forced refresh cannot
       // re-render the sidebar on a timer when the payload is identical.
-      setSessions(current =>
-        sessionsUnchanged(current, nextSessions) ? current : nextSessions
-      )
+      //
+      // Preserve foreign chats: cross-project split groups can reference
+      // chats outside the current project scope. `loadForeignSessions`
+      // hydrates them into `sessions`, but a subsequent scoped `loadSessions`
+      // (TTL refresh, forced reload) used to REPLACE the whole array,
+      // dropping those foreigns and causing a visible flicker while the
+      // useEffect re-detected them and re-fetched. Now we keep any chat
+      // whose `projectId` doesn't match the active scope — those are the
+      // foreign hydrations we resolved separately. Chats deleted from the
+      // active scope still disappear (they had matching projectId).
+      setSessions(current => {
+        const scopedIds = new Set(nextSessions.map(s => s.id))
+        const preservedForeign = projectId
+          ? current.filter(
+              s => !scopedIds.has(s.id) && s.projectId !== projectId
+            )
+          : []
+        const merged =
+          preservedForeign.length > 0
+            ? [...nextSessions, ...preservedForeign]
+            : nextSessions
+        return sessionsUnchanged(current, merged) ? current : merged
+      })
       setChatBySessionId(current => {
         let changed = false
         const next = { ...current }
@@ -152,6 +183,76 @@ export function useAppBootstrapLoaders({
   )
 
   loadSessionsRef.current = loadSessions
+
+  /**
+   * Hydrate metadata for chatIds that appear in split groups but live
+   * outside the current project scope. Idempotent: dedupes against the
+   * current `sessions` cache and any in-flight lookups. Silently ignores
+   * ids the backend can't resolve (chat was deleted while still in a group).
+   * Called on bootstrap, on scope changes, on addToGroup/promotePending,
+   * and after Move-to-project so the panel header, sidebar entry, and
+   * chat body stay coherent regardless of which project the user is in.
+   */
+  const loadForeignSessions = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return
+      const knownIds = new Set(sessionsRef.current.map(s => s.id))
+      const missing = ids.filter(id => {
+        if (!id) return false
+        if (isSessionGroupId(id)) return false
+        if (knownIds.has(id)) return false
+        if (foreignInFlightRef.current.has(id)) return false
+        return true
+      })
+      if (missing.length === 0) return
+      for (const id of missing) foreignInFlightRef.current.add(id)
+      try {
+        const fetched = await client.listSessionsByIds(missing)
+        if (fetched.length === 0) return
+        setSessions(current => {
+          const byId = new Map(current.map(s => [s.id, s]))
+          let changed = false
+          for (const item of fetched) {
+            const prev = byId.get(item.id)
+            if (
+              !prev ||
+              prev.title !== item.title ||
+              prev.projectId !== item.projectId ||
+              prev.updatedAt !== item.updatedAt ||
+              prev.lastMessageAt !== item.lastMessageAt ||
+              prev.status !== item.status ||
+              prev.organizeLabel !== item.organizeLabel
+            ) {
+              byId.set(item.id, item)
+              changed = true
+            }
+          }
+          if (!changed) return current
+          // Preserve original ordering when possible; append new entries at
+          // the end so we don't shuffle the sidebar every merge.
+          const merged: AgentSession[] = []
+          const seen = new Set<string>()
+          for (const s of current) {
+            const next = byId.get(s.id)
+            if (next) {
+              merged.push(next)
+              seen.add(s.id)
+            }
+          }
+          for (const item of fetched) {
+            if (!seen.has(item.id)) merged.push(item)
+          }
+          return merged
+        })
+      } catch {
+        // Backend older than the bulk endpoint or transient network — the
+        // caller may retry on the next event; nothing else needs to happen.
+      } finally {
+        for (const id of missing) foreignInFlightRef.current.delete(id)
+      }
+    },
+    [client]
+  )
 
   const loadSessionPreviews = useCallback(
     async (sessionIds: string[], signal?: AbortSignal) => {
@@ -366,6 +467,7 @@ export function useAppBootstrapLoaders({
     loadSessionsRef,
     loadSkillsRef,
     loadSessions,
+    loadForeignSessions,
     loadProjects,
     loadSkills,
     loadIntegrations,

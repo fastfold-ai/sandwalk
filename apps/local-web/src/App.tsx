@@ -12,6 +12,7 @@ import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
+import { useGlobalSessionEvents } from '@/hooks/useGlobalSessionEvents'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
 import { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import {
@@ -160,6 +161,18 @@ export default function App() {
     setPendingOpenPath: ui.setPendingOpenPath,
     pendingAttachmentsRef: ui.pendingAttachmentsRef,
     setChatBySessionIdRef
+  })
+
+  // Single global SSE for session-level events (create/update/delete/
+  // status_changed/run.*). Replaces the previous 2-second poll + snapshot
+  // diff approach that produced false-positive attention marks whenever
+  // two independent fetch sources (loadSessions + loadForeignSessions)
+  // returned stale overlapping views of the same chat's status.
+  useGlobalSessionEvents({
+    client: bootstrap.client,
+    health: bootstrap.health,
+    sessionIdRef: ui.sessionIdRef,
+    setSessions: bootstrap.setSessions
   })
 
   // Multi-select para split view: cualquier click con Shift/Meta en una
@@ -545,6 +558,34 @@ export default function App() {
     () => tabs.openTabIds.filter(id => !chatsInsideGroupIds.has(id)),
     [tabs.openTabIds, chatsInsideGroupIds]
   )
+
+  /*
+   * Cross-project split groups: `bootstrap.sessions` is fetched scoped to
+   * `activeProjectId`, so any chat inside a group that belongs to a
+   * different project is absent from the sessions cache. That absence
+   * turns the split panel header into "Untitled / Sin proyecto asociado"
+   * (with actions hidden) and drops the chat from the sidebar tree of
+   * the group. This effect resolves those "foreign" chats via the bulk
+   * endpoint so headers + sidebar stay coherent regardless of scope.
+   *
+   * The effect fires on:
+   *   - Bootstrap (initial `sessions` populate)
+   *   - Scope change (sessions list gets replaced)
+   *   - addToGroup / promotePendingGroup (chatsInsideGroupIds grows)
+   *   - removeFromGroup / dissolveGroup (no-op if all present, else prune)
+   *
+   * `loadForeignSessions` internally dedupes against the current cache
+   * and in-flight lookups so re-firing on every render is cheap.
+   */
+  useEffect(() => {
+    const knownIds = new Set(bootstrap.sessions.map(s => s.id))
+    const missing: string[] = []
+    for (const id of chatsInsideGroupIds) {
+      if (!knownIds.has(id)) missing.push(id)
+    }
+    if (missing.length === 0) return
+    void bootstrap.loadForeignSessions(missing)
+  }, [bootstrap.sessions, chatsInsideGroupIds, bootstrap.loadForeignSessions])
 
   /*
    * Auto-redirect eliminado: causaba loop infinito de "Maximum update

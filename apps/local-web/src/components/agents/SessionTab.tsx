@@ -8,10 +8,11 @@ import { cn } from '@/lib/utils'
 
 import { SessionSourceIcon } from './SessionSourceIcon'
 import { SessionStatusIcon } from './SessionStatusIcon'
-import { TAB_INLINE_COLORS } from './tab-context-menu'
 
-const UNREAD_DOT_COLOR =
-  TAB_INLINE_COLORS.find(item => item.name === 'Blue')?.value ?? '#8BB8F5'
+// Attention (unread) marker. Deliberately outside `TAB_INLINE_COLORS` so it
+// never collides with a user-assigned tab color — same rationale as the
+// mirror constant in `sidebar-session-list.tsx`.
+const UNREAD_DOT_COLOR = '#F5A97A'
 
 /** Title marquee — same feel as the previous chrome-tabs label. */
 function TabMarqueeTitle({

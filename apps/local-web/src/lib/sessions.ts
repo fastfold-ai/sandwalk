@@ -228,7 +228,14 @@ function sessionLastActivity(item: AgentSession): number {
  */
 export function groupTabItems(
   sessions: AgentSession[],
-  groups: SessionGroup[] = []
+  groups: SessionGroup[] = [],
+  /**
+   * Optional pool used only to resolve `group.children` when the group
+   * contains chatIds that don't belong to the currently scoped `sessions`
+   * list (cross-project splits). Falls back to `sessions` when omitted so
+   * existing callers stay unchanged.
+   */
+  sessionsForGroupChildren?: AgentSession[]
 ): TabItemSection[] {
   const now = new Date()
   const today = new Date(
@@ -240,6 +247,10 @@ export function groupTabItems(
 
   const sessionsById = new Map<string, AgentSession>()
   for (const session of sessions) sessionsById.set(session.id, session)
+  const groupChildrenById =
+    sessionsForGroupChildren && sessionsForGroupChildren !== sessions
+      ? new Map(sessionsForGroupChildren.map(s => [s.id, s]))
+      : sessionsById
 
   const chatIdsInGroups = new Set<string>()
   for (const g of groups) for (const id of g.chatIds) chatIdsInGroups.add(id)
@@ -255,7 +266,7 @@ export function groupTabItems(
 
   const groupItems: TabItem[] = groups.map(group => {
     const children = group.chatIds
-      .map(id => sessionsById.get(id))
+      .map(id => groupChildrenById.get(id))
       .filter((s): s is AgentSession => Boolean(s))
     // Actividad del grupo = la última actividad de cualquiera de sus chats.
     const lastActivity = children.reduce(

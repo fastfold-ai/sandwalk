@@ -23,6 +23,7 @@ import {
   useRef,
   useState
 } from 'react'
+import { flushSync } from 'react-dom'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
@@ -31,10 +32,7 @@ import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
 import { GroupDissolveDialog } from '@/components/agents/SessionTabs'
 import { SessionSourceIcon } from '@/components/agents/SessionSourceIcon'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
-import {
-  TAB_INLINE_COLORS,
-  TabInlineColorRow
-} from '@/components/agents/tab-context-menu'
+import { TabInlineColorRow } from '@/components/agents/tab-context-menu'
 import {
   Popover,
   PopoverContent,
@@ -50,9 +48,15 @@ import {
 } from '@/lib/sidebar-group-expanded'
 import { cn } from '@/lib/utils'
 
-/** Same Blue pastel as the tab color tag — marks unread notification sessions. */
-const UNREAD_DOT_COLOR =
-  TAB_INLINE_COLORS.find(item => item.name === 'Blue')?.value ?? '#8BB8F5'
+/**
+ * Attention (unread) marker. Deliberately outside `TAB_INLINE_COLORS` so it
+ * never renders the same swatch as a user-assigned tab color — with the
+ * previous "Blue" mapping, a chat that had Blue assigned AND was unread
+ * showed two identical dots side-by-side, which read as a rendering bug.
+ * Soft coral: warm, notification-flavored, distinct from every pastel in
+ * the tag palette.
+ */
+const UNREAD_DOT_COLOR = '#F5A97A'
 
 /** Initial rows per sidebar section; "Load more" reveals the next page. */
 const SECTION_PAGE_SIZE = 40
@@ -392,10 +396,21 @@ export function SidebarSessionList({
                                * chat como el activo del grupo y navegamos
                                * al grupo. Así el split se abre con ese
                                * panel enfocado — no un tab suelto.
+                               *
+                               * `flushSync` fuerza que el patch del
+                               * `activeChatId` se aplique ANTES del
+                               * navigate, si no el shell renderiza un
+                               * primer frame con el activeChildId viejo
+                               * (chat previamente seleccionado del split)
+                               * y sólo al siguiente commit muestra el
+                               * chat correcto — se ve como si el primer
+                               * click abriera el chat equivocado.
                                */
                               setSelectionAnchorId(chatId)
                               if (setTabGroupActiveChat) {
-                                setTabGroupActiveChat(item.group.id, chatId)
+                                flushSync(() => {
+                                  setTabGroupActiveChat(item.group.id, chatId)
+                                })
                               }
                               navigate(`/agents/${item.group.id}`)
                             }}

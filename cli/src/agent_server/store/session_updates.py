@@ -123,7 +123,26 @@ class SessionUpdateMixin:
                 "UPDATE sessions SET status = ?, updated_at = ? WHERE id = ?",
                 (status, now.isoformat(), session_id),
             )
-        return self.get_session(session_id)
+        session = self.get_session(session_id)
+        if session is not None:
+            # Push the transition on the global session bus so subscribers
+            # (frontend `useGlobalSessionEvents`) can react without diffing
+            # snapshots from a poll. Import lazily to avoid a circular
+            # dependency between the store and the app-level bus.
+            from agent_server.session_event_bus import (  # noqa: PLC0415
+                SessionEventType,
+                session_event_bus,
+            )
+
+            session_event_bus.publish(
+                SessionEventType.SESSION_STATUS_CHANGED,
+                {
+                    "sessionId": session_id,
+                    "status": status,
+                    "session": session.model_dump(mode="json", by_alias=True),
+                },
+            )
+        return session
 
     def touch_session(self, session_id: str) -> AgentSession | None:
         """Bump updated_at + last_message_at so the session sorts as recent in the UI."""

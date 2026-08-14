@@ -372,7 +372,19 @@ export function SessionChatBody({
                 : 'pointer-events-none translate-y-full opacity-0'
             )}
           >
-            <AgentComposerSlot {...agentComposerSlotProps} embedded />
+            <AgentComposerSlot
+              {...agentComposerSlotProps}
+              embedded
+              /*
+               * Solo el panel focused del split autoenfoca su composer. Si
+               * los N paneles compitieran por el foco al montar, el último
+               * en autoenfocarse dispararía `onFocusCapture` del panel
+               * padre en `ChatSplitContainer`, llamando `onFocusChat` con
+               * el chatId equivocado — pisando la selección que el usuario
+               * hizo desde el sidebar (o desde otro punto).
+               */
+              autoFocus={splitFocused}
+            />
           </div>
         ) : (
           <div

@@ -128,7 +128,14 @@ export function buildSessionSidebarModel(input: {
   const applicableGroups = input.tabGroups.filter(g =>
     g.chatIds.some(id => displayedIds.has(id))
   )
-  const sections = groupTabItems(displayedSessions, applicableGroups)
+  // Pass `input.sessions` (unfiltered) so groupTabItems can resolve foreign
+  // chats inside cross-project groups. Standalone chats stay scoped via
+  // `displayedSessions`; only group `children` benefit from the wider pool.
+  const sections = groupTabItems(
+    displayedSessions,
+    applicableGroups,
+    input.sessions
+  )
   // `openTabs` mezcla chats y grupos en el orden real de `openTabIds`. Los
   // items que no se pueden resolver (chat en otro scope, grupo aún cargando)
   // se saltean. `activeSessionId` respeta la visibilidad del chat/grupo
