@@ -1,4 +1,4 @@
-import { Loader2, Monitor, Network, X } from 'lucide-react'
+import { Loader, Monitor, Network, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { OsPlatformIcon } from '@/components/agents/os-platform-icon'
@@ -261,7 +261,7 @@ export function WelcomeHome({
           >
             <span className="text-foreground shrink-0">
               {connecting ? (
-                <Loader2 className="size-5 animate-spin" />
+                <Loader className="size-5 animate-spin" />
               ) : (
                 <Monitor className="size-5" />
               )}
@@ -301,7 +301,7 @@ export function WelcomeHome({
 
           {loadingRecents ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Loader2 className="size-4 animate-spin" />
+              <Loader className="size-4 animate-spin" />
               Loading…
             </div>
           ) : recents.length === 0 ? (
@@ -333,7 +333,7 @@ export function WelcomeHome({
                         </span>
                         <span className="text-muted-foreground flex min-w-0 shrink-0 items-center gap-1.5 text-xs">
                           {busy ? (
-                            <Loader2 className="size-3.5 animate-spin" />
+                            <Loader className="size-3.5 animate-spin" />
                           ) : (
                             <>
                               <span className="max-w-[14rem] truncate">

@@ -1,8 +1,9 @@
 import type {
+  BenchActiveStatus,
   BenchResultSummary,
   LocalAgentClient
 } from '@sandwalk/agent-local-client'
-import { ExternalLink, Loader2, Target } from 'lucide-react'
+import { ExternalLink, Loader, Pause, Target } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -10,7 +11,7 @@ import { cn } from '@/lib/utils'
 
 function isBenchRunInProgress(status?: string | null): boolean {
   const value = (status || '').toLowerCase()
-  return value === 'running' || value === 'paused' || value === 'interrupted'
+  return value === 'running' || value === 'paused' || value === 'queued'
 }
 
 /** Compact run duration: `39s`, `11m 12s`, `2h 35m`, `1d 2h`. */
@@ -36,6 +37,29 @@ function displayRunSeconds(row: BenchResultSummary, nowMs: number): number {
   return Math.max(reported, wall)
 }
 
+function overlayLiveStatus(
+  rows: BenchResultSummary[],
+  active: BenchActiveStatus | null
+): BenchResultSummary[] {
+  if (!active) return rows
+  const live = new Map<string, string>()
+  for (const job of active.inflight ?? []) live.set(job.runId, 'running')
+  for (const job of active.queue ?? []) live.set(job.runId, 'queued')
+  for (const job of active.paused ?? []) live.set(job.runId, 'paused')
+  if (active.running && active.currentRunId) {
+    live.set(active.currentRunId, 'running')
+  }
+  return rows.map(row => {
+    const next = live.get(row.runId)
+    if (next) return { ...row, status: next }
+    const status = (row.status || '').toLowerCase()
+    if (status === 'running' || status === 'queued') {
+      return { ...row, status: 'interrupted' }
+    }
+    return row
+  })
+}
+
 export function HomeProjectBenchLinks({
   client,
   projectId,
@@ -54,15 +78,24 @@ export function HomeProjectBenchLinks({
 
   useEffect(() => {
     let cancelled = false
+    let sawSuccess = false
     const load = () => {
-      void client
-        .listBenchResults()
-        .then(items => {
+      void Promise.all([
+        client.listBenchResults({ limit: 100 }),
+        client.getBenchActive()
+      ])
+        .then(([page, active]) => {
           if (cancelled) return
-          setRows(items.filter(item => item.projectId === projectId))
+          sawSuccess = true
+          setRows(
+            overlayLiveStatus(
+              page.data.filter(item => item.projectId === projectId),
+              active
+            )
+          )
         })
         .catch(() => {
-          if (!cancelled) setRows([])
+          if (!cancelled && !sawSuccess) setRows([])
         })
         .finally(() => {
           if (!cancelled) setLoaded(true)
@@ -70,30 +103,12 @@ export function HomeProjectBenchLinks({
     }
     setLoaded(false)
     load()
-    return () => {
-      cancelled = true
-    }
-  }, [client, projectId])
-
-  useEffect(() => {
-    if (!hasActiveRun) return
-    let cancelled = false
-    const id = window.setInterval(() => {
-      void client
-        .listBenchResults()
-        .then(items => {
-          if (cancelled) return
-          setRows(items.filter(item => item.projectId === projectId))
-        })
-        .catch(() => {
-          /* keep last good snapshot */
-        })
-    }, 4000)
+    const id = window.setInterval(load, 1500)
     return () => {
       cancelled = true
       window.clearInterval(id)
     }
-  }, [client, hasActiveRun, projectId])
+  }, [client, projectId])
 
   useEffect(() => {
     if (!hasActiveRun) return
@@ -127,11 +142,13 @@ export function HomeProjectBenchLinks({
       </h3>
       <div className="grid gap-3 sm:grid-cols-2">
         {rows.map(row => {
-          const running = isBenchRunInProgress(row.status)
+          const statusKey = (row.status || '').toLowerCase()
+          const paused = statusKey === 'paused' || statusKey === 'interrupted'
+          const running = statusKey === 'running'
           const statusLabel =
-            (row.status || '').toLowerCase() === 'paused'
+            statusKey === 'paused'
               ? 'Paused'
-              : (row.status || '').toLowerCase() === 'interrupted'
+              : statusKey === 'interrupted'
                 ? 'Interrupted'
                 : 'Running'
           const pct = Math.round((row.accuracy || 0) * 1000) / 10
@@ -156,7 +173,9 @@ export function HomeProjectBenchLinks({
                       'flex size-8 shrink-0 items-center justify-center rounded-md',
                       running
                         ? 'bg-sky-500/15 text-sky-600'
-                        : pct >= 70
+                        : paused
+                          ? 'bg-muted text-muted-foreground'
+                          : pct >= 70
                           ? 'bg-emerald-500/15 text-emerald-600'
                           : pct >= 40
                             ? 'bg-amber-500/15 text-amber-600'
@@ -164,7 +183,9 @@ export function HomeProjectBenchLinks({
                     )}
                   >
                     {running ? (
-                      <Loader2 className="size-3.5 animate-spin" />
+                      <Loader className="size-3.5 animate-spin" />
+                    ) : paused ? (
+                      <Pause className="size-3.5" />
                     ) : (
                       <Target className="size-3.5" />
                     )}
@@ -178,7 +199,11 @@ export function HomeProjectBenchLinks({
                     </p>
                   </div>
                 </div>
-                {running ? (
+                {paused ? (
+                  <p className="text-muted-foreground text-sm font-semibold">
+                    {statusLabel}
+                  </p>
+                ) : running ? (
                   <p className="text-sky-600 text-sm font-semibold">
                     {statusLabel}
                   </p>

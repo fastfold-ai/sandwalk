@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react'
+import { Loader } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -142,7 +142,7 @@ export function VercelOidcModal({
             onClick={() => void submit()}
           >
             {saving || busy ? (
-              <Loader2 className="size-3.5 animate-spin" />
+              <Loader className="size-3.5 animate-spin" />
             ) : null}
             Save &amp; Test
           </Button>

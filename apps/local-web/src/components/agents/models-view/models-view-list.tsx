@@ -1,18 +1,20 @@
 import type { AgentModel } from '@sandwalk/agent-ui-core'
-import { Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react'
-
+import { Loader, Plus, RefreshCw, Star, Trash2 } from 'lucide-react'
 import { ListRowsSkeleton } from '@/components/agents/PageSkeletons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { catalogModelPrefKey } from '@/lib/composer-models'
 import { cn } from '@/lib/utils'
 
-import { ModelToggle } from './models-view-shared'
+import { ModelFavoriteButton, ModelToggle } from './models-view-shared'
+import type { ModelSourceFilter } from './models-view-utils'
 
 export function ModelsListSection({
   query,
   sourceFilter,
   providerFilter,
   models,
+  favoriteKeys,
   loading,
   refreshing,
   filteredModels,
@@ -29,12 +31,14 @@ export function ModelsListSection({
   onOpenCreate,
   onRefresh,
   onToggleModel,
+  onToggleFavorite,
   onRemoveCustomModel
 }: {
   query: string
-  sourceFilter: 'all' | 'cloud' | 'local'
+  sourceFilter: ModelSourceFilter
   providerFilter: string
   models: AgentModel[]
+  favoriteKeys: string[]
   loading: boolean
   refreshing: boolean
   filteredModels: AgentModel[]
@@ -44,15 +48,17 @@ export function ModelsListSection({
   showAllModels: boolean
   pendingEnabled: Record<string, boolean>
   onQueryChange: (value: string) => void
-  onSourceFilterChange: (value: 'all' | 'cloud' | 'local') => void
+  onSourceFilterChange: (value: ModelSourceFilter) => void
   onProviderFilterChange: (value: string) => void
   onShowAllModelsChange: (value: boolean | ((open: boolean) => boolean)) => void
   onOpenCustomCreate: () => void
   onOpenCreate: () => void
   onRefresh: () => void
   onToggleModel: (model: AgentModel) => void
+  onToggleFavorite: (model: AgentModel) => void
   onRemoveCustomModel: (model: AgentModel) => void
 }) {
+  const favoriteSet = new Set(favoriteKeys)
   return (
     <section className="bg-muted/20 border-border/60 space-y-0 overflow-hidden rounded-xl border shadow-sm">
       <div className="flex items-center gap-2 border-b px-3 py-2">
@@ -91,7 +97,7 @@ export function ModelsListSection({
           aria-label="Refresh models"
         >
           {refreshing || loading ? (
-            <Loader2 className="animate-spin" />
+            <Loader className="animate-spin" />
           ) : (
             <RefreshCw />
           )}
@@ -103,6 +109,7 @@ export function ModelsListSection({
           {(
             [
               { id: 'all', label: 'All' },
+              { id: 'favorites', label: 'Favorites' },
               { id: 'cloud', label: 'Cloud' },
               { id: 'local', label: 'Local' }
             ] as const
@@ -111,7 +118,7 @@ export function ModelsListSection({
               key={option.id}
               type="button"
               className={cn(
-                'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
                 sourceFilter === option.id
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
@@ -120,11 +127,20 @@ export function ModelsListSection({
                 onSourceFilterChange(option.id)
                 onShowAllModelsChange(false)
                 if (option.id === 'local') onProviderFilterChange('local')
+                else if (option.id === 'favorites') onProviderFilterChange('all')
                 else if (option.id === 'cloud' && providerFilter === 'local') {
                   onProviderFilterChange('all')
                 }
               }}
             >
+              {option.id === 'favorites' ? (
+                <Star
+                  className={cn(
+                    'size-3',
+                    sourceFilter === 'favorites' && 'fill-current'
+                  )}
+                />
+              ) : null}
               {option.label}
             </button>
           ))}
@@ -175,13 +191,17 @@ export function ModelsListSection({
           <ListRowsSkeleton rows={8} />
         ) : filteredModels.length === 0 ? (
           <div className="text-muted-foreground px-4 py-8 text-sm">
-            {providerFilter !== 'all'
-              ? 'No models match this provider filter.'
-              : sourceFilter === 'local'
-                ? 'No local models yet. Add a Local LLM endpoint to discover them.'
-                : sourceFilter === 'cloud'
-                  ? 'No cloud models match this filter.'
-                  : 'No models match this search.'}
+            {query.trim()
+              ? 'No models match this search.'
+              : sourceFilter === 'favorites'
+                ? 'No favorite models yet. Star a model to pin it here.'
+                : providerFilter !== 'all'
+                  ? 'No models match this provider filter.'
+                  : sourceFilter === 'local'
+                    ? 'No local models yet. Add a Local LLM endpoint to discover them.'
+                    : sourceFilter === 'cloud'
+                      ? 'No cloud models match this filter.'
+                      : 'No models match this search.'}
           </div>
         ) : (
           visibleModels.map(model => {
@@ -195,7 +215,7 @@ export function ModelsListSection({
             return (
               <div
                 key={key}
-                className="flex items-center justify-between gap-3 px-4 py-3"
+                className="group flex items-center justify-between gap-3 px-4 py-3"
               >
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium">
@@ -207,6 +227,11 @@ export function ModelsListSection({
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                  <ModelFavoriteButton
+                    favorite={favoriteSet.has(catalogModelPrefKey(model))}
+                    label={model.label}
+                    onToggle={() => onToggleFavorite(model)}
+                  />
                   {model.source === 'custom' ? (
                     <Button
                       variant="ghost"

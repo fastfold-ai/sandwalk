@@ -17,7 +17,7 @@ def delete_bench_project_data(store: Any, project_id: str | None) -> int:
         return 0
     sessions = []
     try:
-        sessions = store.list_sessions(project_id=project_id)
+        sessions = store.list_sessions(project_id=project_id, include_bench=True)
     except Exception as exc:  # noqa: BLE001
         logger.warning("list sessions for bench project %s failed: %s", project_id, exc)
         return 0

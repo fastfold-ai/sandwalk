@@ -5,6 +5,7 @@ import type {
   IntegrationSummary,
   ModelProfile,
   ModelProfileProbeResult,
+  ToggleModelFavoriteResult,
   UpsertModelProfileInput
 } from '@sandwalk/agent-ui-core'
 import { Info } from 'lucide-react'
@@ -46,6 +47,8 @@ export function ModelsView({
   onTestProviderKey,
   onRevealStoredSecret,
   onRevealProfileSecret,
+  onLoadModelPreferences,
+  onToggleModelFavorite,
   embedded = false
 }: {
   integrations: IntegrationSummary[]
@@ -98,6 +101,8 @@ export function ModelsView({
   onRevealStoredSecret: (key: string) => Promise<string>
   /** Load a saved Local LLM API key for show/copy / discover. */
   onRevealProfileSecret: (profileId: string) => Promise<string>
+  onLoadModelPreferences: () => Promise<{ favorites: string[] }>
+  onToggleModelFavorite: (model: AgentModel) => Promise<ToggleModelFavoriteResult>
   /** Compact chrome for setup wizard embedding. */
   embedded?: boolean
 }) {
@@ -143,7 +148,9 @@ export function ModelsView({
     onSaveProviderKey,
     onClearProviderKey: runClearProviderKey,
     onTestProviderKey: runTestProviderKey,
-    onRevealProfileSecret
+    onRevealProfileSecret,
+    onLoadModelPreferences,
+    onToggleModelFavorite
   })
   const [multimodalGuideOpen, setMultimodalGuideOpen] = useState(false)
 
@@ -175,6 +182,7 @@ export function ModelsView({
           sourceFilter={state.sourceFilter}
           providerFilter={state.providerFilter}
           models={state.models}
+          favoriteKeys={state.favoriteKeys}
           loading={state.loading}
           refreshing={state.refreshing}
           filteredModels={state.filteredModels}
@@ -194,6 +202,7 @@ export function ModelsView({
           }}
           onRefresh={() => void state.refresh()}
           onToggleModel={model => void state.toggleModel(model)}
+          onToggleFavorite={model => void state.toggleFavorite(model)}
           onRemoveCustomModel={model => void state.removeCustomModel(model)}
         />
 

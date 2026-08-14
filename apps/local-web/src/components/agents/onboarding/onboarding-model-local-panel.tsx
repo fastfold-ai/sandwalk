@@ -1,5 +1,4 @@
-import { Check, Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react'
-
+import { Check, Eye, EyeOff, Loader, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -124,7 +123,7 @@ export function OnboardingModelLocalPanel({
           onClick={() => onDiscover()}
         >
           {discoverBusy ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader className="size-4 animate-spin" />
           ) : (
             <RefreshCw className="size-4" />
           )}
@@ -132,7 +131,7 @@ export function OnboardingModelLocalPanel({
         </Button>
         <Button type="button" disabled={localBusy} onClick={() => onSave()}>
           {localBusy ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader className="size-4 animate-spin" />
           ) : localSaved ? (
             <Check className="size-4" />
           ) : null}

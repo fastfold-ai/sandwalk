@@ -1,6 +1,5 @@
 import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
-import { Check, Loader2 } from 'lucide-react'
-
+import { Check, Loader } from 'lucide-react'
 import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelPicker'
 import type { ComposerModelOption } from '@/lib/composer-models'
 
@@ -36,7 +35,7 @@ export function OnboardingModelDefaultPicker({
       </div>
       {loading ? (
         <p className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Loader2 className="size-4 animate-spin" />
+          <Loader className="size-4 animate-spin" />
           Loading models…
         </p>
       ) : modelOptions.length === 0 ? (
@@ -52,7 +51,7 @@ export function OnboardingModelDefaultPicker({
             onModelSelect={onModelSelect}
           />
           {saving ? (
-            <Loader2 className="text-muted-foreground size-3.5 animate-spin" />
+            <Loader className="text-muted-foreground size-3.5 animate-spin" />
           ) : saved ? (
             <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
               <Check className="size-3.5" />

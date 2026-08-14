@@ -1,6 +1,5 @@
 import type { AgentSkill } from '@sandwalk/agent-ui-core'
-import { Box, Download, Loader2 } from 'lucide-react'
-
+import { Box, Download, Loader } from 'lucide-react'
 import {
   CardGridSkeleton,
   ListRowsSkeleton
@@ -192,7 +191,7 @@ export function SkillsInstalledGridSection({
                       onClick={() => onInstallFeatured?.(item)}
                     >
                       {installing ? (
-                        <Loader2 className="size-3.5 animate-spin" />
+                        <Loader className="size-3.5 animate-spin" />
                       ) : (
                         <Download className="size-3.5" />
                       )}

@@ -1,14 +1,5 @@
 import type { ModelProfile } from '@sandwalk/agent-ui-core'
-import {
-  Check,
-  ChevronDown,
-  Copy,
-  Eye,
-  EyeOff,
-  Loader2,
-  RefreshCw,
-  Trash2
-} from 'lucide-react'
+import { Check, ChevronDown, Copy, Eye, EyeOff, Loader, RefreshCw, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -294,7 +285,7 @@ export function ModelsProfileDialog({
                   onClick={() => void copySecret()}
                 >
                   {secretAction === 'copy' ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader className="size-4 animate-spin" />
                   ) : copied ? (
                     <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
                   ) : (
@@ -312,7 +303,7 @@ export function ModelsProfileDialog({
                   onClick={() => void toggleReveal()}
                 >
                   {secretAction === 'reveal' ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader className="size-4 animate-spin" />
                   ) : showProfileApiKey ? (
                     <EyeOff className="size-4" />
                   ) : (
@@ -336,7 +327,7 @@ export function ModelsProfileDialog({
               onClick={onDiscoverModels}
             >
               {discovering ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Loader className="size-3.5 animate-spin" />
               ) : (
                 <RefreshCw className="size-3.5" />
               )}
@@ -414,7 +405,7 @@ export function ModelsProfileDialog({
               disabled={busy || !form.baseUrl.trim()}
               onClick={onTestProfile}
             >
-              {testingProfile ? <Loader2 className="animate-spin" /> : null}
+              {testingProfile ? <Loader className="animate-spin" /> : null}
               Test
             </Button>
           </div>
@@ -427,7 +418,7 @@ export function ModelsProfileDialog({
               Cancel
             </Button>
             <Button disabled={busy} onClick={onSaveProfile}>
-              {savingProfile ? <Loader2 className="animate-spin" /> : null}
+              {savingProfile ? <Loader className="animate-spin" /> : null}
               Save
             </Button>
           </div>

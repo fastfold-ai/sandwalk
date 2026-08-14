@@ -62,6 +62,11 @@ type ModelsViewCallbacks = {
     key: string
   ) => Promise<{ ok: boolean; message: string }>
   onRevealProfileSecret?: (profileId: string) => Promise<string>
+  onLoadModelPreferences: () => Promise<{ favorites: string[] }>
+  onToggleModelFavorite: (model: AgentModel) => Promise<{
+    favorite: boolean
+    favorites: string[]
+  }>
 }
 
 export function useModelsViewState(callbacks: ModelsViewCallbacks) {
@@ -72,6 +77,8 @@ export function useModelsViewState(callbacks: ModelsViewCallbacks) {
     onListModels: callbacks.onListModels,
     onUpdateModelEnabled: callbacks.onUpdateModelEnabled,
     onListProfiles: callbacks.onListProfiles,
+    onLoadModelPreferences: callbacks.onLoadModelPreferences,
+    onToggleModelFavorite: callbacks.onToggleModelFavorite,
     setError
   })
 

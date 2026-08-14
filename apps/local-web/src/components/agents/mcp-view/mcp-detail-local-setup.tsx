@@ -1,4 +1,4 @@
-import { Check, Copy, Download, ExternalLink, Loader2, RotateCcw } from 'lucide-react'
+import { Check, Copy, Download, ExternalLink, Loader, RotateCcw } from 'lucide-react'
 import { type ReactNode,useState } from 'react'
 import { toast } from 'sonner'
 
@@ -89,7 +89,7 @@ export function McpDetailLocalSetupDialog({
           onClick={() => void runInstall(false)}
         >
           {installing ? (
-            <Loader2 className="size-3.5 animate-spin" />
+            <Loader className="size-3.5 animate-spin" />
           ) : (
             <Download className="size-3.5" />
           )}
@@ -105,7 +105,7 @@ export function McpDetailLocalSetupDialog({
           onClick={() => void runInstall(true)}
         >
           {installing ? (
-            <Loader2 className="size-3.5 animate-spin" />
+            <Loader className="size-3.5 animate-spin" />
           ) : (
             <RotateCcw className="size-3.5" />
           )}

@@ -20,6 +20,7 @@ class EventMixin:
         event_type: str,
         payload: dict[str, Any],
         run_id: str | None = None,
+        notify: bool = True,
     ) -> EventEnvelope:
         event_id = str(uuid.uuid4())
         timestamp = utc_now()
@@ -39,8 +40,10 @@ class EventMixin:
                 ),
             )
             sequence = int(cursor.lastrowid or 0)
-        # Wake SSE pollers immediately (outside the write lock).
-        EVENT_NOTIFIER.notify(session_id)
+        # Wake SSE pollers immediately (outside the write lock). Bench
+        # cells poll session status instead of SSE — skip the wake.
+        if notify:
+            EVENT_NOTIFIER.notify(session_id)
         return EventEnvelope(
             id=event_id,
             session_id=session_id,

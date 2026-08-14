@@ -1,4 +1,4 @@
-import { Cable, ChevronDown, ExternalLink, Loader2, Plus } from 'lucide-react'
+import { Cable, ChevronDown, ExternalLink, Loader, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
@@ -50,7 +50,7 @@ export function SlackAddSplitButton({
         onClick={onAddToSlack}
       >
         {waiting ? (
-          <Loader2 className="size-3.5 animate-spin" />
+          <Loader className="size-3.5 animate-spin" />
         ) : (
           <Plus className="size-3.5" />
         )}
@@ -169,7 +169,7 @@ export function SlackOneClickDialog({
 
           {waiting ? (
             <div className="border-border/70 bg-muted/30 flex items-center gap-2 rounded-lg border p-3">
-              <Loader2 className="size-3.5 shrink-0 animate-spin" />
+              <Loader className="size-3.5 shrink-0 animate-spin" />
               <p className="text-[12px] leading-relaxed">
                 Waiting for you to approve Sandwalk in Slack…
               </p>

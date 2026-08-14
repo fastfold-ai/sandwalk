@@ -8,6 +8,7 @@ import os
 import secrets
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -147,6 +148,24 @@ def create_app(
         except Exception:
             pass
         sandbox_event_bus.bind_loop(asyncio.get_running_loop())
+        from agent_server.bench_service.runtime import (
+            api_executor_workers,
+            start_bench_runtime,
+        )
+
+        api_pool = ThreadPoolExecutor(
+            max_workers=api_executor_workers(),
+            thread_name_prefix="sandwalk-api",
+        )
+        asyncio.get_running_loop().set_default_executor(api_pool)
+        try:
+            start_bench_runtime()
+        except Exception:
+            import logging
+
+            logging.getLogger("agent_server").exception(
+                "Bench runtime failed to start; bench will share the API loop"
+            )
         # Inbound connectors are best-effort: a Slack outage must not stop the
         # server from booting.
         try:
@@ -166,7 +185,17 @@ def create_app(
             await backup_task
         await connector_service.stop()
         await pty_manager.shutdown()
+        try:
+            from agent_server.bench_service.runtime import stop_bench_runtime
+
+            stop_bench_runtime()
+        except Exception:
+            pass
         await service.shutdown()
+        try:
+            api_pool.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            pass
         store.close()
 
     app = FastAPI(

@@ -1,5 +1,5 @@
 import type { AgentSkill, IntegrationUnlock } from '@sandwalk/agent-ui-core'
-import { Box, CircleAlert, Loader2, Puzzle } from 'lucide-react'
+import { Box, CircleAlert, Loader, Puzzle } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
@@ -154,7 +154,7 @@ export function SkillUnlockRow({
           disabled={busy || (action === 'install' && !unlock.source)}
           onClick={action === 'install' ? onInstall : onEnable}
         >
-          {busy ? <Loader2 className="animate-spin" /> : null}
+          {busy ? <Loader className="animate-spin" /> : null}
           {busy
             ? action === 'install'
               ? 'Installing…'
@@ -216,7 +216,7 @@ export function CapabilityUnlockRow({
       )}
       {unlock.installable && unlock.installed !== true && onInstall ? (
         <Button type="button" size="sm" disabled={busy} onClick={onInstall}>
-          {busy ? <Loader2 className="animate-spin" /> : null}
+          {busy ? <Loader className="animate-spin" /> : null}
           {busy ? 'Installing…' : 'Install'}
         </Button>
       ) : null}

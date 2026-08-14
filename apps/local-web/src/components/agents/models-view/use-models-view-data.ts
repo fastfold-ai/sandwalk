@@ -1,11 +1,18 @@
-import type { AgentModel, IntegrationSummary, ModelProfile } from '@sandwalk/agent-ui-core'
+import type {
+  AgentModel,
+  IntegrationSummary,
+  ModelProfile,
+  ToggleModelFavoriteResult
+} from '@sandwalk/agent-ui-core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { scoreModelCatalogSearch } from '@/lib/composer-models'
+import { catalogModelPrefKey } from '@/lib/composer-models'
 
 import {
+  filterModelCatalog,
   LLM_API_KEY_ORDER,
-  MODEL_LIST_PREVIEW_LIMIT
+  MODEL_LIST_PREVIEW_LIMIT,
+  type ModelSourceFilter
 } from './models-view-utils'
 
 type ModelsViewDataCallbacks = {
@@ -20,6 +27,8 @@ type ModelsViewDataCallbacks = {
     provider?: string | null
   ) => Promise<AgentModel>
   onListProfiles: (signal?: AbortSignal) => Promise<ModelProfile[]>
+  onLoadModelPreferences: () => Promise<{ favorites: string[] }>
+  onToggleModelFavorite: (model: AgentModel) => Promise<ToggleModelFavoriteResult>
 }
 
 type ModelsViewDataInput = ModelsViewDataCallbacks & {
@@ -32,14 +41,15 @@ export function useModelsViewData({
   onListModels,
   onUpdateModelEnabled,
   onListProfiles,
+  onLoadModelPreferences,
+  onToggleModelFavorite,
   setError
 }: ModelsViewDataInput) {
   const [models, setModels] = useState<AgentModel[]>([])
   const [profiles, setProfiles] = useState<ModelProfile[]>([])
+  const [favoriteKeys, setFavoriteKeys] = useState<string[]>([])
   const [query, setQuery] = useState('')
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'cloud' | 'local'>(
-    'all'
-  )
+  const [sourceFilter, setSourceFilter] = useState<ModelSourceFilter>('all')
   const [providerFilter, setProviderFilter] = useState<string>('all')
   const [showAllModels, setShowAllModels] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -64,16 +74,22 @@ export function useModelsViewData({
   onListModelsRef.current = onListModels
   const onListProfilesRef = useRef(onListProfiles)
   onListProfilesRef.current = onListProfiles
+  const onLoadModelPreferencesRef = useRef(onLoadModelPreferences)
+  onLoadModelPreferencesRef.current = onLoadModelPreferences
+  const onToggleModelFavoriteRef = useRef(onToggleModelFavorite)
+  onToggleModelFavoriteRef.current = onToggleModelFavorite
 
   const load = useCallback(
     async (discover = true) => {
       setError(null)
-      const [nextModels, nextProfiles] = await Promise.all([
+      const [nextModels, nextProfiles, nextPrefs] = await Promise.all([
         onListModelsRef.current({ discover }),
-        onListProfilesRef.current()
+        onListProfilesRef.current(),
+        onLoadModelPreferencesRef.current().catch(() => ({ favorites: [] }))
       ])
       setModels(nextModels)
       setProfiles(nextProfiles)
+      setFavoriteKeys(nextPrefs.favorites || [])
     },
     [setError]
   )
@@ -128,26 +144,16 @@ export function useModelsViewData({
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [models])
 
-  const filteredModels = useMemo(() => {
-    const needle = query.trim()
-    const filtered = models.filter(model => {
-      const isLocal = model.source === 'profile'
-      const isCloud = model.source === 'cloud' || model.source === 'custom'
-      if (sourceFilter === 'local' && !isLocal) return false
-      if (sourceFilter === 'cloud' && !isCloud) return false
-      const providerKey = isLocal ? 'local' : model.provider
-      if (providerFilter !== 'all' && providerKey !== providerFilter) return false
-      if (!needle) return true
-      return scoreModelCatalogSearch(model, needle) >= 0
-    })
-    if (!needle) return filtered
-    return [...filtered].sort((a, b) => {
-      const scoreDiff =
-        scoreModelCatalogSearch(b, needle) - scoreModelCatalogSearch(a, needle)
-      if (scoreDiff !== 0) return scoreDiff
-      return a.label.localeCompare(b.label)
-    })
-  }, [models, query, sourceFilter, providerFilter])
+  const filteredModels = useMemo(
+    () =>
+      filterModelCatalog(models, {
+        query,
+        sourceFilter,
+        providerFilter,
+        favoriteKeys
+      }),
+    [models, query, sourceFilter, providerFilter, favoriteKeys]
+  )
 
   const isSearching = query.trim().length > 0
   const visibleModels =
@@ -201,6 +207,28 @@ export function useModelsViewData({
     }
   }
 
+  const toggleFavorite = async (model: AgentModel) => {
+    const key = catalogModelPrefKey(model)
+    const wasFavorite = favoriteKeys.includes(key)
+    setFavoriteKeys(prev =>
+      wasFavorite ? prev.filter(item => item !== key) : [...prev, key]
+    )
+    setError(null)
+    try {
+      const result = await onToggleModelFavoriteRef.current(model)
+      setFavoriteKeys(result.favorites)
+    } catch (err) {
+      setFavoriteKeys(prev =>
+        wasFavorite
+          ? prev.includes(key)
+            ? prev
+            : [...prev, key]
+          : prev.filter(item => item !== key)
+      )
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const localProfiles = useMemo(
     () => profiles.filter(profile => !profile.isCloud),
     [profiles]
@@ -209,6 +237,7 @@ export function useModelsViewData({
   return {
     models,
     profiles,
+    favoriteKeys,
     query,
     sourceFilter,
     providerFilter,
@@ -229,7 +258,8 @@ export function useModelsViewData({
     setProviderFilter,
     setShowAllModels,
     refresh,
-    toggleModel
+    toggleModel,
+    toggleFavorite
   }
 }
 

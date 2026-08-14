@@ -1,6 +1,5 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import { Loader2 } from 'lucide-react'
-
+import { Loader } from 'lucide-react'
 import { DataView } from '@/components/agents/DataView'
 
 import { OnboardingIntegrationDetail } from './onboarding/onboarding-integration-detail'
@@ -17,7 +16,7 @@ export function OnboardingIntegrationsStep({
   if (integrations.loading && integrations.featured.length === 0) {
     return (
       <p className="text-muted-foreground flex items-center gap-2 text-sm">
-        <Loader2 className="size-4 animate-spin" />
+        <Loader className="size-4 animate-spin" />
         Loading integrations…
       </p>
     )

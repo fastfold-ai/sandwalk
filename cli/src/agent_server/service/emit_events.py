@@ -127,31 +127,35 @@ def _todos_from_write_todos_call(event_payload: dict[str, Any]) -> list[dict[str
 
 
 def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
+    seed = store.get_session(session_id)
+    is_bench = getattr(seed, "source", None) == "bench"
+
     def emit_runtime_event(event: str, **payload: Any) -> None:
         event_type = _EVENT_TYPES.get(event)
         if event_type is None:
             return
-        # After Stop, status flips to interrupted/idle/error. Drop zombie
-        # emissions from a still-running worker thread so the UI stays quiet.
-        session = store.get_session(session_id)
-        if session is not None and session.status not in {
-            "running",
-            "awaiting_approval",
-        }:
-            return
-        is_bench = getattr(session, "source", None) == "bench"
         if event == "stream":
             # Perf probe: run pipeline reports tail latency after last token.
             import time
 
             emit_runtime_event.last_stream_at = time.monotonic()
-            # Bench sessions never stream in the chat UI — skip per-token SQLite
-            # writes (dominant cost under multi-worker benches).
+            # Bench sessions never stream in the chat UI — skip per-token
+            # SQLite reads/writes (dominant cost under multi-worker benches).
             if is_bench:
                 return
         # High-frequency progress noise; final message/tools/usage still persist.
         if is_bench and event == "activity":
             return
+        session = seed
+        if not is_bench:
+            # After Stop, status flips to interrupted/idle/error. Drop zombie
+            # emissions from a still-running worker thread so the UI stays quiet.
+            session = store.get_session(session_id)
+            if session is not None and session.status not in {
+                "running",
+                "awaiting_approval",
+            }:
+                return
         event_payload = _event_payload(event, payload)
         if event == "approval_required":
             # Keep runId on the wire for the UI even though payload omits it.
@@ -164,6 +168,7 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
             run_id=run_id,
             event_type=event_type,
             payload=event_payload,
+            notify=not is_bench,
         )
         if event == "usage":
             tokens = parse_usage_tokens(event_payload)
@@ -190,6 +195,8 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
                 cache_read_tokens=tokens["cache_read_tokens"],
                 cache_creation_tokens=tokens["cache_creation_tokens"],
             )
+        if is_bench:
+            return
         if event == "tool_start" and event_payload.get("name") == "write_todos":
             todos = _todos_from_write_todos_call(event_payload)
             if todos is not None:

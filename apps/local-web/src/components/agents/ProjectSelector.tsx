@@ -1,12 +1,5 @@
 import type { AgentProject } from '@sandwalk/agent-ui-core'
-import {
-  Check,
-  ChevronDown,
-  Loader2,
-  Plus,
-  RefreshCw,
-  Search
-} from 'lucide-react'
+import { Check, ChevronDown, Loader, Plus, RefreshCw, Search } from 'lucide-react'
 import { type UIEvent,useEffect, useMemo, useState } from 'react'
 
 import {
@@ -184,7 +177,7 @@ export function ProjectSelector({
               }}
             >
               {refreshing ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Loader className="size-3.5 animate-spin" />
               ) : (
                 <RefreshCw className="size-3.5" />
               )}

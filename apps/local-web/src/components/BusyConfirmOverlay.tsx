@@ -1,5 +1,4 @@
-import { Check, Loader2 } from 'lucide-react'
-
+import { Check, Loader } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function BusyConfirmOverlay({
@@ -29,7 +28,7 @@ export function BusyConfirmOverlay({
           {phase === 'done' ? (
             <Check className="size-6" />
           ) : (
-            <Loader2 className="size-6 animate-spin" />
+            <Loader className="size-6 animate-spin" />
           )}
         </div>
         <div className="space-y-1 text-center">

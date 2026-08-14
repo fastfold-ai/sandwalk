@@ -2,7 +2,7 @@ import type {
   DatasetInstallResult,
   DatasetSummary
 } from '@sandwalk/agent-ui-core'
-import { Loader2, RefreshCw, Search } from 'lucide-react'
+import { Loader, RefreshCw, Search } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ListRowsSkeleton } from '@/components/agents/PageSkeletons'
@@ -177,7 +177,7 @@ export function DataView({
           aria-label="Refresh datasets"
         >
           {refreshing || loading ? (
-            <Loader2 className="animate-spin" />
+            <Loader className="animate-spin" />
           ) : (
             <RefreshCw />
           )}

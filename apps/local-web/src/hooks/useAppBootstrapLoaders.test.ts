@@ -1,7 +1,11 @@
 import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { describe, expect, it } from 'vitest'
 
-import { sessionsUnchanged } from './useAppBootstrapLoaders'
+import {
+  mergeRunActiveFromSessions,
+  sessionsUnchanged
+} from './useAppBootstrapLoaders'
+import { emptySessionChatState } from '@/lib/sessions'
 
 function session(overrides: Partial<AgentSession> = {}): AgentSession {
   return {
@@ -51,5 +55,26 @@ describe('sessionsUnchanged', () => {
     const a = [session({ id: 'a' }), session({ id: 'b' })]
     const b = [session({ id: 'b' }), session({ id: 'a' })]
     expect(sessionsUnchanged(a, b)).toBe(false)
+  })
+})
+
+describe('mergeRunActiveFromSessions', () => {
+  it('promotes idle chat state when the list says running', () => {
+    const current = { a: emptySessionChatState() }
+    const next = mergeRunActiveFromSessions(current, [
+      session({ status: 'running' })
+    ])
+    expect(next.a.runActive).toBe(true)
+  })
+
+  it('does not demote an optimistic running send from a stale idle list', () => {
+    const current = {
+      a: { ...emptySessionChatState(), runActive: true }
+    }
+    const next = mergeRunActiveFromSessions(current, [
+      session({ status: 'idle' })
+    ])
+    expect(next).toBe(current)
+    expect(next.a.runActive).toBe(true)
   })
 })

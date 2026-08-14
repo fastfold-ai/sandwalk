@@ -1,5 +1,5 @@
 import type { AccountSummary } from '@sandwalk/agent-ui-core'
-import { ExternalLink, Loader2, LogOut, WandSparkles } from 'lucide-react'
+import { ExternalLink, Loader, LogOut, WandSparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -105,7 +105,7 @@ export function GeneralViewAccountSection({
               onClick={onSignOutClick}
             >
               {signingOut ? (
-                <Loader2 className="animate-spin" />
+                <Loader className="animate-spin" />
               ) : (
                 <LogOut />
               )}

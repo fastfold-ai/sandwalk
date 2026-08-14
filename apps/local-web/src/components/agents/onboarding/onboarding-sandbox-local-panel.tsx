@@ -1,6 +1,5 @@
 import type { EnvironmentReport } from '@sandwalk/agent-ui-core'
-import { Check, ChevronDown, Loader2, Package } from 'lucide-react'
-
+import { Check, ChevronDown, Loader, Package } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { formatBytes } from './onboarding-sandbox-utils'
@@ -37,7 +36,7 @@ export function OnboardingSandboxLocalPanel({
 
       {envLoading && !report ? (
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Loader2 className="size-4 animate-spin" />
+          <Loader className="size-4 animate-spin" />
           Loading environment…
         </div>
       ) : null}

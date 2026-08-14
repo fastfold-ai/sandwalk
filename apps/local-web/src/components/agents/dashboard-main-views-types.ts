@@ -100,7 +100,7 @@ export type DashboardMainViewsProps = {
   loadMcpServers: () => Promise<void>
   refreshMcp: () => Promise<void>
   loadSpecialists: () => Promise<void>
-  loadModelOptions: () => Promise<void>
+  loadModelOptions: (options?: { force?: boolean }) => Promise<void>
   loadSessions: () => Promise<void>
   loadServerStatus: (signal?: AbortSignal) => ReturnType<LocalAgentClient['getServerStatus']>
   loadAccountForUi: (options?: {

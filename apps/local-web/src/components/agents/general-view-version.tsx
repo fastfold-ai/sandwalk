@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react'
+import { Loader } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -163,7 +163,7 @@ export function GeneralViewVersionSection({
               onCheckUpdates()
             }}
           >
-            {busy ? <Loader2 className="animate-spin" /> : null}
+            {busy ? <Loader className="animate-spin" /> : null}
             {actionLabel}
           </Button>
         </SettingsRow>
@@ -181,7 +181,7 @@ export function GeneralViewVersionSection({
                 disabled={cliBusy || !onCheckCliPath}
                 onClick={() => onCheckCliPath?.()}
               >
-                {checkingCliPath ? <Loader2 className="animate-spin" /> : null}
+                {checkingCliPath ? <Loader className="animate-spin" /> : null}
                 Check
               </Button>
               <Button
@@ -193,7 +193,7 @@ export function GeneralViewVersionSection({
                 onClick={() => onInstallCliPath?.()}
               >
                 {installingCliPath ? (
-                  <Loader2 className="animate-spin" />
+                  <Loader className="animate-spin" />
                 ) : null}
                 {cliActionLabel(cliPath ?? null, Boolean(installingCliPath))}
               </Button>

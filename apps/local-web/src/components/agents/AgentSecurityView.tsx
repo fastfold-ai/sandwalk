@@ -1,5 +1,5 @@
 import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
-import { AlertTriangle, Check, FolderLock, Globe, Loader2 } from 'lucide-react'
+import { AlertTriangle, Check, FolderLock, Globe, Loader } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -173,7 +173,7 @@ export function AgentSecurityView({
             disabled={!connected || saving || !dirty}
             onClick={() => void save()}
           >
-            {saving ? <Loader2 className="animate-spin" /> : <Check />}
+            {saving ? <Loader className="animate-spin" /> : <Check />}
             Save
           </Button>
         </div>

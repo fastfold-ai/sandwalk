@@ -5,7 +5,7 @@ import type {
   IntegrationUnlock,
   ToolSummary
 } from '@sandwalk/agent-ui-core'
-import { Loader2, Wrench } from 'lucide-react'
+import { Loader, Wrench } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -206,7 +206,7 @@ export function IntegrationUnlocksSection({
       <div className="bg-muted/20 border-border/60 divide-y overflow-hidden rounded-xl border">
         {loading && (hasSkills || hasTools) ? (
           <div className="text-muted-foreground flex items-center gap-2 px-4 py-4 text-sm">
-            <Loader2 className="size-4 animate-spin" />
+            <Loader className="size-4 animate-spin" />
             Loading current status…
           </div>
         ) : (

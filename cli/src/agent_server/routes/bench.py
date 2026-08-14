@@ -11,17 +11,19 @@ from fastapi.responses import FileResponse, StreamingResponse
 from agent_server.app_deps import AppDeps
 from agent_server.bench_service import (
     bootstrap_resumable,
-    cancel_current,
+    cancel_run,
     clear_results,
     delete_result,
     enqueue,
     export_path,
     get_active_status,
+    apply_live_status,
     get_result,
-    list_results,
+    list_results_page,
     list_suite_cards,
-    pause_current,
+    pause_run,
     remove_queued,
+    rename_result,
     resume_run,
     start_install,
 )
@@ -31,6 +33,7 @@ from agent_server.bench_service.dataset_install import (
     total_cache_bytes,
     uninstall_suite,
 )
+from agent_server.bench_service.results_store import _provider_from_row, slice_page
 from agent_server.models.bench import (
     BenchActiveStatus,
     BenchCancelResponse,
@@ -42,6 +45,7 @@ from agent_server.models.bench import (
     BenchResultList,
     BenchResultSummary,
     BenchResumeResponse,
+    BenchRunPatchRequest,
     BenchSpawnRequest,
     BenchSpawnResponse,
     BenchSuiteCard,
@@ -126,8 +130,51 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
         return await asyncio.to_thread(get_active_status)
 
     @app.get("/v1/bench/runs", response_model=BenchResultList)
-    async def bench_runs() -> BenchResultList:
-        rows = await asyncio.to_thread(list_results)
+    async def bench_runs(
+        q: str | None = None,
+        suite: str | None = None,
+        status: str | None = None,
+        provider: str | None = None,
+        sort: str = "date_desc",
+        cursor: str | None = None,
+        limit: int = 25,
+    ) -> BenchResultList:
+        sort_key = (sort or "date_desc").strip().lower()
+        usage_sort = sort_key in {"usage_desc", "usage_asc"}
+        date_sort = "date_asc" if sort_key == "date_asc" else "date_desc"
+        page = await asyncio.to_thread(
+            list_results_page,
+            limit=limit,
+            cursor=None if usage_sort else cursor,
+            q=q,
+            suite=suite,
+            status=status,
+            provider=provider,
+            sort=date_sort,
+            paginate=not usage_sort,
+        )
+        ids = [
+            str(row.get("project_id") or "")
+            for row in page["data"]
+            if row.get("project_id")
+        ]
+        tokens = await asyncio.to_thread(
+            deps.store.lifetime_tokens_by_project, ids
+        )
+        rows = list(page["data"])
+        if usage_sort:
+            reverse = sort_key == "usage_desc"
+
+            def usage_key(row: dict) -> tuple[int, str]:
+                pid = str(row.get("project_id") or "")
+                n = int(tokens.get(pid) or 0) if pid else 0
+                return (n, str(row.get("run_id") or ""))
+
+            rows.sort(key=usage_key, reverse=reverse)
+            sliced = slice_page(rows, limit=limit, cursor=cursor)
+            rows = sliced["data"]
+            page["next_cursor"] = sliced["next_cursor"]
+            page["total"] = sliced["total"]
         data = [
             BenchResultSummary(
                 run_id=str(r.get("run_id") or ""),
@@ -151,17 +198,53 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
                     if r.get("reasoning_fast") is not None
                     else None
                 ),
+                name=(str(r["name"]) if r.get("name") not in (None, "") else None),
+                provider=(
+                    str(r["provider"]) if r.get("provider") not in (None, "") else None
+                ),
+                lifetime_tokens=(
+                    tokens.get(str(r.get("project_id") or ""))
+                    if r.get("project_id")
+                    else None
+                ),
             )
             for r in rows
         ]
-        return BenchResultList(data=data)
+        return BenchResultList(
+            data=data,
+            next_cursor=page.get("next_cursor"),
+            total=int(page.get("total") or 0),
+            providers=list(page.get("providers") or []),
+        )
 
     @app.get("/v1/bench/runs/{run_id}")
     async def bench_run_detail(run_id: str) -> dict:
         row = await asyncio.to_thread(get_result, run_id)
         if row is None:
             raise HTTPException(status_code=404, detail="Run not found.")
-        return row
+        live = apply_live_status(row)
+        provider = _provider_from_row(live)
+        if provider:
+            live = {**live, "provider": provider}
+        project_id = str(live.get("project_id") or "")
+        if project_id:
+            tokens = await asyncio.to_thread(
+                deps.store.lifetime_tokens_by_project, [project_id]
+            )
+            live = {
+                **live,
+                "lifetime_tokens": tokens.get(project_id),
+            }
+        return live
+
+    @app.patch("/v1/bench/runs/{run_id}")
+    async def bench_run_patch(run_id: str, body: BenchRunPatchRequest) -> dict:
+        if body.name is None:
+            raise HTTPException(status_code=400, detail="Nothing to update.")
+        row = await asyncio.to_thread(rename_result, run_id, body.name)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Run not found.")
+        return {"ok": True, "runId": run_id, "name": row.get("name")}
 
     @app.get("/v1/bench/runs/{run_id}/export")
     async def bench_export(run_id: str) -> FileResponse:
@@ -176,13 +259,12 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
 
     @app.post("/v1/bench/runs/{run_id}/cancel", response_model=BenchCancelResponse)
     async def bench_cancel(run_id: str) -> BenchCancelResponse:
-        # Cancel active regardless of id match (queue is single-active)
-        rid = await asyncio.to_thread(cancel_current)
+        rid = await asyncio.to_thread(cancel_run, run_id)
         return BenchCancelResponse(ok=True, run_id=rid or run_id)
 
     @app.post("/v1/bench/runs/{run_id}/pause", response_model=BenchPauseResponse)
     async def bench_pause(run_id: str) -> BenchPauseResponse:
-        rid = await asyncio.to_thread(pause_current)
+        rid = await asyncio.to_thread(pause_run, run_id)
         if rid is None:
             raise HTTPException(status_code=409, detail="No active run to pause.")
         return BenchPauseResponse(ok=True, run_id=rid)

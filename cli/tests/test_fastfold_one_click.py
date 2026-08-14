@@ -74,7 +74,34 @@ def test_import_fastfold_one_click_persists_key(monkeypatch):
     assert ff._pending_claim_token is None
 
 
-def test_import_requires_pending_claim():
+def test_local_oauth_return_url_rewrites_wildcard_bind(monkeypatch):
+    from agent_server.connectors.service import local_oauth_return_url
+
+    monkeypatch.setenv("FASTFOLD_SERVE_HOST", "0.0.0.0")
+    monkeypatch.setenv("FASTFOLD_SERVE_PORT", "8787")
+    assert local_oauth_return_url() == "http://127.0.0.1:8787/oauth/callback"
     ff.clear_fastfold_one_click()
     with pytest.raises(ValueError, match="No Sandwalk allow"):
         ff.import_fastfold_one_click(MagicMock())
+
+
+def test_oauth_callback_return_to_uses_lan_origin_not_wildcard_bind(monkeypatch):
+    from agent_server.connectors.service import oauth_callback_return_to
+
+    monkeypatch.setenv("FASTFOLD_SERVE_HOST", "0.0.0.0")
+    monkeypatch.setenv("FASTFOLD_SERVE_PORT", "8787")
+    assert (
+        oauth_callback_return_to(
+            origin="http://192.168.2.178:8787",
+            base_url="http://0.0.0.0:8787/",
+        )
+        == "http://192.168.2.178:8787/oauth/callback"
+    )
+    assert (
+        oauth_callback_return_to(origin=None, base_url="http://192.168.2.178:8787/")
+        == "http://192.168.2.178:8787/oauth/callback"
+    )
+    assert (
+        oauth_callback_return_to(origin=None, base_url="http://0.0.0.0:8787/")
+        == "http://127.0.0.1:8787/oauth/callback"
+    )

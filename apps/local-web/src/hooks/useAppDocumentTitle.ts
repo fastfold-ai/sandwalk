@@ -8,6 +8,7 @@ import {
   setDesktopWindowTitle,
   upsertDesktopWindowSnapshot
 } from '@/lib/desktop'
+import { desktopSpaRoute } from '@/lib/desktop-spa-route'
 import { onboardingStepDef } from '@/lib/onboarding'
 import {
   readCachedRemoteHostname,
@@ -64,7 +65,7 @@ function pageLabel(args: DocumentTitleArgs): string {
   if (args.isDashboardDoctor) return 'Doctor'
   if (args.isDashboardBench) {
     if (typeof window !== 'undefined') {
-      const path = window.location.pathname
+      const path = desktopSpaRoute(window.location)
       if (path.includes('/compare')) return 'Compare · Benchmarking'
       const match = path.match(/\/bench\/([^/]+)/)
       if (match?.[1] && match[1] !== 'compare') return 'Bench result'
@@ -125,9 +126,7 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     const dockTitle = remote ? `${label} — ${remote}` : label
     void setDesktopWindowTitle(dockTitle)
     const route =
-      typeof window !== 'undefined'
-        ? `${window.location.pathname}${window.location.search}`
-        : '/'
+      typeof window !== 'undefined' ? desktopSpaRoute(window.location) : '/'
     const timer = window.setTimeout(() => {
       const path = route || '/'
       const genericLocal =

@@ -3,17 +3,7 @@ import type {
   AgentCatalogSkillDetail,
   AgentSkillDetail
 } from '@sandwalk/agent-ui-core'
-import {
-  ArrowUp,
-  Box,
-  CalendarDays,
-  GitBranch,
-  Loader2,
-  Tag,
-  Trash2,
-  UserRound
-} from 'lucide-react'
-
+import { ArrowUp, Box, CalendarDays, GitBranch, Loader, Tag, Trash2, UserRound } from 'lucide-react'
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { Button } from '@/components/ui/button'
@@ -143,7 +133,7 @@ export function SkillsInstalledDetailView({
                 onClick={onUpgrade}
               >
                 {pendingUpgrade ? (
-                  <Loader2 className="mr-1 size-3.5 animate-spin" />
+                  <Loader className="mr-1 size-3.5 animate-spin" />
                 ) : (
                   <ArrowUp className="mr-1 size-3.5" />
                 )}

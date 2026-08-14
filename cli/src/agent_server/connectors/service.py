@@ -13,6 +13,7 @@ import logging
 import os
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 from agent_server.connectors.addressing import parse_target
 from agent_server.connectors.directory import (
@@ -48,12 +49,32 @@ FAILED_REACTION = "warning"
 # agent_server.routes.slack_oauth_return), so it works with whatever host/port
 # `sandwalk serve` was actually started with rather than assuming 8787.
 LOCAL_OAUTH_CALLBACK_PATH = "/oauth/callback"
+_WILDCARD_BIND_HOSTS = {"0.0.0.0", "::", "[::]"}
 
 
 def local_oauth_return_url() -> str:
     host = os.environ.get("FASTFOLD_SERVE_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    if host in _WILDCARD_BIND_HOSTS:
+        host = "127.0.0.1"
     port = os.environ.get("FASTFOLD_SERVE_PORT", "8787").strip() or "8787"
     return f"http://{host}:{port}{LOCAL_OAUTH_CALLBACK_PATH}"
+
+
+def oauth_callback_return_to(*, origin: str | None = None, base_url: str | None = None) -> str:
+    """Browser callback URL from the host the user actually opened.
+
+    ``sandwalk serve --host 0.0.0.0`` (Allow Remote) must not send 0.0.0.0 to
+    FastFold Cloud — that bind address is not a valid OAuth return_to host.
+    """
+    for candidate in (origin, base_url):
+        parsed = urlparse((candidate or "").strip())
+        host = (parsed.hostname or "").strip().lower()
+        if parsed.scheme not in {"http", "https"} or not host:
+            continue
+        if host in _WILDCARD_BIND_HOSTS:
+            continue
+        return f"{parsed.scheme}://{parsed.netloc}{LOCAL_OAUTH_CALLBACK_PATH}"
+    return local_oauth_return_url()
 
 
 def _cloud_request(

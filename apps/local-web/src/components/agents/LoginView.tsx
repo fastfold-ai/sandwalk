@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
@@ -132,7 +132,7 @@ export function LoginView({
               disabled={submitting || !apiKey.trim()}
               className="bg-primary text-primary-foreground mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              {submitting ? <Loader className="size-4 animate-spin" /> : null}
               Sign in
             </button>
 

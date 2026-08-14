@@ -1,11 +1,4 @@
-import {
-  Check,
-  Copy,
-  Loader2,
-  Network,
-  RefreshCw,
-  Terminal
-} from 'lucide-react'
+import { Check, Copy, Loader, Network, RefreshCw, Terminal } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { LanTopologyScan } from '@/components/agents/lan-topology-scan'
@@ -270,7 +263,7 @@ export function OpenRemoteWindowDialog({
                   }}
                 >
                   {scanning ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader className="size-3.5 animate-spin" />
                   ) : (
                     <RefreshCw className="size-3.5" />
                   )}
@@ -321,7 +314,7 @@ export function OpenRemoteWindowDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={busy}>
-              {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+              {busy ? <Loader className="size-4 animate-spin" /> : null}
               Open window
             </Button>
           </DialogFooter>

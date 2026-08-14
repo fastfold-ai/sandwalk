@@ -1,5 +1,4 @@
-import { CircleCheck, Loader2 } from 'lucide-react'
-
+import { CircleCheck, Loader } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -130,7 +129,7 @@ export function SandboxModalSection({
           onClick={() => onRunProbe()}
         >
           {busy && overlayMessage?.startsWith('Probing') ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader className="size-4 animate-spin" />
           ) : (
             <CircleCheck className="size-4" />
           )}
@@ -142,7 +141,7 @@ export function SandboxModalSection({
           }
           onClick={() => onSaveModalTokens()}
         >
-          {savingTokens ? <Loader2 className="animate-spin" /> : null}
+          {savingTokens ? <Loader className="animate-spin" /> : null}
           Save
         </Button>
       </div>

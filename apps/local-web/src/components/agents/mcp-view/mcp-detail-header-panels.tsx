@@ -1,15 +1,4 @@
-import {
-  ArrowLeft,
-  ChevronDown,
-  ExternalLink,
-  KeyRound,
-  Loader2,
-  Plug,
-  RefreshCw,
-  RotateCcw,
-  Unplug,
-  Wrench
-} from 'lucide-react'
+import { ArrowLeft, ChevronDown, ExternalLink, KeyRound, Loader, Plug, RefreshCw, RotateCcw, Unplug, Wrench } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
@@ -94,7 +83,7 @@ export function McpDetailHeaderBar({
                     disabled={connectPending || disconnectPending}
                   >
                     {connectPending ? (
-                      <Loader2 className="size-3.5 animate-spin" />
+                      <Loader className="size-3.5 animate-spin" />
                     ) : (
                       <Plug className="size-3.5" />
                     )}
@@ -128,7 +117,7 @@ export function McpDetailHeaderBar({
                 onClick={() => primaryConnect()}
               >
                 {connectPending ? (
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <Loader className="size-3.5 animate-spin" />
                 ) : (
                   <Plug className="size-3.5" />
                 )}
@@ -145,7 +134,7 @@ export function McpDetailHeaderBar({
                 onClick={() => void disconnect()}
               >
                 {disconnectPending ? (
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <Loader className="size-3.5 animate-spin" />
                 ) : (
                   <Unplug className="size-3.5" />
                 )}
@@ -163,7 +152,7 @@ export function McpDetailHeaderBar({
           onClick={() => void loadTools(true)}
         >
           {refreshing ? (
-            <Loader2 className="size-3.5 animate-spin" />
+            <Loader className="size-3.5 animate-spin" />
           ) : (
             <RefreshCw className="size-3.5" />
           )}
@@ -191,7 +180,7 @@ export function McpDetailHeaderBar({
             onClick={() => void onReinstallLocal()}
           >
             {reinstallPending ? (
-              <Loader2 className="size-3.5 animate-spin" />
+              <Loader className="size-3.5 animate-spin" />
             ) : (
               <RotateCcw className="size-3.5" />
             )}

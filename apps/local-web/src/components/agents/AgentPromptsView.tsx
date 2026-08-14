@@ -3,7 +3,7 @@ import type {
   RuntimeSettings,
   Specialist
 } from '@sandwalk/agent-ui-core'
-import { Check, ChevronDown, Loader2, RefreshCw } from 'lucide-react'
+import { Check, ChevronDown, Loader, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { SpecialistAvatar } from '@/components/agents/SpecialistsView'
@@ -341,7 +341,7 @@ export function AgentPromptsView({
 
         {isEstimating && !budget ? (
           <div className="bg-muted/20 flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-4 py-10">
-            <Loader2 className="text-muted-foreground size-5 animate-spin" />
+            <Loader className="text-muted-foreground size-5 animate-spin" />
             <div className="text-center">
               <p className="text-sm font-medium">Estimating input token context</p>
               <p className="text-muted-foreground mt-1 text-xs">

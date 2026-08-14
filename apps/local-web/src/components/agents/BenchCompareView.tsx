@@ -1,13 +1,5 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import {
-  ArrowLeft,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
-  Loader2,
-  X
-} from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, ChevronRight, ExternalLink, Loader, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -360,7 +352,7 @@ export function BenchCompareView({
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 md:px-6">
           {loading ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Loader2 className="size-4 animate-spin" />
+              <Loader className="size-4 animate-spin" />
               Loading comparison…
             </div>
           ) : null}

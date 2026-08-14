@@ -2,8 +2,7 @@ import type {
   DatasetInstallResult,
   DatasetSummary
 } from '@sandwalk/agent-ui-core'
-import { Download, Loader2, Trash2 } from 'lucide-react'
-
+import { Download, Loader, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function DataViewRow({
@@ -65,7 +64,7 @@ export function DataViewRow({
             onClick={onInstall}
           >
             {installing ? (
-              <Loader2 className="animate-spin" />
+              <Loader className="animate-spin" />
             ) : (
               <Download className="size-3.5" />
             )}
@@ -83,7 +82,7 @@ export function DataViewRow({
             title="Remove"
           >
             {removing ? (
-              <Loader2 className="size-3.5 animate-spin" />
+              <Loader className="size-3.5 animate-spin" />
             ) : (
               <Trash2 className="size-3.5" />
             )}

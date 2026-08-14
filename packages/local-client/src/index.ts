@@ -192,6 +192,19 @@ export type BenchProgress = {
   benchCurrent?: number
   benchTotal?: number
   inFlight?: number
+  runId?: string | null
+}
+
+export type BenchQueueItem = {
+  runId: string
+  modelId: string
+  suites: string[]
+  sampleSizes?: Array<number | null>
+  status?: 'queued' | 'running' | 'paused'
+  lastProgress?: BenchProgress | null
+  provider?: string | null
+  startedAt?: string | null
+  elapsedS?: number | null
 }
 
 export type BenchActiveStatus = {
@@ -200,7 +213,10 @@ export type BenchActiveStatus = {
   currentModel?: string | null
   currentRunId?: string | null
   lastProgress?: BenchProgress | null
-  queue: Array<{ runId: string; modelId: string; suites: string[] }>
+  queue: BenchQueueItem[]
+  inflight?: BenchQueueItem[]
+  paused?: BenchQueueItem[]
+  parallelRuns?: number
   resumableRunId?: string | null
   projectId?: string | null
 }
@@ -219,6 +235,27 @@ export type BenchResultSummary = {
   status?: string | null
   reasoningEffort?: string | null
   reasoningFast?: boolean | null
+  name?: string | null
+  provider?: string | null
+  lifetimeTokens?: number | null
+}
+
+export type BenchResultPage = {
+  data: BenchResultSummary[]
+  nextCursor?: string | null
+  total: number
+  providers: string[]
+}
+
+export type ListBenchResultsOptions = {
+  q?: string
+  suite?: string
+  status?: string
+  provider?: string
+  sort?: 'date_desc' | 'date_asc' | 'usage_desc' | 'usage_asc'
+  cursor?: string
+  limit?: number
+  signal?: AbortSignal
 }
 
 function num(raw: Record<string, unknown>, camel: string, snake: string): number {
@@ -555,6 +592,7 @@ export class LocalAgentClient
       thinking?: boolean
       dryRun?: boolean
       concurrency?: number
+      parallelRuns?: number
       cleanupSessions?: boolean
       clientSurface?: 'cli' | 'ui'
     },
@@ -575,12 +613,50 @@ export class LocalAgentClient
     return this.request<BenchActiveStatus>('/bench/runs/active', { signal })
   }
 
-  async listBenchResults(signal?: AbortSignal): Promise<BenchResultSummary[]> {
-    const result = await this.request<{ data: BenchResultSummary[] }>(
-      '/bench/runs',
-      { signal }
-    )
-    return result.data
+  async listBenchResults(
+    opts?: ListBenchResultsOptions
+  ): Promise<BenchResultPage> {
+    const params = new URLSearchParams()
+    if (opts?.q) params.set('q', opts.q)
+    if (opts?.suite) params.set('suite', opts.suite)
+    if (opts?.status) params.set('status', opts.status)
+    if (opts?.provider) params.set('provider', opts.provider)
+    if (opts?.sort) params.set('sort', opts.sort)
+    if (opts?.cursor) params.set('cursor', opts.cursor)
+    if (opts?.limit) params.set('limit', String(opts.limit))
+    const query = params.toString()
+    const result = await this.request<{
+      data: BenchResultSummary[]
+      nextCursor?: string | null
+      total?: number
+      providers?: string[]
+    }>(`/bench/runs${query ? `?${query}` : ''}`, { signal: opts?.signal })
+    return {
+      data: (result.data || []).map(row => {
+        const raw = row as BenchResultSummary & { lifetime_tokens?: number }
+        const tokens = Number(raw.lifetimeTokens ?? raw.lifetime_tokens)
+        return {
+          ...raw,
+          lifetimeTokens: Number.isFinite(tokens) ? tokens : null
+        }
+      }),
+      nextCursor: result.nextCursor ?? null,
+      total: Number(result.total) || (result.data || []).length,
+      providers: Array.isArray(result.providers) ? result.providers : []
+    }
+  }
+
+  patchBenchRun(
+    runId: string,
+    body: { name: string },
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean; runId?: string; name?: string | null }> {
+    return this.request(`/bench/runs/${encodeURIComponent(runId)}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal
+    })
   }
 
   getBenchResult(

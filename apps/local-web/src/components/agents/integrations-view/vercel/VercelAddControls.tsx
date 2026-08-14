@@ -1,4 +1,4 @@
-import { ChevronDown, KeyRound, Loader2, Plus } from 'lucide-react'
+import { ChevronDown, KeyRound, Loader, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -42,7 +42,7 @@ export function VercelAddControls({
         onClick={onRunTerminal}
       >
         {busy ? (
-          <Loader2 className="size-3.5 animate-spin" />
+          <Loader className="size-3.5 animate-spin" />
         ) : (
           <Plus className="size-3.5" />
         )}

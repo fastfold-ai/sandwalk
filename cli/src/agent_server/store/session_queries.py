@@ -10,8 +10,9 @@ class SessionQueryMixin:
     def sessions_revision(self) -> str:
         """Compact watermark for list polling — one aggregate row, no payloads.
 
-        Bench sessions are excluded so multi-worker benches do not thrash the
-        sidebar revision poll.
+        Bench sessions are omitted from the global watermark so a live suite
+        does not thrash Dashboard polling. Project-scoped lists still include
+        them and skip this watermark.
         """
         with self._connect() as connection:
             row = connection.execute(
@@ -33,30 +34,26 @@ class SessionQueryMixin:
         self,
         *,
         project_id: str | None = None,
-        include_bench: bool = False,
+        include_bench: bool | None = None,
     ) -> list[AgentSession]:
+        clauses: list[str] = []
+        params: list[str] = []
+        if project_id:
+            clauses.append("project_id = ?")
+            params.append(project_id)
+        show_bench = include_bench if include_bench is not None else bool(project_id)
+        if not show_bench:
+            clauses.append("COALESCE(source, '') != 'bench'")
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         with self._connect() as connection:
-            if project_id:
-                rows = connection.execute(
-                    """
-                    SELECT * FROM sessions
-                    WHERE project_id = ?
-                    ORDER BY updated_at DESC, id DESC
-                    """,
-                    (project_id,),
-                ).fetchall()
-            elif include_bench:
-                rows = connection.execute(
-                    "SELECT * FROM sessions ORDER BY updated_at DESC, id DESC"
-                ).fetchall()
-            else:
-                rows = connection.execute(
-                    """
-                    SELECT * FROM sessions
-                    WHERE COALESCE(source, '') != 'bench'
-                    ORDER BY updated_at DESC, id DESC
-                    """
-                ).fetchall()
+            rows = connection.execute(
+                f"""
+                SELECT * FROM sessions
+                {where}
+                ORDER BY updated_at DESC, id DESC
+                """,
+                params,
+            ).fetchall()
         return [session_from_row(row) for row in rows]
 
     def get_session(self, session_id: str) -> AgentSession | None:
@@ -76,8 +73,10 @@ class SessionQueryMixin:
                 SELECT DISTINCT sessions.*
                 FROM sessions
                 LEFT JOIN messages ON messages.session_id = sessions.id
-                WHERE sessions.title LIKE ? ESCAPE '\\'
-                   OR messages.content LIKE ? ESCAPE '\\'
+                WHERE (
+                    sessions.title LIKE ? ESCAPE '\\'
+                    OR messages.content LIKE ? ESCAPE '\\'
+                  )
                 ORDER BY sessions.updated_at DESC, sessions.id DESC
                 LIMIT ?
                 """,

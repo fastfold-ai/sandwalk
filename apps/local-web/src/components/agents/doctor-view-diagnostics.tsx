@@ -1,5 +1,4 @@
-import { Download, Loader2 } from 'lucide-react'
-
+import { Download, Loader } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function DoctorDiagnosticsSection({
@@ -36,7 +35,7 @@ export function DoctorDiagnosticsSection({
           onClick={onDownloadLogs}
         >
           {exporting ? (
-            <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+            <Loader className="mr-1.5 size-3.5 animate-spin" />
           ) : (
             <Download className="mr-1.5 size-3.5" />
           )}

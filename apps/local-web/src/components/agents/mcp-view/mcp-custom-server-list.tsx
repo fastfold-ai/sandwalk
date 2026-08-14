@@ -3,7 +3,7 @@ import type {
   McpCatalogEntry,
   McpServer
 } from '@sandwalk/agent-ui-core'
-import { KeyRound, Loader2, Plus, Trash2 } from 'lucide-react'
+import { KeyRound, Loader, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -391,7 +391,7 @@ export function McpCustomServerList({
                       className="h-7 gap-1.5 px-2.5 text-xs"
                       disabled
                     >
-                      <Loader2 className="size-3.5 animate-spin" />
+                      <Loader className="size-3.5 animate-spin" />
                       Waiting for callback…
                     </Button>
                   </>
@@ -449,7 +449,7 @@ export function McpCustomServerList({
                       }}
                     >
                       {pending ? (
-                        <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                        <Loader className="mr-1.5 size-3.5 animate-spin" />
                       ) : null}
                       Connect
                     </Button>

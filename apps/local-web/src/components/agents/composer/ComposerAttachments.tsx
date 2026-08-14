@@ -1,4 +1,4 @@
-import { FileText, Loader2, Music2, X } from 'lucide-react'
+import { FileText, Loader, Music2, X } from 'lucide-react'
 import { useState } from 'react'
 
 import { VideoPlayPreview } from '@/components/agents/VideoPlayPreview'
@@ -110,7 +110,7 @@ export function ComposerAttachments({
           <AttachmentThumb item={item} />
           {item.status === 'uploading' ? (
             <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/35">
-              <Loader2 className="size-4 animate-spin text-white" />
+              <Loader className="size-4 animate-spin text-white" />
             </div>
           ) : null}
           {item.status === 'error' ? (

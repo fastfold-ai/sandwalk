@@ -2,7 +2,7 @@ import type {
   AgentSkillDepsInstallResult,
   AgentSkillDepsStatus
 } from '@sandwalk/agent-ui-core'
-import { CheckCircle2, Download, Loader2, RotateCcw, Stethoscope } from 'lucide-react'
+import { CheckCircle2, Download, Loader, RotateCcw, Stethoscope } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -127,7 +127,7 @@ export function SkillsDetailDepsPanel({
         </div>
         {loading && !status ? (
           <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-            <Loader2 className="size-3.5 animate-spin" />
+            <Loader className="size-3.5 animate-spin" />
             Checking…
           </span>
         ) : status ? (
@@ -203,7 +203,7 @@ export function SkillsDetailDepsPanel({
             onClick={() => void runInstall(false)}
           >
             {busy === 'install' ? (
-              <Loader2 className="size-3.5 animate-spin" />
+              <Loader className="size-3.5 animate-spin" />
             ) : (
               <Download className="size-3.5" />
             )}
@@ -219,7 +219,7 @@ export function SkillsDetailDepsPanel({
             onClick={() => void runInstall(true)}
           >
             {busy === 'reinstall' ? (
-              <Loader2 className="size-3.5 animate-spin" />
+              <Loader className="size-3.5 animate-spin" />
             ) : (
               <RotateCcw className="size-3.5" />
             )}
@@ -235,7 +235,7 @@ export function SkillsDetailDepsPanel({
           onClick={() => void runDoctor()}
         >
           {busy === 'doctor' ? (
-            <Loader2 className="size-3.5 animate-spin" />
+            <Loader className="size-3.5 animate-spin" />
           ) : (
             <Stethoscope className="size-3.5" />
           )}

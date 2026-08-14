@@ -1,6 +1,5 @@
 import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
-import { Check, Eye, EyeOff, Loader2 } from 'lucide-react'
-
+import { Check, Eye, EyeOff, Loader } from 'lucide-react'
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
 import {
   LLM_API_KEY_COPY,
@@ -60,7 +59,7 @@ export function OnboardingModelCloudPanel({
     <div className="space-y-3">
       {loadingIntegrations ? (
         <p className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Loader2 className="size-4 animate-spin" />
+          <Loader className="size-4 animate-spin" />
           Loading providers…
         </p>
       ) : (
@@ -155,7 +154,7 @@ export function OnboardingModelCloudPanel({
               onClick={() => onSave()}
             >
               {cloudBusy ? (
-                <Loader2 className="size-4 animate-spin" />
+                <Loader className="size-4 animate-spin" />
               ) : cloudSaved ? (
                 <Check className="size-4" />
               ) : null}
