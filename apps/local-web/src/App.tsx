@@ -1,5 +1,4 @@
 import type { SessionGroup } from '@sandwalk/agent-ui-core'
-import { isSessionGroupId } from '@sandwalk/agent-ui-core'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -220,7 +219,7 @@ export default function App() {
 
   const createSplitFromSelection = useCallback(() => {
     const ids = Array.from(selectedChatIds).filter(
-      id => !isSessionGroupId(id)
+      id => !id.startsWith('grp_')
     )
     if (ids.length < 2) return
     const groupId = createSplitGroup(ids)
@@ -249,7 +248,7 @@ export default function App() {
   const handlePickSplitPartner = useCallback(
     (partnerId: string) => {
       const groupId = route.sessionId
-      if (!groupId || !isSessionGroupId(groupId)) return
+      if (!groupId || !groupId.startsWith('grp_')) return
       const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
       if (!group || !group.isPending) return
       const sourceId = group.chatIds[0]
@@ -271,7 +270,7 @@ export default function App() {
 
   const handleCancelPendingSplit = useCallback(() => {
     const groupId = route.sessionId
-    if (!groupId || !isSessionGroupId(groupId)) return
+    if (!groupId || !groupId.startsWith('grp_')) return
     const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
     if (!group || !group.isPending) return
     const sourceId = group.chatIds[0]
@@ -296,7 +295,7 @@ export default function App() {
   const handleRemoveChatFromSplit = useCallback(
     (chatId: string) => {
       const groupId = route.sessionId
-      if (!groupId || !isSessionGroupId(groupId)) return
+      if (!groupId || !groupId.startsWith('grp_')) return
       const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
       if (!group) return
       const survivor = group.chatIds.find(id => id !== chatId) ?? null
@@ -312,7 +311,7 @@ export default function App() {
   const handleAddChatToSplit = useCallback(
     (chatId: string) => {
       const groupId = route.sessionId
-      if (!groupId || !isSessionGroupId(groupId)) return
+      if (!groupId || !groupId.startsWith('grp_')) return
       const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
       if (!group || group.isPending) return
       if (group.chatIds.includes(chatId)) return
@@ -500,24 +499,6 @@ export default function App() {
     setSessions: bootstrap.setSessions
   })
 
-  /*
-   * Set de todos los chatIds que viven adentro de cualquier grupo.
-   * Se computa antes de `useAppSessionEffects` porque su callback
-   * `chatIsInsideAnyGroup` lo reusa para hacer lookup O(1) en vez de
-   * escanear grupos en cada llamada (`.some(...includes(...))` era
-   * O(grupos × chatsPerGrupo) por invocación).
-   *
-   * También lo usa el filtro de `openTabIds` más abajo — mismo Set,
-   * misma referencia estable mientras `allTabGroups` no cambie.
-   */
-  const chatsInsideGroupIds = useMemo(() => {
-    const set = new Set<string>()
-    for (const g of tabGroupsStore.allTabGroups) {
-      for (const id of g.chatIds) set.add(id)
-    }
-    return set
-  }, [tabGroupsStore.allTabGroups])
-
   useAppSessionEffects({
     setIntegrationValues: ui.setIntegrationValues,
     selectedIntegrationKey: context.selectedIntegrationKey,
@@ -542,7 +523,8 @@ export default function App() {
     pendingMentionRef: ui.pendingMentionRef,
     setComposer: layer.chat.setComposer,
     setComposerFiles: layer.chat.setComposerFiles,
-    chatIsInsideAnyGroup: (chatId: string) => chatsInsideGroupIds.has(chatId),
+    chatIsInsideAnyGroup: (chatId: string) =>
+      tabGroupsStore.allTabGroups.some(g => g.chatIds.includes(chatId)),
     tabGroups: tabGroupsStore.allTabGroups
   })
 
@@ -556,6 +538,22 @@ export default function App() {
     })
   }, [bootstrap.loadSessions, ui.projectScopeId])
 
+  /*
+   * `openTabIds` puede tener chatIds sueltos que en realidad ya viven
+   * dentro de un grupo (residuos de storage viejo, o carreras al crear
+   * un grupo). Los filtramos aquí para que nunca se vean afuera del
+   * grupo — el grupo es la única representación válida. Antes teníamos
+   * una excepción para el chat activo pero eso causaba render duplicado
+   * (chat suelto + chat como children del grupo → React keys duplicadas
+   * → todo el estado del sidebar/strip se rompía).
+   */
+  const chatsInsideGroupIds = useMemo(() => {
+    const set = new Set<string>()
+    for (const g of tabGroupsStore.allTabGroups) {
+      for (const id of g.chatIds) set.add(id)
+    }
+    return set
+  }, [tabGroupsStore.allTabGroups])
   const cleanedOpenTabIds = useMemo(
     () => tabs.openTabIds.filter(id => !chatsInsideGroupIds.has(id)),
     [tabs.openTabIds, chatsInsideGroupIds]
@@ -766,7 +764,7 @@ export default function App() {
           createSplitFromSelection,
           createSplitFromSidebar: () => {
             const ids = Array.from(layer.actions.selectedSessionIds).filter(
-              id => !isSessionGroupId(id)
+              id => !id.startsWith('grp_')
             )
             if (ids.length < 2) return
             const groupId = createSplitGroup(ids)
@@ -778,7 +776,7 @@ export default function App() {
           canSplitFromSidebar:
             layer.actions.selectedSessionIds.size >= 2 &&
             Array.from(layer.actions.selectedSessionIds).filter(
-              id => !isSessionGroupId(id)
+              id => !id.startsWith('grp_')
             ).length >= 2,
           onSelectTabGroup: (groupId: string) => {
             navigate(`/agents/${groupId}`)

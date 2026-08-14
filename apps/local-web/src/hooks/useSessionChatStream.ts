@@ -364,11 +364,8 @@ export function useSessionChatStream({
                 )
               )
             } else if (event.type === 'session.updated') {
-              // `useGlobalSessionEvents` (single global SSE) is the
-              // authoritative path for updating the `sessions` cache from
-              // session.updated — no need to double-fetch the full list
-              // here. We still refresh THIS chat's transcript because
-              // compact / auto-title rewrite the message history.
+              void loadSessionsRef.current?.()
+              // Compact (and similar) rewrites history — refresh the transcript.
               void client.listMessages(id).then(history => {
                 patchChat(id, prev => ({
                   ...prev,
@@ -422,8 +419,7 @@ export function useSessionChatStream({
                   messagesLoaded: true
                 }))
               })
-              // Global SSE handles sessions-list refresh; no manual reload
-              // needed here (would duplicate a fetch that already runs).
+              void loadSessionsRef.current?.()
             }
           }
         })
@@ -442,14 +438,5 @@ export function useSessionChatStream({
           }
         })
     }
-    // Nota: NO agregamos cleanup aquí. Un cleanup que limpia timers
-    // pendientes rompe el grace period — cuando el usuario navega rápido
-    // (sessionId cambia) el cleanup mata los timers ANTES de que aborten
-    // los streams del sessionId anterior, y como el body agenda NUEVOS
-    // timers para los mismos ids, los streams viejos quedan abiertos.
-    // Resultado: streams se acumulan → saturan el pool → nuevas requests
-    // se cuelgan (regresión del bug de thread pool que arreglamos en la
-    // Capa 1). Los timers son inofensivos: cuando finalmente disparen,
-    // el abort no hace nada si el controller ya fue reemplazado.
   }, [client, health, patchChat, sessionId])
 }

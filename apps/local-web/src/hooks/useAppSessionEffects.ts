@@ -5,7 +5,6 @@ import type {
   IntegrationSummary,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
-import { isSessionGroupId } from '@sandwalk/agent-ui-core'
 import type { Dispatch, SetStateAction } from 'react'
 import { type MutableRefObject,useEffect } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
@@ -131,7 +130,7 @@ export function useAppSessionEffects({
         // (no aparecen en `sessions`), y el chip del grupo desaparecía
         // de la strip después del primer click aunque el user lo tuviera
         // marcado como abierto.
-        if (isSessionGroupId(id)) {
+        if (id.startsWith('grp_')) {
           const group = tabGroups.find(g => g.id === id)
           if (!group) return false
           return group.chatIds.some(chatId => {

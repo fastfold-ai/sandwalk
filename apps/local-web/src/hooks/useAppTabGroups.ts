@@ -3,9 +3,7 @@ import {
   type Dispatch,
   type SetStateAction,
   useCallback,
-  useEffect,
-  useMemo,
-  useRef
+  useMemo
 } from 'react'
 
 import { writeTabGroups } from '@/lib/app-storage'
@@ -99,30 +97,15 @@ export function useAppTabGroups(
 
   const patchGroups = useCallback(
     (updater: (current: SessionGroup[]) => SessionGroup[]) => {
-      // Pure state reducer — persistence is handled by the effect below
-      // observing `allTabGroups`. Writing to localStorage inside the
-      // updater tripped React StrictMode (dev double-run wrote twice) and
-      // could re-order writes under rapid overlapping updates.
       setAllTabGroups(current => {
         const next = updater(current)
         if (next === current) return current
+        writeTabGroups(next)
         return next
       })
     },
     [setAllTabGroups]
   )
-
-  // Skip the initial write: the initial `allTabGroups` came from disk via
-  // `readTabGroups()` in `useAppUiState`, so re-writing it is redundant.
-  // Subsequent state changes flow through here.
-  const skipInitialWrite = useRef(true)
-  useEffect(() => {
-    if (skipInitialWrite.current) {
-      skipInitialWrite.current = false
-      return
-    }
-    writeTabGroups(allTabGroups)
-  }, [allTabGroups])
 
   const createGroup = useCallback(
     (chatIds: string[], overrides?: Partial<SessionGroup>): string | null => {

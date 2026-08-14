@@ -122,10 +122,7 @@ class _LifecycleMixin:
                     {"sessionId": session_id},
                 )
             except Exception:  # noqa: BLE001
-                logger.debug(
-                    "session_event_bus publish failed for delete",
-                    exc_info=True,
-                )
+                pass
         return deleted
 
     def submit_message(

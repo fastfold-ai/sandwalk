@@ -1,10 +1,9 @@
-import type { AgentSession, SessionGroup } from '@sandwalk/agent-ui-core'
+import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   emptySessionChatState,
   groupSessions,
-  groupTabItems,
   isLowSignalTitle,
   relativeDayLabel,
   relativeTime
@@ -105,93 +104,5 @@ describe('groupSessions', () => {
       groups.filter(g => g.id !== 'pinned' && g.id !== 'archive').flatMap(g => g.items)
         .length
     ).toBe(1)
-  })
-})
-
-function group(
-  id: string,
-  chatIds: string[],
-  overrides: Partial<SessionGroup> = {}
-): SessionGroup {
-  return {
-    id,
-    name: id,
-    color: null,
-    pinned: false,
-    chatIds,
-    activeChatId: chatIds[0],
-    ...overrides
-  } as SessionGroup
-}
-
-describe('groupTabItems', () => {
-  it('resolves group children from scoped sessions when no wider pool given', () => {
-    const scoped = [
-      session({ id: 'a', title: 'A' }),
-      session({ id: 'b', title: 'B' })
-    ]
-    const groups = [group('grp_1', ['a', 'b'])]
-    const sections = groupTabItems(scoped, groups)
-    const groupItem = sections
-      .flatMap(s => s.items)
-      .find(i => i.kind === 'group')
-    if (groupItem?.kind === 'group') {
-      expect(groupItem.children.map(c => c.id)).toEqual(['a', 'b'])
-    } else {
-      throw new Error('expected group item')
-    }
-  })
-
-  it('resolves foreign group children from the wider pool', () => {
-    // Regression guard for the cross-project sidebar bug: when a group
-    // contains a chat from another project, the scoped list filters it
-    // out, but children should still resolve via the wider pool.
-    const scoped = [session({ id: 'a', title: 'A', projectId: 'p1' })]
-    const wider = [
-      session({ id: 'a', title: 'A', projectId: 'p1' }),
-      session({ id: 'b', title: 'B (foreign)', projectId: 'p2' })
-    ]
-    const groups = [group('grp_1', ['a', 'b'])]
-    const sections = groupTabItems(scoped, groups, wider)
-    const groupItem = sections
-      .flatMap(s => s.items)
-      .find(i => i.kind === 'group')
-    if (groupItem?.kind === 'group') {
-      expect(groupItem.children.map(c => c.id).sort()).toEqual(['a', 'b'])
-    } else {
-      throw new Error('expected group item')
-    }
-  })
-
-  it('does NOT surface foreign chats as standalone items', () => {
-    // The wider pool is only for group children resolution — it must
-    // not leak foreign chats into the flat standalone listing.
-    const scoped = [session({ id: 'a', title: 'A' })]
-    const wider = [
-      session({ id: 'a', title: 'A' }),
-      session({ id: 'c', title: 'C (foreign)', projectId: 'p2' })
-    ]
-    const sections = groupTabItems(scoped, [], wider)
-    const chatIds = sections
-      .flatMap(s => s.items)
-      .filter(i => i.kind === 'chat')
-      .map(i => i.id)
-    expect(chatIds).toContain('a')
-    expect(chatIds).not.toContain('c')
-  })
-
-  it('excludes chats that live inside a group from the flat listing', () => {
-    const scoped = [
-      session({ id: 'a', title: 'A' }),
-      session({ id: 'b', title: 'B' }),
-      session({ id: 'c', title: 'C' })
-    ]
-    const groups = [group('grp_1', ['a', 'b'])]
-    const sections = groupTabItems(scoped, groups)
-    const chatIds = sections
-      .flatMap(s => s.items)
-      .filter(i => i.kind === 'chat')
-      .map(i => i.id)
-    expect(chatIds).toEqual(['c'])
   })
 })

@@ -79,11 +79,8 @@ class SessionQueryMixin:
             return []
         placeholders = ",".join("?" for _ in cleaned)
         with self._connect() as connection:
-            # ORDER BY matches `list_sessions` so callers can iterate
-            # results consistently regardless of which fetch path they used.
             rows = connection.execute(
-                f"SELECT * FROM sessions WHERE id IN ({placeholders}) "  # noqa: S608
-                "ORDER BY updated_at DESC, id DESC",
+                f"SELECT * FROM sessions WHERE id IN ({placeholders})",
                 cleaned,
             ).fetchall()
         return [session_from_row(row) for row in rows]

@@ -11,6 +11,7 @@ authoritative event catalog and payload shape.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
 
@@ -29,22 +30,26 @@ def register_session_events_global_routes(app: FastAPI, deps: AppDeps) -> None: 
         async def event_source() -> AsyncIterator[str]:
             # Subscribe first, then emit a hello frame so the client knows
             # the connection is live (also flushes any proxy buffering).
-            # `subscribe()` cleans up its own subscriber slot on generator
-            # close (via GC / finally in SessionEventBus.subscribe), so no
-            # extra teardown needed here.
             subscription = session_event_bus.subscribe()
             yield ": connected\n\n"
-            async for event in subscription:
-                if shutdown_event.is_set():
-                    break
-                if await request.is_disconnected():
-                    break
-                payload = json.dumps(event, separators=(",", ":"), default=str)
-                yield f"id: {event['sequence']}\ndata: {payload}\n\n"
-                # Same WKWebView (Tauri) buffer flush trick as the
-                # per-session SSE — trailing small frames can sit in
-                # the fetch stream until more bytes arrive.
-                yield ":" + (" " * 8192) + "\n\n"
+            try:
+                async for event in subscription:
+                    if shutdown_event.is_set():
+                        break
+                    if await request.is_disconnected():
+                        break
+                    payload = json.dumps(event, separators=(",", ":"), default=str)
+                    yield f"id: {event['sequence']}\ndata: {payload}\n\n"
+                    # Same WKWebView (Tauri) buffer flush trick as the
+                    # per-session SSE — trailing small frames can sit in
+                    # the fetch stream until more bytes arrive.
+                    yield ":" + (" " * 8192) + "\n\n"
+            except asyncio.CancelledError:
+                raise
+            finally:
+                # `subscribe()` cleanup runs on generator close via GC;
+                # nothing else to do here.
+                pass
 
         return StreamingResponse(
             event_source(),

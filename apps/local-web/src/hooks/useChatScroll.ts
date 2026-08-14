@@ -209,14 +209,9 @@ export function useChatScroll({
       if (content) observer.observe(content)
     }
     // Hard stop so a viewport that never emits (unlikely but possible)
-    // doesn't leave the observer running forever. Guarded on
-    // `activeSessionRef` — if the user tab-switched during the 750 ms
-    // window we don't want to mark this sessionId as "applied" (would
-    // skip retry logic the next time they come back to it).
+    // doesn't leave the observer running forever.
     safetyTimer = window.setTimeout(() => {
-      if (activeSessionRef.current === sessionId) {
-        appliedForRef.current = sessionId
-      }
+      appliedForRef.current = sessionId
       cleanup()
     }, SAFETY_MS)
 
