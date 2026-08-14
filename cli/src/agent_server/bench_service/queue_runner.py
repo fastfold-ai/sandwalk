@@ -88,12 +88,20 @@ class BenchQueueState:
 
 
 _state = BenchQueueState()
+_job_hook = None
 
 
 def reset_state_for_tests() -> None:
     """Drop in-memory queue state. Tests must join workers first."""
-    global _state
+    global _state, _job_hook
     _state = BenchQueueState()
+    _job_hook = None
+    try:
+        from agent_server.bench_service.runtime import _stopping
+
+        _stopping.clear()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def bootstrap_resumable() -> None:
@@ -566,6 +574,7 @@ def _ckpt_item(ckpt: dict[str, Any]) -> BenchQueueItem:
 
 
 def _pump(deps: AppDeps) -> None:
+    to_start: list[threading.Thread] = []
     with _state.lock:
         cap = max(1, _state.max_parallel)
         while _state.queue and len(_state.inflight) < cap:
@@ -582,13 +591,15 @@ def _pump(deps: AppDeps) -> None:
                 name=f"sandwalk-bench-{job.run_id[:8]}",
             )
             _state.job_threads[job.run_id] = thread
-            thread.start()
+            to_start.append(thread)
+    for thread in to_start:
+        thread.start()
 
 
 def _job_thread(deps: AppDeps, job: BenchJob) -> None:
     outcome = "error"
     try:
-        outcome = _run_job(deps, job)
+        outcome = _execute_job(deps, job)
     except Exception as exc:  # noqa: BLE001
         logger.exception("bench job failed: %s", exc)
         _emit(
@@ -660,6 +671,14 @@ def _stop_reason(run_id: str) -> str | None:
         if run_id in _state.pause_ids:
             return "pause"
         return None
+
+
+def _execute_job(deps: AppDeps, job: BenchJob) -> str:
+    """Run one stack. Tests assign ``_job_hook`` instead of patching this."""
+    hook = _job_hook
+    if hook is not None:
+        return hook(deps, job)
+    return _run_job(deps, job)
 
 
 def _run_job(deps: AppDeps, job: BenchJob) -> str:

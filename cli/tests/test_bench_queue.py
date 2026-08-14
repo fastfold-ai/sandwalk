@@ -70,7 +70,7 @@ def _join_jobs(timeout: float = 3) -> None:
 def test_enqueue_while_running_keeps_a_separate_stack(queue_env, monkeypatch):
     started = threading.Event()
     release = threading.Event()
-    monkeypatch.setattr(qr, "_run_job", _block_until_stop(started, release))
+    qr._job_hook = _block_until_stop(started, release)
     deps = MagicMock()
     first = qr.enqueue(deps, _req(model="m1"))
     assert started.wait(2)
@@ -97,7 +97,7 @@ def test_enqueue_while_running_keeps_a_separate_stack(queue_env, monkeypatch):
 def test_cancel_inflight_does_not_wipe_queue(queue_env, monkeypatch):
     started = threading.Event()
     release = threading.Event()
-    monkeypatch.setattr(qr, "_run_job", _block_until_stop(started, release))
+    qr._job_hook = _block_until_stop(started, release)
     deps = MagicMock()
     first = qr.enqueue(deps, _req(model="m1"))[0]
     assert started.wait(2)
@@ -137,7 +137,7 @@ def test_parallel_runs_start_two_stacks(queue_env, monkeypatch):
             time.sleep(0.01)
         return "completed"
 
-    monkeypatch.setattr(qr, "_run_job", fake_run)
+    qr._job_hook = fake_run
     deps = MagicMock()
     ids = qr.enqueue(deps, _req(model="m1", models=["m2"], parallel_runs=2))
     assert len(ids) == 2
@@ -153,7 +153,7 @@ def test_parallel_runs_start_two_stacks(queue_env, monkeypatch):
 def test_resume_allowed_while_another_run_is_active(queue_env, monkeypatch):
     started = threading.Event()
     release = threading.Event()
-    monkeypatch.setattr(qr, "_run_job", _block_until_stop(started, release))
+    qr._job_hook = _block_until_stop(started, release)
     deps = MagicMock()
     qr.enqueue(deps, _req(model="m1", parallel_runs=2))
     assert started.wait(2)
@@ -178,7 +178,7 @@ def test_resume_allowed_while_another_run_is_active(queue_env, monkeypatch):
 def test_pause_inflight_stays_resumable_without_checkpoint(queue_env, monkeypatch):
     started = threading.Event()
     release = threading.Event()
-    monkeypatch.setattr(qr, "_run_job", _block_until_stop(started, release))
+    qr._job_hook = _block_until_stop(started, release)
     deps = MagicMock()
     rid = qr.enqueue(deps, _req(model="m1"))[0]
     assert started.wait(2)
@@ -226,7 +226,7 @@ def test_active_status_lists_disk_paused_when_memory_empty(queue_env, monkeypatc
 def test_inflight_status_stamps_stable_started_at(queue_env, monkeypatch):
     started = threading.Event()
     release = threading.Event()
-    monkeypatch.setattr(qr, "_run_job", _block_until_stop(started, release))
+    qr._job_hook = _block_until_stop(started, release)
     qr.enqueue(MagicMock(), _req(model="m1"))
     assert started.wait(2)
     first = qr.get_active_status().inflight[0]
@@ -242,7 +242,7 @@ def test_inflight_status_stamps_stable_started_at(queue_env, monkeypatch):
 def test_resume_inflight_uses_checkpoint_elapsed(queue_env, monkeypatch):
     started = threading.Event()
     release = threading.Event()
-    monkeypatch.setattr(qr, "_run_job", _block_until_stop(started, release))
+    qr._job_hook = _block_until_stop(started, release)
     monkeypatch.setattr(
         qr,
         "find_resumable_checkpoint",

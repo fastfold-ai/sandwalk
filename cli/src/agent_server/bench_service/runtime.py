@@ -67,6 +67,9 @@ def start_bench_runtime() -> None:
         _thread.start()
     if not _ready.wait(5):
         raise RuntimeError("Bench runtime failed to start")
+    deadline = time.monotonic() + 2
+    while bench_loop() is None and time.monotonic() < deadline:
+        time.sleep(0.01)
 
 
 def stop_bench_runtime(*, timeout: float = 8.0) -> None:
@@ -122,6 +125,7 @@ def _clear() -> None:
     _executor = None
     _thread = None
     _ready.clear()
+    _stopping.clear()
 
 
 def _run_loop() -> None:
@@ -135,7 +139,11 @@ def _run_loop() -> None:
     loop.set_default_executor(executor)
     _loop = loop
     _executor = executor
-    _ready.set()
+
+    def _mark_ready() -> None:
+        _ready.set()
+
+    loop.call_soon(_mark_ready)
     logger.info(
         "Bench runtime started (%s agent workers)",
         bench_executor_workers(),
