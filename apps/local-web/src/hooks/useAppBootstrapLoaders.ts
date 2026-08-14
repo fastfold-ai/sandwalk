@@ -10,6 +10,7 @@ import type {
   SandboxSettings,
   Specialist
 } from '@sandwalk/agent-ui-core'
+import { isSessionGroupId } from '@sandwalk/agent-ui-core'
 import type { Dispatch, SetStateAction } from 'react'
 import { useCallback, useRef, useState } from 'react'
 
@@ -155,6 +156,9 @@ export function useAppBootstrapLoaders({
   const loadSessionPreviews = useCallback(
     async (sessionIds: string[], signal?: AbortSignal) => {
       const missing = sessionIds.filter(id => {
+        // Group ids are frontend-only tab wrappers; they have no
+        // /sessions/grp_*/messages route on the backend.
+        if (isSessionGroupId(id)) return false
         if (sessionPreviewsRef.current[id] !== undefined) return false
         if (previewInFlightRef.current.has(id)) return false
         return true

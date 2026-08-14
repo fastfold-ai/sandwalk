@@ -6,6 +6,7 @@ import type {
   McpCatalogEntry,
   McpServer
 } from '@sandwalk/agent-ui-core'
+import { isSessionGroupId } from '@sandwalk/agent-ui-core'
 import { type MutableRefObject, type SetStateAction,useCallback, useRef } from 'react'
 
 import { resolveSelectedIntegrationKey } from '@/components/app/app-display'
@@ -74,6 +75,11 @@ export function usePrefetchSessionMessages(
   return useCallback(
     async (id: string, signal?: AbortSignal) => {
       if (isDraftAgentSessionId(id)) return
+      // Group ids (grp_*) are frontend-only tab wrappers — the backend
+      // has no `/sessions/grp_*/messages` route and returns 404. The
+      // group's children mount their own `SessionChatMount`s which each
+      // prefetch by their real chat id.
+      if (isSessionGroupId(id)) return
       if (chatBySessionIdRef.current[id]?.messagesLoaded) return
       try {
         const history = await client.listMessages(id, signal)

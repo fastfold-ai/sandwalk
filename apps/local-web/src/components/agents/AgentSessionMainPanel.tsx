@@ -655,7 +655,6 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             ) : null}
             {showWorkspaceFiles && workspaceSessionId ? (
               <WorkspacePanel
-                key={workspaceSessionId}
                 client={client}
                 sessionId={workspaceSessionId}
                 workspacePath={isDraft ? null : session?.workspacePath ?? null}
@@ -735,7 +734,6 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
               </div>
             ) : null}
             <WorkspacePanel
-              key={workspaceSessionId}
               client={client}
               sessionId={workspaceSessionId}
               workspacePath={isDraft ? null : session?.workspacePath ?? null}
