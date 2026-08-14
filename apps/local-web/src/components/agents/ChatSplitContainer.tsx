@@ -48,9 +48,9 @@ export type ChatSplitContainerProps = {
   }
   onFocusChat: (chatId: string) => void
   /**
-   * Recibe los props del header por panel (files/terminal/preview/CLI/
-   * ellipsis + estado + callbacks) para el chatId dado. Se aplica al slot
-   * del header de cada `SplitFragment`.
+   * Returns the per-panel header props (files/terminal/preview/CLI/
+   * ellipsis + state + callbacks) for the given chatId. Applied to the
+   * header slot of each `SplitFragment`.
    */
   buildHeaderProps: (
     chatId: string,
@@ -59,13 +59,12 @@ export type ChatSplitContainerProps = {
   ) => ChatSplitPanelHeaderProps
   projects: AgentProject[]
   /**
-   * Contexto y callbacks del picker — se usa en dos situaciones:
-   *  1. Modo pending (creado desde "Create split view", falta elegir el
-   *     segundo chat). `onPickPartner` promueve el grupo.
-   *  2. Modo add (usuario clickeó el "+" a la derecha para agregar un
-   *     chat más al split ya armado). `onAddChat` agrega al grupo.
-   * Ambos pickers son visualmente idénticos; sólo cambia qué callback
-   * se dispara al elegir.
+   * Picker context and callbacks — used in two situations:
+   *  1. Pending mode (created from "Create split view", second chat
+   *     still to be picked). `onPickPartner` promotes the group.
+   *  2. Add mode (user clicked "+" on the right edge to add one more
+   *     chat to the assembled split). `onAddChat` appends to the group.
+   * Both pickers look identical; only the callback differs on pick.
    */
   pickerContext?: {
     client: LocalAgentClient
@@ -90,44 +89,41 @@ export function ChatSplitContainer({
   const activeChatId = group.activeChatId
   const isPending = Boolean(group.isPending)
 
-  // Cuando el usuario está armando un split, la card del picker se
-  // comporta como un panel más: hover ring cuando pasa el mouse,
-  // border-primary/60 cuando la clickea (pasa a "focused"). Al hacer
-  // click en el chat A el picker pierde el foco. Sólo puede haber una
-  // card focused a la vez, como en un split real.
+  // While the user is assembling a split, the picker card behaves like
+  // any other panel: hover ring on mouse-over, border-primary/60 when
+  // clicked ("focused"). Clicking chat A takes focus away from the
+  // picker. Only one card can be focused at a time, same as a real split.
   const [pickerFocused, setPickerFocused] = useState(false)
-  // Add mode: usuario clickeó el "+" a la derecha para agregar un chat
-  // MÁS al split ya armado. Se abre un panel picker adicional a la
-  // derecha; elegir → addToGroup; cancelar (X) → sólo cierra el picker,
-  // el grupo queda intacto.
+  // Add mode: the user clicked "+" on the right edge to append ONE more
+  // chat to an already-formed split. An extra picker panel opens on the
+  // right; picking → addToGroup; cancelling (X) → just closes the
+  // picker, the group stays intact.
   const [addingPanel, setAddingPanel] = useState(false)
-  // Zona sensible en el borde derecho extremo: al mouseEnter en los
-  // últimos ~12px del panel, se expande la columna del "+" con
-  // animación (empuja los chats a la izquierda). Al mouseLeave se
-  // colapsa. No es un elemento visible por default, sólo hitbox +
-  // resultado animado.
+  // Hitbox at the far-right edge of the panel: on mouseEnter within the
+  // last ~12px, the "+" column expands with an animation (pushing chats
+  // to the left). On mouseLeave it collapses. No visible element by
+  // default — just hitbox + animated result.
   const [gutterHovered, setGutterHovered] = useState(false)
 
   if (chatIds.length === 0) return null
 
-  // Slot picker aparece cuando:
-  //  - grupo pending (se está armando el 2do).
-  //  - grupo real y usuario clickeó "+" para agregar un chat más.
+  // Picker slot shows when:
+  //  - group is pending (still assembling the 2nd chat).
+  //  - real group + the user clicked "+" to add one more chat.
   const hasPickerSlot = isPending || addingPanel
   const totalPanels = hasPickerSlot ? chatIds.length + 1 : chatIds.length
-  // El "+" a la derecha solo aparece en splits reales (no pending) y
-  // cuando no estamos ya agregando un panel.
+  // The "+" gutter only shows for real (non-pending) splits and when
+  // we're not already adding a panel.
   const canShowAddSlot =
     !isPending && !addingPanel && Boolean(pickerContext)
 
   return (
     <div
       className="relative flex h-full min-h-0 min-w-0 flex-1"
-      // Fallback: cuando el mouse sale del contenedor entero (por el
-      // borde derecho de la ventana o cualquier otro edge del app), el
-      // mouseleave de la columna no se dispara porque el mouse va
-      // directo fuera del document. Escuchamos a nivel contenedor
-      // externo para asegurar el colapso.
+      // Fallback: when the mouse leaves the whole container (via the
+      // window's right edge or any other app edge), the column's own
+      // mouseleave doesn't fire because the mouse exits the document
+      // directly. Listening at the outer container guarantees collapse.
       onMouseLeave={() => {
         if (gutterHovered) setGutterHovered(false)
       }}
@@ -140,8 +136,8 @@ export function ChatSplitContainer({
       }
     >
       {chatIds.map((chatId, index) => {
-        // El chat es focused si es el activeChatId Y el picker no está
-        // focused (solo puede haber uno con foco visual).
+        // A chat is focused when it's the activeChatId AND the picker
+        // isn't focused (only one card holds visual focus).
         const isFocused = chatId === activeChatId && !pickerFocused
         const isLast = index === totalPanels - 1
         const props = buildMountProps(chatId)
@@ -173,11 +169,11 @@ export function ChatSplitContainer({
           className="min-w-0"
         >
           {/*
-            Card EXTERIOR del picker: mismos estados visuales que un
-            SplitFragment — focused (border-primary/60) cuando el usuario
-            está interactuando, hover ring en otro caso. La X en el
-            header cancela: si es pending, disuelve el grupo entero; si
-            es add mode, sólo cierra este panel sin tocar el grupo.
+            OUTER picker card: same visual states as a SplitFragment —
+            focused (border-primary/60) when the user is interacting,
+            hover ring otherwise. The X in the header cancels: if
+            pending, dissolves the whole group; if add mode, just
+            closes this panel without touching the group.
           */}
           <div
             className={cn(
@@ -193,10 +189,9 @@ export function ChatSplitContainer({
               if (!pickerFocused) setPickerFocused(true)
             }}
           >
-            {/* X arriba a la derecha de la card exterior (patrón
-                Chrome dual-view). Si es pending → disuelve el grupo.
-                Si es add mode → cierra este panel picker sin tocar el
-                grupo. */}
+            {/* X at the top-right of the outer card (Chrome dual-view
+                pattern). If pending → dissolves the group. If add mode
+                → closes this picker panel without touching the group. */}
             <button
               type="button"
               onClick={() => {
@@ -213,10 +208,10 @@ export function ChatSplitContainer({
               <X className="size-4" />
             </button>
             {/*
-              Layout centrado: título "Pick a chat…" arriba libre (fuera
-              de la caja del widget) y el picker debajo. Ambos centrados
-              horizontalmente en la card exterior. Un gap vertical los
-              mantiene alineados como un mensaje + formulario.
+              Centered layout: title "Pick a chat…" up top (outside the
+              widget box) and the picker below. Both horizontally
+              centered in the outer card. A vertical gap keeps them
+              aligned like a message + form.
             */}
             <div className="flex h-full min-h-0 min-w-0 flex-col items-center justify-center gap-3 overflow-hidden p-4">
               <h2 className="text-foreground shrink-0 text-center text-[14px] font-medium">
@@ -230,14 +225,13 @@ export function ChatSplitContainer({
                 allTabGroups={pickerContext.allTabGroups}
                 cachedSessions={sessions}
                 onPick={chatId => {
-                  // Resetear estados locales antes de disparar el
-                  // cambio de grupo: si no lo hacemos, cuando el picker
-                  // desaparece y aparecen los nuevos elementos (chat B
-                  // + hitbox del "+"), React dispara mouseenter/focus
-                  // automático en los elementos que quedan bajo el
-                  // mouse — lo cual activaría el gutter del "+" solo
-                  // por el cambio de layout, no por intención real del
-                  // usuario.
+                  // Reset local state BEFORE firing the group change:
+                  // otherwise, when the picker disappears and the new
+                  // elements (chat B + "+" hitbox) appear, React fires
+                  // automatic mouseenter/focus on whatever ends up
+                  // under the cursor — which would activate the "+"
+                  // gutter just from the layout shift, not from real
+                  // user intent.
                   setGutterHovered(false)
                   setPickerFocused(false)
                   if (isPending) {
@@ -254,11 +248,11 @@ export function ChatSplitContainer({
       ) : null}
     </ResizablePanelGroup>
     {/*
-      Columna animada del "+": invisible por defecto (w-0). Se expande
-      a 48px cuando el mouse entra en la hitbox derecha extrema. Al
-      salir el mouse de la columna se colapsa. La columna vive en el
-      flex row (no absolute) así que al expandirse empuja los chats a
-      la izquierda con transition suave.
+      Animated "+" column: invisible by default (w-0). Expands to 48px
+      when the mouse enters the far-right hitbox. Collapses when the
+      mouse leaves the column. The column lives in the flex row (not
+      absolute) so expanding pushes the chats to the left with a smooth
+      transition.
     */}
     {canShowAddSlot ? (
       <div
@@ -282,9 +276,9 @@ export function ChatSplitContainer({
       </div>
     ) : null}
     {/*
-      Hitbox invisible pegada al borde derecho extremo — captura el
-      hover en los últimos ~12px y activa el gutter animado. No ocupa
-      espacio en el layout (es absolute), y no se muestra visualmente.
+      Invisible hitbox pinned to the far-right edge — captures hover on
+      the last ~12px and toggles the animated gutter. Zero layout
+      footprint (absolute) and no visual appearance.
     */}
     {canShowAddSlot ? (
       <div
@@ -327,24 +321,24 @@ export function SplitFragment({
         <div
           className={cn(
             /*
-             * Cada panel del split es una tarjeta independiente (patrón
-             * Chrome dual-view). Border + rounded + bg-background lo envuelven
-             * como un cuadro propio; el focused sube el borde a `primary/60`
-             * + shadow para dejar clarísimo en cuál chat está el usuario
-             * mientras los otros quedan legibles pero secundarios.
+             * Each split panel is an independent card (Chrome dual-view
+             * pattern). Border + rounded + bg-background wrap it as a
+             * discrete box; focused bumps the border to `primary/60`
+             * so it's crystal-clear which chat the user is on while
+             * the others stay readable but secondary.
              */
             /*
-             * `duration-300 ease-out` para el paso focused/no-focused: el
-             * border/shadow crecen suave en vez de aparecer de golpe cuando el
-             * usuario clickea otro panel. El ring del hover se mantiene con
-             * su timing corto (150 ms default de Tailwind) para que reaccione
-             * inmediato al mouse.
+             * `duration-300 ease-out` for the focused/non-focused
+             * transition: the border grows softly instead of snapping
+             * when the user clicks another panel. Hover ring keeps its
+             * short timing (Tailwind's 150ms default) so it reacts
+             * instantly to the mouse.
              */
             /*
-             * Panel del split: solo el `border-color` distingue focused vs
-             * no-focused (más el ring en hover cuando no está focused).
-             * Antes había `shadow-md` acompañando pero era imperceptible
-             * y encarecía el paint frame a frame.
+             * Split panel visual: only `border-color` distinguishes
+             * focused vs non-focused (plus the hover ring when not
+             * focused). We used to add `shadow-md` too, but it was
+             * imperceptible and expensive per paint frame.
              */
             'bg-background relative flex h-full min-w-0 flex-col overflow-hidden rounded-lg border transition-[border-color] duration-300 ease-out',
             isFocused
@@ -356,11 +350,11 @@ export function SplitFragment({
         >
           <ChatSplitPanelHeader {...headerProps} />
           {/*
-            El composer del panel se pinta como barra embedded (pegada al
-            bottom con animación slide) — la visibilidad y la animación las
-            maneja `SessionChatBody` a partir de `splitMode`. Acá solo se le
-            pasa el flag; el composer sigue mounted siempre para preservar
-            el texto que estaba escribiendo el usuario en cada panel.
+            The panel's composer renders as an embedded bar (docked to
+            the bottom with a slide animation) — visibility + animation
+            are handled by `SessionChatBody` based on `splitMode`. We
+            just pass the flag here; the composer stays mounted always
+            so per-panel draft text is preserved.
           */}
           <div
             className="flex h-full min-w-0 flex-1 flex-col"

@@ -76,9 +76,10 @@ export default function App() {
     tabs.setOpenTabIds
   )
 
-  // Grupos son "tabs virtuales": cuando la ruta apunta a un grupo, el shell
-  // trabaja con su chat activo para todos los efectos por-sesión y luego el
-  // AgentSessionMainPanel decide si renderiza vista split o single-tab.
+  // Groups are "virtual tabs": when the route points to a group, the
+  // shell uses its active child chat for all per-session concerns, then
+  // AgentSessionMainPanel decides whether to render split view or
+  // single-tab.
   const activeGroup = useMemo(
     () =>
       route.sessionId
@@ -175,10 +176,10 @@ export default function App() {
     setSessions: bootstrap.setSessions
   })
 
-  // Multi-select para split view: cualquier click con Shift/Meta en una
-  // pestaña, chat del sidebar o item del dropdown agrega/quita ese chatId
-  // aquí. Cuando hay >= 2 seleccionados aparece un action bar que crea el
-  // grupo con todos.
+  // Multi-select for split view: any Shift/Meta click on a tab, a
+  // sidebar chat or a dropdown item adds/removes that chatId here.
+  // When 2+ chats are selected, an action bar appears that creates
+  // the group with all of them.
   const [selectedChatIds, setSelectedChatIds] = React.useState<Set<string>>(
     () => new Set()
   )
@@ -253,9 +254,9 @@ export default function App() {
       if (!group || !group.isPending) return
       const sourceId = group.chatIds[0]
       if (sourceId === partnerId) return
-      // Boost la fecha del compañero como si el split se hubiera creado
-      // con los dos desde el principio — así el chat entrante también
-      // sube a Today (mismo comportamiento que createSplitGroup).
+      // Boost the partner's date as if the split had been created with
+      // both chats from the start — this way the incoming chat also
+      // bubbles up to Today (same behavior as createSplitGroup).
       const now = new Date().toISOString()
       setChatDateBoosts([partnerId], now)
       bootstrap.setSessions(current =>
@@ -340,10 +341,11 @@ export default function App() {
     [layer.actions]
   )
 
-  // Estado del dialog "Rename split view". Análogo a `renameTarget` de
-  // chats: el target guarda el grupo cuyo nombre se edita; el value es el
-  // input controlado. `submitRenameGroup` llama al store cuando el trim
-  // del value no queda vacío. La única validación es "no vacío".
+  // Dialog state for "Rename split view". Analogous to `renameTarget`
+  // for chats: `target` holds the group whose name is being edited;
+  // `value` is the controlled input. `submitRenameGroup` calls the
+  // store when the trimmed value isn't empty. Only validation is "not
+  // empty".
   const [renameGroupTarget, setRenameGroupTarget] =
     useState<SessionGroup | null>(null)
   const [renameGroupValue, setRenameGroupValue] = useState('')
@@ -359,10 +361,10 @@ export default function App() {
     setRenameGroupValue(group.name || '')
   }, [])
 
-  // Args comunes que todo `SessionChatMount` de split view va a instanciar
-  // combinándolos con su chatId + session propia. Se calcula una vez para que
-  // los mounts secundarios de un grupo puedan levantar su pipeline con los
-  // mismos handles compartidos que ya usa el mount activo.
+  // Common args that every split-view `SessionChatMount` combines with
+  // its own chatId + session. Computed once so secondary mounts within
+  // a group can boot their pipeline with the same shared handles the
+  // active mount uses.
   const perSessionBaseArgs = useMemo(
     () => ({
       client: bootstrap.client,
@@ -600,11 +602,11 @@ export default function App() {
 
   const { sections, openTabs } = buildSessionSidebarModel({
     sessions: bootstrap.sessions,
-    // Pasamos los grupos GLOBALES (todos los scopes) para que el modelo
-    // pueda resolver un `grp_xxx` aunque el proyecto activo no coincida
-    // con el scope donde el grupo se creó. `buildSessionSidebarModel`
-    // internamente filtra por lo aplicable al scope actual — pero puede
-    // reconocer un grupo que atraviesa scopes en `openTabIds`.
+    // Pass ALL groups (across every scope) so the model can resolve a
+    // `grp_xxx` even when the active project doesn't match the scope
+    // the group was created in. `buildSessionSidebarModel` filters
+    // internally by scope, but it can still recognize a cross-scope
+    // group in `openTabIds`.
     tabGroups: tabGroupsStore.allTabGroups,
     activeProjectId: context.activeProjectId,
     openTabIds: cleanedOpenTabIds,

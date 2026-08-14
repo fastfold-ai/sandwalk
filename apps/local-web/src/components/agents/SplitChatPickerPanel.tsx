@@ -72,8 +72,8 @@ export function SplitChatPickerPanel({
   const [reloadTick, setReloadTick] = useState(0)
   const searchRef = useRef<HTMLInputElement | null>(null)
 
-  // Chats que ya viven dentro de algún grupo — quedan excluidos del picker
-  // (regla: un chat solo puede estar en un split a la vez).
+  // Chats that already live inside some group — excluded from the
+  // picker (rule: a chat can only be in one split at a time).
   const chatIdsInAnyGroup = useMemo(() => {
     const s = new Set<string>()
     for (const g of allTabGroups) for (const id of g.chatIds) s.add(id)
@@ -81,12 +81,12 @@ export function SplitChatPickerPanel({
   }, [allTabGroups])
 
   useEffect(() => {
-    // Fast path: si el proyecto elegido es el mismo que el activo del
-    // app, reusamos las sesiones ya cacheadas por el bootstrap — sin
-    // fetch. Elimina el race del boot (server aún arrancando) y el
-    // "loading eterno" cuando el usuario abre el picker apenas
-    // terminó el reset dev. El bootstrap se mantiene fresco solo por
-    // el ciclo de eventos SSE / loadSessions.
+    // Fast path: if the picked project matches the app's active one,
+    // reuse the sessions already cached by bootstrap — no fetch. This
+    // eliminates the boot race (server still starting) and the
+    // "eternal loading" state when the user opens the picker right
+    // after a dev reset. Bootstrap stays fresh on its own via the
+    // SSE / loadSessions cycle.
     if (projectId === activeProjectId) {
       setState({ kind: 'ready', sessions: cachedSessions })
       return
@@ -116,7 +116,7 @@ export function SplitChatPickerPanel({
   }, [client, projectId, activeProjectId, cachedSessions, reloadTick])
 
   useEffect(() => {
-    // Foco al input al abrir para arrancar tipeando de una.
+    // Focus the input on open so the user can start typing immediately.
     searchRef.current?.focus()
   }, [])
 
@@ -134,13 +134,13 @@ export function SplitChatPickerPanel({
   const activeProject = projects.find(p => p.id === projectId) || null
 
   return (
-    // Card INTERIOR — widget compacto centrado dentro de la card
-    // exterior (que sí tiene border/focus y la X arriba a la derecha).
-    // Máx-ancho para que se lea como un modal pequeño; máx-alto al 65%
-    // del padre para que nunca se estire a todo el panel — el scroll
-    // de la lista vive adentro del body.
+    // INNER card — compact widget centered inside the outer card
+    // (which owns the border/focus and the X in the top-right).
+    // Max-width so it reads as a small modal; max-height at 65% of
+    // the parent so it never stretches to fill the panel — the list
+    // scroll lives inside the body.
     <div className="bg-background flex w-full max-w-sm max-h-[65%] min-h-0 flex-col overflow-hidden rounded-lg border shadow-sm">
-      {/* Toolbar: proyecto + búsqueda. */}
+      {/* Toolbar: project + search. */}
       <div className="flex shrink-0 flex-col gap-2 px-3 py-3">
         <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">

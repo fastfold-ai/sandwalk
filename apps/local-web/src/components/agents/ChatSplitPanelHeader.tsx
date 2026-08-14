@@ -66,8 +66,9 @@ export type ChatSplitPanelHeaderProps = {
   onFocusPanel: () => void
   projects: AgentProject[]
   onSelectProjectScope: (projectId: string) => void
-  // Toggles compartidos con el shell — apuntan al panel único global
-  // (Files / Terminal / Preview). Se van a mover a modal en otra iteración.
+  // Toggles shared with the shell — they point at the single global
+  // panel (Files / Terminal / Preview). To be moved into a modal in a
+  // future iteration.
   showFiles: boolean
   showTerminal: boolean
   showPreview: boolean
@@ -152,7 +153,7 @@ export function ChatSplitPanelHeader({
           : 'bg-muted/25 border-border/30 text-muted-foreground'
       )}
     >
-      {/* Izquierda: status + color + título / proyecto */}
+      {/* Left: status + color + title / project */}
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <span className="flex size-5 shrink-0 items-center justify-center">
           {session ? <SessionStatusIcon status={session.status} /> : null}

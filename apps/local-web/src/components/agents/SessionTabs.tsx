@@ -150,9 +150,10 @@ export function SessionTabs({
   onCreateSplitFromSelection?: () => void
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
-  // Modal de confirmación para "Delete Split View": la acción disuelve el
-  // grupo (los chats vuelven a ser conversaciones sueltas) — irreversible
-  // en tanto la agrupación se pierde, pero ningún chat se borra.
+  // Confirmation modal for "Delete Split View": the action dissolves
+  // the group (chats become standalone conversations again) —
+  // irreversible in the sense that the grouping is lost, but no chat
+  // is deleted.
   const [dissolveConfirm, setDissolveConfirm] = useState<SessionGroup | null>(
     null
   )
@@ -277,12 +278,12 @@ export function SessionTabs({
     const idx = orderedTabs.findIndex(tab => tab.id === activeId)
     if (idx < 0) return
 
-    // Si el tab activo YA está totalmente visible en el viewport del
-    // strip, no scrolleamos: el usuario acaba de clickear un tab que
-    // ya ve, no tiene sentido animar. El centrado automático solo
-    // aplica cuando el tab está fuera del viewport (típicamente
-    // porque el usuario navegó desde el sidebar o el dropdown "All
-    // tabs" a un tab que no estaba a la vista).
+    // If the active tab is ALREADY fully visible in the strip's
+    // viewport, don't scroll: the user just clicked a tab they can
+    // already see, no point animating. Auto-centering only kicks in
+    // when the tab is off-viewport (typically because the user
+    // navigated from the sidebar or the "All tabs" dropdown to a tab
+    // that wasn't in view).
     const stripRect = strip.getBoundingClientRect()
     const tabRect = tabEl.getBoundingClientRect()
     const isFullyVisible =
