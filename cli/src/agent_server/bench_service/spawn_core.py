@@ -22,7 +22,12 @@ from agent_server.bench_service.judge import (
     heuristic_checklist,
     run_llm_judge,
 )
-from agent_server.bench_service.results_store import get_result, new_run_id, save_result
+from agent_server.bench_service.results_store import (
+    get_result,
+    new_run_id,
+    resolve_bench_provider,
+    save_result,
+)
 from agent_server.settings_service import SettingsService
 
 logger = logging.getLogger(__name__)
@@ -110,7 +115,10 @@ def run_agent_suite(
         raise RuntimeError(f"No cells for suite {suite_id}")
 
     settings = SettingsService.get()
-    use_provider = provider or str(getattr(cells[0], "provider", None) or settings.provider)
+    use_provider = resolve_bench_provider(
+        provider or str(getattr(cells[0], "provider", None) or settings.provider),
+        profile_id=getattr(settings, "openai_profile_id", None),
+    ) or provider or str(getattr(cells[0], "provider", None) or settings.provider)
     use_model = model_id or cells[0].model_id
     workers = max(1, int(concurrency or 1))
 
@@ -233,6 +241,10 @@ def run_agent_suite(
             environment=environment,
         )
         result["status"] = status
+        result["provider"] = use_provider
+        prior_name = (resume_checkpoint or {}).get("name") or (prior or {}).get("name")
+        if prior_name:
+            result["name"] = prior_name
         save_result(result)
         _checkpoint(status)
         return result
@@ -298,10 +310,19 @@ def run_agent_suite(
                 _copy_inputs(pack, cell, ws)
                 (ws / "BENCH_PROMPT.md").write_text(cell.prompt, encoding="utf-8")
             # Chat stores only a short kickoff — full text stays in BENCH_PROMPT.md.
-            deps.service.submit_message(
-                session_id=sid,
-                content=bench_kickoff_message(question_id=cell.question_id),
-            )
+            if _reason():
+                stop_reason = _reason() or "pause"
+                return None
+            try:
+                deps.service.submit_message(
+                    session_id=sid,
+                    content=bench_kickoff_message(question_id=cell.question_id),
+                )
+            except RuntimeError as exc:
+                if "event loop" in str(exc).lower():
+                    stop_reason = stop_reason or "pause"
+                    return None
+                raise
             _wait_until_settled(deps, sid, stop_check=_reason, timeout_s=3600)
             reason = _reason()
             if reason:
@@ -352,6 +373,27 @@ def run_agent_suite(
             idx, cell = claimed
             try:
                 row = _run_cell(idx, cell)
+            except RuntimeError as exc:
+                if "event loop" in str(exc).lower():
+                    stop_reason = stop_reason or "pause"
+                    return
+                logger.exception("bench cell failed: %s", exc)
+                row = {
+                    "id": str(idx),
+                    "correct": False,
+                    "expected": "",
+                    "predicted": "",
+                    "question": str(getattr(cell, "prompt", ""))[:2000],
+                    "raw_response": "",
+                    "category": str(cell.question_id),
+                    "question_id": str(cell.question_id),
+                    "time_s": 0,
+                    "session_id": None,
+                    "eval_mode": "error",
+                    "judge": {"error": str(exc)},
+                    "tools_seen": [],
+                    "heuristics": {},
+                }
             except Exception as exc:  # noqa: BLE001
                 logger.exception("bench cell failed: %s", exc)
                 row = {
@@ -444,6 +486,10 @@ def run_agent_suite(
         environment=environment,
     )
     result["status"] = "completed"
+    result["provider"] = use_provider
+    prior_name = (resume_checkpoint or {}).get("name") or (prior or {}).get("name")
+    if prior_name:
+        result["name"] = prior_name
     save_result(result)
     delete_checkpoint(run_id)
     if cleanup_sessions:

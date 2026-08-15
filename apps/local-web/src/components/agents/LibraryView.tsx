@@ -1,19 +1,7 @@
 import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { LibraryItem, LibraryKind } from '@sandwalk/agent-ui-core'
-import {
-  Check,
-  LayoutGrid,
-  LibraryBig,
-  List,
-  Loader2,
-  MessageSquarePlus,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  Upload,
-  X
-} from 'lucide-react'
+import { Check, LayoutGrid, LibraryBig, List, Loader, MessageSquarePlus, MoreHorizontal, Pencil, Trash2, Upload, X } from 'lucide-react'
 import {
   memo,
   useCallback,
@@ -699,7 +687,7 @@ export function LibraryView({
 
           {loading && items.length === 0 ? (
             <div className="text-muted-foreground flex items-center gap-2 py-16 text-[13px]">
-              <Loader2 className="size-4 animate-spin" />
+              <Loader className="size-4 animate-spin" />
               Loading library…
             </div>
           ) : items.length === 0 ? (
@@ -960,7 +948,7 @@ export function LibraryView({
           ) : null}
           {loadingMore ? (
             <div className="text-muted-foreground flex items-center justify-center gap-2 py-6 text-[12px]">
-              <Loader2 className="size-3.5 animate-spin" />
+              <Loader className="size-3.5 animate-spin" />
               Loading more…
             </div>
           ) : null}

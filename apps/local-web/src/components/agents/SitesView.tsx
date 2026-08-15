@@ -1,16 +1,6 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentProject, AgentSession, Site } from '@sandwalk/agent-ui-core'
-import {
-  ExternalLink,
-  Globe2,
-  LayoutGrid,
-  List,
-  Loader2,
-  Pencil,
-  Plus,
-  Rocket,
-  Trash2
-} from 'lucide-react'
+import { ExternalLink, Globe2, LayoutGrid, List, Loader, Pencil, Plus, Rocket, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
@@ -99,7 +89,7 @@ function SiteActions({
       ) : null}
       <Button size="sm" onClick={onPublish} disabled={busy}>
         {busy ? (
-          <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+          <Loader className="mr-1.5 size-3.5 animate-spin" />
         ) : (
           <Rocket className="mr-1.5 size-3.5" />
         )}
@@ -269,7 +259,7 @@ export function SitesView({
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="text-muted-foreground size-5 animate-spin" />
+        <Loader className="text-muted-foreground size-5 animate-spin" />
       </div>
     )
   }

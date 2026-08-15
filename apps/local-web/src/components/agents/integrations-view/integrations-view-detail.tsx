@@ -4,7 +4,7 @@ import type {
   IntegrationSetupResult,
   IntegrationSummary
 } from '@sandwalk/agent-ui-core'
-import { CircleCheck, Loader2 } from 'lucide-react'
+import { CircleCheck, Loader } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { BusyConfirmOverlay } from '@/components/BusyConfirmOverlay'
@@ -169,7 +169,7 @@ export function IntegrationsDetailView({
                   onClick={() => void view.runValidate(selected.key)}
                 >
                   {view.validationBusy ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader className="size-4 animate-spin" />
                   ) : (
                     <CircleCheck className="size-4" />
                   )}
@@ -185,7 +185,7 @@ export function IntegrationsDetailView({
                   }
                 >
                   {view.validationBusy ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader className="size-4 animate-spin" />
                   ) : null}
                   Save &amp; Test
                 </Button>

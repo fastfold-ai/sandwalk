@@ -2,7 +2,7 @@ import './index.css'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, HashRouter } from 'react-router-dom'
 
 import App from './App.tsx'
 import { AppErrorBoundary } from './components/AppErrorBoundary.tsx'
@@ -11,6 +11,7 @@ import { Toaster } from './components/ui/sonner.tsx'
 import { DesktopUpdateProvider } from './hooks/useDesktopUpdate.tsx'
 import { installBlockBrowserBackspace } from './lib/block-browser-backspace.ts'
 import { isMacDesktopOverlay, platformOS } from './lib/desktop.ts'
+import { usesDesktopHashRouter } from './lib/desktop-spa-route.ts'
 import {
   applyAccentColor,
   applyAppFont,
@@ -57,9 +58,11 @@ if (isMacDesktopOverlay()) {
   applyDockIcon(getStoredDockIcon())
 }
 
+const Router = usesDesktopHashRouter() ? HashRouter : BrowserRouter
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
+    <Router>
       <ChatStoreProvider>
         <DesktopUpdateProvider>
           <AppErrorBoundary>
@@ -68,6 +71,6 @@ createRoot(document.getElementById('root')!).render(
           <Toaster closeButton position="top-center" />
         </DesktopUpdateProvider>
       </ChatStoreProvider>
-    </BrowserRouter>
+    </Router>
   </StrictMode>
 )

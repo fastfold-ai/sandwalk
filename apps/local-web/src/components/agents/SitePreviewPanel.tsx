@@ -1,13 +1,6 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { Site } from '@sandwalk/agent-ui-core'
-import {
-  ExternalLink,
-  Globe2,
-  Loader2,
-  RefreshCw,
-  Rocket,
-  X
-} from 'lucide-react'
+import { ExternalLink, Globe2, Loader, RefreshCw, Rocket, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -212,7 +205,7 @@ export function SitePreviewPanel({
               disabled={!selected || publishing}
             >
               {publishing ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Loader className="size-3.5 animate-spin" />
               ) : (
                 <Rocket className="size-3.5" />
               )}
@@ -251,7 +244,7 @@ export function SitePreviewPanel({
 
       {loading ? (
         <div className="text-muted-foreground flex min-h-0 flex-1 items-center justify-center gap-2 text-xs">
-          <Loader2 className="size-4 animate-spin" />
+          <Loader className="size-4 animate-spin" />
           Loading sites…
         </div>
       ) : error && !preview ? (
@@ -278,7 +271,7 @@ export function SitePreviewPanel({
         />
       ) : (
         <div className="text-muted-foreground flex min-h-0 flex-1 items-center justify-center gap-2 text-xs">
-          <Loader2 className="size-4 animate-spin" />
+          <Loader className="size-4 animate-spin" />
           Preparing preview…
         </div>
       )}

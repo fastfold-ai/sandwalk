@@ -1,22 +1,48 @@
-import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import {
-  ArrowLeft,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Download,
-  ExternalLink,
-  Loader2,
-  Target,
-  X
-} from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import type {
+  BenchActiveStatus,
+  BenchSuiteCard,
+  LocalAgentClient
+} from '@sandwalk/agent-local-client'
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, ExternalLink, Loader, Pencil, Play, Target, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { formatTokenCount } from '@/components/agents/usage-overview-utils'
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+
+const PACK_DISPLAY_TITLES: Record<string, string> = {
+  'bio-capybara-full': 'Bio-Capybara-full',
+  'skills-mcp-bakeoff': 'Bio-Capybara-full'
+}
+
+function suiteTitle(id: string | null | undefined, suites: BenchSuiteCard[]): string {
+  if (!id) return ''
+  const fromCard = suites.find(card => card.id === id || card.packId === id)?.title
+  return fromCard || PACK_DISPLAY_TITLES[id] || id
+}
+
+function prettyProvider(id: string): string {
+  const raw = id.trim()
+  if (!raw) return ''
+  const key = raw.toLowerCase()
+  if (key === 'openai') return 'OpenAI'
+  if (key === 'openai_compatible' || key === 'openai-compatible') {
+    return 'OpenAI-compatible'
+  }
+  if (key === 'omlx') return 'oMLX'
+  if (key === 'unsloth') return 'Unsloth'
+  if (key === 'ollama') return 'Ollama'
+  if (key === 'llama_cpp' || key === 'llamacpp') return 'llama.cpp'
+  if (key === 'lm_studio' || key === 'lmstudio') return 'LM Studio'
+  if (key === 'ds4') return 'DS4'
+  if (key === 'openrouter') return 'OpenRouter'
+  if (key === 'deepseek') return 'DeepSeek'
+  return raw.charAt(0).toUpperCase() + raw.slice(1)
+}
 
 type BenchQuestion = {
   id?: string
@@ -373,21 +399,49 @@ function BenchEnvironmentPanel({ env }: { env: BenchEnvironment }) {
   )
 }
 
+function liveStatusForRun(
+  runId: string,
+  active: BenchActiveStatus | null
+): string | null {
+  if (!active) return null
+  if (
+    (active.inflight ?? []).some(job => job.runId === runId) ||
+    (active.running && active.currentRunId === runId)
+  ) {
+    return 'running'
+  }
+  if ((active.queue ?? []).some(job => job.runId === runId)) return 'queued'
+  if ((active.paused ?? []).some(job => job.runId === runId)) return 'paused'
+  return null
+}
+
 export function BenchResultDetail({
   client,
-  runId
+  runId,
+  suites = []
 }: {
   client: LocalAgentClient
   runId: string
+  suites?: BenchSuiteCard[]
 }) {
   const navigate = useNavigate()
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null)
+  const [liveStatus, setLiveStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [openId, setOpenId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'pass' | 'fail'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(40)
+  const [resuming, setResuming] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draftName, setDraftName] = useState('')
+  const editingRef = useRef(false)
   const PAGE = 40
+
+  useEffect(() => {
+    editingRef.current = editing
+  }, [editing])
 
   useEffect(() => {
     let cancelled = false
@@ -395,22 +449,39 @@ export function BenchResultDetail({
     setError(null)
     setVisibleCount(PAGE)
     setOpenId(null)
-    void client
-      .getBenchResult(runId)
-      .then(row => {
-        if (cancelled) return
-        setDetail(row)
-      })
-      .catch(err => {
-        if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Unable to load result')
-        setDetail(null)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+    const load = (initial: boolean) => {
+      void Promise.all([
+        client.getBenchResult(runId),
+        client.getBenchActive().catch(() => null)
+      ])
+        .then(([row, active]) => {
+          if (cancelled) return
+          setDetail(current => {
+            if (editingRef.current && current) {
+              return { ...row, name: current.name }
+            }
+            return row
+          })
+          setLiveStatus(liveStatusForRun(runId, active))
+        })
+        .catch(err => {
+          if (cancelled) return
+          if (initial) {
+            setError(
+              err instanceof Error ? err.message : 'Unable to load result'
+            )
+            setDetail(null)
+          }
+        })
+        .finally(() => {
+          if (!cancelled && initial) setLoading(false)
+        })
+    }
+    load(true)
+    const id = window.setInterval(() => load(false), 1500)
     return () => {
       cancelled = true
+      window.clearInterval(id)
     }
   }, [client, runId])
 
@@ -418,10 +489,13 @@ export function BenchResultDetail({
   const categories = useMemo(() => categoryScores(detail), [detail])
   const environment = useMemo(() => asEnvironment(detail), [detail])
   const filtered = useMemo(() => {
-    if (filter === 'pass') return questions.filter(q => q.correct)
-    if (filter === 'fail') return questions.filter(q => !q.correct)
-    return questions
-  }, [filter, questions])
+    const byCategory = categoryFilter
+      ? questions.filter(q => (q.category || '') === categoryFilter)
+      : questions
+    if (filter === 'pass') return byCategory.filter(q => q.correct)
+    if (filter === 'fail') return byCategory.filter(q => !q.correct)
+    return byCategory
+  }, [categoryFilter, filter, questions])
   const visible = useMemo(
     () => filtered.slice(0, visibleCount),
     [filtered, visibleCount]
@@ -430,7 +504,7 @@ export function BenchResultDetail({
   useEffect(() => {
     setVisibleCount(PAGE)
     setOpenId(null)
-  }, [filter])
+  }, [categoryFilter, filter])
   const accuracy = Number(detail?.accuracy ?? 0)
   const pct = Math.round(accuracy * 1000) / 10
   const correct = Number(detail?.correct ?? 0)
@@ -441,6 +515,22 @@ export function BenchResultDetail({
   const projectId = (detail?.project_id || detail?.projectId || null) as
     | string
     | null
+  const displayName =
+    String(detail?.name || '').trim() || suiteTitle(benchmark, suites) || benchmark
+  const suiteLabel = suiteTitle(benchmark, suites) || benchmark
+  const providerRaw = String(
+    detail?.provider ||
+      environment?.model?.provider ||
+      (environment?.runtime?.provider ?? '') ||
+      ''
+  ).trim()
+  const provider = prettyProvider(providerRaw)
+  const lifetimeTokens = Number(
+    detail?.lifetimeTokens ?? detail?.lifetime_tokens
+  )
+  const usageLabel = Number.isFinite(lifetimeTokens)
+    ? formatTokenCount(lifetimeTokens)
+    : null
   const startedLabel = formatStartedAt(
     environment?.started_at ||
       environment?.captured_at ||
@@ -450,10 +540,47 @@ export function BenchResultDetail({
 
   useEffect(() => {
     if (!detail) return
-    document.title = `${benchmark} · Benchmarking · Sandwalk`
-  }, [benchmark, detail])
+    document.title = `${displayName} · Benchmarking · Sandwalk`
+  }, [displayName, detail])
 
   const goBack = () => navigate('/dashboard/bench')
+  const storedStatus = String(detail?.status || '').toLowerCase()
+  const statusKey = (liveStatus || storedStatus).toLowerCase()
+  const paused = statusKey === 'paused' || statusKey === 'interrupted'
+  const running = statusKey === 'running'
+  const isPartial =
+    Boolean(statusKey) &&
+    statusKey !== 'completed' &&
+    statusKey !== 'queued'
+
+  const startEdit = () => {
+    setDraftName(String(detail?.name || '').trim() || displayName)
+    setEditing(true)
+  }
+
+  const saveName = async (name: string) => {
+    const next = name.trim()
+    setEditing(false)
+    try {
+      await client.patchBenchRun(runId, { name: next })
+      setDetail(current =>
+        current ? { ...current, name: next || null } : current
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to rename run')
+    }
+  }
+
+  const resumeRun = async () => {
+    setResuming(true)
+    try {
+      await client.resumeBenchRun(runId)
+      navigate('/dashboard/bench')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to resume bench')
+      setResuming(false)
+    }
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -477,10 +604,34 @@ export function BenchResultDetail({
           </button>
           <span className="text-muted-foreground/40">/</span>
           <span className="text-foreground truncate font-medium">
-            {benchmark}
+            {displayName}
           </span>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {paused ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={resuming}
+              onClick={() => void resumeRun()}
+            >
+              {resuming ? (
+                <Loader className="size-3.5 animate-spin" />
+              ) : (
+                <Play className="size-3.5" />
+              )}
+              Resume
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={startEdit}
+          >
+            <Pencil className="size-3.5" />
+            Rename
+          </Button>
           {projectId ? (
             <Button
               type="button"
@@ -517,7 +668,7 @@ export function BenchResultDetail({
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 md:px-6">
           {loading ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Loader2 className="size-4 animate-spin" />
+              <Loader className="size-4 animate-spin" />
               Loading result…
             </div>
           ) : null}
@@ -535,15 +686,47 @@ export function BenchResultDetail({
                   <div
                     className={cn(
                       'flex size-10 shrink-0 items-center justify-center rounded-md',
-                      pctBg(pct)
+                      running
+                        ? 'bg-sky-500/15 text-sky-600'
+                        : paused
+                          ? 'bg-muted text-muted-foreground'
+                          : pctBg(pct)
                     )}
                   >
-                    <Target className="size-4" />
+                    {running ? (
+                      <Loader className="size-4 animate-spin" />
+                    ) : (
+                      <Target className="size-4" />
+                    )}
                   </div>
                   <div className="min-w-0">
-                    <h1 className="text-xl font-semibold tracking-tight">
-                      {benchmark}
-                    </h1>
+                    {editing ? (
+                      <Input
+                        autoFocus
+                        value={draftName}
+                        onChange={event => setDraftName(event.target.value)}
+                        onBlur={() => void saveName(draftName)}
+                        onKeyDown={event => {
+                          if (event.key === 'Enter') void saveName(draftName)
+                          if (event.key === 'Escape') setEditing(false)
+                        }}
+                        className="h-9 max-w-md text-xl font-semibold"
+                      />
+                    ) : (
+                      <div className="flex min-w-0 items-center gap-2">
+                        <h1 className="truncate text-xl font-semibold tracking-tight">
+                          {displayName}
+                        </h1>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground shrink-0"
+                          aria-label="Rename run"
+                          onClick={startEdit}
+                        >
+                          <Pencil className="size-3.5" />
+                        </button>
+                      </div>
+                    )}
                     <p className="text-muted-foreground mt-1 text-sm">
                       {modelId}
                       {timeS ? ` · ${formatRunDuration(timeS)}` : ''}
@@ -551,6 +734,26 @@ export function BenchResultDetail({
                       {detail.thinking_used || detail.thinkingUsed
                         ? ' · thinking'
                         : ''}
+                    </p>
+                    <p className="text-muted-foreground mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                      <span>
+                        Provider{' '}
+                        <span className="text-foreground font-medium">
+                          {provider || '—'}
+                        </span>
+                      </span>
+                      <span>
+                        Usage{' '}
+                        <span className="text-foreground font-medium tabular-nums">
+                          {usageLabel || '—'}
+                        </span>
+                      </span>
+                      <span>
+                        Suite{' '}
+                        <span className="text-foreground font-medium">
+                          {suiteLabel}
+                        </span>
+                      </span>
                     </p>
                     <p className="text-muted-foreground mt-0.5 font-mono text-[11px]">
                       {runId}
@@ -569,6 +772,20 @@ export function BenchResultDetail({
                   <p className="text-muted-foreground text-sm tabular-nums">
                     {correct}/{total} correct
                   </p>
+                  {running ? (
+                    <p className="text-sky-600 mt-1 inline-flex items-center justify-end gap-1.5 text-xs font-medium">
+                      <Loader className="size-3.5 animate-spin" />
+                      Running
+                      <span className="text-muted-foreground font-normal">
+                        · Partial results
+                      </span>
+                    </p>
+                  ) : isPartial ? (
+                    <p className="text-muted-foreground mt-1 text-xs font-medium">
+                      Partial results
+                      {paused ? ' · paused' : ''}
+                    </p>
+                  ) : null}
                 </div>
               </header>
 
@@ -579,9 +796,23 @@ export function BenchResultDetail({
                   <h2 className="text-sm font-semibold">Categories</h2>
                   <div className="grid gap-1.5 sm:grid-cols-2">
                     {categories.map(([cat, score]) => (
-                      <div
+                      <button
                         key={cat}
-                        className="border-border/60 flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                        type="button"
+                        className={cn(
+                          'border-border/60 flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors',
+                          categoryFilter === cat
+                            ? 'border-primary/40 bg-primary/[0.04]'
+                            : 'hover:bg-muted/40'
+                        )}
+                        onClick={() => {
+                          setCategoryFilter(current =>
+                            current === cat ? null : cat
+                          )
+                          document
+                            .getElementById('bench-questions')
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }}
                       >
                         <span className="text-muted-foreground truncate">
                           {cat.replace(/_/g, ' ')}
@@ -594,13 +825,13 @@ export function BenchResultDetail({
                         >
                           {(Number(score) * 100).toFixed(1)}%
                         </span>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </section>
               ) : null}
 
-              <section className="space-y-3">
+              <section id="bench-questions" className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-sm font-semibold">
                     Questions
@@ -608,10 +839,25 @@ export function BenchResultDetail({
                       <span className="text-muted-foreground font-normal">
                         {' '}
                         · {filtered.length}
-                        {filter !== 'all' ? ` of ${questions.length}` : ''}
+                        {filter !== 'all' || categoryFilter
+                          ? ` of ${questions.length}`
+                          : ''}
+                        {categoryFilter
+                          ? ` · ${categoryFilter.replace(/_/g, ' ')}`
+                          : ''}
                       </span>
                     ) : null}
                   </h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                  {categoryFilter ? (
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground text-xs"
+                      onClick={() => setCategoryFilter(null)}
+                    >
+                      Clear category
+                    </button>
+                  ) : null}
                   <div className="bg-muted/50 inline-flex rounded-md p-0.5">
                     {(
                       [
@@ -636,6 +882,7 @@ export function BenchResultDetail({
                         {label}
                       </button>
                     ))}
+                  </div>
                   </div>
                 </div>
 

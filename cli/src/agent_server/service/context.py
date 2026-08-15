@@ -23,12 +23,15 @@ class RunContext:
 def build_run_context(store: AgentStore, session_id: str) -> RunContext:
     from agent_server.mcp_service import McpService
 
-    mcp_servers = McpService(store).resolve_runtime_servers()
     project_context = None
     specialist_instructions = None
     allowed_skill_names = None
     allowed_tool_names = None
     current = store.get_session(session_id)
+    is_bench = current is not None and getattr(current, "source", None) == "bench"
+    # Bench cells without a specialist were probing every Dashboard MCP
+    # (Hugging Face 5s timeouts) and stalling chat in the same process.
+    mcp_servers = [] if is_bench else McpService(store).resolve_runtime_servers()
     if current and current.project_id:
         project = store.get_project(current.project_id)
         if project and project.agent_context:
@@ -43,6 +46,8 @@ def build_run_context(store: AgentStore, session_id: str) -> RunContext:
             allowed_skill_names = list(specialist.skill_names or [])
             # Explicit allowlist (may be empty → no domain registry tools).
             allowed_tool_names = list(specialist.tool_names or [])
+            if is_bench:
+                mcp_servers = McpService(store).resolve_runtime_servers()
             mcp_servers = filter_mcp_servers_for_specialist(
                 mcp_servers,
                 mcp_server_ids=list(specialist.mcp_server_ids or []),

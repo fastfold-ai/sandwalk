@@ -1,5 +1,4 @@
-import { Loader2 } from 'lucide-react'
-
+import { Loader } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -98,7 +97,7 @@ export function ModelsCustomDialog({
             disabled={savingCustom || !customForm.id.trim()}
             onClick={onSaveCustomModel}
           >
-            {savingCustom ? <Loader2 className="animate-spin" /> : null}
+            {savingCustom ? <Loader className="animate-spin" /> : null}
             Add to list
           </Button>
         </DialogFooter>

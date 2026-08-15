@@ -3,8 +3,7 @@ import type {
   IntegrationSetupResult,
   IntegrationSummary
 } from '@sandwalk/agent-ui-core'
-import { Check, CircleCheck, Eye, EyeOff, Loader2 } from 'lucide-react'
-
+import { Check, CircleCheck, Eye, EyeOff, Loader } from 'lucide-react'
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
 import { FastfoldAddControls } from '@/components/agents/integrations-view/fastfold/FastfoldAddControls'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
@@ -145,7 +144,7 @@ export function OnboardingIntegrationDetail({
             className="shrink-0"
           >
             {setupRunning || openingTerminal ? (
-              <Loader2 className="size-4 animate-spin" />
+              <Loader className="size-4 animate-spin" />
             ) : (
               <img
                 src="/integrations/vercel.png"
@@ -272,7 +271,7 @@ export function OnboardingIntegrationDetail({
           className="inline-flex h-9 items-center gap-2"
         >
           {busy ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader className="size-4 animate-spin" />
           ) : (
             <Check className="size-4" />
           )}

@@ -1,4 +1,50 @@
-import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
+import type { AgentModel, IntegrationSummary } from '@sandwalk/agent-ui-core'
+
+import {
+  catalogModelPrefKey,
+  scoreModelCatalogSearch
+} from '@/lib/composer-models'
+
+export type ModelSourceFilter = 'all' | 'cloud' | 'local' | 'favorites'
+
+export function filterModelCatalog(
+  models: AgentModel[],
+  options: {
+    query: string
+    sourceFilter: ModelSourceFilter
+    providerFilter: string
+    favoriteKeys: string[]
+  }
+): AgentModel[] {
+  const needle = options.query.trim()
+  const favoriteSet = new Set(options.favoriteKeys)
+  const filtered = models.filter(model => {
+    const isLocal = model.source === 'profile'
+    const isCloud = model.source === 'cloud' || model.source === 'custom'
+    if (options.sourceFilter === 'favorites') {
+      if (!favoriteSet.has(catalogModelPrefKey(model))) return false
+    } else {
+      if (options.sourceFilter === 'local' && !isLocal) return false
+      if (options.sourceFilter === 'cloud' && !isCloud) return false
+    }
+    const providerKey = isLocal ? 'local' : model.provider
+    if (
+      options.providerFilter !== 'all' &&
+      providerKey !== options.providerFilter
+    ) {
+      return false
+    }
+    if (!needle) return true
+    return scoreModelCatalogSearch(model, needle) >= 0
+  })
+  if (!needle) return filtered
+  return [...filtered].sort((a, b) => {
+    const scoreDiff =
+      scoreModelCatalogSearch(b, needle) - scoreModelCatalogSearch(a, needle)
+    if (scoreDiff !== 0) return scoreDiff
+    return a.label.localeCompare(b.label)
+  })
+}
 
 export const CLOUD_PROVIDERS = [
   { value: 'openai', label: 'OpenAI' },

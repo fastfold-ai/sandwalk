@@ -1,5 +1,4 @@
-import { Loader2, Plug, Search, Unplug } from 'lucide-react'
-
+import { Loader, Plug, Search, Unplug } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -58,7 +57,7 @@ export function McpDetailToolsSection({ state }: { state: McpDetailViewState }) 
 
       {loading ? (
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Loader2 className="size-4 animate-spin" />
+          <Loader className="size-4 animate-spin" />
           Loading tools…
         </div>
       ) : null}
@@ -76,7 +75,7 @@ export function McpDetailToolsSection({ state }: { state: McpDetailViewState }) 
                 onClick={() => primaryConnect()}
               >
                 {connectPending ? (
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <Loader className="size-3.5 animate-spin" />
                 ) : (
                   <Plug className="size-3.5" />
                 )}
@@ -92,7 +91,7 @@ export function McpDetailToolsSection({ state }: { state: McpDetailViewState }) 
                   onClick={() => void disconnect()}
                 >
                   {disconnectPending ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader className="size-3.5 animate-spin" />
                   ) : (
                     <Unplug className="size-3.5" />
                   )}

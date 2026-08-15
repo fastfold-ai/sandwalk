@@ -1,5 +1,4 @@
-import { Check, Loader2, RotateCcw } from 'lucide-react'
-
+import { Check, Loader, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -134,7 +133,7 @@ export function SandboxSettingsSection({
           onClick={() => onApply()}
         >
           {busy && overlayMessage?.startsWith('Saving') ? (
-            <Loader2 className="animate-spin" />
+            <Loader className="animate-spin" />
           ) : (
             <Check />
           )}

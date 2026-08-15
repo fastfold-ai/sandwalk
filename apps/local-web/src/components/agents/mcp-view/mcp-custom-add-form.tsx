@@ -1,5 +1,4 @@
-import { ChevronDown, Loader2 } from 'lucide-react'
-
+import { ChevronDown, Loader } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -183,7 +182,7 @@ export function McpCustomAddForm({
           disabled={creatingCustom || !mcpName.trim() || !mcpTarget.trim()}
           onClick={onSubmitCustomMcp}
         >
-          {creatingCustom ? <Loader2 className="size-4 animate-spin" /> : null}
+          {creatingCustom ? <Loader className="size-4 animate-spin" /> : null}
           Add server
         </Button>
       </div>

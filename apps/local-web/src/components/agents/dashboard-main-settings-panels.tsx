@@ -209,22 +209,22 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
             signal,
             provider
           )
-          void loadModelOptions()
+          void loadModelOptions({ force: true })
           return updated
         }}
         onCreateCustomModel={async (input, signal) => {
           const created = await client.createCustomModel(input, signal)
-          void loadModelOptions()
+          void loadModelOptions({ force: true })
           return created
         }}
         onDeleteCustomModel={async (modelId, signal) => {
           await client.deleteCustomModel(modelId, signal)
-          void loadModelOptions()
+          void loadModelOptions({ force: true })
         }}
         onListProfiles={signal => client.listModelProfiles({ signal })}
         onCreateProfile={async (input, signal) => {
           const created = await client.createModelProfile(input, signal)
-          void loadModelOptions()
+          void loadModelOptions({ force: true })
           return created
         }}
         onUpdateProfile={async (profileId, input, signal) => {
@@ -233,12 +233,12 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
             input,
             signal
           )
-          void loadModelOptions()
+          void loadModelOptions({ force: true })
           return updated
         }}
         onDeleteProfile={async (profileId, signal) => {
           await client.deleteModelProfile(profileId, signal)
-          void loadModelOptions()
+          void loadModelOptions({ force: true })
         }}
         onProbeProfile={(profileId, signal) =>
           client.probeModelProfile(profileId, signal)
@@ -249,12 +249,12 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         onSaveProviderKey={async (key, values) => {
           await client.updateIntegration(key, values)
           await loadIntegrations()
-          await loadModelOptions()
+          await loadModelOptions({ force: true })
         }}
         onClearProviderKey={async key => {
           await client.removeIntegration(key)
           await loadIntegrations()
-          await loadModelOptions()
+          await loadModelOptions({ force: true })
         }}
         onTestProviderKey={key => client.validateIntegration(key)}
         onRevealStoredSecret={async key => {
@@ -265,6 +265,14 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
           const revealed = await client.revealModelProfileSecret(profileId)
           return revealed.value
         }}
+        onLoadModelPreferences={() => client.getModelPreferences()}
+        onToggleModelFavorite={model =>
+          client.toggleModelFavorite({
+            provider: model.provider,
+            model: model.id,
+            profileId: model.profileId
+          })
+        }
       />
     )
   }

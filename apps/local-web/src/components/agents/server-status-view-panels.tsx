@@ -1,6 +1,5 @@
 import type { ServerStatusReport } from '@sandwalk/agent-ui-core'
-import { Loader2 } from 'lucide-react'
-
+import { Loader } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -121,7 +120,7 @@ export function ServerStatusCacheSection({
             onClick={onRequestClear}
             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
-            {clearing ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            {clearing ? <Loader className="size-3.5 animate-spin" /> : null}
             Clear cache
           </Button>
         </div>

@@ -2,7 +2,7 @@ import type {
   AgentCatalogLeaderboardView,
   AgentCatalogSkill
 } from '@sandwalk/agent-ui-core'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader, RefreshCw } from 'lucide-react'
 import { type TouchEvent, useEffect, useRef, useState, type WheelEvent } from 'react'
 
 import { ListRowsSkeleton } from '@/components/agents/PageSkeletons'
@@ -232,7 +232,7 @@ export function SkillsCatalogResultsSection({
               opacity: catalogRefreshing || pullDistance > 12 ? 1 : 0.5
             }}
           >
-            <Loader2
+            <Loader
               className={cn(
                 'size-3.5',
                 catalogRefreshing || pullDistance >= PULL_THRESHOLD
@@ -337,7 +337,7 @@ export function SkillsCatalogResultsSection({
               <div className="text-muted-foreground flex min-h-10 flex-col items-center justify-center gap-2 px-3 py-3 text-xs">
                 {catalogLoadingMore ? (
                   <span className="flex items-center gap-2">
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader className="size-3.5 animate-spin" />
                     Loading more…
                   </span>
                 ) : catalogHasMore ? (

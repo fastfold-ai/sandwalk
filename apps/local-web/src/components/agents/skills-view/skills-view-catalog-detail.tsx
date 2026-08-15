@@ -3,8 +3,7 @@ import type {
   AgentCatalogSkillAudit,
   AgentCatalogSkillDetail
 } from '@sandwalk/agent-ui-core'
-import { Loader, Loader2, Plus } from 'lucide-react'
-
+import { Loader, Plus } from 'lucide-react'
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { Button } from '@/components/ui/button'
@@ -124,7 +123,7 @@ export function SkillsCatalogDetailView({
             onClick={onInstall}
           >
             {installBusy ? (
-              <Loader2 className="mr-1 size-3.5 animate-spin" />
+              <Loader className="mr-1 size-3.5 animate-spin" />
             ) : (
               <Plus className="mr-1 size-3.5" />
             )}

@@ -1,30 +1,18 @@
 import type {
   BenchActiveStatus,
-  BenchResultSummary,
+  BenchProgress,
+  BenchQueueItem,
   BenchSuiteCard,
   LocalAgentClient
 } from '@sandwalk/agent-local-client'
 import type { RuntimeSettings, Specialist } from '@sandwalk/agent-ui-core'
-import {
-  Check,
-  Columns2,
-  Copy,
-  Download,
-  ExternalLink,
-  Gauge,
-  Loader2,
-  Pause,
-  Play,
-  Target,
-  Terminal,
-  Trash2,
-  X
-} from 'lucide-react'
+import { Check, Copy, Download, Gauge, Loader, Pause, Play, Terminal, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
 import { BenchCompareView } from '@/components/agents/BenchCompareView'
 import { BenchResultDetail } from '@/components/agents/BenchResultDetail'
+import { BenchResultsList } from '@/components/agents/BenchResultsList'
 import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelPicker'
 import { ComposerSpecialistPicker } from '@/components/agents/composer/ComposerSpecialistPicker'
 import { composerModelOptionKey } from '@/components/agents/composer/useComposerModelPickerNav'
@@ -38,11 +26,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { copyText } from '@/lib/clipboard'
 import {
   type ComposerModelOption,
-  formatModelEffortBadge,
   patchComposerModelEffort,
   toComposerModelOptions
 } from '@/lib/composer-models'
-import { relativeDayLabel } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 type Tab = 'new' | 'results'
@@ -56,23 +42,6 @@ function formatBytes(n: number): string {
     value /= 1024
   }
   return `${n} B`
-}
-
-/** Compact run duration: `39s`, `11m 12s`, `2h 35m`, `1d 2h`. */
-function formatRunDuration(seconds: number): string {
-  const total = Math.max(0, Math.round(Number(seconds) || 0))
-  if (total < 60) return `${total}s`
-  const days = Math.floor(total / 86_400)
-  const hours = Math.floor((total % 86_400) / 3_600)
-  const minutes = Math.floor((total % 3_600) / 60)
-  const secs = total % 60
-  if (days > 0) {
-    return hours > 0 ? `${days}d ${hours}h` : `${days}d`
-  }
-  if (hours > 0) {
-    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
-  }
-  return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`
 }
 
 /** Map stable pack ids to Dashboard card titles. */
@@ -91,6 +60,24 @@ function suiteDisplayName(
     card => card.id === id || card.packId === id
   )?.title
   return fromCard || PACK_DISPLAY_TITLES[id] || id
+}
+
+function jobBarPct(progress?: BenchProgress | null): number {
+  if (!progress?.benchTotal || progress.benchTotal <= 0) return 0
+  return Math.min(
+    100,
+    Math.round(((progress.benchCurrent || 0) / progress.benchTotal) * 100)
+  )
+}
+
+function jobSuitesLabel(
+  item: Pick<BenchQueueItem, 'suites'>,
+  suites: BenchSuiteCard[]
+): string {
+  return (item.suites || [])
+    .map(id => suiteDisplayName(id, suites))
+    .filter(Boolean)
+    .join(', ')
 }
 
 function installButtonLabel(card: BenchSuiteCard, installing: boolean): string {
@@ -156,11 +143,11 @@ export function BenchView({
   const [specialists, setSpecialists] = useState<Specialist[]>([])
   const [specialistId, setSpecialistId] = useState<string | null>(null)
   const [active, setActive] = useState<BenchActiveStatus | null>(null)
-  const [results, setResults] = useState<BenchResultSummary[]>([])
-  const [compareSelection, setCompareSelection] = useState<string[]>([])
+  const [resultsTotal, setResultsTotal] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [spawning, setSpawning] = useState(false)
   const [concurrency, setConcurrency] = useState(1)
+  const [parallelRuns, setParallelRuns] = useState(4)
   const [cleanupSessions, setCleanupSessions] = useState(false)
   const [startingInstallId, setStartingInstallId] = useState<string | null>(
     null
@@ -169,10 +156,10 @@ export function BenchView({
   const [copiedCli, setCopiedCli] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
-  const [cacheBytes, setCacheBytes] = useState(0)
   const [brokenAvatars, setBrokenAvatars] = useState<Set<string>>(
     () => new Set()
   )
+  const [resumingId, setResumingId] = useState<string | null>(null)
   const wasBusyRef = useRef(false)
   const prevOverlayRef = useRef(false)
   const cliCloseTimerRef = useRef<number | null>(null)
@@ -217,7 +204,6 @@ export function BenchView({
         (profiles || []).map(profile => [profile.id, profile.backend])
       )
       setSuites(catalog.suites)
-      setCacheBytes(catalog.cacheBytes)
       setSpecialists((specialistRows || []).filter(row => row.enabled !== false))
       setModelOptions(
         toComposerModelOptions(
@@ -238,8 +224,8 @@ export function BenchView({
 
   const loadResults = useCallback(async () => {
     try {
-      const res = await client.listBenchResults()
-      setResults(res)
+      const page = await client.listBenchResults({ limit: 1 })
+      setResultsTotal(page.total)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load results')
@@ -265,21 +251,55 @@ export function BenchView({
     void loadStatus()
   }, [loadCatalog, loadStatus])
 
-  const paused = active?.phase === 'paused' || Boolean(active?.resumableRunId)
+  const inflightJobs: BenchQueueItem[] = active?.inflight?.length
+    ? active.inflight
+    : active?.running && active.currentRunId
+      ? [
+          {
+            runId: active.currentRunId,
+            modelId: active.currentModel || '',
+            suites: [],
+            status: 'running',
+            lastProgress: active.lastProgress
+          }
+        ]
+      : []
+  const queuedJobs = active?.queue ?? []
+  const pausedJobs: BenchQueueItem[] = active?.paused?.length
+    ? active.paused
+    : active?.resumableRunId && inflightJobs.length === 0
+      ? [
+          {
+            runId: active.resumableRunId,
+            modelId: active.currentModel || '',
+            suites: [],
+            status: 'paused'
+          }
+        ]
+      : []
+  const paused = pausedJobs.length > 0 && inflightJobs.length === 0
   const busy = Boolean(
-    active?.running || (active?.queue?.length ?? 0) > 0 || spawning
+    inflightJobs.length > 0 || queuedJobs.length > 0 || spawning
   )
-  const showProgress = busy || paused
+  const stacking = busy
+  const showProgress = busy
   const installsInFlight = suites.some(card => card.installing)
 
-  // While a run is active, poll only /runs/active (skip heavy results list).
+  // While a run is active, poll live queue often and results a bit slower
+  // so finished stacks land in the same list.
   useEffect(() => {
-    if (!busy) return
-    const timer = window.setInterval(() => {
+    if (!stacking) return
+    const activeTimer = window.setInterval(() => {
       void loadActive()
     }, 1500)
-    return () => window.clearInterval(timer)
-  }, [busy, loadActive])
+    const resultsTimer = window.setInterval(() => {
+      void loadResults()
+    }, 4000)
+    return () => {
+      window.clearInterval(activeTimer)
+      window.clearInterval(resultsTimer)
+    }
+  }, [stacking, loadActive, loadResults])
 
   // Poll catalog while a background dataset install is running (survives navigation).
   useEffect(() => {
@@ -292,12 +312,12 @@ export function BenchView({
 
   // When a run finishes or pauses, refresh Results.
   useEffect(() => {
-    if (wasBusyRef.current && !busy) {
+    if (wasBusyRef.current && !busy && pausedJobs.length === 0) {
       void loadStatus()
       setSelectedIds(new Set())
     }
     wasBusyRef.current = busy
-  }, [busy, loadStatus])
+  }, [busy, loadStatus, pausedJobs.length])
 
   useEffect(() => {
     if (paused && !busy) {
@@ -317,15 +337,8 @@ export function BenchView({
       ),
     [compareModels, primaryModel, runtimeSettings?.openaiProfileId]
   )
-  const progress = active?.lastProgress
-  const barPct =
-    progress?.benchTotal && progress.benchTotal > 0
-      ? Math.min(
-          100,
-          Math.round(((progress.benchCurrent || 0) / progress.benchTotal) * 100)
-        )
-      : 0
-  const queuedCount = active?.queue?.length ?? 0
+  const queuedCount = queuedJobs.length
+  const inflightCount = inflightJobs.length
 
   const sampleFor = (card: BenchSuiteCard): number | null =>
     sampleBySuite[card.id] ?? minSampleSize(card)
@@ -425,9 +438,12 @@ export function BenchView({
         models: compareQueue.map(option => option.model),
         specialistId,
         concurrency,
+        parallelRuns,
         cleanupSessions
       })
       wasBusyRef.current = true
+      setSelectedIds(new Set())
+      setCompareModels([])
       await loadStatus()
       setTab('results')
     } catch (err) {
@@ -437,146 +453,187 @@ export function BenchView({
     }
   }
 
-  const runIdForActions =
-    active?.currentRunId || active?.resumableRunId || 'active'
+  const dropActiveRun = (runId: string) => {
+    setActive(prev => {
+      if (!prev) return prev
+      const inflight = (prev.inflight || []).filter(job => job.runId !== runId)
+      const queue = prev.queue.filter(job => job.runId !== runId)
+      const pausedRows = (prev.paused || []).filter(job => job.runId !== runId)
+      const current = inflight[0]
+      return {
+        ...prev,
+        inflight,
+        queue,
+        paused: pausedRows,
+        running: inflight.length > 0,
+        currentRunId: current?.runId ?? pausedRows[0]?.runId ?? null,
+        currentModel: current?.modelId ?? pausedRows[0]?.modelId ?? null,
+        lastProgress: current?.lastProgress ?? null,
+        resumableRunId: pausedRows[0]?.runId ?? null,
+        phase: inflight.length
+          ? 'running'
+          : queue.length
+            ? 'loading'
+            : pausedRows.length
+              ? 'paused'
+              : 'idle'
+      }
+    })
+  }
+
+  const cancelJob = async (runId: string) => {
+    try {
+      await client.cancelBenchRun(runId)
+    } finally {
+      dropActiveRun(runId)
+      await loadStatus()
+    }
+  }
+
+  const resumeJob = async (runId: string) => {
+    setResumingId(runId)
+    try {
+      await client.resumeBenchRun(runId)
+      await loadStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to resume bench')
+    } finally {
+      setResumingId(null)
+    }
+  }
+
+  const pauseJob = async (runId: string) => {
+    try {
+      await client.pauseBenchRun(runId)
+      await loadStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to pause bench')
+    }
+  }
+
+  const renderJobRow = (
+    item: BenchQueueItem,
+    kind: 'running' | 'paused' | 'queued'
+  ) => {
+    const progress = item.lastProgress
+    const pct = jobBarPct(progress)
+    const suitesLabel = jobSuitesLabel(item, suites)
+    return (
+      <div
+        key={item.runId}
+        className="border-border/60 space-y-2 rounded-md border px-3 py-2.5"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-foreground flex flex-wrap items-center gap-1.5 text-xs font-medium">
+              {kind === 'running' ? (
+                <Loader className="size-3 animate-spin" />
+              ) : kind === 'paused' ? (
+                <Pause className="size-3" />
+              ) : null}
+              <span className="truncate">{item.modelId || 'Queued run'}</span>
+              {suitesLabel ? (
+                <span className="text-muted-foreground font-normal">
+                  · {suitesLabel}
+                </span>
+              ) : null}
+              <span className="text-muted-foreground font-normal">
+                {kind === 'queued'
+                  ? 'queued'
+                  : kind === 'paused'
+                    ? 'paused'
+                    : progress?.inFlight
+                      ? `${progress.inFlight} in flight`
+                      : 'running'}
+              </span>
+            </p>
+            {kind !== 'queued' ? (
+              <p className="text-muted-foreground mt-0.5 text-[11px]">
+                {progress?.message ||
+                  (kind === 'paused'
+                    ? 'Paused — resume to continue'
+                    : 'Working…')}
+                {progress?.benchTotal
+                  ? ` · ${progress.benchCurrent ?? 0}/${progress.benchTotal}`
+                  : ''}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-1">
+            {kind === 'paused' ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={resumingId === item.runId}
+                onClick={() => void resumeJob(item.runId)}
+              >
+                {resumingId === item.runId ? (
+                  <Loader className="size-3.5 animate-spin" />
+                ) : (
+                  <Play className="size-3.5" />
+                )}
+                Resume
+              </Button>
+            ) : kind === 'running' ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  void client.pauseBenchRun(item.runId).then(loadStatus)
+                }
+              >
+                <Pause className="size-3.5" />
+                Pause
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
+              onClick={() => void cancelJob(item.runId)}
+            >
+              {kind === 'queued' ? (
+                <X className="size-3.5" />
+              ) : (
+                <Trash2 className="size-3.5" />
+              )}
+              Remove
+            </Button>
+          </div>
+        </div>
+        {kind === 'running' ? (
+          <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+            <div
+              className="bg-foreground h-full transition-all duration-500"
+              style={{ width: `${Math.max(pct, 4)}%` }}
+            />
+          </div>
+        ) : null}
+      </div>
+    )
+  }
 
   const progressCard = showProgress ? (
     <section className="border-border/70 space-y-3 rounded-md border p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold">
-            {paused
-              ? 'Paused'
-              : spawning && !active?.running
-                ? 'Queuing…'
-                : 'In progress'}
-          </h3>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {active?.currentModel || primaryModel}
-            {progress?.benchmark
-              ? ` · ${suiteDisplayName(progress.benchmark, suites)}`
-              : ''}
-            {queuedCount ? ` · ${queuedCount} queued` : ''}
-            {progress?.inFlight
-              ? ` · ${progress.inFlight} in flight`
-              : ''}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-          {active?.projectId ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => navigate(`/projects/${active.projectId}`)}
-            >
-              <ExternalLink className="size-3.5" />
-              View
-            </Button>
-          ) : null}
-          {paused ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() =>
-                void client.resumeBenchRun(runIdForActions).then(loadStatus)
-              }
-            >
-              <Play className="size-3.5" />
-              Resume
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              disabled={!active?.running}
-              onClick={() =>
-                void client.pauseBenchRun(runIdForActions).then(loadActive)
-              }
-            >
-              <Pause className="size-3.5" />
-              Pause
-            </Button>
-          )}
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
-            onClick={() =>
-              void (async () => {
-                try {
-                  await client.cancelBenchRun(runIdForActions)
-                } finally {
-                  // Drop the paused card immediately even if the server
-                  // already had a stale resumable pointer.
-                  setActive(prev =>
-                    prev
-                      ? {
-                          ...prev,
-                          running: false,
-                          phase: 'idle',
-                          resumableRunId: null,
-                          currentRunId: null,
-                          lastProgress: null,
-                          queue: [],
-                          projectId: null
-                        }
-                      : prev
-                  )
-                  await loadStatus()
-                }
-              })()
-            }
-          >
-            <Trash2 className="size-3.5" />
-            Remove
-          </Button>
-        </div>
+      <div>
+        <h3 className="text-sm font-semibold">
+          {spawning && inflightCount === 0 ? 'Queuing…' : 'In progress'}
+        </h3>
+        <p className="text-muted-foreground mt-0.5 text-xs">
+          {inflightCount ? `${inflightCount} running` : 'Waiting'}
+          {queuedCount ? ` · ${queuedCount} queued` : ''}
+          {parallelRuns > 1 ? ` · up to ${parallelRuns} in parallel` : ''}
+        </p>
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {active?.currentModel ? (
-          <span className="bg-muted text-foreground inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs">
-            {paused ? (
-              <Pause className="size-3" />
-            ) : (
-              <Loader2 className="size-3 animate-spin" />
-            )}
-            {active.currentModel}
-          </span>
-        ) : spawning ? (
-          <span className="bg-muted text-foreground inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs">
-            <Loader2 className="size-3 animate-spin" />
-            Starting…
-          </span>
+      <div className="space-y-2">
+        {inflightJobs.map(item => renderJobRow(item, 'running'))}
+        {queuedJobs.map(item => renderJobRow(item, 'queued'))}
+        {spawning && inflightCount === 0 && queuedCount === 0 ? (
+          <p className="text-muted-foreground text-xs">Queuing run…</p>
         ) : null}
-        {active?.queue?.map(item => (
-          <span
-            key={item.runId}
-            className="border-border/70 text-muted-foreground inline-flex rounded-md border px-2 py-1 text-xs"
-          >
-            {item.modelId}
-          </span>
-        ))}
-      </div>
-      <p className="text-muted-foreground text-sm">
-        {progress?.message ||
-          (paused
-            ? 'Paused — resume to continue'
-            : spawning
-              ? 'Queuing run…'
-              : 'Working…')}
-        {' · '}
-        {progress?.benchCurrent ?? progress?.current ?? 0}/
-        {progress?.benchTotal ?? progress?.total ?? 0}
-      </p>
-      <div className="bg-muted h-1.5 overflow-hidden rounded-full">
-        <div
-          className="bg-foreground h-full transition-all duration-500"
-          style={{ width: `${Math.max(barPct, spawning ? 4 : 0)}%` }}
-        />
       </div>
     </section>
   ) : null
@@ -631,7 +688,7 @@ export function BenchView({
 
   const modelCount = 1 + compareQueue.length
   const runLabel = [
-    busy ? 'Queue' : 'Run',
+    stacking ? 'Queue' : 'Run',
     selectedCount
       ? `${selectedCount} suite${selectedCount === 1 ? '' : 's'}`
       : null,
@@ -647,27 +704,7 @@ export function BenchView({
   }
 
   if (detailRunId) {
-    return <BenchResultDetail client={client} runId={detailRunId} />
-  }
-
-  const toggleCompareSelection = (runId: string) => {
-    setCompareSelection(current => {
-      if (current.includes(runId)) {
-        return current.filter(id => id !== runId)
-      }
-      if (current.length >= 2) {
-        return [current[1], runId]
-      }
-      return [...current, runId]
-    })
-  }
-
-  const openCompare = () => {
-    if (compareSelection.length !== 2) return
-    const [a, b] = compareSelection
-    navigate(
-      `/dashboard/bench/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
-    )
+    return <BenchResultDetail client={client} runId={detailRunId} suites={suites} />
   }
 
   const suiteAvatar = (card: BenchSuiteCard) => {
@@ -745,11 +782,11 @@ export function BenchView({
               {label}
               {id === 'results'
                 ? busy
-                  ? results.length
-                    ? ` (${results.length} · live)`
+                  ? resultsTotal
+                    ? ` (${resultsTotal} · live)`
                     : ' (live)'
-                  : results.length
-                    ? ` (${results.length})`
+                  : resultsTotal
+                    ? ` (${resultsTotal})`
                     : ''
                 : ''}
             </button>
@@ -764,33 +801,7 @@ export function BenchView({
 
         {tab === 'new' ? (
           <>
-            {showProgress ? (
-              <button
-                type="button"
-                onClick={() => setTab('results')}
-                className="border-border/70 bg-muted/30 text-muted-foreground hover:text-foreground flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors"
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  {paused ? (
-                    <Pause className="size-3" />
-                  ) : (
-                    <Loader2 className="size-3 animate-spin" />
-                  )}
-                  {paused ? 'Run paused' : 'Run in progress'}
-                  {progress?.benchmark
-                    ? ` · ${suiteDisplayName(progress.benchmark, suites)}`
-                    : ''}
-                  {queuedCount ? ` · ${queuedCount} queued` : ''}
-                </span>
-                <span>View on Results →</span>
-              </button>
-            ) : null}
-            {cacheBytes > 0 ? (
-              <p className="text-muted-foreground text-[11px]">
-                Dataset cache: {formatBytes(cacheBytes)} · remove a suite below to
-                free space
-              </p>
-            ) : null}
+            {progressCard}
             <div className="grid gap-2 sm:grid-cols-2">
               {suites.map(card => {
                 const on = selectedIds.has(card.id)
@@ -960,7 +971,7 @@ export function BenchView({
                           onClick={() => void installSuite(card)}
                         >
                           {installing ? (
-                            <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                            <Loader className="size-3.5 shrink-0 animate-spin" />
                           ) : (
                             <Download className="size-3.5 shrink-0" />
                           )}
@@ -1025,249 +1036,18 @@ export function BenchView({
         ) : null}
 
         {tab === 'results' ? (
-          <section className="space-y-3">
-            {progressCard}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-muted-foreground text-sm">
-                {results.length
-                  ? `${results.length} run${results.length === 1 ? '' : 's'}`
-                  : busy
-                    ? 'Waiting for the first finished run…'
-                    : 'No runs yet'}
-                {compareSelection.length ? (
-                  <span>
-                    {' '}
-                    · {compareSelection.length}/2 selected for compare
-                  </span>
-                ) : results.length >= 2 ? (
-                  <span> · select 2 to compare</span>
-                ) : null}
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                {compareSelection.length ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setCompareSelection([])}
-                  >
-                    Clear selection
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={compareSelection.length !== 2}
-                  onClick={openCompare}
-                >
-                  <Columns2 className="size-3.5" />
-                  Compare
-                  {compareSelection.length === 2 ? '' : ` · ${compareSelection.length}/2`}
-                </Button>
-                {results.length ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      void client.resetBenchResults().then(loadStatus)
-                    }
-                  >
-                    <Trash2 className="size-3.5" />
-                    Clear
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-            <div className="space-y-2">
-              {results.map(r => {
-                const pct = Math.round((r.accuracy || 0) * 1000) / 10
-                const running = ['running', 'paused', 'interrupted'].includes(
-                  (r.status || '').toLowerCase()
-                )
-                const statusLabel =
-                  (r.status || '').toLowerCase() === 'paused'
-                    ? 'Paused'
-                    : (r.status || '').toLowerCase() === 'interrupted'
-                      ? 'Interrupted'
-                      : 'Running'
-                const picked = compareSelection.includes(r.runId)
-                return (
-                  <div
-                    key={r.runId}
-                    className={cn(
-                      'group border-border/70 rounded-md border px-3 py-3 transition-colors',
-                      picked
-                        ? 'border-primary/35 bg-primary/[0.04]'
-                        : 'hover:bg-muted/30'
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-2.5">
-                        <button
-                          type="button"
-                          aria-label={
-                            picked
-                              ? 'Deselect for compare'
-                              : 'Select for compare'
-                          }
-                          aria-pressed={picked}
-                          title={picked ? 'Selected for compare' : 'Select to compare'}
-                          className="relative size-8 shrink-0"
-                          onClick={() => toggleCompareSelection(r.runId)}
-                        >
-                          <span
-                            className={cn(
-                              'flex size-8 items-center justify-center rounded-md transition-opacity',
-                              running
-                                ? 'bg-sky-500/15 text-sky-600'
-                                : pct >= 70
-                                  ? 'bg-emerald-500/15 text-emerald-600'
-                                  : pct >= 40
-                                    ? 'bg-amber-500/15 text-amber-600'
-                                    : 'bg-red-500/15 text-red-600',
-                              picked
-                                ? 'opacity-30'
-                                : 'group-hover:opacity-30'
-                            )}
-                          >
-                            {running ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <Target className="size-3.5" />
-                            )}
-                          </span>
-                          <span
-                            className={cn(
-                              'absolute inset-0 m-auto flex size-4 items-center justify-center rounded-full border shadow-sm transition-opacity',
-                              picked
-                                ? 'border-primary bg-primary text-primary-foreground opacity-100'
-                                : 'border-border/80 bg-background/95 text-muted-foreground opacity-0 group-hover:opacity-100'
-                            )}
-                          >
-                            {picked ? (
-                              <Check className="size-2.5" strokeWidth={3} />
-                            ) : null}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className="min-w-0 flex-1 text-left"
-                          onClick={() => {
-                            setTab('results')
-                            navigate(
-                              `/dashboard/bench/${encodeURIComponent(r.runId)}`
-                            )
-                          }}
-                        >
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <h4 className="text-sm font-semibold">
-                              {suiteDisplayName(r.benchmark, suites)}
-                            </h4>
-                            <span className="bg-muted text-muted-foreground rounded-md px-1.5 py-0.5 text-[11px]">
-                              {r.modelId}
-                              {r.reasoningEffort ||
-                              r.reasoningFast != null
-                                ? ` · ${formatModelEffortBadge({
-                                    reasoningEffort:
-                                      r.reasoningEffort || 'medium',
-                                    reasoningFast: Boolean(r.reasoningFast)
-                                  })}`
-                                : r.thinkingUsed
-                                  ? ' · thinking'
-                                  : ''}
-                            </span>
-                          </div>
-                          <p className="text-muted-foreground mt-0.5 text-xs">
-                            {r.correct}/{r.total} · {formatRunDuration(r.timeS)}
-                            {r.createdAt
-                              ? ` · ${relativeDayLabel(r.createdAt)}`
-                              : ''}
-                          </p>
-                        </button>
-                      </div>
-                      {running ? (
-                        <p className="text-sky-600 text-sm font-semibold">
-                          {statusLabel}
-                        </p>
-                      ) : (
-                        <p
-                          className={cn(
-                            'text-lg font-semibold tabular-nums',
-                            pct >= 70
-                              ? 'text-emerald-600'
-                              : pct >= 40
-                                ? 'text-amber-600'
-                                : 'text-red-600'
-                          )}
-                        >
-                          {pct.toFixed(1)}%
-                        </p>
-                      )}
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground"
-                        onClick={() =>
-                          navigate(
-                            `/dashboard/bench/${encodeURIComponent(r.runId)}`
-                          )
-                        }
-                      >
-                        View details
-                      </button>
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-                        onClick={() =>
-                          void client
-                            .downloadBenchExport(r.runId)
-                            .then(file => {
-                              const url = URL.createObjectURL(file.blob)
-                              const a = document.createElement('a')
-                              a.href = url
-                              a.download = file.filename
-                              a.click()
-                              URL.revokeObjectURL(url)
-                            })
-                        }
-                      >
-                        <Download className="size-3" />
-                        Download
-                      </button>
-                      {r.projectId ? (
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-                          onClick={() => navigate(`/projects/${r.projectId}`)}
-                        >
-                          <ExternalLink className="size-3" />
-                          View
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                )
-              })}
-              {!results.length ? (
-                <div className="border-border/60 rounded-md border border-dashed px-4 py-8 text-center">
-                  <p className="text-muted-foreground text-sm">
-                    No results yet. Start a run from New.
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="mt-3"
-                    onClick={() => setTab('new')}
-                  >
-                    New bench
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          </section>
+          <BenchResultsList
+            client={client}
+            suites={suites}
+            inflightJobs={inflightJobs}
+            queuedJobs={queuedJobs}
+            pausedJobs={pausedJobs}
+            busy={busy}
+            resumingId={resumingId}
+            onResume={runId => void resumeJob(runId)}
+            onPause={runId => void pauseJob(runId)}
+            onCancel={runId => void cancelJob(runId)}
+          />
         ) : null}
         </div>
       </ScrollArea>
@@ -1410,18 +1190,42 @@ export function BenchView({
                     })
                   }
                 />
-                <label className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+                <label
+                  className="text-muted-foreground flex items-center gap-1.5 text-[11px]"
+                  title="Parallel questions inside one suite"
+                >
                   Workers
                   <select
                     className="border-border bg-background text-foreground rounded-md border px-1.5 py-1 text-xs"
                     value={concurrency}
                     onChange={e =>
                       setConcurrency(
-                        Math.max(1, Math.min(8, Number(e.target.value) || 1))
+                        Math.max(1, Math.min(16, Number(e.target.value) || 1))
                       )
                     }
                   >
-                    {[1, 2, 3, 4, 6, 8].map(n => (
+                    {[1, 2, 3, 4, 6, 8, 12, 16].map(n => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label
+                  className="text-muted-foreground flex items-center gap-1.5 text-[11px]"
+                  title="How many independent stacks run at once. Separate from Workers."
+                >
+                  Parallel runs
+                  <select
+                    className="border-border bg-background text-foreground rounded-md border px-1.5 py-1 text-xs"
+                    value={parallelRuns}
+                    onChange={e =>
+                      setParallelRuns(
+                        Math.max(1, Math.min(16, Number(e.target.value) || 1))
+                      )
+                    }
+                  >
+                    {[1, 2, 3, 4, 6, 8, 12, 16].map(n => (
                       <option key={n} value={n}>
                         {n}
                       </option>
@@ -1524,13 +1328,11 @@ export function BenchView({
                 <Button
                   type="button"
                   size="sm"
-                  disabled={
-                    spawning || busy || paused || !selectedCount || !primaryModel
-                  }
+                  disabled={spawning || !selectedCount || !primaryModel}
                   onClick={() => void runSelected()}
                 >
                   {spawning ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader className="size-3.5 animate-spin" />
                   ) : (
                     <Play className="size-3.5" />
                   )}

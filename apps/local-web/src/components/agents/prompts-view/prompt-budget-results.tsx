@@ -1,6 +1,5 @@
 import type { PromptBudgetResponse, Specialist } from '@sandwalk/agent-ui-core'
-import { AlertTriangle, Loader2 } from 'lucide-react'
-
+import { AlertTriangle, Loader } from 'lucide-react'
 import { SpecialistAvatar } from '@/components/agents/SpecialistsView'
 import { cn } from '@/lib/utils'
 
@@ -44,7 +43,7 @@ export function PromptBudgetResults({
     <div className="relative space-y-8">
       {isEstimating ? (
         <div className="bg-background/70 absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl backdrop-blur-[2px]">
-          <Loader2 className="size-5 animate-spin" />
+          <Loader className="size-5 animate-spin" />
           <div className="text-center">
             <p className="text-sm font-medium">
               Recalculating input token estimate

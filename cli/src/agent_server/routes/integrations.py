@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Request
 
 from agent_server.app_deps import AppDeps
 from agent_server.models import (
@@ -160,13 +160,18 @@ def register_integration_routes(app: FastAPI, deps: AppDeps) -> None:
         "/v1/integrations/fastfold-cloud/one-click",
         response_model=FastfoldOneClickStart,
     )
-    async def start_fastfold_one_click() -> FastfoldOneClickStart:
+    async def start_fastfold_one_click(request: Request) -> FastfoldOneClickStart:
+        from agent_server.connectors.service import oauth_callback_return_to
         from agent_server.integrations_service.fastfold_one_click import (
             start_fastfold_one_click as _start,
         )
 
+        return_to = oauth_callback_return_to(
+            origin=request.headers.get("origin"),
+            base_url=str(request.base_url),
+        )
         try:
-            auth_url = await asyncio.to_thread(_start)
+            auth_url = await asyncio.to_thread(_start, return_to=return_to)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return FastfoldOneClickStart(auth_url=auth_url)

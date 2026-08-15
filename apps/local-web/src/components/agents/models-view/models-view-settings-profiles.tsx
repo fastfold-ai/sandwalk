@@ -1,12 +1,5 @@
 import type { ModelProfile } from '@sandwalk/agent-ui-core'
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Loader2,
-  Plus
-} from 'lucide-react'
-
+import { Check, ChevronDown, ChevronRight, Loader, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -97,7 +90,7 @@ export function ModelsProfilesSection({
                       </span>
                       {probe?.probing ? (
                         <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-                          <Loader2 className="size-3.5 animate-spin" />
+                          <Loader className="size-3.5 animate-spin" />
                           Checking…
                         </span>
                       ) : probe?.tone === 'ok' ? (

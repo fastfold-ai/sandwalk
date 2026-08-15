@@ -1,5 +1,4 @@
-import { CircleAlert, Gift, Loader2 } from 'lucide-react'
-
+import { CircleAlert, Gift, Loader } from 'lucide-react'
 import { useDesktopUpdate } from '@/hooks/useDesktopUpdate'
 import type { DesktopUpdateProgress } from '@/lib/desktop-updater'
 import { cn } from '@/lib/utils'
@@ -27,7 +26,7 @@ export function DesktopUpdateBanner() {
     : showFailure
       ? 'Update failed'
       : 'New update available'
-  const Icon = showInstalling ? Loader2 : showFailure ? CircleAlert : Gift
+  const Icon = showInstalling ? Loader : showFailure ? CircleAlert : Gift
 
   return (
     <div

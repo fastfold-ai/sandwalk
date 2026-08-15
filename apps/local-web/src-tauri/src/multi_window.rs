@@ -18,6 +18,23 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindo
 const MAX_RECENTS: usize = 12;
 pub const DEFAULT_API: &str = "http://127.0.0.1:8787";
 
+/// Reload the SPA without requesting a history path from the asset protocol.
+/// Hash routes (`index.html#/dashboard/...`) reload in place; leftover
+/// history URLs are rewritten onto `index.html` plus a hash.
+const SPA_RELOAD_JS: &str = r#"(function(){
+  try {
+    var u = new URL(location.href);
+    var path = u.pathname || '/';
+    var isIndex = path === '/' || /index\.html$/i.test(path);
+    if (isIndex || u.hash) { location.reload(); return; }
+    var last = path.split('/').pop() || '';
+    if (last.indexOf('.') !== -1) { location.reload(); return; }
+    location.replace('/index.html#' + path + (u.search || ''));
+  } catch (e) {
+    location.reload();
+  }
+})();"#;
+
 #[derive(Debug, Clone)]
 struct WindowMeta {
     url: String,
@@ -974,6 +991,18 @@ pub fn open_or_focus_window(
     Ok(label)
 }
 
+fn spa_reload_focused_window(app: &AppHandle) {
+    let target = app
+        .webview_windows()
+        .into_iter()
+        .find(|(_, w)| w.is_focused().unwrap_or(false) && w.is_visible().unwrap_or(true))
+        .map(|(_, w)| w)
+        .or_else(|| app.get_webview_window("main"));
+    if let Some(win) = target {
+        let _ = win.eval(SPA_RELOAD_JS);
+    }
+}
+
 fn emit_menu_action(app: &AppHandle, payload: MenuActionPayload) {
     let target = app
         .webview_windows()
@@ -1074,6 +1103,18 @@ pub fn install_app_menu(app: &AppHandle) -> Result<(), String> {
         .build()
         .map_err(|e| e.to_string())?;
 
+    // Cmd+R must not let WKWebView request a history SPA path from the
+    // custom protocol (that 404s into the Back / Reload interstitial).
+    let view = SubmenuBuilder::new(app, "View")
+        .item(
+            &tauri::menu::MenuItemBuilder::with_id("reload-page", "Reload Page")
+                .accelerator("CmdOrCtrl+R")
+                .build(app)
+                .map_err(|e| e.to_string())?,
+        )
+        .build()
+        .map_err(|e| e.to_string())?;
+
     let window_menu = SubmenuBuilder::new(app, "Window")
         .minimize()
         .maximize()
@@ -1084,6 +1125,7 @@ pub fn install_app_menu(app: &AppHandle) -> Result<(), String> {
         .item(&app_menu)
         .item(&file)
         .item(&edit)
+        .item(&view)
         .item(&window_menu)
         .build()
         .map_err(|e| e.to_string())?;
@@ -1148,6 +1190,9 @@ pub fn handle_menu_event(
                     platform: None,
                 },
             );
+        }
+        "reload-page" => {
+            spa_reload_focused_window(app);
         }
         "server-settings" => {
             let _ = open_server_settings_app();

@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader } from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -76,7 +76,7 @@ export function BackendConnectFields({
         </div>
       </div>
       <Button className="mt-1 h-11 w-full" disabled={connecting} type="submit">
-        {connecting ? <Loader2 className="animate-spin" /> : null}
+        {connecting ? <Loader className="animate-spin" /> : null}
         {submitLabel}
       </Button>
     </>

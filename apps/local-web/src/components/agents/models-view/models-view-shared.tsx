@@ -1,6 +1,38 @@
-import { Cpu } from 'lucide-react'
+import { Cpu, Star } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+
+export function ModelFavoriteButton({
+  favorite,
+  label,
+  onToggle
+}: {
+  favorite: boolean
+  label: string
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      title={favorite ? 'Unpin favorite' : 'Pin favorite'}
+      aria-label={favorite ? `Unpin ${label}` : `Pin ${label}`}
+      aria-pressed={favorite}
+      className={cn(
+        'rounded-sm p-0.5',
+        favorite
+          ? 'text-muted-foreground'
+          : 'text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+      )}
+      onClick={event => {
+        event.preventDefault()
+        event.stopPropagation()
+        onToggle()
+      }}
+    >
+      <Star className={cn('size-3.5', favorite && 'fill-current')} />
+    </button>
+  )
+}
 
 export function ModelToggle({
   enabled,

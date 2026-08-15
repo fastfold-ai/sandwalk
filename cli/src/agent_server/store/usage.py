@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from typing import Any
 
 from agent_server.store.util import utc_now
 
 _SURFACES = frozenset({"cli", "ui", "slack", "unknown"})
+_PROJECT_TOKEN_TTL_S = 8.0
+_project_token_cache: dict[str, tuple[float, int]] = {}
+_project_token_lock = threading.Lock()
 
 
 def normalize_surface(value: object | None) -> str:
@@ -110,6 +115,46 @@ class UsageMixin:
                     """
                 ).fetchall()
         return [dict(row) for row in rows]
+
+    def lifetime_tokens_by_project(self, project_ids: list[str]) -> dict[str, int]:
+        """Cheap SUM(input+output) per project. Cached a few seconds."""
+        wanted = sorted({str(item).strip() for item in project_ids if str(item).strip()})
+        if not wanted:
+            return {}
+        now = time.monotonic()
+        found: dict[str, int] = {}
+        missing: list[str] = []
+        with _project_token_lock:
+            for pid in wanted:
+                hit = _project_token_cache.get(pid)
+                if hit is not None and now - hit[0] < _PROJECT_TOKEN_TTL_S:
+                    found[pid] = hit[1]
+                else:
+                    missing.append(pid)
+        if missing:
+            placeholders = ",".join("?" for _ in missing)
+            with self._connect() as connection:
+                rows = connection.execute(
+                    f"""
+                    SELECT s.project_id AS project_id,
+                           COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens
+                    FROM usage_runs u
+                    INNER JOIN sessions s ON s.id = u.session_id
+                    WHERE s.project_id IN ({placeholders})
+                    GROUP BY s.project_id
+                    """,
+                    missing,
+                ).fetchall()
+            fetched = {
+                str(row["project_id"]): int(row["tokens"] or 0) for row in rows
+            }
+            stamp = time.monotonic()
+            with _project_token_lock:
+                for pid in missing:
+                    tokens = fetched.get(pid, 0)
+                    _project_token_cache[pid] = (stamp, tokens)
+                    found[pid] = tokens
+        return found
 
     def list_session_ids_for_project(self, project_id: str) -> list[str]:
         scoped = (project_id or "").strip()

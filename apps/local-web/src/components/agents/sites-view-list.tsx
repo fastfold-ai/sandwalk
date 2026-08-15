@@ -1,15 +1,6 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentProject, AgentSession, Site } from '@sandwalk/agent-ui-core'
-import {
-  ExternalLink,
-  Globe2,
-  Loader2,
-  MoreHorizontal,
-  Pencil,
-  Rocket,
-  Trash2
-} from 'lucide-react'
-
+import { ExternalLink, Globe2, Loader, MoreHorizontal, Pencil, Rocket, Trash2 } from 'lucide-react'
 import { SiteThumbnail } from '@/components/agents/site-thumbnail'
 import { Button } from '@/components/ui/button'
 import {
@@ -104,7 +95,7 @@ export function SitesViewList({
                   onClick={() => (published ? onOpen(site) : onPublish(site))}
                 >
                   {busy ? (
-                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                    <Loader className="mr-1.5 size-3.5 animate-spin" />
                   ) : published ? (
                     <ExternalLink className="mr-1.5 size-3.5" />
                   ) : (
@@ -231,7 +222,7 @@ export function SitesViewGrid({
                   aria-label={published ? `Open ${site.name}` : `Publish ${site.name}`}
                 >
                   {busy ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader className="size-3.5 animate-spin" />
                   ) : published ? (
                     <ExternalLink className="size-3.5" />
                   ) : (

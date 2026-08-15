@@ -88,6 +88,8 @@ class BenchSpawnRequest(ApiModel):
     dry_run: bool = False
     # Parallel cells within a single suite run (in-process workers).
     concurrency: int = 1
+    # Independent stacks that may run at the same time (distinct from concurrency).
+    parallel_runs: int | None = None
     # After a successful suite, optionally delete the bench project + sessions.
     cleanup_sessions: bool | None = False
     # Dashboard Bench defaults to ui; `sandwalk eval` should send cli.
@@ -110,12 +112,21 @@ class BenchProgress(ApiModel):
     bench_current: int = 0
     bench_total: int = 0
     in_flight: int = 0
+    run_id: str | None = None
 
 
 class BenchQueueItem(ApiModel):
     run_id: str
     model_id: str
     suites: list[str] = Field(default_factory=list)
+    sample_sizes: list[int | None] = Field(default_factory=list)
+    status: Literal["queued", "running", "paused"] = "queued"
+    last_progress: BenchProgress | None = None
+    provider: str | None = None
+    """When this running segment began (unset while queued/paused)."""
+    started_at: str | None = None
+    """Active seconds before ``started_at`` (running) or frozen total (paused)."""
+    elapsed_s: float = 0
 
 
 class BenchActiveStatus(ApiModel):
@@ -125,6 +136,9 @@ class BenchActiveStatus(ApiModel):
     current_run_id: str | None = None
     last_progress: BenchProgress | None = None
     queue: list[BenchQueueItem] = Field(default_factory=list)
+    inflight: list[BenchQueueItem] = Field(default_factory=list)
+    paused: list[BenchQueueItem] = Field(default_factory=list)
+    parallel_runs: int = 1
     resumable_run_id: str | None = None
     project_id: str | None = None
 
@@ -143,10 +157,20 @@ class BenchResultSummary(ApiModel):
     status: str | None = None
     reasoning_effort: str | None = None
     reasoning_fast: bool | None = None
+    name: str | None = None
+    provider: str | None = None
+    lifetime_tokens: int | None = None
 
 
 class BenchResultList(ApiModel):
     data: list[BenchResultSummary]
+    next_cursor: str | None = None
+    total: int = 0
+    providers: list[str] = []
+
+
+class BenchRunPatchRequest(ApiModel):
+    name: str | None = None
 
 
 class BenchCancelResponse(ApiModel):

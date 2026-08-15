@@ -330,6 +330,19 @@ export function composerModelPrefKey(option: {
   return mid
 }
 
+/** Catalog rows use ``id`` instead of composer ``model``. Same key space. */
+export function catalogModelPrefKey(model: {
+  id: string
+  provider: string
+  profileId?: string | null
+}): string {
+  return composerModelPrefKey({
+    provider: model.provider,
+    model: model.id,
+    profileId: model.profileId
+  })
+}
+
 /** Higher is better. Returns -1 when the option does not match ``query``. */
 export function scoreComposerModelSearch(
   option: ComposerModelOption,

@@ -1,10 +1,5 @@
 import type { McpCatalogEntry } from '@sandwalk/agent-ui-core'
-import {
-  ChevronDown,
-  ExternalLink,
-  KeyRound,
-  Loader2,
-} from 'lucide-react'
+import { ChevronDown, ExternalLink, KeyRound, Loader } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -215,7 +210,7 @@ export function McpCatalogCard({
                 onClick={event => event.stopPropagation()}
               >
                 {pending ? (
-                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  <Loader className="mr-1.5 size-3.5 animate-spin" />
                 ) : null}
                 {label}
                 <ChevronDown className="ml-1 size-3.5 opacity-70" />
@@ -249,7 +244,7 @@ export function McpCatalogCard({
             }}
           >
             {pending ? (
-              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              <Loader className="mr-1.5 size-3.5 animate-spin" />
             ) : null}
             {label}
           </Button>

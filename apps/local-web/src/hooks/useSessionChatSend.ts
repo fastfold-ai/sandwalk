@@ -5,10 +5,13 @@ import {
   type MutableRefObject,
   type SetStateAction,
   useCallback,
-  useEffect} from 'react'
+  useEffect,
+  useRef
+} from 'react'
 
 import { buildSendContent, finalizePendingTools } from '@/lib/chat-actions'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import { isSessionBusyError } from '@/lib/session-busy'
 import type { SessionChatState } from '@/lib/sessions'
 
 /**
@@ -100,6 +103,20 @@ export function useSessionChatSend({
   ensureAgentSession,
   scrollChatToBottomRef
 }: UseSessionChatSendArgs) {
+  const runActiveRef = useRef(runActive)
+  runActiveRef.current = runActive
+  const sendingRef = useRef(new Set<string>())
+
+  const queueFollowUp = (id: string, text: string) => {
+    patchChat(id, prev => ({
+      ...prev,
+      runActive: true,
+      queuedMessages: prev.queuedMessages.some(item => item.text === text)
+        ? prev.queuedMessages
+        : [...prev.queuedMessages, { id: crypto.randomUUID(), text }]
+    }))
+  }
+
   const sendMessage = async (composerOverride?: string) => {
     const composerText = composerOverride ?? composerLiveRef.current ?? composer
     const content = buildSendContent({
@@ -107,9 +124,47 @@ export function useSessionChatSend({
       composerSkills,
       composerFiles
     })
-    if (!content || runActive) return
+    if (!content) return
+    const existingId =
+      sessionId && !isDraftAgentSessionId(sessionId) ? sessionId : null
+    if (
+      runActiveRef.current ||
+      (existingId && sendingRef.current.has(existingId))
+    ) {
+      if (existingId) {
+        queueFollowUp(existingId, composerText)
+        composerLiveRef.current = ''
+        patchChat(existingId, {
+          composer: '',
+          composerSkills: [],
+          composerFiles: []
+        })
+      }
+      return
+    }
+    if (existingId) sendingRef.current.add(existingId)
     const targetSessionId = await ensureAgentSession()
-    if (!targetSessionId || isDraftAgentSessionId(targetSessionId)) return
+    if (!targetSessionId || isDraftAgentSessionId(targetSessionId)) {
+      if (existingId) sendingRef.current.delete(existingId)
+      return
+    }
+    if (existingId && existingId !== targetSessionId) {
+      sendingRef.current.delete(existingId)
+    }
+    if (
+      sendingRef.current.has(targetSessionId) &&
+      existingId !== targetSessionId
+    ) {
+      queueFollowUp(targetSessionId, composerText)
+      composerLiveRef.current = ''
+      patchChat(targetSessionId, {
+        composer: '',
+        composerSkills: [],
+        composerFiles: []
+      })
+      return
+    }
+    sendingRef.current.add(targetSessionId)
     const previousComposer = composerText
     const previousSkills = composerSkills
     const previousFiles = composerFiles
@@ -157,6 +212,19 @@ export function useSessionChatSend({
         runActive: true
       }))
     } catch (cause) {
+      const message =
+        cause instanceof Error ? cause.message : 'Unable to send message'
+      if (isSessionBusyError(message)) {
+        queueFollowUp(targetSessionId, previousComposer)
+        setSessions(current =>
+          current.map(item =>
+            item.id === targetSessionId
+              ? { ...item, status: 'running' as const }
+              : item
+          )
+        )
+        return
+      }
       composerLiveRef.current = previousComposer
       patchChat(targetSessionId, {
         composer: previousComposer,
@@ -164,9 +232,9 @@ export function useSessionChatSend({
         composerFiles: previousFiles,
         runActive: false
       })
-      setError(
-        cause instanceof Error ? cause.message : 'Unable to send message'
-      )
+      setError(message)
+    } finally {
+      sendingRef.current.delete(targetSessionId)
     }
   }
 
@@ -199,7 +267,10 @@ export function useSessionChatSend({
       return
     }
 
-    if (runActive && !isDraftAgentSessionId(sessionId)) {
+    if (
+      (runActiveRef.current || sendingRef.current.has(sessionId)) &&
+      !isDraftAgentSessionId(sessionId)
+    ) {
       patchChat(sessionId, prev => ({
         ...prev,
         queuedMessages: [

@@ -1,5 +1,5 @@
 import type { DoctorReport } from '@sandwalk/agent-ui-core'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -114,7 +114,7 @@ export function DoctorView({
             onClick={() => void runDoctor()}
           >
             {loading ? (
-              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              <Loader className="mr-1.5 size-3.5 animate-spin" />
             ) : (
               <RefreshCw className="mr-1.5 size-3.5" />
             )}

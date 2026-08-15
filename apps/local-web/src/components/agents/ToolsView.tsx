@@ -4,7 +4,7 @@ import type {
   ToolCatalog,
   ToolSummary
 } from '@sandwalk/agent-ui-core'
-import { ListFilter, Loader2, RefreshCw, Search } from 'lucide-react'
+import { ListFilter, Loader, RefreshCw, Search } from 'lucide-react'
 import { useState } from 'react'
 
 import { ListRowsSkeleton } from '@/components/agents/PageSkeletons'
@@ -118,7 +118,7 @@ export function ToolsView({
               aria-label="Refresh tools"
             >
               {data.refreshing || data.loading ? (
-                <Loader2 className="animate-spin" />
+                <Loader className="animate-spin" />
               ) : (
                 <RefreshCw />
               )}
@@ -146,7 +146,7 @@ export function ToolsView({
                 disabled={data.batchBusy || data.enableEligible.length === 0}
                 onClick={() => void data.batchUpdate('enable')}
               >
-                {data.batchBusy ? <Loader2 className="animate-spin" /> : null}
+                {data.batchBusy ? <Loader className="animate-spin" /> : null}
                 Enable ({data.enableEligible.length})
               </Button>
               <Button
@@ -156,7 +156,7 @@ export function ToolsView({
                 disabled={data.batchBusy || data.disableEligible.length === 0}
                 onClick={() => void data.batchUpdate('disable')}
               >
-                {data.batchBusy ? <Loader2 className="animate-spin" /> : null}
+                {data.batchBusy ? <Loader className="animate-spin" /> : null}
                 Disable ({data.disableEligible.length})
               </Button>
             </div>

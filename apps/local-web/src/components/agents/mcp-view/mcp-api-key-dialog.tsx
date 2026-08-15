@@ -1,4 +1,4 @@
-import { Check, Copy, Eye, EyeOff, Loader2, Trash2 } from 'lucide-react'
+import { Check, Copy, Eye, EyeOff, Loader, Trash2 } from 'lucide-react'
 import { type ReactNode,useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -284,7 +284,7 @@ export function McpApiKeyDialog({
                 onClick={() => void copySecret()}
               >
                 {pendingAction === 'copy' ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader className="size-4 animate-spin" />
                 ) : copied ? (
                   <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
                 ) : (
@@ -300,7 +300,7 @@ export function McpApiKeyDialog({
                 onClick={() => void toggleReveal()}
               >
                 {pendingAction === 'reveal' ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader className="size-4 animate-spin" />
                 ) : revealed ? (
                   <EyeOff className="size-4" />
                 ) : (
@@ -347,7 +347,7 @@ export function McpApiKeyDialog({
                 onClick={() => void runRemove()}
               >
                 {pendingAction === 'remove' ? (
-                  <Loader2 className="animate-spin" />
+                  <Loader className="animate-spin" />
                 ) : (
                   <Trash2 />
                 )}
@@ -361,7 +361,7 @@ export function McpApiKeyDialog({
                 onClick={() => void runTest()}
               >
                 {pendingAction === 'test' ? (
-                  <Loader2 className="animate-spin" />
+                  <Loader className="animate-spin" />
                 ) : null}
                 Test
               </Button>
@@ -380,7 +380,7 @@ export function McpApiKeyDialog({
               onClick={() => void runSave()}
             >
               {pendingAction === 'save' ? (
-                <Loader2 className="animate-spin" />
+                <Loader className="animate-spin" />
               ) : null}
               Save
             </Button>

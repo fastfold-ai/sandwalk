@@ -6,18 +6,23 @@ from agent_server.bench_service.install_jobs import start_install
 from agent_server.bench_service.queue_runner import (
     bootstrap_resumable,
     cancel_current,
+    cancel_run,
     enqueue,
     get_active_status,
     pause_current,
+    pause_run,
     remove_queued,
     resume_run,
 )
 from agent_server.bench_service.results_store import (
+    apply_live_status,
     clear_results,
     delete_result,
     export_path,
     get_result,
     list_results,
+    list_results_page,
+    rename_result,
 )
 
 __all__ = [
@@ -27,11 +32,16 @@ __all__ = [
     "enqueue",
     "get_active_status",
     "cancel_current",
+    "cancel_run",
     "pause_current",
+    "pause_run",
     "resume_run",
     "bootstrap_resumable",
     "remove_queued",
     "list_results",
+    "list_results_page",
+    "rename_result",
+    "apply_live_status",
     "get_result",
     "export_path",
     "clear_results",

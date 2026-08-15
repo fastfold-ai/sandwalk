@@ -33,6 +33,30 @@ type UseAppBootstrapLoadersArgs = {
   >
 }
 
+/**
+ * Promote runActive from the session list (other surfaces starting a run).
+ * Never demote from a list snapshot — that race (POST in flight, poll still
+ * idle) lets the composer send again and 409s. SSE / Stop own the idle flip.
+ */
+export function mergeRunActiveFromSessions(
+  current: Record<string, SessionChatState>,
+  sessions: AgentSession[]
+) {
+  let changed = false
+  const next = { ...current }
+  for (const item of sessions) {
+    const prev = next[item.id]
+    if (!prev) continue
+    const shouldRun =
+      item.status === 'running' || item.status === 'awaiting_approval'
+    if (prev.runActive === shouldRun) continue
+    if (prev.runActive && !shouldRun) continue
+    next[item.id] = { ...prev, runActive: shouldRun }
+    changed = true
+  }
+  return changed ? next : current
+}
+
 /** Fields the sidebar renders — enough to tell a real change from a re-fetch. */
 export function sessionsUnchanged(a: AgentSession[], b: AgentSession[]) {
   if (a.length !== b.length) return false
@@ -79,7 +103,7 @@ export function useAppBootstrapLoaders({
   >(null)
   const loadSkillsRef = useRef<(() => Promise<void>) | null>(null)
   const sessionsRevisionRef = useRef<string | null>(null)
-  /** When set, listSessions is project-scoped (includes bench). */
+  /** When set, listSessions is project-scoped (includes bench cells). */
   const sessionsListScopeRef = useRef<string | null>(null)
   const sessionPreviewsRef = useRef<Record<string, string>>({})
   const previewInFlightRef = useRef(new Set<string>())
@@ -112,8 +136,8 @@ export function useAppBootstrapLoaders({
       const key = projectId
         ? `sessions:${client.baseUrl}:project:${projectId}`
         : `sessions:${client.baseUrl}`
-      // Cheap watermark first for the global (non-bench) list. Project scope
-      // includes bench sessions that do not bump the global revision.
+      // Cheap watermark first for the global list (bench cells omitted).
+      // Project scope includes bench cells and skips this watermark.
       if (!options?.force && !projectId) {
         try {
           const revision = await dedupeAsync(`${key}:rev`, () =>
@@ -163,20 +187,9 @@ export function useAppBootstrapLoaders({
             : nextSessions
         return sessionsUnchanged(current, merged) ? current : merged
       })
-      setChatBySessionId(current => {
-        let changed = false
-        const next = { ...current }
-        for (const item of nextSessions) {
-          const prev = next[item.id]
-          if (!prev) continue
-          const shouldRun =
-            item.status === 'running' || item.status === 'awaiting_approval'
-          if (prev.runActive === shouldRun) continue
-          next[item.id] = { ...prev, runActive: shouldRun }
-          changed = true
-        }
-        return changed ? next : current
-      })
+      setChatBySessionId(current =>
+        mergeRunActiveFromSessions(current, nextSessions)
+      )
       // Previews load lazily from Home via loadSessionPreviews.
     },
     [client, setChatBySessionId]
@@ -399,7 +412,7 @@ export function useAppBootstrapLoaders({
     }
   }, [client])
 
-  const loadModelOptions = useCallback(async () => {
+  const loadModelOptions = useCallback(async (options?: { force?: boolean }) => {
     try {
       const [models, profiles] = await dedupeAsync(
         `models:${client.baseUrl}`,
@@ -411,7 +424,7 @@ export function useAppBootstrapLoaders({
             }),
             client.listModelProfiles().catch(() => [])
           ]),
-        { ttlMs: MODEL_TTL_MS }
+        { ttlMs: MODEL_TTL_MS, force: options?.force }
       )
       const backendsByProfileId = Object.fromEntries(
         (profiles || []).map(profile => [profile.id, profile.backend])

@@ -1,6 +1,5 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import { Check, Loader2 } from 'lucide-react'
-
+import { Check, Loader } from 'lucide-react'
 import { McpView } from '@/components/agents/McpView'
 import { cn } from '@/lib/utils'
 
@@ -18,7 +17,7 @@ export function OnboardingSkillsStep({
   if (skills.loading && skills.skills.length === 0 && skills.suggestions.length === 0) {
     return (
       <p className="text-muted-foreground flex items-center gap-2 text-sm">
-        <Loader2 className="size-4 animate-spin" />
+        <Loader className="size-4 animate-spin" />
         Loading skills…
       </p>
     )
@@ -70,7 +69,7 @@ export function OnboardingSkillsStep({
             )}
           >
             {skills.installBusy ? (
-              <Loader2 className="size-4 animate-spin" />
+              <Loader className="size-4 animate-spin" />
             ) : (
               <Check className="size-4" />
             )}

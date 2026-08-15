@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react'
+import { Loader } from 'lucide-react'
 import { useState } from 'react'
 
 import { RemoteBackendConnectForm } from '@/components/agents/RemoteBackendConnectForm'
@@ -73,7 +73,7 @@ export function AppGatesLocalWaiting({
             </p>
           </div>
           {starting || (connecting && !connectError) ? (
-            <Loader2 className="text-muted-foreground size-5 animate-spin" />
+            <Loader className="text-muted-foreground size-5 animate-spin" />
           ) : null}
         </div>
 
@@ -91,7 +91,7 @@ export function AppGatesLocalWaiting({
               disabled={connecting}
               onClick={() => void connect()}
             >
-              {connecting ? <Loader2 className="animate-spin" /> : null}
+              {connecting ? <Loader className="animate-spin" /> : null}
               Retry
             </Button>
           )}

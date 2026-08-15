@@ -1,5 +1,5 @@
 import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { BusyConfirmOverlay } from '@/components/BusyConfirmOverlay'
@@ -156,7 +156,7 @@ export function AgentRuntimeView({
             disabled={!connected || saving || !dirty}
             onClick={() => void save()}
           >
-            {saving ? <Loader2 className="animate-spin" /> : <Check />}
+            {saving ? <Loader className="animate-spin" /> : <Check />}
             Save
           </Button>
         </div>

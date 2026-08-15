@@ -1,6 +1,6 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { SlackWorkspace } from '@sandwalk/agent-ui-core'
-import { Check, Copy, ExternalLink, Loader2 } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -172,7 +172,7 @@ export function SlackAddWorkspaceModal({
 
               {waiting ? (
                 <div className="border-border/70 bg-muted/30 flex items-center gap-2 rounded-lg border p-3">
-                  <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                  <Loader className="size-3.5 shrink-0 animate-spin" />
                   <p className="text-[12px] leading-relaxed">
                     Waiting for you to approve Sandwalk in Slack…
                   </p>
@@ -288,7 +288,7 @@ export function SlackAddWorkspaceModal({
               disabled={busy || !botToken.trim() || !appToken.trim()}
               onClick={() => void submit()}
             >
-              {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {busy ? <Loader className="size-3.5 animate-spin" /> : null}
               {updating ? 'Save tokens' : 'Connect'}
             </Button>
           </div>

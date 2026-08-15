@@ -4383,7 +4383,7 @@ wheels = [
 
 [[package]]
 name = "sandwalk"
-version = "0.0.1"
+version = "0.1.0b1"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

@@ -1,14 +1,6 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { LibraryItem, WorkspaceFileContent } from '@sandwalk/agent-ui-core'
-import {
-  Download,
-  Loader2,
-  MessageSquarePlus,
-  Pencil,
-  RefreshCw,
-  Save,
-  X
-} from 'lucide-react'
+import { Download, Loader, MessageSquarePlus, Pencil, RefreshCw, Save, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { FilePreview } from '@/components/agents/FilePreview'
@@ -301,7 +293,7 @@ export function LibraryPreviewDialog({
             <div className="relative min-h-0 flex-1 overflow-hidden">
               {loading ? (
                 <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-[13px]">
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader className="size-4 animate-spin" />
                   Loading…
                 </div>
               ) : error ? (

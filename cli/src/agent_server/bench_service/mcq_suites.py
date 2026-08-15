@@ -88,7 +88,7 @@ MCQ_SUITES: dict[str, McqSuite] = {
             "Runs via Sandwalk agent sessions (harness)."
         ),
         author="Allen Institute for AI",
-        author_avatar=None,
+        author_avatar="/brand/bench/ai2-mark.png",
         subject_label="science reasoning",
         full_size=1172,
         default_sample_size=30,

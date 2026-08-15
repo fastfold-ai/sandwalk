@@ -1,14 +1,5 @@
 import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Eye,
-  EyeOff,
-  Loader2,
-  Trash2
-} from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Loader, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -414,7 +405,7 @@ export function ModelsApiKeysSection({
                       onClick={() => void copySecret()}
                     >
                       {pendingAction === 'copy' ? (
-                        <Loader2 className="size-4 animate-spin" />
+                        <Loader className="size-4 animate-spin" />
                       ) : copied ? (
                         <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
                       ) : (
@@ -438,7 +429,7 @@ export function ModelsApiKeysSection({
                       onClick={() => void toggleReveal()}
                     >
                       {pendingAction === 'reveal' ? (
-                        <Loader2 className="size-4 animate-spin" />
+                        <Loader className="size-4 animate-spin" />
                       ) : revealedKeys[activeIntegration.key] ? (
                         <EyeOff className="size-4" />
                       ) : (
@@ -519,7 +510,7 @@ export function ModelsApiKeysSection({
                       onClick={() => void runClear()}
                     >
                       {pendingAction === 'remove' ? (
-                        <Loader2 className="animate-spin" />
+                        <Loader className="animate-spin" />
                       ) : (
                         <Trash2 />
                       )}
@@ -532,7 +523,7 @@ export function ModelsApiKeysSection({
                     onClick={() => void runTest()}
                   >
                     {pendingAction === 'test' ? (
-                      <Loader2 className="animate-spin" />
+                      <Loader className="animate-spin" />
                     ) : null}
                     Test
                   </Button>
@@ -550,7 +541,7 @@ export function ModelsApiKeysSection({
                     onClick={() => void runSave()}
                   >
                     {pendingAction === 'save' ? (
-                      <Loader2 className="animate-spin" />
+                      <Loader className="animate-spin" />
                     ) : null}
                     Save
                   </Button>

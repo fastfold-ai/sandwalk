@@ -4,7 +4,7 @@ import type {
   SlackSubscription,
   SlackWorkspace
 } from '@sandwalk/agent-ui-core'
-import { Loader2 } from 'lucide-react'
+import { Loader } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -142,7 +142,7 @@ export function SlackConnectorPanel({
       <>
         {addPortal}
         <div className="text-muted-foreground flex items-center gap-2 py-10 text-[13px]">
-          <Loader2 className="size-4 animate-spin" />
+          <Loader className="size-4 animate-spin" />
           Loading Slack…
         </div>
       </>

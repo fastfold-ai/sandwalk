@@ -1,5 +1,4 @@
-import { ArrowUp, Loader2, X } from 'lucide-react'
-
+import { ArrowUp, Loader, X } from 'lucide-react'
 import { VoiceLevelBars } from '@/components/agents/composer/VoiceLevelBars'
 import { cn } from '@/lib/utils'
 
@@ -40,7 +39,7 @@ export function ComposerVoiceBar({
       <div className="flex min-w-0 flex-1 items-center justify-center gap-2.5">
         {transcribing ? (
           <>
-            <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
+            <Loader className="text-muted-foreground size-4 shrink-0 animate-spin" />
             <span className="text-muted-foreground text-[15px]">Transcribing</span>
           </>
         ) : (

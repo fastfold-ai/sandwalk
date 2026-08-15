@@ -281,3 +281,50 @@ def test_usage_overview_filters_by_project(tmp_path: Path, monkeypatch):
     assert scoped.models_used == 1
     empty = build_usage_overview(store, project_id="missing-project")
     assert empty.lifetime_tokens == 0
+
+
+def test_lifetime_tokens_by_project_batches_and_caches(tmp_path: Path):
+    store = AgentStore(tmp_path / "usage.db", exclusive=True)
+    project_a = store.create_project(name="A", folder_path=None)
+    project_b = store.create_project(name="B", folder_path=None)
+    session_a = store.create_session(
+        title="in-a", workspace_path=None, project_id=project_a.id
+    )
+    session_b = store.create_session(
+        title="in-b", workspace_path=None, project_id=project_b.id
+    )
+    today = __import__("datetime").date.today().isoformat()
+    store.upsert_usage_run(
+        run_id="r-a",
+        session_id=session_a.id,
+        day=today,
+        input_tokens=80,
+        output_tokens=20,
+    )
+    store.upsert_usage_run(
+        run_id="r-b",
+        session_id=session_b.id,
+        day=today,
+        input_tokens=5,
+        output_tokens=7,
+    )
+    first = store.lifetime_tokens_by_project(
+        [project_a.id, project_b.id, "missing-project"]
+    )
+    assert first[project_a.id] == 100
+    assert first[project_b.id] == 12
+    assert first["missing-project"] == 0
+    store.upsert_usage_run(
+        run_id="r-a",
+        session_id=session_a.id,
+        day=today,
+        input_tokens=999,
+        output_tokens=0,
+    )
+    cached = store.lifetime_tokens_by_project([project_a.id])
+    assert cached[project_a.id] == 100
+    from agent_server.store import usage as usage_mod
+
+    usage_mod._project_token_cache.clear()
+    fresh = store.lifetime_tokens_by_project([project_a.id])
+    assert fresh[project_a.id] == 999

@@ -1,5 +1,4 @@
-import { Loader2, Square, Terminal } from 'lucide-react'
-
+import { Loader, Square, Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type TranscriptTool = {
@@ -108,7 +107,7 @@ export function ToolCard({
           </span>
           <span className="flex h-3 w-3 items-center justify-center">
             {tool.status === 'pending' ? (
-              <Loader2 className="text-muted-foreground h-2.5 w-2.5 animate-spin [animation-duration:1.8s]" />
+              <Loader className="text-muted-foreground h-2.5 w-2.5 animate-spin [animation-duration:1.8s]" />
             ) : tool.status === 'error' ? (
               <span className="h-1.5 w-1.5 rounded-full bg-red-500/70" />
             ) : null}
