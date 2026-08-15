@@ -12,6 +12,7 @@ from agent_server.bench_service.queue_runner import (
     pause_current,
     pause_run,
     remove_queued,
+    resolve_result_run_id,
     resume_run,
 )
 from agent_server.bench_service.results_store import (
@@ -23,6 +24,7 @@ from agent_server.bench_service.results_store import (
     list_results,
     list_results_page,
     rename_result,
+    result_from_checkpoint,
 )
 
 __all__ = [
@@ -36,6 +38,7 @@ __all__ = [
     "pause_current",
     "pause_run",
     "resume_run",
+    "resolve_result_run_id",
     "bootstrap_resumable",
     "remove_queued",
     "list_results",
@@ -43,6 +46,7 @@ __all__ = [
     "rename_result",
     "apply_live_status",
     "get_result",
+    "result_from_checkpoint",
     "export_path",
     "clear_results",
     "delete_result",

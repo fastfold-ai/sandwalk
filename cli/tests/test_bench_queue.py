@@ -264,6 +264,50 @@ def test_resume_inflight_uses_checkpoint_elapsed(queue_env, monkeypatch):
     _join_jobs()
 
 
+def test_multi_suite_inflight_exposes_active_suite_id(queue_env, monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+    qr._job_hook = _block_until_stop(started, release)
+    deps = MagicMock()
+    stack_id = qr.enqueue(
+        deps,
+        _req(
+            model="m1",
+            suites=[
+                BenchSuiteRef(suite_id="mmlu", sample_size=10),
+                BenchSuiteRef(suite_id="mmlu-pro", sample_size=10),
+            ],
+        ),
+    )[0]
+    assert started.wait(2)
+    suite_id = "suite-mmlu-pro"
+    with qr._state.lock:
+        job = qr._state.inflight[stack_id]
+        job.active_run_id = suite_id
+    status = qr.get_active_status()
+    assert status.current_run_id == suite_id
+    assert {row.run_id for row in status.inflight} == {suite_id}
+    assert qr.live_run_statuses() == {suite_id: "running"}
+    assert qr.pause_run(suite_id) == stack_id
+    release.set()
+    _join_jobs()
+
+
+def test_resolve_result_run_id_maps_stack_to_suite_file(queue_env, monkeypatch, tmp_path):
+    started = threading.Event()
+    release = threading.Event()
+    qr._job_hook = _block_until_stop(started, release)
+    monkeypatch.setattr(qr, "get_result", lambda rid: {"run_id": rid} if rid == "suite-file" else None)
+    stack_id = qr.enqueue(MagicMock(), _req(model="m1"))[0]
+    assert started.wait(2)
+    with qr._state.lock:
+        qr._state.inflight[stack_id].active_run_id = "suite-file"
+    assert qr.resolve_result_run_id(stack_id) == "suite-file"
+    assert qr.resolve_result_run_id("suite-file") == "suite-file"
+    release.set()
+    _join_jobs()
+
+
 def test_paused_status_exposes_frozen_elapsed(queue_env, monkeypatch):
     monkeypatch.setattr(
         qr,

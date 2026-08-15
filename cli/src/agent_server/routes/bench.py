@@ -24,9 +24,12 @@ from agent_server.bench_service import (
     pause_run,
     remove_queued,
     rename_result,
+    resolve_result_run_id,
+    result_from_checkpoint,
     resume_run,
     start_install,
 )
+from agent_server.bench_service.checkpoint import load_checkpoint
 from agent_server.bench_service.dataset_install import (
     BenchInstallError,
     cache_root,
@@ -219,7 +222,17 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
 
     @app.get("/v1/bench/runs/{run_id}")
     async def bench_run_detail(run_id: str) -> dict:
-        row = await asyncio.to_thread(get_result, run_id)
+        def _load() -> dict | None:
+            rid = resolve_result_run_id(run_id)
+            row = get_result(rid)
+            if row is not None:
+                return row
+            ckpt = load_checkpoint(rid) or load_checkpoint(run_id)
+            if ckpt is None:
+                return None
+            return result_from_checkpoint(ckpt)
+
+        row = await asyncio.to_thread(_load)
         if row is None:
             raise HTTPException(status_code=404, detail="Run not found.")
         live = apply_live_status(row)

@@ -366,6 +366,35 @@ def get_result(run_id: str) -> dict[str, Any] | None:
         return None
 
 
+def result_from_checkpoint(ckpt: dict[str, Any]) -> dict[str, Any]:
+    """Minimal result row so a paused stack without a JSON file still loads."""
+    completed = list(ckpt.get("completed_question_ids") or [])
+    remaining = list(ckpt.get("remaining_question_ids") or [])
+    total = len(completed) + len(remaining)
+    sample = ckpt.get("sample_size")
+    if not total and sample not in (None, ""):
+        try:
+            total = int(sample)
+        except (TypeError, ValueError):
+            total = 0
+    return {
+        "run_id": str(ckpt.get("run_id") or ""),
+        "model_id": str(ckpt.get("model_id") or ""),
+        "benchmark": str(ckpt.get("benchmark") or ckpt.get("suite_id") or ""),
+        "accuracy": 0.0,
+        "correct": len(completed),
+        "total": total,
+        "skipped": 0,
+        "time_s": float(ckpt.get("elapsed_s") or 0),
+        "thinking_used": bool(ckpt.get("thinking")),
+        "status": str(ckpt.get("status") or "paused"),
+        "provider": ckpt.get("provider"),
+        "project_id": ckpt.get("project_id"),
+        "created_at": ckpt.get("updated_at") or ckpt.get("created_at"),
+        "questions": [],
+    }
+
+
 def rename_result(run_id: str, name: str) -> dict[str, Any] | None:
     row = get_result(run_id)
     if row is None:

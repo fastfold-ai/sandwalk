@@ -39,6 +39,16 @@ def test_live_inflight_lists_as_running(tmp_path, monkeypatch):
     assert rows[0]["status"] == "running"
 
 
+def test_completed_stack_sibling_is_not_running(tmp_path, monkeypatch):
+    monkeypatch.setattr(rs, "results_dir", lambda: tmp_path)
+    monkeypatch.setattr(rs, "_live_run_statuses", lambda: {"suite-pro": "running"})
+    _write(tmp_path, "suite-mmlu", status="completed", benchmark="mmlu")
+    _write(tmp_path, "suite-pro", status="running", benchmark="mmlu-pro")
+    by_id = {row["run_id"]: row["status"] for row in rs.list_results()}
+    assert by_id["suite-mmlu"] == "completed"
+    assert by_id["suite-pro"] == "running"
+
+
 def test_provider_from_environment_and_model_prefix(tmp_path, monkeypatch):
     monkeypatch.setattr(rs, "results_dir", lambda: tmp_path)
     _write(
