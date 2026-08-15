@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 
@@ -42,3 +43,16 @@ def test_wake_all_advances_every_session():
     n.wake_all()
     assert n.generation("a") == 2
     assert n.generation("b") == 1
+
+
+def test_async_wait_for_change_wakes_matching_session():
+    n = EventNotifier()
+    seen = n.generation("s")
+
+    async def _run() -> int:
+        task = asyncio.create_task(n.async_wait_for_change("s", seen, 2))
+        await asyncio.sleep(0.02)
+        n.notify("s")
+        return await task
+
+    assert asyncio.run(_run()) == seen + 1

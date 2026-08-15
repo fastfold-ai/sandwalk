@@ -30,7 +30,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(eq=False)
 class _AsyncWaiter:
     """Ties an ``asyncio.Event`` to the loop that created it.
 
