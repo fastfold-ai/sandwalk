@@ -25,6 +25,7 @@ from agent_server.models import (
     ServerStatusReport,
     StorageReport,
 )
+from agent_server.observability import OBSERVABILITY, thread_pool_snapshot
 
 
 def local_user_name() -> str:
@@ -54,6 +55,26 @@ def register_health_routes(app: FastAPI, deps: AppDeps) -> None:
                 terminal=True,
             ),
         )
+
+    @app.get("/v1/debug/health")
+    async def debug_health() -> dict[str, object]:
+        """Concurrency + connection counters for debugging thread-pool pressure.
+
+        Reading this endpoint costs nothing (pure in-memory counters). Compare
+        `thread_pool.active_threads` vs `thread_pool.max_workers` to spot
+        saturation. If `sse_streams_open` keeps climbing while chats stay
+        static, a stream is leaking.
+        """
+        active_runs = 0
+        try:
+            active_runs = len(deps.service._active_runs)  # noqa: SLF001
+        except Exception:
+            active_runs = -1
+        return {
+            "connections": OBSERVABILITY.snapshot(),
+            "thread_pool": thread_pool_snapshot(),
+            "active_runs": active_runs,
+        }
 
     @app.get("/v1/discover", response_model=DiscoverResponse)
     async def discover() -> DiscoverResponse:

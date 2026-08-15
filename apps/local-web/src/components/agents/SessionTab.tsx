@@ -1,17 +1,18 @@
 import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pin, X } from 'lucide-react'
+import { Columns2, Pin, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { cn } from '@/lib/utils'
 
 import { SessionSourceIcon } from './SessionSourceIcon'
 import { SessionStatusIcon } from './SessionStatusIcon'
-import { TAB_INLINE_COLORS } from './tab-context-menu'
 
-const UNREAD_DOT_COLOR =
-  TAB_INLINE_COLORS.find(item => item.name === 'Blue')?.value ?? '#8BB8F5'
+// Attention (unread) marker. Deliberately outside `TAB_INLINE_COLORS` so it
+// never collides with a user-assigned tab color — same rationale as the
+// mirror constant in `sidebar-session-list.tsx`.
+const UNREAD_DOT_COLOR = '#F5A97A'
 
 /** Title marquee — same feel as the previous chrome-tabs label. */
 function TabMarqueeTitle({
@@ -162,9 +163,18 @@ export type SessionTabProps = {
   color?: string
   unread: boolean
   draggable: boolean
-  onSelect: (id: string) => void
+  onSelect: (id: string, event?: React.MouseEvent) => void
   onClose: (id: string) => void
   onContextMenu: (id: string, event: React.MouseEvent) => void
+  selected?: boolean
+  /**
+   * Cuando la pestaña representa un grupo de split view, en vez del
+   * SessionStatusIcon + SessionSourceIcon se dibuja el icono Columns2 y un
+   * badge numérico con `groupCount`. Todo lo demás (chrome, hover, marquee,
+   * X para disolver) se mantiene idéntico al de una pestaña de sesión.
+   */
+  variant?: 'session' | 'group'
+  groupCount?: number
 }
 
 export function SessionTab({
@@ -175,8 +185,12 @@ export function SessionTab({
   draggable,
   onSelect,
   onClose,
-  onContextMenu
+  onContextMenu,
+  selected,
+  variant = 'session',
+  groupCount
 }: SessionTabProps) {
+  const isGroup = variant === 'group'
   const [hovering, setHovering] = useState(false)
   const {
     attributes,
@@ -238,18 +252,38 @@ export function SessionTab({
         if (event.button !== 0) return
         const target = event.target as HTMLElement | null
         if (target?.closest('.chrome-tab-close')) return
-        onSelect(tab.id)
+        onSelect(tab.id, event)
       }}
       onContextMenu={event => {
         event.preventDefault()
         onContextMenu(tab.id, event)
       }}
       {...(active ? { 'data-active': 'true' } : {})}
+      {...(selected ? { 'data-selected': 'true' } : {})}
     >
       <TabBackground width={tabWidth} />
       <div className="chrome-tab-content">
-        <SessionStatusIcon status={tab.status} />
-        <SessionSourceIcon source={tab.source} label={tab.sourceLabel} />
+        {isGroup ? (
+          <>
+            <Columns2
+              className="text-muted-foreground size-3.5 shrink-0"
+              aria-hidden
+            />
+            {typeof groupCount === 'number' ? (
+              <span
+                className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
+                aria-label={`${groupCount} chats`}
+              >
+                {groupCount}
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <SessionStatusIcon status={tab.status} />
+            <SessionSourceIcon source={tab.source} label={tab.sourceLabel} />
+          </>
+        )}
         {pinned ? (
           <Pin className="text-muted-foreground size-3 shrink-0" aria-hidden />
         ) : null}

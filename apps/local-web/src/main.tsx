@@ -6,6 +6,7 @@ import { BrowserRouter, HashRouter } from 'react-router-dom'
 
 import App from './App.tsx'
 import { AppErrorBoundary } from './components/AppErrorBoundary.tsx'
+import { ChatStoreProvider } from './hooks/chat-store-context.tsx'
 import { Toaster } from './components/ui/sonner.tsx'
 import { DesktopUpdateProvider } from './hooks/useDesktopUpdate.tsx'
 import { installBlockBrowserBackspace } from './lib/block-browser-backspace.ts'
@@ -62,12 +63,14 @@ const Router = usesDesktopHashRouter() ? HashRouter : BrowserRouter
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Router>
-      <AppErrorBoundary>
+      <ChatStoreProvider>
         <DesktopUpdateProvider>
-          <App />
+          <AppErrorBoundary>
+            <App />
+          </AppErrorBoundary>
+          <Toaster closeButton position="top-center" />
         </DesktopUpdateProvider>
-      </AppErrorBoundary>
-      <Toaster closeButton position="top-center" />
+      </ChatStoreProvider>
     </Router>
   </StrictMode>
 )

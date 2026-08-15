@@ -832,6 +832,25 @@ export class LocalAgentClient
     return result.data
   }
 
+  /**
+   * Bulk metadata fetch for a specific set of session ids — used to hydrate
+   * foreign chats (from other projects) that appear inside cross-project
+   * split groups. Missing ids are silently skipped by the backend.
+   */
+  async listSessionsByIds(
+    ids: string[],
+    signal?: AbortSignal
+  ): Promise<AgentSession[]> {
+    const cleaned = ids.filter(Boolean)
+    if (cleaned.length === 0) return []
+    const params = new URLSearchParams({ ids: cleaned.join(',') })
+    const result = await this.request<{ data: AgentSession[] }>(
+      `/sessions?${params.toString()}`,
+      { signal }
+    )
+    return result.data
+  }
+
   async getSessionsRevision(signal?: AbortSignal): Promise<string> {
     const result = await this.request<{ revision: string }>(
       '/sessions/revision',
@@ -1962,6 +1981,101 @@ export class LocalAgentClient
         signal: options?.signal
       }
     )
+  }
+
+  /**
+   * Subscribe to the global session-lifecycle SSE stream (create / update /
+   * delete / status_changed / run.*). Replaces the frontend's 2-second
+   * `listSessions` poll + snapshot-diff for status transitions. One
+   * connection covers every chat across every project.
+   *
+   * Same EventSource-first strategy as `streamEvents` (WKWebView buffer
+   * quirk on the per-session SSE applies here too).
+   */
+  async streamGlobalSessionEvents(options: {
+    signal?: AbortSignal
+    onEvent: (event: {
+      sequence: number
+      type: string
+      timestamp: number
+      payload: Record<string, unknown>
+    }) => void
+  }): Promise<void> {
+    if (typeof EventSource !== 'undefined') {
+      const query = new URLSearchParams()
+      if (this.apiKey) query.set('token', this.apiKey)
+      const suffix = query.size ? `?${query}` : ''
+      const url = `${this.baseUrl}/v1/session-events${suffix}`
+      return new Promise<void>((resolve, reject) => {
+        const source = new EventSource(url, { withCredentials: true })
+        let opened = false
+        const cleanup = () => {
+          source.close()
+          options.signal?.removeEventListener('abort', onAbort)
+        }
+        const onAbort = () => {
+          cleanup()
+          resolve()
+        }
+        if (options.signal?.aborted) {
+          onAbort()
+          return
+        }
+        options.signal?.addEventListener('abort', onAbort)
+        source.onopen = () => {
+          opened = true
+        }
+        source.onmessage = message => {
+          try {
+            options.onEvent(JSON.parse(message.data))
+          } catch {
+            // Ignore malformed frames; the stream keeps going.
+          }
+        }
+        source.onerror = () => {
+          if (source.readyState === EventSource.CLOSED) {
+            cleanup()
+            if (opened) resolve()
+            else
+              reject(
+                new Error(
+                  'FastFold Agent global session event stream failed to connect'
+                )
+              )
+          }
+        }
+      })
+    }
+    // Fallback: fetch + ReadableStream (non-Tauri browsers without EventSource
+    // are rare; the pattern mirrors `streamEvents`).
+    const response = await fetch(`${this.baseUrl}/v1/session-events`, {
+      credentials: 'include',
+      headers: this.headers({ accept: 'text/event-stream' }),
+      signal: options.signal
+    })
+    if (!response.ok || !response.body) {
+      throw new Error(
+        `FastFold Agent global session event stream failed with status ${response.status}`
+      )
+    }
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const frames = buffer.split('\n\n')
+      buffer = frames.pop() ?? ''
+      for (const frame of frames) {
+        const data = frame
+          .split('\n')
+          .filter(line => line.startsWith('data:'))
+          .map(line => line.slice(5).trim())
+          .join('')
+        if (data) options.onEvent(JSON.parse(data))
+      }
+    }
   }
 
   async streamEvents(

@@ -62,6 +62,15 @@ export function AppShell(props: AppShellProps) {
           batchMoveSelected={props.batchMoveSelected}
           batchExportSelected={props.batchExportSelected}
           setBatchDeletePending={props.setBatchDeletePending}
+          onBatchSplitView={props.createSplitFromSidebar}
+          canBatchSplitView={props.canSplitFromSidebar}
+          onSelectTabGroup={props.onSelectTabGroup}
+          onRenameTabGroup={props.onRenameTabGroup}
+          onGoToChatProject={props.onGoToChatProject}
+          onDissolveTabGroup={props.dissolveTabGroup}
+          onSetTabGroupColor={props.setTabGroupColor}
+          activeGroupChildId={props.activeGroup?.activeChatId ?? null}
+          setTabGroupActiveChat={props.setTabGroupActiveChat}
           setCollapsedSidebarSections={props.setCollapsedSidebarSections}
           selectSessionRange={props.selectSessionRange}
           toggleSessionSelected={props.toggleSessionSelected}
@@ -178,6 +187,7 @@ export function AppShell(props: AppShellProps) {
           setProjectScopeId={props.setProjectScopeId}
           createSession={props.createSession}
           openTabs={props.openTabs}
+          openTabIds={props.openTabIds}
           sessionId={props.sessionId}
           session={props.session}
           openSessionTab={props.openSessionTab}
@@ -238,6 +248,24 @@ export function AppShell(props: AppShellProps) {
           setPendingOpenPath={props.setPendingOpenPath}
           setComposer={props.setComposer}
           setComposerFiles={props.setComposerFiles}
+          activeGroup={props.activeGroup}
+          perSessionBaseArgs={props.perSessionBaseArgs}
+          allSessions={props.allSessions}
+          setTabGroupActiveChat={props.setTabGroupActiveChat}
+          tabGroups={props.tabGroups}
+          onSplitWithNextTab={props.onSplitWithNextTab}
+          onPickSplitPartner={props.onPickSplitPartner}
+          onCancelPendingSplit={props.onCancelPendingSplit}
+          onAddChatToSplit={props.onAddChatToSplit}
+          onRemoveChatFromSplit={props.onRemoveChatFromSplit}
+          dissolveTabGroup={props.dissolveTabGroup}
+          renameTabGroup={props.onRenameTabGroup}
+          setTabGroupColor={props.setTabGroupColor}
+          closeTabGroup={props.closeTabGroup}
+          selectedChatIds={props.selectedChatIds}
+          toggleSelectChat={props.toggleSelectChat}
+          clearSelectChats={props.clearSelectChats}
+          createSplitFromSelection={props.createSplitFromSelection}
         />
         </ResizablePanelGroup>
       </div>
@@ -271,6 +299,11 @@ export function AppShell(props: AppShellProps) {
         setRenameTarget={props.setRenameTarget}
         setRenameValue={props.setRenameValue}
         submitRename={props.submitRename}
+        renameGroupTarget={props.renameGroupTarget}
+        renameGroupValue={props.renameGroupValue}
+        setRenameGroupTarget={props.setRenameGroupTarget}
+        setRenameGroupValue={props.setRenameGroupValue}
+        submitRenameGroup={props.submitRenameGroup}
         deleteTarget={props.deleteTarget}
         setDeleteTarget={props.setDeleteTarget}
         confirmDelete={props.confirmDelete}

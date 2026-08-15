@@ -154,7 +154,24 @@ class _LifecycleMixin:
         if task is not None and not task.done():
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
-        return self.store.delete_session(session_id)
+        deleted = self.store.delete_session(session_id)
+        if deleted:
+            # Notify the global session bus so subscribers can prune the
+            # chat from their cache without polling. Lazy import keeps the
+            # service layer free of a hard bus dependency at import time.
+            try:
+                from agent_server.session_event_bus import (  # noqa: PLC0415
+                    SessionEventType,
+                    session_event_bus,
+                )
+
+                session_event_bus.publish(
+                    SessionEventType.SESSION_DELETED,
+                    {"sessionId": session_id},
+                )
+            except Exception:  # noqa: BLE001
+                pass
+        return deleted
 
     def submit_message(
         self,

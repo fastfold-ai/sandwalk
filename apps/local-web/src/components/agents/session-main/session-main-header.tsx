@@ -1,5 +1,9 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
+import type {
+  AgentProject,
+  AgentSession,
+  SessionGroup
+} from '@sandwalk/agent-ui-core'
 import {
   Check,
   Copy,
@@ -42,6 +46,8 @@ export type SessionMainHeaderProps = {
   sidebarCollapsed: boolean
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>
   openTabs: AgentSession[]
+  /** Mezcla real de IDs de sesión y grupo en el orden de la strip. */
+  openTabIds?: string[]
   sessionId: string | null
   session: AgentSession | null
   navigate: NavigateFunction
@@ -73,12 +79,37 @@ export type SessionMainHeaderProps = {
   onPrepareDraftWorkspace?: () => void | Promise<void>
   /** Opens a fresh draft session (same handler as the sidebar "New agent"). */
   createSession?: (projectId?: string | null) => void | Promise<void>
+  groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
+  onSplitWith?: (sourceId: string) => void
+  onDissolveGroup?: (groupId: string) => void
+  onRenameGroup?: (group: SessionGroup) => void
+  onSetGroupColor?: (groupId: string, color: string | null) => void
+  onCloseGroup?: (groupId: string) => void
+  /**
+   * Cuando la ruta activa apunta a un grupo, el shell oculta su fila de
+   * acciones flotantes (folder / files / terminal / preview / CLI): cada
+   * panel del split muestra sus propios controles arriba (evita duplicar
+   * y quitar la ambigüedad de "a qué chat aplica").
+   */
+  inSplitGroup?: boolean
+  /**
+   * Id del grupo activo (si el user está en un split). El activeId
+   * visual del strip usa `activeGroupId ?? sessionId` — sin este prop,
+   * `sessionId` (chatId real) no matchearía ningún tab porque el chat
+   * vive oculto dentro del grupo.
+   */
+  activeGroupId?: string | null
+  selectedChatIds?: Set<string>
+  onToggleSelectChat?: (id: string) => void
+  onClearSelection?: () => void
+  onCreateSplitFromSelection?: () => void
 }
 
 export function SessionMainHeader({
   sidebarCollapsed,
   setSidebarCollapsed,
   openTabs,
+  openTabIds,
   sessionId,
   session,
   navigate,
@@ -98,14 +129,26 @@ export function SessionMainHeader({
   setCliMenuOpen,
   copiedResumeCommand,
   setCopiedResumeCommand,
-  terminalOpen,
+  terminalOpen: _terminalOpen,
   setTerminalOpen,
   filesPanelCollapsed,
   setFilesPanelCollapsed,
   panelView,
   setPanelView,
   onPrepareDraftWorkspace,
-  createSession
+  createSession,
+  groups,
+  onSplitWith,
+  onDissolveGroup,
+  onRenameGroup,
+  onSetGroupColor,
+  onCloseGroup,
+  selectedChatIds,
+  onToggleSelectChat,
+  onClearSelection,
+  onCreateSplitFromSelection,
+  inSplitGroup,
+  activeGroupId
 }: SessionMainHeaderProps) {
   const overlay = useMacDesktopOverlay()
   // Collapse: reveal after panel closes. Expand: keep briefly so icons don't gap.
@@ -133,10 +176,10 @@ export function SessionMainHeader({
     showPreviewAction
 
   const openTerminal = () => {
-    if (terminalOpen) {
-      setTerminalOpen(false)
-      return
-    }
+    // Por ahora la terminal queda siempre abierta y no se puede cerrar.
+    // El shortcut ⌘⇧T garantiza que el panel Files se vea (para exponer
+    // la terminal si estaba oculto por Files collapsed), pero nunca hace
+    // toggle-off — hasta que definamos la UX final.
     if (isDraft && inProject) {
       void (async () => {
         await onPrepareDraftWorkspace?.()
@@ -234,7 +277,8 @@ export function SessionMainHeader({
         />
         <SessionTabs
           tabs={openTabs}
-          activeId={sessionId}
+          openTabIds={openTabIds}
+          activeId={activeGroupId ?? sessionId}
           onSelect={id => {
             void navigateToSession({
               id,
@@ -261,15 +305,32 @@ export function SessionMainHeader({
                 item.organizeLabel === 'archive' ? null : 'archive'
             })
           }
+          onMoveToProject={(item, projectId) =>
+            void updateSession(item, { projectId })
+          }
+          projects={projects}
           onDelete={item => setDeleteTarget(item)}
           onCreateSession={
             createSession ? () => void createSession(activeProjectId) : undefined
           }
+          groups={groups}
+          onSplitWith={onSplitWith}
+          onDissolveGroup={onDissolveGroup}
+          onRenameGroup={onRenameGroup}
+          onSetGroupColor={onSetGroupColor}
+          onCloseGroup={onCloseGroup}
+          selectedChatIds={selectedChatIds}
+          onToggleSelectChat={onToggleSelectChat}
+          onClearSelection={onClearSelection}
+          onCreateSplitFromSelection={onCreateSplitFromSelection}
         />
       </DesktopDragRegion>
 
-      {/* Folder + actions float over the session content (no dedicated bar) */}
-      {showFloatingActions || projectName ? (
+      {/* Folder + actions float over the session content (no dedicated bar).
+          En split view el header de cada panel absorbe estos controles —
+          apagamos esta fila para no duplicar y evitar la ambigüedad de
+          "cuál chat operan". */}
+      {!inSplitGroup && (showFloatingActions || projectName) ? (
         <div className="pointer-events-none absolute inset-x-0 top-full z-30 flex h-0 items-start justify-between px-2.5 pt-1.5">
           {projectName && session?.projectId ? (
             <button
@@ -377,54 +438,11 @@ export function SessionMainHeader({
               </DropdownMenu>
             ) : null}
             <TooltipProvider delayDuration={300}>
-              {showTerminalAction ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        floatBtn,
-                        terminalOpen &&
-                          'text-foreground bg-background dark:bg-zinc-800'
-                      )}
-                      onClick={openTerminal}
-                      aria-label={
-                        terminalOpen ? 'Hide terminal' : 'Show terminal'
-                      }
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="size-4"
-                        aria-hidden
-                      >
-                        <rect width="18" height="18" x="3" y="3" rx="2" />
-                        <path d="m8 10 2 2-2 2" />
-                        <path d="M12 14h4" />
-                      </svg>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    className="flex items-center gap-2"
-                  >
-                    <span>
-                      {terminalOpen
-                        ? 'Hide terminal'
-                        : isDraft && !inProject
-                          ? 'Open terminal in home'
-                          : 'Show terminal'}
-                    </span>
-                    <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
-                      ⌘⇧T
-                    </kbd>
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
+              {/*
+                Botón Terminal oculto por ahora — la terminal queda siempre
+                abierta por defecto y no se puede cerrar hasta que
+                definamos su UX final.
+              */}
               {showFilesAction ? (
                 <Tooltip>
                   <TooltipTrigger asChild>

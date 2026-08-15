@@ -179,6 +179,7 @@ export function useAppBootstrap({
     loadSessionsRef: loaders.loadSessionsRef,
     loadSkillsRef: loaders.loadSkillsRef,
     loadSessions: loaders.loadSessions,
+    loadForeignSessions: loaders.loadForeignSessions,
     loadProjects: loaders.loadProjects,
     loadSkills: loaders.loadSkills,
     loadIntegrations: loaders.loadIntegrations,

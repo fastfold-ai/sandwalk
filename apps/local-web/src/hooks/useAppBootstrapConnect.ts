@@ -41,10 +41,14 @@ import { useLocalServerWait } from './useLocalServerWait'
 
 type LoaderBundle = ReturnType<typeof useAppBootstrapLoaders>
 
-/** Revision poll cadence. Full /sessions only runs when the watermark moves.
- * Keep this snappy so background runs (no per-session SSE) still update
- * sidebar status / awaiting_approval without flooding the API. */
-const SESSION_LIST_REFRESH_MS = 2_000
+/** Safety-net poll cadence. The primary channel for background run
+ * status / approvals is now the global SSE stream driven by
+ * `useGlobalSessionEvents`. This poll only fires as a fallback in case the
+ * stream drops (network hiccup, backend restart) and never reconnects —
+ * 60s is enough to recover without the flood of stale snapshots that the
+ * former 2s cadence produced. Focus/visibility change still triggers an
+ * immediate refresh for perceived snappiness. */
+const SESSION_LIST_REFRESH_MS = 60_000
 
 type UseAppBootstrapConnectArgs = {
   client: LocalAgentClient

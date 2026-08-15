@@ -43,6 +43,15 @@ type UseAppSessionEffectsArgs = {
   pendingMentionRef: MutableRefObject<string | string[] | null>
   setComposer: Dispatch<SetStateAction<string>>
   setComposerFiles: Dispatch<SetStateAction<string[]>>
+  /** Returns true if the chat lives inside a split-view group in this scope. */
+  chatIsInsideAnyGroup?: (chatId: string) => boolean
+  /**
+   * Todos los grupos activos (union de todos los scopes) — el effect que
+   * limpia `openTabsByProject` los consulta para no borrar los `grp_xxx`
+   * como si fueran "chats desconocidos". Un grupo se conserva en la lista
+   * si al menos uno de sus chats pertenece al proyecto activo.
+   */
+  tabGroups?: import('@sandwalk/agent-ui-core').SessionGroup[]
 }
 
 export function useAppSessionEffects({
@@ -68,7 +77,9 @@ export function useAppSessionEffects({
   setError,
   pendingMentionRef,
   setComposer,
-  setComposerFiles
+  setComposerFiles,
+  chatIsInsideAnyGroup,
+  tabGroups = []
 }: UseAppSessionEffectsArgs) {
   useEffect(() => {
     setIntegrationValues({})
@@ -87,9 +98,16 @@ export function useAppSessionEffects({
     const item = sessions.find(session => session.id === sessionId)
     // Keep project tab strips clean: only pin sessions that belong to the scope.
     if (activeProjectId && item && item.projectId !== activeProjectId) return
+    // Chats que viven dentro de un grupo no se auto-abren como tabs sueltas:
+    // el grupo ya está en la strip como pestaña virtual y agregarlos volvería
+    // a duplicar el chat en el strip.
+    if (chatIsInsideAnyGroup?.(sessionId)) {
+      clearSessionAttention(sessionId)
+      return
+    }
     openSessionTab(sessionId)
     clearSessionAttention(sessionId)
-  }, [activeProjectId, openSessionTab, sessionId, sessions])
+  }, [activeProjectId, openSessionTab, sessionId, sessions, chatIsInsideAnyGroup])
 
   // Clear Dock badge for the open session when the window is focused again.
   useEffect(() => {
@@ -107,6 +125,19 @@ export function useAppSessionEffects({
       const ids = current[activeProjectId]
       if (!ids || ids.length === 0) return current
       const filtered = ids.filter(id => {
+        // Grupos: se conservan si al menos un chat interno pertenece al
+        // proyecto activo. Antes este filtro borraba TODOS los `grp_xxx`
+        // (no aparecen en `sessions`), y el chip del grupo desaparecía
+        // de la strip después del primer click aunque el user lo tuviera
+        // marcado como abierto.
+        if (id.startsWith('grp_')) {
+          const group = tabGroups.find(g => g.id === id)
+          if (!group) return false
+          return group.chatIds.some(chatId => {
+            const chat = sessions.find(s => s.id === chatId)
+            return Boolean(chat && chat.projectId === activeProjectId)
+          })
+        }
         const item = sessions.find(session => session.id === id)
         return Boolean(item && item.projectId === activeProjectId)
       })
@@ -117,7 +148,7 @@ export function useAppSessionEffects({
       writeOpenTabsByProject(next)
       return next
     })
-  }, [activeProjectId, sessions])
+  }, [activeProjectId, sessions, tabGroups])
 
   useEffect(() => {
     if (!sessionId || isDraftAgentSessionId(sessionId)) return
@@ -136,11 +167,17 @@ export function useAppSessionEffects({
   useEffect(() => {
     if (sessions.length === 0) return
     const existing = new Set(sessions.map(item => item.id))
+    const validGroupIds = new Set(tabGroups.map(g => g.id))
     setOpenTabsByProject(current => {
       let changed = false
       const next: Record<string, string[]> = {}
       for (const [key, ids] of Object.entries(current)) {
-        const filtered = ids.filter(id => existing.has(id))
+        // Un id se conserva si es un chat válido O un grp_ conocido.
+        // Antes este cleanup borraba TODOS los `grp_xxx` (no están en
+        // `sessions`) y los grupos desaparecían al primer render.
+        const filtered = ids.filter(
+          id => existing.has(id) || validGroupIds.has(id)
+        )
         if (filtered.length !== ids.length) changed = true
         if (filtered.length > 0) next[key] = filtered
         else if (ids.length > 0) changed = true
@@ -163,7 +200,7 @@ export function useAppSessionEffects({
       writeLastSessionByScope(next)
       return next
     })
-  }, [sessions])
+  }, [sessions, tabGroups])
 
   useEffect(() => {
     const listId =

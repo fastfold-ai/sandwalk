@@ -14,6 +14,35 @@ import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { isSessionBusyError } from '@/lib/session-busy'
 import type { SessionChatState } from '@/lib/sessions'
 
+/**
+ * Retries `client.sendMessage` on `409 SessionBusyError` with short
+ * backoff. Motivation: the backend's `_active_runs[sessionId]` entry is
+ * cleared by an asyncio done_callback that runs slightly after the SSE
+ * `run.completed` event reaches the UI. If the user hits send in that
+ * ~100ms window, the backend still sees a "busy" task and rejects.
+ * Retrying twice (300 ms + 600 ms) covers that gap without touching the
+ * run lifecycle. If it still fails after the retries, the original 409
+ * bubbles up as a real error.
+ */
+async function sendMessageWithBusyRetry(
+  client: LocalAgentClient,
+  sessionId: string,
+  content: string
+): Promise<void> {
+  const delaysMs = [300, 600]
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await client.sendMessage(sessionId, content)
+      return
+    } catch (cause) {
+      const isBusy =
+        cause instanceof Error && / 409:/.test(cause.message)
+      if (!isBusy || attempt >= delaysMs.length) throw cause
+      await new Promise(resolve => window.setTimeout(resolve, delaysMs[attempt]))
+    }
+  }
+}
+
 type UseSessionChatSendArgs = {
   client: LocalAgentClient
   sessionId: string | null
@@ -43,6 +72,15 @@ type UseSessionChatSendArgs = {
     projectId?: string | null,
     options?: { navigate?: boolean }
   ) => Promise<string | null>
+  /**
+   * Populated by `usePerSessionChatState` / `useAppSessionLayer` after
+   * `useChatScroll` runs (declaration-order forces this indirection). We
+   * call it right after the optimistic composer clear so the user's own
+   * message and the incoming stream stay in view — the auto-scroll
+   * ResizeObserver alone doesn't fire soon enough on a freshly-mounted
+   * split panel that lost `stickToBottom`.
+   */
+  scrollChatToBottomRef?: MutableRefObject<(() => void) | null>
 }
 
 export function useSessionChatSend({
@@ -62,7 +100,8 @@ export function useSessionChatSend({
   patchChat,
   setSessions,
   setError,
-  ensureAgentSession
+  ensureAgentSession,
+  scrollChatToBottomRef
 }: UseSessionChatSendArgs) {
   const runActiveRef = useRef(runActive)
   runActiveRef.current = runActive
@@ -139,6 +178,15 @@ export function useSessionChatSend({
       runActive: true,
       messagesLoaded: true
     })
+    // Pin the transcript to the bottom on the next frame — the user's own
+    // message pushes the content past the fold, and if `stickToBottom` was
+    // false (common after split-mount when layout wasn't stable) the
+    // upcoming SSE deltas won't scroll on their own. Ref-based so send
+    // hook can be declared before scroll hook without a circular dep.
+    if (scrollChatToBottomRef?.current) {
+      const scroll = scrollChatToBottomRef.current
+      window.requestAnimationFrame(() => scroll())
+    }
     setSessions(current =>
       current.map(item =>
         item.id === targetSessionId
@@ -148,7 +196,14 @@ export function useSessionChatSend({
     )
     setError(null)
     try {
-      await client.sendMessage(targetSessionId, content)
+      // Retry on 409 SessionBusyError: when the user hits send right
+      // after a previous run completed, there's a small window where
+      // the SSE `run.completed` reached the UI (runActive is false in
+      // the sidebar) but the backend's asyncio.Task hasn't yet run its
+      // done_callback that clears `_active_runs[sessionId]`. Retries
+      // with short backoff cover that gap without changing anything
+      // about the run lifecycle.
+      await sendMessageWithBusyRetry(client, targetSessionId, content)
       const history = await client.listMessages(targetSessionId)
       patchChat(targetSessionId, prev => ({
         ...prev,

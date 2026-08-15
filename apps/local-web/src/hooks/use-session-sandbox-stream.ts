@@ -1,5 +1,6 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { BackendHealth, SessionSandboxStatus } from '@sandwalk/agent-ui-core'
+import { isSessionGroupId } from '@sandwalk/agent-ui-core'
 import {
   type Dispatch,
   type MutableRefObject,
@@ -30,7 +31,15 @@ export function useSessionSandboxStream({
   setSessionSandboxPhase: Dispatch<SetStateAction<SandboxActionPhase>>
 }) {
   useEffect(() => {
-    if (!sessionId || !health || isDraftAgentSessionId(sessionId)) {
+    // Group ids arrive here only via defensive paths; the group's child
+    // chats each own their own sandbox stream. Opening a WS to
+    // /sessions/grp_*/sandbox/stream 404s and burns reconnect budget.
+    if (
+      !sessionId ||
+      !health ||
+      isDraftAgentSessionId(sessionId) ||
+      isSessionGroupId(sessionId)
+    ) {
       setSessionSandboxStatus(null)
       setSessionSandboxPhase('idle')
       sandboxActionSessionRef.current = null

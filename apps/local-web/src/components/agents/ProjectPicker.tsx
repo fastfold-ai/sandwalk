@@ -2,6 +2,7 @@ import type { AgentProject } from '@sandwalk/agent-ui-core'
 import { ChevronDown, Folder, Plus, Search } from 'lucide-react'
 import { type ReactNode, useMemo, useState } from 'react'
 
+import { ProjectMark } from '@/components/agents/ProjectMark'
 import { Input } from '@/components/ui/input'
 import {
   Popover,
@@ -114,7 +115,16 @@ export function ProjectPicker({
               onClick={() => select(null)}
             >
               <Folder className="text-muted-foreground size-3.5" />
-              {noneLabel}
+              <span className="flex-1 truncate">{noneLabel}</span>
+              {/*
+                Chats sin proyecto asignado aparecen sólo en la vista "All
+                projects" del sidebar (no cuelgan de ninguna carpeta). El
+                sufijo lo hace explícito para que el usuario no confunda
+                "No project" con "borrar la asignación".
+              */}
+              <span className="text-muted-foreground shrink-0 text-xs">
+                (All)
+              </span>
             </button>
 
             {!query.trim() && recent.length > 0 ? (
@@ -132,7 +142,12 @@ export function ProjectPicker({
                     )}
                     onClick={() => select(project.id)}
                   >
-                    <Folder className="text-muted-foreground size-3.5 shrink-0" />
+                    <ProjectMark
+                      icon={project.icon}
+                      color={project.color}
+                      className="size-5 shrink-0"
+                      iconClassName="size-3"
+                    />
                     <span className="truncate">{project.name}</span>
                   </button>
                 ))}
@@ -162,13 +177,19 @@ export function ProjectPicker({
                       onClick={() => select(project.id)}
                     >
                       <span className="flex w-full items-center gap-2">
-                        <Folder className="text-muted-foreground size-3.5 shrink-0" />
+                        <ProjectMark
+                          icon={project.icon}
+                          color={project.color}
+                          className="size-5 shrink-0"
+                          iconClassName="size-3"
+                        />
                         <span className="min-w-0 flex-1 truncate">
                           {project.name}
                         </span>
                       </span>
                       {project.description ? (
-                        <span className="text-muted-foreground truncate pl-5 text-xs">
+                        // pl-7 alinea la descripción con el nombre (icono 20 px + gap 8 px).
+                        <span className="text-muted-foreground truncate pl-7 text-xs">
                           {project.description}
                         </span>
                       ) : null}

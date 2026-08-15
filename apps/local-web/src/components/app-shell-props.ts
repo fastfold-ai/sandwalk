@@ -13,6 +13,7 @@ import type {
   McpServer,
   RuntimeSettings,
   SandboxSettings,
+  SessionGroup,
   Specialist,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
@@ -22,12 +23,13 @@ import type { Location, NavigateFunction } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { type DashboardMainViewsProps } from '@/components/agents/DashboardMainViews'
+import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { type DashboardSection } from '@/components/agents/DashboardSidebar'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import type { CreateDraftSession } from '@/lib/draft-agent'
-import { groupSessions,type SessionChatState } from '@/lib/sessions'
+import { type SessionChatState, type TabItem, type TabItemSection } from '@/lib/sessions'
 import { type parseCatalogSkillId,type SkillsViewMode } from '@/lib/skills-catalog'
 
 export type AppShellProps = {
@@ -42,7 +44,7 @@ export type AppShellProps = {
   backendUrl: string
   projects: AgentProject[]
   activeProjectId: string | null
-  sections: ReturnType<typeof groupSessions>
+  sections: TabItemSection[]
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
   chatBySessionId: Record<string, SessionChatState>
@@ -163,7 +165,8 @@ export type AppShellProps = {
   refreshSessionSandbox: DashboardMainViewsProps['refreshSessionSandbox']
   togglePinProject: DashboardMainViewsProps['togglePinProject']
   deleteProject: DashboardMainViewsProps['deleteProject']
-  openTabs: AgentSession[]
+  openTabs: TabItem[]
+  openTabIds: string[]
   session: AgentSession | null
   closeSessionTab: (sessionId: string) => void
   closeOtherSessionTabs: (sessionId: string) => void
@@ -240,8 +243,47 @@ export type AppShellProps = {
   setRenameTarget: Dispatch<SetStateAction<AgentSession | null>>
   setRenameValue: Dispatch<SetStateAction<string>>
   submitRename: () => Promise<void>
+  renameGroupTarget: SessionGroup | null
+  renameGroupValue: string
+  setRenameGroupTarget: Dispatch<SetStateAction<SessionGroup | null>>
+  setRenameGroupValue: Dispatch<SetStateAction<string>>
+  submitRenameGroup: () => void
   deleteTarget: AgentSession | null
   confirmDelete: () => Promise<void>
   batchDeletePending: boolean
   confirmBatchDelete: () => Promise<void>
+  tabGroups: SessionGroup[]
+  createTabGroup: (
+    chatIds: string[],
+    overrides?: Partial<SessionGroup>
+  ) => string | null
+  dissolveTabGroup: (groupId: string) => void
+  renameTabGroup: (group: SessionGroup) => void
+  closeTabGroup: (groupId: string) => void
+  addChatToGroup: (groupId: string, chatId: string) => void
+  removeChatFromGroup: (groupId: string, chatId: string) => number
+  setTabGroupColor: (groupId: string, color: string | null) => void
+  setTabGroupPinned: (groupId: string, pinned: boolean) => void
+  setTabGroupActiveChat: (groupId: string, chatId: string) => void
+  reorderChatsInTabGroup: (groupId: string, orderedChatIds: string[]) => void
+  activeGroup: SessionGroup | null
+  perSessionBaseArgs: Omit<
+    PerSessionChatStateArgs,
+    'sessionId' | 'session' | 'sessionIdRef'
+  >
+  allSessions: AgentSession[]
+  onSplitWithNextTab: (sourceId: string) => void
+  onPickSplitPartner: (partnerId: string) => void
+  onCancelPendingSplit: () => void
+  onAddChatToSplit: (chatId: string) => void
+  onRemoveChatFromSplit: (chatId: string) => void
+  selectedChatIds: Set<string>
+  toggleSelectChat: (id: string) => void
+  clearSelectChats: () => void
+  createSplitFromSelection: () => void
+  createSplitFromSidebar: () => void
+  canSplitFromSidebar: boolean
+  onSelectTabGroup: (groupId: string) => void
+  onRenameTabGroup: (group: SessionGroup) => void
+  onGoToChatProject: (chat: AgentSession) => void
 }

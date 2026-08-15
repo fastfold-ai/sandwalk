@@ -1,8 +1,12 @@
-import type { AgentSession, IntegrationSummary } from '@sandwalk/agent-ui-core'
+import type {
+  AgentSession,
+  IntegrationSummary,
+  SessionGroup
+} from '@sandwalk/agent-ui-core'
 
 import { slugifyIntegrationRoute } from '@/components/agents/dashboard-main-view-helpers'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
-import { groupSessions } from '@/lib/sessions'
+import { groupTabItems, type TabItem } from '@/lib/sessions'
 
 export function resolveSelectedIntegrationKey(
   decodedIntegrationRouteName: string | null,
@@ -107,6 +111,7 @@ export function computeShowSessionTabs(input: {
 
 export function buildSessionSidebarModel(input: {
   sessions: AgentSession[]
+  tabGroups: SessionGroup[]
   activeProjectId: string | null
   openTabIds: string[]
   /** Keep the open chat visible in the tab strip while its project assignment catches up. */
@@ -115,15 +120,65 @@ export function buildSessionSidebarModel(input: {
   const displayedSessions = input.activeProjectId
     ? input.sessions.filter(item => item.projectId === input.activeProjectId)
     : input.sessions
-  const sections = groupSessions(displayedSessions)
-  const openTabs = input.openTabIds
-    .map(id => input.sessions.find(item => item.id === id))
-    .filter((item): item is AgentSession => Boolean(item))
-    .filter(
-      item =>
-        !input.activeProjectId ||
-        item.projectId === input.activeProjectId ||
-        item.id === input.activeSessionId
-    )
+  // Grupos que aplican al scope actual: al menos uno de sus chatIds vive en
+  // `displayedSessions`. Los grupos son por-scope-de-proyecto ya en el store
+  // (`useAppTabGroups` usa `projectTabsKey`), esta segunda vuelta filtra por
+  // si acaso quedaron grupos con chats de otros scopes al vuelo.
+  const displayedIds = new Set(displayedSessions.map(item => item.id))
+  const applicableGroups = input.tabGroups.filter(g =>
+    g.chatIds.some(id => displayedIds.has(id))
+  )
+  // Pass `input.sessions` (unfiltered) so groupTabItems can resolve foreign
+  // chats inside cross-project groups. Standalone chats stay scoped via
+  // `displayedSessions`; only group `children` benefit from the wider pool.
+  const sections = groupTabItems(
+    displayedSessions,
+    applicableGroups,
+    input.sessions
+  )
+  // `openTabs` mezcla chats y grupos en el orden real de `openTabIds`. Los
+  // items que no se pueden resolver (chat en otro scope, grupo aún cargando)
+  // se saltean. `activeSessionId` respeta la visibilidad del chat/grupo
+  // activo aunque el filtro de proyecto lo excluiría.
+  const sessionsById = new Map(input.sessions.map(s => [s.id, s]))
+  const groupsById = new Map(input.tabGroups.map(g => [g.id, g]))
+  const openTabs: TabItem[] = input.openTabIds
+    .map<TabItem | null>(id => {
+      const group = groupsById.get(id)
+      if (group) {
+        const children = group.chatIds
+          .map(cid => sessionsById.get(cid))
+          .filter((s): s is AgentSession => Boolean(s))
+        return {
+          kind: 'group',
+          id: group.id,
+          group,
+          children,
+          lastActivity: 0
+        }
+      }
+      const session = sessionsById.get(id)
+      if (session) {
+        return {
+          kind: 'chat',
+          id: session.id,
+          session,
+          lastActivity: 0
+        }
+      }
+      return null
+    })
+    .filter((item): item is TabItem => Boolean(item))
+    .filter(item => {
+      if (!input.activeProjectId) return true
+      if (item.id === input.activeSessionId) return true
+      if (item.kind === 'chat') {
+        return item.session.projectId === input.activeProjectId
+      }
+      // Grupos: aplican si al menos uno de sus chats pertenece al scope.
+      return item.children.some(
+        s => s.projectId === input.activeProjectId
+      )
+    })
   return { displayedSessions, sections, openTabs }
 }
