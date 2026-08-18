@@ -28,6 +28,7 @@ from agent_server.bench_service.results_store import (
     resolve_bench_provider,
     save_result,
 )
+from agent_server.bench_service.usage_rollup import rollup_suite_usage
 from agent_server.settings_service import SettingsService
 
 logger = logging.getLogger(__name__)
@@ -155,8 +156,10 @@ def run_agent_suite(
         if resume_checkpoint and resume_checkpoint.get("project_id")
         else None
     )
+    workers_store = deps.worker_store()
+    workers_svc = deps.worker_service()
     if project_id:
-        project = deps.store.get_project(project_id)
+        project = workers_store.get_project(project_id)
         if project is None:
             project_id = None
     if not project_id:
@@ -169,7 +172,7 @@ def run_agent_suite(
         desc = build_project_description(
             pack=pack, matrix_name=matrix or suite_id, cells=cells
         )
-        project = deps.store.create_project(
+        project = workers_store.create_project(
             name=name,
             description=desc,
             agent_context=None,
@@ -179,7 +182,7 @@ def run_agent_suite(
         )
         project_id = project.id
     else:
-        project = deps.store.get_project(project_id)
+        project = workers_store.get_project(project_id)
 
     pending = [
         (idx, cell)
@@ -246,6 +249,13 @@ def run_agent_suite(
         if prior_name:
             result["name"] = prior_name
         save_result(result)
+        rollup_suite_usage(
+            chat_store=deps.store,
+            bench_store=workers_store,
+            result=result,
+            surface=client_surface,
+        )
+        save_result(result)
         _checkpoint(status)
         return result
 
@@ -282,7 +292,7 @@ def run_agent_suite(
         cell_model = use_model or cell.model_id
         # Per-session model — do not churn global SettingsService (disk + env)
         # under multi-worker load.
-        session = deps.service.create_session(
+        session = workers_svc.create_session(
             title=cell.title,
             workspace_path=None,
             project_id=project_id,
@@ -292,7 +302,7 @@ def run_agent_suite(
             provider=use_provider,
             model=cell_model,
         )
-        session = deps.service.ensure_workspace(session.id)
+        session = workers_svc.ensure_workspace(session.id)
         sid = session.id
         with merge_lock:
             in_flight.add(sid)
@@ -314,7 +324,7 @@ def run_agent_suite(
                 stop_reason = _reason() or "pause"
                 return None
             try:
-                deps.service.submit_message(
+                workers_svc.submit_message(
                     session_id=sid,
                     content=bench_kickoff_message(question_id=cell.question_id),
                 )
@@ -328,7 +338,7 @@ def run_agent_suite(
             if reason:
                 stop_reason = reason
                 try:
-                    deps.service.interrupt(sid)
+                    workers_svc.interrupt(sid)
                 except Exception:  # noqa: BLE001
                     pass
                 return None
@@ -419,7 +429,7 @@ def run_agent_suite(
                     sessions = list(in_flight)
                 for sid in sessions:
                     try:
-                        deps.service.interrupt(sid)
+                        workers_svc.interrupt(sid)
                     except Exception:  # noqa: BLE001
                         pass
                 return
@@ -491,9 +501,16 @@ def run_agent_suite(
     if prior_name:
         result["name"] = prior_name
     save_result(result)
+    rollup_suite_usage(
+        chat_store=deps.store,
+        bench_store=workers_store,
+        result=result,
+        surface=client_surface,
+    )
+    save_result(result)
     delete_checkpoint(run_id)
     if cleanup_sessions:
-        delete_bench_project_data(deps.store, project_id)
+        delete_bench_project_data(workers_store, project_id)
         result["project_id"] = None
         result["sessions_cleaned"] = True
         save_result(result)
@@ -819,11 +836,11 @@ def _wait_until_settled(
             reason = "cancel"
         if reason:
             try:
-                deps.service.interrupt(session_id)
+                deps.worker_service().interrupt(session_id)
             except Exception:  # noqa: BLE001
                 pass
             return
-        session = deps.store.get_session(session_id)
+        session = deps.worker_store().get_session(session_id)
         if session is None:
             return
         status = session.status
@@ -834,17 +851,17 @@ def _wait_until_settled(
         if not saw_running and status == "idle":
             # wait a bit for status to flip to running
             time.sleep(0.5)
-            session = deps.store.get_session(session_id)
+            session = deps.worker_store().get_session(session_id)
             if session and session.status == "idle":
                 # maybe finished very fast
-                msgs = deps.store.list_messages(session_id)
+                msgs = deps.worker_store().list_messages(session_id)
                 if any(m.role == "assistant" for m in msgs):
                     return
         time.sleep(1.0)
 
 
 def _grade_session(deps: AppDeps, *, session_id: str, cell: Any, index: int) -> dict[str, Any]:
-    msgs = deps.store.list_messages(session_id)
+    msgs = deps.worker_store().list_messages(session_id)
     assistant = ""
     for m in reversed(msgs):
         if m.role == "assistant" and (m.content or "").strip():
@@ -857,7 +874,7 @@ def _grade_session(deps: AppDeps, *, session_id: str, cell: Any, index: int) -> 
     # Code-exec suites grade the full assistant transcript (code blocks), not
     # a trailing Answer: line.
     predicted = assistant if eval_mode == "code_exec" else extract_answer(assistant)
-    events = deps.store.list_events(session_id) if hasattr(deps.store, "list_events") else []
+    events = deps.worker_store().list_events(session_id) if hasattr(deps.worker_store(), "list_events") else []
     tool_names = collect_tool_names_from_events(events)
     meta = (q.metadata if q else {}) or {}
     checklist = list(meta.get("checklist") or [])

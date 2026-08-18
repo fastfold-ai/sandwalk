@@ -217,11 +217,13 @@ CREATE TABLE IF NOT EXISTS session_connector_mutes (
 
 CREATE TABLE IF NOT EXISTS usage_runs (
     run_id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
+    session_id TEXT,
     day TEXT NOT NULL,
     surface TEXT NOT NULL DEFAULT 'unknown',
     model_id TEXT,
     provider TEXT,
+    project_id TEXT,
+    kind TEXT NOT NULL DEFAULT 'chat',
     input_tokens INTEGER NOT NULL DEFAULT 0,
     output_tokens INTEGER NOT NULL DEFAULT 0,
     cache_read_tokens INTEGER NOT NULL DEFAULT 0,

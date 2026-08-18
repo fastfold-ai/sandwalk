@@ -343,6 +343,15 @@ export function catalogModelPrefKey(model: {
   })
 }
 
+function normalizeModelSearchText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[./_]+/g, '-')
+    .replace(/[\s]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
 /** Higher is better. Returns -1 when the option does not match ``query``. */
 export function scoreComposerModelSearch(
   option: ComposerModelOption,
@@ -360,18 +369,10 @@ export function scoreComposerModelSearch(
     .trim()
     .toLowerCase()
   const words = label.split(/[\s\-_/]+/).filter(Boolean)
-
-  if (label === q || model === q || bare === q) return 1000
-  if (label.startsWith(q)) return 900
-  if (bare.startsWith(q) || model.startsWith(q)) return 850
-  if (words.some(word => word.startsWith(q))) return 800
-  if (provider.startsWith(q) || speed.startsWith(q)) return 700
-  if (label.includes(q)) return 500
-  if (bare.includes(q) || model.includes(q)) return 400
-  if (provider.includes(q) || speed.includes(q)) return 300
   const haystack = [
     label,
     model,
+    bare,
     provider,
     speed,
     option.source || '',
@@ -379,8 +380,27 @@ export function scoreComposerModelSearch(
   ]
     .join(' ')
     .toLowerCase()
+  const compactQuery = normalizeModelSearchText(q)
+  const compactHaystack = normalizeModelSearchText(haystack)
+  const tokens = q.split(/[\s\-_/]+/).filter(Boolean)
+  const compactTokens = tokens.map(normalizeModelSearchText).filter(Boolean)
+  if (
+    compactTokens.length > 0 &&
+    !compactTokens.every(token => compactHaystack.includes(token))
+  ) {
+    return -1
+  }
+
+  if (label === q || model === q || bare === q) return 1000
+  if (label.startsWith(q) || compactHaystack === compactQuery) return 900
+  if (bare.startsWith(q) || model.startsWith(q)) return 850
+  if (words.some(word => word.startsWith(q))) return 800
+  if (provider.startsWith(q) || speed.startsWith(q)) return 700
+  if (label.includes(q) || compactHaystack.includes(compactQuery)) return 500
+  if (bare.includes(q) || model.includes(q)) return 400
+  if (provider.includes(q) || speed.includes(q)) return 300
   if (haystack.includes(q)) return 100
-  return -1
+  return compactTokens.length > 0 ? 80 : -1
 }
 
 export type ComposerModelPreferences = {

@@ -156,22 +156,16 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
             sort=date_sort,
             paginate=not usage_sort,
         )
-        ids = [
-            str(row.get("project_id") or "")
-            for row in page["data"]
-            if row.get("project_id")
-        ]
-        tokens = await asyncio.to_thread(
-            deps.store.lifetime_tokens_by_project, ids
-        )
+        ids = [str(row.get("run_id") or "") for row in page["data"] if row.get("run_id")]
+        tokens = await asyncio.to_thread(deps.store.lifetime_tokens_by_run, ids)
         rows = list(page["data"])
         if usage_sort:
             reverse = sort_key == "usage_desc"
 
             def usage_key(row: dict) -> tuple[int, str]:
-                pid = str(row.get("project_id") or "")
-                n = int(tokens.get(pid) or 0) if pid else 0
-                return (n, str(row.get("run_id") or ""))
+                rid = str(row.get("run_id") or "")
+                n = int(row.get("lifetime_tokens") or tokens.get(rid) or 0)
+                return (n, rid)
 
             rows.sort(key=usage_key, reverse=reverse)
             sliced = slice_page(rows, limit=limit, cursor=cursor)
@@ -206,9 +200,9 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
                     str(r["provider"]) if r.get("provider") not in (None, "") else None
                 ),
                 lifetime_tokens=(
-                    tokens.get(str(r.get("project_id") or ""))
-                    if r.get("project_id")
-                    else None
+                    int(r["lifetime_tokens"])
+                    if r.get("lifetime_tokens") not in (None, "")
+                    else tokens.get(str(r.get("run_id") or ""))
                 ),
             )
             for r in rows
@@ -239,15 +233,10 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
         provider = _provider_from_row(live)
         if provider:
             live = {**live, "provider": provider}
-        project_id = str(live.get("project_id") or "")
-        if project_id:
-            tokens = await asyncio.to_thread(
-                deps.store.lifetime_tokens_by_project, [project_id]
-            )
-            live = {
-                **live,
-                "lifetime_tokens": tokens.get(project_id),
-            }
+        rid = str(live.get("run_id") or run_id)
+        if live.get("lifetime_tokens") in (None, ""):
+            tokens = await asyncio.to_thread(deps.store.lifetime_tokens_by_run, [rid])
+            live = {**live, "lifetime_tokens": tokens.get(rid)}
         return live
 
     @app.patch("/v1/bench/runs/{run_id}")
@@ -293,7 +282,7 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
     @app.delete("/v1/bench/runs/{run_id}")
     async def bench_delete_run(run_id: str) -> dict:
         ok = await asyncio.to_thread(
-            delete_result, run_id, store=deps.store, delete_sessions=True
+            delete_result, run_id, store=deps.worker_store(), delete_sessions=True
         )
         if not ok:
             raise HTTPException(status_code=404, detail="Run not found.")
@@ -308,7 +297,9 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
 
     @app.post("/v1/bench/results/reset", response_model=BenchResetResponse)
     async def bench_reset() -> BenchResetResponse:
-        cleared, sessions = await asyncio.to_thread(clear_results, store=deps.store)
+        cleared, sessions = await asyncio.to_thread(
+            clear_results, store=deps.worker_store()
+        )
         return BenchResetResponse(ok=True, cleared=cleared, sessions_deleted=sessions)
 
     @app.post("/v1/bench/grade", response_model=BenchGradeResponse)

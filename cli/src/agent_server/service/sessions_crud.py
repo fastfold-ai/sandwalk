@@ -11,7 +11,13 @@ from agent_server.session_event_bus import SessionEventType, session_event_bus
 
 def _publish_session_bus_event(event_type: str, session: AgentSession) -> None:
     """Fan out to `session_event_bus` — swallow errors so a broken subscriber
-    can never break the write path."""
+    can never break the write path.
+
+    Bench cells stay off the global All-chats stream; they belong on
+    Benchmarking results, not the sidebar.
+    """
+    if getattr(session, "source", None) == "bench":
+        return
     try:
         session_event_bus.publish(
             event_type,

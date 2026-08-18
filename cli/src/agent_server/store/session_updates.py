@@ -124,11 +124,12 @@ class SessionUpdateMixin:
                 (status, now.isoformat(), session_id),
             )
         session = self.get_session(session_id)
-        if session is not None:
+        if session is not None and getattr(session, "source", None) != "bench":
             # Push the transition on the global session bus so subscribers
             # (frontend `useGlobalSessionEvents`) can react without diffing
             # snapshots from a poll. Import lazily to avoid a circular
             # dependency between the store and the app-level bus.
+            # Bench cells are omitted so live MMLU (etc.) do not leak into All.
             from agent_server.session_event_bus import (  # noqa: PLC0415
                 SessionEventType,
                 session_event_bus,

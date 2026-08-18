@@ -5,6 +5,7 @@ import {
   SessionActivityHeatmapGrid,
   SessionActivityHeatmapLegend
 } from '@/components/agents/session-activity-heatmap-grid'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 import {
@@ -94,8 +95,13 @@ export function ActivityHeatmapWidget({
           />
           <SessionActivityHeatmapLegend />
         </div>
-      ) : (
+      ) : overview ? (
         <p className="text-muted-foreground text-sm">No activity yet.</p>
+      ) : (
+        <div className="mt-2 flex-1 space-y-2" aria-busy="true">
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-3 w-32" />
+        </div>
       )}
     </div>
   )

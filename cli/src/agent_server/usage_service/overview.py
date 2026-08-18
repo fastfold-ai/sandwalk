@@ -48,75 +48,21 @@ def _span_seconds(start: datetime | None, end: datetime | None) -> int:
     return max(0, int((end - start).total_seconds()))
 
 
-_AGENT_GAP_SECONDS = 2 * 3600  # idle gap that ends an agent stretch
-_AGENT_EVENT_TYPES = (
-    "run.started",
-    "run.completed",
-    "run.usage",
-    "tool.started",
-    "tool.completed",
-    "assistant.message",
-)
-
-
-def _longest_contiguous_seconds(
-    timestamps: list[datetime],
-    *,
-    gap_seconds: int = _AGENT_GAP_SECONDS,
-) -> int:
-    if not timestamps:
-        return 0
-    ordered = sorted(timestamps)
-    best = 0
-    start = prev = ordered[0]
-    for stamp in ordered[1:]:
-        if _span_seconds(prev, stamp) > gap_seconds:
-            best = max(best, _span_seconds(start, prev))
-            start = stamp
-        prev = stamp
-    return max(best, _span_seconds(start, prev))
-
-
 def _longest_agent_seconds(
     store: AgentStore, *, session_ids: set[str] | None = None
 ) -> int:
-    """Longest contiguous agent activity window (gap-tolerant), not idle age."""
+    """Longest usage-ledger span per session (not a full events table scan).
+
+    Scanning ``events`` for tool/run rows contends with live benches on the
+    same SQLite WAL and stalls Overview. The ledger is enough for the metric.
+    """
     allow = session_ids
-    by_session: dict[str, list[datetime]] = defaultdict(list)
-    try:
-        with store._connect() as connection:  # type: ignore[attr-defined]
-            placeholders = ",".join("?" for _ in _AGENT_EVENT_TYPES)
-            rows = connection.execute(
-                f"""
-                SELECT session_id, timestamp
-                FROM events
-                WHERE type IN ({placeholders})
-                ORDER BY session_id, timestamp
-                """,
-                _AGENT_EVENT_TYPES,
-            ).fetchall()
-        for row in rows:
-            sid = str(row["session_id"] or "").strip()
-            if allow is not None and sid not in allow:
-                continue
-            stamp = _as_datetime(row["timestamp"])
-            if sid and stamp is not None:
-                by_session[sid].append(stamp)
-    except Exception:
-        by_session = {}
+    if allow is not None and not allow:
+        return 0
     best = 0
-    for stamps in by_session.values():
-        secs = _longest_contiguous_seconds(stamps)
-        if secs > best:
-            best = secs
-    if best > 0:
-        return best
-    # Fallback: densest run.usage span per session from the ledger.
     try:
         with store._connect() as connection:  # type: ignore[attr-defined]
             if allow is not None:
-                if not allow:
-                    return 0
                 ph = ",".join("?" for _ in allow)
                 rows = connection.execute(
                     f"""
@@ -130,9 +76,11 @@ def _longest_agent_seconds(
             else:
                 rows = connection.execute(
                     """
-                    SELECT session_id, MIN(updated_at) AS t0, MAX(updated_at) AS t1
-                    FROM usage_runs
-                    GROUP BY session_id
+                    SELECT u.session_id, MIN(u.updated_at) AS t0, MAX(u.updated_at) AS t1
+                    FROM usage_runs u
+                    INNER JOIN sessions s ON s.id = u.session_id
+                    WHERE COALESCE(s.source, '') != 'bench'
+                    GROUP BY u.session_id
                     """
                 ).fetchall()
         for row in rows:

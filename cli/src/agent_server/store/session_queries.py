@@ -92,7 +92,8 @@ class SessionQueryMixin:
                 SELECT DISTINCT sessions.*
                 FROM sessions
                 LEFT JOIN messages ON messages.session_id = sessions.id
-                WHERE (
+                WHERE COALESCE(sessions.source, '') != 'bench'
+                  AND (
                     sessions.title LIKE ? ESCAPE '\\'
                     OR messages.content LIKE ? ESCAPE '\\'
                   )

@@ -31,32 +31,39 @@ class UsageMixin:
         self,
         *,
         run_id: str,
-        session_id: str,
+        session_id: str | None,
         day: str,
         surface: str = "unknown",
         model_id: str | None = None,
         provider: str | None = None,
+        project_id: str | None = None,
+        kind: str = "chat",
         input_tokens: int = 0,
         output_tokens: int = 0,
         cache_read_tokens: int = 0,
         cache_creation_tokens: int = 0,
     ) -> None:
         rid = str(run_id or "").strip()
-        sid = str(session_id or "").strip()
-        if not rid or not sid:
+        sid = str(session_id or "").strip() or None
+        bucket = "bench" if str(kind or "").strip().lower() == "bench" else "chat"
+        if not rid:
+            return
+        if bucket == "chat" and not sid:
             return
         now = utc_now().isoformat()
+        pid = str(project_id or "").strip() or None
         with self._write_lock, self._connect() as connection:
             connection.execute(
                 """
                 INSERT INTO usage_runs(
                     run_id, session_id, day, surface, model_id, provider,
+                    project_id, kind,
                     input_tokens, output_tokens, cache_read_tokens,
                     cache_creation_tokens, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(run_id) DO UPDATE SET
-                    session_id = excluded.session_id,
+                    session_id = COALESCE(excluded.session_id, usage_runs.session_id),
                     day = excluded.day,
                     surface = CASE
                         WHEN excluded.surface != 'unknown' THEN excluded.surface
@@ -64,6 +71,8 @@ class UsageMixin:
                     END,
                     model_id = COALESCE(excluded.model_id, usage_runs.model_id),
                     provider = COALESCE(excluded.provider, usage_runs.provider),
+                    project_id = COALESCE(excluded.project_id, usage_runs.project_id),
+                    kind = excluded.kind,
                     input_tokens = excluded.input_tokens,
                     output_tokens = excluded.output_tokens,
                     cache_read_tokens = excluded.cache_read_tokens,
@@ -77,6 +86,8 @@ class UsageMixin:
                     normalize_surface(surface),
                     (model_id or "").strip() or None,
                     normalize_provider(provider),
+                    pid,
+                    bucket,
                     max(0, int(input_tokens or 0)),
                     max(0, int(output_tokens or 0)),
                     max(0, int(cache_read_tokens or 0)),
@@ -86,35 +97,70 @@ class UsageMixin:
             )
 
     def list_usage_runs(
-        self, *, project_id: str | None = None
+        self, *, project_id: str | None = None, include_bench: bool | None = None
     ) -> list[dict[str, Any]]:
         scoped = (project_id or "").strip() or None
+        show_cell_sessions = include_bench if include_bench is not None else bool(scoped)
         with self._connect() as connection:
             if scoped:
+                extra = "" if show_cell_sessions else (
+                    " AND (COALESCE(u.kind, 'chat') = 'bench'"
+                    " OR COALESCE(s.source, '') != 'bench')"
+                )
                 rows = connection.execute(
-                    """
+                    f"""
                     SELECT u.run_id, u.session_id, u.day, u.surface, u.model_id,
-                           u.provider, u.input_tokens, u.output_tokens,
-                           u.cache_read_tokens, u.cache_creation_tokens,
-                           u.updated_at
+                           u.provider, u.project_id, u.kind, u.input_tokens,
+                           u.output_tokens, u.cache_read_tokens,
+                           u.cache_creation_tokens, u.updated_at
                     FROM usage_runs u
-                    INNER JOIN sessions s ON s.id = u.session_id
-                    WHERE s.project_id = ?
+                    LEFT JOIN sessions s ON s.id = u.session_id
+                    WHERE COALESCE(u.project_id, s.project_id) = ?{extra}
                     ORDER BY u.day ASC, u.run_id ASC
                     """,
                     (scoped,),
                 ).fetchall()
             else:
+                extra = (
+                    ""
+                    if show_cell_sessions
+                    else (
+                        " WHERE COALESCE(u.kind, 'chat') = 'bench'"
+                        " OR s.id IS NULL OR COALESCE(s.source, '') != 'bench'"
+                    )
+                )
                 rows = connection.execute(
-                    """
-                    SELECT run_id, session_id, day, surface, model_id, provider,
-                           input_tokens, output_tokens, cache_read_tokens,
-                           cache_creation_tokens, updated_at
-                    FROM usage_runs
-                    ORDER BY day ASC, run_id ASC
+                    f"""
+                    SELECT u.run_id, u.session_id, u.day, u.surface, u.model_id,
+                           u.provider, u.project_id, u.kind, u.input_tokens,
+                           u.output_tokens, u.cache_read_tokens,
+                           u.cache_creation_tokens, u.updated_at
+                    FROM usage_runs u
+                    LEFT JOIN sessions s ON s.id = u.session_id
+                    {extra}
+                    ORDER BY u.day ASC, u.run_id ASC
                     """
                 ).fetchall()
         return [dict(row) for row in rows]
+
+    def lifetime_tokens_by_run(self, run_ids: list[str]) -> dict[str, int]:
+        wanted = sorted({str(item).strip() for item in run_ids if str(item).strip()})
+        if not wanted:
+            return {}
+        placeholders = ",".join("?" for _ in wanted)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT run_id,
+                       COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens
+                FROM usage_runs
+                WHERE run_id IN ({placeholders})
+                GROUP BY run_id
+                """,
+                wanted,
+            ).fetchall()
+        found = {str(row["run_id"]): int(row["tokens"] or 0) for row in rows}
+        return {rid: found.get(rid, 0) for rid in wanted}
 
     def lifetime_tokens_by_project(self, project_ids: list[str]) -> dict[str, int]:
         """Cheap SUM(input+output) per project. Cached a few seconds."""
@@ -136,12 +182,12 @@ class UsageMixin:
             with self._connect() as connection:
                 rows = connection.execute(
                     f"""
-                    SELECT s.project_id AS project_id,
+                    SELECT COALESCE(u.project_id, s.project_id) AS project_id,
                            COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens
                     FROM usage_runs u
-                    INNER JOIN sessions s ON s.id = u.session_id
-                    WHERE s.project_id IN ({placeholders})
-                    GROUP BY s.project_id
+                    LEFT JOIN sessions s ON s.id = u.session_id
+                    WHERE COALESCE(u.project_id, s.project_id) IN ({placeholders})
+                    GROUP BY COALESCE(u.project_id, s.project_id)
                     """,
                     missing,
                 ).fetchall()

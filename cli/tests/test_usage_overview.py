@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 from agent_server.store import AgentStore
@@ -283,6 +284,133 @@ def test_usage_overview_filters_by_project(tmp_path: Path, monkeypatch):
     assert empty.lifetime_tokens == 0
 
 
+def test_usage_overview_excludes_bench_sessions(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "auth.json"))
+    monkeypatch.setattr(
+        "agent_server.usage_service.backfill._trajectory_paths",
+        lambda: [],
+    )
+    store = AgentStore(tmp_path / "usage.db", exclusive=True)
+    for key in (
+        "usage_backfill_v1",
+        "usage_model_repair_v1",
+        "usage_provider_repair_v1",
+        "usage_alias_repair_v1",
+    ):
+        store.set_usage_meta(key, "done")
+    chat = store.create_session(title="hi", workspace_path=None)
+    cell = store.create_session(
+        title="MMLU · anatomy", workspace_path=None, source="bench"
+    )
+    today = __import__("datetime").date.today().isoformat()
+    store.upsert_usage_run(
+        run_id="r-chat",
+        session_id=chat.id,
+        day=today,
+        surface="ui",
+        model_id="model-a",
+        provider="openai",
+        input_tokens=10,
+        output_tokens=0,
+    )
+    store.upsert_usage_run(
+        run_id="r-bench",
+        session_id=cell.id,
+        day=today,
+        surface="ui",
+        model_id="model-b",
+        provider="openai",
+        input_tokens=5000,
+        output_tokens=0,
+    )
+    overview = build_usage_overview(store)
+    assert overview.lifetime_tokens == 10
+    assert overview.models_used == 1
+    project = store.create_project(name="Bench · MMLU", folder_path=None)
+    store.update_session(cell.id, project_id=project.id, update_project_id=True)
+    scoped = build_usage_overview(store, project_id=project.id)
+    assert scoped.lifetime_tokens == 5000
+
+
+def test_usage_overview_includes_bench_rollup(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("SANDWALK_SETTINGS_PATH", str(tmp_path / "auth.json"))
+    monkeypatch.setattr(
+        "agent_server.usage_service.backfill._trajectory_paths",
+        lambda: [],
+    )
+    from agent_server.bench_service.usage_rollup import rollup_suite_usage
+
+    chat = AgentStore(tmp_path / "chat.db", exclusive=True)
+    bench = AgentStore(tmp_path / "bench.db", exclusive=True)
+    try:
+        for key in (
+            "usage_backfill_v1",
+            "usage_model_repair_v1",
+            "usage_provider_repair_v1",
+            "usage_alias_repair_v1",
+        ):
+            chat.set_usage_meta(key, "done")
+        project = chat.create_project(name="Research", folder_path=None)
+        today = __import__("datetime").date.today().isoformat()
+        chat.upsert_usage_run(
+            run_id="r-chat",
+            session_id="s-chat",
+            day=today,
+            surface="ui",
+            model_id="model-a",
+            provider="openai",
+            input_tokens=10,
+            output_tokens=0,
+        )
+        cell_project = bench.create_project(name="Bench · MMLU", folder_path=None)
+        cell = bench.create_session(
+            title="cell",
+            workspace_path=None,
+            project_id=cell_project.id,
+            source="bench",
+        )
+        bench.upsert_usage_run(
+            run_id="cell-run",
+            session_id=cell.id,
+            day=today,
+            input_tokens=500,
+            output_tokens=20,
+        )
+        result = rollup_suite_usage(
+            chat_store=chat,
+            bench_store=bench,
+            result={
+                "run_id": "suite-1",
+                "project_id": cell_project.id,
+                "model_id": "model-b",
+                "provider": "openrouter",
+            },
+            usage_project_id=project.id,
+        )
+        assert result["lifetime_tokens"] == 520
+        overview = build_usage_overview(chat)
+        assert overview.lifetime_tokens == 530
+        scoped = build_usage_overview(chat, project_id=project.id)
+        assert scoped.lifetime_tokens == 520
+        again = rollup_suite_usage(
+            chat_store=chat,
+            bench_store=bench,
+            result={
+                "run_id": "suite-1",
+                "project_id": cell_project.id,
+                "model_id": "model-b",
+                "provider": "openrouter",
+            },
+            usage_project_id=project.id,
+        )
+        overview2 = build_usage_overview(chat)
+        assert again["lifetime_tokens"] == 520
+        assert overview2.lifetime_tokens == 530
+    finally:
+        chat.close()
+        bench.close()
+
+
 def test_lifetime_tokens_by_project_batches_and_caches(tmp_path: Path):
     store = AgentStore(tmp_path / "usage.db", exclusive=True)
     project_a = store.create_project(name="A", folder_path=None)
@@ -328,3 +456,48 @@ def test_lifetime_tokens_by_project_batches_and_caches(tmp_path: Path):
     usage_mod._project_token_cache.clear()
     fresh = store.lifetime_tokens_by_project([project_a.id])
     assert fresh[project_a.id] == 999
+
+
+def test_open_existing_usage_runs_without_project_id(tmp_path: Path):
+    """Packaged DBs already have usage_runs; schema indexes must not run first."""
+    path = tmp_path / "legacy.db"
+    with sqlite3.connect(path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE usage_runs (
+                run_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                day TEXT NOT NULL,
+                surface TEXT NOT NULL DEFAULT 'unknown',
+                model_id TEXT,
+                provider TEXT,
+                input_tokens INTEGER NOT NULL DEFAULT 0,
+                output_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+    store = AgentStore(path, exclusive=True)
+    try:
+        with store._connect() as connection:
+            names = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(usage_runs)")
+            }
+        assert "project_id" in names
+        assert "kind" in names
+        store.upsert_usage_run(
+            run_id="suite-1",
+            session_id=None,
+            day="2026-08-18",
+            kind="bench",
+            input_tokens=1,
+            output_tokens=0,
+        )
+        rows = store.list_usage_runs()
+        assert rows[0]["kind"] == "bench"
+        assert rows[0]["session_id"] is None
+    finally:
+        store.close()

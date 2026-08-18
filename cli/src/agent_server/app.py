@@ -110,6 +110,8 @@ def create_app(
 
         logging.getLogger("agent_server").warning("%s", store.last_heal_note)
     service = AgentService(store)
+    bench_store = AgentStore(store.path.with_name("bench-agent.db"), exclusive=True)
+    bench_service = AgentService(bench_store)
     library_service = LibraryService(store, service)
     connector_service = ConnectorService(store, service)
     integrations_service = IntegrationsService()
@@ -195,10 +197,18 @@ def create_app(
             pass
         await service.shutdown()
         try:
+            await bench_service.shutdown()
+        except Exception:
+            pass
+        try:
             api_pool.shutdown(wait=False, cancel_futures=True)
         except Exception:
             pass
         store.close()
+        try:
+            bench_store.close()
+        except Exception:
+            pass
 
     app = FastAPI(
         title="sandwalk",
@@ -231,6 +241,8 @@ def create_app(
         connector_service=connector_service,
         backend_id=backend_id,
         cli_api_key=api_key,
+        bench_store=bench_store,
+        bench_service=bench_service,
     )
     # Headless CLI (`sandwalk eval`) and tests can reuse the same wiring.
     app.state.deps = deps
