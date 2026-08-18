@@ -178,7 +178,10 @@ export function useAppBootstrapLoaders({
         const scopedIds = new Set(nextSessions.map(s => s.id))
         const preservedForeign = projectId
           ? current.filter(
-              s => !scopedIds.has(s.id) && s.projectId !== projectId
+              s =>
+                !scopedIds.has(s.id) &&
+                s.projectId !== projectId &&
+                s.source !== 'bench'
             )
           : []
         const merged =

@@ -325,10 +325,15 @@ function createdMs(row: ResultRow): number {
 
 function liveRank(row: ResultRow): number {
   const status = (row.status || '').toLowerCase()
+  // Only pin the active queue so Newest/Oldest stay chronological.
+  // Paused leftovers would otherwise sit above newer completed runs.
   if (status === 'running') return 0
   if (status === 'queued') return 1
-  if (status === 'paused') return 2
-  return 3
+  return 2
+}
+
+function rowDateMs(row: ResultRow): number {
+  return createdMs(row) || Date.parse(row.startedAt || '') || 0
 }
 
 function sortResultRows(rows: ResultRow[], sort: SortId): ResultRow[] {
@@ -340,9 +345,7 @@ function sortResultRows(rows: ResultRow[], sort: SortId): ResultRow[] {
       const delta = (b.lifetimeTokens || 0) - (a.lifetimeTokens || 0)
       return sort === 'usage_desc' ? delta : -delta
     }
-    const aMs = createdMs(a) || Date.parse(a.startedAt || '') || 0
-    const bMs = createdMs(b) || Date.parse(b.startedAt || '') || 0
-    const delta = bMs - aMs
+    const delta = rowDateMs(b) - rowDateMs(a)
     return sort === 'date_asc' ? -delta : delta
   })
   return copy

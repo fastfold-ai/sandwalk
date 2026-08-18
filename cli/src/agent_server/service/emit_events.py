@@ -158,7 +158,6 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
                 return
         event_payload = _event_payload(event, payload)
         if event == "approval_required":
-            # Keep runId on the wire for the UI even though payload omits it.
             event_payload = {**event_payload, "runId": run_id}
             store.set_session_status(session_id, "awaiting_approval")
         elif event == "approval_resolved":
@@ -190,6 +189,7 @@ def make_event_emitter(store: AgentStore, session_id: str, run_id: str):
                 surface=surface_for_session(session),
                 model_id=model_id,
                 provider=provider,
+                project_id=getattr(session, "project_id", None),
                 input_tokens=tokens["input_tokens"],
                 output_tokens=tokens["output_tokens"],
                 cache_read_tokens=tokens["cache_read_tokens"],

@@ -52,6 +52,10 @@ function extractSession(payload: Record<string, unknown>): AgentSession | null {
   return raw as AgentSession
 }
 
+function isBenchSession(session: AgentSession | null): boolean {
+  return session?.source === 'bench'
+}
+
 function extractSessionId(payload: Record<string, unknown>): string | null {
   const id = payload.sessionId
   return typeof id === 'string' ? id : null
@@ -78,7 +82,7 @@ export function useGlobalSessionEvents({
           switch (event.type) {
             case 'session.created': {
               const session = extractSession(payload)
-              if (!session) return
+              if (!session || isBenchSession(session)) return
               setSessions(current =>
                 current.some(s => s.id === session.id)
                   ? current
@@ -89,7 +93,7 @@ export function useGlobalSessionEvents({
             case 'session.updated':
             case 'session.status_changed': {
               const session = extractSession(payload)
-              if (!session) return
+              if (!session || isBenchSession(session)) return
               setSessions(current => {
                 let changed = false
                 const next = current.map(s => {
@@ -126,8 +130,9 @@ export function useGlobalSessionEvents({
             }
             case 'run.awaiting_approval': {
               if (!sessionId || isActiveChat) return
-              markSessionAttention(sessionId)
               const session = extractSession(payload)
+              if (isBenchSession(session)) return
+              markSessionAttention(sessionId)
               notifyApprovalRequired({
                 sessionId,
                 sessionTitle: session?.title
@@ -137,8 +142,9 @@ export function useGlobalSessionEvents({
             case 'run.completed':
             case 'run.failed': {
               if (!sessionId || isActiveChat) return
-              markSessionAttention(sessionId)
               const session = extractSession(payload)
+              if (isBenchSession(session)) return
+              markSessionAttention(sessionId)
               notifyRunCompleted({
                 sessionId,
                 sessionTitle: session?.title,

@@ -271,6 +271,28 @@ describe('scoreComposerModelSearch', () => {
     )
     expect(scoreComposerModelSearch(opus, 'Deep')).toBe(-1)
   })
+
+  it('matches hyphenated ids when the query uses spaces', () => {
+    const gemini = {
+      provider: 'google',
+      model: 'google/gemini-3.7-flash',
+      label: 'Gemini 3.7 Flash',
+      speed: 'Gemini'
+    }
+    const opus = {
+      provider: 'anthropic',
+      model: 'claude-opus-5',
+      label: 'Opus 5',
+      speed: 'Anthropic'
+    }
+    expect(scoreComposerModelSearch(gemini, 'Gemini 3.7')).toBeGreaterThan(0)
+    expect(scoreComposerModelSearch(opus, 'Gemini 3.7')).toBe(-1)
+    expect(
+      rankComposerModelOptions([gemini, opus], 'Gemini 3.7').flatMap(
+        section => section.options
+      )
+    ).toEqual([gemini])
+  })
 })
 
 describe('rankComposerModelOptions', () => {

@@ -231,3 +231,63 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
     }
     if "provider" not in usage_columns:
         connection.execute("ALTER TABLE usage_runs ADD COLUMN provider TEXT")
+    if "project_id" not in usage_columns:
+        connection.execute("ALTER TABLE usage_runs ADD COLUMN project_id TEXT")
+    if "kind" not in usage_columns:
+        connection.execute(
+            "ALTER TABLE usage_runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'chat'"
+        )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS usage_runs_project ON usage_runs(project_id)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS usage_runs_kind_day ON usage_runs(kind, day)"
+    )
+    session_col = next(
+        (
+            row
+            for row in connection.execute("PRAGMA table_info(usage_runs)").fetchall()
+            if row["name"] == "session_id"
+        ),
+        None,
+    )
+    if session_col is not None and int(session_col["notnull"] or 0):
+        connection.executescript(
+            """
+            CREATE TABLE usage_runs_v2 (
+                run_id TEXT PRIMARY KEY,
+                session_id TEXT,
+                day TEXT NOT NULL,
+                surface TEXT NOT NULL DEFAULT 'unknown',
+                model_id TEXT,
+                provider TEXT,
+                project_id TEXT,
+                kind TEXT NOT NULL DEFAULT 'chat',
+                input_tokens INTEGER NOT NULL DEFAULT 0,
+                output_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
+            INSERT INTO usage_runs_v2(
+                run_id, session_id, day, surface, model_id, provider,
+                project_id, kind, input_tokens, output_tokens,
+                cache_read_tokens, cache_creation_tokens, updated_at
+            )
+            SELECT
+                run_id, session_id, day, surface, model_id, provider,
+                project_id, COALESCE(kind, 'chat'), input_tokens,
+                output_tokens, cache_read_tokens, cache_creation_tokens,
+                updated_at
+            FROM usage_runs;
+            DROP TABLE usage_runs;
+            ALTER TABLE usage_runs_v2 RENAME TO usage_runs;
+            CREATE INDEX IF NOT EXISTS usage_runs_day ON usage_runs(day);
+            CREATE INDEX IF NOT EXISTS usage_runs_surface_day
+                ON usage_runs(surface, day);
+            CREATE INDEX IF NOT EXISTS usage_runs_model_day
+                ON usage_runs(model_id, day);
+            CREATE INDEX IF NOT EXISTS usage_runs_project ON usage_runs(project_id);
+            CREATE INDEX IF NOT EXISTS usage_runs_kind_day ON usage_runs(kind, day);
+            """
+        )

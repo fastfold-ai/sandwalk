@@ -104,6 +104,8 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     loadSessionsRef: args.loadSessionsRef,
     loadSkillsRef: args.loadSkillsRef
   })
+  // Visible chat only. Split panels open their own streams via
+  // SessionChatMount; the sidebar uses useGlobalSessionEvents.
 
   // Background run completions / approvals surface through
   // `useGlobalSessionEvents` (single SSE channel published by the server).

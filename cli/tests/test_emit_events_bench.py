@@ -42,5 +42,9 @@ def test_bench_stream_skips_sqlite_and_sse_notify(tmp_path: Path):
         events = store.list_events(session.id)
         assert [event.type for event in events] == ["tool.started"]
         assert EVENT_NOTIFIER.generation(session.id) == before
+        emit("usage", input_tokens=12, output_tokens=3)
+        assert EVENT_NOTIFIER.generation(session.id) == before
+        runs = store.list_usage_runs(include_bench=True)
+        assert runs
     finally:
         store.close()

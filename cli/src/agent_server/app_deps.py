@@ -50,6 +50,14 @@ class AppDeps:
     connector_service: ConnectorService
     backend_id: str
     cli_api_key: str | None
+    bench_store: AgentStore | None = None
+    bench_service: AgentService | None = None
+
+    def worker_store(self) -> AgentStore:
+        return self.bench_store or self.store
+
+    def worker_service(self) -> AgentService:
+        return self.bench_service or self.service
 
     def session_workspace(self, session_id: str) -> WorkspaceService:
         session = self.store.get_session(session_id)
