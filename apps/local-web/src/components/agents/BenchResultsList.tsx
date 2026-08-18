@@ -22,6 +22,7 @@ import {
   MoreHorizontal,
   Pause,
   Play,
+  RefreshCw,
   Search,
   Tag,
   Target,
@@ -242,7 +243,7 @@ function queueItemToRow(
     elapsedS: job.elapsedS ?? existing?.timeS ?? 0,
     thinkingUsed: existing?.thinkingUsed,
     projectId: existing?.projectId,
-    createdAt: existing?.createdAt,
+    createdAt: existing?.createdAt || job.startedAt || null,
     status,
     reasoningEffort: existing?.reasoningEffort,
     reasoningFast: existing?.reasoningFast,
@@ -322,14 +323,26 @@ function createdMs(row: ResultRow): number {
   return Number.isFinite(raw) ? raw : 0
 }
 
+function liveRank(row: ResultRow): number {
+  const status = (row.status || '').toLowerCase()
+  if (status === 'running') return 0
+  if (status === 'queued') return 1
+  if (status === 'paused') return 2
+  return 3
+}
+
 function sortResultRows(rows: ResultRow[], sort: SortId): ResultRow[] {
   const copy = [...rows]
   copy.sort((a, b) => {
+    const live = liveRank(a) - liveRank(b)
+    if (live !== 0) return live
     if (sort === 'usage_desc' || sort === 'usage_asc') {
       const delta = (b.lifetimeTokens || 0) - (a.lifetimeTokens || 0)
       return sort === 'usage_desc' ? delta : -delta
     }
-    const delta = createdMs(b) - createdMs(a)
+    const aMs = createdMs(a) || Date.parse(a.startedAt || '') || 0
+    const bMs = createdMs(b) || Date.parse(b.startedAt || '') || 0
+    const delta = bMs - aMs
     return sort === 'date_asc' ? -delta : delta
   })
   return copy
@@ -814,6 +827,16 @@ export function BenchResultsList({
               Clear selection
             </Button>
           ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={loading}
+            onClick={() => void fetchPage(null, false)}
+          >
+            <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
+            Refresh
+          </Button>
           <Button
             type="button"
             size="sm"

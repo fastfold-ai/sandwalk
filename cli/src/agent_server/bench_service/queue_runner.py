@@ -24,6 +24,7 @@ from agent_server.bench_service.results_store import (
     get_result,
     new_run_id,
     resolve_bench_provider,
+    result_from_checkpoint,
     save_result,
 )
 from agent_server.bench_service.spawn_core import run_agent_suite
@@ -69,6 +70,9 @@ class BenchJob:
     suite_index: int = 0
     started_at: str | None = None
     elapsed_s: float = 0.0
+    # Result-file id for the suite currently executing (may differ from
+    # ``run_id`` on a multi-suite stack).
+    active_run_id: str | None = None
 
 
 @dataclass
@@ -142,20 +146,46 @@ def bootstrap_resumable() -> None:
         }
 
 
+def _live_id(job: BenchJob) -> str:
+    return job.active_run_id or job.run_id
+
+
+def _stack_id_locked(rid: str) -> str | None:
+    """Map a suite result id back to the inflight/queued stack id."""
+    if rid in _state.inflight:
+        return rid
+    for jid, job in _state.inflight.items():
+        if job.active_run_id == rid:
+            return jid
+    for job in _state.queue:
+        if job.run_id == rid or job.active_run_id == rid:
+            return job.run_id
+    if rid in _state.paused:
+        return rid
+    return None
+
+
 def get_active_status() -> BenchActiveStatus:
     with _state.lock:
         inflight_items = [
-            _job_item(job, "running", _state.progress_by_run.get(job.run_id))
+            _job_item(
+                job,
+                "running",
+                _state.progress_by_run.get(_live_id(job))
+                or _state.progress_by_run.get(job.run_id),
+            )
             for job in _state.inflight.values()
         ]
         queue_items = [_job_item(job, "queued") for job in _state.queue]
         paused_map = dict(_state.paused)
-        live_ids = set(_state.inflight) | {job.run_id for job in _state.queue}
+        live_ids = {_live_id(job) for job in _state.inflight.values()} | {
+            job.run_id for job in _state.queue
+        } | set(_state.inflight)
         running = bool(_state.inflight)
         queued = bool(_state.queue)
         current = next(iter(_state.inflight.values()), None)
         current_model = current.model_id if current else None
-        current_run_id = current.run_id if current else None
+        current_run_id = _live_id(current) if current else None
         progress_by_run = dict(_state.progress_by_run)
         last_progress = _state.last_progress
         phase_raw = _state.phase
@@ -283,16 +313,21 @@ def cancel_run(run_id: str | None = None) -> str | None:
                     rid = str(ckpt["run_id"])
         if rid is None:
             return None
-        if rid in _state.inflight:
-            _state.cancel_ids.add(rid)
-            _state.pause_ids.discard(rid)
+        stack_id = _stack_id_locked(rid) or rid
+        if stack_id in _state.inflight:
+            _state.cancel_ids.add(stack_id)
+            _state.pause_ids.discard(stack_id)
         else:
             before = len(_state.queue)
-            _state.queue = [job for job in _state.queue if job.run_id != rid]
+            _state.queue = [
+                job
+                for job in _state.queue
+                if job.run_id != stack_id and job.active_run_id != rid
+            ]
             queued_hit = len(_state.queue) < before
-        paused_ckpt = _state.paused.pop(rid, None)
+        paused_ckpt = _state.paused.pop(rid, None) or _state.paused.pop(stack_id, None)
         if (
-            rid not in _state.inflight
+            stack_id not in _state.inflight
             and not queued_hit
             and paused_ckpt is None
             and not _state.inflight
@@ -301,13 +336,16 @@ def cancel_run(run_id: str | None = None) -> str | None:
         ):
             _state.phase = "idle"
             _state.last_progress = None
-        cancel_rid = rid
+        cancel_rid = stack_id
+        suite_rid = rid if rid != stack_id else None
 
     if queued_hit:
         return cancel_rid
 
     if paused_ckpt is not None or cancel_rid not in _live_inflight_ids():
         _mark_cancelled(cancel_rid)
+        if suite_rid:
+            _mark_cancelled(suite_rid)
     return cancel_rid
 
 
@@ -320,11 +358,14 @@ def pause_run(run_id: str | None = None) -> str | None:
         rid = None if not run_id or run_id == "active" else run_id
         if rid is None:
             rid = next(iter(_state.inflight), None)
-        if rid is None or rid not in _state.inflight:
+        if rid is None:
             return None
-        _state.pause_ids.add(rid)
-        _state.cancel_ids.discard(rid)
-        return rid
+        stack_id = _stack_id_locked(rid)
+        if stack_id is None or stack_id not in _state.inflight:
+            return None
+        _state.pause_ids.add(stack_id)
+        _state.cancel_ids.discard(stack_id)
+        return stack_id
 
 
 def request_bench_shutdown() -> list[threading.Thread]:
@@ -408,14 +449,38 @@ def _live_inflight_ids() -> set[str]:
 
 
 def live_run_statuses() -> dict[str, str]:
-    """In-memory queue status keyed by run_id (running / queued / paused)."""
+    """In-memory queue status keyed by result ``run_id`` (running / queued / paused)."""
     with _state.lock:
-        statuses = dict.fromkeys(_state.inflight, "running")
+        statuses: dict[str, str] = {}
+        for job in _state.inflight.values():
+            statuses[_live_id(job)] = "running"
         for job in _state.queue:
             statuses[job.run_id] = "queued"
         for rid in _state.paused:
             statuses.setdefault(rid, "paused")
         return statuses
+
+
+def resolve_result_run_id(run_id: str) -> str:
+    """Map a stack id to the suite result file that actually exists."""
+    if get_result(run_id) is not None:
+        return run_id
+    with _state.lock:
+        job = _state.inflight.get(run_id)
+        if job is None:
+            for candidate in _state.inflight.values():
+                if candidate.active_run_id == run_id:
+                    job = candidate
+                    break
+        live = _live_id(job) if job else None
+    if live and live != run_id and get_result(live) is not None:
+        return live
+    ckpt = load_checkpoint(run_id)
+    if ckpt and ckpt.get("run_id"):
+        alt = str(ckpt["run_id"])
+        if alt != run_id and get_result(alt) is not None:
+            return alt
+    return run_id
 
 
 def _mark_cancelled(run_id: str) -> None:
@@ -489,7 +554,7 @@ def _job_item(
         job.started_at = _utc_now_iso()
         job.elapsed_s = _elapsed_base(job)
     return BenchQueueItem(
-        run_id=job.run_id,
+        run_id=_live_id(job) if status == "running" else job.run_id,
         model_id=job.model_id,
         suites=[str(s.get("suite_id") or "") for s in job.suites],
         sample_sizes=_sample_sizes(job.suites),
@@ -546,6 +611,8 @@ def _ensure_paused_checkpoint(job: BenchJob) -> dict[str, Any]:
         ckpt = {**ckpt, "status": "paused"}
     try:
         save_checkpoint(ckpt)
+        if get_result(str(ckpt.get("run_id") or "")) is None:
+            save_result(result_from_checkpoint(ckpt))
     except Exception:  # noqa: BLE001
         logger.exception("failed to save pause checkpoint for %s", job.run_id)
     return ckpt
@@ -697,6 +764,19 @@ def _run_job(deps: AppDeps, job: BenchJob) -> str:
         suite = job.suites[s_idx]
         suite_id = str(suite["suite_id"])
         sample = suite.get("sample_size")
+        pack_id = suite.get("pack_id")
+        matrix = suite.get("matrix")
+        if not pack_id:
+            pack_id, matrix = _split_suite(suite_id)
+        resume = job.resume_checkpoint if s_idx == start_idx else None
+        if resume and resume.get("run_id"):
+            pinned = str(resume["run_id"])
+        elif s_idx == start_idx:
+            pinned = job.run_id
+        else:
+            pinned = new_run_id()
+        with _state.lock:
+            job.active_run_id = pinned
         _emit(
             {
                 "type": "progress",
@@ -709,18 +789,8 @@ def _run_job(deps: AppDeps, job: BenchJob) -> str:
                 "bench_current": 0,
                 "bench_total": 0,
             },
-            job.run_id,
+            pinned,
         )
-        pack_id = suite.get("pack_id")
-        matrix = suite.get("matrix")
-        if not pack_id:
-            pack_id, matrix = _split_suite(suite_id)
-        pinned = job.run_id if suite_total == 1 else (
-            job.run_id if job.resume_checkpoint else None
-        )
-        if suite_total == 1:
-            pinned = job.run_id
-        resume = job.resume_checkpoint if s_idx == start_idx else None
         result = run_agent_suite(
             deps=deps,
             suite_id=suite_id,
@@ -734,9 +804,9 @@ def _run_job(deps: AppDeps, job: BenchJob) -> str:
             thinking=job.thinking,
             client_surface=job.client_surface,
             run_id=pinned,
-            on_progress=lambda p, idx=s_idx: _emit(
+            on_progress=lambda p, idx=s_idx, rid=pinned: _emit(
                 {**p, "current": idx, "total": suite_total},
-                job.run_id,
+                rid,
             ),
             stop_check=stop_check,
             concurrency=job.concurrency,
