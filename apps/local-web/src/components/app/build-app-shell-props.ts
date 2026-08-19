@@ -5,8 +5,8 @@ import type { buildAgentComposerSlotProps } from '@/components/app/build-agent-c
 import type { AppShellProps } from '@/components/app-shell-props'
 import type { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import type { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
-import type { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import type { useAppRouting } from '@/hooks/useAppRouting'
+import type { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import type { useAppUiState } from '@/hooks/useAppUiState'
 import type { useChatScroll } from '@/hooks/useChatScroll'
 import type { useSessionActions } from '@/hooks/useSessionActions'
@@ -296,6 +296,8 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     setTabGroupColor: input.tabGroupsStore.setGroupColor,
     setTabGroupPinned: input.tabGroupsStore.setGroupPinned,
     setTabGroupActiveChat: input.tabGroupsStore.setGroupActiveChat,
+    setTabGroupLayoutForMonitor:
+      input.tabGroupsStore.setGroupLayoutForMonitor,
     reorderChatsInTabGroup: input.tabGroupsStore.reorderChatsInGroup,
     activeGroup: input.activeGroup,
     perSessionBaseArgs: input.perSessionBaseArgs,

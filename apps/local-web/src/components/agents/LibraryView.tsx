@@ -23,6 +23,7 @@ import {
   TabContextSeparator
 } from '@/components/agents/tab-context-menu'
 import { VideoPlayPreview } from '@/components/agents/VideoPlayPreview'
+import { formatFileBytes } from '@/components/agents/widget-board/useProjectAssetStats'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -32,7 +33,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { formatFileBytes } from '@/components/agents/widget-board/useProjectAssetStats'
 import { getFileIcon } from '@/lib/file-icons'
 import { cn } from '@/lib/utils'
 

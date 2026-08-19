@@ -1,3 +1,19 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors} from '@dnd-kit/core'
+import {
+  arrayMove,
+  rectSortingStrategy,
+  SortableContext,
+  useSortable
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentProject,
@@ -6,23 +22,6 @@ import type {
   WidgetLayoutItem,
   WidgetSize
 } from '@sandwalk/agent-ui-core'
-import {
-  closestCenter,
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  rectSortingStrategy,
-  SortableContext,
-  useSortable
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -49,9 +48,8 @@ import { colSpanClass } from './grid'
 import type { WidgetSurface, WidgetType } from './types'
 import {
   formatFileBytes,
-  useProjectAssetStats,
-  type ProjectAssetStats
-} from './useProjectAssetStats'
+  type ProjectAssetStats,
+  useProjectAssetStats} from './useProjectAssetStats'
 import { useUsageOverview } from './useUsageOverview'
 import { ActivityHeatmapWidget } from './widgets/ActivityHeatmapWidget'
 import {

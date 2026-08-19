@@ -8,9 +8,8 @@ import type { NavigateFunction } from 'react-router-dom'
 
 import { SessionChatBody } from '@/components/agents/session-main/session-chat-body'
 import {
-  usePerSessionChatState,
-  type PerSessionChatStateArgs
-} from '@/hooks/usePerSessionChatState'
+  type PerSessionChatStateArgs,
+  usePerSessionChatState} from '@/hooks/usePerSessionChatState'
 
 /**
  * Instantiates a full per-session chat surface (mensajes SSE stream, composer,

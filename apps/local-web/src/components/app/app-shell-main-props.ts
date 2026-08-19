@@ -24,11 +24,11 @@ import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import {
   type DashboardMainViewsProps
 } from '@/components/agents/DashboardMainViews'
-import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { type DashboardSection } from '@/components/agents/DashboardSidebar'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
+import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import type { CreateDraftSession } from '@/lib/draft-agent'
 import { type SessionChatState } from '@/lib/sessions'
 import {
@@ -211,6 +211,11 @@ export type AppShellMainProps = {
   >
   allSessions: AgentSession[]
   setTabGroupActiveChat: (groupId: string, chatId: string) => void
+  setTabGroupLayoutForMonitor: (
+    groupId: string,
+    fingerprint: string,
+    tree: import('@sandwalk/agent-ui-core').PaneNode
+  ) => void
   tabGroups: SessionGroup[]
   onSplitWithNextTab: (sourceId: string) => void
   onPickSplitPartner: (partnerId: string) => void

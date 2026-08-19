@@ -195,6 +195,11 @@ export function readTabGroups(): SessionGroup[] {
           // sesiones — al recargar se descartan y el chat de origen
           // vuelve suelto naturalmente.
           .filter(g => !g.isPending)
+          // Legacy shape: el layout persistido usaba `ChatCell[]` (grid
+          // absoluto de x/y/w/h). El nuevo shape es un árbol PaneNode.
+          // Descartamos los layouts viejos silenciosamente para que la
+          // migración sea invisible — el grupo cae al tree default.
+          .map(g => (g.layout ? { ...g, layout: sanitizeLayout(g.layout) } : g))
       }
     }
     // Fallback: migrar desde el schema por-proyecto (aplanado + dedupe).
@@ -227,6 +232,30 @@ export function readTabGroups(): SessionGroup[] {
   } catch {
     return []
   }
+}
+
+/**
+ * Filter a persisted `layout` object, keeping only per-monitor entries
+ * whose value already looks like a `PaneNode`. Legacy `ChatCell[]` shapes
+ * (arrays instead of tree nodes) are dropped — the group falls back to
+ * the default tiling tree on read.
+ */
+function sanitizeLayout(
+  layout: NonNullable<SessionGroup['layout']>
+): NonNullable<SessionGroup['layout']> | undefined {
+  const perMonitor: Record<string, NonNullable<SessionGroup['layout']>['perMonitor'][string]> = {}
+  for (const [fp, value] of Object.entries(layout.perMonitor || {})) {
+    if (looksLikePaneNode(value)) perMonitor[fp] = value
+  }
+  return Object.keys(perMonitor).length > 0 ? { perMonitor } : undefined
+}
+
+function looksLikePaneNode(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const v = value as { type?: string; chatId?: string; children?: unknown[] }
+  if (v.type === 'chat' && typeof v.chatId === 'string') return true
+  if (v.type === 'branch' && Array.isArray(v.children)) return true
+  return false
 }
 
 export function writeTabGroups(groups: SessionGroup[]) {

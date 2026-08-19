@@ -1,5 +1,6 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { Loader } from 'lucide-react'
+
 import { DataView } from '@/components/agents/DataView'
 
 import { OnboardingIntegrationDetail } from './onboarding/onboarding-integration-detail'

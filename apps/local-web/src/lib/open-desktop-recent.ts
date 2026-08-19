@@ -1,10 +1,10 @@
 import { normalizeBackendUrl } from '@/lib/backend-url'
 import { openDesktopWindow } from '@/lib/desktop'
-import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 import {
   rememberRemoteHostname,
   rememberRemotePlatform
 } from '@/lib/remote-hostname'
+import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 
 export type DesktopRecentRef = {
   url: string

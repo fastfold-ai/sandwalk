@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { CapyOverlay } from '@/components/agents/capy/CapyOverlay'
+import { PaneContextMenu } from '@/components/agents/PaneContextMenu'
 import {
   buildSessionSidebarModel,
   computeShowSessionTabs,
@@ -13,10 +14,7 @@ import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
-import { useEventsMux } from '@/hooks/useEventsMux'
-import { useGlobalSessionEvents } from '@/hooks/useGlobalSessionEvents'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
-import { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import {
   useAppRouteContext,
   useChatBySessionIdBridge
@@ -25,9 +23,12 @@ import { useAppRouting } from '@/hooks/useAppRouting'
 import { useAppSessionEffects } from '@/hooks/useAppSessionEffects'
 import { useAppSessionLayer } from '@/hooks/useAppSessionLayer'
 import { useAppShellEffects } from '@/hooks/useAppShellEffects'
+import { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import { useAppUiState } from '@/hooks/useAppUiState'
 import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
 import { useDesktopWindowMenu } from '@/hooks/useDesktopWindowMenu'
+import { useEventsMux } from '@/hooks/useEventsMux'
+import { useGlobalSessionEvents } from '@/hooks/useGlobalSessionEvents'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
@@ -850,6 +851,7 @@ export default function App() {
         activeProjectId={context.activeProjectId}
         activeChatId={effectiveSessionId}
       />
+      <PaneContextMenu />
     </>
   )
 }

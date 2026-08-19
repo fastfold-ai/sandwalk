@@ -1,5 +1,6 @@
 import { Loader, Monitor, Network, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 import { OsPlatformIcon } from '@/components/agents/os-platform-icon'
 import { SandwalkMark } from '@/components/SandwalkMark'
@@ -20,7 +21,6 @@ import {
 import { openDesktopRecent } from '@/lib/open-desktop-recent'
 import { readCachedRemotePlatform } from '@/lib/remote-hostname'
 import { cn } from '@/lib/utils'
-import { toast } from 'sonner'
 
 function hostport(url: string): string {
   try {

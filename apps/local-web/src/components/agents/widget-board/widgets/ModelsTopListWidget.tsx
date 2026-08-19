@@ -4,13 +4,13 @@ import type {
   WidgetSize
 } from '@sandwalk/agent-ui-core'
 
+import { UsageModelsSkeleton } from '../../usage-overview-skeletons'
 import {
   colorForChartModel,
   formatTokenCount,
   modelSeriesKey,
   providerLabel
 } from '../../usage-overview-utils'
-import { UsageModelsSkeleton } from '../../usage-overview-skeletons'
 import { widgetShellClass } from '../grid'
 
 function MostUsedModelsList({

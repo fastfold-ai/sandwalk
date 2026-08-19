@@ -1,11 +1,12 @@
 import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { describe, expect, it } from 'vitest'
 
+import { emptySessionChatState } from '@/lib/sessions'
+
 import {
   mergeRunActiveFromSessions,
   sessionsUnchanged
 } from './useAppBootstrapLoaders'
-import { emptySessionChatState } from '@/lib/sessions'
 
 function session(overrides: Partial<AgentSession> = {}): AgentSession {
   return {

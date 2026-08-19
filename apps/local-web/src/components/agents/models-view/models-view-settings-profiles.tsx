@@ -1,5 +1,6 @@
 import type { ModelProfile } from '@sandwalk/agent-ui-core'
 import { Check, ChevronDown, ChevronRight, Loader, Plus } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 

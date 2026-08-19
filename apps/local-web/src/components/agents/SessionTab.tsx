@@ -1,6 +1,6 @@
-import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { Columns2, Pin, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 

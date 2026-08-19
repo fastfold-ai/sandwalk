@@ -1,4 +1,5 @@
 import { CircleAlert, Gift, Loader } from 'lucide-react'
+
 import { useDesktopUpdate } from '@/hooks/useDesktopUpdate'
 import type { DesktopUpdateProgress } from '@/lib/desktop-updater'
 import { cn } from '@/lib/utils'

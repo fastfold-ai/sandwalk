@@ -6,12 +6,12 @@ import {
   AppShellMainDragStrip,
   AppShellTitleBar
 } from '@/components/app/app-shell-main-chrome'
-import { ConnectionStatusLabel } from '@/components/ConnectionStatusLabel'
 import {
   type AppShellMainProps,
   isDashboardMainView
 } from '@/components/app/app-shell-main-props'
 import { buildDashboardMainViewsProps } from '@/components/app/build-dashboard-main-views-props'
+import { ConnectionStatusLabel } from '@/components/ConnectionStatusLabel'
 import {
   SHELL_SIDEBAR_MOTION_MS,
   ShellNavStrip
@@ -165,6 +165,7 @@ export function AppShellMain(props: AppShellMainProps) {
             perSessionBaseArgs={props.perSessionBaseArgs}
             allSessions={props.allSessions}
             setTabGroupActiveChat={props.setTabGroupActiveChat}
+            setTabGroupLayoutForMonitor={props.setTabGroupLayoutForMonitor}
             tabGroups={props.tabGroups}
             onSplitWithNextTab={props.onSplitWithNextTab}
             onPickSplitPartner={props.onPickSplitPartner}

@@ -4,6 +4,7 @@ import type {
   IntegrationSummary
 } from '@sandwalk/agent-ui-core'
 import { Check, CircleCheck, Eye, EyeOff, Loader } from 'lucide-react'
+
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
 import { FastfoldAddControls } from '@/components/agents/integrations-view/fastfold/FastfoldAddControls'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'

@@ -1,16 +1,12 @@
-import type {
-  AgentProject,
-  AgentSession,
-  SessionGroup
-} from '@sandwalk/agent-ui-core'
+import './session-chrome-tabs.css'
+
 import {
   closestCenter,
   DndContext,
+  type DragEndEvent,
   PointerSensor,
   useSensor,
-  useSensors,
-  type DragEndEvent
-} from '@dnd-kit/core'
+  useSensors} from '@dnd-kit/core'
 import {
   restrictToHorizontalAxis,
   restrictToParentElement
@@ -20,6 +16,11 @@ import {
   horizontalListSortingStrategy,
   SortableContext
 } from '@dnd-kit/sortable'
+import type {
+  AgentProject,
+  AgentSession,
+  SessionGroup
+} from '@sandwalk/agent-ui-core'
 import {
   Archive,
   ChevronDown,
@@ -62,8 +63,8 @@ import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 import { ProjectPicker } from './ProjectPicker'
-import { SessionStatusIcon } from './SessionStatusIcon'
 import { useSessionTabColors } from './session-tab-colors'
+import { SessionStatusIcon } from './SessionStatusIcon'
 import { SessionTab } from './SessionTab'
 import {
   TabContextItem,
@@ -71,8 +72,6 @@ import {
   TabContextSeparator,
   TabInlineColorRow
 } from './tab-context-menu'
-
-import './session-chrome-tabs.css'
 
 /** Height of the two chrome-tab overflow buttons (all-tabs + new-agent). */
 const OVERFLOW_BTN_HEIGHT = 'h-[30px]'

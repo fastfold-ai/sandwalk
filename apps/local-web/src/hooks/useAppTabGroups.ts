@@ -1,4 +1,8 @@
-import type { AgentSession, SessionGroup } from '@sandwalk/agent-ui-core'
+import type {
+  AgentSession,
+  PaneNode,
+  SessionGroup
+} from '@sandwalk/agent-ui-core'
 import {
   type Dispatch,
   type SetStateAction,
@@ -345,6 +349,49 @@ export function useAppTabGroups(
   )
 
   /**
+   * Replace the tiling tree for a specific monitor fingerprint. Called on
+   * every split / close / resize inside the tiling container; the layouts
+   * for other monitors are left untouched.
+   */
+  const setGroupLayoutForMonitor = useCallback(
+    (groupId: string, fingerprint: string, tree: PaneNode) => {
+      patchGroups(current =>
+        current.map(g => {
+          if (g.id !== groupId) return g
+          const prev = g.layout?.perMonitor ?? {}
+          return {
+            ...g,
+            layout: {
+              perMonitor: { ...prev, [fingerprint]: tree }
+            }
+          }
+        })
+      )
+    },
+    [patchGroups]
+  )
+
+  /**
+   * Wipe the layout for a specific monitor — used when the user picks
+   * "reset layout" or when the chat list changes so drastically that the
+   * saved layout no longer maps cleanly.
+   */
+  const clearGroupLayoutForMonitor = useCallback(
+    (groupId: string, fingerprint: string) => {
+      patchGroups(current =>
+        current.map(g => {
+          if (g.id !== groupId || !g.layout) return g
+          const next = { ...g.layout.perMonitor }
+          if (!(fingerprint in next)) return g
+          delete next[fingerprint]
+          return { ...g, layout: { perMonitor: next } }
+        })
+      )
+    },
+    [patchGroups]
+  )
+
+  /**
    * Global cleanup — llamado cuando una sesión se borra / se detecta como
    * inexistente. Autodissolve cualquier grupo que quede con menos de 2 chats.
    */
@@ -391,6 +438,8 @@ export function useAppTabGroups(
     setGroupColor,
     setGroupPinned,
     setGroupActiveChat,
+    setGroupLayoutForMonitor,
+    clearGroupLayoutForMonitor,
     reorderChatsInGroup,
     pruneChatFromGroups
   }

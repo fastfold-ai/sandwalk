@@ -15,18 +15,17 @@ import { useEffect, useRef, useState } from 'react'
 import { ProjectMark } from '@/components/agents/ProjectMark'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from '@/components/ui/popover'
-
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover'
 import {
   Tooltip,
   TooltipContent,
@@ -36,8 +35,8 @@ import {
 import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
 
-import { SessionStatusIcon } from './SessionStatusIcon'
 import { useSessionTabColors } from './session-tab-colors'
+import { SessionStatusIcon } from './SessionStatusIcon'
 import { TabInlineColorRow } from './tab-context-menu'
 
 /**

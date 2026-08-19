@@ -4,6 +4,7 @@ import type {
   AgentCatalogSkillDetail
 } from '@sandwalk/agent-ui-core'
 import { Loader, Plus } from 'lucide-react'
+
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { Button } from '@/components/ui/button'

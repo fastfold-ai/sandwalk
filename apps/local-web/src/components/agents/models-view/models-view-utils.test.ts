@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest'
-
 import type { AgentModel } from '@sandwalk/agent-ui-core'
+import { describe, expect, it } from 'vitest'
 
 import { catalogModelPrefKey } from '@/lib/composer-models'
 

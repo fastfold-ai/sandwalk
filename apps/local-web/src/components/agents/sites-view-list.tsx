@@ -1,6 +1,7 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentProject, AgentSession, Site } from '@sandwalk/agent-ui-core'
 import { ExternalLink, Globe2, Loader, MoreHorizontal, Pencil, Rocket, Trash2 } from 'lucide-react'
+
 import { SiteThumbnail } from '@/components/agents/site-thumbnail'
 import { Button } from '@/components/ui/button'
 import {
