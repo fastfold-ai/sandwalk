@@ -13,6 +13,7 @@
   <a href="#get-started">Get started</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="#features">Features</a> ·
+  <a href="#capy">Capy</a> ·
   <a href="#cli">CLI</a> ·
   <a href="#documentation">Docs</a>
 </p>
@@ -63,9 +64,21 @@ sandwalk "What is known about KRAS G12C inhibitors?"
 
 Agents run 24/7 on your machine or in the cloud: OpenRouter, frontier APIs, or local models. Science is a starter toolkit, not a ceiling.
 
+### Capy
+
+Capy is the overlay meta-agent. It stays out of the chat list and orchestrates worker chats, Bench, Doctor, skills, MCP, and projects.
+
+- Open it from the sidebar, or **Ctrl + Ctrl** anywhere to show the minimized icon and talk hands-free.
+- Spawn chats, `#` mention them, seed context, and open a split when you start two or more.
+- New chats follow the current sidebar scope (All vs a selected project). Capy can create projects and move chats.
+- Minimize to keep talking. A macOS-style red badge counts new replies.
+
+<!-- screenshot: images/capy.png — Capy overlay or minimized icon -->
+<p align="center"><em>Placeholder: Capy overlay. Save as <code>images/capy.png</code></em></p>
+
 ### Split view and chats
 
-Several sessions in tabs. Chat and files side by side. CLI, Mac, and iOS share one session.
+Chrome-style session tabs. Group 2–3 chats side by side — including chats from different projects. Each panel is a full session (own composer and stream). Files, terminal, and preview sit in the workspace panel under the tab strip. CLI, Mac, and iOS share one session.
 
 ### CLI
 
@@ -88,9 +101,9 @@ Install from GitHub or [skills.sh](https://skills.sh). Type `/` in chat to brows
 <!-- screenshot: images/skills.png — Composer / picker with a skill open -->
 <p align="center"><em>Placeholder: Skills / MCP picker. Save as <code>images/skills.png</code></em></p>
 
-### Benchmarking
+### Benchmarking and Doctor
 
-Automate evals, score results, and run LLM judges. Dashboard → Bench, or `sandwalk eval`.
+Automate evals, score results, and run LLM judges. Dashboard → Bench, or `sandwalk eval`. Live suites stay off your chat list. Doctor reports diagnostics from the Dashboard or via Capy.
 
 <!-- screenshot: images/bench.png — Bench results with scores / judges -->
 <p align="center"><em>Placeholder: Bench results. Save as <code>images/bench.png</code></em></p>
@@ -101,6 +114,10 @@ Skill install and remove pause for **Approve / Edit / Reject** in the desktop ch
 
 <!-- screenshot: images/hitl.png — Approval card in chat -->
 <p align="center"><em>Placeholder: Approval card. Save as <code>images/hitl.png</code></em></p>
+
+### Projects and widgets
+
+Projects group chats. Project Home and Dashboard Overview use configurable widget boards (usage, library size, description, agent context). Library lists project-folder files next to chat artifacts.
 
 ### Artifacts
 
