@@ -250,12 +250,42 @@ function sanitizeLayout(
   return Object.keys(perMonitor).length > 0 ? { perMonitor } : undefined
 }
 
+/**
+ * Recursive shape check for a persisted `PaneNode`. Rejects any tree
+ * that isn't fully well-formed — this includes a chat leaf without a
+ * chatId, a branch with mismatched `ratios` and `children` lengths,
+ * ratios that don't sum to ~1, an unknown `direction`, or a child that
+ * itself fails the same check. Rejected trees are dropped by
+ * `sanitizeLayout` and the group falls back to the default row.
+ */
 function looksLikePaneNode(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false
-  const v = value as { type?: string; chatId?: string; children?: unknown[] }
-  if (v.type === 'chat' && typeof v.chatId === 'string') return true
-  if (v.type === 'branch' && Array.isArray(v.children)) return true
-  return false
+  const v = value as {
+    type?: string
+    chatId?: string
+    direction?: string
+    ratios?: unknown
+    children?: unknown[]
+  }
+  if (v.type === 'chat') {
+    if (typeof v.chatId !== 'string' || v.chatId.length === 0) return false
+    // Reject the transient picker placeholder id used by
+    // `ChatTilingContainer` — it's UI state, never a real chat.
+    // Duplicated string on purpose to avoid a UI → storage import.
+    if (v.chatId === '__picker__') return false
+    return true
+  }
+  if (v.type !== 'branch') return false
+  if (v.direction !== 'horizontal' && v.direction !== 'vertical') return false
+  if (!Array.isArray(v.children) || v.children.length === 0) return false
+  if (!Array.isArray(v.ratios)) return false
+  if (v.ratios.length !== v.children.length) return false
+  const sum = (v.ratios as unknown[]).reduce<number>((acc, r) => {
+    if (typeof r !== 'number' || Number.isNaN(r) || r < 0) return NaN
+    return acc + r
+  }, 0)
+  if (!Number.isFinite(sum) || Math.abs(sum - 1) > 0.01) return false
+  return v.children.every(child => looksLikePaneNode(child))
 }
 
 export function writeTabGroups(groups: SessionGroup[]) {

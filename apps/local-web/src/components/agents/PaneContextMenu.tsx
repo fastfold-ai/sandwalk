@@ -1,3 +1,10 @@
+import {
+  ArrowDownToLine,
+  ArrowLeftToLine,
+  ArrowRightToLine,
+  ArrowUpToLine,
+  X
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import {
@@ -54,39 +61,56 @@ export function PaneContextMenu() {
           }}
         />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="bottom" className="w-52">
+      <DropdownMenuContent
+        align="start"
+        side="bottom"
+        // Keeps the menu inside the viewport when the click lands near
+        // the bottom-right of a pane (small splits especially). Radix's
+        // Popper flip handles the axis, this padding prevents flush-cut
+        // edges once flipped.
+        collisionPadding={{ bottom: 8, right: 8, top: 8, left: 8 }}
+        className="w-52"
+      >
         <DropdownMenuItem
+          className="gap-2 text-[13px]"
           onSelect={() => {
             state.handlers.onSplitLeft()
             setState(null)
           }}
         >
+          <ArrowLeftToLine className="size-3.5" />
           Split left
         </DropdownMenuItem>
         <DropdownMenuItem
+          className="gap-2 text-[13px]"
           onSelect={() => {
             state.handlers.onSplitRight()
             setState(null)
           }}
         >
+          <ArrowRightToLine className="size-3.5" />
           Split right
           <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
+          className="gap-2 text-[13px]"
           onSelect={() => {
             state.handlers.onSplitUp()
             setState(null)
           }}
         >
+          <ArrowUpToLine className="size-3.5" />
           Split up
         </DropdownMenuItem>
         <DropdownMenuItem
+          className="gap-2 text-[13px]"
           onSelect={() => {
             state.handlers.onSplitDown()
             setState(null)
           }}
         >
+          <ArrowDownToLine className="size-3.5" />
           Split down
           <DropdownMenuShortcut>⇧⌘D</DropdownMenuShortcut>
         </DropdownMenuItem>
@@ -94,11 +118,13 @@ export function PaneContextMenu() {
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              className="gap-2 text-[13px]"
               onSelect={() => {
                 state.handlers.onClose?.()
                 setState(null)
               }}
             >
+              <X className="size-3.5" />
               Close pane
               <DropdownMenuShortcut>⌘W</DropdownMenuShortcut>
             </DropdownMenuItem>

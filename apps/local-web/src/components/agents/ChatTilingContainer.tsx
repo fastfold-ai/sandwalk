@@ -24,10 +24,12 @@ import {
 } from '@/components/ui/resizable'
 import {
   buildDefaultTree,
+  extractChatIds,
   reconcileTree,
   setBranchRatios,
   type SplitDirection,
-  splitPane} from '@/hooks/useChatTiling'
+  splitPane
+} from '@/hooks/useChatTiling'
 import { useMonitorFingerprint } from '@/lib/monitor-fingerprint'
 import { cn } from '@/lib/utils'
 
@@ -95,6 +97,25 @@ export function ChatTilingContainer({
 
   const [pickerRequest, setPickerRequest] = useState<PickerRequest | null>(null)
 
+  // Reset the picker whenever the active group changes — otherwise a
+  // half-opened picker in group A survives a jump to group B and back,
+  // pointing at a target chat that may not exist in the new tree.
+  useEffect(() => {
+    setPickerRequest(null)
+  }, [group.id])
+
+  // Also drop the picker if its target chat was removed from the group
+  // by any code path (server-side prune, close-pane, etc.).
+  useEffect(() => {
+    if (
+      pickerRequest &&
+      pickerRequest.targetChatId !== PICKER_CELL_ID &&
+      !chatIds.includes(pickerRequest.targetChatId)
+    ) {
+      setPickerRequest(null)
+    }
+  }, [chatIds, pickerRequest])
+
   // Pending groups always render as a two-pane split: the source chat on
   // one side and the picker on the other. Once the user picks, the tree
   // stays two-pane and the picker turns into a real chat.
@@ -157,9 +178,18 @@ export function ChatTilingContainer({
 
   const handleClose = useCallback(
     (chatId: string) => {
+      // Before removing the pane, move focus to a surviving sibling so
+      // the split doesn't end up with `activeChatId` pointing at a chat
+      // that no longer exists. Pick the previous chat in tree order, or
+      // fall back to the next one when the closed pane was first.
+      const ids = extractChatIds(baseTree)
+      const idx = ids.indexOf(chatId)
+      const nextFocus =
+        idx > 0 ? ids[idx - 1] : idx === 0 && ids.length > 1 ? ids[1] : null
+      if (nextFocus && nextFocus !== chatId) onFocusChat(nextFocus)
       onCloseChat(chatId)
     },
-    [onCloseChat]
+    [baseTree, onFocusChat, onCloseChat]
   )
 
   const handleFocus = useCallback(
@@ -172,6 +202,13 @@ export function ChatTilingContainer({
   const handleBranchLayout = useCallback(
     (path: number[], sizesPct: number[]) => {
       const ratios = sizesPct.map(pct => pct / 100)
+      // `onLayout` from react-resizable-panels fires on every mount and
+      // every window resize, not just when the user drags a divider.
+      // Bail out if the new ratios are within 0.1% of the current ones —
+      // otherwise every mount/resize would rewrite `group.layout` to
+      // localStorage even though nothing meaningful changed.
+      const currentRatios = getBranchRatiosAt(baseTree, path)
+      if (currentRatios && ratiosAreClose(currentRatios, ratios)) return
       const next = setBranchRatios(baseTree, path, ratios)
       if (next === baseTree) return
       commitTree(next)
@@ -213,6 +250,12 @@ export function ChatTilingContainer({
     const handler = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey
       if (!meta) return
+      // The embedded xterm terminal binds its own ⌘W/⌘D — if the user is
+      // typing in a terminal pane the shortcut belongs to that widget,
+      // not to the split view. Never fight over an event that already
+      // has an owner.
+      const active = document.activeElement
+      if (active && active.closest('.xterm')) return
       const key = e.key.toLowerCase()
       if (key === 'd') {
         e.preventDefault()
@@ -345,7 +388,7 @@ function PaneRenderer({
         const isLast = i === node.children.length - 1
         return (
           <PaneGroupSlot
-            key={paneKey(child, i)}
+            key={paneKey(child)}
             child={child}
             i={i}
             path={path}
@@ -396,7 +439,7 @@ function PaneGroupSlot({
   return (
     <>
       <ResizablePanel
-        id={`pane-${paneKey(child, i)}`}
+        id={`pane-${paneKey(child)}`}
         order={i}
         defaultSize={defaultSize}
         minSize={5}
@@ -425,9 +468,56 @@ function PaneGroupSlot({
   )
 }
 
-function paneKey(node: PaneNode, index: number): string {
-  if (node.type === 'chat') return `chat-${node.chatId}-${index}`
-  return `branch-${node.direction}-${index}-${node.children.length}`
+/**
+ * React key generator for a pane. MUST be stable across renders even when
+ * the pane's index inside its parent branch changes (e.g. a new sibling
+ * is inserted to its left after a split). If we mixed the index in, React
+ * would treat the same chat as a different element and remount its
+ * SessionChatMount — killing SSE streams and scroll position.
+ *
+ * Leaves are keyed by `chatId` alone (unique inside a group). Branches
+ * are keyed by their contents (direction + sorted chat ids of their
+ * descendants), so a branch's identity survives adds/removes as long as
+ * its "membership" hasn't changed.
+ */
+function paneKey(node: PaneNode): string {
+  if (node.type === 'chat') return `chat-${node.chatId}`
+  const descendants = branchDescendantIds(node).sort().join('|')
+  return `branch-${node.direction}-${descendants}`
+}
+
+function branchDescendantIds(node: PaneNode): string[] {
+  if (node.type === 'chat') return [node.chatId]
+  return node.children.flatMap(branchDescendantIds)
+}
+
+/**
+ * Look up the ratios array of the branch at `path`. Returns null when
+ * the path is invalid or the target isn't a branch (leaf can't have
+ * ratios). Used by `handleBranchLayout` to no-op layout callbacks that
+ * only report the existing shape.
+ */
+function getBranchRatiosAt(node: PaneNode, path: number[]): number[] | null {
+  let cursor: PaneNode = node
+  for (const idx of path) {
+    if (cursor.type !== 'branch') return null
+    const child = cursor.children[idx]
+    if (!child) return null
+    cursor = child
+  }
+  return cursor.type === 'branch' ? cursor.ratios : null
+}
+
+/**
+ * True when two ratio arrays are equivalent within 0.1% per slot. Guards
+ * `onLayout` against no-op mount/resize floods.
+ */
+function ratiosAreClose(a: number[], b: number[], epsilon = 0.001): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (Math.abs(a[i] - b[i]) > epsilon) return false
+  }
+  return true
 }
 
 function ChatLeaf({
@@ -457,7 +547,24 @@ function ChatLeaf({
 }) {
   const props = buildMountProps(chatId)
   const chatSession = sessions.find(s => s.id === chatId) || null
-  const headerProps = buildHeaderProps(chatId, focused, focusPanel)
+  // The parent-built header props don't know about the tiling tree, so
+  // we inject the four split handlers here — they mirror the right-click
+  // context menu entries and let ellipsis-menu users add panes without
+  // discovering the right-click gesture. `onRemoveFromSplit` already
+  // handles "Close pane" in that menu, so we don't duplicate it here.
+  //
+  // INVARIANT: this override is what makes `Split left/right/up/down`
+  // appear in the ellipsis menu. The parent `buildSplitHeaderProps`
+  // documents the same invariant — DO NOT drop this override without
+  // also lifting the split handlers into the builder.
+  const baseHeaderProps = buildHeaderProps(chatId, focused, focusPanel)
+  const headerProps: ChatSplitPanelHeaderProps = {
+    ...baseHeaderProps,
+    onSplitLeft: (id: string) => onSplit(id, 'horizontal', 'before'),
+    onSplitRight: (id: string) => onSplit(id, 'horizontal', 'after'),
+    onSplitUp: (id: string) => onSplit(id, 'vertical', 'before'),
+    onSplitDown: (id: string) => onSplit(id, 'vertical', 'after')
+  }
   return (
     <div
       className={cn(
@@ -512,6 +619,18 @@ function PickerLeaf({
   onPick: (chatId: string) => void
   onCancel: () => void
 }) {
+  // Keyboard escape mirrors the pattern in Warp / iTerm2: Esc closes the
+  // "pick a chat" prompt. Without this, keyboard-only users have to tab
+  // all the way to the X button.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      onCancel()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onCancel])
   if (!pickerContext) return null
   return (
     <div className="bg-background border-border/50 relative flex h-full min-w-0 flex-col overflow-hidden rounded-lg border">

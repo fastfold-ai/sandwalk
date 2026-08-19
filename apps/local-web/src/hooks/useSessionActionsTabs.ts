@@ -5,6 +5,7 @@ import {
   writeLastSessionByScope,
   writeRecentProjectIds
 } from '@/lib/app-storage'
+import { DRAFT_AGENT_SESSION_ID } from '@/lib/draft-agent'
 
 import type { UseSessionActionsArgs } from './useSessionActionsTypes'
 
@@ -14,13 +15,16 @@ type UseSessionActionsTabsArgs = Pick<
   | 'activeProjectId'
   | 'tabsScopeKey'
   | 'sessionId'
+  | 'stripSessionId'
   | 'sessions'
   | 'lastSessionByScope'
   | 'setLastSessionByScope'
   | 'setProjectScopeId'
   | 'setRecentProjectIds'
+  | 'openTabIds'
   | 'setOpenTabIds'
   | 'patchOpenTabs'
+  | 'tabGroups'
 >
 
 export function useSessionActionsTabs({
@@ -28,12 +32,15 @@ export function useSessionActionsTabs({
   activeProjectId,
   tabsScopeKey,
   sessionId,
+  stripSessionId,
   sessions,
   setLastSessionByScope,
   setProjectScopeId,
   setRecentProjectIds,
+  openTabIds,
   setOpenTabIds,
-  patchOpenTabs
+  patchOpenTabs,
+  tabGroups
 }: UseSessionActionsTabsArgs) {
   const closeSessionTab = (id: string) => {
     const scopeProjectId = activeProjectId
@@ -48,44 +55,62 @@ export function useSessionActionsTabs({
       return item.projectId === scopeProjectId
     }
 
-    let neighbor: string | null | undefined
-    setOpenTabIds(current => {
-      const index = current.indexOf(id)
-      if (index === -1) return current
-      const withoutClosed = current.filter(tabId => tabId !== id)
-      const next = scopeProjectId
-        ? withoutClosed.filter(tabIsInScope)
-        : withoutClosed
+    // Neighbor picking + effective-tab compare use `stripSessionId`
+    // (the id shown in the strip). Using `sessionId` (which resolves to
+    // the child chat when the strip shows a grp_) misfires: closing the
+    // group tab thinks "you're not on this tab", skips the navigate,
+    // and a downstream effect re-opens the group on next render.
+    const activeTabId = stripSessionId ?? sessionId
 
-      if (id === sessionId) {
-        if (next.length === 0) {
-          neighbor = null
-        } else {
-          const preferred = withoutClosed
-            .slice(Math.min(index, withoutClosed.length))
-            .concat(
-              withoutClosed
-                .slice(0, Math.min(index, withoutClosed.length))
-                .reverse()
-            )
-            .find(tabId => next.includes(tabId))
-          neighbor = preferred || next[next.length - 1] || null
-        }
-      }
-      return next
-    })
+    // Compute EVERYTHING off the render-time snapshot of `openTabIds`,
+    // then commit the next value with a plain `setOpenTabIds(next)`.
+    // A previous version tried a functional updater and stashed `index`
+    // and `neighbor` in outer variables via side effects inside the
+    // updater. React 18 batching combined with the sibling `setMenu`
+    // and `navigate` calls sometimes skipped the "eager computation"
+    // optimization, leaving `index` at its initial `-1` and tripping
+    // the early return before `navigate` fired — the observable
+    // "first click deselects, second click closes" behavior.
+    const index = openTabIds.indexOf(id)
+    if (index === -1) return
+    const withoutClosed = openTabIds.filter(tabId => tabId !== id)
+    const next = scopeProjectId
+      ? withoutClosed.filter(tabIsInScope)
+      : withoutClosed
+    let neighbor: string | null = null
+    if (id === activeTabId && next.length > 0) {
+      const preferred = withoutClosed
+        .slice(Math.min(index, withoutClosed.length))
+        .concat(
+          withoutClosed
+            .slice(0, Math.min(index, withoutClosed.length))
+            .reverse()
+        )
+        .find(tabId => next.includes(tabId))
+      neighbor = preferred || next[next.length - 1] || null
+    }
 
-    if (neighbor === undefined) return
+    setOpenTabIds(next)
+
+    if (id !== activeTabId) return
 
     if (!neighbor) {
       setLastSessionByScope(current => {
         if (!(tabsScopeKey in current)) return current
-        const next = { ...current }
-        delete next[tabsScopeKey]
-        writeLastSessionByScope(next)
-        return next
+        const nextMap = { ...current }
+        delete nextMap[tabsScopeKey]
+        writeLastSessionByScope(nextMap)
+        return nextMap
       })
-      navigate(scopeProjectId ? `/projects/${scopeProjectId}` : '/')
+      // Closing the last tab lands on the empty draft-chat state — the
+      // canonical "no chat open" surface. Sending the user to Project
+      // Home (`/projects/<id>`) whenever a scope was active surprised
+      // them: the chat sidebar disappears and coming back to /agents
+      // re-hydrates whatever chat happened to be in `lastSessionByScope`,
+      // which reads as "the app opened a random chat". The draft route
+      // preserves the active project scope without opening any real
+      // conversation.
+      navigate(`/agents/${DRAFT_AGENT_SESSION_ID}`)
       return
     }
 
@@ -93,8 +118,27 @@ export function useSessionActionsTabs({
   }
 
   const closeOtherSessionTabs = (keepId: string) => {
-    setOpenTabIds(current => current.filter(id => id === keepId))
-    if (sessionId !== keepId) navigate(`/agents/${keepId}`)
+    // Pinning promises "sticky" for both groups AND chats. Preserve any
+    // id whose pinned state is true — group or session — instead of
+    // sweeping them away with the rest.
+    const activeTabId = stripSessionId ?? sessionId
+    const pinnedGroupIds = new Set(
+      tabGroups.filter(g => g.pinned).map(g => g.id)
+    )
+    const pinnedChatIds = new Set(
+      sessions
+        .filter(s => s.organizeLabel === 'pinned')
+        .map(s => s.id)
+    )
+    setOpenTabIds(current =>
+      current.filter(
+        id =>
+          id === keepId ||
+          pinnedGroupIds.has(id) ||
+          pinnedChatIds.has(id)
+      )
+    )
+    if (activeTabId !== keepId) navigate(`/agents/${keepId}`)
   }
 
   const reorderSessionTabs = (orderedIds: string[]) => {
