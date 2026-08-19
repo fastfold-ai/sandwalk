@@ -28,4 +28,27 @@
   animation:
     capy-working-hue 2.2s linear infinite,
     capy-working-glow 1.6s ease-in-out infinite;
+  border-radius: 999px;
+}
+
+.capy-unread-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  z-index: 2;
+  box-sizing: border-box;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ff3b30;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  letter-spacing: -0.02em;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 0 0 1.5px rgb(0 0 0 / 0.22);
 }

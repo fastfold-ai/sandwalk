@@ -18,7 +18,7 @@ import '@/components/agents/capy/CapyOverlay.css'
 import { useCapyHandsFree } from '@/hooks/useCapyHandsFree'
 import { useCapySession } from '@/hooks/useCapySession'
 import { useCapyWindow } from '@/hooks/useCapyWindow'
-import { CAPY_MIN_HEIGHT, CAPY_MIN_WIDTH } from '@/lib/capy-ui'
+import { CAPY_MIN_HEIGHT, CAPY_MIN_WIDTH, formatCapyUnreadBadge } from '@/lib/capy-ui'
 import { isDraftAgentSessionId, isReservedAgentRouteId } from '@/lib/draft-agent'
 import type { ComposerModelOption } from '@/lib/composer-models'
 import { cn } from '@/lib/utils'
@@ -68,10 +68,10 @@ export function CapyOverlay({
   const { state, persist } = useCapyWindow()
   const enabled = Boolean(health)
   const capy = useCapySession({ client, health, enabled })
-  const [unread, setUnread] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const wasRunning = useRef(false)
   const handsFree = useCapyHandsFree({
-    enabled: Boolean(state.minimized && health),
+    enabled: Boolean(health),
     send: text => capy.send(text),
     runActive: capy.chat.runActive
   })
@@ -111,13 +111,13 @@ export function CapyOverlay({
 
   useEffect(() => {
     if (state.minimized && wasRunning.current && !capy.chat.runActive) {
-      setUnread(true)
+      setUnreadCount(count => count + 1)
     }
     wasRunning.current = capy.chat.runActive
   }, [capy.chat.runActive, state.minimized])
 
   useEffect(() => {
-    if (state.open && !state.minimized) setUnread(false)
+    if (state.open && !state.minimized) setUnreadCount(0)
   }, [state.minimized, state.open])
 
   useEffect(() => {
@@ -185,7 +185,7 @@ export function CapyOverlay({
       resize.current = null
       dragKind.current = null
       if (kind === 'minimized' && !wasDrag) {
-        setUnread(false)
+        setUnreadCount(0)
         persist({ ...stateRef.current, open: true, minimized: false })
       }
     }
@@ -234,6 +234,7 @@ export function CapyOverlay({
 
   if (state.minimized) {
     const working = capy.chat.runActive || handsFree.transcribing
+    const unreadLabel = formatCapyUnreadBadge(unreadCount)
     return (
       <div
         className="fixed z-[80]"
@@ -242,7 +243,7 @@ export function CapyOverlay({
         <div
           className={cn(
             'relative size-14 cursor-grab rounded-full shadow-[0_12px_40px_-8px_rgba(0,0,0,0.55)] active:cursor-grabbing dark:shadow-[0_16px_48px_-6px_rgba(0,0,0,0.8)]',
-            working && 'capy-working-hue text-sky-400',
+            working && 'text-sky-400',
             handsFree.recording && 'ring-2 ring-red-500 ring-offset-2 ring-offset-background',
             handsFree.transcribing &&
               !capy.chat.runActive &&
@@ -255,8 +256,8 @@ export function CapyOverlay({
           aria-label={
             working
               ? 'Capy is working.'
-              : unread
-                ? 'Open Capy. New reply.'
+              : unreadLabel
+                ? `Open Capy. ${unreadCount} new ${unreadCount === 1 ? 'reply' : 'replies'}.`
                 : 'Open Capy. Double-tap Control for hands-free voice.'
           }
           title={
@@ -265,17 +266,23 @@ export function CapyOverlay({
               : 'Double-tap Control to talk to Capy'
           }
         >
-          <img src={capyLogo} alt="" className="size-14 rounded-full object-cover" />
-          {unread ? (
-            <span
-              className="bg-foreground absolute -left-0.5 -top-0.5 size-3 rounded-full border-2 border-background"
-              aria-hidden
-            />
+          <img
+            src={capyLogo}
+            alt=""
+            className={cn(
+              'size-14 rounded-full object-cover',
+              working && 'capy-working-hue'
+            )}
+          />
+          {unreadLabel ? (
+            <span className="capy-unread-badge" aria-hidden>
+              {unreadLabel}
+            </span>
           ) : null}
         </div>
         <button
           type="button"
-          className="bg-background border-border absolute -right-1 -top-1 z-10 size-5 rounded-full border text-[10px]"
+          className="bg-background border-border absolute -left-1 -top-1 z-10 size-5 rounded-full border text-[10px]"
           onPointerDown={stopDrag}
           onClick={() => persist({ ...state, open: false, minimized: false })}
           aria-label="Close Capy"

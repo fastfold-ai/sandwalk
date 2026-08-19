@@ -3,8 +3,10 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   type CapyWindowState,
   CAPY_OPEN_EVENT,
+  CAPY_REVEAL_MINIMIZED_EVENT,
   clampCapyWindow,
   readCapyWindow,
+  shouldRevealCapyMinimized,
   writeCapyWindow
 } from '@/lib/capy-ui'
 
@@ -21,11 +23,18 @@ export function useCapyWindow() {
     const onOpen = () => {
       persist({ ...readCapyWindow(), open: true, minimized: false })
     }
+    const onRevealMinimized = () => {
+      const current = readCapyWindow()
+      if (!shouldRevealCapyMinimized(current)) return
+      persist({ ...current, open: false, minimized: true })
+    }
     const onResize = () => persist(readCapyWindow())
     window.addEventListener(CAPY_OPEN_EVENT, onOpen)
+    window.addEventListener(CAPY_REVEAL_MINIMIZED_EVENT, onRevealMinimized)
     window.addEventListener('resize', onResize)
     return () => {
       window.removeEventListener(CAPY_OPEN_EVENT, onOpen)
+      window.removeEventListener(CAPY_REVEAL_MINIMIZED_EVENT, onRevealMinimized)
       window.removeEventListener('resize', onResize)
     }
   }, [persist])

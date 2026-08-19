@@ -5,7 +5,9 @@ import {
   CAPY_WINDOW_DEFAULT,
   clampCapyWindow,
   createDoubleTap,
-  isCapyHandsFreeKey
+  formatCapyUnreadBadge,
+  isCapyHandsFreeKey,
+  shouldRevealCapyMinimized
 } from './capy-ui'
 
 describe('applyCapyOpenSplit', () => {
@@ -64,6 +66,23 @@ describe('clampCapyWindow', () => {
     )
     expect(next.x + 56).toBeLessThanOrEqual(view.width - 8)
     expect(next.y + 56).toBeLessThanOrEqual(view.height - 8)
+  })
+})
+
+describe('formatCapyUnreadBadge', () => {
+  it('formats a macOS-style count', () => {
+    expect(formatCapyUnreadBadge(0)).toBeNull()
+    expect(formatCapyUnreadBadge(1)).toBe('1')
+    expect(formatCapyUnreadBadge(12)).toBe('12')
+    expect(formatCapyUnreadBadge(100)).toBe('99+')
+  })
+})
+
+describe('shouldRevealCapyMinimized', () => {
+  it('reveals only when Capy is fully hidden', () => {
+    expect(shouldRevealCapyMinimized({ open: false, minimized: false })).toBe(true)
+    expect(shouldRevealCapyMinimized({ open: true, minimized: false })).toBe(false)
+    expect(shouldRevealCapyMinimized({ open: false, minimized: true })).toBe(false)
   })
 })
 

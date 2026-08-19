@@ -8,7 +8,11 @@ import {
   stopDictation,
   voiceReady
 } from '@/lib/desktop-voice'
-import { createDoubleTap, isCapyHandsFreeKey } from '@/lib/capy-ui'
+import {
+  createDoubleTap,
+  isCapyHandsFreeKey,
+  requestRevealCapyMinimized
+} from '@/lib/capy-ui'
 
 export function useCapyHandsFree({
   enabled,
@@ -71,7 +75,7 @@ export function useCapyHandsFree({
   }, [desktop])
 
   useEffect(() => {
-    if (!enabled || !desktop) return
+    if (!enabled) return
     const tapped = createDoubleTap()
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && recordingRef.current) {
@@ -82,11 +86,12 @@ export function useCapyHandsFree({
       if (!isCapyHandsFreeKey(event)) return
       if (!tapped()) return
       event.preventDefault()
+      requestRevealCapyMinimized()
       void toggle()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [cancel, desktop, enabled, toggle])
+  }, [cancel, enabled, toggle])
 
   useEffect(() => {
     if (enabled) return

@@ -1,13 +1,12 @@
 import { ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-import capyLogo from '@/assets/capy-logo.png'
+import { CapySidebarButton } from '@/components/agents/capy/CapySidebarButton'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { DesktopUpdateBanner } from '@/components/DesktopUpdateBanner'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { DRAFT_AGENT_SESSION_ID } from '@/lib/draft-agent'
-import { requestOpenCapy } from '@/lib/capy-ui'
 import { cn } from '@/lib/utils'
 
 import { DASHBOARD_NAV_GROUPS } from './dashboard-nav'
@@ -82,16 +81,7 @@ export function DashboardSidebar({
 
       <div className="shrink-0 p-2">
         <DesktopUpdateBanner />
-        <button
-          type="button"
-          className="hover:bg-muted mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-          onClick={() => requestOpenCapy()}
-          title="Open Capy"
-          data-capy-trigger
-        >
-          <img src={capyLogo} alt="" className="size-5 rounded-full object-cover" />
-          Capy
-        </button>
+        <CapySidebarButton />
         <SidebarUserMenu
           userName={userName}
           onLogout={onLogout}

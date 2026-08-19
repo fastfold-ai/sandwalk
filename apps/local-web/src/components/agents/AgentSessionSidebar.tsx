@@ -21,7 +21,7 @@ import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import { DesktopUpdateBanner } from '@/components/DesktopUpdateBanner'
 import { SandwalkMark } from '@/components/SandwalkMark'
-import capyLogo from '@/assets/capy-logo.png'
+import { CapySidebarButton } from '@/components/agents/capy/CapySidebarButton'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -30,7 +30,6 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { type SessionChatState, type TabItemSection } from '@/lib/sessions'
-import { requestOpenCapy } from '@/lib/capy-ui'
 import { cn } from '@/lib/utils'
 
 import { SidebarBatchBar } from './session-sidebar/sidebar-batch-bar'
@@ -304,16 +303,7 @@ export function AgentSessionSidebar({
           canSplitView={canBatchSplitView}
         />
         <DesktopUpdateBanner />
-        <button
-          type="button"
-          className="hover:bg-muted mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-          onClick={() => requestOpenCapy()}
-          title="Open Capy"
-          data-capy-trigger
-        >
-          <img src={capyLogo} alt="" className="size-5 rounded-full object-cover" />
-          Capy
-        </button>
+        <CapySidebarButton />
         <SidebarUserMenu
           userName={sidebarUserName}
           onLogout={onLogout}

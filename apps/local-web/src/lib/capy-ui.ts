@@ -89,9 +89,18 @@ export function writeCapyWindow(state: CapyWindowState) {
 }
 
 export const CAPY_OPEN_EVENT = 'sandwalk:capy-open'
+export const CAPY_REVEAL_MINIMIZED_EVENT = 'sandwalk:capy-reveal-minimized'
 
 export function requestOpenCapy() {
   window.dispatchEvent(new Event(CAPY_OPEN_EVENT))
+}
+
+export function shouldRevealCapyMinimized(state: Pick<CapyWindowState, 'open' | 'minimized'>) {
+  return !state.open && !state.minimized
+}
+
+export function requestRevealCapyMinimized() {
+  window.dispatchEvent(new Event(CAPY_REVEAL_MINIMIZED_EVENT))
 }
 
 export const CAPY_HANDS_FREE_WINDOW_MS = 400
@@ -108,6 +117,12 @@ export function isCapyHandsFreeKey(event: {
     !event.metaKey &&
     !event.altKey
   )
+}
+
+export function formatCapyUnreadBadge(count: number): string | null {
+  if (count <= 0) return null
+  if (count > 99) return '99+'
+  return String(count)
 }
 
 export function createDoubleTap(windowMs = CAPY_HANDS_FREE_WINDOW_MS) {
