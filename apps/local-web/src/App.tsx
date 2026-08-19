@@ -140,6 +140,7 @@ export default function App() {
     setRuntimeSettings: bootstrap.setRuntimeSettings,
     loadModelOptions: bootstrap.loadModelOptions,
     sessionId: effectiveSessionId,
+    enableTranscriptStream: !activeGroup,
     sessionIdRef: ui.sessionIdRef,
     session: context.session,
     activeProjectId: context.activeProjectId,
@@ -178,7 +179,8 @@ export default function App() {
   })
   useEventsMux({
     client: bootstrap.client,
-    health: bootstrap.health
+    health: bootstrap.health,
+    pinnedSessionIds: activeGroup?.chatIds ?? []
   })
 
   // Multi-select for split view: any Shift/Meta click on a tab, a

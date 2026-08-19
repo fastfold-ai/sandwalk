@@ -374,17 +374,8 @@ export function useSessionChatStream({
       return
     }
 
-    // Token SSE for the *visible* session only.
-    //
-    // Streaming every running session opens one EventSource each and exhausts
-    // the browser's ~6 HTTP/1.1 connections/host — UI freezes (black splash on
-    // transparent Tauri) while /v1/sessions still answers fine. Background
-    // runs keep going on the server; status comes from the sessions revision
-    // poll. Opening a chat attaches SSE and catches up via afterSequence +
-    // message history.
-    // Draft /agents/new has no API session — never open a stream for it.
-    // Group ids (`grp_*`) aren't sessions; the group's child chats each
-    // mount their own `SessionChatMount` which opens SSE per real chat id.
+    // One mux connection covers every mounted split pane (not just the
+    // focused chat). Sidebar-only sessions stay on the registry.
     const wanted = new Set<string>()
     if (
       sessionId &&
@@ -404,6 +395,8 @@ export function useSessionChatStream({
         dropDeltaBuffer(id)
       }
       streamControllersRef.current.clear()
+      // Each split pane registers its own chat id. The shell skips this
+      // hook in split view so focus changes cannot unbind a pane.
       const unsubs = [...wanted].map(id =>
         registerTranscriptSseHandler(id, event =>
           handleEventRef.current(id, event)
