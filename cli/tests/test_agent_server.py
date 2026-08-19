@@ -48,6 +48,7 @@ def test_agent_server_health_and_session_contract(tmp_path: Path, monkeypatch):
         assert health.json()["capabilities"]["localFilesystem"] is True
         assert health.json()["capabilities"]["skills"] is True
         assert health.json()["capabilities"]["integrations"] is True
+        assert health.json()["capabilities"]["eventMux"] is True
 
         integrations = client.get("/v1/integrations")
         assert integrations.status_code == 200

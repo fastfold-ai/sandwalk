@@ -12,6 +12,7 @@ import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
+import { useEventsMux } from '@/hooks/useEventsMux'
 import { useGlobalSessionEvents } from '@/hooks/useGlobalSessionEvents'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
 import { useAppTabGroups } from '@/hooks/useAppTabGroups'
@@ -174,6 +175,10 @@ export default function App() {
     health: bootstrap.health,
     sessionIdRef: ui.sessionIdRef,
     setSessions: bootstrap.setSessions
+  })
+  useEventsMux({
+    client: bootstrap.client,
+    health: bootstrap.health
   })
 
   // Multi-select for split view: any Shift/Meta click on a tab, a

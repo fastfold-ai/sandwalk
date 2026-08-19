@@ -14,6 +14,7 @@ import {
 } from '@/lib/browser-notifications'
 import { reduceChatOnAgentEvent } from '@/lib/chat-actions'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import { registerTranscriptSseHandler } from '@/lib/events-mux-registry'
 import { markSessionAttention } from '@/lib/session-attention'
 import type { SessionChatState } from '@/lib/sessions'
 
@@ -198,74 +199,10 @@ export function useSessionChatStream({
   // reconnects that lose Last-Event-ID) don't replay the entire history —
   // that spam-logged run.completed and could leave the UI looking stuck.
   const afterSequenceRef = useRef<Map<string, number>>(new Map())
-
-  useEffect(() => {
-    if (!health) {
-      for (const timer of streamCloseTimersRef.current.values()) {
-        window.clearTimeout(timer)
-      }
-      streamCloseTimersRef.current.clear()
-      for (const [id, controller] of streamControllersRef.current) {
-        controller.abort()
-        dropDeltaBuffer(id)
-      }
-      streamControllersRef.current.clear()
-      return
-    }
-
-    // Token SSE for the *visible* session only.
-    //
-    // Streaming every running session opens one EventSource each and exhausts
-    // the browser's ~6 HTTP/1.1 connections/host — UI freezes (black splash on
-    // transparent Tauri) while /v1/sessions still answers fine. Background
-    // runs keep going on the server; status comes from the sessions revision
-    // poll. Opening a chat attaches SSE and catches up via afterSequence +
-    // message history.
-    // Draft /agents/new has no API session — never open a stream for it.
-    // Group ids (`grp_*`) aren't sessions; the group's child chats each
-    // mount their own `SessionChatMount` which opens SSE per real chat id.
-    const wanted = new Set<string>()
-    if (
-      sessionId &&
-      !isDraftAgentSessionId(sessionId) &&
-      !isSessionGroupId(sessionId)
-    ) {
-      wanted.add(sessionId)
-    }
-
-    for (const [id, controller] of [...streamControllersRef.current]) {
-      if (!wanted.has(id)) {
-        // Schedule delayed abort — a fast tab switch back to this session
-        // reuses the stream. See STREAM_GRACE_MS above.
-        if (!streamCloseTimersRef.current.has(id)) {
-          const timer = window.setTimeout(() => {
-            streamCloseTimersRef.current.delete(id)
-            controller.abort()
-            streamControllersRef.current.delete(id)
-            dropDeltaBuffer(id)
-          }, STREAM_GRACE_MS)
-          streamCloseTimersRef.current.set(id, timer)
-        }
-      }
-    }
-
-    for (const id of wanted) {
-      // Cancel any pending delayed-abort for this session — we still want it.
-      const pending = streamCloseTimersRef.current.get(id)
-      if (pending !== undefined) {
-        window.clearTimeout(pending)
-        streamCloseTimersRef.current.delete(id)
-      }
-      if (streamControllersRef.current.has(id)) continue
-      const controller = new AbortController()
-      streamControllersRef.current.set(id, controller)
-      const afterSequence = afterSequenceRef.current.get(id) || 0
-
-      void client
-        .streamEvents(id, {
-          afterSequence,
-          signal: controller.signal,
-          onEvent: (event: AgentEvent) => {
+  const handleEventRef = useRef<(id: string, event: AgentEvent) => void>(
+    () => {}
+  )
+  handleEventRef.current = (id: string, event: AgentEvent) => {
             if (typeof event.sequence === 'number' && event.sequence > 0) {
               const prev = afterSequenceRef.current.get(id) || 0
               if (event.sequence > prev) {
@@ -421,6 +358,96 @@ export function useSessionChatStream({
               })
               void loadSessionsRef.current?.()
             }
+  }
+
+  useEffect(() => {
+    if (!health) {
+      for (const timer of streamCloseTimersRef.current.values()) {
+        window.clearTimeout(timer)
+      }
+      streamCloseTimersRef.current.clear()
+      for (const [id, controller] of streamControllersRef.current) {
+        controller.abort()
+        dropDeltaBuffer(id)
+      }
+      streamControllersRef.current.clear()
+      return
+    }
+
+    // Token SSE for the *visible* session only.
+    //
+    // Streaming every running session opens one EventSource each and exhausts
+    // the browser's ~6 HTTP/1.1 connections/host — UI freezes (black splash on
+    // transparent Tauri) while /v1/sessions still answers fine. Background
+    // runs keep going on the server; status comes from the sessions revision
+    // poll. Opening a chat attaches SSE and catches up via afterSequence +
+    // message history.
+    // Draft /agents/new has no API session — never open a stream for it.
+    // Group ids (`grp_*`) aren't sessions; the group's child chats each
+    // mount their own `SessionChatMount` which opens SSE per real chat id.
+    const wanted = new Set<string>()
+    if (
+      sessionId &&
+      !isDraftAgentSessionId(sessionId) &&
+      !isSessionGroupId(sessionId)
+    ) {
+      wanted.add(sessionId)
+    }
+
+    if (health.capabilities?.eventMux) {
+      for (const timer of streamCloseTimersRef.current.values()) {
+        window.clearTimeout(timer)
+      }
+      streamCloseTimersRef.current.clear()
+      for (const [id, controller] of streamControllersRef.current) {
+        controller.abort()
+        dropDeltaBuffer(id)
+      }
+      streamControllersRef.current.clear()
+      const unsubs = [...wanted].map(id =>
+        registerTranscriptSseHandler(id, event =>
+          handleEventRef.current(id, event)
+        )
+      )
+      return () => {
+        for (const unsub of unsubs) unsub()
+      }
+    }
+
+    for (const [id, controller] of [...streamControllersRef.current]) {
+      if (!wanted.has(id)) {
+        // Schedule delayed abort — a fast tab switch back to this session
+        // reuses the stream. See STREAM_GRACE_MS above.
+        if (!streamCloseTimersRef.current.has(id)) {
+          const timer = window.setTimeout(() => {
+            streamCloseTimersRef.current.delete(id)
+            controller.abort()
+            streamControllersRef.current.delete(id)
+            dropDeltaBuffer(id)
+          }, STREAM_GRACE_MS)
+          streamCloseTimersRef.current.set(id, timer)
+        }
+      }
+    }
+
+    for (const id of wanted) {
+      // Cancel any pending delayed-abort for this session — we still want it.
+      const pending = streamCloseTimersRef.current.get(id)
+      if (pending !== undefined) {
+        window.clearTimeout(pending)
+        streamCloseTimersRef.current.delete(id)
+      }
+      if (streamControllersRef.current.has(id)) continue
+      const controller = new AbortController()
+      streamControllersRef.current.set(id, controller)
+      const afterSequence = afterSequenceRef.current.get(id) || 0
+
+      void client
+        .streamEvents(id, {
+          afterSequence,
+          signal: controller.signal,
+          onEvent: (event: AgentEvent) => {
+            handleEventRef.current(id, event)
           }
         })
         .catch((cause: unknown) => {

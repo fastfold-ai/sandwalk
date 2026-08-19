@@ -133,6 +133,12 @@ class AgentRunner(
         progress_callback=None,
     ) -> ExecutionResult:
         """Execute a query synchronously (blocking wrapper around async)."""
-        return self._run_coro_sync(
-            self._run_async(query, context, progress_callback)
-        )
+        from agent.mcp_server.tool_handler import tool_session_var
+
+        token = tool_session_var.set(self.session)
+        try:
+            return self._run_coro_sync(
+                self._run_async(query, context, progress_callback)
+            )
+        finally:
+            tool_session_var.reset(token)

@@ -53,6 +53,7 @@ def register_health_routes(app: FastAPI, deps: AppDeps) -> None:
                 integrations=True,
                 mcp=True,
                 terminal=True,
+                event_mux=True,
             ),
         )
 

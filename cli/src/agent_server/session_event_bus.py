@@ -103,19 +103,25 @@ class SessionEventBus:
         else:
             _deliver()
 
-    async def subscribe(self) -> AsyncIterator[dict[str, Any]]:
-        """Yield events until the caller stops iterating."""
+    def subscribe_queue(self) -> asyncio.Queue[dict[str, Any]]:
+        """Register a subscriber queue the caller drains itself."""
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(
             maxsize=self._QUEUE_CAPACITY
         )
-        async with self._guard:
-            self._subscribers.add(queue)
+        self._subscribers.add(queue)
+        return queue
+
+    def unsubscribe_queue(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
+        self._subscribers.discard(queue)
+
+    async def subscribe(self) -> AsyncIterator[dict[str, Any]]:
+        """Yield events until the caller stops iterating."""
+        queue = self.subscribe_queue()
         try:
             while True:
                 yield await queue.get()
         finally:
-            async with self._guard:
-                self._subscribers.discard(queue)
+            self.unsubscribe_queue(queue)
 
 
 # Process-wide bus for the local agent server.

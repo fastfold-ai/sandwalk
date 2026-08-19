@@ -18,6 +18,7 @@ export type BackendCapabilities = {
   integrations: boolean
   mcp: boolean
   terminal: boolean
+  eventMux?: boolean
   executionBackends: string[]
 }
 

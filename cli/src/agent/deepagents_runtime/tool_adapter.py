@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import re
+import threading
 from typing import Any
+
+_SCHEMA_CACHE: dict[tuple, Any] = {}
+_SCHEMA_LOCK = threading.Lock()
 
 
 def _sanitize_tool_name(name: str) -> str:
@@ -21,6 +25,12 @@ def _args_schema_for(model_name: str, parameters: dict | None, *, required_code:
     """
     from pydantic import ConfigDict, Field, create_model
 
+    param_items = tuple(sorted((str(k), str(v)) for k, v in (parameters or {}).items()))
+    cache_key = (model_name, param_items, required_code)
+    cached = _SCHEMA_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
     fields: dict[str, Any] = {}
     if required_code:
         fields["code"] = (str, Field(description="Code to execute"))
@@ -32,9 +42,12 @@ def _args_schema_for(model_name: str, parameters: dict | None, *, required_code:
 
     config = ConfigDict(protected_namespaces=())
     try:
-        return create_model(f"{model_name}_Args", __config__=config, **fields)
+        schema = create_model(f"{model_name}_Args", __config__=config, **fields)
     except Exception:  # noqa: BLE001 - fall back to an arg-less schema
-        return create_model(f"{model_name}_Args", __config__=config)
+        schema = create_model(f"{model_name}_Args", __config__=config)
+    with _SCHEMA_LOCK:
+        _SCHEMA_CACHE[cache_key] = schema
+    return schema
 
 
 def _make_lc_tool(*, name: str, description: str, args_schema, handler, strip_none: bool = True):

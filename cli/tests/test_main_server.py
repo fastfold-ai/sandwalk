@@ -72,6 +72,11 @@ def test_run_server_rejects_non_loopback_without_public():
         run_server(host="0.0.0.0")
 
 
+def test_run_server_rejects_partial_tls(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="tls-cert"):
+        run_server(host="127.0.0.1", tls_cert=tmp_path / "missing.pem")
+
+
 def test_signal_shutdown_closes_long_lived_streams():
     event = threading.Event()
     app = SimpleNamespace(state=SimpleNamespace(shutdown_event=event))

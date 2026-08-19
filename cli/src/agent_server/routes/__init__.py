@@ -23,6 +23,7 @@ from agent_server.routes.mcp_servers_manage import register_mcp_server_manage_ro
 from agent_server.routes.model_profiles import register_model_profile_routes
 from agent_server.routes.models import register_model_routes
 from agent_server.routes.projects import register_project_routes
+from agent_server.routes.events_mux import register_events_mux_routes
 from agent_server.routes.session_events_global import (
     register_session_events_global_routes,
 )
@@ -77,3 +78,4 @@ def register_all_routes(app: FastAPI, deps: AppDeps) -> None:
     register_pty_routes(app, deps)
     register_session_event_routes(app, deps)
     register_session_events_global_routes(app, deps)
+    register_events_mux_routes(app, deps)
