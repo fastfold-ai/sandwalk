@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   computeAtFileQuery,
+  computeHashChatQuery,
   computeSlashSkillQuery,
   extractSkillOverviewFromMarkdown,
   getSkillPromptExamples
@@ -69,5 +70,27 @@ describe('computeAtFileQuery', () => {
     expect(computeAtFileQuery('open @src/ a', 11)).toBeNull()
     expect(computeAtFileQuery('email@x', 7)).toBeNull()
     expect(computeAtFileQuery('hello', 5)).toBeNull()
+  })
+})
+
+describe('computeHashChatQuery', () => {
+  it('detects #chat mentions like @ file mentions, including at start of input', () => {
+    expect(computeHashChatQuery('summarize #hi', 13)).toEqual({
+      query: 'hi',
+      start: 10,
+      end: 13
+    })
+    expect(computeHashChatQuery('#EGFR', 5)).toEqual({
+      query: 'EGFR',
+      start: 0,
+      end: 5
+    })
+    expect(computeHashChatQuery('#', 1)).toEqual({
+      query: '',
+      start: 0,
+      end: 1
+    })
+    expect(computeHashChatQuery('foo#bar', 7)).toBeNull()
+    expect(computeHashChatQuery('hello', 5)).toBeNull()
   })
 })

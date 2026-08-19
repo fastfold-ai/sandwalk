@@ -1,4 +1,5 @@
 import type {
+  AgentSession,
   AgentSkill,
   McpServer,
   WorkspaceFile
@@ -13,9 +14,11 @@ import type { ComposerAtMenuHandle } from '@/components/agents/composer/Composer
 import {
   ComposerFileChip,
   ComposerMcpChip,
-  ComposerSkillChip
+  ComposerSkillChip,
+  ComposerChatChip
 } from '@/components/agents/composer/ComposerChip'
 import { ComposerDraftTextPart } from '@/components/agents/composer/ComposerDraftTextPart'
+import type { ComposerHashMenuHandle } from '@/components/agents/composer/ComposerHashMenu'
 import type { ComposerSlashMenuHandle } from '@/components/agents/composer/ComposerSlashMenu'
 import {
   type ComposerPart,
@@ -47,8 +50,12 @@ export function ComposerDraftEditor({
   onSend,
   atOpen,
   slashOpen,
+  hashOpen = false,
   atMenuRef,
   slashMenuRef,
+  hashMenuRef,
+  mentionChats = [],
+  placeholder,
   embedded = false
 }: {
   draft: string
@@ -76,8 +83,12 @@ export function ComposerDraftEditor({
   onSend: () => void
   atOpen: boolean
   slashOpen: boolean
+  hashOpen?: boolean
   atMenuRef: MutableRefObject<ComposerAtMenuHandle | null>
   slashMenuRef: MutableRefObject<ComposerSlashMenuHandle | null>
+  hashMenuRef?: MutableRefObject<ComposerHashMenuHandle | null>
+  mentionChats?: AgentSession[]
+  placeholder?: string
   /**
    * Cuando true (split view), quita el `pt` interno del scroll y deja solo
    * `pb`. El aire con el separator de arriba lo aporta el `pt-3` externo del
@@ -96,9 +107,11 @@ export function ComposerDraftEditor({
     focusedPartIndex,
     atOpen,
     slashOpen,
+    hashOpen,
     textInputRefs,
     atMenuRef,
     slashMenuRef,
+    hashMenuRef,
     setFocusedPartIndex,
     setCaretPos,
     setLocalDraft,
@@ -178,6 +191,20 @@ export function ComposerDraftEditor({
             />
           )
         }
+        if (part.type === 'chat') {
+          chipRenderIndex += 1
+          const chipIndex = chipRenderIndex
+          return (
+            <ComposerChatChip
+              key={`chat-${partIndex}-${part.sessionId}`}
+              sessionId={part.sessionId}
+              title={mentionChats.find(chat => chat.id === part.sessionId)?.title}
+              onRemove={() => {
+                commitDraft(removeComposerChipAt(draft, chipIndex))
+              }}
+            />
+          )
+        }
         if (part.type === 'mcp') {
           chipRenderIndex += 1
           const chipIndex = chipRenderIndex
@@ -215,6 +242,7 @@ export function ComposerDraftEditor({
             setCaretPos={setCaretPos}
             updateTextPart={updateTextPart}
             handleKeyDown={handleKeyDown}
+            placeholder={placeholder}
           />
         )
       })}

@@ -1,6 +1,7 @@
 import type { KeyboardEvent, MutableRefObject } from 'react'
 
 import type { ComposerAtMenuHandle } from '@/components/agents/composer/ComposerAtMenu'
+import type { ComposerHashMenuHandle } from '@/components/agents/composer/ComposerHashMenu'
 import type { ComposerSlashMenuHandle } from '@/components/agents/composer/ComposerSlashMenu'
 import {
   chipTokenLength,
@@ -15,11 +16,13 @@ type DraftEditorHandlersInput = {
   focusedPartIndex: number
   atOpen: boolean
   slashOpen: boolean
+  hashOpen?: boolean
   textInputRefs: MutableRefObject<
     Map<number, HTMLInputElement | HTMLTextAreaElement>
   >
   atMenuRef: MutableRefObject<ComposerAtMenuHandle | null>
   slashMenuRef: MutableRefObject<ComposerSlashMenuHandle | null>
+  hashMenuRef?: MutableRefObject<ComposerHashMenuHandle | null>
   setFocusedPartIndex: (index: number) => void
   setCaretPos: (pos: number) => void
   setLocalDraft: (value: string) => void
@@ -34,9 +37,11 @@ export function createDraftEditorHandlers({
   focusedPartIndex,
   atOpen,
   slashOpen,
+  hashOpen = false,
   textInputRefs,
   atMenuRef,
   slashMenuRef,
+  hashMenuRef,
   setFocusedPartIndex,
   setCaretPos,
   setLocalDraft,
@@ -130,6 +135,7 @@ export function createDraftEditorHandlers({
 
     if (atOpen && atMenuRef.current?.handleKeyDown(event)) return
     if (slashOpen && slashMenuRef.current?.handleKeyDown(event)) return
+    if (hashOpen && hashMenuRef?.current?.handleKeyDown(event)) return
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       onSend()

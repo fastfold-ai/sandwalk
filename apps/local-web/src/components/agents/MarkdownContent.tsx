@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
 
 import type { SkillIconSkill } from '@/components/agents/SkillMentionChip'
+import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { cn } from '@/lib/utils'
 
 import { buildMarkdownComponents } from './markdown-components'
@@ -23,7 +24,8 @@ export const MarkdownContent = memo(function MarkdownContent({
   streaming = false,
   onOpenFile,
   workspacePath,
-  skills
+  skills,
+  mentionChats
 }: {
   content: string
   className?: string
@@ -35,6 +37,7 @@ export const MarkdownContent = memo(function MarkdownContent({
   workspacePath?: string | null
   /** Installed skills for custom / featured chip icons in chat. */
   skills?: SkillIconSkill[]
+  mentionChats?: AgentSession[]
 }) {
   const navigate = useNavigate()
   const prepared = useMemo(() => {
@@ -48,9 +51,10 @@ export const MarkdownContent = memo(function MarkdownContent({
         streaming,
         onOpenFile,
         workspacePath,
-        skills
+        skills,
+        mentionChats
       }),
-    [navigate, streaming, onOpenFile, workspacePath, skills]
+    [mentionChats, navigate, streaming, onOpenFile, workspacePath, skills]
   )
 
   return (

@@ -1,6 +1,6 @@
 import { Icon } from '@iconify/react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { McpServer, WorkspaceFile } from '@sandwalk/agent-ui-core'
+import type { AgentSession, McpServer, WorkspaceFile } from '@sandwalk/agent-ui-core'
 import { Folder, Plug } from 'lucide-react'
 import { Fragment, type ReactNode } from 'react'
 
@@ -8,6 +8,7 @@ import {
   mcpIconForChip,
   mcpIconForServer
 } from '@/components/agents/composer/composer-mention-utils'
+import { ComposerChatChip } from '@/components/agents/composer/ComposerChip'
 import {
   mentionDisplayName,
   mentionPathIsDirectory,
@@ -53,7 +54,8 @@ export function UserMessageContent({
   workspacePath,
   workspaceFiles = [],
   skills,
-  mcpServers
+  mcpServers,
+  mentionChats = []
 }: {
   content: string
   className?: string
@@ -64,6 +66,7 @@ export function UserMessageContent({
   workspaceFiles?: WorkspaceFile[]
   skills?: SkillIconSkill[]
   mcpServers?: McpServer[]
+  mentionChats?: AgentSession[]
 }) {
   const parts = parseMessageParts(content)
   const canPreview = Boolean(client && sessionId)
@@ -220,6 +223,16 @@ export function UserMessageContent({
           )}
           <span className="max-w-[200px] truncate">{part.name}</span>
         </a>
+      )
+    }
+    if (part.type === 'chat') {
+      const title = mentionChats.find(chat => chat.id === part.sessionId)?.title
+      return (
+        <ComposerChatChip
+          key={`chat-${index}-${part.sessionId}`}
+          sessionId={part.sessionId}
+          title={title}
+        />
       )
     }
     return (

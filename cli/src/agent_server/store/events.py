@@ -76,3 +76,11 @@ class EventMixin:
             )
             for row in rows
         ]
+
+    def clear_events(self, session_id: str) -> int:
+        with self._write_lock, self._connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM events WHERE session_id = ?",
+                (session_id,),
+            )
+        return int(cursor.rowcount)

@@ -124,7 +124,10 @@ class SessionUpdateMixin:
                 (status, now.isoformat(), session_id),
             )
         session = self.get_session(session_id)
-        if session is not None and getattr(session, "source", None) != "bench":
+        if session is not None and getattr(session, "source", None) not in {
+            "bench",
+            "capy",
+        }:
             # Push the transition on the global session bus so subscribers
             # (frontend `useGlobalSessionEvents`) can react without diffing
             # snapshots from a poll. Import lazily to avoid a circular

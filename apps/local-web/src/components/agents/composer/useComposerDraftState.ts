@@ -1,10 +1,11 @@
-import type { WorkspaceFile } from '@sandwalk/agent-ui-core'
+import type { AgentSession, WorkspaceFile } from '@sandwalk/agent-ui-core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { createChipInserters } from '@/components/agents/composer/composer-chip-insert'
 import { useComposerCaret } from '@/components/agents/composer/useComposerCaret'
 import {
   computeAtFileQuery,
+  computeHashChatQuery,
   computeSlashSkillQuery
 } from '@/components/agents/skill-examples'
 
@@ -15,6 +16,7 @@ export function useComposerDraftState({
   autoFocus,
   focusKey,
   workspaceFiles = [],
+  mentionChats,
   onEnsureWorkspaceFiles
 }: {
   value: string
@@ -23,6 +25,7 @@ export function useComposerDraftState({
   autoFocus?: boolean
   focusKey?: string | null
   workspaceFiles?: WorkspaceFile[]
+  mentionChats?: AgentSession[]
   onEnsureWorkspaceFiles?: () => void | Promise<void>
 }) {
   const textInputRefs = useRef<
@@ -35,6 +38,7 @@ export function useComposerDraftState({
   const emittedDraftRef = useRef(value)
   const [slashDismissed, setSlashDismissed] = useState(false)
   const [atDismissed, setAtDismissed] = useState(false)
+  const [hashDismissed, setHashDismissed] = useState(false)
 
   draftRef.current = draft
 
@@ -105,19 +109,24 @@ export function useComposerDraftState({
     () => computeAtFileQuery(draft, caretPos),
     [caretPos, draft]
   )
-  const activeMention =
-    slash && atMention
-      ? slash.start >= atMention.start
-        ? ('slash' as const)
-        : ('at' as const)
-      : slash
-        ? ('slash' as const)
-        : atMention
-          ? ('at' as const)
-          : null
+  const hashMention = useMemo(
+    () => (mentionChats ? computeHashChatQuery(draft, caretPos) : null),
+    [caretPos, draft, mentionChats]
+  )
+  const activeMention = useMemo(() => {
+    const candidates: Array<{ kind: 'slash' | 'at' | 'hash'; start: number }> =
+      []
+    if (slash) candidates.push({ kind: 'slash', start: slash.start })
+    if (atMention) candidates.push({ kind: 'at', start: atMention.start })
+    if (hashMention) candidates.push({ kind: 'hash', start: hashMention.start })
+    if (candidates.length === 0) return null
+    return candidates.sort((a, b) => b.start - a.start)[0]?.kind ?? null
+  }, [atMention, hashMention, slash])
   const slashOpen =
     activeMention === 'slash' && Boolean(slash) && !slashDismissed
   const atOpen = activeMention === 'at' && Boolean(atMention) && !atDismissed
+  const hashOpen =
+    activeMention === 'hash' && Boolean(hashMention) && !hashDismissed
 
   useEffect(() => {
     setSlashDismissed(false)
@@ -126,6 +135,10 @@ export function useComposerDraftState({
   useEffect(() => {
     setAtDismissed(false)
   }, [atMention?.start])
+
+  useEffect(() => {
+    setHashDismissed(false)
+  }, [hashMention?.start])
 
   // Load @ file index when the menu opens — do not wait for the Files panel.
   const ensuredAtStartRef = useRef<number | null>(null)
@@ -142,6 +155,7 @@ export function useComposerDraftState({
         draft,
         slash,
         atMention,
+        hashMention,
         commitDraft,
         pendingCaretRef,
         applyComposerCaret
@@ -151,6 +165,7 @@ export function useComposerDraftState({
       atMention,
       commitDraft,
       draft,
+      hashMention,
       pendingCaretRef,
       slash
     ]
@@ -176,6 +191,30 @@ export function useComposerDraftState({
       .slice(0, 40)
   }, [atMention, workspaceFiles])
 
+  const hashResults = useMemo(() => {
+    if (!hashMention || !mentionChats) return []
+    const query = hashMention.query.toLowerCase()
+    return mentionChats
+      .filter(chat => chat.source !== 'capy' && chat.source !== 'bench')
+      .filter(chat => {
+        if (!query) return true
+        const title = chat.title.toLowerCase()
+        return title.includes(query) || chat.id.toLowerCase().includes(query)
+      })
+      .sort((a, b) => {
+        if (!query) {
+          return (b.updatedAt || '').localeCompare(a.updatedAt || '')
+        }
+        const aTitle = a.title.toLowerCase()
+        const bTitle = b.title.toLowerCase()
+        const aPrefix = aTitle.startsWith(query) ? 0 : 1
+        const bPrefix = bTitle.startsWith(query) ? 0 : 1
+        if (aPrefix !== bPrefix) return aPrefix - bPrefix
+        return aTitle.localeCompare(bTitle)
+      })
+      .slice(0, 40)
+  }, [hashMention, mentionChats])
+
   const clearDraftAfterSend = useCallback(() => {
     emittedDraftRef.current = ''
     setLocalDraft('')
@@ -194,24 +233,28 @@ export function useComposerDraftState({
     slash,
     slashOpen,
     atOpen,
+    hashOpen,
     setSlashDismissed,
     setAtDismissed,
+    setHashDismissed,
     pendingCaretRef,
     autoFocusedKeyRef,
     focusActiveComposerInput,
     chipInserters,
-    atResults
+    atResults,
+    hashResults
   }
 }
 
 export function useComposerMentionFocus(
   slashOpen: boolean,
   atOpen: boolean,
-  focusActiveComposerInput: () => void
+  focusActiveComposerInput: () => void,
+  hashOpen = false
 ) {
   const mentionMenuWasOpenRef = useRef(false)
   useEffect(() => {
-    const open = slashOpen || atOpen
+    const open = slashOpen || atOpen || hashOpen
     if (open && !mentionMenuWasOpenRef.current) {
       const frame = window.requestAnimationFrame(() => {
         focusActiveComposerInput()
@@ -220,5 +263,5 @@ export function useComposerMentionFocus(
       return () => window.cancelAnimationFrame(frame)
     }
     if (!open) mentionMenuWasOpenRef.current = false
-  }, [atOpen, focusActiveComposerInput, slashOpen])
+  }, [atOpen, focusActiveComposerInput, hashOpen, slashOpen])
 }

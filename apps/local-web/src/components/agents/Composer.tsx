@@ -14,6 +14,10 @@ import {
 import { ComposerAttachments } from '@/components/agents/composer/ComposerAttachments'
 import { ComposerDraftEditor } from '@/components/agents/composer/ComposerDraftEditor'
 import {
+  ComposerHashMenu,
+  type ComposerHashMenuHandle
+} from '@/components/agents/composer/ComposerHashMenu'
+import {
   ComposerSlashMenu,
   type ComposerSlashMenuHandle
 } from '@/components/agents/composer/ComposerSlashMenu'
@@ -81,11 +85,14 @@ export function Composer({
   onPlanModeChange,
   editingQueued = false,
   onCancelEditQueued,
-  embedded = false
+  embedded = false,
+  mentionChats,
+  placeholder
 }: ComposerProps) {
   const [auraTick, setAuraTick] = useState(0)
   const atMenuRef = useRef<ComposerAtMenuHandle | null>(null)
   const slashMenuRef = useRef<ComposerSlashMenuHandle | null>(null)
+  const hashMenuRef = useRef<ComposerHashMenuHandle | null>(null)
 
   const draftState = useComposerDraftState({
     value,
@@ -94,6 +101,7 @@ export function Composer({
     autoFocus,
     focusKey,
     workspaceFiles,
+    mentionChats,
     onEnsureWorkspaceFiles
   })
 
@@ -153,7 +161,8 @@ export function Composer({
   useComposerMentionFocus(
     draftState.slashOpen,
     draftState.atOpen,
-    draftState.focusActiveComposerInput
+    draftState.focusActiveComposerInput,
+    draftState.hashOpen
   )
 
   const voice = useComposerVoice({
@@ -202,6 +211,18 @@ export function Composer({
         workspaceFileCount={workspaceFiles.length}
         onPick={draftState.chipInserters.insertFileChip}
         onDismiss={() => draftState.setAtDismissed(true)}
+        focusInput={draftState.focusActiveComposerInput}
+      />
+
+      <ComposerHashMenu
+        ref={hashMenuRef}
+        open={draftState.hashOpen}
+        results={draftState.hashResults}
+        chatCount={(mentionChats ?? []).filter(
+          chat => chat.source !== 'capy' && chat.source !== 'bench'
+        ).length}
+        onPick={draftState.chipInserters.insertChatChip}
+        onDismiss={() => draftState.setHashDismissed(true)}
         focusInput={draftState.focusActiveComposerInput}
       />
 
@@ -338,8 +359,12 @@ export function Composer({
                 onSend={handleSend}
                 atOpen={draftState.atOpen}
                 slashOpen={draftState.slashOpen}
+                hashOpen={draftState.hashOpen}
                 atMenuRef={atMenuRef}
                 slashMenuRef={slashMenuRef}
+                hashMenuRef={hashMenuRef}
+                mentionChats={mentionChats}
+                placeholder={placeholder}
               />
               <ComposerToolbar
                 running={running}

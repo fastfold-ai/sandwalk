@@ -42,7 +42,7 @@ def session_from_row(row: sqlite3.Row) -> AgentSession:
         title_source = "pending"
     raw_origin = row["source"] if "source" in keys else None
     origin = str(raw_origin or "").strip().lower() or None
-    if origin not in {"slack", "bench", None}:
+    if origin not in {"slack", "bench", "capy", None}:
         origin = None
     raw_surface = row["client_surface"] if "client_surface" in keys else "unknown"
     surface = str(raw_surface or "unknown").strip().lower()

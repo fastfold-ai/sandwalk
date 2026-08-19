@@ -195,7 +195,7 @@ export function ComposerModelPicker({
       <PopoverContent
         align="start"
         side="top"
-        className="w-[min(18rem,calc(100vw-2rem))] overflow-visible p-0"
+        className="z-[90] w-[min(18rem,calc(100vw-2rem))] overflow-visible p-0"
         onCloseAutoFocus={event => event.preventDefault()}
         onInteractOutside={event => {
           if (effortMenuOpen) event.preventDefault()

@@ -21,6 +21,7 @@ import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import { DesktopUpdateBanner } from '@/components/DesktopUpdateBanner'
 import { SandwalkMark } from '@/components/SandwalkMark'
+import { CapySidebarButton } from '@/components/agents/capy/CapySidebarButton'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -302,6 +303,7 @@ export function AgentSessionSidebar({
           canSplitView={canBatchSplitView}
         />
         <DesktopUpdateBanner />
+        <CapySidebarButton />
         <SidebarUserMenu
           userName={sidebarUserName}
           onLogout={onLogout}

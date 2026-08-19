@@ -122,8 +122,9 @@ class SessionCreateMixin:
         if normalized_source is not None and normalized_source not in {
             "slack",
             "bench",
+            "capy",
         }:
-            raise ValueError("source must be 'slack' or 'bench'")
+            raise ValueError("source must be 'slack', 'bench', or 'capy'")
 
         from agent_server.store.usage import normalize_surface
 

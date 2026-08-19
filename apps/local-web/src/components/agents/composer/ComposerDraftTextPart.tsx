@@ -23,7 +23,8 @@ export function ComposerDraftTextPart({
   setFocusedPartIndex,
   setCaretPos,
   updateTextPart,
-  handleKeyDown
+  handleKeyDown,
+  placeholder
 }: {
   part: Extract<ComposerPart, { type: 'text' }>
   partIndex: number
@@ -44,6 +45,7 @@ export function ComposerDraftTextPart({
   handleKeyDown: (
     event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => void
+  placeholder?: string
 }) {
   const isLastText = partIndex === lastTextPartIndex(composerParts)
   if (!isLastText && part.text.length === 0) {
@@ -58,7 +60,7 @@ export function ComposerDraftTextPart({
     isLastText && !part.text && !hasInlineChips
       ? running
         ? 'Add a follow-up'
-        : 'Ask Agent, @ for context, / for skills & MCPs'
+        : placeholder || 'Ask Agent, @ for context, / for skills & MCPs'
       : undefined
 
   const emptyLastText = isLastText && !part.text

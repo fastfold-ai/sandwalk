@@ -24,7 +24,7 @@ class SessionQueryMixin:
                          0
                        )
                 FROM sessions
-                WHERE COALESCE(source, '') != 'bench'
+                WHERE COALESCE(source, '') NOT IN ('bench', 'capy')
                 """
             ).fetchone()
         count, updated_at, running = row[0], row[1], row[2]
@@ -35,6 +35,7 @@ class SessionQueryMixin:
         *,
         project_id: str | None = None,
         include_bench: bool | None = None,
+        include_hidden: bool = False,
     ) -> list[AgentSession]:
         clauses: list[str] = []
         params: list[str] = []
@@ -42,8 +43,11 @@ class SessionQueryMixin:
             clauses.append("project_id = ?")
             params.append(project_id)
         show_bench = include_bench if include_bench is not None else bool(project_id)
-        if not show_bench:
-            clauses.append("COALESCE(source, '') != 'bench'")
+        if not include_hidden:
+            if show_bench:
+                clauses.append("COALESCE(source, '') != 'capy'")
+            else:
+                clauses.append("COALESCE(source, '') NOT IN ('bench', 'capy')")
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         with self._connect() as connection:
             rows = connection.execute(
@@ -92,7 +96,7 @@ class SessionQueryMixin:
                 SELECT DISTINCT sessions.*
                 FROM sessions
                 LEFT JOIN messages ON messages.session_id = sessions.id
-                WHERE COALESCE(sessions.source, '') != 'bench'
+                WHERE COALESCE(sessions.source, '') NOT IN ('bench', 'capy')
                   AND (
                     sessions.title LIKE ? ESCAPE '\\'
                     OR messages.content LIKE ? ESCAPE '\\'

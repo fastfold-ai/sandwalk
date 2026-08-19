@@ -79,7 +79,7 @@ def _longest_agent_seconds(
                     SELECT u.session_id, MIN(u.updated_at) AS t0, MAX(u.updated_at) AS t1
                     FROM usage_runs u
                     INNER JOIN sessions s ON s.id = u.session_id
-                    WHERE COALESCE(s.source, '') != 'bench'
+                    WHERE COALESCE(s.source, '') NOT IN ('bench', 'capy')
                     GROUP BY u.session_id
                     """
                 ).fetchall()

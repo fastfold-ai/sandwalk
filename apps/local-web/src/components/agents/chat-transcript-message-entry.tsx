@@ -56,7 +56,8 @@ export function ChatTranscriptMessageEntry({
   sessionId,
   skills = [],
   mcpServers = [],
-  workspaceFiles = []
+  workspaceFiles = [],
+  mentionChats = []
 }: {
   entry: Extract<TranscriptEntry, { kind: 'message' }>
   runActive: boolean
@@ -72,6 +73,7 @@ export function ChatTranscriptMessageEntry({
   skills?: AgentSkill[]
   mcpServers?: McpServer[]
   workspaceFiles?: WorkspaceFile[]
+  mentionChats?: AgentSession[]
 }) {
   const message = entry.message
   const isUser = message.role === 'user'
@@ -108,6 +110,7 @@ export function ChatTranscriptMessageEntry({
               workspaceFiles={workspaceFiles}
               skills={skills}
               mcpServers={mcpServers}
+              mentionChats={mentionChats}
             />
           </div>
         </div>
@@ -126,6 +129,7 @@ export function ChatTranscriptMessageEntry({
               onOpenFile={onOpenFile}
               workspacePath={session?.workspacePath}
               skills={skills}
+              mentionChats={mentionChats}
               className="max-w-full [&_*]:max-w-full [&_pre]:w-full [&_pre]:max-w-full [&_pre_code]:whitespace-pre-wrap [&_table]:w-full [&_table]:table-auto"
             />
           ) : null}

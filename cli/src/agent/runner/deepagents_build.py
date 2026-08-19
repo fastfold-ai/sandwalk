@@ -66,32 +66,48 @@ class DeepAgentsBuildMixin:
             or getattr(self.trajectory, "session_id", "")
             or ""
         ).strip()
+        capy_mode = bool(ctx.get("capy_mode"))
         tools, sandbox, code_trace_buffer, display_name_map = create_ct_langchain_tools(
             self.session,
             exclude_categories=exclude_cats,
             exclude_tools=exclude_tool_names,
             provider=provider,
-            tool_mode=tool_mode,
+            tool_mode="native" if capy_mode else tool_mode,
             session_id=session_id_for_tools or None,
+            include_run_python=not capy_mode,
         )
-        try:
-            tools_by_server: dict[str, list[str]] = {}
-            external_tools = await create_external_mcp_tools(
-                ctx.get("mcp_servers"),
-                out_tools_by_server=tools_by_server,
-            )
-            if tools_by_server:
-                ctx["mcp_tools_by_server"] = tools_by_server
-            existing_names = {getattr(tool, "name", "") for tool in tools}
-            tools.extend(
-                tool
-                for tool in external_tools
-                if getattr(tool, "name", "") not in existing_names
-            )
-        except Exception as mcp_error:  # noqa: BLE001
-            logger.warning("Unable to load external MCP tools: %s", mcp_error)
+        if capy_mode:
+            kept = []
+            kept_map = {}
+            for tool in tools:
+                name = str(getattr(tool, "name", "") or "")
+                display = str(display_name_map.get(name, name) or "")
+                if display.startswith("capy.") or name.startswith("capy"):
+                    kept.append(tool)
+                    kept_map[name] = display if display.startswith("capy.") else name
+            tools = kept
+            display_name_map = kept_map
+            sandbox = None
+            code_trace_buffer = []
+        if not capy_mode:
+            try:
+                tools_by_server: dict[str, list[str]] = {}
+                external_tools = await create_external_mcp_tools(
+                    ctx.get("mcp_servers"),
+                    out_tools_by_server=tools_by_server,
+                )
+                if tools_by_server:
+                    ctx["mcp_tools_by_server"] = tools_by_server
+                existing_names = {getattr(tool, "name", "") for tool in tools}
+                tools.extend(
+                    tool
+                    for tool in external_tools
+                    if getattr(tool, "name", "") not in existing_names
+                )
+            except Exception as mcp_error:  # noqa: BLE001
+                logger.warning("Unable to load external MCP tools: %s", mcp_error)
 
-        if session_id_for_tools:
+        if session_id_for_tools and not ctx.get("capy_mode"):
             try:
                 from agent.sandbox_control_tools import create_sandbox_control_tools
 
@@ -156,6 +172,16 @@ class DeepAgentsBuildMixin:
         ).strip().lower() or None
         if sandbox_backend_hint not in {"builtin", "modal"}:
             sandbox_backend_hint = None
+        if ctx.get("capy_mode"):
+            prompt = str(ctx.get("specialist_instructions") or "").strip()
+            names = ", ".join(n for n in tool_names if n)
+            if names:
+                prompt = (
+                    f"{prompt}\n\nCall these tools directly as function calls "
+                    f"(never run_python, execute, or tools.capy.*): {names}\n"
+                    "Do not narrate missing tools. Keep replies short and user-facing."
+                )
+            return prompt
         return build_system_prompt(
             self.session,
             tool_names=tool_names,
@@ -174,6 +200,8 @@ class DeepAgentsBuildMixin:
 
     def _build_deepagents_user_prompt(self, query: str, ctx: dict) -> tuple[str, dict]:
         """Resolve the session workspace and append run context to the user prompt."""
+        if ctx.get("capy_mode"):
+            return query, ctx
         user_prompt = query
         context_parts = []
         workspace_path = str(ctx.get("workspace_path") or "").strip()
@@ -364,12 +392,12 @@ class DeepAgentsBuildMixin:
             "model": model,
             "tools": tools,
             "system_prompt": system_prompt,
-            "skills": agent_skills,
+            "skills": None if ctx.get("capy_mode") else agent_skills,
             "backend": backend,
             "interrupt_on": build_interrupt_on(),
             "checkpointer": get_session_checkpointer(session_id),
         }
-        if flags.include_domain_subagents:
+        if flags.include_domain_subagents and not ctx.get("capy_mode"):
             create_kwargs["subagents"] = build_domain_subagents()
         # Always install modality sanitizer so text-only providers (DeepSeek,
         # many local LLMs) do not 400 on MCP image/file tool results.
@@ -387,7 +415,19 @@ class DeepAgentsBuildMixin:
                 profile=getattr(model, "profile", None),
             )
         ]
-        if flags.excluded_deepagents_tools:
+        if ctx.get("capy_mode"):
+            from agent.deepagents_runtime.knowledge_level_middleware import (
+                KnowledgeLevelMiddleware,
+            )
+            from agent_server.capy import CAPY_EXCLUDED_DEEPAGENTS_TOOLS
+
+            middleware.append(
+                KnowledgeLevelMiddleware(
+                    excluded=frozenset(flags.excluded_deepagents_tools)
+                    | CAPY_EXCLUDED_DEEPAGENTS_TOOLS
+                )
+            )
+        elif flags.excluded_deepagents_tools:
             # Strip excluded tools *and* their middleware system prompts
             # (write_todos / task). Plain _ToolExclusionMiddleware leaves those
             # prompts in place and inflates billed input_tokens vs Context.

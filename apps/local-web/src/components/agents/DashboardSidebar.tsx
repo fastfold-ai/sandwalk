@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
+import { CapySidebarButton } from '@/components/agents/capy/CapySidebarButton'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { DesktopUpdateBanner } from '@/components/DesktopUpdateBanner'
 import { Button } from '@/components/ui/button'
@@ -80,6 +81,7 @@ export function DashboardSidebar({
 
       <div className="shrink-0 p-2">
         <DesktopUpdateBanner />
+        <CapySidebarButton />
         <SidebarUserMenu
           userName={userName}
           onLogout={onLogout}

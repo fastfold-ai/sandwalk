@@ -19,7 +19,7 @@ SandboxBackendChoice = Literal["builtin", "modal"]
 TitleSource = Literal["pending", "auto", "user"]
 
 # Connector/origin that spawned the session; None means it started locally.
-SessionSource = Literal["slack", "bench"]
+SessionSource = Literal["slack", "bench", "capy"]
 
 # Product surface for usage attribution (independent of Slack `source`).
 ClientSurface = Literal["cli", "ui", "slack", "unknown"]

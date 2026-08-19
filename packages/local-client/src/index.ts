@@ -861,6 +861,35 @@ export class LocalAgentClient
     return result.revision
   }
 
+  async getCapySession(signal?: AbortSignal): Promise<AgentSession> {
+    return this.request<AgentSession>('/capy/session', { signal })
+  }
+
+  async resetCapySession(signal?: AbortSignal): Promise<AgentSession> {
+    return this.request<AgentSession>('/capy/session/reset', {
+      method: 'POST',
+      signal
+    })
+  }
+
+  async setCapyScope(
+    scope: { projectId?: string | null; sessionId?: string | null },
+    signal?: AbortSignal
+  ): Promise<{ projectId: string | null; sessionId: string | null }> {
+    return this.request<{ projectId: string | null; sessionId: string | null }>(
+      '/capy/scope',
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          projectId: scope.projectId ?? null,
+          sessionId: scope.sessionId ?? null
+        }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
+
   async listProjects(signal?: AbortSignal): Promise<AgentProject[]> {
     const result = await this.request<{ data: AgentProject[] }>('/projects', {
       signal

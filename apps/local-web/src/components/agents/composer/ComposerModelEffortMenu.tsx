@@ -54,7 +54,7 @@ export function ComposerModelEffortMenu({
         side="right"
         align="start"
         sideOffset={10}
-        className="w-44 overflow-hidden p-0"
+        className="z-[90] w-44 overflow-hidden p-0"
         onOpenAutoFocus={event => event.preventDefault()}
         onCloseAutoFocus={event => event.preventDefault()}
       >

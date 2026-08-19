@@ -24,6 +24,7 @@ def run_existing_agent(
     provider: str | None = None,
     model: str | None = None,
     openai_profile_id: str | None = None,
+    capy_mode: bool = False,
 ) -> str:
     """Temporary adapter until AgentRunner is split into AgentRuntime."""
     from agent.config import Config
@@ -87,6 +88,9 @@ def run_existing_agent(
             context["allowed_skill_names"] = allowed_skill_names
         if allowed_tool_names is not None:
             context["allowed_tool_names"] = allowed_tool_names
+        if capy_mode:
+            context["capy_mode"] = True
+            context["mcp_servers"] = []
         result = runner.run(content, context, progress_callback=progress_callback)
         return result.summary or "Done."
     finally:

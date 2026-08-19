@@ -139,3 +139,17 @@ export function computeAtFileQuery(
   if (/\s/.test(after)) return null
   return { query: after, start: at, end: caretPos }
 }
+
+/** `#chat` mentions — same trigger rules as `@` file search (including start of input). */
+export function computeHashChatQuery(
+  value: string,
+  caretPos: number
+): { query: string; start: number; end: number } | null {
+  const uptoCaret = value.slice(0, caretPos)
+  const hash = uptoCaret.lastIndexOf('#')
+  if (hash === -1) return null
+  if (hash > 0 && !/\s/.test(uptoCaret[hash - 1])) return null
+  const after = uptoCaret.slice(hash + 1)
+  if (/\s/.test(after) || after.includes('⟦')) return null
+  return { query: after, start: hash, end: caretPos }
+}

@@ -8,6 +8,7 @@ from agent_server.app_deps import AppDeps
 from agent_server.routes.account import register_account_routes
 from agent_server.routes.auth import register_auth_routes
 from agent_server.routes.bench import register_bench_routes
+from agent_server.routes.capy import register_capy_routes
 from agent_server.routes.connectors import register_connector_routes
 from agent_server.routes.dashboard_layout import register_dashboard_layout_routes
 from agent_server.routes.datasets_tools import register_dataset_tool_routes
@@ -56,6 +57,7 @@ def register_all_routes(app: FastAPI, deps: AppDeps) -> None:
     register_integration_routes(app, deps)
     register_settings_routes(app, deps)
     register_bench_routes(app, deps)
+    register_capy_routes(app, deps)
     register_account_routes(app, deps)
     register_model_routes(app, deps)
     register_model_profile_routes(app, deps)

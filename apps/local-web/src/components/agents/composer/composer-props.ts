@@ -1,4 +1,5 @@
 import type {
+  AgentSession,
   AgentSkill,
   AgentSkillDetail,
   McpServer,
@@ -108,4 +109,6 @@ export type ComposerProps = {
    * arriba del composer lo dibuja el contenedor exterior.
    */
   embedded?: boolean
+  mentionChats?: AgentSession[]
+  placeholder?: string
 }
