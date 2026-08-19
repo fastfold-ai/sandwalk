@@ -1,26 +1,26 @@
-import { Archive, Minus, Pin, Upload, X } from 'lucide-react'
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
-  AgentSkill,
   AgentSession,
+  AgentSkill,
   BackendHealth,
   McpServer,
   RuntimeSettings
 } from '@sandwalk/agent-ui-core'
 import { isSessionGroupId } from '@sandwalk/agent-ui-core'
+import { Archive, Minus, Pin, Upload, X } from 'lucide-react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
+import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
 
 import capyLogo from '@/assets/capy-logo.png'
+import '@/components/agents/capy/CapyOverlay.css'
 import { CapyChat } from '@/components/agents/capy/CapyChat'
 import { CapyComposer } from '@/components/agents/capy/CapyComposer'
-import '@/components/agents/capy/CapyOverlay.css'
 import { useCapyHandsFree } from '@/hooks/useCapyHandsFree'
 import { useCapySession } from '@/hooks/useCapySession'
 import { useCapyWindow } from '@/hooks/useCapyWindow'
 import { CAPY_MIN_HEIGHT, CAPY_MIN_WIDTH, formatCapyUnreadBadge } from '@/lib/capy-ui'
-import { isDraftAgentSessionId, isReservedAgentRouteId } from '@/lib/draft-agent'
 import type { ComposerModelOption } from '@/lib/composer-models'
+import { isDraftAgentSessionId, isReservedAgentRouteId } from '@/lib/draft-agent'
 import { cn } from '@/lib/utils'
 
 function clampSize(width: number, height: number) {

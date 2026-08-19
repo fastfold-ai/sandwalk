@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  chatChipToken,
   composerToMessage,
   fileChipToken,
   mcpChipToken,
@@ -9,7 +10,6 @@ import {
   removeComposerChipAt,
   serializeComposerParts,
   skillChipToken,
-  chatChipToken,
   spaceAroundChips
 } from './composer-parts'
 

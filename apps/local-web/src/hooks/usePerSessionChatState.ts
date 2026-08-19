@@ -88,7 +88,9 @@ export type PerSessionChatStateArgs = {
     scopeKey: string,
     updater: (current: string[]) => string[]
   ) => void
+  openTabIds: string[]
   setOpenTabIds: (value: string[] | ((current: string[]) => string[])) => void
+  tabGroups: import('@sandwalk/agent-ui-core').SessionGroup[]
   setCollapsedSidebarSections: Dispatch<
     SetStateAction<Record<string, boolean>>
   >
@@ -139,6 +141,8 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     activeProjectId: args.activeProjectId,
     tabsScopeKey: args.tabsScopeKey,
     sessionId: args.sessionId,
+    // Per-session mount: strip id and chat id are always the same.
+    stripSessionId: args.sessionId,
     sessionIdRef,
     session: args.session,
     sessions: args.sessions,
@@ -151,7 +155,9 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     setProjectScopeId: args.setProjectScopeId,
     setRecentProjectIds: args.setRecentProjectIds,
     patchOpenTabs: args.patchOpenTabs,
+    openTabIds: args.openTabIds,
     setOpenTabIds: args.setOpenTabIds,
+    tabGroups: args.tabGroups,
     patchChat: chat.patchChat,
     setChatBySessionId: chat.setChatBySessionId,
     composerLiveRef: chat.composerLiveRef,

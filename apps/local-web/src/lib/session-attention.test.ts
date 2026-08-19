@@ -1,16 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  SESSION_ATTENTION_STORAGE_KEY,
-  SESSION_LAST_READ_INIT_KEY,
-  SESSION_LAST_READ_STORAGE_KEY,
   clearAllSessionAttention,
   clearSessionAttention,
   getAttentionSessionIds,
   hasSessionAttention,
   markSessionAttention,
-  recoverUnreadFromSessions
-} from './session-attention'
+  recoverUnreadFromSessions,
+  SESSION_ATTENTION_STORAGE_KEY,
+  SESSION_LAST_READ_INIT_KEY,
+  SESSION_LAST_READ_STORAGE_KEY} from './session-attention'
 
 // setDockBadge is a Tauri desktop call — mock it out so the tests don't
 // try to invoke a native API in jsdom.

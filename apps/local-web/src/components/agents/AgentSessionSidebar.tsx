@@ -17,12 +17,12 @@ import {
 import { type Dispatch, type SetStateAction, useEffect, useState } from 'react'
 import { type NavigateFunction, useLocation } from 'react-router-dom'
 
+import { CapySidebarButton } from '@/components/agents/capy/CapySidebarButton'
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { DesktopDragRegion } from '@/components/DesktopDragRegion'
 import { DesktopUpdateBanner } from '@/components/DesktopUpdateBanner'
 import { SandwalkMark } from '@/components/SandwalkMark'
-import { CapySidebarButton } from '@/components/agents/capy/CapySidebarButton'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -30,6 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip'
+import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { type SessionChatState, type TabItemSection } from '@/lib/sessions'
 import {
   readSidebarUnreadFilter,
@@ -37,7 +38,6 @@ import {
   writeSidebarUnreadFilter
 } from '@/lib/sidebar-unread-filter'
 import { cn } from '@/lib/utils'
-import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 
 import { SidebarBatchBar } from './session-sidebar/sidebar-batch-bar'
 import { SidebarSessionList } from './session-sidebar/sidebar-session-list'

@@ -43,13 +43,13 @@ import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { navigateToSession } from '@/lib/navigate-session'
 import { relativeTime, type SessionChatState, type TabItemSection } from '@/lib/sessions'
 import {
-  filterSectionsToUnread,
-  UNREAD_DOT_COLOR
-} from '@/lib/sidebar-unread-filter'
-import {
   isSidebarGroupExpanded,
   setSidebarGroupExpanded
 } from '@/lib/sidebar-group-expanded'
+import {
+  filterSectionsToUnread,
+  UNREAD_DOT_COLOR
+} from '@/lib/sidebar-unread-filter'
 import { cn } from '@/lib/utils'
 
 function UnreadDot({ className }: { className?: string }) {
