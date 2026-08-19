@@ -27,6 +27,16 @@ import { type TranscriptEntry } from '@/components/agents/transcript'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 
+// Stable empty-array singletons for the ?= defaults below. A fresh `[]`
+// per render changes identity, which cascades into MarkdownContent's
+// useMemo → new markdown component object → MarkdownCodeBlock unmounts
+// → shiki re-runs → height swap → visible jitter.
+const EMPTY_PLAN_PATHS: string[] = []
+const EMPTY_SKILLS: AgentSkill[] = []
+const EMPTY_MCP_SERVERS: McpServer[] = []
+const EMPTY_WORKSPACE_FILES: WorkspaceFile[] = []
+const EMPTY_MENTION_CHATS: AgentSession[] = []
+
 type ChatTranscriptProps = {
   chatScrollRef: RefObject<HTMLDivElement | null>
   chatEndRef: RefObject<HTMLDivElement | null>
@@ -84,17 +94,17 @@ export function ChatTranscript({
   activeRunTools,
   activeRunTodos,
   activeBuildPlan = null,
-  builtPlanPaths = [],
+  builtPlanPaths = EMPTY_PLAN_PATHS,
   liveDelta,
   pendingApproval = null,
   approvalSubmitting = false,
   onSubmitApprovals,
   showScrollToBottom,
   onScrollToBottom,
-  skills = [],
-  mcpServers = [],
-  workspaceFiles = [],
-  mentionChats = []
+  skills = EMPTY_SKILLS,
+  mcpServers = EMPTY_MCP_SERVERS,
+  workspaceFiles = EMPTY_WORKSPACE_FILES,
+  mentionChats = EMPTY_MENTION_CHATS
 }: ChatTranscriptProps) {
   const timelineItems = useMemo(
     () => buildChatTimelineItems(conversationTimeline),

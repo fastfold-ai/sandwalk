@@ -483,7 +483,7 @@ export function SessionTabs({
                     unread={false}
                     draggable={draggable}
                     onSelect={onSelect}
-                    onClose={onDissolveGroup || (() => {})}
+                    onClose={onCloseGroup ? () => onCloseGroup(group.id) : () => {}}
                     onContextMenu={openContextMenu}
                     selected={selectedChatIds?.has(group.id) ?? false}
                     variant="group"
