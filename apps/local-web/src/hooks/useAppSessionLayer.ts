@@ -53,6 +53,12 @@ type SessionLayerArgs = {
   setRuntimeSettings: Dispatch<SetStateAction<RuntimeSettings | null>>
   loadModelOptions: () => Promise<void>
   sessionId: string | null
+  /**
+   * Split view mounts `SessionChatMount` per pane (each opens transcript
+   * SSE). The shell must not also subscribe the focused chat — unbinding
+   * on blur dropped mux delivery until focus/reload.
+   */
+  enableTranscriptStream?: boolean
   sessionIdRef: MutableRefObject<string | null>
   session: AgentSession | null
   activeProjectId: string | null
@@ -93,7 +99,8 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
   useSessionChatStream({
     client: args.client,
     health: args.health,
-    sessionId: args.sessionId,
+    sessionId:
+      args.enableTranscriptStream === false ? null : args.sessionId,
     sessionIdRef: args.sessionIdRef,
     sessions: args.sessions,
     chatBySessionIdRef: chat.chatBySessionIdRef,

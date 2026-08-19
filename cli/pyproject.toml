@@ -58,6 +58,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+http2 = ["hypercorn>=0.17"]
 notebook = ["nbconvert>=7.0"]
 # Kept for older install commands; packages are now in core dependencies.
 slack = ["slack-bolt>=1.21"]

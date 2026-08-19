@@ -145,6 +145,20 @@ class DeepAgentsRunMixin:
             )
 
         provider = str(config.get("llm.provider", "anthropic") or "anthropic").strip().lower()
+        session_tag = str(ctx.get("session_id") or "")[:8] or "cli"
+        mark = t0
+
+        def _span(label: str) -> None:
+            nonlocal mark
+            now = time.time()
+            logger.info(
+                "[perf] deepagents %s: %s +%.2fs (since start %.2fs)",
+                session_tag,
+                label,
+                now - mark,
+                now - t0,
+            )
+            mark = now
 
         allow_live_spinner = (not self._headless) and (progress_callback is None)
         thinking_status = None
@@ -165,6 +179,7 @@ class DeepAgentsRunMixin:
                 if thinking_status is not None:
                     thinking_status.stop()
                 return self._make_error_result(query, str(e), time.time() - t0)
+            _span("model")
 
             # ----- Tools -----
             (
@@ -183,6 +198,7 @@ class DeepAgentsRunMixin:
                 create_external_mcp_tools,
                 finalize_tools_for_provider,
             )
+            _span(f"tools n={len(tools)}")
 
             # ----- System prompt (skills handled natively by deepagents) -----
             system_prompt = self._build_deepagents_system_prompt(
@@ -197,6 +213,7 @@ class DeepAgentsRunMixin:
 
             # ----- User prompt -----
             user_prompt, ctx = self._build_deepagents_user_prompt(query, ctx)
+            _span("prompt")
 
             # ----- Build agent -----
             agent, sandbox_handle = await self._build_deepagents_agent(
@@ -208,6 +225,7 @@ class DeepAgentsRunMixin:
                 create_deep_agent,
                 resolve_skill_source_dirs,
             )
+            _span("create_deep_agent")
 
             transcript = getattr(self.session, "transcript", None)
             sink = None
@@ -288,10 +306,20 @@ class DeepAgentsRunMixin:
             }
             # PTC tools.* callables bypass LangGraph interrupt_on; expose the
             # same approval broker / CLI collector via a per-run contextvar.
+            first_activity = {"logged": False}
+            wrapped_progress = progress_callback
+
+            if progress_callback is not None:
+                def wrapped_progress(event, **payload):  # noqa: ANN001
+                    if not first_activity["logged"] and event == "stream":
+                        first_activity["logged"] = True
+                        _span("first_stream")
+                    return progress_callback(event, **payload)
+
             hitl_token = set_hitl_context(
                 session_id=session_id or None,
                 headless=bool(self._headless),
-                progress_callback=progress_callback,
+                progress_callback=wrapped_progress,
                 console=getattr(self.session, "console", None),
             )
             try:
@@ -310,7 +338,7 @@ class DeepAgentsRunMixin:
                             thinking_status=thinking_status,
                             allow_live_spinner=allow_live_spinner,
                             runner=self,
-                            on_activity=progress_callback,
+                            on_activity=wrapped_progress,
                             code_trace_buffer=code_trace_buffer,
                             display_name_map=display_name_map,
                             group_tools=bool(

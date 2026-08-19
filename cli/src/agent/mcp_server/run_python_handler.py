@@ -65,9 +65,16 @@ def _make_run_python_handler(
         max_retries=max_retries,
         extra_read_dirs=extra_read_dirs or None,
     )
-    sandbox.load_datasets()
-    if tools_namespace is not None:
-        sandbox.inject_tools(tools_namespace)
+    primed = False
+
+    def _prime_sandbox() -> None:
+        nonlocal primed
+        if primed:
+            return
+        sandbox.load_datasets()
+        if tools_namespace is not None:
+            sandbox.inject_tools(tools_namespace)
+        primed = True
 
     def _host_workspace_root() -> str:
         import os
@@ -104,6 +111,7 @@ def _make_run_python_handler(
                 logger.info(
                     "Rewrote /workspace → host session path for host run_python"
                 )
+            _prime_sandbox()
             exec_result = await asyncio.to_thread(sandbox.execute, host_code)
             exec_result = {
                 **exec_result,

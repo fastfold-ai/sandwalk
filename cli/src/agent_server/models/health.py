@@ -16,6 +16,7 @@ class Capabilities(ApiModel):
     integrations: bool = False
     mcp: bool = False
     terminal: bool = False
+    event_mux: bool = True
     execution_backends: list[str] = Field(default_factory=lambda: ["local"])
 
 

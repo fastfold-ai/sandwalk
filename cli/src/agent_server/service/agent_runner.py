@@ -63,6 +63,9 @@ def run_existing_agent(
         elif message.role == "assistant" and pending_user is not None:
             trajectory.add_turn(pending_user, message.content)
             pending_user = None
+    from agent.mcp_server.tool_handler import tool_session_var
+
+    token = tool_session_var.set(session)
     runner = AgentRunner(session, trajectory=trajectory, headless=True)
     if on_runner_ready is not None:
         on_runner_ready(runner)
@@ -87,5 +90,6 @@ def run_existing_agent(
         result = runner.run(content, context, progress_callback=progress_callback)
         return result.summary or "Done."
     finally:
+        tool_session_var.reset(token)
         if on_runner_done is not None:
             on_runner_done()

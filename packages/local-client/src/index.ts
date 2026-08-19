@@ -2078,6 +2078,132 @@ export class LocalAgentClient
     }
   }
 
+  /**
+   * One EventSource for sidebar lifecycle + visible chat transcripts.
+   * Prefer this over N `/sessions/{id}/events` streams (HTTP/1.1 cap).
+   */
+  async streamMuxEvents(options: {
+    sessionIds: string[]
+    afterBySession?: Record<string, number>
+    signal?: AbortSignal
+    onFrame: (frame: {
+      channel: 'transcript' | 'lifecycle'
+      sessionId?: string
+      event: Record<string, unknown>
+    }) => void
+  }): Promise<void> {
+    const query = new URLSearchParams()
+    if (options.sessionIds.length) {
+      query.set('sessions', options.sessionIds.join(','))
+    }
+    const after = Object.entries(options.afterBySession || {})
+      .filter(([, seq]) => Number(seq) > 0)
+      .map(([id, seq]) => `${id}:${seq}`)
+    if (after.length) query.set('after', after.join(','))
+    if (this.apiKey) query.set('token', this.apiKey)
+    const suffix = query.size ? `?${query}` : ''
+    const url = `${this.baseUrl}/v1/events${suffix}`
+    if (typeof EventSource !== 'undefined') {
+      return new Promise<void>((resolve, reject) => {
+        const source = new EventSource(url, { withCredentials: true })
+        let opened = false
+        const cleanup = () => {
+          source.close()
+          options.signal?.removeEventListener('abort', onAbort)
+        }
+        const onAbort = () => {
+          cleanup()
+          resolve()
+        }
+        if (options.signal?.aborted) {
+          onAbort()
+          return
+        }
+        options.signal?.addEventListener('abort', onAbort)
+        source.onopen = () => {
+          opened = true
+        }
+        source.onmessage = message => {
+          try {
+            const parsed = JSON.parse(message.data) as {
+              channel?: string
+              sessionId?: string
+              event?: Record<string, unknown>
+            }
+            if (parsed.channel === 'transcript' && parsed.event) {
+              options.onFrame({
+                channel: 'transcript',
+                sessionId: parsed.sessionId,
+                event: parsed.event
+              })
+              return
+            }
+            if (parsed.channel === 'lifecycle' && parsed.event) {
+              options.onFrame({
+                channel: 'lifecycle',
+                event: parsed.event
+              })
+            }
+          } catch {
+            // Ignore malformed frames; the stream keeps going.
+          }
+        }
+        source.onerror = () => {
+          if (source.readyState === EventSource.CLOSED) {
+            cleanup()
+            if (opened) resolve()
+            else
+              reject(
+                new Error('FastFold Agent mux event stream failed to connect')
+              )
+          }
+        }
+      })
+    }
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers: this.headers({ accept: 'text/event-stream' }),
+      signal: options.signal
+    })
+    if (!response.ok || !response.body) {
+      throw new Error(
+        `FastFold Agent mux event stream failed with status ${response.status}`
+      )
+    }
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const frames = buffer.split('\n\n')
+      buffer = frames.pop() ?? ''
+      for (const frame of frames) {
+        const data = frame
+          .split('\n')
+          .filter(line => line.startsWith('data:'))
+          .map(line => line.slice(5).trim())
+          .join('')
+        if (!data) continue
+        const parsed = JSON.parse(data) as {
+          channel?: string
+          sessionId?: string
+          event?: Record<string, unknown>
+        }
+        if (parsed.channel === 'transcript' && parsed.event) {
+          options.onFrame({
+            channel: 'transcript',
+            sessionId: parsed.sessionId,
+            event: parsed.event
+          })
+        } else if (parsed.channel === 'lifecycle' && parsed.event) {
+          options.onFrame({ channel: 'lifecycle', event: parsed.event })
+        }
+      }
+    }
+  }
+
   async streamEvents(
     sessionId: string,
     options: {

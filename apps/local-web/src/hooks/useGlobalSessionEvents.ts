@@ -34,6 +34,7 @@ import {
   notifyRunCompleted
 } from '@/lib/browser-notifications'
 import { markSessionAttention } from '@/lib/session-attention'
+import { setLifecycleSseHandler } from '@/lib/events-mux-registry'
 
 type UseGlobalSessionEventsArgs = {
   client: LocalAgentClient
@@ -69,11 +70,11 @@ export function useGlobalSessionEvents({
 }: UseGlobalSessionEventsArgs) {
   useEffect(() => {
     if (!health) return
-    const controller = new AbortController()
-    void client
-      .streamGlobalSessionEvents({
-        signal: controller.signal,
-        onEvent: event => {
+
+    const onEvent = (event: {
+      type: string
+      payload: Record<string, unknown>
+    }) => {
           const payload = event.payload
           const sessionId = extractSessionId(payload)
           const isActiveChat =
@@ -157,7 +158,18 @@ export function useGlobalSessionEvents({
             default:
               return
           }
-        }
+    }
+
+    if (health.capabilities?.eventMux) {
+      setLifecycleSseHandler(onEvent)
+      return () => setLifecycleSseHandler(null)
+    }
+
+    const controller = new AbortController()
+    void client
+      .streamGlobalSessionEvents({
+        signal: controller.signal,
+        onEvent
       })
       .catch(() => {
         // Silent failure: safety poll in useAppBootstrapConnect (60s) is

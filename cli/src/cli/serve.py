@@ -42,6 +42,18 @@ def serve_cmd(
         "--uds",
         help="Serve over a user-scoped Unix domain socket instead of TCP",
     ),
+    tls_cert: Path | None = typer.Option(
+        None,
+        "--tls-cert",
+        envvar="SANDWALK_TLS_CERT",
+        help="PEM cert for HTTPS/HTTP/2 (requires hypercorn + --tls-key)",
+    ),
+    tls_key: Path | None = typer.Option(
+        None,
+        "--tls-key",
+        envvar="SANDWALK_TLS_KEY",
+        help="PEM private key for HTTPS/HTTP/2",
+    ),
 ):
     """Start the local or explicitly exposed FastFold agent server."""
     from agent_server.main import run_server
@@ -55,6 +67,8 @@ def serve_cmd(
             allowed_origins=allowed_origin,
             allowed_hosts=allowed_host,
             uds=uds,
+            tls_cert=tls_cert,
+            tls_key=tls_key,
         )
     except ValueError as exc:
         console.print(f"[red]Server configuration error:[/red] {exc}")

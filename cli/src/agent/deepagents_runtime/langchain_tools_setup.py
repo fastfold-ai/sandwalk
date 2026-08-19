@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from agent.deepagents_runtime.tool_adapter import (
@@ -10,6 +11,9 @@ from agent.deepagents_runtime.tool_adapter import (
     _make_search_tools_tool,
     _sanitize_tool_name,
 )
+
+_NATIVE_TOOLS_LOCK = threading.Lock()
+_NATIVE_TOOLS_CACHE: dict[tuple, tuple[list[Any], dict[str, str]]] = {}
 
 
 def make_unique_namer(used_names: set[str]):
@@ -77,32 +81,43 @@ def build_native_domain_tools(
     exclude_tools: set[str],
     display_name_map: dict[str, str],
     unique_name,
+    used_names: set[str],
 ) -> list[Any]:
     """Native mode: expose every non-excluded registry tool as its own schema."""
-    from agent.mcp_server import _make_tool_handler
-    from tools import EXPERIMENTAL_CATEGORIES, registry
+    cache_key = (frozenset(exclude_categories), frozenset(exclude_tools))
+    with _NATIVE_TOOLS_LOCK:
+        cached = _NATIVE_TOOLS_CACHE.get(cache_key)
+        if cached is not None:
+            tools, names = cached
+            display_name_map.update(names)
+            used_names.update(names)
+            return list(tools)
 
-    tools: list[Any] = []
-    for tool_obj in registry.list_tools():
-        if tool_obj.category in exclude_categories:
-            continue
-        if tool_obj.name in exclude_tools:
-            continue
-        if tool_obj.category in EXPERIMENTAL_CATEGORIES:
-            continue
+        from agent.mcp_server import _make_tool_handler
+        from tools import EXPERIMENTAL_CATEGORIES, registry
 
-        safe_name = unique_name(tool_obj.name)
-        display_name_map[safe_name] = tool_obj.name
-        description = tool_obj.description or tool_obj.name
-        if getattr(tool_obj, "usage_guide", ""):
-            description = f"{description}\nUSE WHEN: {tool_obj.usage_guide}"[:1024]
+        tools: list[Any] = []
+        for tool_obj in registry.list_tools():
+            if tool_obj.category in exclude_categories:
+                continue
+            if tool_obj.name in exclude_tools:
+                continue
+            if tool_obj.category in EXPERIMENTAL_CATEGORIES:
+                continue
 
-        tools.append(
-            _make_lc_tool(
-                name=safe_name,
-                description=description,
-                args_schema=_args_schema_for(safe_name, tool_obj.parameters),
-                handler=_make_tool_handler(tool_obj, session),
+            safe_name = unique_name(tool_obj.name)
+            display_name_map[safe_name] = tool_obj.name
+            description = tool_obj.description or tool_obj.name
+            if getattr(tool_obj, "usage_guide", ""):
+                description = f"{description}\nUSE WHEN: {tool_obj.usage_guide}"[:1024]
+
+            tools.append(
+                _make_lc_tool(
+                    name=safe_name,
+                    description=description,
+                    args_schema=_args_schema_for(safe_name, tool_obj.parameters),
+                    handler=_make_tool_handler(tool_obj, session),
+                )
             )
-        )
-    return tools
+        _NATIVE_TOOLS_CACHE[cache_key] = (list(tools), dict(display_name_map))
+        return tools

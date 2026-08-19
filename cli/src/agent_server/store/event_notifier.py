@@ -152,5 +152,50 @@ class EventNotifier:
                 if not self._async_waiters[session_id]:
                     del self._async_waiters[session_id]
 
+    async def async_wait_for_any(
+        self,
+        session_ids: list[str],
+        seen: dict[str, int],
+        timeout: float,
+    ) -> dict[str, int]:
+        """Wake when any listed session advances, or ``timeout`` elapses."""
+        ids = [str(item).strip() for item in session_ids if str(item).strip()]
+        if not ids:
+            await asyncio.sleep(max(0.0, timeout))
+            return {}
+
+        def _snapshot() -> dict[str, int]:
+            return {sid: self._generations[sid] for sid in ids}
+
+        with self._mu:
+            gens = _snapshot()
+            if any(gens[sid] != int(seen.get(sid) or 0) for sid in ids):
+                return gens
+
+        loop = asyncio.get_running_loop()
+        waiter = _AsyncWaiter(loop=loop, event=asyncio.Event())
+        with self._mu:
+            gens = _snapshot()
+            if any(gens[sid] != int(seen.get(sid) or 0) for sid in ids):
+                return gens
+            for sid in ids:
+                self._async_waiters[sid].add(waiter)
+        try:
+            try:
+                await asyncio.wait_for(waiter.event.wait(), timeout=timeout)
+            except TimeoutError:
+                pass
+            with self._mu:
+                return _snapshot()
+        finally:
+            with self._mu:
+                for sid in ids:
+                    waiters = self._async_waiters.get(sid)
+                    if waiters is None:
+                        continue
+                    waiters.discard(waiter)
+                    if not waiters:
+                        del self._async_waiters[sid]
+
 
 EVENT_NOTIFIER = EventNotifier()

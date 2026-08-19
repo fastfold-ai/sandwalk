@@ -30,6 +30,42 @@ def _serve(app, **kwargs) -> None:
     ShutdownAwareServer(uvicorn.Config(app, **kwargs)).run()
 
 
+def _serve_http2(
+    app,
+    *,
+    host: str,
+    port: int,
+    certfile: Path,
+    keyfile: Path,
+    **kwargs,
+) -> None:
+    """HTTPS with ALPN h2 — WKWebView will not speak h2c on http://."""
+    try:
+        import asyncio
+
+        from hypercorn.asyncio import serve
+        from hypercorn.config import Config
+    except ImportError as exc:
+        raise ValueError(
+            "HTTPS/HTTP/2 requires hypercorn. Install with: pip install hypercorn"
+        ) from exc
+
+    config = Config()
+    config.bind = [f"{host}:{port}"]
+    config.certfile = str(certfile)
+    config.keyfile = str(keyfile)
+    config.alpn_protocols = ["h2", "http/1.1"]
+    grace = kwargs.get("timeout_graceful_shutdown", SHUTDOWN_GRACE_SECONDS)
+    config.graceful_timeout = float(grace)
+    if kwargs.get("log_level"):
+        config.loglevel = str(kwargs["log_level"])
+
+    async def _run() -> None:
+        await serve(app, config)
+
+    asyncio.run(_run())
+
+
 def run_server(
     *,
     host: str = "127.0.0.1",
@@ -39,6 +75,8 @@ def run_server(
     allowed_origins: list[str] | None = None,
     allowed_hosts: list[str] | None = None,
     uds: Path | None = None,
+    tls_cert: Path | None = None,
+    tls_key: Path | None = None,
 ) -> None:
     log_config = None
     try:
@@ -56,11 +94,18 @@ def run_server(
 
     origins = [value.strip().rstrip("/") for value in (allowed_origins or []) if value.strip()]
     hosts = [value.strip() for value in (allowed_hosts or []) if value.strip()]
-    key = (api_key or "").strip() or None
+    api_secret = (api_key or "").strip() or None
     is_loopback = host in {"127.0.0.1", "localhost", "::1"}
 
-    if uds is not None and public:
-        raise ValueError("Unix-socket mode cannot be combined with --public.")
+    cert = Path(tls_cert).expanduser() if tls_cert else None
+    tls_key_path = Path(tls_key).expanduser() if tls_key else None
+    if bool(cert) != bool(tls_key_path):
+        raise ValueError("HTTPS/HTTP/2 requires both --tls-cert and --tls-key.")
+    if cert is not None and tls_key_path is not None:
+        if not cert.is_file() or not tls_key_path.is_file():
+            raise ValueError("TLS cert/key paths must exist.")
+    if uds is not None and (cert is not None or public):
+        raise ValueError("Unix-socket mode cannot be combined with --public or TLS.")
     # Non-loopback bind (Mac Network → Allow Remote, or `serve --host 0.0.0.0`)
     # implies public mode; callers may omit --public.
     if not is_loopback and not public:
@@ -70,7 +115,7 @@ def run_server(
     from agent_server.auth_settings import load_settings, resolve_effective_api_key
 
     persisted = load_settings()
-    effective = resolve_effective_api_key(cli_api_key=key, settings=persisted)
+    effective = resolve_effective_api_key(cli_api_key=api_secret, settings=persisted)
     if public and not effective:
         raise ValueError(
             "Public / LAN mode requires --api-key, FASTFOLD_SERVER_API_KEY, "
@@ -131,12 +176,12 @@ def run_server(
         os.environ["FASTFOLD_SERVE_UDS"] = str(uds.expanduser().resolve())
     else:
         os.environ.pop("FASTFOLD_SERVE_UDS", None)
-    if key:
-        os.environ.setdefault("FASTFOLD_SERVER_API_KEY", key)
+    if api_secret:
+        os.environ.setdefault("FASTFOLD_SERVER_API_KEY", api_secret)
 
     try:
         app = create_app(
-            api_key=key,
+            api_key=api_secret,
             allowed_origins=origins,
             allowed_hosts=hosts,
         )
@@ -178,6 +223,17 @@ def run_server(
         finally:
             os.umask(previous_umask)
             socket_path.unlink(missing_ok=True)
+        return
+
+    if cert is not None and tls_key_path is not None:
+        _serve_http2(
+            app,
+            host=host,
+            port=port,
+            certfile=cert,
+            keyfile=tls_key_path,
+            **run_kwargs,
+        )
         return
 
     _serve(app, host=host, port=port, **run_kwargs)

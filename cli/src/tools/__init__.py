@@ -7,6 +7,7 @@ Tools are organized by category (target, structure, chemistry, etc.).
 
 import importlib
 import logging
+import threading
 
 from tools.registry import EXPERIMENTAL_CATEGORIES, Tool, ToolRegistry, registry
 
@@ -85,12 +86,17 @@ def _load_tools():
 # Lazy loading — tools are registered on first access
 _loaded = False
 _load_errors: dict[str, str] = {}
+_load_lock = threading.Lock()
 
 
 def ensure_loaded():
     global _loaded
     global _load_errors
-    if not _loaded:
+    if _loaded:
+        return
+    with _load_lock:
+        if _loaded:
+            return
         _load_errors = _load_tools()
         _loaded = True
 

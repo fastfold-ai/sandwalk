@@ -11,6 +11,7 @@ from agent_server.routes.bench import register_bench_routes
 from agent_server.routes.connectors import register_connector_routes
 from agent_server.routes.dashboard_layout import register_dashboard_layout_routes
 from agent_server.routes.datasets_tools import register_dataset_tool_routes
+from agent_server.routes.events_mux import register_events_mux_routes
 from agent_server.routes.health import register_health_routes
 from agent_server.routes.integrations import register_integration_routes
 from agent_server.routes.library import register_library_routes
@@ -77,3 +78,4 @@ def register_all_routes(app: FastAPI, deps: AppDeps) -> None:
     register_pty_routes(app, deps)
     register_session_event_routes(app, deps)
     register_session_events_global_routes(app, deps)
+    register_events_mux_routes(app, deps)

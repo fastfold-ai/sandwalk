@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any
 
 from agent.deepagents_runtime.chat_model import (
@@ -44,6 +46,7 @@ def create_ct_langchain_tools(
     """
     from tools import ensure_loaded
 
+    t0 = time.perf_counter()
     ensure_loaded()
     exclude_categories = exclude_categories or set()
     exclude_tools = exclude_tools or set()
@@ -72,6 +75,7 @@ def create_ct_langchain_tools(
             exclude_tools=exclude_tools,
             display_name_map=display_name_map,
             unique_name=unique_name,
+            used_names=used_names,
         )
 
     sandbox = None
@@ -93,4 +97,10 @@ def create_ct_langchain_tools(
     if not ptc and provider_needs_openai_tool_cap(provider):
         tools = _cap_tools_for_openai(tools)
 
+    logging.getLogger("runner").info(
+        "[perf] create_ct_langchain_tools n=%d mode=%s +%.2fs",
+        len(tools),
+        tool_mode,
+        time.perf_counter() - t0,
+    )
     return tools, sandbox, code_trace_buffer, display_name_map
