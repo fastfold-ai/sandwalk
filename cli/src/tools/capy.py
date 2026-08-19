@@ -59,6 +59,7 @@ def _resolve_project_id(store, spec: str = "current") -> dict:
     name="capy.list_sessions",
     description="List worker chats (id, title, status). Excludes Capy and bench.",
     category="capy",
+    usage_guide="Use to see worker chats the user can mention or route work to.",
     parameters={},
 )
 def capy_list_sessions(**kwargs) -> dict:
@@ -84,6 +85,7 @@ def capy_list_sessions(**kwargs) -> dict:
     name="capy.read_session",
     description="Bounded extract of a worker chat (last turns, tools). Not a full dump.",
     category="capy",
+    usage_guide="Use to pull a short excerpt from one worker chat before summarizing or seeding.",
     parameters={"session_id": "Chat id (from #mention or list_sessions)."},
 )
 def capy_read_session(session_id: str = "", **kwargs) -> dict:
@@ -96,6 +98,7 @@ def capy_read_session(session_id: str = "", **kwargs) -> dict:
     name="capy.summarize_session",
     description="Fetch a bounded extract so you can summarize the chat in your reply.",
     category="capy",
+    usage_guide="Use when the user asks what happened in a specific chat.",
     parameters={"session_id": "Chat id to summarize."},
 )
 def capy_summarize_session(session_id: str = "", **kwargs) -> dict:
@@ -114,6 +117,7 @@ def capy_summarize_session(session_id: str = "", **kwargs) -> dict:
     name="capy.send_message",
     description="Send a follow-up message to an existing worker chat (starts a run).",
     category="capy",
+    usage_guide="Use to continue an existing worker chat with a follow-up prompt.",
     parameters={
         "session_id": "Target chat id.",
         "content": "Message text for that chat.",
@@ -146,6 +150,7 @@ def capy_send_message(session_id: str = "", content: str = "", **kwargs) -> dict
     name="capy.spawn_sessions",
     description="Create N worker chats, optionally send a first message, open split if N>=2. Defaults to the current UI project (All if none selected).",
     category="capy",
+    usage_guide="Use to start one or more new worker chats, optionally in the current project.",
     parameters={
         "count": "How many chats to create (1-8).",
         "message": "Optional first user message for each chat.",
@@ -197,6 +202,7 @@ def capy_spawn_sessions(
     name="capy.seed_session",
     description="Send imported context from a source chat into a target chat (or create target).",
     category="capy",
+    usage_guide="Use to copy a brief from one chat into another (or a new chat).",
     parameters={
         "source_id": "Chat to extract from.",
         "target_id": "Existing target chat id, or empty to create one.",
@@ -255,6 +261,7 @@ def capy_seed_session(
     name="capy.open_split",
     description="Ask the UI to open the given worker chats as a split view (needs 2+ ids).",
     category="capy",
+    usage_guide="Use after creating 2+ chats when the user should see them side by side.",
     parameters={"session_ids": "Comma-separated chat ids."},
 )
 def capy_open_split(session_ids: str = "", **kwargs) -> dict:
@@ -267,115 +274,10 @@ def capy_open_split(session_ids: str = "", **kwargs) -> dict:
 
 
 @registry.register(
-    name="capy.list_projects",
-    description="List projects and the current sidebar scope (All vs a project).",
-    category="capy",
-    parameters={},
-)
-def capy_list_projects(**kwargs) -> dict:
-    from agent_server.capy.scope import format_capy_scope, get_capy_scope
-
-    store = _deps().store
-    current = get_capy_scope().get("project_id")
-    rows = [
-        {
-            "id": item.id,
-            "name": item.name,
-            "description": item.description,
-            "sessionCount": item.session_count,
-            "selected": item.id == current,
-        }
-        for item in store.list_projects()
-    ]
-    return {
-        "summary": format_capy_scope(store).split("\n")[1].lstrip("- ").strip(),
-        "currentProjectId": current,
-        "projects": rows,
-    }
-
-
-@registry.register(
-    name="capy.create_project",
-    description="Create a project. Does not switch the sidebar unless you then spawn chats into it.",
-    category="capy",
-    parameters={
-        "name": "Project name.",
-        "description": "Optional short description.",
-    },
-)
-def capy_create_project(name: str = "", description: str = "", **kwargs) -> dict:
-    title = str(name or "").strip()
-    if not title:
-        return {"ok": False, "summary": "Project name required."}
-    try:
-        project = _deps().store.create_project(
-            name=title,
-            description=str(description or "").strip() or None,
-        )
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "summary": str(exc)}
-    return {
-        "ok": True,
-        "summary": f"Created project “{project.name}”.",
-        "projectId": project.id,
-        "name": project.name,
-    }
-
-
-@registry.register(
-    name="capy.move_session",
-    description="Move chats into a project, or All (unassigned). project_id: id, name, all, or current.",
-    category="capy",
-    parameters={
-        "session_ids": "Comma-separated chat ids.",
-        "project_id": "Target project id/name, all, or current.",
-    },
-)
-def capy_move_session(
-    session_ids: str = "",
-    project_id: str = "current",
-    **kwargs,
-) -> dict:
-    ids = _csv(session_ids)
-    if not ids:
-        return {"ok": False, "summary": "session_ids required."}
-    deps = _deps()
-    resolved = _resolve_project_id(deps.store, project_id)
-    if not resolved["ok"]:
-        return resolved
-    pid = resolved["projectId"]
-    moved = []
-    for sid in ids:
-        session = deps.store.get_session(sid)
-        if session is None:
-            continue
-        if str(getattr(session, "source", "") or "") in {"capy", "bench"}:
-            continue
-        try:
-            updated = deps.service.update_session(
-                session_id=sid,
-                title=None,
-                organize_label=None,
-                update_organize_label=False,
-                project_id=pid,
-                update_project_id=True,
-            )
-            moved.append({"id": updated.id, "title": updated.title, "projectId": pid})
-        except Exception as exc:  # noqa: BLE001
-            return {"ok": False, "summary": str(exc)}
-    where = resolved.get("projectName") or "All"
-    return {
-        "ok": True,
-        "summary": f"Moved {len(moved)} chat(s) to {where}.",
-        "sessions": moved,
-        "projectId": pid,
-    }
-
-
-@registry.register(
     name="capy.skills_list",
     description="List installed skills (name, enabled). Management only.",
     category="capy",
+    usage_guide="Use to inspect installed skills before enabling, disabling, or installing.",
     parameters={},
 )
 def capy_skills_list(**kwargs) -> dict:
@@ -393,6 +295,7 @@ def capy_skills_list(**kwargs) -> dict:
     name="capy.skills_install",
     description="Install a skill by name or slug. Does not run the skill.",
     category="capy",
+    usage_guide="Use when the user wants a skill added to Sandwalk.",
     parameters={"name": "Skill name or install spec."},
 )
 def capy_skills_install(name: str = "", **kwargs) -> dict:
@@ -411,6 +314,7 @@ def capy_skills_install(name: str = "", **kwargs) -> dict:
     name="capy.skills_set_enabled",
     description="Enable or disable an installed skill.",
     category="capy",
+    usage_guide="Use to turn an installed skill on or off.",
     parameters={"name": "Skill name.", "enabled": "true or false."},
 )
 def capy_skills_set_enabled(name: str = "", enabled: bool = True, **kwargs) -> dict:
@@ -429,6 +333,7 @@ def capy_skills_set_enabled(name: str = "", enabled: bool = True, **kwargs) -> d
     name="capy.mcp_list",
     description="List configured MCP servers (id, name, enabled).",
     category="capy",
+    usage_guide="Use to inspect configured MCP servers.",
     parameters={},
 )
 def capy_mcp_list(**kwargs) -> dict:
@@ -449,6 +354,7 @@ def capy_mcp_list(**kwargs) -> dict:
     name="capy.app_status",
     description="Local Sandwalk version and whether the API is healthy.",
     category="capy",
+    usage_guide="Use for a quick local app/version/health check.",
     parameters={},
 )
 def capy_app_status(**kwargs) -> dict:
@@ -471,6 +377,7 @@ def capy_app_status(**kwargs) -> dict:
     name="capy.server_restart",
     description="Restart the local Sandwalk server process.",
     category="capy",
+    usage_guide="Use only when the user asks to restart the local server.",
     parameters={},
 )
 def capy_server_restart(**kwargs) -> dict:
@@ -529,6 +436,7 @@ def _parse_suites(suite_ids: str, sample_size) -> list[dict]:
         "specialists, and current default model/provider. Call before launching."
     ),
     category="capy",
+    usage_guide="Use before launching Bench to pick suite ids, models, and sample sizes.",
     parameters={},
 )
 def capy_bench_catalog(**kwargs) -> dict:
@@ -599,6 +507,7 @@ def capy_bench_catalog(**kwargs) -> dict:
     name="capy.bench_status",
     description="Current Bench queue: running, queued, paused stacks.",
     category="capy",
+    usage_guide="Use to see whether Bench runs are queued, running, or paused.",
     parameters={},
 )
 def capy_bench_status(**kwargs) -> dict:
@@ -625,6 +534,7 @@ def capy_bench_status(**kwargs) -> dict:
         "concurrency, parallel_runs, thinking, cleanup_sessions, dry_run."
     ),
     category="capy",
+    usage_guide="Use to queue Bench runs the same way as Dashboard → Bench.",
     parameters={
         "suite_ids": "Comma-separated suite ids, optionally id:sampleSize.",
         "model": "Primary model id (defaults to settings if omitted).",
@@ -699,6 +609,7 @@ def capy_bench_launch(
     name="capy.bench_install",
     description="Start downloading an installable Bench dataset (same as UI Install).",
     category="capy",
+    usage_guide="Use to download an installable Bench dataset.",
     parameters={"suite_id": "Suite id from bench_catalog (installable=true)."},
 )
 def capy_bench_install(suite_id: str = "", **kwargs) -> dict:
@@ -770,6 +681,7 @@ def _question_brief(questions: list, *, cap: int = 12) -> dict:
         "Same list as Dashboard → Bench results."
     ),
     category="capy",
+    usage_guide="Use to list completed or in-progress Bench runs and scores.",
     parameters={
         "q": "Optional search (model, suite, run id, name).",
         "suite": "Optional suite/benchmark id filter.",
@@ -849,6 +761,7 @@ def capy_bench_results(
         "and a sample of incorrect questions. Pass run_id from bench_results."
     ),
     category="capy",
+    usage_guide="Use to inspect one Bench run’s scores, tokens, and missed questions.",
     parameters={"run_id": "Bench run id."},
 )
 def capy_bench_inspect(run_id: str = "", **kwargs) -> dict:
@@ -941,6 +854,7 @@ def _log_issue_lines(*, max_lines: int = 12) -> dict:
         "info, skills, and recent log issues. Does not download a zip."
     ),
     category="capy",
+    usage_guide="Use when the user asks if Sandwalk is healthy or why something is broken.",
     parameters={"scope": "full (default) or core."},
 )
 def capy_doctor(scope: str = "full", **kwargs) -> dict:
@@ -994,6 +908,7 @@ def capy_doctor(scope: str = "full", **kwargs) -> dict:
     name="capy.list_projects",
     description="List projects (id, name, chat count) plus the current UI scope.",
     category="capy",
+    usage_guide="Use to see projects and the current sidebar scope (All vs a project).",
     parameters={},
 )
 def capy_list_projects(**kwargs) -> dict:
@@ -1029,6 +944,7 @@ def capy_list_projects(**kwargs) -> dict:
     name="capy.create_project",
     description="Create a project. Optionally create a first chat inside it.",
     category="capy",
+    usage_guide="Use to create a project, optionally with a first chat.",
     parameters={
         "name": "Project name.",
         "description": "Optional description.",
@@ -1082,6 +998,7 @@ def capy_create_project(
     name="capy.move_session",
     description="Move one or more chats into a project, or All (unassigned).",
     category="capy",
+    usage_guide="Use to move worker chats into a project or All.",
     parameters={
         "session_ids": "Comma-separated chat ids.",
         "project_id": "Project id/name, current, or all.",
