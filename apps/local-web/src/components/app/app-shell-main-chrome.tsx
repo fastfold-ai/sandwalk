@@ -14,7 +14,7 @@ export function AppShellTitleBar({ activeTitle }: { activeTitle: string }) {
 }
 
 const INTERACTIVE_SELECTOR =
-  'button, a, input, textarea, select, label, summary, [role="button"], [role="tab"], [role="menuitem"], [role="menuitemcheckbox"], [role="switch"], [role="checkbox"], [role="radio"], [role="combobox"], [role="option"], [data-no-window-drag], [data-radix-collection-item]'
+  'button, a, input, textarea, select, label, summary, [role="button"], [role="tab"], [role="menuitem"], [role="menuitemcheckbox"], [role="switch"], [role="checkbox"], [role="radio"], [role="combobox"], [role="option"], [data-no-window-drag], [data-radix-collection-item], [data-capy-root]'
 
 function isInteractiveTarget(target: EventTarget | null) {
   return (

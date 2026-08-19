@@ -1,4 +1,4 @@
-import { Archive, Minus, Pin, X } from 'lucide-react'
+import { Archive, Minus, Pin, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
@@ -69,6 +69,7 @@ export function CapyOverlay({
   const enabled = Boolean(health)
   const capy = useCapySession({ client, health, enabled })
   const [unreadCount, setUnreadCount] = useState(0)
+  const [dropActive, setDropActive] = useState(false)
   const wasRunning = useRef(false)
   const handsFree = useCapyHandsFree({
     enabled: Boolean(health),
@@ -205,6 +206,8 @@ export function CapyOverlay({
       if (kind === 'window' && (event.target as HTMLElement | null)?.closest('button')) {
         return
       }
+      event.preventDefault()
+      event.stopPropagation()
       dragged.current = false
       dragKind.current = kind
       const current = stateRef.current
@@ -212,6 +215,7 @@ export function CapyOverlay({
         dx: event.clientX - current.x,
         dy: event.clientY - current.y
       }
+      event.currentTarget.setPointerCapture?.(event.pointerId)
     }
   const onResizeDown =
     (edge: 'e' | 'w' | 's' | 'se' | 'sw') =>
@@ -237,6 +241,8 @@ export function CapyOverlay({
     const unreadLabel = formatCapyUnreadBadge(unreadCount)
     return (
       <div
+        data-capy-root
+        data-no-window-drag
         className="fixed z-[80]"
         style={{ left: state.x, top: state.y }}
       >
@@ -298,7 +304,11 @@ export function CapyOverlay({
     <div
       ref={rootRef}
       data-capy-root
-      className="border-border bg-background fixed z-[80] flex flex-col overflow-hidden rounded-2xl border shadow-[0_24px_80px_-12px_rgba(0,0,0,0.65),0_8px_24px_-8px_rgba(0,0,0,0.45)] dark:shadow-[0_28px_90px_-10px_rgba(0,0,0,0.85),0_10px_32px_-6px_rgba(0,0,0,0.7)]"
+      data-no-window-drag
+      className={cn(
+        'border-border bg-background fixed z-[80] flex flex-col overflow-hidden rounded-2xl border shadow-[0_24px_80px_-12px_rgba(0,0,0,0.65),0_8px_24px_-8px_rgba(0,0,0,0.45)] dark:shadow-[0_28px_90px_-10px_rgba(0,0,0,0.85),0_10px_32px_-6px_rgba(0,0,0,0.7)]',
+        dropActive && 'border-sky-500/60 ring-2 ring-sky-500/25'
+      )}
       style={{
         left: state.x,
         top: state.y,
@@ -401,6 +411,17 @@ export function CapyOverlay({
           />
         )}
       </div>
+      {dropActive ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 bg-sky-500/10 backdrop-blur-[1px]"
+          aria-hidden
+        >
+          <Upload className="size-7 text-sky-700 dark:text-sky-300" />
+          <p className="text-sm font-medium text-sky-800 dark:text-sky-200">
+            Drop to Capy
+          </p>
+        </div>
+      ) : null}
       <div className="p-3 pt-0">
         <CapyComposer
           client={client}
@@ -414,6 +435,8 @@ export function CapyOverlay({
           modelOptions={modelOptions}
           runtimeSettings={runtimeSettings}
           tokenUsage={capy.chat.tokenUsage}
+          captureWindowDrops
+          onDropActiveChange={setDropActive}
           onChange={next => capy.setChat(prev => ({ ...prev, composer: next }))}
           onSend={text => {
             if (!text.trim()) return

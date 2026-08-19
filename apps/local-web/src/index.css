@@ -1553,7 +1553,9 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
 .sandwalk-drag-region textarea,
 .sandwalk-drag-region select,
 .sandwalk-drag-region [role='button'],
-.sandwalk-drag-region [data-no-window-drag] {
+.sandwalk-drag-region [data-no-window-drag],
+[data-capy-root],
+[data-capy-root] * {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }

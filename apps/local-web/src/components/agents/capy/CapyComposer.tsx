@@ -41,7 +41,9 @@ export function CapyComposer({
   onSessionUpdated,
   onMessagesReloaded,
   setRuntimeSettings,
-  loadModelOptions
+  loadModelOptions,
+  captureWindowDrops = false,
+  onDropActiveChange
 }: {
   client: LocalAgentClient
   session: AgentSession | null
@@ -63,6 +65,8 @@ export function CapyComposer({
     value: RuntimeSettings | null | ((current: RuntimeSettings | null) => RuntimeSettings | null)
   ) => void
   loadModelOptions: () => Promise<void>
+  captureWindowDrops?: boolean
+  onDropActiveChange?: (active: boolean) => void
 }) {
   const navigate = useNavigate()
   const [compactBusy, setCompactBusy] = useState(false)
@@ -93,6 +97,8 @@ export function CapyComposer({
       fileChips={[]}
       mentionChats={chats}
       placeholder="Ask Capy..."
+      captureWindowDrops={captureWindowDrops}
+      onDropActiveChange={onDropActiveChange}
       modelOptions={modelOptions}
       runtimeSettings={composerRuntime}
       tokenUsage={tokenUsage}

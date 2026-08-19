@@ -111,4 +111,7 @@ export type ComposerProps = {
   embedded?: boolean
   mentionChats?: AgentSession[]
   placeholder?: string
+  /** When true, file drops anywhere in the window go to this composer. */
+  captureWindowDrops?: boolean
+  onDropActiveChange?: (active: boolean) => void
 }

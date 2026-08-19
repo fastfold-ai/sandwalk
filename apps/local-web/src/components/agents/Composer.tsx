@@ -87,7 +87,9 @@ export function Composer({
   onCancelEditQueued,
   embedded = false,
   mentionChats,
-  placeholder
+  placeholder,
+  captureWindowDrops = false,
+  onDropActiveChange
 }: ComposerProps) {
   const [auraTick, setAuraTick] = useState(0)
   const atMenuRef = useRef<ComposerAtMenuHandle | null>(null)
@@ -155,7 +157,9 @@ export function Composer({
     },
     onWorkspacePath: payload => {
       draftState.chipInserters.appendFileChips([payload])
-    }
+    },
+    captureWindow: captureWindowDrops,
+    onDraggingChange: kind => onDropActiveChange?.(Boolean(kind))
   })
 
   useComposerMentionFocus(
