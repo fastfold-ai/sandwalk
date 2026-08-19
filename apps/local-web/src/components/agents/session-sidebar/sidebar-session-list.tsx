@@ -43,20 +43,24 @@ import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { navigateToSession } from '@/lib/navigate-session'
 import { relativeTime, type SessionChatState, type TabItemSection } from '@/lib/sessions'
 import {
+  filterSectionsToUnread,
+  UNREAD_DOT_COLOR
+} from '@/lib/sidebar-unread-filter'
+import {
   isSidebarGroupExpanded,
   setSidebarGroupExpanded
 } from '@/lib/sidebar-group-expanded'
 import { cn } from '@/lib/utils'
 
-/**
- * Attention (unread) marker. Deliberately outside `TAB_INLINE_COLORS` so it
- * never renders the same swatch as a user-assigned tab color — with the
- * previous "Blue" mapping, a chat that had Blue assigned AND was unread
- * showed two identical dots side-by-side, which read as a rendering bug.
- * Soft coral: warm, notification-flavored, distinct from every pastel in
- * the tag palette.
- */
-const UNREAD_DOT_COLOR = '#F5A97A'
+function UnreadDot({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn('size-2 shrink-0 rounded-full', className)}
+      style={{ backgroundColor: UNREAD_DOT_COLOR }}
+      aria-label="Unread"
+    />
+  )
+}
 
 /** Initial rows per sidebar section; "Load more" reveals the next page. */
 const SECTION_PAGE_SIZE = 40
@@ -224,6 +228,7 @@ export type SidebarSessionListProps = {
    * tab individual, abrimos el grupo con ese chat enfocado en el split.
    */
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
+  unreadOnly?: boolean
 }
 
 export function SidebarSessionList({
@@ -254,7 +259,8 @@ export function SidebarSessionList({
   activeProjectId,
   onGoToChatProject,
   activeGroupChildId,
-  setTabGroupActiveChat
+  setTabGroupActiveChat,
+  unreadOnly = false
 }: SidebarSessionListProps) {
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
@@ -293,12 +299,20 @@ export function SidebarSessionList({
     setDisplayedSections(sections)
   }, [sections, listOpacity])
 
+  const listSections = useMemo(
+    () =>
+      unreadOnly
+        ? filterSectionsToUnread(displayedSections, attentionIds)
+        : displayedSections,
+    [attentionIds, displayedSections, unreadOnly]
+  )
+
   // Keep the active session in view even if it sits past the first page.
   useEffect(() => {
     if (!sessionId) return
     setVisibleBySection(current => {
       let next: Record<string, number> | null = null
-      for (const section of displayedSections) {
+      for (const section of listSections) {
         const index = section.items.findIndex(item => item.id === sessionId)
         if (index < 0) continue
         const needed =
@@ -310,17 +324,17 @@ export function SidebarSessionList({
       }
       return next ?? current
     })
-  }, [displayedSections, sessionId])
+  }, [listSections, sessionId])
 
   const orderedRenderedSessionIds = useMemo(() => {
     const ids: string[] = []
-    for (const section of displayedSections) {
+    for (const section of listSections) {
       if (collapsedSidebarSections[section.id]) continue
       const limit = visibleBySection[section.id] ?? SECTION_PAGE_SIZE
       for (const item of section.items.slice(0, limit)) ids.push(item.id)
     }
     return ids
-  }, [collapsedSidebarSections, displayedSections, visibleBySection])
+  }, [collapsedSidebarSections, listSections, visibleBySection])
 
   return (
     <ScrollArea className="flex-1">
@@ -328,40 +342,52 @@ export function SidebarSessionList({
         className="space-y-2.5 p-2.5 transition-opacity duration-150 ease-out"
         style={{ opacity: listOpacity }}
       >
-        {displayedSections.length === 0 ? (
+        {listSections.length === 0 ? (
           <p className="text-muted-foreground px-1.5 py-2 text-[13px]">
-            No Agents Yet
+            {unreadOnly ? 'No unread chats' : 'No Agents Yet'}
           </p>
         ) : (
-          displayedSections.map(section => {
+          listSections.map(section => {
             const limit = visibleBySection[section.id] ?? SECTION_PAGE_SIZE
             const visibleItems = section.items.slice(0, limit)
             const remaining = Math.max(0, section.items.length - visibleItems.length)
+            const collapsed = Boolean(collapsedSidebarSections[section.id])
             return (
               <div key={section.id} className="space-y-0.5">
-                {/*
-                 * Header de sección sin chevron: los headers de tramo
-                 * (Today / Yesterday / …) siempre están expandidos, así
-                 * los únicos chevrones visibles en el sidebar son los de
-                 * los split view groups — se destacan más y no compiten
-                 * con los chevrones de sección.
-                 */}
-                <div className="text-muted-foreground/80 flex w-full items-center gap-1.5 rounded-md px-2 py-0.5 text-left text-[12px]">
-                  <span className="min-w-0 truncate">
-                    {section.title}
-                  </span>
-                  {/*
-                    Badge con el mismo estilo que el conteo de chats en los
-                    split-view tabs — pegado al título para que se lea como
-                    "cuántos hay en esta sección", no como una nota suelta.
-                  */}
+                <button
+                  type="button"
+                  className="text-muted-foreground/80 hover:text-foreground group/sec flex w-full items-center gap-1.5 rounded-md px-2 py-0.5 text-left text-[12px]"
+                  aria-expanded={!collapsed}
+                  aria-label={
+                    collapsed
+                      ? `Expand ${section.title}`
+                      : `Collapse ${section.title}`
+                  }
+                  onClick={() =>
+                    setCollapsedSidebarSections(current => ({
+                      ...current,
+                      [section.id]: !current[section.id]
+                    }))
+                  }
+                >
+                  <span className="min-w-0 truncate">{section.title}</span>
                   <span
                     className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
-                    aria-label={`${section.items.length} items`}
+                    aria-hidden
                   >
                     {section.items.length}
                   </span>
-                </div>
+                  <ChevronDown
+                    className={cn(
+                      'size-3.5 shrink-0 transition-[opacity,transform]',
+                      collapsed
+                        ? '-rotate-90 opacity-100'
+                        : 'opacity-0 group-hover/sec:opacity-100'
+                    )}
+                    aria-hidden
+                  />
+                </button>
+                {collapsed ? null : (
                 <ul className="space-y-px">
                     {visibleItems.map(item => {
                       if (item.kind === 'group') {
@@ -527,13 +553,6 @@ export function SidebarSessionList({
                               {chat.organizeLabel === 'pinned' ? (
                                 <Pin className="text-muted-foreground/70 size-3 shrink-0" />
                               ) : null}
-                              {attentionIds.has(item.id) ? (
-                                <span
-                                  className="size-2 shrink-0 rounded-full border border-black/10"
-                                  style={{ backgroundColor: UNREAD_DOT_COLOR }}
-                                  aria-label="Unread"
-                                />
-                              ) : null}
                               {tabColor ? (
                                 <span
                                   className="size-2 shrink-0 rounded-full border border-black/10"
@@ -555,8 +574,12 @@ export function SidebarSessionList({
                                     : 'opacity-100 group-hover:opacity-0'
                                 )}
                               >
-                                {relativeTime(
-                                  chat.lastMessageAt || chat.updatedAt
+                                {attentionIds.has(item.id) ? (
+                                  <UnreadDot />
+                                ) : (
+                                  relativeTime(
+                                    chat.lastMessageAt || chat.updatedAt
+                                  )
                                 )}
                               </span>
                               <Popover
@@ -673,6 +696,7 @@ export function SidebarSessionList({
                       </li>
                     ) : null}
                   </ul>
+                )}
               </div>
             )
           })
@@ -762,6 +786,7 @@ function SidebarGroupItem({
   const chatCount = group.chatIds.length
   const groupActive = group.id === activeId
   const activeInside = chats.some(chat => chat.id === activeId)
+  const groupUnread = chats.some(chat => attentionIds.has(chat.id))
 
   return (
     <li>
@@ -827,13 +852,19 @@ function SidebarGroupItem({
             <SidebarMarqueeTitle text={label} />
           </button>
         </div>
+        <div className="relative h-6 w-8 justify-self-end">
+          {groupUnread && !menuOpen ? (
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-end pr-0.5 group-hover/gr:opacity-0">
+              <UnreadDot />
+            </span>
+          ) : null}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger asChild>
             <button
               type="button"
               aria-label={`Options for ${label}`}
               className={cn(
-                'text-muted-foreground hover:text-foreground hover:bg-muted justify-self-end rounded-md p-0.5 transition-opacity',
+                'text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5 transition-opacity',
                 menuOpen ? 'opacity-100' : 'opacity-0 group-hover/gr:opacity-100'
               )}
               onClick={event => event.stopPropagation()}
@@ -886,6 +917,7 @@ function SidebarGroupItem({
             ) : null}
           </PopoverContent>
         </Popover>
+        </div>
       </div>
       <GroupDissolveDialog
         group={dissolveConfirmOpen ? group : null}
@@ -949,13 +981,6 @@ function SidebarGroupItem({
                         }
                       />
                     </span>
-                    {attentionIds.has(chat.id) ? (
-                      <span
-                        className="size-2 shrink-0 rounded-full border border-black/10"
-                        style={{ backgroundColor: UNREAD_DOT_COLOR }}
-                        aria-label="Unread"
-                      />
-                    ) : null}
                     {tabColor ? (
                       <span
                         className="size-2 shrink-0 rounded-full border border-black/10"
@@ -966,6 +991,11 @@ function SidebarGroupItem({
                     <SidebarMarqueeTitle text={chat.title || 'Untitled'} />
                   </button>
                   <div className="relative h-6 w-8 justify-self-end">
+                  {attentionIds.has(chat.id) && !menuOpenForChat ? (
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-end pr-0.5 group-hover/child:opacity-0">
+                      <UnreadDot />
+                    </span>
+                  ) : null}
                   <Popover
                     open={menuOpenForChat}
                     onOpenChange={open =>

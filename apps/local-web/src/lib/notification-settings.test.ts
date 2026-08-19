@@ -6,7 +6,8 @@ import {
   getStoredNotifyApproval,
   getStoredNotifyCompletion,
   NOTIFY_APPROVAL_CHANGE_EVENT,
-  NOTIFY_COMPLETION_CHANGE_EVENT
+  NOTIFY_COMPLETION_CHANGE_EVENT,
+  shouldNotifyCompletion
 } from './notification-settings'
 
 function installMemoryLocalStorage() {
@@ -45,6 +46,21 @@ describe('notification-settings', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it('notifies unfocused when another chat finished', () => {
+    expect(
+      shouldNotifyCompletion('unfocused', {
+        windowFocused: true,
+        viewingSession: false
+      })
+    ).toBe(true)
+    expect(
+      shouldNotifyCompletion('unfocused', {
+        windowFocused: true,
+        viewingSession: true
+      })
+    ).toBe(false)
   })
 
   it('defaults completion to unfocused and approval to true', () => {

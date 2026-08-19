@@ -1,11 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  SESSION_ATTENTION_STORAGE_KEY,
+  SESSION_LAST_READ_INIT_KEY,
+  SESSION_LAST_READ_STORAGE_KEY,
   clearAllSessionAttention,
   clearSessionAttention,
   getAttentionSessionIds,
   hasSessionAttention,
-  markSessionAttention
+  markSessionAttention,
+  recoverUnreadFromSessions
 } from './session-attention'
 
 // setDockBadge is a Tauri desktop call — mock it out so the tests don't
@@ -14,8 +18,41 @@ vi.mock('@/lib/desktop', () => ({
   setDockBadge: vi.fn(() => Promise.resolve())
 }))
 
+function installMemoryLocalStorage() {
+  const store = new Map<string, string>()
+  const memory: Storage = {
+    get length() {
+      return store.size
+    },
+    clear() {
+      store.clear()
+    },
+    getItem(key: string) {
+      return store.has(key) ? store.get(key)! : null
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null
+    },
+    removeItem(key: string) {
+      store.delete(key)
+    },
+    setItem(key: string, value: string) {
+      store.set(key, String(value))
+    }
+  }
+  vi.stubGlobal('localStorage', memory)
+}
+
 beforeEach(() => {
+  installMemoryLocalStorage()
   clearAllSessionAttention()
+  localStorage.removeItem(SESSION_ATTENTION_STORAGE_KEY)
+  localStorage.removeItem(SESSION_LAST_READ_STORAGE_KEY)
+  localStorage.removeItem(SESSION_LAST_READ_INIT_KEY)
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('markSessionAttention / hasSessionAttention', () => {
@@ -54,6 +91,37 @@ describe('clearSessionAttention', () => {
     clearSessionAttention('a')
     expect(hasSessionAttention('a')).toBe(false)
     expect(hasSessionAttention('b')).toBe(true)
+  })
+})
+
+describe('persist and recover', () => {
+  it('writes marked ids to localStorage', () => {
+    markSessionAttention('slack-1')
+    expect(JSON.parse(localStorage.getItem(SESSION_ATTENTION_STORAGE_KEY) || '[]')).toEqual([
+      'slack-1'
+    ])
+  })
+
+  it('does not mark historical chats on first recover', () => {
+    const missed = recoverUnreadFromSessions(
+      [{ id: 'old', lastMessageAt: '2026-01-01T00:00:00.000Z' }],
+      null
+    )
+    expect(missed).toEqual([])
+    expect(hasSessionAttention('old')).toBe(false)
+  })
+
+  it('marks chats that got a newer message after last read', () => {
+    recoverUnreadFromSessions(
+      [{ id: 's1', lastMessageAt: '2026-01-01T00:00:00.000Z' }],
+      null
+    )
+    const missed = recoverUnreadFromSessions(
+      [{ id: 's1', lastMessageAt: '2026-08-19T12:00:00.000Z' }],
+      null
+    )
+    expect(missed).toEqual(['s1'])
+    expect(hasSessionAttention('s1')).toBe(true)
   })
 })
 

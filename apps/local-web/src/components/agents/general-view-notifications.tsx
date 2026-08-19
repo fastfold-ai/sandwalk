@@ -160,7 +160,7 @@ export function GeneralViewNotificationsSection() {
       <div className="divide-border/60 border-border/60 divide-y border-y">
         <SettingsRow
           label="Completion notifications"
-          description="Notify when an agent finishes or fails a run."
+          description="Banner when a chat finishes. Default: any chat you are not looking at, including Slack and background runs."
         >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

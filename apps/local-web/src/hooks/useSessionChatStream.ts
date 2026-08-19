@@ -340,7 +340,8 @@ export function useSessionChatStream({
                   notifyRunCompleted({
                     sessionId: id,
                     sessionTitle: session?.title,
-                    ok: event.type === 'run.completed'
+                    ok: event.type === 'run.completed',
+                    viewingSession: sessionIdRef.current === id
                   })
                 }
                 return next

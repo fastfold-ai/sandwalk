@@ -4,7 +4,7 @@ import { isTauri } from '@/lib/desktop'
 import {
   getStoredNotifyApproval,
   getStoredNotifyCompletion,
-  type NotifyCompletionMode
+  shouldNotifyCompletion
 } from '@/lib/notification-settings'
 
 let webPermissionRequested = false
@@ -19,10 +19,11 @@ function isWindowFocused(): boolean {
   }
 }
 
-function shouldNotifyCompletion(mode: NotifyCompletionMode): boolean {
-  if (mode === 'never') return false
-  if (mode === 'always') return true
-  return !isWindowFocused()
+function completionNotifyAllowed(viewingSession: boolean): boolean {
+  return shouldNotifyCompletion(getStoredNotifyCompletion(), {
+    windowFocused: isWindowFocused(),
+    viewingSession
+  })
 }
 
 async function ensureWebPermission(): Promise<
@@ -176,12 +177,24 @@ export function notifyApprovalRequired(input: {
   })
 }
 
+export function notifyMissedCompletions(count: number): void {
+  if (count <= 0) return
+  if (getStoredNotifyCompletion() === 'never') return
+  const n = count === 1 ? '1 chat finished' : `${count} chats finished`
+  void sendOsNotification({
+    title: 'Sandwalk',
+    body: `${n} while you were away.`,
+    tag: 'sandwalk-missed-complete'
+  })
+}
+
 export function notifyRunCompleted(input: {
   sessionTitle?: string | null
   sessionId?: string | null
   ok: boolean
+  viewingSession?: boolean
 }): void {
-  if (!shouldNotifyCompletion(getStoredNotifyCompletion())) return
+  if (!completionNotifyAllowed(Boolean(input.viewingSession))) return
 
   const session = (input.sessionTitle || '').trim()
   const title = input.ok ? 'Agent finished' : 'Agent failed'

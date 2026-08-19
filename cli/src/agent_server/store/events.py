@@ -44,6 +44,12 @@ class EventMixin:
         # cells poll session status instead of SSE — skip the wake.
         if notify:
             EVENT_NOTIFIER.notify(session_id)
+        if event_type in {
+            "run.completed",
+            "run.failed",
+            "run.awaiting_approval",
+        }:
+            self._publish_run_lifecycle(session_id, event_type)
         return EventEnvelope(
             id=event_id,
             session_id=session_id,
@@ -53,6 +59,29 @@ class EventMixin:
             type=event_type,
             payload=payload,
         )
+
+    def _publish_run_lifecycle(self, session_id: str, event_type: str) -> None:
+        """Fan run finish/HITL out on the global session bus.
+
+        Per-session SSE only reaches chats the UI already subscribed to. Slack
+        (and any other background chat) needs this so the desktop can mark
+        unread, Dock badge, and banners without that stream.
+        """
+        session = self.get_session(session_id)
+        if session is None or getattr(session, "source", None) in {"bench", "capy"}:
+            return
+        try:
+            from agent_server.session_event_bus import session_event_bus
+
+            session_event_bus.publish(
+                event_type,
+                {
+                    "sessionId": session_id,
+                    "session": session.model_dump(mode="json", by_alias=True),
+                },
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     def list_events(self, session_id: str, *, after_sequence: int = 0) -> list[EventEnvelope]:
         with self._connect() as connection:

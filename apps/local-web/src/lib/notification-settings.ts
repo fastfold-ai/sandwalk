@@ -13,9 +13,18 @@ export const NOTIFY_COMPLETION_OPTIONS: {
   label: string
 }[] = [
   { id: 'never', label: 'Never' },
-  { id: 'unfocused', label: 'Only when unfocused' },
+  { id: 'unfocused', label: "When you're not in that chat" },
   { id: 'always', label: 'Always' }
 ]
+
+export function shouldNotifyCompletion(
+  mode: NotifyCompletionMode,
+  opts: { windowFocused: boolean; viewingSession: boolean }
+): boolean {
+  if (mode === 'never') return false
+  if (mode === 'always') return true
+  return !opts.viewingSession || !opts.windowFocused
+}
 
 export function getStoredNotifyCompletion(): NotifyCompletionMode {
   try {

@@ -155,7 +155,8 @@ export function useGlobalSessionEvents({
               notifyRunCompleted({
                 sessionId,
                 sessionTitle: session?.title,
-                ok: event.type === 'run.completed'
+                ok: event.type === 'run.completed',
+                viewingSession: isActiveChat
               })
               return
             }

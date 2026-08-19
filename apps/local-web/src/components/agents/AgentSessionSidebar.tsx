@@ -6,6 +6,7 @@ import type {
   SessionGroup
 } from '@sandwalk/agent-ui-core'
 import {
+  Bell,
   Globe2,
   Home,
   LayoutDashboard,
@@ -13,7 +14,7 @@ import {
   Search,
   Send
 } from 'lucide-react'
-import type { Dispatch, SetStateAction } from 'react'
+import { type Dispatch, type SetStateAction, useEffect, useState } from 'react'
 import { type NavigateFunction, useLocation } from 'react-router-dom'
 
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
@@ -30,7 +31,13 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { type SessionChatState, type TabItemSection } from '@/lib/sessions'
+import {
+  readSidebarUnreadFilter,
+  UNREAD_DOT_COLOR,
+  writeSidebarUnreadFilter
+} from '@/lib/sidebar-unread-filter'
 import { cn } from '@/lib/utils'
+import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 
 import { SidebarBatchBar } from './session-sidebar/sidebar-batch-bar'
 import { SidebarSessionList } from './session-sidebar/sidebar-session-list'
@@ -144,6 +151,24 @@ export function AgentSessionSidebar({
   onRefreshUser
 }: AgentSessionSidebarProps) {
   const location = useLocation()
+  const attentionIds = useSessionAttentionIds()
+  const [unreadOnly, setUnreadOnly] = useState(readSidebarUnreadFilter)
+  const hasUnread = attentionIds.size > 0
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code !== 'KeyU' || !event.altKey || !event.metaKey) return
+      event.preventDefault()
+      setUnreadOnly(current => {
+        const next = !current
+        writeSidebarUnreadFilter(next)
+        return next
+      })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   const isLibrary =
     location.pathname === '/library' ||
     location.pathname.startsWith('/library/')
@@ -189,6 +214,43 @@ export function AgentSessionSidebar({
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Search ⌘K</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    'relative size-6 shrink-0 rounded-full',
+                    unreadOnly
+                      ? 'bg-[#5EB3FF]/20 text-[#5EB3FF] hover:bg-[#5EB3FF]/25 hover:text-[#5EB3FF]'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={() => {
+                    setUnreadOnly(current => {
+                      const next = !current
+                      writeSidebarUnreadFilter(next)
+                      return next
+                    })
+                  }}
+                  aria-pressed={unreadOnly}
+                  aria-label={
+                    unreadOnly ? 'Show all chats' : 'Show unread chats'
+                  }
+                >
+                  <Bell className="size-3" />
+                  {hasUnread ? (
+                    <span
+                      className="absolute top-0.5 right-0.5 size-1.5 rounded-full"
+                      style={{ backgroundColor: UNREAD_DOT_COLOR }}
+                      aria-hidden
+                    />
+                  ) : null}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {unreadOnly ? 'Show all chats' : 'Show unread'} ⌥⌘U
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
@@ -287,6 +349,7 @@ export function AgentSessionSidebar({
         onGoToChatProject={onGoToChatProject}
         activeGroupChildId={activeGroupChildId}
         setTabGroupActiveChat={setTabGroupActiveChat}
+        unreadOnly={unreadOnly}
       />
       <div className="relative shrink-0 p-2">
         <SidebarBatchBar

@@ -4,15 +4,12 @@ import { CSS } from '@dnd-kit/utilities'
 import { Columns2, Pin, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+import { UNREAD_DOT_COLOR } from '@/lib/sidebar-unread-filter'
 import { cn } from '@/lib/utils'
 
 import { SessionSourceIcon } from './SessionSourceIcon'
 import { SessionStatusIcon } from './SessionStatusIcon'
 
-// Attention (unread) marker. Deliberately outside `TAB_INLINE_COLORS` so it
-// never collides with a user-assigned tab color — same rationale as the
-// mirror constant in `sidebar-session-list.tsx`.
-const UNREAD_DOT_COLOR = '#F5A97A'
 
 /** Title marquee — same feel as the previous chrome-tabs label. */
 function TabMarqueeTitle({
@@ -289,7 +286,7 @@ export function SessionTab({
         ) : null}
         {unread ? (
           <span
-            className="size-2 shrink-0 rounded-full border border-black/10"
+            className="size-2 shrink-0 rounded-full"
             style={{ backgroundColor: UNREAD_DOT_COLOR }}
             aria-label="Unread"
           />

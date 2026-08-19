@@ -33,6 +33,8 @@ import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { visibleSessionIds } from '@/lib/sessions'
 import { applyCapyOpenSplit } from '@/lib/capy-ui'
+import { notifyMissedCompletions } from '@/lib/browser-notifications'
+import { recoverUnreadFromSessions } from '@/lib/session-attention'
 
 export default function App() {
   const location = useLocation()
@@ -216,6 +218,15 @@ export default function App() {
     },
     [tabGroupsStore, bootstrap]
   )
+
+  useEffect(() => {
+    if (!bootstrap.health || bootstrap.sessions.length === 0) return
+    const missed = recoverUnreadFromSessions(
+      bootstrap.sessions,
+      effectiveSessionId
+    )
+    if (missed.length > 0) notifyMissedCompletions(missed.length)
+  }, [bootstrap.health, bootstrap.sessions, effectiveSessionId])
 
   useGlobalSessionEvents({
     client: bootstrap.client,
