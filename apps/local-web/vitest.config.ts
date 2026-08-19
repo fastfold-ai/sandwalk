@@ -45,6 +45,7 @@ export default defineConfig({
         'src/lib/skills-catalog-install.ts',
         'src/lib/skills-catalog-source.ts',
         'src/lib/theme.ts',
+        'src/lib/workspace-download.ts',
         '**/*.test.ts',
         '**/*.test.tsx'
       ],

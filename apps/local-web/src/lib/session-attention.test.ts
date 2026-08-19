@@ -123,6 +123,45 @@ describe('persist and recover', () => {
     expect(missed).toEqual(['s1'])
     expect(hasSessionAttention('s1')).toBe(true)
   })
+
+  it('skips bench, capy, the open chat, and chats without lastMessageAt', () => {
+    recoverUnreadFromSessions(
+      [{ id: 'seed', lastMessageAt: '2026-01-01T00:00:00.000Z' }],
+      null
+    )
+    const missed = recoverUnreadFromSessions(
+      [
+        {
+          id: 'bench',
+          source: 'bench',
+          lastMessageAt: '2026-08-19T12:00:00.000Z'
+        },
+        {
+          id: 'capy',
+          source: 'capy',
+          lastMessageAt: '2026-08-19T12:00:00.000Z'
+        },
+        { id: 'open', lastMessageAt: '2026-08-19T12:00:00.000Z' },
+        { id: 'empty' },
+        { id: 'new', lastMessageAt: '2026-08-19T12:00:00.000Z' }
+      ],
+      'open'
+    )
+    expect(missed).toEqual(['new'])
+    expect(hasSessionAttention('bench')).toBe(false)
+    expect(hasSessionAttention('capy')).toBe(false)
+    expect(hasSessionAttention('open')).toBe(false)
+  })
+
+  it('treats invalid stored last-read JSON as empty', () => {
+    localStorage.setItem(SESSION_LAST_READ_INIT_KEY, '1')
+    localStorage.setItem(SESSION_LAST_READ_STORAGE_KEY, '{not-json')
+    const missed = recoverUnreadFromSessions(
+      [{ id: 's2', lastMessageAt: '2026-08-19T12:00:00.000Z' }],
+      null
+    )
+    expect(missed).toEqual(['s2'])
+  })
 })
 
 describe('clearAllSessionAttention', () => {

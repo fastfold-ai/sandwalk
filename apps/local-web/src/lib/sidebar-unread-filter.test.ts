@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { filterSectionsToUnread } from './sidebar-unread-filter'
+import {
+  filterSectionsToUnread,
+  readSidebarUnreadFilter,
+  writeSidebarUnreadFilter
+} from './sidebar-unread-filter'
 
 const chat = (id: string) =>
   ({
@@ -59,5 +63,32 @@ describe('filterSectionsToUnread', () => {
       new Set()
     )
     expect(next).toEqual([])
+  })
+})
+
+describe('sidebar unread filter persistence', () => {
+  beforeEach(() => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+      removeItem: (key: string) => {
+        store.delete(key)
+      }
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('defaults off and persists the toggle', () => {
+    expect(readSidebarUnreadFilter()).toBe(false)
+    writeSidebarUnreadFilter(true)
+    expect(readSidebarUnreadFilter()).toBe(true)
+    writeSidebarUnreadFilter(false)
+    expect(readSidebarUnreadFilter()).toBe(false)
   })
 })
