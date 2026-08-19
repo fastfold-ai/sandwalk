@@ -1,4 +1,5 @@
 import type {
+  AgentSession,
   AgentSkill,
   McpServer,
   WorkspaceFile
@@ -7,6 +8,7 @@ import { type MutableRefObject } from 'react'
 import { flushSync } from 'react-dom'
 
 import {
+  chatChipToken,
   fileChipToken,
   mcpChipToken,
   skillChipToken,
@@ -28,6 +30,7 @@ export function createChipInserters({
   draft,
   slash,
   atMention,
+  hashMention,
   commitDraft,
   pendingCaretRef,
   applyComposerCaret
@@ -35,6 +38,7 @@ export function createChipInserters({
   draft: string
   slash: { start: number; end: number } | null
   atMention: { start: number; end: number } | null
+  hashMention?: { start: number; end: number } | null
   commitDraft: (value: string) => void
   pendingCaretRef: MutableRefObject<number | null>
   applyComposerCaret: (caret: number) => boolean
@@ -149,10 +153,27 @@ export function createChipInserters({
     focusAfterChipInsert(caret)
   }
 
+  const insertChatChip = (session: AgentSession) => {
+    if (!hashMention) return
+    const before = draft.slice(0, hashMention.start)
+    const after = draft.slice(hashMention.end).replace(/^\s+/u, '')
+    const token = chatChipToken(session.id)
+    const nextValue = spaceAroundChips(
+      after ? `${before}${token} ${after}` : `${before}${token}`
+    )
+    const caret = caretAfterInsertedToken(nextValue, token)
+    pendingCaretRef.current = caret
+    flushSync(() => {
+      commitDraft(nextValue)
+    })
+    focusAfterChipInsert(caret)
+  }
+
   return {
     insertSkillChip,
     insertMcpChip,
     insertFileChip,
+    insertChatChip,
     appendFileChips,
     insertExample
   }

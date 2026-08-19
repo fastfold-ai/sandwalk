@@ -1,5 +1,5 @@
 import { Icon } from '@iconify/react'
-import { Folder, Plug, Sparkles, X } from 'lucide-react'
+import { Folder, MessageSquare, Plug, Sparkles, X } from 'lucide-react'
 
 import { mcpIconForChip } from '@/components/agents/composer/composer-mention-utils'
 import {
@@ -159,6 +159,36 @@ export function ComposerMcpChip({
       >
         <X className="size-3" />
       </button>
+    </span>
+  )
+}
+
+export function ComposerChatChip({
+  sessionId,
+  title,
+  onRemove
+}: {
+  sessionId: string
+  title?: string
+  onRemove?: () => void
+}) {
+  const label = title?.trim() || sessionId.slice(0, 8)
+  return (
+    <span className="bg-muted/50 border-border/70 inline-flex max-w-full select-none items-center gap-0.5 rounded-full border px-1.5 py-0 align-middle text-xs leading-5">
+      <MessageSquare className="text-muted-foreground size-3.5 shrink-0" />
+      <span className="text-foreground max-w-[180px] truncate" title={sessionId}>
+        #{label}
+      </span>
+      {onRemove ? (
+        <button
+          type="button"
+          className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-4 items-center justify-center rounded-full"
+          onClick={onRemove}
+          aria-label={`Remove #${label}`}
+        >
+          <X className="size-3" />
+        </button>
+      ) : null}
     </span>
   )
 }

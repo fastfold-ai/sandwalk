@@ -1,0 +1,31 @@
+@keyframes capy-working-hue {
+  0% {
+    filter: hue-rotate(0deg) saturate(1.2);
+  }
+  50% {
+    filter: hue-rotate(180deg) saturate(1.45);
+  }
+  100% {
+    filter: hue-rotate(360deg) saturate(1.2);
+  }
+}
+
+@keyframes capy-working-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, currentColor 35%, transparent),
+      0 12px 40px -8px rgb(0 0 0 / 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, currentColor 70%, transparent),
+      0 0 22px 4px color-mix(in srgb, currentColor 40%, transparent);
+  }
+}
+
+.capy-working-hue {
+  animation:
+    capy-working-hue 2.2s linear infinite,
+    capy-working-glow 1.6s ease-in-out infinite;
+}

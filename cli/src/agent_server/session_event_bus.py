@@ -139,4 +139,4 @@ class SessionEventType:
     RUN_AWAITING_APPROVAL = "run.awaiting_approval"
     RUN_COMPLETED = "run.completed"
     RUN_FAILED = "run.failed"
-    RUN_INTERRUPTED = "run.interrupted"
+    UI_COMMAND = "ui.command"

@@ -16,7 +16,7 @@ def _publish_session_bus_event(event_type: str, session: AgentSession) -> None:
     Bench cells stay off the global All-chats stream; they belong on
     Benchmarking results, not the sidebar.
     """
-    if getattr(session, "source", None) == "bench":
+    if getattr(session, "source", None) in {"bench", "capy"}:
         return
     try:
         session_event_bus.publish(

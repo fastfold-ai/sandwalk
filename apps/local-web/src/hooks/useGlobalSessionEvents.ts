@@ -43,6 +43,7 @@ type UseGlobalSessionEventsArgs = {
    *  per-session SSE already handles them). */
   sessionIdRef: MutableRefObject<string | null>
   setSessions: Dispatch<SetStateAction<AgentSession[]>>
+  onUiCommand?: (payload: Record<string, unknown>) => void
 }
 
 function extractSession(payload: Record<string, unknown>): AgentSession | null {
@@ -53,8 +54,8 @@ function extractSession(payload: Record<string, unknown>): AgentSession | null {
   return raw as AgentSession
 }
 
-function isBenchSession(session: AgentSession | null): boolean {
-  return session?.source === 'bench'
+function isHiddenSession(session: AgentSession | null): boolean {
+  return session?.source === 'bench' || session?.source === 'capy'
 }
 
 function extractSessionId(payload: Record<string, unknown>): string | null {
@@ -66,7 +67,8 @@ export function useGlobalSessionEvents({
   client,
   health,
   sessionIdRef,
-  setSessions
+  setSessions,
+  onUiCommand
 }: UseGlobalSessionEventsArgs) {
   useEffect(() => {
     if (!health) return
@@ -81,9 +83,13 @@ export function useGlobalSessionEvents({
             sessionId !== null && sessionIdRef.current === sessionId
 
           switch (event.type) {
+            case 'ui.command': {
+              onUiCommand?.(payload)
+              return
+            }
             case 'session.created': {
               const session = extractSession(payload)
-              if (!session || isBenchSession(session)) return
+              if (!session || isHiddenSession(session)) return
               setSessions(current =>
                 current.some(s => s.id === session.id)
                   ? current
@@ -94,7 +100,7 @@ export function useGlobalSessionEvents({
             case 'session.updated':
             case 'session.status_changed': {
               const session = extractSession(payload)
-              if (!session || isBenchSession(session)) return
+              if (!session || isHiddenSession(session)) return
               setSessions(current => {
                 let changed = false
                 const next = current.map(s => {
@@ -132,7 +138,7 @@ export function useGlobalSessionEvents({
             case 'run.awaiting_approval': {
               if (!sessionId || isActiveChat) return
               const session = extractSession(payload)
-              if (isBenchSession(session)) return
+              if (isHiddenSession(session)) return
               markSessionAttention(sessionId)
               notifyApprovalRequired({
                 sessionId,
@@ -144,7 +150,7 @@ export function useGlobalSessionEvents({
             case 'run.failed': {
               if (!sessionId || isActiveChat) return
               const session = extractSession(payload)
-              if (isBenchSession(session)) return
+              if (isHiddenSession(session)) return
               markSessionAttention(sessionId)
               notifyRunCompleted({
                 sessionId,
@@ -176,5 +182,5 @@ export function useGlobalSessionEvents({
         // the fallback if the global stream can't stay connected.
       })
     return () => controller.abort()
-  }, [client, health, sessionIdRef, setSessions])
+  }, [client, health, sessionIdRef, setSessions, onUiCommand])
 }

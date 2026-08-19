@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Components } from 'react-markdown'
 import type { NavigateFunction } from 'react-router-dom'
+import type { AgentSession } from '@sandwalk/agent-ui-core'
 
 import { ExternalUrlLink } from '@/components/agents/ExternalUrlLink'
 import {
@@ -19,6 +20,7 @@ export type MarkdownComponentOptions = {
   onOpenFile?: (path: string) => void
   workspacePath?: string | null
   skills?: SkillIconSkill[]
+  mentionChats?: AgentSession[]
 }
 
 /** Static markdown element map — identity must stay stable across renders. */
@@ -27,10 +29,17 @@ export function buildMarkdownComponents({
   streaming,
   onOpenFile,
   workspacePath,
-  skills
+  skills,
+  mentionChats
 }: MarkdownComponentOptions): Components {
   const linkify = (children: ReactNode) =>
-    linkifyWorkspacePathChildren(children, onOpenFile, workspacePath, skills)
+    linkifyWorkspacePathChildren(
+      children,
+      onOpenFile,
+      workspacePath,
+      skills,
+      mentionChats
+    )
 
   return {
     h1({ children }) {

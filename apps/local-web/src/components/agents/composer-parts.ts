@@ -5,8 +5,10 @@ export type ComposerPart =
   | { type: 'file'; path: string }
   | { type: 'skill'; name: string }
   | { type: 'mcp'; id: string; name: string }
+  | { type: 'chat'; sessionId: string }
 
-const TOKEN_RE = /⟦@:([^⟧]+)⟧|⟦\/:([^⟧]+)⟧|⟦mcp:([^⟧]+)⟧/g
+const TOKEN_RE =
+  /⟦@:([^⟧]+)⟧|⟦\/:([^⟧]+)⟧|⟦mcp:([^⟧]+)⟧|⟦#:([^⟧]+)⟧|\[\[#:([^\]]+)\]\]/g
 /**
  * Sent-message mentions: @path/to/file, /skill-name, or mcp:Name.
  * Skill slash form requires a word boundary so URL paths like
@@ -73,6 +75,10 @@ export function mcpChipToken(id: string, name: string) {
   return `⟦mcp:${encodeURIComponent(id)}:${encodeURIComponent(name)}⟧`
 }
 
+export function chatChipToken(sessionId: string) {
+  return `⟦#:${sessionId}⟧`
+}
+
 function parseMcpTokenPayload(raw: string): { id: string; name: string } {
   const trimmed = String(raw || '')
   const sep = trimmed.indexOf(':')
@@ -88,9 +94,9 @@ function parseMcpTokenPayload(raw: string): { id: string; name: string } {
 /** Ensure at most one space before/after chip tokens (no doubles). */
 export function spaceAroundChips(value: string): string {
   return value
-    .replace(/[ \t]+(?=⟦(?:[@/]|mcp:))/g, ' ')
+    .replace(/[ \t]+(?=⟦(?:[@/#]|mcp:))/g, ' ')
     .replace(/(⟧)[ \t]+/g, '$1 ')
-    .replace(/([^\s⟦])(⟦(?:[@/]|mcp:))/g, '$1 $2')
+    .replace(/([^\s⟦])(⟦(?:[@/#]|mcp:))/g, '$1 $2')
     .replace(/(⟧)([^\s⟧])/g, '$1 $2')
 }
 
@@ -108,6 +114,8 @@ export function parseComposerParts(value: string): ComposerPart[] {
       parts.push({ type: 'skill', name: match[2] })
     } else if (match[3] != null) {
       parts.push({ type: 'mcp', ...parseMcpTokenPayload(match[3]) })
+    } else if (match[4] != null || match[5] != null) {
+      parts.push({ type: 'chat', sessionId: match[4] || match[5] })
     }
     last = index + match[0].length
   }
@@ -129,6 +137,24 @@ export function parseMessageParts(content: string): ComposerPart[] {
   const hits: Hit[] = []
   const urls = findUrlRanges(content)
 
+  for (const match of content.matchAll(TOKEN_RE)) {
+    const start = match.index ?? 0
+    const end = start + match[0].length
+    if (match[1] != null) {
+      hits.push({ start, end, part: { type: 'file', path: match[1] } })
+    } else if (match[2] != null) {
+      hits.push({ start, end, part: { type: 'skill', name: match[2] } })
+    } else if (match[3] != null) {
+      hits.push({ start, end, part: { type: 'mcp', ...parseMcpTokenPayload(match[3]) } })
+    } else if (match[4] != null || match[5] != null) {
+      hits.push({
+        start,
+        end,
+        part: { type: 'chat', sessionId: match[4] || match[5] }
+      })
+    }
+  }
+
   for (const match of content.matchAll(FILE_MENTION_RE)) {
     const raw = match[1] || ''
     if (!raw) continue
@@ -136,6 +162,7 @@ export function parseMessageParts(content: string): ComposerPart[] {
     const start = (match.index ?? 0) + full.indexOf(raw)
     const end = start + raw.length
     if (rangeOverlapsUrl(urls, start, end)) continue
+    if (hits.some(hit => start < hit.end && end > hit.start)) continue
     hits.push({
       start,
       end,
@@ -194,6 +221,7 @@ export function serializeComposerParts(parts: ComposerPart[]): string {
       if (part.type === 'text') return part.text
       if (part.type === 'file') return fileChipToken(part.path)
       if (part.type === 'mcp') return mcpChipToken(part.id, part.name)
+      if (part.type === 'chat') return chatChipToken(part.sessionId)
       return skillChipToken(part.name)
     })
     .join('')
@@ -208,9 +236,11 @@ export function composerToMessage(value: string): string {
         ? part.text
         : part.type === 'file'
           ? `@${part.path}`
-          : part.type === 'mcp'
+        : part.type === 'mcp'
             ? `mcp:${encodeURIComponent(part.name)}`
-            : `/${part.name}`
+            : part.type === 'chat'
+              ? chatChipToken(part.sessionId)
+              : `/${part.name}`
     if (!piece) continue
     if (out && !/\s$/.test(out) && !/^\s/.test(piece)) {
       out += ' '
@@ -247,5 +277,25 @@ export function removeComposerChipAt(value: string, chipIndex: number): string {
 export function chipTokenLength(part: Exclude<ComposerPart, { type: 'text' }>): number {
   if (part.type === 'file') return fileChipToken(part.path).length
   if (part.type === 'mcp') return mcpChipToken(part.id, part.name).length
+  if (part.type === 'chat') return chatChipToken(part.sessionId).length
   return skillChipToken(part.name).length
+}
+
+export function splitTextWithChatMentions(
+  text: string
+): Array<{ type: 'text'; text: string } | { type: 'chat'; sessionId: string }> {
+  const re = /⟦#:([^⟧]+)⟧|\[\[#:([^\]]+)\]\]/g
+  const parts: Array<
+    { type: 'text'; text: string } | { type: 'chat'; sessionId: string }
+  > = []
+  let last = 0
+  for (const match of text.matchAll(re)) {
+    const start = match.index ?? 0
+    if (start > last) parts.push({ type: 'text', text: text.slice(last, start) })
+    parts.push({ type: 'chat', sessionId: match[1] || match[2] })
+    last = start + match[0].length
+  }
+  if (last < text.length) parts.push({ type: 'text', text: text.slice(last) })
+  if (parts.length === 0) parts.push({ type: 'text', text })
+  return parts
 }

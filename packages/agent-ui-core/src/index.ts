@@ -385,7 +385,7 @@ export type MessageSource = {
 
 export type SessionTitleSource = 'pending' | 'auto' | 'user'
 
-export type SessionSource = 'slack' | 'bench'
+export type SessionSource = 'slack' | 'bench' | 'capy'
 
 export type ClientSurface = 'cli' | 'ui' | 'slack' | 'unknown'
 

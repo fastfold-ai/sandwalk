@@ -57,6 +57,7 @@ _TOOL_MODULES = (
     "ops",
     "skills",
     "sites",
+    "capy",
     "dna",
     "omics",
     "shell",

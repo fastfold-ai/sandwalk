@@ -246,6 +246,9 @@ def create_app(
     )
     # Headless CLI (`sandwalk eval`) and tests can reuse the same wiring.
     app.state.deps = deps
+    from agent_server.capy import bind_capy_deps
+
+    bind_capy_deps(deps)
 
     app.add_middleware(
         TrustedHostMiddleware,

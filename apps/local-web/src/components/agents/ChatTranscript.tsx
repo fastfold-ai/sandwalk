@@ -59,6 +59,7 @@ type ChatTranscriptProps = {
   skills?: AgentSkill[]
   mcpServers?: McpServer[]
   workspaceFiles?: WorkspaceFile[]
+  mentionChats?: AgentSession[]
 }
 
 export function ChatTranscript({
@@ -92,7 +93,8 @@ export function ChatTranscript({
   onScrollToBottom,
   skills = [],
   mcpServers = [],
-  workspaceFiles = []
+  workspaceFiles = [],
+  mentionChats = []
 }: ChatTranscriptProps) {
   const timelineItems = useMemo(
     () => buildChatTimelineItems(conversationTimeline),
@@ -196,6 +198,7 @@ export function ChatTranscript({
                 skills={skills}
                 mcpServers={mcpServers}
                 workspaceFiles={workspaceFiles}
+                mentionChats={mentionChats}
               />
             ))}
             {runActive && activeBuildPlan ? (
@@ -229,6 +232,7 @@ export function ChatTranscript({
                   onOpenFile={onOpenFile}
                   workspacePath={session?.workspacePath}
                   skills={skills}
+                  mentionChats={mentionChats}
                   className="max-w-full space-y-3 [&_*]:max-w-full"
                 />
               </div>

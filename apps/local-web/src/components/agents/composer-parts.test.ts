@@ -9,6 +9,7 @@ import {
   removeComposerChipAt,
   serializeComposerParts,
   skillChipToken,
+  chatChipToken,
   spaceAroundChips
 } from './composer-parts'
 
@@ -20,6 +21,7 @@ describe('chip tokens', () => {
     expect(mcpChipToken('linear', 'Linear')).toBe(
       '⟦mcp:linear:Linear⟧'
     )
+    expect(chatChipToken('abc')).toBe('⟦#:abc⟧')
   })
 })
 
@@ -49,6 +51,19 @@ describe('parseComposerParts / serializeComposerParts', () => {
     expect(serializeComposerParts(parts)).toBe(value)
   })
 
+  it('serializes # chat mention chips into Capy user messages', () => {
+    const value = `summarize ${chatChipToken('abc')} and seed ${chatChipToken('def')}`
+    const parts = parseComposerParts(value)
+    expect(parts).toEqual([
+      { type: 'text', text: 'summarize ' },
+      { type: 'chat', sessionId: 'abc' },
+      { type: 'text', text: ' and seed ' },
+      { type: 'chat', sessionId: 'def' },
+      { type: 'text', text: '' }
+    ])
+    expect(serializeComposerParts(parts)).toBe(value)
+  })
+
   it('returns a single empty text part for empty input', () => {
     expect(parseComposerParts('')).toEqual([{ type: 'text', text: '' }])
   })
@@ -66,6 +81,21 @@ describe('parseMessageParts', () => {
       { type: 'text', text: ' and ' },
       { type: 'mcp', id: 'Linear', name: 'Linear' },
       { type: 'text', text: ' please' }
+    ])
+  })
+
+  it('parses chat mention chips in sent messages', () => {
+    expect(
+      parseMessageParts(`what is this chat about ${chatChipToken('e5e47e1b-0ebc')}?`)
+    ).toEqual([
+      { type: 'text', text: 'what is this chat about ' },
+      { type: 'chat', sessionId: 'e5e47e1b-0ebc' },
+      { type: 'text', text: '?' }
+    ])
+    expect(parseMessageParts('see [[#:abc-123]] now')).toEqual([
+      { type: 'text', text: 'see ' },
+      { type: 'chat', sessionId: 'abc-123' },
+      { type: 'text', text: ' now' }
     ])
   })
 

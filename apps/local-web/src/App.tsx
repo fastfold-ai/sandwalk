@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
+import { CapyOverlay } from '@/components/agents/capy/CapyOverlay'
 import {
   buildSessionSidebarModel,
   computeShowSessionTabs,
@@ -31,6 +32,7 @@ import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { visibleSessionIds } from '@/lib/sessions'
+import { applyCapyOpenSplit } from '@/lib/capy-ui'
 
 export default function App() {
   const location = useLocation()
@@ -171,17 +173,7 @@ export default function App() {
   // diff approach that produced false-positive attention marks whenever
   // two independent fetch sources (loadSessions + loadForeignSessions)
   // returned stale overlapping views of the same chat's status.
-  useGlobalSessionEvents({
-    client: bootstrap.client,
-    health: bootstrap.health,
-    sessionIdRef: ui.sessionIdRef,
-    setSessions: bootstrap.setSessions
-  })
-  useEventsMux({
-    client: bootstrap.client,
-    health: bootstrap.health,
-    pinnedSessionIds: activeGroup?.chatIds ?? []
-  })
+  const [capySessionId, setCapySessionId] = React.useState<string | null>(null)
 
   // Multi-select for split view: any Shift/Meta click on a tab, a
   // sidebar chat or a dropdown item adds/removes that chatId here.
@@ -224,6 +216,30 @@ export default function App() {
     },
     [tabGroupsStore, bootstrap]
   )
+
+  useGlobalSessionEvents({
+    client: bootstrap.client,
+    health: bootstrap.health,
+    sessionIdRef: ui.sessionIdRef,
+    setSessions: bootstrap.setSessions,
+    onUiCommand: payload => {
+      if (payload.action !== 'open_split') return
+      const ids = Array.isArray(payload.sessionIds)
+        ? payload.sessionIds.filter((id): id is string => typeof id === 'string')
+        : []
+      void bootstrap.loadSessions({ force: true }).then(() => {
+        applyCapyOpenSplit(ids, createSplitGroup, path => navigate(path))
+      })
+    }
+  })
+  useEventsMux({
+    client: bootstrap.client,
+    health: bootstrap.health,
+    pinnedSessionIds: [
+      ...(activeGroup?.chatIds ?? []),
+      ...(capySessionId ? [capySessionId] : [])
+    ]
+  })
 
   const createSplitFromSelection = useCallback(() => {
     const ids = Array.from(selectedChatIds).filter(
@@ -809,6 +825,20 @@ export default function App() {
         })}
       />
       {remoteDialog}
+      <CapyOverlay
+        client={bootstrap.client}
+        health={bootstrap.health}
+        chats={bootstrap.sessions}
+        skills={bootstrap.skills}
+        mcpServers={bootstrap.mcpServers}
+        modelOptions={bootstrap.modelOptions}
+        runtimeSettings={bootstrap.runtimeSettings}
+        setRuntimeSettings={bootstrap.setRuntimeSettings}
+        loadModelOptions={bootstrap.loadModelOptions}
+        onSessionId={setCapySessionId}
+        activeProjectId={context.activeProjectId}
+        activeChatId={effectiveSessionId}
+      />
     </>
   )
 }

@@ -43,6 +43,7 @@ type TimelineItemProps = {
   skills?: AgentSkill[]
   mcpServers?: McpServer[]
   workspaceFiles?: WorkspaceFile[]
+  mentionChats?: AgentSession[]
 }
 
 /** Memoized: history rows must not re-render on every streamed delta. */
@@ -66,7 +67,8 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
   hiddenPlanPaths = [],
   skills = [],
   mcpServers = [],
-  workspaceFiles = []
+  workspaceFiles = [],
+  mentionChats = []
 }: TimelineItemProps) {
   const hiddenPlans =
     hiddenPlanPaths instanceof Set
@@ -204,6 +206,7 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
       skills={skills}
       mcpServers={mcpServers}
       workspaceFiles={workspaceFiles}
+      mentionChats={mentionChats}
     />
   )
 })
