@@ -23,12 +23,27 @@ def register_pty_routes(app: FastAPI, deps: AppDeps) -> None:
     async def _require_agent_session(session_id: str) -> None:
         if session_id == HOST_TERMINAL_SESSION_ID:
             return
+        # FAS-107: terminal ids are first-class here — accept the id when it
+        # matches a terminal_sessions row, so the picker's "New terminal"
+        # can pipe the live PTY through the same /v1/sessions/{id}/pty
+        # transport the frontend already uses. Chat ids still hit the chat
+        # validation below.
+        if session_id.startswith("term_"):
+            term = await asyncio.to_thread(store.get_terminal, session_id)
+            if term is None:
+                raise HTTPException(status_code=404, detail="Terminal not found.")
+            return
         if await asyncio.to_thread(store.get_session, session_id) is None:
             raise HTTPException(status_code=404, detail="Session not found.")
 
     def _pty_cwd(session_id: str) -> str:
         if session_id == HOST_TERMINAL_SESSION_ID:
             return str(Path.home().expanduser().resolve())
+        if session_id.startswith("term_"):
+            term = store.get_terminal(session_id)
+            if term is None:
+                raise HTTPException(status_code=404, detail="Terminal not found.")
+            return term.workspace_path or str(Path.home().expanduser().resolve())
         session = service.ensure_workspace(session_id)
         if not session.workspace_path:
             raise HTTPException(status_code=409, detail="Session has no workspace.")
@@ -130,7 +145,11 @@ def register_pty_routes(app: FastAPI, deps: AppDeps) -> None:
                 await websocket.close(code=4401)
                 return
         if session_id != HOST_TERMINAL_SESSION_ID:
-            if await asyncio.to_thread(store.get_session, session_id) is None:
+            if session_id.startswith("term_"):
+                if await asyncio.to_thread(store.get_terminal, session_id) is None:
+                    await websocket.close(code=4404)
+                    return
+            elif await asyncio.to_thread(store.get_session, session_id) is None:
                 await websocket.close(code=4404)
                 return
         if pty_manager.get(session_id, pty_id) is None:

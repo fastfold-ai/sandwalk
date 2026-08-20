@@ -302,19 +302,41 @@ export function ChatTilingContainer({
         node={renderTree}
         path={[]}
         onBranchLayout={handleBranchLayout}
-        renderLeaf={(chatId, focused, focusPanel) =>
-          chatId === PICKER_CELL_ID ? (
-            <PickerLeaf
-              sourceChatId={
-                pickerRequest?.targetChatId ?? chatIds[0] ?? ''
-              }
-              projects={projects}
-              sessions={sessions}
-              pickerContext={pickerContext}
-              onPick={handlePicked}
-              onCancel={handleCancelPicker}
-            />
-          ) : (
+        renderLeaf={(chatId, focused, focusPanel) => {
+          if (chatId === PICKER_CELL_ID) {
+            return (
+              <PickerLeaf
+                sourceChatId={
+                  pickerRequest?.targetChatId ?? chatIds[0] ?? ''
+                }
+                projects={projects}
+                sessions={sessions}
+                pickerContext={pickerContext}
+                onPick={handlePicked}
+                onCancel={handleCancelPicker}
+              />
+            )
+          }
+          // Terminals share the `chatIds` slot for backwards-compat with
+          // the tab-groups store, but must render as terminal leaves.
+          // Detect by matching against the fetched terminals list; if
+          // matched, delegate to TerminalLeaf.
+          const asTerminal = terminals?.find(t => t.id === chatId)
+          if (asTerminal && terminalClient && onCloseTerminal) {
+            return (
+              <TerminalLeaf
+                terminalId={chatId}
+                focused={focused}
+                focusPanel={focusPanel}
+                client={terminalClient}
+                terminals={terminals}
+                onSplit={handleSplit}
+                onClose={onCloseTerminal}
+                canClose={chatIds.length > 1}
+              />
+            )
+          }
+          return (
             <ChatLeaf
               chatId={chatId}
               focused={focused}
@@ -327,7 +349,7 @@ export function ChatTilingContainer({
               canClose={chatIds.length > 1}
             />
           )
-        }
+        }}
         renderTerminalLeaf={
           terminalClient && onCloseTerminal
             ? (terminalId, focused, focusPanel) => (
