@@ -41,7 +41,9 @@ from agent_server.routes.sites import register_site_routes
 from agent_server.routes.skills import register_skill_routes
 from agent_server.routes.slack_oauth_return import register_slack_oauth_return_routes
 from agent_server.routes.specialists import register_specialist_routes
+from agent_server.routes.terminals import register_terminal_routes
 from agent_server.routes.usage import register_usage_routes
+from agent_server.routes.workspace_items import register_workspace_item_routes
 
 
 def register_all_routes(app: FastAPI, deps: AppDeps) -> None:
@@ -78,6 +80,8 @@ def register_all_routes(app: FastAPI, deps: AppDeps) -> None:
     register_workspace_routes(app, deps)
     register_workspace_mutate_routes(app, deps)
     register_pty_routes(app, deps)
+    register_terminal_routes(app, deps)
+    register_workspace_item_routes(app, deps)
     register_session_event_routes(app, deps)
     register_session_events_global_routes(app, deps)
     register_events_mux_routes(app, deps)

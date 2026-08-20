@@ -583,14 +583,77 @@ export type AgentSession = {
  * Persisted client-side (localStorage) as a UI preference — not on the backend.
  */
 /**
+ * Kind discriminator for every "thing that can appear in a tab or split".
+ * Chat and Terminal ship in FAS-107; files/preview/structure are the
+ * planned next entrants and slot into the same union.
+ */
+export type WorkspaceItemKind = 'chat' | 'terminal'
+
+/**
+ * Lightweight typed pointer stored in tab strip / split groups / tiling
+ * leaves. Cheap to list and easy to narrow. Precedent: VSCode's
+ * `Tab.input: TabInputText | TabInputTerminal | TabInputWebview | ...`.
+ */
+export type WorkspaceItemRef =
+  | { kind: 'chat'; id: string }
+  | { kind: 'terminal'; id: string }
+
+/**
+ * Row from the `workspace_items` denormalized index — the tab strip /
+ * sidebar / split picker query this shape and then hydrate per-kind
+ * detail (title, model, cwd) on demand from the kind's own endpoint.
+ */
+export type WorkspaceItem = {
+  id: string
+  kind: WorkspaceItemKind
+  projectId: string | null
+  organizeLabel: 'pinned' | 'archive' | null
+  title: string
+  updatedAt: string
+}
+
+/**
+ * Terminal-as-first-class-item (FAS-107). Peer of `AgentSession`. The
+ * live PTY (fd, buffer, WebSocket subscribers) is held in the server's
+ * `PtyManager` on top of this metadata row.
+ */
+export type TerminalSession = {
+  id: string
+  title: string
+  titleSource: SessionTitleSource
+  projectId: string | null
+  workspacePath: string | null
+  shell: string | null
+  /** Set when the terminal was opened from a chat's side-panel. */
+  originChatId: string | null
+  /**
+   * Stable identity for user-assigned color / rename across shell
+   * respawns in the same cwd. Precedent: WezTerm's `pane_id` vs pane
+   * role split — the ephemeral id changes when a shell dies but the
+   * slot_key stays the same so color/name follow.
+   */
+  slotKey: string | null
+  status: 'idle' | 'running' | 'detached' | 'exited'
+  lastActivityAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/**
  * Tiling tree used for the split-view layout (Warp / iTerm2 pattern).
- * A leaf holds a chatId; a branch splits its content horizontally or
+ * A leaf holds a chatId or a terminalId (or a generic typed `ref`, used
+ * by new layouts); a branch splits its content horizontally or
  * vertically among N children whose `ratios` sum to 1.0. Stored
  * per-monitor so a docked 4K layout doesn't dictate the shape on a
  * MacBook 13".
+ *
+ * The `type: 'chat'` leaf is kept for backwards-compat with layouts
+ * persisted before FAS-107 — new writes use `type: 'ref'`.
  */
 export type PaneNode =
   | { type: 'chat'; chatId: string }
+  | { type: 'terminal'; terminalId: string }
+  | { type: 'ref'; ref: WorkspaceItemRef }
   | {
       type: 'branch'
       direction: 'horizontal' | 'vertical'
@@ -605,7 +668,14 @@ export type SessionGroup = {
   /** Same palette as the tab color tag; null = no color. */
   color: string | null
   pinned: boolean
+  /**
+   * Legacy: chat-only members. FAS-107 introduces `items` for mixed
+   * chat+terminal groups; readers migrate on the fly. New writes should
+   * fill both fields for one release, then drop `chatIds`.
+   */
   chatIds: string[]
+  /** Typed members (FAS-107). Contains a superset of `chatIds`. */
+  items?: WorkspaceItemRef[]
   /** Which chat inside the split has focus (composer visible, side panel bound). */
   activeChatId: string
   /**

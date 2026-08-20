@@ -30,6 +30,60 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS sites_updated
             ON sites(updated_at DESC, id DESC);
+
+        -- FAS-107: Terminal as a first-class item peer to Chat.
+        -- Precedent: VSCode's TabInputText | TabInputTerminal split, Zellij's
+        -- PaneId::Terminal | PaneId::Plugin. Terminals get their own table
+        -- (Chat-shaped columns like provider/model/tokens are meaningless
+        -- for a shell); the tab strip / sidebar / splits query the unified
+        -- workspace_items index instead of UNIONing across kinds.
+        CREATE TABLE IF NOT EXISTS terminal_sessions (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            title_source TEXT NOT NULL DEFAULT 'pending',
+            project_id TEXT,
+            workspace_path TEXT,
+            shell TEXT,
+            origin_chat_id TEXT,
+            slot_key TEXT,
+            status TEXT NOT NULL DEFAULT 'idle',
+            last_activity_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS terminal_sessions_project_updated
+            ON terminal_sessions(project_id, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS terminal_sessions_slot_key
+            ON terminal_sessions(slot_key)
+            WHERE slot_key IS NOT NULL;
+
+        -- Denormalized index over "everything that can appear in a tab or
+        -- split". One row per underlying entity (chat or terminal today,
+        -- files/preview/structure later). Columns are exactly what the tab
+        -- strip sorts and filters by, so a single indexed query serves the
+        -- strip without UNIONing across kinds.
+        CREATE TABLE IF NOT EXISTS workspace_items (
+            id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL,
+            project_id TEXT,
+            organize_label TEXT,
+            title TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS workspace_items_project_updated
+            ON workspace_items(project_id, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS workspace_items_kind_updated
+            ON workspace_items(kind, updated_at DESC);
+
+        -- Ring-buffer scrollback for terminals across app restarts.
+        -- Bounded at write-time (last ~256 KB per PTY); reader replays the
+        -- current blob on WebSocket attach. Precedent: iTerm2 Instant
+        -- Replay narrowed to scrollback, WezTerm mux buffer.
+        CREATE TABLE IF NOT EXISTS pty_scrollback (
+            id TEXT PRIMARY KEY REFERENCES terminal_sessions(id) ON DELETE CASCADE,
+            ring BLOB NOT NULL,
+            updated_at TEXT NOT NULL
+        );
         """
     )
     columns = {row["name"] for row in connection.execute("PRAGMA table_info(sessions)").fetchall()}
@@ -243,6 +297,38 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
     connection.execute(
         "CREATE INDEX IF NOT EXISTS usage_runs_kind_day ON usage_runs(kind, day)"
     )
+    # FAS-107 backfill: mirror every existing chat session into workspace_items
+    # so the tab strip / sidebar can query the unified index without a UNION.
+    # Idempotent — INSERT OR IGNORE keeps existing rows untouched, and the
+    # UPDATE keeps the denormalized copy in sync on subsequent boots.
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO workspace_items(
+            id, kind, project_id, organize_label, title, updated_at
+        )
+        SELECT id, 'chat', project_id, organize_label, title, updated_at
+        FROM sessions
+        """
+    )
+    connection.execute(
+        """
+        UPDATE workspace_items
+        SET project_id = sessions.project_id,
+            organize_label = sessions.organize_label,
+            title = sessions.title,
+            updated_at = sessions.updated_at
+        FROM sessions
+        WHERE workspace_items.kind = 'chat'
+          AND workspace_items.id = sessions.id
+          AND (
+               workspace_items.project_id IS NOT sessions.project_id
+            OR workspace_items.organize_label IS NOT sessions.organize_label
+            OR workspace_items.title != sessions.title
+            OR workspace_items.updated_at != sessions.updated_at
+          )
+        """
+    )
+
     session_col = next(
         (
             row

@@ -15,7 +15,9 @@ from agent_server.store.sessions import SessionCreateMixin
 from agent_server.store.sites import SiteMixin
 from agent_server.store.specialist_updates import SpecialistUpdateMixin
 from agent_server.store.specialists import SpecialistMixin
+from agent_server.store.terminal_sessions import TerminalSessionMixin
 from agent_server.store.usage import UsageMixin
+from agent_server.store.workspace_items import WorkspaceItemMixin
 
 
 class AgentStore(
@@ -31,6 +33,8 @@ class AgentStore(
     LibraryMixin,
     SiteMixin,
     ConnectorMixin,
+    TerminalSessionMixin,
+    WorkspaceItemMixin,
     UsageMixin,
     AgentStoreBase,
 ):

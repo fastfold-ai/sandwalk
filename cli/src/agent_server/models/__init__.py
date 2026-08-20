@@ -41,6 +41,8 @@ from agent_server.models.usage import (
 )
 from agent_server.models.sessions_messages import AgentMessage, EventEnvelope, EventList, MessageFeedbackRequest, MessageFeedbackResponse, MessageList, MessageRole, MessageSource, SendMessageRequest, StartRunResponse
 from agent_server.models.sessions_pty import CreatePtyRequest, PtySessionInfo, PtySessionList, UpdatePtyRequest
+from agent_server.models.terminals import CreateTerminalRequest, TerminalSession, TerminalSessionList, TerminalStatus, TerminalTitleSource, UpdateTerminalRequest
+from agent_server.models.workspace_items import WorkspaceItem, WorkspaceItemKind, WorkspaceItemList
 from agent_server.models.sessions_workspace import CreateWorkspaceFolderRequest, MoveWorkspaceFileRequest, WorkspaceFile, WorkspaceFileContent, WorkspaceFileList, WorkspaceMutationResponse, WriteWorkspaceFileRequest
 from agent_server.models.settings import OnboardingSettings, PromptBudgetBucket, PromptBudgetResponse, PromptBudgetToolCounts, RuntimeSettings, SandboxProbeReport, SandboxProbeStep, SandboxSettings, UpdateOnboardingSettingsRequest, UpdateRuntimeSettingsRequest, UpdateSandboxSettingsRequest
 from agent_server.models.sites import DeleteSiteResponse, PublishSiteRequest, RegisterSiteRequest, RenameSiteRequest, Site, SiteList, SitePreview, SitePublishResult
