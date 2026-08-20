@@ -778,6 +778,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
               terminals={terminals}
               terminalClient={client}
               onCloseTerminal={handleCloseTerminal}
+              onRenameTerminal={handleRenameTerminal}
+              onToggleTerminalOrganizeLabel={handleToggleTerminalOrganizeLabel}
+              onMoveTerminalToProject={handleMoveTerminalToProjectLocal}
             />
           ) : (
           <main className="relative flex h-full min-w-0 flex-col">

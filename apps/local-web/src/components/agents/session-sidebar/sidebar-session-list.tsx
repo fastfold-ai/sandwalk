@@ -35,6 +35,7 @@ import type { NavigateFunction } from 'react-router-dom'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
+import { TerminalActionsMenu } from '@/components/agents/TerminalActionsMenu'
 import { SessionSourceIcon } from '@/components/agents/SessionSourceIcon'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
 import { GroupDissolveDialog } from '@/components/agents/SessionTabs'
@@ -451,13 +452,25 @@ export function SidebarSessionList({
                             exportTranscript={exportTranscript}
                             setDeleteTarget={setDeleteTarget}
                             onSelectTerminal={terminalId => {
-                              // FAS-107: opening a terminal member of the
-                              // split from the sidebar takes you to its
-                              // solo route (parity with clicking a chat
-                              // child, which navigates to the group with
-                              // that chat focused).
-                              openSessionTab(terminalId)
-                              navigate(`/terminals/${terminalId}`)
+                              /*
+                               * FAS-107 P2: parity con el `onSelectChat`
+                               * de abajo. Un terminal miembro de un split
+                               * NO se saca a `/terminals/:id` — eso lo
+                               * agrandaba a pantalla completa y dejaba al
+                               * usuario en un "tab invisible" fuera del
+                               * strip. En su lugar seteamos el terminal
+                               * como el `activeChatId` del grupo (los
+                               * grupos aceptan term_* ids) y navegamos al
+                               * grupo, para que el split renderice con
+                               * ese panel enfocado.
+                               */
+                              setSelectionAnchorId(terminalId)
+                              if (setTabGroupActiveChat) {
+                                flushSync(() => {
+                                  setTabGroupActiveChat(item.group.id, terminalId)
+                                })
+                              }
+                              navigate(`/agents/${item.group.id}`)
                             }}
                             onCloseTerminal={onCloseTerminal}
                             onRenameTerminal={onRenameTerminal}
@@ -1408,9 +1421,6 @@ function SidebarSplitTerminalChild({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const isPinned = terminal.organizeLabel === 'pinned'
-  const isArchived = terminal.organizeLabel === 'archive'
-  const itemBase =
-    'hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]'
   return (
     <li>
       <div
@@ -1465,97 +1475,35 @@ function SidebarSplitTerminalChild({
               </button>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-52 p-1.5">
-              {onRename ? (
-                <button
-                  type="button"
-                  className={itemBase}
-                  onClick={() => {
-                    setMenuOpen(false)
-                    onRename(terminal.id)
-                  }}
-                >
-                  <Pencil className="size-3.5" />
-                  Rename…
-                </button>
-              ) : null}
-              {onTogglePin ? (
-                <button
-                  type="button"
-                  className={itemBase}
-                  onClick={() => {
-                    setMenuOpen(false)
-                    onTogglePin(terminal.id)
-                  }}
-                >
-                  <Pin className="size-3.5" />
-                  {isPinned ? 'Unpin' : 'Pin'}
-                </button>
-              ) : null}
-              {onMoveToProject ? (
-                <ProjectPicker
-                  projects={projects}
-                  value={terminal.projectId}
-                  noneLabel="No project"
-                  trigger={
-                    <button type="button" className={itemBase}>
-                      <Folder className="size-3.5" />
-                      Move to project…
-                    </button>
-                  }
-                  onChange={projectId => {
-                    void onMoveToProject(terminal.id, projectId)
-                    setMenuOpen(false)
-                  }}
-                />
-              ) : null}
-              <div className="px-2 py-1.5">
-                <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">
-                  Color
-                </div>
-                <TabInlineColorRow
-                  value={tabColor}
-                  onSelect={color => {
-                    onSetColor(color)
-                    setMenuOpen(false)
-                  }}
-                  onClear={() => {
-                    onSetColor(null)
-                    setMenuOpen(false)
-                  }}
-                />
-              </div>
-              {onToggleArchive ? (
-                <button
-                  type="button"
-                  className={itemBase}
-                  onClick={() => {
-                    setMenuOpen(false)
-                    onToggleArchive(terminal.id)
-                  }}
-                >
-                  <Archive className="size-3.5" />
-                  {isArchived ? 'Unarchive' : 'Archive'}
-                </button>
-              ) : null}
-              {onDelete ? (
-                <>
-                  <div className="border-border/60 my-1 border-t" />
-                  <button
-                    type="button"
-                    className={cn(
-                      itemBase,
-                      'hover:bg-destructive/10 text-destructive'
-                    )}
-                    onClick={() => {
-                      setMenuOpen(false)
-                      onDelete(terminal.id)
-                    }}
-                  >
-                    <X className="size-3.5" />
-                    Delete terminal
-                  </button>
-                </>
-              ) : null}
+              <TerminalActionsMenu
+                terminal={terminal}
+                projects={projects}
+                tabColor={tabColor}
+                onRename={() => {
+                  setMenuOpen(false)
+                  onRename?.(terminal.id)
+                }}
+                onTogglePin={() => {
+                  setMenuOpen(false)
+                  onTogglePin?.(terminal.id)
+                }}
+                onMoveToProject={projectId => {
+                  setMenuOpen(false)
+                  void onMoveToProject?.(terminal.id, projectId)
+                }}
+                onSetTabColor={color => {
+                  setMenuOpen(false)
+                  onSetColor(color)
+                }}
+                onArchive={() => {
+                  setMenuOpen(false)
+                  onToggleArchive?.(terminal.id)
+                }}
+                onDelete={() => {
+                  setMenuOpen(false)
+                  onDelete?.(terminal.id)
+                }}
+              />
             </PopoverContent>
           </Popover>
         </div>

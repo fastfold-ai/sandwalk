@@ -1,9 +1,9 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { TerminalSession } from '@sandwalk/agent-ui-core'
-import { SquareTerminal } from 'lucide-react'
+import type { AgentProject, TerminalSession } from '@sandwalk/agent-ui-core'
 import { type MouseEvent, useCallback } from 'react'
 
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
+import { TerminalSplitPanelHeader } from '@/components/agents/TerminalSplitPanelHeader'
 import { cn } from '@/lib/utils'
 
 import type {
@@ -25,13 +25,28 @@ type TerminalLeafProps = {
   ) => void
   onClose: (terminalId: string) => void
   canClose: boolean
+  /**
+   * FAS-107 P3: parity with ChatLeaf — the panel header exposes the
+   * same actions per pane (rename / pin / color / move to project /
+   * archive / split L/R/U/D / close pane). Callbacks are prop-drilled
+   * from the shell via `ChatTilingContainer`.
+   */
+  projects?: AgentProject[]
+  onRename?: (terminalId: string) => void
+  onTogglePin?: (terminalId: string) => void
+  onToggleArchive?: (terminalId: string) => void
+  onMoveToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
 }
 
 /**
  * Terminal-as-pane leaf (FAS-107). Peer of `ChatLeaf` inside the tiling
- * tree. Wraps the existing `TerminalPanel` with the same focus ring +
- * right-click split menu behaviour as chat panes, so users can split,
- * close, and resize a terminal like any other item.
+ * tree. Wraps `TerminalPanel` with a header that mirrors
+ * `ChatSplitPanelHeader` (same 52px, same focused/unfocused states,
+ * same ⋯ menu structure) — see `TerminalSplitPanelHeader` for the
+ * action set.
  *
  * The focused ring uses an orange accent (matching the picker's
  * "New terminal" card in Fase 4) to distinguish where keystrokes will
@@ -46,10 +61,14 @@ export function TerminalLeaf({
   terminals,
   onSplit,
   onClose,
-  canClose
+  canClose,
+  projects,
+  onRename,
+  onTogglePin,
+  onToggleArchive,
+  onMoveToProject
 }: TerminalLeafProps) {
   const terminal = terminals.find(t => t.id === terminalId) ?? null
-  const title = terminal?.title ?? 'Terminal'
 
   const onContextMenu = useCallback(
     (event: MouseEvent) => {
@@ -92,25 +111,23 @@ export function TerminalLeaf({
       onContextMenu={onContextMenu}
       onMouseDownCapture={focusPanel}
       onFocusCapture={focusPanel}
-      aria-label={`Terminal pane: ${title}`}
+      aria-label={`Terminal pane: ${terminal?.title ?? 'Terminal'}`}
     >
-      <div className="border-border/50 flex h-9 shrink-0 items-center gap-2 border-b px-3">
-        <SquareTerminal
-          aria-hidden
-          className={cn(
-            'size-3.5',
-            focused ? 'text-orange-500' : 'text-muted-foreground'
-          )}
-        />
-        <span
-          className={cn(
-            'truncate text-[13px]',
-            focused ? 'text-foreground' : 'text-muted-foreground'
-          )}
-        >
-          {title}
-        </span>
-      </div>
+      <TerminalSplitPanelHeader
+        terminal={terminal}
+        focused={focused}
+        onFocusPanel={focusPanel}
+        projects={projects ?? []}
+        onRename={onRename}
+        onTogglePin={onTogglePin}
+        onToggleArchive={onToggleArchive}
+        onMoveToProject={onMoveToProject}
+        onRemoveFromSplit={canClose ? id => onClose(id) : undefined}
+        onSplitLeft={id => onSplit(id, 'horizontal', 'before')}
+        onSplitRight={id => onSplit(id, 'horizontal', 'after')}
+        onSplitUp={id => onSplit(id, 'vertical', 'before')}
+        onSplitDown={id => onSplit(id, 'vertical', 'after')}
+      />
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
         <TerminalPanel
           client={client}

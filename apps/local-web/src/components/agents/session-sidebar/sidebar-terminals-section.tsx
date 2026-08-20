@@ -2,48 +2,20 @@ import type {
   AgentProject,
   TerminalSession
 } from '@sandwalk/agent-ui-core'
-import {
-  Archive,
-  ArchiveRestore,
-  ChevronDown,
-  Folder,
-  MoreHorizontal,
-  Palette,
-  Pencil,
-  Pin,
-  PinOff,
-  SquareTerminal,
-  X
-} from 'lucide-react'
+import { ChevronDown, MoreHorizontal, Pin, SquareTerminal } from 'lucide-react'
 import { useState } from 'react'
 
+import { TerminalActionsMenu } from '@/components/agents/TerminalActionsMenu'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover'
 import {
   clearTerminalActivity,
   useTerminalHasActivity
 } from '@/lib/terminal-attention'
 import { cn } from '@/lib/utils'
-
-// Palette matches the chat sidebar tab colors so users see one system.
-const TERMINAL_TAB_COLORS: Array<{ id: string; hex: string; label: string }> = [
-  { id: 'red', hex: '#ef4444', label: 'Red' },
-  { id: 'orange', hex: '#f97316', label: 'Orange' },
-  { id: 'amber', hex: '#f59e0b', label: 'Amber' },
-  { id: 'green', hex: '#22c55e', label: 'Green' },
-  { id: 'cyan', hex: '#06b6d4', label: 'Cyan' },
-  { id: 'blue', hex: '#3b82f6', label: 'Blue' },
-  { id: 'violet', hex: '#8b5cf6', label: 'Violet' },
-  { id: 'pink', hex: '#ec4899', label: 'Pink' }
-]
 
 /**
  * FAS-107 GF6: terminals of the active project as a section INSIDE the
@@ -123,7 +95,14 @@ export function SidebarTerminalsSection({
 /**
  * Terminal row exported for the inline mixed-list renderer in
  * `sidebar-session-list.tsx`. Keeps a single source of truth for the
- * row anatomy (icon, activity dot, action menu, delete).
+ * row anatomy (icon, activity dot, action menu).
+ *
+ * P4+P5 fix: uses `Popover` + `TerminalActionsMenu` (parity with the
+ * chat row) so the menu opens pegged to the ⋯ trigger and its
+ * sub-panels (color, project) render inline instead of as Radix
+ * `DropdownMenuSub` flyouts that flipped up when the sidebar was
+ * narrow. Right-click on the whole row also opens the menu — parity
+ * with the chat row.
  */
 export function SidebarTerminalRow({
   terminal,
@@ -204,7 +183,7 @@ function TerminalRowInner({
 }) {
   const hasActivity = useTerminalHasActivity(term.id)
   const isPinned = term.organizeLabel === 'pinned'
-  const isArchived = term.organizeLabel === 'archive'
+  const [menuOpen, setMenuOpen] = useState(false)
   return (
     <li>
       <div
@@ -212,6 +191,12 @@ function TerminalRowInner({
           'hover:bg-sidebar-accent/45 group grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-md px-2 py-1.5',
           active && 'bg-sidebar-accent/55'
         )}
+        onContextMenu={event => {
+          // P4: right-click anywhere on the row opens the same menu the
+          // ⋯ trigger would — parity with the chat row.
+          event.preventDefault()
+          setMenuOpen(true)
+        }}
       >
         <button
           type="button"
@@ -244,122 +229,55 @@ function TerminalRowInner({
             />
           ) : null}
         </button>
-        <div className="flex items-center gap-0.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+        <div className="relative flex items-center gap-0.5">
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
               <button
                 type="button"
                 aria-label={`Actions for ${term.title}`}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted hidden shrink-0 rounded p-0.5 group-hover:inline-flex"
+                className={cn(
+                  'text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded p-0.5 transition-opacity',
+                  menuOpen
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                )}
                 onClick={e => e.stopPropagation()}
               >
                 <MoreHorizontal className="size-3.5" />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="min-w-[200px]"
-              onCloseAutoFocus={e => e.preventDefault()}
-            >
-              {onRename ? (
-                <DropdownMenuItem onSelect={() => onRename(term.id)}>
-                  <Pencil className="mr-2 size-3.5" />
-                  <span>Rename</span>
-                </DropdownMenuItem>
-              ) : null}
-              {onTogglePin ? (
-                <DropdownMenuItem onSelect={() => onTogglePin(term.id)}>
-                  {isPinned ? (
-                    <PinOff className="mr-2 size-3.5" />
-                  ) : (
-                    <Pin className="mr-2 size-3.5" />
-                  )}
-                  <span>{isPinned ? 'Unpin' : 'Pin'}</span>
-                </DropdownMenuItem>
-              ) : null}
-              {onSetColor ? (
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <Palette className="mr-2 size-3.5" />
-                    <span>Set color</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="min-w-[160px]">
-                    <DropdownMenuItem
-                      onSelect={() => onSetColor(term.id, null)}
-                    >
-                      <span
-                        aria-hidden
-                        className="mr-2 size-3 rounded-full border border-black/10"
-                      />
-                      <span>None</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {TERMINAL_TAB_COLORS.map(c => (
-                      <DropdownMenuItem
-                        key={c.id}
-                        onSelect={() => onSetColor(term.id, c.hex)}
-                      >
-                        <span
-                          aria-hidden
-                          className="mr-2 size-3 rounded-full border border-black/10"
-                          style={{ backgroundColor: c.hex }}
-                        />
-                        <span>{c.label}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              ) : null}
-              {onMoveToProject ? (
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <Folder className="mr-2 size-3.5" />
-                    <span>Move to project</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="min-w-[180px]">
-                    <DropdownMenuItem
-                      onSelect={() => void onMoveToProject(term.id, null)}
-                    >
-                      <span>No project</span>
-                    </DropdownMenuItem>
-                    {projects.length > 0 ? (
-                      <DropdownMenuSeparator />
-                    ) : null}
-                    {projects.map(p => (
-                      <DropdownMenuItem
-                        key={p.id}
-                        onSelect={() => void onMoveToProject(term.id, p.id)}
-                      >
-                        <span className="truncate">{p.name}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              ) : null}
-              {onToggleArchive ? (
-                <DropdownMenuItem onSelect={() => onToggleArchive(term.id)}>
-                  {isArchived ? (
-                    <ArchiveRestore className="mr-2 size-3.5" />
-                  ) : (
-                    <Archive className="mr-2 size-3.5" />
-                  )}
-                  <span>{isArchived ? 'Unarchive' : 'Archive'}</span>
-                </DropdownMenuItem>
-              ) : null}
-              {onClose ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onSelect={() => onClose(term.id)}
-                  >
-                    <X className="mr-2 size-3.5" />
-                    <span>Delete terminal</span>
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-52 p-1.5">
+              <TerminalActionsMenu
+                terminal={term}
+                projects={projects}
+                tabColor={colorValue || null}
+                onRename={() => {
+                  setMenuOpen(false)
+                  onRename?.(term.id)
+                }}
+                onTogglePin={() => {
+                  setMenuOpen(false)
+                  onTogglePin?.(term.id)
+                }}
+                onMoveToProject={projectId => {
+                  setMenuOpen(false)
+                  void onMoveToProject?.(term.id, projectId)
+                }}
+                onSetTabColor={color => {
+                  setMenuOpen(false)
+                  onSetColor?.(term.id, color)
+                }}
+                onArchive={() => {
+                  setMenuOpen(false)
+                  onToggleArchive?.(term.id)
+                }}
+                onDelete={() => {
+                  setMenuOpen(false)
+                  onClose?.(term.id)
+                }}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </li>

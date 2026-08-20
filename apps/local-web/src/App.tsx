@@ -169,6 +169,10 @@ export default function App() {
           projectId: bootstrapActiveProjectIdForShortcut ?? null
         })
         .then(term => {
+          // FAS-107 P6: register the new terminal in the strip BEFORE
+          // navigating, so a chip appears (parity with the "+ New
+          // terminal" dropdown flow).
+          openSessionTabRef.current?.(term.id)
           navigate(`/terminals/${term.id}`)
         })
         .catch(err => console.error('⌘⇧T createTerminal failed', err))
@@ -202,6 +206,15 @@ export default function App() {
     ui.openTabsByProject,
     ui.setOpenTabsByProject
   )
+  // FAS-107 P6: expose `openSessionTab` to the ⌘⇧T effect declared above
+  // (which sits before `tabs` for TDZ reasons). The ref lets the effect
+  // register the new terminal id in the strip right after creation so a
+  // chip appears — parity with the "+" dropdown flow in
+  // AgentSessionMainPanel.
+  const openSessionTabRef = useRef(tabs.openSessionTab)
+  useEffect(() => {
+    openSessionTabRef.current = tabs.openSessionTab
+  }, [tabs.openSessionTab])
   const tabGroupsStore = useAppTabGroups(
     ui.projectScopeId,
     bootstrap.sessions,
@@ -720,7 +733,8 @@ export default function App() {
     setComposer: layer.chat.setComposer,
     setComposerFiles: layer.chat.setComposerFiles,
     chatIsInsideAnyGroup: chatIsInsideAnyGroupMemo,
-    tabGroups: tabGroupsStore.allTabGroups
+    tabGroups: tabGroupsStore.allTabGroups,
+    terminals: terminalsLive.terminals
   })
 
   // Bench sessions are omitted from the global list (sidebar noise). When a

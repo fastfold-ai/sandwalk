@@ -3,6 +3,7 @@ import type {
   AgentSession,
   AgentSkillDetail,
   IntegrationSummary,
+  TerminalSession,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import type { Dispatch, SetStateAction } from 'react'
@@ -52,6 +53,13 @@ type UseAppSessionEffectsArgs = {
    * si al menos uno de sus chats pertenece al proyecto activo.
    */
   tabGroups?: import('@sandwalk/agent-ui-core').SessionGroup[]
+  /**
+   * FAS-107 P1: todos los terminales conocidos. El cleanup de
+   * `openTabsByProject` los usa como tercera fuente de verdad (además de
+   * `sessions` y `tabGroups`) — sin esto, un `term_*` id en el strip se
+   * caía al primer render porque no matcheaba ninguna sesión existente.
+   */
+  terminals?: TerminalSession[]
 }
 
 export function useAppSessionEffects({
@@ -79,7 +87,8 @@ export function useAppSessionEffects({
   setComposer,
   setComposerFiles,
   chatIsInsideAnyGroup,
-  tabGroups = []
+  tabGroups = [],
+  terminals = []
 }: UseAppSessionEffectsArgs) {
   useEffect(() => {
     setIntegrationValues({})
@@ -138,6 +147,13 @@ export function useAppSessionEffects({
             return Boolean(chat && chat.projectId === activeProjectId)
           })
         }
+        // FAS-107 P1: terminales viven en su propio store (`terminals`),
+        // no en `sessions`. Sin este chequeo un `term_*` id caería al
+        // primer render porque `sessions.find(...)` devolvería undefined.
+        if (id.startsWith('term_')) {
+          const term = terminals.find(t => t.id === id)
+          return Boolean(term && (term.projectId ?? null) === activeProjectId)
+        }
         const item = sessions.find(session => session.id === id)
         return Boolean(item && item.projectId === activeProjectId)
       })
@@ -148,7 +164,7 @@ export function useAppSessionEffects({
       writeOpenTabsByProject(next)
       return next
     })
-  }, [activeProjectId, sessions, tabGroups])
+  }, [activeProjectId, sessions, tabGroups, terminals])
 
   useEffect(() => {
     if (!sessionId || isDraftAgentSessionId(sessionId)) return
@@ -168,15 +184,21 @@ export function useAppSessionEffects({
     if (sessions.length === 0) return
     const existing = new Set(sessions.map(item => item.id))
     const validGroupIds = new Set(tabGroups.map(g => g.id))
+    // FAS-107 P1: terminales son first-class; sus ids también son válidos
+    // en `openTabsByProject`.
+    const validTerminalIds = new Set(terminals.map(t => t.id))
     setOpenTabsByProject(current => {
       let changed = false
       const next: Record<string, string[]> = {}
       for (const [key, ids] of Object.entries(current)) {
-        // Un id se conserva si es un chat válido O un grp_ conocido.
-        // Antes este cleanup borraba TODOS los `grp_xxx` (no están en
-        // `sessions`) y los grupos desaparecían al primer render.
+        // Un id se conserva si es un chat válido O un grp_ conocido O un
+        // terminal. Antes este cleanup borraba TODOS los `grp_xxx` y los
+        // `term_*` (ninguno vive en `sessions`).
         const filtered = ids.filter(
-          id => existing.has(id) || validGroupIds.has(id)
+          id =>
+            existing.has(id) ||
+            validGroupIds.has(id) ||
+            validTerminalIds.has(id)
         )
         if (filtered.length !== ids.length) changed = true
         if (filtered.length > 0) next[key] = filtered
@@ -200,7 +222,7 @@ export function useAppSessionEffects({
       writeLastSessionByScope(next)
       return next
     })
-  }, [sessions, tabGroups])
+  }, [sessions, tabGroups, terminals])
 
   useEffect(() => {
     const listId =

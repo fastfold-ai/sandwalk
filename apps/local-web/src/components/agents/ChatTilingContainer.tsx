@@ -93,6 +93,20 @@ export type ChatTilingContainerProps = {
   terminals?: TerminalSession[]
   terminalClient?: LocalAgentClient
   onCloseTerminal?: (terminalId: string) => void
+  /**
+   * FAS-107 P3: parity with chat panes — the terminal split header
+   * exposes rename / pin / archive / move to project. Callbacks are
+   * optional; when absent the corresponding menu items don't render.
+   */
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
 }
 
 /**
@@ -114,7 +128,10 @@ export function ChatTilingContainer({
   onCloseChat,
   terminals,
   terminalClient,
-  onCloseTerminal
+  onCloseTerminal,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel,
+  onMoveTerminalToProject
 }: ChatTilingContainerProps) {
   const chatIds = group.chatIds
   const activeChatId = group.activeChatId
@@ -339,6 +356,21 @@ export function ChatTilingContainer({
                 onSplit={handleSplit}
                 onClose={onCloseTerminal}
                 canClose={chatIds.length > 1}
+                projects={projects}
+                onRename={onRenameTerminal}
+                onTogglePin={
+                  onToggleTerminalOrganizeLabel
+                    ? id =>
+                        void onToggleTerminalOrganizeLabel(id, 'pinned')
+                    : undefined
+                }
+                onToggleArchive={
+                  onToggleTerminalOrganizeLabel
+                    ? id =>
+                        void onToggleTerminalOrganizeLabel(id, 'archive')
+                    : undefined
+                }
+                onMoveToProject={onMoveTerminalToProject}
               />
             )
           }
@@ -368,6 +400,21 @@ export function ChatTilingContainer({
                   onSplit={handleSplit}
                   onClose={onCloseTerminal}
                   canClose={chatIds.length > 1}
+                  projects={projects}
+                  onRename={onRenameTerminal}
+                  onTogglePin={
+                    onToggleTerminalOrganizeLabel
+                      ? id =>
+                          void onToggleTerminalOrganizeLabel(id, 'pinned')
+                      : undefined
+                  }
+                  onToggleArchive={
+                    onToggleTerminalOrganizeLabel
+                      ? id =>
+                          void onToggleTerminalOrganizeLabel(id, 'archive')
+                      : undefined
+                  }
+                  onMoveToProject={onMoveTerminalToProject}
                 />
               )
             : undefined
