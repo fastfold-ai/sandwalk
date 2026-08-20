@@ -110,11 +110,18 @@ export type SessionMainHeaderProps = {
   inSplitGroup?: boolean
   /**
    * Id del grupo activo (si el user está en un split). El activeId
-   * visual del strip usa `activeGroupId ?? sessionId` — sin este prop,
-   * `sessionId` (chatId real) no matchearía ningún tab porque el chat
-   * vive oculto dentro del grupo.
+   * visual del strip usa `activeGroupId ?? sessionId ?? activeTerminalId`
+   * — sin `activeGroupId` un chat que vive oculto dentro de un split
+   * nunca resolvería como activo, y sin `activeTerminalId` un terminal
+   * suelto en `/terminals/:id` deja su chip apagado.
    */
   activeGroupId?: string | null
+  /**
+   * FAS-107: id del terminal activo cuando la ruta es `/terminals/:id`.
+   * Se usa como último fallback del `activeId` del strip para que el
+   * chip del terminal se ilumine igual que un chat activo.
+   */
+  activeTerminalId?: string | null
   selectedChatIds?: Set<string>
   onToggleSelectChat?: (id: string) => void
   onClearSelection?: () => void
@@ -170,7 +177,8 @@ export function SessionMainHeader({
   onClearSelection,
   onCreateSplitFromSelection,
   inSplitGroup,
-  activeGroupId
+  activeGroupId,
+  activeTerminalId
 }: SessionMainHeaderProps) {
   const overlay = useMacDesktopOverlay()
   // Collapse: reveal after panel closes. Expand: keep briefly so icons don't gap.
@@ -300,7 +308,7 @@ export function SessionMainHeader({
         <SessionTabs
           tabs={openTabs}
           openTabIds={openTabIds}
-          activeId={activeGroupId ?? sessionId}
+          activeId={activeGroupId ?? sessionId ?? activeTerminalId ?? null}
           onSelect={id => {
             void navigateToSession({
               id,

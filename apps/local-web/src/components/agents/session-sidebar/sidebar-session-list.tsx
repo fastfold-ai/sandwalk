@@ -1,5 +1,9 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
+import type {
+  AgentProject,
+  AgentSession,
+  TerminalSession
+} from '@sandwalk/agent-ui-core'
 import {
   Archive,
   ArrowUpRight,
@@ -12,7 +16,9 @@ import {
   Pencil,
   Pin,
   Search,
-  Trash2
+  SquareTerminal,
+  Trash2,
+  X
 } from 'lucide-react'
 import {
   type Dispatch,
@@ -41,7 +47,12 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { navigateToSession } from '@/lib/navigate-session'
-import { relativeTime, type SessionChatState, type TabItemSection } from '@/lib/sessions'
+import {
+  type GroupChild,
+  relativeTime,
+  type SessionChatState,
+  type TabItemSection
+} from '@/lib/sessions'
 import {
   isSidebarGroupExpanded,
   setSidebarGroupExpanded
@@ -419,7 +430,7 @@ export function SidebarSessionList({
                           <SidebarGroupItem
                             key={item.id}
                             group={item.group}
-                            chats={item.children}
+                            children={item.children}
                             activeId={sessionId}
                             chatBySessionId={chatBySessionId}
                             tabColors={tabColors}
@@ -439,6 +450,21 @@ export function SidebarSessionList({
                             updateSession={updateSession}
                             exportTranscript={exportTranscript}
                             setDeleteTarget={setDeleteTarget}
+                            onSelectTerminal={terminalId => {
+                              // FAS-107: opening a terminal member of the
+                              // split from the sidebar takes you to its
+                              // solo route (parity with clicking a chat
+                              // child, which navigates to the group with
+                              // that chat focused).
+                              openSessionTab(terminalId)
+                              navigate(`/terminals/${terminalId}`)
+                            }}
+                            onCloseTerminal={onCloseTerminal}
+                            onRenameTerminal={onRenameTerminal}
+                            onToggleTerminalOrganizeLabel={
+                              onToggleTerminalOrganizeLabel
+                            }
+                            onMoveTerminalToProject={onMoveTerminalToProject}
                             onSelectChat={chatId => {
                               /*
                                * Chat hijo del split: en vez de abrir el
@@ -472,7 +498,17 @@ export function SidebarSessionList({
                           <SidebarTerminalRow
                             key={item.id}
                             terminal={item.terminal}
-                            active={item.id === activeTerminalId}
+                            // FAS-107: the row lights up whether you're
+                            // on the terminal's solo route (URL matches
+                            // `activeTerminalId`) or the terminal is the
+                            // focused pane of a split (URL is
+                            // `/agents/:groupId` and `activeGroupChildId`
+                            // resolves to this terminal). Matches the way
+                            // chat children of a split highlight.
+                            active={
+                              item.id === activeTerminalId ||
+                              item.id === activeGroupChildId
+                            }
                             projects={projects}
                             colorValue={tabColors[item.id]}
                             onOpen={id => {
@@ -764,7 +800,7 @@ export function SidebarSessionList({
  */
 function SidebarGroupItem({
   group,
-  chats,
+  children: groupChildren,
   activeId,
   activeChildId,
   chatBySessionId,
@@ -775,6 +811,11 @@ function SidebarGroupItem({
   onRenameGroup,
   onDissolveGroup,
   onSelectChat,
+  onSelectTerminal,
+  onCloseTerminal,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel,
+  onMoveTerminalToProject,
   onSetGroupColor,
   activeProjectId,
   onGoToChatProject,
@@ -787,7 +828,7 @@ function SidebarGroupItem({
   setDeleteTarget
 }: {
   group: import('@sandwalk/agent-ui-core').SessionGroup
-  chats: AgentSession[]
+  children: GroupChild[]
   activeId: string | null
   activeChildId: string | null
   chatBySessionId: Record<string, SessionChatState>
@@ -798,6 +839,18 @@ function SidebarGroupItem({
   onRenameGroup?: (group: import('@sandwalk/agent-ui-core').SessionGroup) => void
   onDissolveGroup?: (groupId: string) => void
   onSelectChat: (chatId: string) => void
+  /** FAS-107: click a terminal child of the split → open its solo route. */
+  onSelectTerminal: (terminalId: string) => void
+  onCloseTerminal?: (terminalId: string) => void
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
   onSetGroupColor?: (groupId: string, color: string | null) => void
   activeProjectId: string | null
   onGoToChatProject?: (chat: AgentSession) => void
@@ -832,10 +885,16 @@ function SidebarGroupItem({
   // El name es siempre no-vacío ahora (auto "Group N" al crear, o custom
   // tras rename). El badge con la cuenta de chats vive aparte, al lado.
   const label = group.name || `Group`
-  const chatCount = group.chatIds.length
+  const memberCount = group.chatIds.length
   const groupActive = group.id === activeId
-  const activeInside = chats.some(chat => chat.id === activeId)
-  const groupUnread = chats.some(chat => attentionIds.has(chat.id))
+  // Any child (chat or terminal) with focus lights up the group chip.
+  const activeInside = groupChildren.some(child => child.id === activeId)
+  // Unread only applies to chats — terminals don't participate in the
+  // attention system.
+  const chatChildren = groupChildren.flatMap(child =>
+    child.kind === 'chat' ? [child.session] : []
+  )
+  const groupUnread = chatChildren.some(chat => attentionIds.has(chat.id))
 
   return (
     <li>
@@ -886,9 +945,9 @@ function SidebarGroupItem({
             {!group.isPending ? (
               <span
                 className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
-                aria-label={`${chatCount} chats`}
+                aria-label={`${memberCount} panels`}
               >
-                {chatCount}
+                {memberCount}
               </span>
             ) : null}
             {group.color ? (
@@ -970,7 +1029,7 @@ function SidebarGroupItem({
       </div>
       <GroupDissolveDialog
         group={dissolveConfirmOpen ? group : null}
-        chats={chats}
+        chats={chatChildren}
         onCancel={() => setDissolveConfirmOpen(false)}
         onConfirm={() => {
           setDissolveConfirmOpen(false)
@@ -985,7 +1044,45 @@ function SidebarGroupItem({
           // queda casi invisible contra el fondo del sidebar.
           className="border-foreground/20 ml-3 mt-0.5 space-y-px border-l pl-2"
         >
-          {chats.map(chat => {
+          {groupChildren.map(child => {
+            // FAS-107: terminal children of a split render as a compact
+            // row with the orange square-terminal icon. Everything else
+            // (active highlight, indent, sub-row action menu) matches
+            // the chat child so the visual weight stays symmetric.
+            if (child.kind === 'terminal') {
+              const term = child.terminal
+              const active =
+                term.id === activeChildId || term.id === activeId
+              const tabColor = tabColors[term.id]
+              return (
+                <SidebarSplitTerminalChild
+                  key={term.id}
+                  terminal={term}
+                  active={active}
+                  tabColor={tabColor || null}
+                  projects={projects}
+                  activeProjectId={activeProjectId}
+                  onOpen={() => onSelectTerminal(term.id)}
+                  onRename={onRenameTerminal}
+                  onTogglePin={
+                    onToggleTerminalOrganizeLabel
+                      ? id =>
+                          void onToggleTerminalOrganizeLabel(id, 'pinned')
+                      : undefined
+                  }
+                  onToggleArchive={
+                    onToggleTerminalOrganizeLabel
+                      ? id =>
+                          void onToggleTerminalOrganizeLabel(id, 'archive')
+                      : undefined
+                  }
+                  onMoveToProject={onMoveTerminalToProject}
+                  onSetColor={color => setTabColor(term.id, color)}
+                  onDelete={onCloseTerminal}
+                />
+              )
+            }
+            const chat = child.session
             // El chat "activo" dentro del grupo puede ser el `activeChildId`
             // (si estás en la ruta del grupo con foco en este chat) o el
             // `activeId` global si por alguna razón la ruta apunta al chat
@@ -1269,6 +1366,201 @@ function SplitChildActionsMenu({
         </>
       ) : null}
     </>
+  )
+}
+
+/**
+ * FAS-107: terminal child inside a split-view group in the sidebar.
+ * Mirrors `SplitChildActionsMenu` for chats but with the terminal-specific
+ * palette (Rename, Pin/Unpin, Set color, Move to project, Archive, Delete).
+ * The row layout matches the chat child so a split with mixed panes reads
+ * as a single homogeneous sub-list.
+ */
+function SidebarSplitTerminalChild({
+  terminal,
+  active,
+  tabColor,
+  projects,
+  activeProjectId: _activeProjectId,
+  onOpen,
+  onRename,
+  onTogglePin,
+  onToggleArchive,
+  onMoveToProject,
+  onSetColor,
+  onDelete
+}: {
+  terminal: TerminalSession
+  active: boolean
+  tabColor: string | null
+  projects: AgentProject[]
+  activeProjectId: string | null
+  onOpen: () => void
+  onRename?: (terminalId: string) => void
+  onTogglePin?: (terminalId: string) => void
+  onToggleArchive?: (terminalId: string) => void
+  onMoveToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
+  onSetColor: (color: string | null) => void
+  onDelete?: (terminalId: string) => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const isPinned = terminal.organizeLabel === 'pinned'
+  const isArchived = terminal.organizeLabel === 'archive'
+  const itemBase =
+    'hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]'
+  return (
+    <li>
+      <div
+        className={cn(
+          'group/child hover:bg-sidebar-accent/45 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_2rem] items-center rounded-md px-2 py-1.5',
+          active && 'bg-sidebar-accent/55'
+        )}
+        onContextMenu={event => {
+          event.preventDefault()
+          setMenuOpen(true)
+        }}
+      >
+        <button
+          type="button"
+          className="flex min-w-0 items-center gap-1.5 text-left"
+          onClick={onOpen}
+        >
+          <SquareTerminal
+            className="size-3.5 shrink-0 text-orange-500"
+            aria-hidden
+          />
+          {tabColor ? (
+            <span
+              aria-hidden
+              className="size-2 shrink-0 rounded-full border border-black/10"
+              style={{ backgroundColor: tabColor }}
+            />
+          ) : null}
+          <SidebarMarqueeTitle text={terminal.title || 'Terminal'} />
+          {isPinned ? (
+            <Pin
+              aria-label="Pinned"
+              className="text-muted-foreground/60 size-3 shrink-0"
+            />
+          ) : null}
+        </button>
+        <div className="relative h-6 w-8 justify-self-end">
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Terminal options"
+                className={cn(
+                  'text-muted-foreground hover:text-foreground hover:bg-muted absolute inset-y-0 right-0 my-auto inline-flex items-center justify-center rounded-md p-0.5 transition-opacity',
+                  menuOpen
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover/child:opacity-100'
+                )}
+                onClick={event => event.stopPropagation()}
+              >
+                <MoreHorizontal className="size-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-52 p-1.5">
+              {onRename ? (
+                <button
+                  type="button"
+                  className={itemBase}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onRename(terminal.id)
+                  }}
+                >
+                  <Pencil className="size-3.5" />
+                  Rename…
+                </button>
+              ) : null}
+              {onTogglePin ? (
+                <button
+                  type="button"
+                  className={itemBase}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onTogglePin(terminal.id)
+                  }}
+                >
+                  <Pin className="size-3.5" />
+                  {isPinned ? 'Unpin' : 'Pin'}
+                </button>
+              ) : null}
+              {onMoveToProject ? (
+                <ProjectPicker
+                  projects={projects}
+                  value={terminal.projectId}
+                  noneLabel="No project"
+                  trigger={
+                    <button type="button" className={itemBase}>
+                      <Folder className="size-3.5" />
+                      Move to project…
+                    </button>
+                  }
+                  onChange={projectId => {
+                    void onMoveToProject(terminal.id, projectId)
+                    setMenuOpen(false)
+                  }}
+                />
+              ) : null}
+              <div className="px-2 py-1.5">
+                <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wide">
+                  Color
+                </div>
+                <TabInlineColorRow
+                  value={tabColor}
+                  onSelect={color => {
+                    onSetColor(color)
+                    setMenuOpen(false)
+                  }}
+                  onClear={() => {
+                    onSetColor(null)
+                    setMenuOpen(false)
+                  }}
+                />
+              </div>
+              {onToggleArchive ? (
+                <button
+                  type="button"
+                  className={itemBase}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onToggleArchive(terminal.id)
+                  }}
+                >
+                  <Archive className="size-3.5" />
+                  {isArchived ? 'Unarchive' : 'Archive'}
+                </button>
+              ) : null}
+              {onDelete ? (
+                <>
+                  <div className="border-border/60 my-1 border-t" />
+                  <button
+                    type="button"
+                    className={cn(
+                      itemBase,
+                      'hover:bg-destructive/10 text-destructive'
+                    )}
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onDelete(terminal.id)
+                    }}
+                  >
+                    <X className="size-3.5" />
+                    Delete terminal
+                  </button>
+                </>
+              ) : null}
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+    </li>
   )
 }
 

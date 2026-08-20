@@ -721,6 +721,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         onCreateSplitFromSelection={createSplitFromSelection}
         inSplitGroup={Boolean(activeGroup)}
         activeGroupId={activeGroup?.id ?? null}
+        activeTerminalId={terminalId ?? null}
       />
       <ResizablePanelGroup
         direction="horizontal"
