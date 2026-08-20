@@ -58,34 +58,6 @@ export default function App() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
-  // FAS-107 GF10: `⌘⇧T` opens a new terminal in the active project and
-  // navigates to it. Handled at the shell so it works from any page.
-  const bootstrapClientForShortcut = bootstrap.client
-  const openSessionTabForShortcut = tabs.openSessionTab
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const meta = e.metaKey || e.ctrlKey
-      if (!meta || !e.shiftKey) return
-      if (e.key.toLowerCase() !== 't') return
-      e.preventDefault()
-      const client = bootstrapClientForShortcut
-      if (!client) return
-      void client
-        .createTerminal({ projectId: bootstrap.activeProjectId ?? null })
-        .then(term => {
-          openSessionTabForShortcut(term.id)
-          navigate(`/terminals/${term.id}`)
-        })
-        .catch(err => console.error('⌘⇧T createTerminal failed', err))
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [
-    bootstrapClientForShortcut,
-    bootstrap.activeProjectId,
-    navigate,
-    openSessionTabForShortcut
-  ])
   const ui = useAppUiState()
   const route = useAppRouting(location)
   const { setChatBySessionIdRef, setChatBySessionIdBridge } =
@@ -118,6 +90,36 @@ export default function App() {
     },
     [bootstrap.client, terminalsLive]
   )
+
+  // FAS-107 GF10: `⌘⇧T` opens a new terminal in the active project and
+  // navigates to it. Handled at the shell so it works from any page.
+  // Declared AFTER `bootstrap` so `bootstrap.client` isn't in TDZ.
+  const bootstrapClientForShortcut = bootstrap.client
+  const bootstrapActiveProjectIdForShortcut = bootstrap.activeProjectId
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey
+      if (!meta || !e.shiftKey) return
+      if (e.key.toLowerCase() !== 't') return
+      e.preventDefault()
+      const client = bootstrapClientForShortcut
+      if (!client) return
+      void client
+        .createTerminal({
+          projectId: bootstrapActiveProjectIdForShortcut ?? null
+        })
+        .then(term => {
+          navigate(`/terminals/${term.id}`)
+        })
+        .catch(err => console.error('⌘⇧T createTerminal failed', err))
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [
+    bootstrapClientForShortcut,
+    bootstrapActiveProjectIdForShortcut,
+    navigate
+  ])
 
   const onDesktopRoute = useCallback(
     (path: string) => {
