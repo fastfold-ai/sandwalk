@@ -33,6 +33,7 @@ import {
   ResizablePanelGroup
 } from '@/components/ui/resizable'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { useAppTerminals } from '@/hooks/useAppTerminals'
 import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
 import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { SESSION_PANELS_AUTO_SAVE_ID } from '@/lib/app-storage'
@@ -245,6 +246,78 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     clearSelectChats,
     createSplitFromSelection
   } = props
+
+  // FAS-107: terminals for the active project. Used by the split
+  // picker's "New terminal" card and by the tab strip (when the caller
+  // decides to render terminal chips).
+  const { terminals, refresh: refreshTerminals } = useAppTerminals(
+    client,
+    activeProjectId
+  )
+
+  const handlePickTerminal = useCallback(async () => {
+    if (!activeGroup) return
+    try {
+      const term = await client.createTerminal({
+        projectId: activeProjectId,
+        originChatId: activeGroup.activeChatId,
+        workspacePath: session?.workspacePath ?? null
+      })
+      refreshTerminals()
+      // Fold the new terminal into the split as the picker's partner
+      // pane. We reuse `onAddChatToSplit` because the tab-groups store
+      // treats it as an "add id" op — the id happens to point to a
+      // terminal now, and the tiling tree recognises it as long as the
+      // caller passes the terminals list through.
+      onAddChatToSplit(term.id)
+    } catch (err) {
+      console.error('createTerminal failed', err)
+    }
+  }, [
+    activeGroup,
+    client,
+    activeProjectId,
+    session?.workspacePath,
+    refreshTerminals,
+    onAddChatToSplit
+  ])
+
+  const handlePickNewChat = useCallback(async () => {
+    if (!activeGroup) return
+    try {
+      const created = await client.createSession({
+        title: null,
+        workspacePath: null,
+        projectId: activeProjectId ?? null
+      })
+      if (activeGroup.isPending) {
+        onPickSplitPartner(created.id)
+      } else {
+        onAddChatToSplit(created.id)
+      }
+    } catch (err) {
+      console.error('createSession failed', err)
+    }
+  }, [
+    activeGroup,
+    client,
+    activeProjectId,
+    onPickSplitPartner,
+    onAddChatToSplit
+  ])
+
+  const handleCloseTerminal = useCallback(
+    async (terminalId: string) => {
+      try {
+        await client.deleteTerminal(terminalId)
+        refreshTerminals()
+        onRemoveChatFromSplit(terminalId)
+      } catch (err) {
+        console.error('deleteTerminal failed', err)
+      }
+    },
+    [client, refreshTerminals, onRemoveChatFromSplit]
+  )
 
   const isNarrow = useIsNarrowWindow(1280)
   // En split view con ventana angosta, el side panel deja de ser una columna
@@ -582,7 +655,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 allTabGroups: tabGroups,
                 onPickPartner: onPickSplitPartner,
                 onCancelPending: onCancelPendingSplit,
-                onAddChat: onAddChatToSplit
+                onAddChat: onAddChatToSplit,
+                onPickNewChat: handlePickNewChat,
+                onPickTerminal: handlePickTerminal
               }}
               onLayoutChange={(fingerprint, tree) => {
                 setTabGroupLayoutForMonitor(activeGroup.id, fingerprint, tree)
@@ -590,6 +665,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
               onCloseChat={chatId => {
                 onRemoveChatFromSplit(chatId)
               }}
+              terminals={terminals}
+              terminalClient={client}
+              onCloseTerminal={handleCloseTerminal}
             />
           ) : (
           <main className="relative flex h-full min-w-0 flex-col">
