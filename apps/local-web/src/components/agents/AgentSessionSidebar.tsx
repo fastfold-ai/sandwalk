@@ -360,18 +360,20 @@ export function AgentSessionSidebar({
         activeGroupChildId={activeGroupChildId}
         setTabGroupActiveChat={setTabGroupActiveChat}
         unreadOnly={unreadOnly}
+        extraTopSection={
+          terminals && terminals.length > 0 ? (
+            <SidebarTerminalsSection
+              terminals={terminals}
+              activeId={activeTerminalId ?? null}
+              openTerminal={terminalId => {
+                openSessionTab(terminalId)
+                navigate(`/terminals/${terminalId}`)
+              }}
+              onCloseTerminal={onCloseTerminal}
+            />
+          ) : null
+        }
       />
-      {terminals && terminals.length > 0 ? (
-        <SidebarTerminalsSection
-          terminals={terminals}
-          activeId={activeTerminalId ?? null}
-          openTerminal={terminalId => {
-            openSessionTab(terminalId)
-            navigate(`/terminals/${terminalId}`)
-          }}
-          onCloseTerminal={onCloseTerminal}
-        />
-      ) : null}
       <div className="relative shrink-0 p-2">
         <SidebarBatchBar
           selectedCount={selectedSessionIds.size}

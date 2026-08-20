@@ -229,6 +229,13 @@ export type SidebarSessionListProps = {
    */
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   unreadOnly?: boolean
+  /**
+   * FAS-107 GF6: extra sections rendered at the TOP of the list (before
+   * Today / Yesterday / …). Used for Terminals so they read as part of
+   * the same fluid list instead of a separate strip at the bottom of the
+   * sidebar.
+   */
+  extraTopSection?: React.ReactNode
 }
 
 export function SidebarSessionList({
@@ -260,7 +267,8 @@ export function SidebarSessionList({
   onGoToChatProject,
   activeGroupChildId,
   setTabGroupActiveChat,
-  unreadOnly = false
+  unreadOnly = false,
+  extraTopSection
 }: SidebarSessionListProps) {
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
@@ -342,6 +350,7 @@ export function SidebarSessionList({
         className="space-y-2.5 p-2.5 transition-opacity duration-150 ease-out"
         style={{ opacity: listOpacity }}
       >
+        {extraTopSection}
         {listSections.length === 0 ? (
           <p className="text-muted-foreground px-1.5 py-2 text-[13px]">
             {unreadOnly ? 'No unread chats' : 'No Agents Yet'}
