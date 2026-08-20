@@ -1,10 +1,10 @@
+import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { memo, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
 
 import type { SkillIconSkill } from '@/components/agents/SkillMentionChip'
-import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { cn } from '@/lib/utils'
 
 import { buildMarkdownComponents } from './markdown-components'

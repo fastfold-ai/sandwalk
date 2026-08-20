@@ -20,11 +20,8 @@ import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { type NavigateFunction,useLocation } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
-import { ChatSplitContainer } from '@/components/agents/ChatSplitContainer'
+import { ChatTilingContainer } from '@/components/agents/ChatTilingContainer'
 import { fileChipToken } from '@/components/agents/composer-parts'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
-import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { useSessionSiteAutoPreview } from '@/components/agents/sites/use-session-site-auto-preview'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
@@ -35,6 +32,9 @@ import {
   ResizablePanel,
   ResizablePanelGroup
 } from '@/components/ui/resizable'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
+import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { SESSION_PANELS_AUTO_SAVE_ID } from '@/lib/app-storage'
 import {
   HOST_TERMINAL_SESSION_ID,
@@ -134,6 +134,11 @@ export type AgentSessionMainPanelProps = {
   >
   allSessions: AgentSession[]
   setTabGroupActiveChat: (groupId: string, chatId: string) => void
+  setTabGroupLayoutForMonitor: (
+    groupId: string,
+    fingerprint: string,
+    tree: import('@sandwalk/agent-ui-core').PaneNode
+  ) => void
   tabGroups: SessionGroup[]
   onSplitWithNextTab: (sourceId: string) => void
   onPickSplitPartner: (partnerId: string) => void
@@ -224,6 +229,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     perSessionBaseArgs,
     allSessions,
     setTabGroupActiveChat,
+    setTabGroupLayoutForMonitor,
     tabGroups,
     onSplitWithNextTab,
     onPickSplitPartner,
@@ -324,18 +330,27 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   const showWorkspaceFiles =
     canShowFilesPanel && Boolean(workspaceSessionId) && (!isDraft || inProject)
 
-  // El picker vive DENTRO del ChatSplitContainer cuando el grupo activo
+  // El picker vive DENTRO del ChatTilingContainer cuando el grupo activo
   // está en modo pending (recién creado desde "Create split view").
   // Ya no hay flow paralelo: el layout es el mismo del split real, sólo
   // que un panel se pinta como picker en vez de un chat mount.
 
   /*
    * Builders del header/mount del panel de un split. Se extraen a
-   * callbacks reutilizables porque los usa tanto `ChatSplitContainer`
+   * callbacks reutilizables porque los usa tanto `ChatTilingContainer`
    * (cuando ya hay un grupo real) como el modo picker (cuando armamos
    * el layout visual del split antes de que exista el grupo). Reusarlos
    * garantiza que Chat A se vea idéntico en ambos casos (mismo header,
    * mismo composer embebido, mismos toggles smart).
+   *
+   * INVARIANT: `onSplitLeft/Right/Up/Down` are NOT populated here. They
+   * live inside `ChatTilingContainer.ChatLeaf` where the tree ops are
+   * in scope; the leaf spreads this builder's result then overrides
+   * those four keys. If you add another consumer of this builder outside
+   * the tiling container, either re-inject the four handlers there or
+   * lift them into this builder (in that case pass the tree helpers as
+   * dependencies). Without either, the ellipsis menu silently loses the
+   * four split entries — no compile error, no runtime error.
    */
   const buildSplitHeaderProps = useCallback(
     (chatId: string, focused: boolean, onFocusPanel: () => void) => {
@@ -552,7 +567,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           className="min-w-0"
         >
           {activeGroup ? (
-            <ChatSplitContainer
+            <ChatTilingContainer
               group={activeGroup}
               sessions={allSessions}
               projects={projects}
@@ -568,6 +583,12 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 onPickPartner: onPickSplitPartner,
                 onCancelPending: onCancelPendingSplit,
                 onAddChat: onAddChatToSplit
+              }}
+              onLayoutChange={(fingerprint, tree) => {
+                setTabGroupLayoutForMonitor(activeGroup.id, fingerprint, tree)
+              }}
+              onCloseChat={chatId => {
+                onRemoveChatFromSplit(chatId)
               }}
             />
           ) : (

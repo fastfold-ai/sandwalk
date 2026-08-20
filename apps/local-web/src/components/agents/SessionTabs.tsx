@@ -1,16 +1,12 @@
-import type {
-  AgentProject,
-  AgentSession,
-  SessionGroup
-} from '@sandwalk/agent-ui-core'
+import './session-chrome-tabs.css'
+
 import {
   closestCenter,
   DndContext,
+  type DragEndEvent,
   PointerSensor,
   useSensor,
-  useSensors,
-  type DragEndEvent
-} from '@dnd-kit/core'
+  useSensors} from '@dnd-kit/core'
 import {
   restrictToHorizontalAxis,
   restrictToParentElement
@@ -20,6 +16,11 @@ import {
   horizontalListSortingStrategy,
   SortableContext
 } from '@dnd-kit/sortable'
+import type {
+  AgentProject,
+  AgentSession,
+  SessionGroup
+} from '@sandwalk/agent-ui-core'
 import {
   Archive,
   ChevronDown,
@@ -62,8 +63,8 @@ import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 import { ProjectPicker } from './ProjectPicker'
-import { SessionStatusIcon } from './SessionStatusIcon'
 import { useSessionTabColors } from './session-tab-colors'
+import { SessionStatusIcon } from './SessionStatusIcon'
 import { SessionTab } from './SessionTab'
 import {
   TabContextItem,
@@ -71,8 +72,6 @@ import {
   TabContextSeparator,
   TabInlineColorRow
 } from './tab-context-menu'
-
-import './session-chrome-tabs.css'
 
 /** Height of the two chrome-tab overflow buttons (all-tabs + new-agent). */
 const OVERFLOW_BTN_HEIGHT = 'h-[30px]'
@@ -200,11 +199,14 @@ export function SessionTabs({
   }, [groups])
 
   const orderedItems = useMemo<TabItem[]>(() => {
-    // Cuando el caller nos pasa openTabIds, respetamos ese orden exacto,
-    // mezclando chats y grupos. Cuando no, hacemos el fallback antiguo
-    // (chats primero por orden, grupos al final) para no romper otros usos.
+    // The caller (App shell) always drives the strip through `openTabIds`.
+    // An EMPTY array means "no tabs open" — render nothing, not "fall back
+    // and paint every group that exists across every project". The old
+    // `else` branch was defensive dead code that fired during the single
+    // frame between `setOpenTabIds([])` and the router settling on `/`,
+    // making every split group visually reappear.
     const items: TabItem[] = []
-    if (openTabIds && openTabIds.length > 0) {
+    if (openTabIds) {
       for (const id of openTabIds) {
         const group = groupsById.get(id)
         if (group) {
@@ -227,6 +229,9 @@ export function SessionTabs({
         }
       }
     } else {
+      // Legacy fallback for callers that don't pass `openTabIds` at all.
+      // Kept behind a strict `undefined` check so passing `[]` no longer
+      // trips it.
       for (const tab of tabs) {
         items.push({
           kind: 'chat',
@@ -478,7 +483,7 @@ export function SessionTabs({
                     unread={false}
                     draggable={draggable}
                     onSelect={onSelect}
-                    onClose={onDissolveGroup || (() => {})}
+                    onClose={onCloseGroup ? () => onCloseGroup(group.id) : () => {}}
                     onContextMenu={openContextMenu}
                     selected={selectedChatIds?.has(group.id) ?? false}
                     variant="group"
@@ -826,12 +831,12 @@ export function SessionTabs({
           <TabContextSeparator />
           <TabContextItem
             icon={<X className="size-3.5" />}
-            label="Close"
+            label="Close tab"
             onClick={() => runAction(() => onClose(menuSession.id))}
           />
           <TabContextItem
             icon={<CircleX className="size-3.5" />}
-            label="Close others"
+            label="Close other tabs"
             disabled={tabs.length <= 1}
             onClick={() => runAction(() => onCloseOthers(menuSession.id))}
           />
@@ -882,13 +887,13 @@ export function SessionTabs({
           {onCloseGroup ? (
             <TabContextItem
               icon={<X className="size-3.5" />}
-              label="Close"
+              label="Close tab"
               onClick={() => runAction(() => onCloseGroup(menuGroup.id))}
             />
           ) : null}
           <TabContextItem
             icon={<CircleX className="size-3.5" />}
-            label="Close others"
+            label="Close other tabs"
             disabled={orderedItems.length <= 1}
             onClick={() => runAction(() => onCloseOthers(menuGroup.id))}
           />

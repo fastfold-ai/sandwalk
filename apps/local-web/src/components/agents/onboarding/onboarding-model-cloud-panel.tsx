@@ -1,5 +1,6 @@
 import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
 import { Check, Eye, EyeOff, Loader } from 'lucide-react'
+
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
 import {
   LLM_API_KEY_COPY,

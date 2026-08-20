@@ -275,13 +275,24 @@ export function useChatScroll({
         if (activeSessionRef.current !== sessionId) return
         const currentScrollHeight = viewport.scrollHeight
         const currentClientHeight = viewport.clientHeight
-        const contentGrew = currentScrollHeight > lastScrollHeightRef.current
+        const growthPx = currentScrollHeight - lastScrollHeightRef.current
+        const contentGrew = growthPx > 0
         const viewportShrunk =
           currentClientHeight < lastClientHeightRef.current
         lastScrollHeightRef.current = currentScrollHeight
         lastClientHeightRef.current = currentClientHeight
 
         if (contentGrew) {
+          // Small growths (< 8 px) come from in-place re-renders (shiki
+          // syntax-highlight swap, animate-in on an existing entry, image
+          // load, font swap), not new streamed content. Snapping to bottom
+          // on those fights the browser's native overflow-anchor and shows
+          // as visible jitter above/below code blocks. Let anchor handle
+          // them; only auto-scroll on genuine growth.
+          if (growthPx < 8) {
+            rememberActive()
+            return
+          }
           if (stickToBottomRef.current) scrollChatToBottom()
           else rememberActive()
           return

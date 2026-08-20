@@ -1,4 +1,5 @@
 import { ArrowUp, Loader, X } from 'lucide-react'
+
 import { VoiceLevelBars } from '@/components/agents/composer/VoiceLevelBars'
 import { cn } from '@/lib/utils'
 

@@ -195,6 +195,11 @@ export function readTabGroups(): SessionGroup[] {
           // sesiones — al recargar se descartan y el chat de origen
           // vuelve suelto naturalmente.
           .filter(g => !g.isPending)
+          // Legacy shape: el layout persistido usaba `ChatCell[]` (grid
+          // absoluto de x/y/w/h). El nuevo shape es un árbol PaneNode.
+          // Descartamos los layouts viejos silenciosamente para que la
+          // migración sea invisible — el grupo cae al tree default.
+          .map(g => (g.layout ? { ...g, layout: sanitizeLayout(g.layout) } : g))
       }
     }
     // Fallback: migrar desde el schema por-proyecto (aplanado + dedupe).
@@ -227,6 +232,60 @@ export function readTabGroups(): SessionGroup[] {
   } catch {
     return []
   }
+}
+
+/**
+ * Filter a persisted `layout` object, keeping only per-monitor entries
+ * whose value already looks like a `PaneNode`. Legacy `ChatCell[]` shapes
+ * (arrays instead of tree nodes) are dropped — the group falls back to
+ * the default tiling tree on read.
+ */
+function sanitizeLayout(
+  layout: NonNullable<SessionGroup['layout']>
+): NonNullable<SessionGroup['layout']> | undefined {
+  const perMonitor: Record<string, NonNullable<SessionGroup['layout']>['perMonitor'][string]> = {}
+  for (const [fp, value] of Object.entries(layout.perMonitor || {})) {
+    if (looksLikePaneNode(value)) perMonitor[fp] = value
+  }
+  return Object.keys(perMonitor).length > 0 ? { perMonitor } : undefined
+}
+
+/**
+ * Recursive shape check for a persisted `PaneNode`. Rejects any tree
+ * that isn't fully well-formed — this includes a chat leaf without a
+ * chatId, a branch with mismatched `ratios` and `children` lengths,
+ * ratios that don't sum to ~1, an unknown `direction`, or a child that
+ * itself fails the same check. Rejected trees are dropped by
+ * `sanitizeLayout` and the group falls back to the default row.
+ */
+function looksLikePaneNode(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const v = value as {
+    type?: string
+    chatId?: string
+    direction?: string
+    ratios?: unknown
+    children?: unknown[]
+  }
+  if (v.type === 'chat') {
+    if (typeof v.chatId !== 'string' || v.chatId.length === 0) return false
+    // Reject the transient picker placeholder id used by
+    // `ChatTilingContainer` — it's UI state, never a real chat.
+    // Duplicated string on purpose to avoid a UI → storage import.
+    if (v.chatId === '__picker__') return false
+    return true
+  }
+  if (v.type !== 'branch') return false
+  if (v.direction !== 'horizontal' && v.direction !== 'vertical') return false
+  if (!Array.isArray(v.children) || v.children.length === 0) return false
+  if (!Array.isArray(v.ratios)) return false
+  if (v.ratios.length !== v.children.length) return false
+  const sum = (v.ratios as unknown[]).reduce<number>((acc, r) => {
+    if (typeof r !== 'number' || Number.isNaN(r) || r < 0) return NaN
+    return acc + r
+  }, 0)
+  if (!Number.isFinite(sum) || Math.abs(sum - 1) > 0.01) return false
+  return v.children.every(child => looksLikePaneNode(child))
 }
 
 export function writeTabGroups(groups: SessionGroup[]) {

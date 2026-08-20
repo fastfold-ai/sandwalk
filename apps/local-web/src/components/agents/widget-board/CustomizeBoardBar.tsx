@@ -2,11 +2,10 @@ import {
   ChartColumn,
   ChevronDown,
   List,
+  type LucideIcon,
   Plus,
   RotateCcw,
-  SquareStack,
-  type LucideIcon
-} from 'lucide-react'
+  SquareStack} from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'

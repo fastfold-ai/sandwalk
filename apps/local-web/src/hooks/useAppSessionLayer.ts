@@ -53,6 +53,7 @@ type SessionLayerArgs = {
   setRuntimeSettings: Dispatch<SetStateAction<RuntimeSettings | null>>
   loadModelOptions: () => Promise<void>
   sessionId: string | null
+  stripSessionId: string | null
   /**
    * Split view mounts `SessionChatMount` per pane (each opens transcript
    * SSE). The shell must not also subscribe the focused chat — unbinding
@@ -72,7 +73,9 @@ type SessionLayerArgs = {
     scopeKey: string,
     updater: (current: string[]) => string[]
   ) => void
+  openTabIds: string[]
   setOpenTabIds: (value: string[] | ((current: string[]) => string[])) => void
+  tabGroups: import('@sandwalk/agent-ui-core').SessionGroup[]
   lastSessionByScope: Record<string, string>
   setLastSessionByScope: Dispatch<SetStateAction<Record<string, string>>>
   setProjectScopeId: Dispatch<SetStateAction<string | null>>
@@ -127,6 +130,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     activeProjectId: args.activeProjectId,
     tabsScopeKey: args.tabsScopeKey,
     sessionId: args.sessionId,
+    stripSessionId: args.stripSessionId,
     sessionIdRef: args.sessionIdRef,
     session: args.session,
     sessions: args.sessions,
@@ -139,7 +143,9 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     setProjectScopeId: args.setProjectScopeId,
     setRecentProjectIds: args.setRecentProjectIds,
     patchOpenTabs: args.patchOpenTabs,
+    openTabIds: args.openTabIds,
     setOpenTabIds: args.setOpenTabIds,
+    tabGroups: args.tabGroups,
     patchChat: chat.patchChat,
     setChatBySessionId: chat.setChatBySessionId,
     composerLiveRef: chat.composerLiveRef,

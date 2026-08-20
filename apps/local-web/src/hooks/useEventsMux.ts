@@ -5,9 +5,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   dispatchLifecycleSse,
   dispatchTranscriptSse,
-  subscribeTranscriptRegistry,
-  subscribedTranscriptSessionIds
-} from '@/lib/events-mux-registry'
+  subscribedTranscriptSessionIds,
+  subscribeTranscriptRegistry} from '@/lib/events-mux-registry'
 
 /** Coalesce split-panel mounts so we don't abort EventSource 3× on open. */
 const MUX_SESSION_DEBOUNCE_MS = 50

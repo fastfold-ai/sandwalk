@@ -1,5 +1,6 @@
 import type { AgentModel } from '@sandwalk/agent-ui-core'
 import { Loader, Plus, RefreshCw, Star, Trash2 } from 'lucide-react'
+
 import { ListRowsSkeleton } from '@/components/agents/PageSkeletons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

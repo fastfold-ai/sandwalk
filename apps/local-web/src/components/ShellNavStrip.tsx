@@ -28,10 +28,11 @@ export function ShellNavControls({
   const { canGoBack, canGoForward, goBack, goForward } = useGlobalHistoryNav()
 
   return (
-    <div
-      className={cn('flex shrink-0 items-center', className)}
-      data-no-window-drag
-    >
+    // No `data-no-window-drag` on the wrapper — the buttons themselves are
+    // already detected as interactive by `closest('button')`, so marking
+    // the whole cluster as "no-drag" also swallowed double-clicks in the
+    // empty gaps between buttons, which should keep the native maximize.
+    <div className={cn('flex shrink-0 items-center', className)}>
       <Button
         type="button"
         variant="ghost"

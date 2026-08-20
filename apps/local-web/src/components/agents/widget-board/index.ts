@@ -1,6 +1,5 @@
-export { WidgetBoard } from './WidgetBoard'
-export { AddWidgetButton } from './CustomizeBoardBar'
 export { catalogEntry } from './catalog'
+export { AddWidgetButton } from './CustomizeBoardBar'
 export {
   createDefaultOverviewLayout,
   createDefaultProjectHomeLayout,
@@ -11,3 +10,4 @@ export {
   OVERVIEW_LAYOUT_VERSION
 } from './defaults'
 export type { WidgetSurface, WidgetType } from './types'
+export { WidgetBoard } from './WidgetBoard'

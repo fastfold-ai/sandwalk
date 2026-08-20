@@ -7,8 +7,8 @@ import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, ExternalLink, Lo
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { formatTokenCount } from '@/components/agents/usage-overview-utils'
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
+import { formatTokenCount } from '@/components/agents/usage-overview-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'

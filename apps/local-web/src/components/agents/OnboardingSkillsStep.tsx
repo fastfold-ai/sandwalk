@@ -1,5 +1,6 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { Check, Loader } from 'lucide-react'
+
 import { McpView } from '@/components/agents/McpView'
 import { cn } from '@/lib/utils'
 

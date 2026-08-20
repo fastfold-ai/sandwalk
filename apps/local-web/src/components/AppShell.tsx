@@ -252,6 +252,7 @@ export function AppShell(props: AppShellProps) {
           perSessionBaseArgs={props.perSessionBaseArgs}
           allSessions={props.allSessions}
           setTabGroupActiveChat={props.setTabGroupActiveChat}
+          setTabGroupLayoutForMonitor={props.setTabGroupLayoutForMonitor}
           tabGroups={props.tabGroups}
           onSplitWithNextTab={props.onSplitWithNextTab}
           onPickSplitPartner={props.onPickSplitPartner}

@@ -363,7 +363,7 @@ export function SessionChatBody({
                * arriba/abajo. El único separador visual con el transcript
                * es el `border-t border-border/50`. Las esquinas curvas
                * inferiores las hereda del `rounded-lg` del panel gracias
-               * al `overflow-hidden` del ChatSplitContainer.
+               * al `overflow-hidden` del ChatTilingContainer.
                */
               'bg-muted/40 border-border/50 absolute inset-x-0 bottom-0 z-10 border-t will-change-transform',
               'transition-[transform,opacity] duration-300 ease-out',
@@ -379,7 +379,7 @@ export function SessionChatBody({
                * Solo el panel focused del split autoenfoca su composer. Si
                * los N paneles compitieran por el foco al montar, el último
                * en autoenfocarse dispararía `onFocusCapture` del panel
-               * padre en `ChatSplitContainer`, llamando `onFocusChat` con
+               * padre en `ChatTilingContainer`, llamando `onFocusChat` con
                * el chatId equivocado — pisando la selección que el usuario
                * hizo desde el sidebar (o desde otro punto).
                */

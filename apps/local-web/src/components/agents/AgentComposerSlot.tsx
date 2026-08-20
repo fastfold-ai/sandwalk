@@ -103,7 +103,7 @@ type AgentComposerSlotProps = {
   /**
    * En split view, N paneles montan y cada uno tiene su propio slot. Si
    * todos autofocean, el último "gana" y su focus bubblea por
-   * `onFocusCapture` del ChatSplitContainer, que llama `onFocusChat` con
+   * `onFocusCapture` del ChatTilingContainer, que llama `onFocusChat` con
    * ese chatId — pisando el chat que el usuario acababa de elegir desde
    * el sidebar. En single-tab siempre queremos autofocus; en split solo
    * el panel focused.

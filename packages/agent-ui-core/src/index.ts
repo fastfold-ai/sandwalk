@@ -582,6 +582,22 @@ export type AgentSession = {
  *
  * Persisted client-side (localStorage) as a UI preference — not on the backend.
  */
+/**
+ * Tiling tree used for the split-view layout (Warp / iTerm2 pattern).
+ * A leaf holds a chatId; a branch splits its content horizontally or
+ * vertically among N children whose `ratios` sum to 1.0. Stored
+ * per-monitor so a docked 4K layout doesn't dictate the shape on a
+ * MacBook 13".
+ */
+export type PaneNode =
+  | { type: 'chat'; chatId: string }
+  | {
+      type: 'branch'
+      direction: 'horizontal' | 'vertical'
+      ratios: number[]
+      children: PaneNode[]
+    }
+
 export type SessionGroup = {
   /** Prefixed id: `grp_<random>` so it never collides with session ids. */
   id: string
@@ -599,6 +615,16 @@ export type SessionGroup = {
    * se limpia y el grupo pasa a ser un split real de 2+ chats.
    */
   isPending?: boolean
+  /**
+   * Tiling tree persisted per-monitor. Missing = group renders with a
+   * generated default (a single horizontal branch with all chats as
+   * siblings, equal ratios). Key is a monitor fingerprint like
+   * `1920x1080@2` — different screens keep independent layouts so the
+   * user's careful 4K arrangement doesn't dictate the shape on a laptop.
+   */
+  layout?: {
+    perMonitor: Record<string, PaneNode>
+  }
 }
 
 /** True for tab-strip ids that identify a group instead of a chat session. */

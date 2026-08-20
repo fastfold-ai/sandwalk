@@ -13,7 +13,11 @@ const ScrollArea = React.forwardRef<
     {...props}
   >
     <ScrollAreaPrimitive.Viewport
-      className="h-full w-full rounded-[inherit] [&>div]:!block [&>div]:!min-w-0"
+      // overflow-anchor:auto lets the browser natively compensate for
+      // reflows above the viewport (e.g. async syntax-highlight swap in
+      // a code block above the scroll position). Without it the visible
+      // text jitters up/down each time a message row resizes.
+      className="h-full w-full rounded-[inherit] [overflow-anchor:auto] [&>div]:!block [&>div]:!min-w-0"
       onScroll={onScroll}
     >
       {children}

@@ -1,5 +1,6 @@
 import type { PromptBudgetResponse, Specialist } from '@sandwalk/agent-ui-core'
 import { AlertTriangle, Loader } from 'lucide-react'
+
 import { SpecialistAvatar } from '@/components/agents/SpecialistsView'
 import { cn } from '@/lib/utils'
 

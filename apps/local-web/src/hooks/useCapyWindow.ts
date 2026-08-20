@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import {
-  type CapyWindowState,
   CAPY_OPEN_EVENT,
   CAPY_REVEAL_MINIMIZED_EVENT,
+  type CapyWindowState,
   clampCapyWindow,
   readCapyWindow,
   shouldRevealCapyMinimized,

@@ -29,9 +29,9 @@ import type { NavigateFunction } from 'react-router-dom'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
-import { GroupDissolveDialog } from '@/components/agents/SessionTabs'
 import { SessionSourceIcon } from '@/components/agents/SessionSourceIcon'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
+import { GroupDissolveDialog } from '@/components/agents/SessionTabs'
 import { TabInlineColorRow } from '@/components/agents/tab-context-menu'
 import {
   Popover,
@@ -43,13 +43,13 @@ import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { navigateToSession } from '@/lib/navigate-session'
 import { relativeTime, type SessionChatState, type TabItemSection } from '@/lib/sessions'
 import {
-  filterSectionsToUnread,
-  UNREAD_DOT_COLOR
-} from '@/lib/sidebar-unread-filter'
-import {
   isSidebarGroupExpanded,
   setSidebarGroupExpanded
 } from '@/lib/sidebar-group-expanded'
+import {
+  filterSectionsToUnread,
+  UNREAD_DOT_COLOR
+} from '@/lib/sidebar-unread-filter'
 import { cn } from '@/lib/utils'
 
 function UnreadDot({ className }: { className?: string }) {

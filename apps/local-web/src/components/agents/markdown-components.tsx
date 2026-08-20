@@ -1,7 +1,7 @@
+import type { AgentSession } from '@sandwalk/agent-ui-core'
 import type { ReactNode } from 'react'
 import type { Components } from 'react-markdown'
 import type { NavigateFunction } from 'react-router-dom'
-import type { AgentSession } from '@sandwalk/agent-ui-core'
 
 import { ExternalUrlLink } from '@/components/agents/ExternalUrlLink'
 import {

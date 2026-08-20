@@ -1,7 +1,8 @@
 import type { UsageOverview, WidgetSize } from '@sandwalk/agent-ui-core'
 
-import { widgetShellClass, valueTextClass } from '../grid'
 import { cn } from '@/lib/utils'
+
+import { valueTextClass,widgetShellClass } from '../grid'
 
 export function MetricStatWidget({
   label,

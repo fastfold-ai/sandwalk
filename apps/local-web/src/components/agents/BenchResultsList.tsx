@@ -31,6 +31,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { formatTokenCount } from '@/components/agents/usage-overview-utils'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -61,7 +62,6 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip'
-import { formatTokenCount } from '@/components/agents/usage-overview-utils'
 import { formatModelEffortBadge } from '@/lib/composer-models'
 import { cn } from '@/lib/utils'
 

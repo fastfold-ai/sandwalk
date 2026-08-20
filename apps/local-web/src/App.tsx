@@ -1,9 +1,10 @@
 import type { SessionGroup } from '@sandwalk/agent-ui-core'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { CapyOverlay } from '@/components/agents/capy/CapyOverlay'
+import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
+import { PaneContextMenu } from '@/components/agents/PaneContextMenu'
 import {
   buildSessionSidebarModel,
   computeShowSessionTabs,
@@ -13,10 +14,7 @@ import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
-import { useEventsMux } from '@/hooks/useEventsMux'
-import { useGlobalSessionEvents } from '@/hooks/useGlobalSessionEvents'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
-import { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import {
   useAppRouteContext,
   useChatBySessionIdBridge
@@ -25,21 +23,40 @@ import { useAppRouting } from '@/hooks/useAppRouting'
 import { useAppSessionEffects } from '@/hooks/useAppSessionEffects'
 import { useAppSessionLayer } from '@/hooks/useAppSessionLayer'
 import { useAppShellEffects } from '@/hooks/useAppShellEffects'
+import { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import { useAppUiState } from '@/hooks/useAppUiState'
 import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
 import { useDesktopWindowMenu } from '@/hooks/useDesktopWindowMenu'
+import { useEventsMux } from '@/hooks/useEventsMux'
+import { useGlobalSessionEvents } from '@/hooks/useGlobalSessionEvents'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
+import { notifyMissedCompletions } from '@/lib/browser-notifications'
+import { applyCapyOpenSplit } from '@/lib/capy-ui'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
-import { visibleSessionIds } from '@/lib/sessions'
-import { applyCapyOpenSplit } from '@/lib/capy-ui'
-import { notifyMissedCompletions } from '@/lib/browser-notifications'
 import { recoverUnreadFromSessions } from '@/lib/session-attention'
+import { visibleSessionIds } from '@/lib/sessions'
 
 export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   useMacDesktopOverlay()
+  // Reserve the tiling split shortcuts (⌘D / ⇧⌘D / ⌘W) so the WebView
+  // never falls back to its default meanings (Add Bookmark, Close Tab)
+  // on pages where the ChatTilingContainer isn't mounted (Welcome,
+  // Library, Bench, Settings, ...). The actual split logic still lives
+  // in ChatTilingContainer; this guard just kills the default action —
+  // a no-op is always safer than surprising Chromium behavior.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey
+      if (!meta) return
+      const key = e.key.toLowerCase()
+      if (key === 'd' || key === 'w') e.preventDefault()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
   const ui = useAppUiState()
   const route = useAppRouting(location)
   const { setChatBySessionIdRef, setChatBySessionIdBridge } =
@@ -96,19 +113,43 @@ export default function App() {
   const effectiveSessionId = activeGroup
     ? activeGroup.activeChatId
     : route.sessionId
+  // What the strip renders as active — always the URL id, so closing a
+  // group chip compares `id === stripSessionId` correctly instead of
+  // matching against the resolved child chat id.
+  const stripSessionId = route.sessionId
+
+  // Stable membership check for session effects. Was an inline arrow
+  // that changed identity every render, which re-fired
+  // `useAppSessionEffects`' auto-open effect on every keystroke and
+  // sometimes re-added a tab in the same batch it was being closed.
+  const chatIsInsideAnyGroupMemo = useCallback(
+    (chatId: string) =>
+      tabGroupsStore.allTabGroups.some(g => g.chatIds.includes(chatId)),
+    [tabGroupsStore.allTabGroups]
+  )
 
   /*
-   * Al navegar a un grupo (`route.sessionId === grp_xxx`), persistimos su
-   * id en `openTabsByProject` del scope activo — mismo patrón que ya usa
-   * `useAppSessionEffects` con chats individuales via `openSessionTab`.
-   * Efecto: el chip del grupo aparece en la strip del proyecto donde el
-   * user navegó, y al recargar se restaura. Si el user visita el mismo
-   * grupo desde otro proyecto, se persiste ahí también, sin duplicar.
+   * Hydrate the group chip into the strip when the user navigates to
+   * `/agents/grp_xxx` (fresh route, sidebar click, reload). Depends
+   * ONLY on `route.sessionId` — never on `activeGroup`, because
+   * mutating `allTabGroups` (pin toggle, rename, addToGroup, activeChat
+   * change) rebuilds the `activeGroup` reference and the old effect
+   * fired on every such mutation, racing `closeSessionTab` and
+   * silently re-adding the group chip the user just closed.
+   *
+   * Reading `allTabGroups` through a ref keeps the guard "does this
+   * group still exist" without pulling the whole store into the effect
+   * dependencies (which would defeat the whole point).
    */
+  const allTabGroupsRef = useRef(tabGroupsStore.allTabGroups)
+  allTabGroupsRef.current = tabGroupsStore.allTabGroups
   useEffect(() => {
-    if (!activeGroup) return
-    tabs.openSessionTab(activeGroup.id)
-  }, [activeGroup, tabs.openSessionTab])
+    const id = route.sessionId
+    if (!id || !id.startsWith('grp_')) return
+    const exists = allTabGroupsRef.current.some(g => g.id === id)
+    if (!exists) return
+    tabs.openSessionTab(id)
+  }, [route.sessionId, tabs.openSessionTab])
 
   const context = useAppRouteContext({
     decodedIntegrationRouteName: route.decodedIntegrationRouteName,
@@ -144,6 +185,7 @@ export default function App() {
     setRuntimeSettings: bootstrap.setRuntimeSettings,
     loadModelOptions: bootstrap.loadModelOptions,
     sessionId: effectiveSessionId,
+    stripSessionId,
     enableTranscriptStream: !activeGroup,
     sessionIdRef: ui.sessionIdRef,
     session: context.session,
@@ -155,7 +197,9 @@ export default function App() {
     openTabsByProject: ui.openTabsByProject,
     setOpenTabsByProject: ui.setOpenTabsByProject,
     patchOpenTabs: tabs.patchOpenTabs,
+    openTabIds: tabs.openTabIds,
     setOpenTabIds: tabs.setOpenTabIds,
+    tabGroups: tabGroupsStore.allTabGroups,
     lastSessionByScope: ui.lastSessionByScope,
     setLastSessionByScope: ui.setLastSessionByScope,
     setProjectScopeId: ui.setProjectScopeId,
@@ -267,7 +311,7 @@ export default function App() {
   /*
    * "Create split view" desde el context menu de un chat: crea un grupo
    * REAL con isPending=true (un solo chat + placeholder). El
-   * `ChatSplitContainer` pinta el chat A en el panel izquierdo y el
+   * `ChatTilingContainer` pinta el chat A en el panel izquierdo y el
    * picker en el derecho. Al elegir un compañero → promotePendingGroup
    * agrega el chat y limpia el flag. Al cancelar (X del picker) →
    * dissolveGroup elimina el grupo (chat A vuelve suelto).
@@ -429,7 +473,9 @@ export default function App() {
       setProjectScopeId: ui.setProjectScopeId,
       setRecentProjectIds: ui.setRecentProjectIds,
       patchOpenTabs: tabs.patchOpenTabs,
+      openTabIds: tabs.openTabIds,
       setOpenTabIds: tabs.setOpenTabIds,
+      tabGroups: tabGroupsStore.allTabGroups,
       setCollapsedSidebarSections: ui.setCollapsedSidebarSections,
       setWorkspaceVersion: ui.setWorkspaceVersion,
       workspaceFiles: ui.workspaceFiles,
@@ -468,7 +514,9 @@ export default function App() {
       ui.setProjectScopeId,
       ui.setRecentProjectIds,
       tabs.patchOpenTabs,
+      tabs.openTabIds,
       tabs.setOpenTabIds,
+      tabGroupsStore.allTabGroups,
       ui.setCollapsedSidebarSections,
       ui.setWorkspaceVersion,
       ui.workspaceFiles,
@@ -559,8 +607,7 @@ export default function App() {
     pendingMentionRef: ui.pendingMentionRef,
     setComposer: layer.chat.setComposer,
     setComposerFiles: layer.chat.setComposerFiles,
-    chatIsInsideAnyGroup: (chatId: string) =>
-      tabGroupsStore.allTabGroups.some(g => g.chatIds.includes(chatId)),
+    chatIsInsideAnyGroup: chatIsInsideAnyGroupMemo,
     tabGroups: tabGroupsStore.allTabGroups
   })
 
@@ -850,6 +897,7 @@ export default function App() {
         activeProjectId={context.activeProjectId}
         activeChatId={effectiveSessionId}
       />
+      <PaneContextMenu />
     </>
   )
 }

@@ -1,6 +1,10 @@
 import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import {
   Archive,
+  ArrowDownToLine,
+  ArrowLeftToLine,
+  ArrowRightToLine,
+  ArrowUpToLine,
   ChevronDown,
   Download,
   Folder,
@@ -15,18 +19,17 @@ import { useEffect, useRef, useState } from 'react'
 import { ProjectMark } from '@/components/agents/ProjectMark'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from '@/components/ui/popover'
-
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover'
 import {
   Tooltip,
   TooltipContent,
@@ -36,8 +39,8 @@ import {
 import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
 
-import { SessionStatusIcon } from './SessionStatusIcon'
 import { useSessionTabColors } from './session-tab-colors'
+import { SessionStatusIcon } from './SessionStatusIcon'
 import { TabInlineColorRow } from './tab-context-menu'
 
 /**
@@ -102,6 +105,17 @@ export type ChatSplitPanelHeaderProps = {
     session: AgentSession,
     projectId: string | null
   ) => void | Promise<void>
+  /**
+   * Split actions — parallel to the right-click context menu, so users
+   * who reach for the header ellipsis get the same power without needing
+   * to know about the right-click. `Close pane` is intentionally NOT
+   * repeated here because the ellipsis already exposes `Close` via
+   * `onRemoveFromSplit`.
+   */
+  onSplitLeft?: (sessionId: string) => void
+  onSplitRight?: (sessionId: string) => void
+  onSplitUp?: (sessionId: string) => void
+  onSplitDown?: (sessionId: string) => void
 }
 
 export function ChatSplitPanelHeader({
@@ -126,7 +140,11 @@ export function ChatSplitPanelHeader({
   onInspect,
   onArchive,
   onRemoveFromSplit,
-  onDelete: _onDelete
+  onDelete: _onDelete,
+  onSplitLeft,
+  onSplitRight,
+  onSplitUp,
+  onSplitDown
 }: ChatSplitPanelHeaderProps) {
   const { tabColors, setTabColor } = useSessionTabColors()
   const [cliOpen, setCliOpen] = useState(false)
@@ -362,6 +380,47 @@ export function ChatSplitPanelHeader({
                       : 'Archive'}
                   </DropdownMenuItem>
                 ) : null}
+                {onSplitLeft || onSplitRight || onSplitUp || onSplitDown ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    {onSplitLeft ? (
+                      <DropdownMenuItem
+                        className="gap-2 text-[13px]"
+                        onSelect={() => onSplitLeft(session.id)}
+                      >
+                        <ArrowLeftToLine className="size-3.5" />
+                        Split left
+                      </DropdownMenuItem>
+                    ) : null}
+                    {onSplitRight ? (
+                      <DropdownMenuItem
+                        className="gap-2 text-[13px]"
+                        onSelect={() => onSplitRight(session.id)}
+                      >
+                        <ArrowRightToLine className="size-3.5" />
+                        Split right
+                      </DropdownMenuItem>
+                    ) : null}
+                    {onSplitUp ? (
+                      <DropdownMenuItem
+                        className="gap-2 text-[13px]"
+                        onSelect={() => onSplitUp(session.id)}
+                      >
+                        <ArrowUpToLine className="size-3.5" />
+                        Split up
+                      </DropdownMenuItem>
+                    ) : null}
+                    {onSplitDown ? (
+                      <DropdownMenuItem
+                        className="gap-2 text-[13px]"
+                        onSelect={() => onSplitDown(session.id)}
+                      >
+                        <ArrowDownToLine className="size-3.5" />
+                        Split down
+                      </DropdownMenuItem>
+                    ) : null}
+                  </>
+                ) : null}
                 {onRemoveFromSplit ? (
                   <>
                     <DropdownMenuSeparator />
@@ -370,7 +429,7 @@ export function ChatSplitPanelHeader({
                       onSelect={() => onRemoveFromSplit(session.id)}
                     >
                       <X className="size-3.5" />
-                      Close
+                      Close pane
                     </DropdownMenuItem>
                   </>
                 ) : null}

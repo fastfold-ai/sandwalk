@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-
 import type { AgentEvent } from '@sandwalk/agent-ui-core'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   dispatchTranscriptSse,

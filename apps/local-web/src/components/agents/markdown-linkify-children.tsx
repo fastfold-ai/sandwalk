@@ -1,3 +1,4 @@
+import type { AgentSession } from '@sandwalk/agent-ui-core'
 import { Children, Fragment, type ReactNode } from 'react'
 
 import { ComposerChatChip } from '@/components/agents/composer/ComposerChip'
@@ -8,7 +9,6 @@ import {
 import { WorkspaceFileChip } from '@/components/agents/WorkspaceFileChip'
 import { splitTextWithSkillMentions } from '@/lib/skill-mentions'
 import { splitTextWithWorkspacePaths } from '@/lib/workspace-file-paths'
-import type { AgentSession } from '@sandwalk/agent-ui-core'
 
 function linkifySkillSegments(
   text: string,

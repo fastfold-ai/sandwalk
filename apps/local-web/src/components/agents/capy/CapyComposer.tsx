@@ -1,6 +1,3 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentSession,
@@ -9,19 +6,22 @@ import type {
   McpServer,
   RuntimeSettings
 } from '@sandwalk/agent-ui-core'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { Composer } from '@/components/agents/Composer'
+import { contentTypeFromPath, needsAttachmentPreview } from '@/lib/attachment-mime'
 import {
   type ComposerModelOption,
   resolveComposerModelOption
 } from '@/lib/composer-models'
+import { mediaObjectUrlFromFile } from '@/lib/media-src'
 import {
   modelSupportsMultimodalKind,
   multimodalKindForFile,
   unsupportedMultimodalHint
 } from '@/lib/multimodal-attach'
-import { contentTypeFromPath, needsAttachmentPreview } from '@/lib/attachment-mime'
-import { mediaObjectUrlFromFile } from '@/lib/media-src'
 
 export function CapyComposer({
   client,

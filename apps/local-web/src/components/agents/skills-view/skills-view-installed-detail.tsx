@@ -4,6 +4,7 @@ import type {
   AgentSkillDetail
 } from '@sandwalk/agent-ui-core'
 import { ArrowUp, Box, CalendarDays, GitBranch, Loader, Tag, Trash2, UserRound } from 'lucide-react'
+
 import { DetailStickyNav } from '@/components/agents/detail-sticky-nav'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { Button } from '@/components/ui/button'

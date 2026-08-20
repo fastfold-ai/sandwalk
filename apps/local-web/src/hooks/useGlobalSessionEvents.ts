@@ -33,8 +33,8 @@ import {
   notifyApprovalRequired,
   notifyRunCompleted
 } from '@/lib/browser-notifications'
-import { markSessionAttention } from '@/lib/session-attention'
 import { setLifecycleSseHandler } from '@/lib/events-mux-registry'
+import { markSessionAttention } from '@/lib/session-attention'
 
 type UseGlobalSessionEventsArgs = {
   client: LocalAgentClient

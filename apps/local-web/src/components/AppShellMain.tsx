@@ -6,12 +6,12 @@ import {
   AppShellMainDragStrip,
   AppShellTitleBar
 } from '@/components/app/app-shell-main-chrome'
-import { ConnectionStatusLabel } from '@/components/ConnectionStatusLabel'
 import {
   type AppShellMainProps,
   isDashboardMainView
 } from '@/components/app/app-shell-main-props'
 import { buildDashboardMainViewsProps } from '@/components/app/build-dashboard-main-views-props'
+import { ConnectionStatusLabel } from '@/components/ConnectionStatusLabel'
 import {
   SHELL_SIDEBAR_MOTION_MS,
   ShellNavStrip
@@ -57,8 +57,15 @@ export function AppShellMain(props: AppShellMainProps) {
       className="min-w-0"
     >
       <div className="sandwalk-shell-main relative flex h-full min-w-0 flex-col bg-background">
-        {/* Layout-neutral drag hit target — every main view, does not shift content. */}
-        <AppShellMainDragStrip />
+        {/*
+         * Layout-neutral drag hit target. Only mount when there's no
+         * visible drag strip already covering the top: when the collapsed
+         * ShellNavStrip is showing, it owns the top row (via its own
+         * DesktopDragRegion), and layering our capture-phase listeners
+         * on top of it causes double-click to fire toggleMaximize twice —
+         * the window maximizes then immediately un-maximizes.
+         */}
+        {!showCollapsedNavStrip ? <AppShellMainDragStrip /> : null}
         <ConnectionStatusLabel
           backendUrl={props.backendUrl}
           loadServerStatus={props.loadServerStatus}
@@ -165,6 +172,7 @@ export function AppShellMain(props: AppShellMainProps) {
             perSessionBaseArgs={props.perSessionBaseArgs}
             allSessions={props.allSessions}
             setTabGroupActiveChat={props.setTabGroupActiveChat}
+            setTabGroupLayoutForMonitor={props.setTabGroupLayoutForMonitor}
             tabGroups={props.tabGroups}
             onSplitWithNextTab={props.onSplitWithNextTab}
             onPickSplitPartner={props.onPickSplitPartner}

@@ -12,11 +12,10 @@ import {
 import { createDraftEditorHandlers } from '@/components/agents/composer/composer-draft-editor-handlers'
 import type { ComposerAtMenuHandle } from '@/components/agents/composer/ComposerAtMenu'
 import {
+  ComposerChatChip,
   ComposerFileChip,
   ComposerMcpChip,
-  ComposerSkillChip,
-  ComposerChatChip
-} from '@/components/agents/composer/ComposerChip'
+  ComposerSkillChip} from '@/components/agents/composer/ComposerChip'
 import { ComposerDraftTextPart } from '@/components/agents/composer/ComposerDraftTextPart'
 import type { ComposerHashMenuHandle } from '@/components/agents/composer/ComposerHashMenu'
 import type { ComposerSlashMenuHandle } from '@/components/agents/composer/ComposerSlashMenu'

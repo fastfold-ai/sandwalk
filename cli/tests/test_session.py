@@ -88,7 +88,13 @@ class TestSessionBasics:
         assert "line 1" in content
         assert "line 2" in content
 
-    def test_openai_provider_uses_openai_api_key(self):
+    def test_openai_provider_uses_openai_api_key(self, monkeypatch):
+        # Defend against env pollution from tests that mutate os.environ
+        # directly (e.g. test_sync_process_env_exports_extras leaves
+        # OPENAI_BASE_URL set; monkeypatch.delenv there only clears BEFORE
+        # the assertion, not after). Under -n auto both tests can land in
+        # the same worker and this one inherits the stale value.
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
         cfg = Config(data={
             "llm.provider": "openai",
             "llm.model": "gpt-5.6-sol",

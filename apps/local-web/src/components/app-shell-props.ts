@@ -23,11 +23,11 @@ import type { Location, NavigateFunction } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { type DashboardMainViewsProps } from '@/components/agents/DashboardMainViews'
-import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { type DashboardSection } from '@/components/agents/DashboardSidebar'
 import { type DashboardSkeletonKind } from '@/components/agents/PageSkeletons'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
+import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import type { CreateDraftSession } from '@/lib/draft-agent'
 import { type SessionChatState, type TabItem, type TabItemSection } from '@/lib/sessions'
 import { type parseCatalogSkillId,type SkillsViewMode } from '@/lib/skills-catalog'
@@ -265,6 +265,11 @@ export type AppShellProps = {
   setTabGroupColor: (groupId: string, color: string | null) => void
   setTabGroupPinned: (groupId: string, pinned: boolean) => void
   setTabGroupActiveChat: (groupId: string, chatId: string) => void
+  setTabGroupLayoutForMonitor: (
+    groupId: string,
+    fingerprint: string,
+    tree: import('@sandwalk/agent-ui-core').PaneNode
+  ) => void
   reorderChatsInTabGroup: (groupId: string, orderedChatIds: string[]) => void
   activeGroup: SessionGroup | null
   perSessionBaseArgs: Omit<

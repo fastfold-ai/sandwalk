@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import {
+  createDoubleTap,
+  isCapyHandsFreeKey,
+  requestRevealCapyMinimized
+} from '@/lib/capy-ui'
 import { isTauri } from '@/lib/desktop'
 import {
   cancelDictation,
@@ -8,11 +13,6 @@ import {
   stopDictation,
   voiceReady
 } from '@/lib/desktop-voice'
-import {
-  createDoubleTap,
-  isCapyHandsFreeKey,
-  requestRevealCapyMinimized
-} from '@/lib/capy-ui'
 
 export function useCapyHandsFree({
   enabled,

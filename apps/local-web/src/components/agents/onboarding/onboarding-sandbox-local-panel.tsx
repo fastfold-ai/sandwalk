@@ -1,5 +1,6 @@
 import type { EnvironmentReport } from '@sandwalk/agent-ui-core'
 import { Check, ChevronDown, Loader, Package } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 
 import { formatBytes } from './onboarding-sandbox-utils'

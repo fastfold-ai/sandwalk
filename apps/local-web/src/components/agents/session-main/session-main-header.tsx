@@ -13,7 +13,7 @@ import {
   Globe2,
   Terminal
 } from 'lucide-react'
-import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
+import { type Dispatch, type SetStateAction,useEffect, useRef } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 import { SessionTabs } from '@/components/agents/SessionTabs'
@@ -24,17 +24,17 @@ import {
 } from '@/components/ShellNavStrip'
 import { Button } from '@/components/ui/button'
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@/components/ui/tooltip'
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip'
 import { useCrossfadeFlag } from '@/hooks/useDeferredTrue'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { copyText } from '@/lib/clipboard'
