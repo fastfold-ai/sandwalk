@@ -388,7 +388,9 @@ export function SessionTabs({
       const title =
         item.kind === 'chat'
           ? item.session.title || 'Untitled'
-          : item.group.name || 'Group'
+          : item.kind === 'group'
+            ? item.group.name || 'Group'
+            : item.terminal.title || 'Terminal'
       return title.toLowerCase().includes(needle)
     })
   }, [orderedItems, searchQuery])
@@ -763,19 +765,33 @@ export function SessionTabs({
                   filteredSearchItems.map(item => {
                     const active = item.id === activeId
                     const isGroup = item.kind === 'group'
-                    const tab = isGroup ? null : item.session
-                    const group = isGroup ? item.group : null
-                    const title = isGroup
-                      ? group!.name || 'Group'
-                      : tab!.title || 'Untitled'
-                    const stamp = isGroup
-                      ? ''
-                      : relativeTime(
-                          tab!.lastMessageAt ||
-                            tab!.updatedAt ||
-                            tab!.createdAt
-                        )
-                    const color = isGroup ? group!.color : tabColors[item.id]
+                    const isTerminal = item.kind === 'terminal'
+                    const title =
+                      item.kind === 'chat'
+                        ? item.session.title || 'Untitled'
+                        : item.kind === 'group'
+                          ? item.group.name || 'Group'
+                          : item.terminal.title || 'Terminal'
+                    const stamp =
+                      item.kind === 'chat'
+                        ? relativeTime(
+                            item.session.lastMessageAt ||
+                              item.session.updatedAt ||
+                              item.session.createdAt
+                          )
+                        : item.kind === 'terminal'
+                          ? relativeTime(
+                              item.terminal.updatedAt || item.terminal.createdAt
+                            )
+                          : ''
+                    const color =
+                      item.kind === 'group' ? item.group.color : tabColors[item.id]
+                    const pinnedBadge =
+                      item.kind === 'chat'
+                        ? item.session.organizeLabel === 'pinned'
+                        : item.kind === 'terminal'
+                          ? item.terminal.organizeLabel === 'pinned'
+                          : item.group.pinned
                     return (
                       <div
                         key={item.id}
@@ -788,7 +804,7 @@ export function SessionTabs({
                         )}
                         onClick={event => {
                           if (
-                            !isGroup &&
+                            item.kind === 'chat' &&
                             onToggleSelectChat &&
                             (event.shiftKey || event.metaKey)
                           ) {
@@ -808,14 +824,18 @@ export function SessionTabs({
                           openContextMenu(item.id, event)
                         }}
                         data-selected={
-                          selectedChatIds?.has(item.id) ? 'true' : undefined
+                          item.kind === 'chat' && selectedChatIds?.has(item.id)
+                            ? 'true'
+                            : undefined
                         }
                       >
                         <span className="bg-muted/80 flex size-7 shrink-0 items-center justify-center rounded-md">
                           {isGroup ? (
                             <Columns2 className="size-3.5" />
+                          ) : isTerminal ? (
+                            <SquareTerminal className="size-3.5 text-orange-500" />
                           ) : (
-                            <SessionStatusIcon status={tab!.status} />
+                            <SessionStatusIcon status={item.session.status} />
                           )}
                         </span>
                         <span className="min-w-0 flex-1">
@@ -827,12 +847,12 @@ export function SessionTabs({
                                 aria-hidden
                               />
                             ) : null}
-                            {isGroup && !group!.isPending ? (
+                            {item.kind === 'group' && !item.group.isPending ? (
                               <span
                                 className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
-                                aria-label={`${group!.chatIds.length} chats`}
+                                aria-label={`${item.group.chatIds.length} chats`}
                               >
-                                {group!.chatIds.length}
+                                {item.group.chatIds.length}
                               </span>
                             ) : null}
                             <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
@@ -842,7 +862,7 @@ export function SessionTabs({
                               className="relative block h-4 shrink-0"
                               style={{ width: 28 }}
                             >
-                              {!isGroup ? (
+                              {stamp ? (
                                 <span className="text-muted-foreground absolute inset-0 inline-flex items-center justify-center text-[11px] tabular-nums transition-opacity group-hover/item:opacity-0">
                                   {stamp}
                                 </span>
@@ -853,8 +873,14 @@ export function SessionTabs({
                                 aria-label={`Close ${title}`}
                                 onClick={event => {
                                   event.stopPropagation()
-                                  if (isGroup) {
+                                  if (item.kind === 'group') {
                                     onCloseGroup?.(item.id)
+                                  } else if (item.kind === 'terminal') {
+                                    if (onCloseTerminal) {
+                                      onCloseTerminal(item.id)
+                                    } else {
+                                      onClose(item.id)
+                                    }
                                   } else {
                                     onClose(item.id)
                                   }
@@ -864,7 +890,7 @@ export function SessionTabs({
                               </button>
                             </span>
                           </span>
-                          {!isGroup && tab!.organizeLabel === 'pinned' ? (
+                          {pinnedBadge ? (
                             <span className="text-muted-foreground mt-0.5 flex items-center gap-1 text-[11px]">
                               <Pin
                                 className="size-3 shrink-0"
