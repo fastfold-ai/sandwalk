@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { AgentSession } from '@sandwalk/agent-ui-core'
-import { Columns2, Pin, X } from 'lucide-react'
+import { Columns2, Pin, SquareTerminal, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { UNREAD_DOT_COLOR } from '@/lib/sidebar-unread-filter'
@@ -170,7 +170,7 @@ export type SessionTabProps = {
    * badge numérico con `groupCount`. Todo lo demás (chrome, hover, marquee,
    * X para disolver) se mantiene idéntico al de una pestaña de sesión.
    */
-  variant?: 'session' | 'group'
+  variant?: 'session' | 'group' | 'terminal'
   groupCount?: number
 }
 
@@ -188,6 +188,7 @@ export function SessionTab({
   groupCount
 }: SessionTabProps) {
   const isGroup = variant === 'group'
+  const isTerminal = variant === 'terminal'
   const [hovering, setHovering] = useState(false)
   const {
     attributes,
@@ -275,6 +276,14 @@ export function SessionTab({
               </span>
             ) : null}
           </>
+        ) : isTerminal ? (
+          // Terminal chip: orange type-icon (SquareTerminal) replaces the
+          // chat status + source icons. Keeps the chip's chrome, marquee,
+          // close button unchanged for a consistent tab-strip anatomy.
+          <SquareTerminal
+            className="size-3.5 shrink-0 text-orange-500"
+            aria-hidden
+          />
         ) : (
           <>
             <SessionStatusIcon status={tab.status} />

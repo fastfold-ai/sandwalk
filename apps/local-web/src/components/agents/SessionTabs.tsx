@@ -19,7 +19,8 @@ import {
 import type {
   AgentProject,
   AgentSession,
-  SessionGroup
+  SessionGroup,
+  TerminalSession
 } from '@sandwalk/agent-ui-core'
 import {
   Archive,
@@ -108,7 +109,9 @@ export function SessionTabs({
   selectedChatIds,
   onToggleSelectChat,
   onClearSelection,
-  onCreateSplitFromSelection
+  onCreateSplitFromSelection,
+  terminals,
+  onCloseTerminal
 }: {
   tabs: AgentSession[]
   activeId: string | null
@@ -147,6 +150,13 @@ export function SessionTabs({
   onToggleSelectChat?: (id: string) => void
   onClearSelection?: () => void
   onCreateSplitFromSelection?: () => void
+  /**
+   * Terminal-as-first-class-item chips (FAS-107). Optional. When
+   * provided, ids in `openTabIds` that match a terminal render as a
+   * SessionTab with `variant="terminal"` (orange SquareTerminal icon).
+   */
+  terminals?: TerminalSession[]
+  onCloseTerminal?: (terminalId: string) => void
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
   // Confirmation modal for "Delete Split View": the action dissolves
@@ -185,6 +195,12 @@ export function SessionTabs({
         group: SessionGroup
         pinned: boolean
       }
+    | {
+        kind: 'terminal'
+        id: string
+        terminal: TerminalSession
+        pinned: boolean
+      }
 
   const tabsById = useMemo(() => {
     const map = new Map<string, AgentSession>()
@@ -197,6 +213,12 @@ export function SessionTabs({
     for (const g of groups ?? []) map.set(g.id, g)
     return map
   }, [groups])
+
+  const terminalsById = useMemo(() => {
+    const map = new Map<string, TerminalSession>()
+    for (const t of terminals ?? []) map.set(t.id, t)
+    return map
+  }, [terminals])
 
   const orderedItems = useMemo<TabItem[]>(() => {
     // The caller (App shell) always drives the strip through `openTabIds`.
@@ -215,6 +237,16 @@ export function SessionTabs({
             id: group.id,
             group,
             pinned: group.pinned
+          })
+          continue
+        }
+        const terminal = terminalsById.get(id)
+        if (terminal) {
+          items.push({
+            kind: 'terminal',
+            id: terminal.id,
+            terminal,
+            pinned: false
           })
           continue
         }
@@ -248,7 +280,7 @@ export function SessionTabs({
     const pinned = items.filter(item => item.pinned)
     const rest = items.filter(item => !item.pinned)
     return [...pinned, ...rest]
-  }, [openTabIds, tabs, tabsById, groupsById, groups])
+  }, [openTabIds, tabs, tabsById, groupsById, groups, terminalsById])
 
   const orderedTabs = useMemo(
     () =>
@@ -456,6 +488,42 @@ export function SessionTabs({
                       onClose={onClose}
                       onContextMenu={openContextMenu}
                       selected={selectedChatIds?.has(tab.id) ?? false}
+                    />
+                  )
+                }
+                if (item.kind === 'terminal') {
+                  const term = item.terminal
+                  const pseudoTab: AgentSession = {
+                    id: term.id,
+                    title: term.title,
+                    status: 'idle',
+                    source: 'local',
+                    sourceLabel: 'Terminal',
+                    organizeLabel: null,
+                    createdAt: term.createdAt,
+                    updatedAt: term.updatedAt,
+                    lastMessageAt: null,
+                    projectId: term.projectId,
+                    titleSource: term.titleSource,
+                    workspacePath: term.workspacePath
+                  } as unknown as AgentSession
+                  return (
+                    <SessionTab
+                      key={term.id}
+                      tab={pseudoTab}
+                      active={term.id === activeId}
+                      color={tabColors[term.id]}
+                      unread={false}
+                      draggable={draggable}
+                      onSelect={onSelect}
+                      onClose={
+                        onCloseTerminal
+                          ? () => onCloseTerminal(term.id)
+                          : onClose
+                      }
+                      onContextMenu={openContextMenu}
+                      selected={selectedChatIds?.has(term.id) ?? false}
+                      variant="terminal"
                     />
                   )
                 }

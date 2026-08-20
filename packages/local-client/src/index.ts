@@ -85,7 +85,9 @@ import type {
   PromptBudgetResponse,
   WorkspaceFile,
   WorkspaceFileContent,
-  PtySessionInfo
+  PtySessionInfo,
+  TerminalSession,
+  WorkspaceItem
 } from '@sandwalk/agent-ui-core'
 
 export type LocalAgentClientOptions = {
@@ -847,6 +849,92 @@ export class LocalAgentClient
     const result = await this.request<{ data: AgentSession[] }>(
       `/sessions?${params.toString()}`,
       { signal }
+    )
+    return result.data
+  }
+
+  // ─── Terminal-as-first-class-item (FAS-107) ───────────────────────────
+
+  async listTerminals(options?: {
+    projectId?: string | null
+    signal?: AbortSignal
+  }): Promise<TerminalSession[]> {
+    const params = new URLSearchParams()
+    if (options?.projectId) params.set('projectId', options.projectId)
+    const query = params.toString()
+    const result = await this.request<{ data: TerminalSession[] }>(
+      `/terminals${query ? `?${query}` : ''}`,
+      { signal: options?.signal }
+    )
+    return result.data
+  }
+
+  async getTerminal(
+    id: string,
+    signal?: AbortSignal
+  ): Promise<TerminalSession> {
+    return this.request<TerminalSession>(`/terminals/${id}`, { signal })
+  }
+
+  async createTerminal(input: {
+    title?: string | null
+    projectId?: string | null
+    workspacePath?: string | null
+    shell?: string | null
+    originChatId?: string | null
+    slotKey?: string | null
+    cols?: number
+    rows?: number
+  }): Promise<TerminalSession> {
+    return this.request<TerminalSession>('/terminals', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: input.title ?? null,
+        projectId: input.projectId ?? null,
+        workspacePath: input.workspacePath ?? null,
+        shell: input.shell ?? null,
+        originChatId: input.originChatId ?? null,
+        slotKey: input.slotKey ?? null,
+        cols: input.cols ?? 80,
+        rows: input.rows ?? 24
+      })
+    })
+  }
+
+  async updateTerminal(
+    id: string,
+    patch: {
+      title?: string | null
+      projectId?: string | null
+      organizeLabel?: string | null
+    }
+  ): Promise<TerminalSession> {
+    return this.request<TerminalSession>(`/terminals/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch)
+    })
+  }
+
+  async deleteTerminal(id: string): Promise<void> {
+    await this.request<void>(`/terminals/${id}`, { method: 'DELETE' })
+  }
+
+  async listWorkspaceItems(options?: {
+    projectId?: string | null
+    kinds?: Array<'chat' | 'terminal'>
+    limit?: number
+    signal?: AbortSignal
+  }): Promise<WorkspaceItem[]> {
+    const params = new URLSearchParams()
+    if (options?.projectId) params.set('projectId', options.projectId)
+    if (options?.kinds && options.kinds.length > 0) {
+      params.set('kind', options.kinds.join(','))
+    }
+    if (options?.limit) params.set('limit', String(options.limit))
+    const query = params.toString()
+    const result = await this.request<{ data: WorkspaceItem[] }>(
+      `/workspace-items${query ? `?${query}` : ''}`,
+      { signal: options?.signal }
     )
     return result.data
   }

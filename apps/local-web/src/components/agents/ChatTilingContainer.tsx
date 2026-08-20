@@ -3,7 +3,8 @@ import type {
   AgentProject,
   AgentSession,
   PaneNode,
-  SessionGroup
+  SessionGroup,
+  TerminalSession
 } from '@sandwalk/agent-ui-core'
 import { X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -16,7 +17,8 @@ import {
   SessionChatMount,
   type SessionChatMountProps
 } from '@/components/agents/SessionChatMount'
-import { SplitChatPickerPanel } from '@/components/agents/SplitChatPickerPanel'
+import { SplitPicker } from '@/components/agents/SplitPicker'
+import { TerminalLeaf } from '@/components/agents/TerminalLeaf'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -25,6 +27,8 @@ import {
 import {
   buildDefaultTree,
   extractChatIds,
+  isLeafPane,
+  leafItemId,
   reconcileTree,
   setBranchRatios,
   type SplitDirection,
@@ -67,9 +71,22 @@ export type ChatTilingContainerProps = {
     onPickPartner: (chatId: string) => void
     onCancelPending: () => void
     onAddChat: (chatId: string) => void
+    /** Optional (FAS-107): create a blank new chat as the split partner. */
+    onPickNewChat?: () => void
+    /** Optional (FAS-107): create a new terminal as the split partner. */
+    onPickTerminal?: () => void
   }
   onLayoutChange: (fingerprint: string, tree: PaneNode) => void
   onCloseChat: (chatId: string) => void
+  /**
+   * Terminal-as-first-class-item support (FAS-107). Populate to enable
+   * rendering `type:'terminal'` leaves alongside chat leaves. Leaving
+   * these undefined keeps the container chat-only, matching pre-107
+   * behaviour.
+   */
+  terminals?: TerminalSession[]
+  terminalClient?: LocalAgentClient
+  onCloseTerminal?: (terminalId: string) => void
 }
 
 /**
@@ -88,7 +105,10 @@ export function ChatTilingContainer({
   projects,
   pickerContext,
   onLayoutChange,
-  onCloseChat
+  onCloseChat,
+  terminals,
+  terminalClient,
+  onCloseTerminal
 }: ChatTilingContainerProps) {
   const chatIds = group.chatIds
   const activeChatId = group.activeChatId
@@ -308,6 +328,22 @@ export function ChatTilingContainer({
             />
           )
         }
+        renderTerminalLeaf={
+          terminalClient && onCloseTerminal
+            ? (terminalId, focused, focusPanel) => (
+                <TerminalLeaf
+                  terminalId={terminalId}
+                  focused={focused}
+                  focusPanel={focusPanel}
+                  client={terminalClient}
+                  terminals={terminals ?? []}
+                  onSplit={handleSplit}
+                  onClose={onCloseTerminal}
+                  canClose={chatIds.length > 1}
+                />
+              )
+            : undefined
+        }
         activeChatId={activeChatId}
         pickerActive={Boolean(pickerRequest)}
         onFocus={handleFocus}
@@ -320,6 +356,8 @@ function stripPicker(node: PaneNode): PaneNode | null {
   if (node.type === 'chat') {
     return node.chatId === PICKER_CELL_ID ? null : node
   }
+  // Terminal & typed-ref leaves are never the picker sentinel — keep as-is.
+  if (node.type === 'terminal' || node.type === 'ref') return node
   const nextChildren: PaneNode[] = []
   const nextRatios: number[] = []
   node.children.forEach((child, i) => {
@@ -350,6 +388,7 @@ function PaneRenderer({
   path,
   onBranchLayout,
   renderLeaf,
+  renderTerminalLeaf,
   activeChatId,
   pickerActive,
   onFocus
@@ -359,6 +398,11 @@ function PaneRenderer({
   onBranchLayout: (path: number[], sizesPct: number[]) => void
   renderLeaf: (
     chatId: string,
+    focused: boolean,
+    focusPanel: () => void
+  ) => React.ReactNode
+  renderTerminalLeaf?: (
+    terminalId: string,
     focused: boolean,
     focusPanel: () => void
   ) => React.ReactNode
@@ -375,6 +419,49 @@ function PaneRenderer({
         onFocusCapture={() => onFocus(node.chatId)}
       >
         {renderLeaf(node.chatId, focused, () => onFocus(node.chatId))}
+      </div>
+    )
+  }
+  if (node.type === 'terminal') {
+    const focused = node.terminalId === activeChatId && !pickerActive
+    // Fallback: if the container was mounted without terminal support,
+    // just render an empty div so we don't crash on legacy layouts that
+    // somehow contain a terminal leaf.
+    if (!renderTerminalLeaf) return <div className="h-full w-full" />
+    return (
+      <div
+        className="h-full w-full"
+        onMouseDownCapture={() => onFocus(node.terminalId)}
+        onFocusCapture={() => onFocus(node.terminalId)}
+      >
+        {renderTerminalLeaf(node.terminalId, focused, () =>
+          onFocus(node.terminalId)
+        )}
+      </div>
+    )
+  }
+  if (node.type === 'ref') {
+    const id = node.ref.id
+    const focused = id === activeChatId && !pickerActive
+    if (node.ref.kind === 'terminal') {
+      if (!renderTerminalLeaf) return <div className="h-full w-full" />
+      return (
+        <div
+          className="h-full w-full"
+          onMouseDownCapture={() => onFocus(id)}
+          onFocusCapture={() => onFocus(id)}
+        >
+          {renderTerminalLeaf(id, focused, () => onFocus(id))}
+        </div>
+      )
+    }
+    return (
+      <div
+        className="h-full w-full"
+        onMouseDownCapture={() => onFocus(id)}
+        onFocusCapture={() => onFocus(id)}
+      >
+        {renderLeaf(id, focused, () => onFocus(id))}
       </div>
     )
   }
@@ -397,6 +484,7 @@ function PaneRenderer({
             direction={node.direction}
             onBranchLayout={onBranchLayout}
             renderLeaf={renderLeaf}
+            renderTerminalLeaf={renderTerminalLeaf}
             activeChatId={activeChatId}
             pickerActive={pickerActive}
             onFocus={onFocus}
@@ -416,6 +504,7 @@ function PaneGroupSlot({
   direction,
   onBranchLayout,
   renderLeaf,
+  renderTerminalLeaf,
   activeChatId,
   pickerActive,
   onFocus
@@ -429,6 +518,11 @@ function PaneGroupSlot({
   onBranchLayout: (path: number[], sizesPct: number[]) => void
   renderLeaf: (
     chatId: string,
+    focused: boolean,
+    focusPanel: () => void
+  ) => React.ReactNode
+  renderTerminalLeaf?: (
+    terminalId: string,
     focused: boolean,
     focusPanel: () => void
   ) => React.ReactNode
@@ -450,6 +544,7 @@ function PaneGroupSlot({
           path={[...path, i]}
           onBranchLayout={onBranchLayout}
           renderLeaf={renderLeaf}
+          renderTerminalLeaf={renderTerminalLeaf}
           activeChatId={activeChatId}
           pickerActive={pickerActive}
           onFocus={onFocus}
@@ -482,12 +577,17 @@ function PaneGroupSlot({
  */
 function paneKey(node: PaneNode): string {
   if (node.type === 'chat') return `chat-${node.chatId}`
+  if (node.type === 'terminal') return `terminal-${node.terminalId}`
+  if (node.type === 'ref') return `${node.ref.kind}-${node.ref.id}`
   const descendants = branchDescendantIds(node).sort().join('|')
   return `branch-${node.direction}-${descendants}`
 }
 
 function branchDescendantIds(node: PaneNode): string[] {
-  if (node.type === 'chat') return [node.chatId]
+  if (isLeafPane(node)) {
+    const id = leafItemId(node)
+    return id ? [id] : []
+  }
   return node.children.flatMap(branchDescendantIds)
 }
 
@@ -619,9 +719,9 @@ function PickerLeaf({
   onPick: (chatId: string) => void
   onCancel: () => void
 }) {
-  // Keyboard escape mirrors the pattern in Warp / iTerm2: Esc closes the
-  // "pick a chat" prompt. Without this, keyboard-only users have to tab
-  // all the way to the X button.
+  // Keyboard escape closes the whole picker — never falls back to
+  // "return to step 1"; that path is reserved for the explicit Back
+  // button so Esc keeps its "cancel the split" semantics.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
@@ -633,30 +733,18 @@ function PickerLeaf({
   }, [onCancel])
   if (!pickerContext) return null
   return (
-    <div className="bg-background border-border/50 relative flex h-full min-w-0 flex-col overflow-hidden rounded-lg border">
-      <button
-        type="button"
-        onClick={onCancel}
-        aria-label="Cancel"
-        className="text-muted-foreground hover:text-foreground hover:bg-muted absolute right-2 top-2 z-10 inline-flex size-7 items-center justify-center rounded-md"
-      >
-        <X className="size-4" />
-      </button>
-      <div className="flex h-full min-h-0 min-w-0 flex-col items-center justify-center gap-3 overflow-hidden p-4">
-        <h2 className="text-foreground shrink-0 text-center text-[14px] font-medium">
-          Pick a chat for the split
-        </h2>
-        <SplitChatPickerPanel
-          client={pickerContext.client}
-          sourceChatId={sourceChatId}
-          activeProjectId={pickerContext.activeProjectId}
-          projects={projects}
-          allTabGroups={pickerContext.allTabGroups}
-          cachedSessions={sessions}
-          onPick={onPick}
-        />
-      </div>
-    </div>
+    <SplitPicker
+      client={pickerContext.client}
+      sourceChatId={sourceChatId}
+      activeProjectId={pickerContext.activeProjectId}
+      projects={projects}
+      allTabGroups={pickerContext.allTabGroups}
+      cachedSessions={sessions}
+      onPickChat={onPick}
+      onPickNewChat={pickerContext.onPickNewChat ?? (() => onCancel())}
+      onPickTerminal={pickerContext.onPickTerminal ?? (() => onCancel())}
+      onCancel={onCancel}
+    />
   )
 }
 
