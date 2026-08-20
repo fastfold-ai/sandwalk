@@ -79,6 +79,8 @@ export type SessionMainHeaderProps = {
   onPrepareDraftWorkspace?: () => void | Promise<void>
   /** Opens a fresh draft session (same handler as the sidebar "New agent"). */
   createSession?: (projectId?: string | null) => void | Promise<void>
+  /** FAS-107 GF5: create + open a new terminal via the tab-strip "+". */
+  onCreateTerminal?: () => void
   groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
@@ -137,6 +139,7 @@ export function SessionMainHeader({
   setPanelView,
   onPrepareDraftWorkspace,
   createSession,
+  onCreateTerminal,
   groups,
   onSplitWith,
   onDissolveGroup,
@@ -313,6 +316,7 @@ export function SessionMainHeader({
           onCreateSession={
             createSession ? () => void createSession(activeProjectId) : undefined
           }
+          onCreateTerminal={onCreateTerminal}
           groups={groups}
           onSplitWith={onSplitWith}
           onDissolveGroup={onDissolveGroup}

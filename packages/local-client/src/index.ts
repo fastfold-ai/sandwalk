@@ -897,7 +897,8 @@ export class LocalAgentClient
         slotKey: input.slotKey ?? null,
         cols: input.cols ?? 80,
         rows: input.rows ?? 24
-      })
+      }),
+      headers: { 'content-type': 'application/json' }
     })
   }
 
@@ -911,7 +912,8 @@ export class LocalAgentClient
   ): Promise<TerminalSession> {
     return this.request<TerminalSession>(`/terminals/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify(patch)
+      body: JSON.stringify(patch),
+      headers: { 'content-type': 'application/json' }
     })
   }
 

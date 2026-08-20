@@ -29,10 +29,12 @@ import {
   Columns2,
   Download,
   Folder,
+  MessageSquare,
   Pencil,
   Pin,
   Plus,
   Search,
+  SquareTerminal,
   Trash2,
   X
 } from 'lucide-react'
@@ -47,6 +49,12 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
   Popover,
@@ -111,7 +119,8 @@ export function SessionTabs({
   onClearSelection,
   onCreateSplitFromSelection,
   terminals,
-  onCloseTerminal
+  onCloseTerminal,
+  onCreateTerminal
 }: {
   tabs: AgentSession[]
   activeId: string | null
@@ -157,6 +166,8 @@ export function SessionTabs({
    */
   terminals?: TerminalSession[]
   onCloseTerminal?: (terminalId: string) => void
+  /** FAS-107 GF5: opens a new terminal from the tab-strip "+" menu. */
+  onCreateTerminal?: () => void
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
   // Confirmation modal for "Delete Split View": the action dissolves
@@ -572,9 +583,16 @@ export function SessionTabs({
       */}
       {onCreateSession ? (
         <div className="sandwalk-tab-new-slot">
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
+          {/*
+            FAS-107 GF5: the "+" now opens a dropdown with two entries
+            (Agent chat / Terminal) so users can create either kind from
+            the same affordance. When `onCreateTerminal` isn't wired the
+            button falls back to the classic single-action behavior for
+            backwards compatibility.
+          */}
+          {onCreateTerminal ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   className={cn(
@@ -585,23 +603,54 @@ export function SessionTabs({
                     'dark:bg-white/[0.1] dark:text-zinc-100',
                     'dark:hover:bg-white/[0.16] dark:hover:text-white'
                   )}
-                  aria-label="New agent"
-                  onClick={onCreateSession}
+                  aria-label="New"
                 >
                   <Plus className="size-3.5 shrink-0" />
                 </button>
-              </TooltipTrigger>
-              <TooltipContent
-                side="bottom"
-                className="flex items-center gap-2"
-              >
-                <span>New agent</span>
-                <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
-                  ⌘N
-                </kbd>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                <DropdownMenuItem onSelect={() => onCreateSession()}>
+                  <MessageSquare className="mr-2 size-3.5 text-sky-500" />
+                  <span>New agent chat</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onCreateTerminal()}>
+                  <SquareTerminal className="mr-2 size-3.5 text-orange-500" />
+                  <span>New terminal</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      `sandwalk-tab-overflow-btn inline-flex ${OVERFLOW_BTN_HEIGHT} items-center justify-center gap-1 rounded-lg`,
+                      'px-2.5',
+                      'bg-black/[0.06] text-foreground/85',
+                      'hover:bg-black/[0.1] hover:text-foreground',
+                      'dark:bg-white/[0.1] dark:text-zinc-100',
+                      'dark:hover:bg-white/[0.16] dark:hover:text-white'
+                    )}
+                    aria-label="New agent"
+                    onClick={onCreateSession}
+                  >
+                    <Plus className="size-3.5 shrink-0" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  className="flex items-center gap-2"
+                >
+                  <span>New agent</span>
+                  <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
+                    ⌘N
+                  </kbd>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       ) : null}
 

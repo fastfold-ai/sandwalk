@@ -17,7 +17,7 @@ import {
   useState
 } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
-import { type NavigateFunction,useLocation } from 'react-router-dom'
+import { matchPath, type NavigateFunction,useLocation } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { ChatTilingContainer } from '@/components/agents/ChatTilingContainer'
@@ -158,6 +158,17 @@ export type AgentSessionMainPanelProps = {
 
 export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   const location = useLocation()
+  // FAS-107 GF3: detect `/terminals/:id` here (rather than prop-drilling
+  // from App.tsx) since the shell already reads `location`. When present,
+  // the main pane renders TerminalPanel instead of chat/split.
+  const terminalRouteMatch = matchPath(
+    '/terminals/:terminalId',
+    location.pathname
+  )
+  const terminalId =
+    terminalRouteMatch?.params.terminalId?.startsWith('term_')
+      ? terminalRouteMatch.params.terminalId
+      : null
   const {
     client,
     navigate,
@@ -620,6 +631,19 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           await prepareDraftWorkspace()
         }}
         createSession={props.createSession}
+        onCreateTerminal={async () => {
+          // FAS-107 GF5: dropdown "+" → create terminal in active project
+          // and navigate to it via the standalone /terminals/:id route.
+          try {
+            const term = await client.createTerminal({
+              projectId: activeProjectId ?? null
+            })
+            addTerminalOptimistic(term)
+            navigate(`/terminals/${term.id}`)
+          } catch (err) {
+            console.error('createTerminal (dropdown) failed', err)
+          }
+        }}
         groups={tabGroups}
         onSplitWith={onSplitWithNextTab}
         onDissolveGroup={dissolveTabGroup}
@@ -646,7 +670,20 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           minSize={30}
           className="min-w-0"
         >
-          {activeGroup ? (
+          {terminalId ? (
+            // FAS-107 GF3: Terminal-as-main-pane. When the URL is
+            // `/terminals/:id`, the whole main slot is one terminal —
+            // no composer, no transcript, no Files sidebar. Header
+            // stays minimal (Fase GF-header-simplificado).
+            <main className="relative flex h-full min-w-0 flex-col">
+              <TerminalPanel
+                client={client}
+                sessionId={terminalId}
+                visible
+                autoCreateOnEmpty
+              />
+            </main>
+          ) : activeGroup ? (
             <ChatTilingContainer
               group={activeGroup}
               sessions={allSessions}

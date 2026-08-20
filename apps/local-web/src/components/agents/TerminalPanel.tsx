@@ -77,6 +77,38 @@ export function TerminalPanel({
     return () => window.removeEventListener('resize', onResize)
   }, [activeId, mountActive])
 
+  // Observe the terminal host DOM directly so pane resizes (dragging a
+  // split divider) refit xterm and inform the PTY of the new cols/rows.
+  // `window.resize` above only fires when the whole window changes; when
+  // the terminal lives inside a split, its own size can change without
+  // any window event, and xterm keeps the stale 80x24 buffer — the PTY
+  // then wraps its output at a column count the pane can't show, which
+  // is the letter-per-line rendering bug users see after any drag.
+  // Precedent: this is the pattern documented by xterm.js and used by
+  // VSCode's terminal wrapper and Warp.
+  useEffect(() => {
+    if (!activeId) return
+    const host = hostsRef.current[activeId]
+    if (!host) return
+    if (typeof ResizeObserver === 'undefined') return
+    let rafId: number | null = null
+    const observer = new ResizeObserver(() => {
+      // Debounce with rAF: the observer fires many times per frame while
+      // the user drags a divider — one refit per frame is enough and
+      // avoids spamming `updatePtySession` on every intermediate size.
+      if (rafId != null) return
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null
+        mountActive(activeId)
+      })
+    })
+    observer.observe(host)
+    return () => {
+      observer.disconnect()
+      if (rafId != null) window.cancelAnimationFrame(rafId)
+    }
+  }, [activeId, mountActive, hostsRef])
+
   useEffect(() => {
     const command = String(startupCommand || '').trim()
     if (!command) return
