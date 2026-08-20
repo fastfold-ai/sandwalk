@@ -291,4 +291,8 @@ export type AppShellProps = {
   onSelectTabGroup: (groupId: string) => void
   onRenameTabGroup: (group: SessionGroup) => void
   onGoToChatProject: (chat: AgentSession) => void
+  /** FAS-107 GF6: terminals of the active project (shared source of truth). */
+  terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
+  onCloseTerminal?: (terminalId: string) => void
+  activeTerminalId?: string | null
 }

@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/resizable'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useAppTerminals } from '@/hooks/useAppTerminals'
+import { clearTerminalActivity } from '@/lib/terminal-attention'
 import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
 import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { SESSION_PANELS_AUTO_SAVE_ID } from '@/lib/app-storage'
@@ -169,6 +170,11 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     terminalRouteMatch?.params.terminalId?.startsWith('term_')
       ? terminalRouteMatch.params.terminalId
       : null
+  // FAS-107 GF9: clear activity dot when the terminal becomes the active
+  // pane. New output only counts as "unseen" while it lives elsewhere.
+  useEffect(() => {
+    if (terminalId) clearTerminalActivity(terminalId)
+  }, [terminalId])
   const {
     client,
     navigate,
@@ -632,18 +638,22 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         }}
         createSession={props.createSession}
         onCreateTerminal={async () => {
-          // FAS-107 GF5: dropdown "+" → create terminal in active project
-          // and navigate to it via the standalone /terminals/:id route.
+          // FAS-107 GF5: dropdown "+" → create terminal in active project,
+          // add it to `openTabIds` so a chip renders in the strip, then
+          // navigate to the standalone /terminals/:id route.
           try {
             const term = await client.createTerminal({
               projectId: activeProjectId ?? null
             })
             addTerminalOptimistic(term)
+            openSessionTab(term.id)
             navigate(`/terminals/${term.id}`)
           } catch (err) {
             console.error('createTerminal (dropdown) failed', err)
           }
         }}
+        terminals={terminals}
+        onCloseTerminal={handleCloseTerminal}
         groups={tabGroups}
         onSplitWith={onSplitWithNextTab}
         onDissolveGroup={dissolveTabGroup}

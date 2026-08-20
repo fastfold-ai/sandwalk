@@ -103,6 +103,10 @@ export type AppShellSidebarProps = {
       | null
       | ((current: AgentSession | null) => AgentSession | null)
   ) => void
+  /** FAS-107 GF6: terminals of the active project. */
+  terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
+  onCloseTerminal?: (terminalId: string) => void
+  activeTerminalId?: string | null
 }
 
 export function AppShellSidebar({
@@ -158,7 +162,10 @@ export function AppShellSidebar({
   openRenameDialog,
   updateSession,
   exportTranscript,
-  setDeleteTarget
+  setDeleteTarget,
+  terminals,
+  onCloseTerminal,
+  activeTerminalId
 }: AppShellSidebarProps) {
   const { onSidebarResize } = useSidebarPixelWidth(
     sidebarPanelRef,
@@ -260,6 +267,9 @@ export function AppShellSidebar({
             setDeleteTarget={setDeleteTarget}
             onLogout={logoutSession}
             onRefreshUser={refreshCloudUserName}
+            terminals={terminals}
+            onCloseTerminal={onCloseTerminal}
+            activeTerminalId={activeTerminalId ?? null}
           />
         )}
       </aside>

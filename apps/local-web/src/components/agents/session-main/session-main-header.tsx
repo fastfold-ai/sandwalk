@@ -81,6 +81,10 @@ export type SessionMainHeaderProps = {
   createSession?: (projectId?: string | null) => void | Promise<void>
   /** FAS-107 GF5: create + open a new terminal via the tab-strip "+". */
   onCreateTerminal?: () => void
+  /** FAS-107 GF1/GF6: terminals so chips render with type-terminal variant. */
+  terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
+  /** FAS-107: close/kill a terminal from its chip. */
+  onCloseTerminal?: (terminalId: string) => void
   groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
@@ -140,6 +144,8 @@ export function SessionMainHeader({
   onPrepareDraftWorkspace,
   createSession,
   onCreateTerminal,
+  terminals,
+  onCloseTerminal,
   groups,
   onSplitWith,
   onDissolveGroup,
@@ -317,6 +323,8 @@ export function SessionMainHeader({
             createSession ? () => void createSession(activeProjectId) : undefined
           }
           onCreateTerminal={onCreateTerminal}
+          terminals={terminals}
+          onCloseTerminal={onCloseTerminal}
           groups={groups}
           onSplitWith={onSplitWith}
           onDissolveGroup={onDissolveGroup}

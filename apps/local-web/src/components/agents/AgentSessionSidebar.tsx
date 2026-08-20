@@ -41,6 +41,7 @@ import { cn } from '@/lib/utils'
 
 import { SidebarBatchBar } from './session-sidebar/sidebar-batch-bar'
 import { SidebarSessionList } from './session-sidebar/sidebar-session-list'
+import { SidebarTerminalsSection } from './session-sidebar/sidebar-terminals-section'
 
 type SessionSection = TabItemSection
 
@@ -97,6 +98,12 @@ type AgentSessionSidebarProps = {
   setDeleteTarget: Dispatch<SetStateAction<AgentSession | null>>
   onLogout: () => void | Promise<void>
   onRefreshUser: () => void | Promise<void>
+  /** FAS-107 GF6: terminals of the active project. Optional. */
+  terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
+  /** Deletes the terminal (kill the shell + remove row). */
+  onCloseTerminal?: (terminalId: string) => void
+  /** Active terminal id when the current URL is `/terminals/:id`. */
+  activeTerminalId?: string | null
 }
 
 export function AgentSessionSidebar({
@@ -148,7 +155,10 @@ export function AgentSessionSidebar({
   exportTranscript,
   setDeleteTarget,
   onLogout,
-  onRefreshUser
+  onRefreshUser,
+  terminals,
+  onCloseTerminal,
+  activeTerminalId
 }: AgentSessionSidebarProps) {
   const location = useLocation()
   const attentionIds = useSessionAttentionIds()
@@ -351,6 +361,17 @@ export function AgentSessionSidebar({
         setTabGroupActiveChat={setTabGroupActiveChat}
         unreadOnly={unreadOnly}
       />
+      {terminals && terminals.length > 0 ? (
+        <SidebarTerminalsSection
+          terminals={terminals}
+          activeId={activeTerminalId ?? null}
+          openTerminal={terminalId => {
+            openSessionTab(terminalId)
+            navigate(`/terminals/${terminalId}`)
+          }}
+          onCloseTerminal={onCloseTerminal}
+        />
+      ) : null}
       <div className="relative shrink-0 p-2">
         <SidebarBatchBar
           selectedCount={selectedSessionIds.size}

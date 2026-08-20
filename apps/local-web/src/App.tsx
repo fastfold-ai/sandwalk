@@ -14,6 +14,7 @@ import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
 import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
+import { useAppTerminals } from '@/hooks/useAppTerminals'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
 import {
   useAppRouteContext,
@@ -60,6 +61,7 @@ export default function App() {
   // FAS-107 GF10: `⌘⇧T` opens a new terminal in the active project and
   // navigates to it. Handled at the shell so it works from any page.
   const bootstrapClientForShortcut = bootstrap.client
+  const openSessionTabForShortcut = tabs.openSessionTab
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey
@@ -71,13 +73,19 @@ export default function App() {
       void client
         .createTerminal({ projectId: bootstrap.activeProjectId ?? null })
         .then(term => {
+          openSessionTabForShortcut(term.id)
           navigate(`/terminals/${term.id}`)
         })
         .catch(err => console.error('⌘⇧T createTerminal failed', err))
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [bootstrapClientForShortcut, bootstrap.activeProjectId, navigate])
+  }, [
+    bootstrapClientForShortcut,
+    bootstrap.activeProjectId,
+    navigate,
+    openSessionTabForShortcut
+  ])
   const ui = useAppUiState()
   const route = useAppRouting(location)
   const { setChatBySessionIdRef, setChatBySessionIdBridge } =
@@ -89,6 +97,27 @@ export default function App() {
     setChatBySessionId: setChatBySessionIdBridge,
     isDashboardModels: route.isDashboardModels
   })
+
+  // FAS-107 GF1/GF6: terminals for the active project, shared source of
+  // truth for both the sidebar list and the tab strip (so a fresh
+  // create appears everywhere without per-consumer fetching).
+  const terminalsLive = useAppTerminals(
+    bootstrap.client,
+    bootstrap.activeProjectId ?? null
+  )
+  const handleDeleteTerminalGlobal = useCallback(
+    async (terminalId: string) => {
+      if (!bootstrap.client) return
+      try {
+        terminalsLive.removeOptimistic(terminalId)
+        await bootstrap.client.deleteTerminal(terminalId)
+        terminalsLive.refresh()
+      } catch (err) {
+        console.error('deleteTerminal (global) failed', err)
+      }
+    },
+    [bootstrap.client, terminalsLive]
+  )
 
   const onDesktopRoute = useCallback(
     (path: string) => {
@@ -818,6 +847,9 @@ export default function App() {
   return (
     <>
       <AppShellConnected
+        terminals={terminalsLive.terminals}
+        onCloseTerminal={handleDeleteTerminalGlobal}
+        activeTerminalId={route.terminalId ?? null}
         {...buildAppShellProps({
           ui,
           route,

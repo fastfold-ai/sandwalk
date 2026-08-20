@@ -82,6 +82,9 @@ export function AppShell(props: AppShellProps) {
           updateSession={props.updateSession}
           exportTranscript={props.exportTranscript}
           setDeleteTarget={props.setDeleteTarget}
+          terminals={props.terminals}
+          onCloseTerminal={props.onCloseTerminal}
+          activeTerminalId={props.activeTerminalId}
         />
 
         <ResizableHandle

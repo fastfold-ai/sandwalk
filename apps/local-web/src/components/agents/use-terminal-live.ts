@@ -5,6 +5,7 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { type RefObject,useCallback, useEffect, useRef } from 'react'
 
 import { copyText } from '@/lib/clipboard'
+import { markTerminalActivity } from '@/lib/terminal-attention'
 import {
   buildTerminalTheme,
   isDocumentDark,
@@ -191,9 +192,18 @@ export function useTerminalLive({
         if (live.disposed) return
         if (typeof event.data === 'string') {
           live.term.write(event.data)
-          return
+        } else {
+          live.term.write(new Uint8Array(event.data as ArrayBuffer))
         }
-        live.term.write(new Uint8Array(event.data as ArrayBuffer))
+        // FAS-107 GF9: any output that lands while the terminal is NOT
+        // the active pane (i.e. its URL is not the current one) counts
+        // as unseen activity. The chip and sidebar row render an orange
+        // dot; the terminal clears its own entry when it becomes active.
+        const currentPath =
+          typeof window !== 'undefined' ? window.location.pathname : ''
+        if (!currentPath.endsWith(`/terminals/${sessionId}`)) {
+          markTerminalActivity(sessionId)
+        }
       })
 
       socket.addEventListener('close', () => {
