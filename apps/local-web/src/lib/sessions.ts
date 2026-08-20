@@ -308,9 +308,10 @@ export function groupTabItems(
       ? item.session.organizeLabel === 'pinned'
       : item.kind === 'group'
         ? item.group.pinned
-        : false
+        : item.terminal.organizeLabel === 'pinned'
   const isArchived = (item: TabItem) =>
-    item.kind === 'chat' && item.session.organizeLabel === 'archive'
+    (item.kind === 'chat' && item.session.organizeLabel === 'archive') ||
+    (item.kind === 'terminal' && item.terminal.organizeLabel === 'archive')
   // Los grupos no tienen "archived" — solo chats pueden estar archivados.
 
   // Dentro de cada sección, "más reciente primero" — sirve para que un

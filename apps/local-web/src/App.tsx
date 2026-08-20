@@ -104,6 +104,53 @@ export default function App() {
     [bootstrap.client, terminalsLive]
   )
 
+  const handleRenameTerminal = useCallback(
+    async (terminalId: string, nextTitle: string) => {
+      if (!bootstrap.client) return
+      const cleaned = nextTitle.trim()
+      if (!cleaned) return
+      try {
+        await bootstrap.client.updateTerminal(terminalId, { title: cleaned })
+        terminalsLive.refresh()
+      } catch (err) {
+        console.error('updateTerminal (rename) failed', err)
+      }
+    },
+    [bootstrap.client, terminalsLive]
+  )
+
+  const promptRenameTerminal = useCallback(
+    (terminalId: string) => {
+      const current = terminalsLive.terminals.find(t => t.id === terminalId)
+      const next = window.prompt(
+        'Rename terminal:',
+        current?.title ?? ''
+      )
+      if (next === null) return
+      void handleRenameTerminal(terminalId, next)
+    },
+    [terminalsLive.terminals, handleRenameTerminal]
+  )
+
+  const handleToggleTerminalOrganizeLabel = useCallback(
+    async (terminalId: string, label: 'pinned' | 'archive') => {
+      if (!bootstrap.client) return
+      const current = terminalsLive.terminals.find(t => t.id === terminalId)
+      // Empty string = clear (the store maps `"" -> None` to null out the
+      // column). Explicit label = set. Toggles between the label and null.
+      const nextLabel: string = current?.organizeLabel === label ? '' : label
+      try {
+        await bootstrap.client.updateTerminal(terminalId, {
+          organizeLabel: nextLabel
+        })
+        terminalsLive.refresh()
+      } catch (err) {
+        console.error('updateTerminal (organize) failed', err)
+      }
+    },
+    [bootstrap.client, terminalsLive]
+  )
+
   // FAS-107 GF10: `⌘⇧T` opens a new terminal in the active project and
   // navigates to it. Handled at the shell so it works from any page.
   // Declared AFTER `bootstrap` so `bootstrap.client` isn't in TDZ.
@@ -867,6 +914,8 @@ export default function App() {
         onCloseTerminal={handleDeleteTerminalGlobal}
         activeTerminalId={route.terminalId ?? null}
         onMoveTerminalToProject={handleMoveTerminalToProject}
+        onRenameTerminal={promptRenameTerminal}
+        onToggleTerminalOrganizeLabel={handleToggleTerminalOrganizeLabel}
         {...buildAppShellProps({
           ui,
           route,

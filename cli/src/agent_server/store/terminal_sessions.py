@@ -26,6 +26,10 @@ def _iso(value: datetime) -> str:
 
 def _row_to_terminal(row: sqlite3.Row) -> TerminalSession:
     last_activity = row["last_activity_at"]
+    keys = row.keys()
+    organize_label_val = (
+        row["organize_label"] if "organize_label" in keys else None
+    )
     return TerminalSession(
         id=str(row["id"]),
         title=str(row["title"]),
@@ -40,6 +44,9 @@ def _row_to_terminal(row: sqlite3.Row) -> TerminalSession:
         ),
         slot_key=(str(row["slot_key"]) if row["slot_key"] is not None else None),
         status=str(row["status"]),  # type: ignore[arg-type]
+        organize_label=(
+            str(organize_label_val) if organize_label_val is not None else None
+        ),
         last_activity_at=(
             datetime.fromisoformat(str(last_activity)) if last_activity is not None else None
         ),
@@ -126,7 +133,7 @@ class TerminalSessionMixin:
                 """
                 SELECT id, title, title_source, project_id, workspace_path,
                        shell, origin_chat_id, slot_key, status,
-                       last_activity_at, created_at, updated_at
+                       organize_label, last_activity_at, created_at, updated_at
                 FROM terminal_sessions
                 WHERE id = ?
                 """,
@@ -155,7 +162,7 @@ class TerminalSessionMixin:
                 f"""
                 SELECT id, title, title_source, project_id, workspace_path,
                        shell, origin_chat_id, slot_key, status,
-                       last_activity_at, created_at, updated_at
+                       organize_label, last_activity_at, created_at, updated_at
                 FROM terminal_sessions
                 {where}
                 ORDER BY updated_at DESC
@@ -198,9 +205,12 @@ class TerminalSessionMixin:
         if last_activity_at is not None:
             assignments.append("last_activity_at = ?")
             params.append(_iso(last_activity_at))
-        # organize_label is stored on the workspace_items row (index-side),
-        # not on the terminal_sessions row — same shape as SessionGroup.
-        # We still want to bump updated_at even if only that changed.
+        # FAS-107 paridad: `organize_label` also lives on `terminal_sessions`
+        # so pin/archive survive without depending on the workspace_items
+        # denormalization. workspace_items still keeps a mirror below.
+        if organize_label is not None:
+            assignments.append("organize_label = ?")
+            params.append(organize_label or None)
         now = utc_now()
         assignments.append("updated_at = ?")
         params.append(_iso(now))

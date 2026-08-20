@@ -86,6 +86,8 @@ export function AppShell(props: AppShellProps) {
           onCloseTerminal={props.onCloseTerminal}
           activeTerminalId={props.activeTerminalId}
           onMoveTerminalToProject={props.onMoveTerminalToProject}
+          onRenameTerminal={props.onRenameTerminal}
+          onToggleTerminalOrganizeLabel={props.onToggleTerminalOrganizeLabel}
         />
 
         <ResizableHandle

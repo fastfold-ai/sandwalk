@@ -108,6 +108,11 @@ type AgentSessionSidebarProps = {
     terminalId: string,
     projectId: string | null
   ) => void | Promise<void>
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
 }
 
 export function AgentSessionSidebar({
@@ -163,7 +168,9 @@ export function AgentSessionSidebar({
   terminals,
   onCloseTerminal,
   activeTerminalId,
-  onMoveTerminalToProject
+  onMoveTerminalToProject,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel
 }: AgentSessionSidebarProps) {
   const location = useLocation()
   const attentionIds = useSessionAttentionIds()
@@ -368,6 +375,8 @@ export function AgentSessionSidebar({
         activeTerminalId={activeTerminalId ?? null}
         onCloseTerminal={onCloseTerminal}
         onMoveTerminalToProject={onMoveTerminalToProject}
+        onRenameTerminal={onRenameTerminal}
+        onToggleTerminalOrganizeLabel={onToggleTerminalOrganizeLabel}
       />
       <div className="relative shrink-0 p-2">
         <SidebarBatchBar

@@ -634,6 +634,12 @@ export type TerminalSession = {
    */
   slotKey: string | null
   status: 'idle' | 'running' | 'detached' | 'exited'
+  /**
+   * FAS-107 paridad-con-chat: `'pinned'` / `'archive'` / null — same
+   * shape as `AgentSession.organizeLabel` so pin/archive work
+   * end-to-end without depending on the workspace_items denormalization.
+   */
+  organizeLabel: 'pinned' | 'archive' | null
   lastActivityAt: string | null
   createdAt: string
   updatedAt: string

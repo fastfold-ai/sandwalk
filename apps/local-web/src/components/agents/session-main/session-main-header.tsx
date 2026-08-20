@@ -85,6 +85,16 @@ export type SessionMainHeaderProps = {
   terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
   /** FAS-107: close/kill a terminal from its chip. */
   onCloseTerminal?: (terminalId: string) => void
+  /** FAS-107 GF-PARITY-5: rename/pin/archive/move a terminal from chip menu. */
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
   groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
@@ -146,6 +156,9 @@ export function SessionMainHeader({
   onCreateTerminal,
   terminals,
   onCloseTerminal,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel,
+  onMoveTerminalToProject,
   groups,
   onSplitWith,
   onDissolveGroup,
@@ -325,6 +338,9 @@ export function SessionMainHeader({
           onCreateTerminal={onCreateTerminal}
           terminals={terminals}
           onCloseTerminal={onCloseTerminal}
+          onRenameTerminal={onRenameTerminal}
+          onToggleTerminalOrganizeLabel={onToggleTerminalOrganizeLabel}
+          onMoveTerminalToProject={onMoveTerminalToProject}
           groups={groups}
           onSplitWith={onSplitWith}
           onDissolveGroup={onDissolveGroup}

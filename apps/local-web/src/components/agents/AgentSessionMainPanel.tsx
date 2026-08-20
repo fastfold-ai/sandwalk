@@ -344,6 +344,57 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     [client, removeTerminalOptimistic, refreshTerminals, onRemoveChatFromSplit]
   )
 
+  // FAS-107 GF-PARITY-5: parity with chat actions. `handleRename/Toggle/Move`
+  // are local mirrors of the shell-level handlers (which drive the sidebar
+  // row menu) so the tab-chip context menu can run without prop-drilling
+  // across the shell.
+  const handleRenameTerminal = useCallback(
+    (terminalId: string) => {
+      const current = terminals.find(t => t.id === terminalId)
+      const next = window.prompt('Rename terminal:', current?.title ?? '')
+      if (next === null) return
+      const cleaned = next.trim()
+      if (!cleaned) return
+      void (async () => {
+        try {
+          await client.updateTerminal(terminalId, { title: cleaned })
+          refreshTerminals()
+        } catch (err) {
+          console.error('updateTerminal (rename) failed', err)
+        }
+      })()
+    },
+    [client, refreshTerminals, terminals]
+  )
+
+  const handleToggleTerminalOrganizeLabel = useCallback(
+    async (terminalId: string, label: 'pinned' | 'archive') => {
+      const current = terminals.find(t => t.id === terminalId)
+      // Empty string = clear (the backend maps `"" -> None` so the column
+      // becomes NULL). Explicit label = set. Toggles between the label and null.
+      const nextLabel: string = current?.organizeLabel === label ? '' : label
+      try {
+        await client.updateTerminal(terminalId, { organizeLabel: nextLabel })
+        refreshTerminals()
+      } catch (err) {
+        console.error('updateTerminal (organize) failed', err)
+      }
+    },
+    [client, refreshTerminals, terminals]
+  )
+
+  const handleMoveTerminalToProjectLocal = useCallback(
+    async (terminalId: string, projectId: string | null) => {
+      try {
+        await client.updateTerminal(terminalId, { projectId })
+        refreshTerminals()
+      } catch (err) {
+        console.error('updateTerminal (move) failed', err)
+      }
+    },
+    [client, refreshTerminals]
+  )
+
   const isNarrow = useIsNarrowWindow(1280)
   // En split view con ventana angosta, el side panel deja de ser una columna
   // resizable (no cabe junto a N chats + composer) y pasa a modal overlay.
@@ -655,6 +706,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         }}
         terminals={terminals}
         onCloseTerminal={handleCloseTerminal}
+        onRenameTerminal={handleRenameTerminal}
+        onToggleTerminalOrganizeLabel={handleToggleTerminalOrganizeLabel}
+        onMoveTerminalToProject={handleMoveTerminalToProjectLocal}
         groups={tabGroups}
         onSplitWith={onSplitWithNextTab}
         onDissolveGroup={dissolveTabGroup}

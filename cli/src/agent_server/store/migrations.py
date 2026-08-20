@@ -47,6 +47,7 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
             origin_chat_id TEXT,
             slot_key TEXT,
             status TEXT NOT NULL DEFAULT 'idle',
+            organize_label TEXT,
             last_activity_at TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -297,6 +298,19 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
     connection.execute(
         "CREATE INDEX IF NOT EXISTS usage_runs_kind_day ON usage_runs(kind, day)"
     )
+    # FAS-107 pin/archive for terminals: adds `organize_label` on existing
+    # DBs that were created before the paridad-con-chat pass. Idempotent.
+    terminal_columns = {
+        row["name"]
+        for row in connection.execute(
+            "PRAGMA table_info(terminal_sessions)"
+        ).fetchall()
+    }
+    if "organize_label" not in terminal_columns:
+        connection.execute(
+            "ALTER TABLE terminal_sessions ADD COLUMN organize_label TEXT"
+        )
+
     # FAS-107 backfill: mirror every existing chat session into workspace_items
     # so the tab strip / sidebar can query the unified index without a UNION.
     # Idempotent — INSERT OR IGNORE keeps existing rows untouched, and the

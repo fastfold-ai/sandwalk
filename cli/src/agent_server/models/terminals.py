@@ -37,6 +37,9 @@ class TerminalSession(ApiModel):
     # in the same cwd. Precedent: WezTerm's pane_id vs pane role split.
     slot_key: str | None = None
     status: TerminalStatus = "idle"
+    # 'pinned' / 'archive' / null — same shape as `AgentSession.organize_label`
+    # so paridad-con-chat is complete: pin/archive live in DB, not localStorage.
+    organize_label: str | None = None
     last_activity_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

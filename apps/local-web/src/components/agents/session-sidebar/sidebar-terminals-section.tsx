@@ -2,7 +2,19 @@ import type {
   AgentProject,
   TerminalSession
 } from '@sandwalk/agent-ui-core'
-import { ChevronDown, Folder, MoreHorizontal, SquareTerminal, X } from 'lucide-react'
+import {
+  Archive,
+  ArchiveRestore,
+  ChevronDown,
+  Folder,
+  MoreHorizontal,
+  Palette,
+  Pencil,
+  Pin,
+  PinOff,
+  SquareTerminal,
+  X
+} from 'lucide-react'
 import { useState } from 'react'
 
 import {
@@ -20,6 +32,18 @@ import {
   useTerminalHasActivity
 } from '@/lib/terminal-attention'
 import { cn } from '@/lib/utils'
+
+// Palette matches the chat sidebar tab colors so users see one system.
+const TERMINAL_TAB_COLORS: Array<{ id: string; hex: string; label: string }> = [
+  { id: 'red', hex: '#ef4444', label: 'Red' },
+  { id: 'orange', hex: '#f97316', label: 'Orange' },
+  { id: 'amber', hex: '#f59e0b', label: 'Amber' },
+  { id: 'green', hex: '#22c55e', label: 'Green' },
+  { id: 'cyan', hex: '#06b6d4', label: 'Cyan' },
+  { id: 'blue', hex: '#3b82f6', label: 'Blue' },
+  { id: 'violet', hex: '#8b5cf6', label: 'Violet' },
+  { id: 'pink', hex: '#ec4899', label: 'Pink' }
+]
 
 /**
  * FAS-107 GF6: terminals of the active project as a section INSIDE the
@@ -107,7 +131,12 @@ export function SidebarTerminalRow({
   onOpen,
   onClose,
   projects,
-  onMoveToProject
+  onMoveToProject,
+  onRename,
+  onTogglePin,
+  onToggleArchive,
+  onSetColor,
+  colorValue
 }: {
   terminal: TerminalSession
   active: boolean
@@ -118,6 +147,11 @@ export function SidebarTerminalRow({
     terminalId: string,
     projectId: string | null
   ) => void | Promise<void>
+  onRename?: (terminalId: string) => void
+  onTogglePin?: (terminalId: string) => void
+  onToggleArchive?: (terminalId: string) => void
+  onSetColor?: (terminalId: string, color: string | null) => void
+  colorValue?: string | null
 }) {
   const term = terminal
   return (
@@ -131,6 +165,11 @@ export function SidebarTerminalRow({
       onClose={onClose}
       projects={projects}
       onMoveToProject={onMoveToProject}
+      onRename={onRename}
+      onTogglePin={onTogglePin}
+      onToggleArchive={onToggleArchive}
+      onSetColor={onSetColor}
+      colorValue={colorValue}
     />
   )
 }
@@ -141,7 +180,12 @@ function TerminalRowInner({
   onOpen,
   onClose,
   projects,
-  onMoveToProject
+  onMoveToProject,
+  onRename,
+  onTogglePin,
+  onToggleArchive,
+  onSetColor,
+  colorValue
 }: {
   term: TerminalSession
   active: boolean
@@ -152,8 +196,15 @@ function TerminalRowInner({
     terminalId: string,
     projectId: string | null
   ) => void | Promise<void>
+  onRename?: (terminalId: string) => void
+  onTogglePin?: (terminalId: string) => void
+  onToggleArchive?: (terminalId: string) => void
+  onSetColor?: (terminalId: string, color: string | null) => void
+  colorValue?: string | null
 }) {
   const hasActivity = useTerminalHasActivity(term.id)
+  const isPinned = term.organizeLabel === 'pinned'
+  const isArchived = term.organizeLabel === 'archive'
   return (
     <li>
       <div
@@ -176,9 +227,22 @@ function TerminalRowInner({
               />
             ) : null}
           </span>
+          {colorValue ? (
+            <span
+              aria-hidden
+              className="size-2 shrink-0 rounded-full border border-black/10"
+              style={{ backgroundColor: colorValue }}
+            />
+          ) : null}
           <span className="text-foreground/90 min-w-0 truncate text-[13px]">
             {term.title}
           </span>
+          {isPinned ? (
+            <Pin
+              aria-label="Pinned"
+              className="text-muted-foreground/60 size-3 shrink-0"
+            />
+          ) : null}
         </button>
         <div className="flex items-center gap-0.5">
           <DropdownMenu>
@@ -197,59 +261,105 @@ function TerminalRowInner({
               className="min-w-[200px]"
               onCloseAutoFocus={e => e.preventDefault()}
             >
-              {onMoveToProject ? (
-                <>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <Folder className="mr-2 size-3.5" />
-                      <span>Move to project</span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="min-w-[180px]">
+              {onRename ? (
+                <DropdownMenuItem onSelect={() => onRename(term.id)}>
+                  <Pencil className="mr-2 size-3.5" />
+                  <span>Rename</span>
+                </DropdownMenuItem>
+              ) : null}
+              {onTogglePin ? (
+                <DropdownMenuItem onSelect={() => onTogglePin(term.id)}>
+                  {isPinned ? (
+                    <PinOff className="mr-2 size-3.5" />
+                  ) : (
+                    <Pin className="mr-2 size-3.5" />
+                  )}
+                  <span>{isPinned ? 'Unpin' : 'Pin'}</span>
+                </DropdownMenuItem>
+              ) : null}
+              {onSetColor ? (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Palette className="mr-2 size-3.5" />
+                    <span>Set color</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="min-w-[160px]">
+                    <DropdownMenuItem
+                      onSelect={() => onSetColor(term.id, null)}
+                    >
+                      <span
+                        aria-hidden
+                        className="mr-2 size-3 rounded-full border border-black/10"
+                      />
+                      <span>None</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {TERMINAL_TAB_COLORS.map(c => (
                       <DropdownMenuItem
-                        onSelect={() => void onMoveToProject(term.id, null)}
+                        key={c.id}
+                        onSelect={() => onSetColor(term.id, c.hex)}
                       >
-                        <span>No project</span>
+                        <span
+                          aria-hidden
+                          className="mr-2 size-3 rounded-full border border-black/10"
+                          style={{ backgroundColor: c.hex }}
+                        />
+                        <span>{c.label}</span>
                       </DropdownMenuItem>
-                      {projects.length > 0 ? (
-                        <DropdownMenuSeparator />
-                      ) : null}
-                      {projects.map(p => (
-                        <DropdownMenuItem
-                          key={p.id}
-                          onSelect={() => void onMoveToProject(term.id, p.id)}
-                        >
-                          <span className="truncate">{p.name}</span>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                  {onClose ? <DropdownMenuSeparator /> : null}
-                </>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              ) : null}
+              {onMoveToProject ? (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Folder className="mr-2 size-3.5" />
+                    <span>Move to project</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="min-w-[180px]">
+                    <DropdownMenuItem
+                      onSelect={() => void onMoveToProject(term.id, null)}
+                    >
+                      <span>No project</span>
+                    </DropdownMenuItem>
+                    {projects.length > 0 ? (
+                      <DropdownMenuSeparator />
+                    ) : null}
+                    {projects.map(p => (
+                      <DropdownMenuItem
+                        key={p.id}
+                        onSelect={() => void onMoveToProject(term.id, p.id)}
+                      >
+                        <span className="truncate">{p.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              ) : null}
+              {onToggleArchive ? (
+                <DropdownMenuItem onSelect={() => onToggleArchive(term.id)}>
+                  {isArchived ? (
+                    <ArchiveRestore className="mr-2 size-3.5" />
+                  ) : (
+                    <Archive className="mr-2 size-3.5" />
+                  )}
+                  <span>{isArchived ? 'Unarchive' : 'Archive'}</span>
+                </DropdownMenuItem>
               ) : null}
               {onClose ? (
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onSelect={() => onClose(term.id)}
-                >
-                  <X className="mr-2 size-3.5" />
-                  <span>Delete terminal</span>
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => onClose(term.id)}
+                  >
+                    <X className="mr-2 size-3.5" />
+                    <span>Delete terminal</span>
+                  </DropdownMenuItem>
+                </>
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
-          {onClose ? (
-            <button
-              type="button"
-              aria-label={`Delete ${term.title}`}
-              className="text-muted-foreground hover:text-destructive hidden shrink-0 rounded p-0.5 group-hover:inline-flex"
-              onClick={e => {
-                e.stopPropagation()
-                onClose(term.id)
-              }}
-            >
-              <X className="size-3" />
-            </button>
-          ) : null}
         </div>
       </div>
     </li>

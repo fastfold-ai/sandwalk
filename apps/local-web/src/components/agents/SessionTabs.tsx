@@ -120,7 +120,10 @@ export function SessionTabs({
   onCreateSplitFromSelection,
   terminals,
   onCloseTerminal,
-  onCreateTerminal
+  onCreateTerminal,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel,
+  onMoveTerminalToProject
 }: {
   tabs: AgentSession[]
   activeId: string | null
@@ -168,6 +171,16 @@ export function SessionTabs({
   onCloseTerminal?: (terminalId: string) => void
   /** FAS-107 GF5: opens a new terminal from the tab-strip "+" menu. */
   onCreateTerminal?: () => void
+  /** FAS-107 GF-PARITY-5: parity actions for the terminal chip context menu. */
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
 }) {
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
   // Confirmation modal for "Delete Split View": the action dissolves
@@ -257,7 +270,7 @@ export function SessionTabs({
             kind: 'terminal',
             id: terminal.id,
             terminal,
-            pinned: false
+            pinned: terminal.organizeLabel === 'pinned'
           })
           continue
         }
@@ -406,6 +419,9 @@ export function SessionTabs({
   const menuGroup = menu
     ? (groups ?? []).find(g => g.id === menu.sessionId) || null
     : null
+  const menuTerminal = menu
+    ? (terminals ?? []).find(t => t.id === menu.sessionId) || null
+    : null
 
   const runAction = (action: () => void) => {
     setMenu(null)
@@ -432,16 +448,9 @@ export function SessionTabs({
   }
 
   const openContextMenu = (id: string, event: React.MouseEvent) => {
-    // FAS-107 GF7: terminals get a minimal right-click menu (delete only).
-    // Rename / pin / color / export don't apply — we skip the chat menu
-    // entirely instead of half-rendering it with broken items.
-    if (id.startsWith('term_') && onCloseTerminal) {
-      const confirmed = window.confirm(
-        'Delete this terminal? The shell will be killed.'
-      )
-      if (confirmed) onCloseTerminal(id)
-      return
-    }
+    // FAS-107 GF-PARITY-5: terminals now share the same menu machinery as
+    // chats/groups. `menuTerminal` (below) resolves the id → TerminalSession
+    // so its dedicated menu branch renders.
     setMenu({ sessionId: id, x: event.clientX, y: event.clientY })
   }
 
@@ -520,7 +529,7 @@ export function SessionTabs({
                     status: 'idle',
                     source: 'local',
                     sourceLabel: 'Terminal',
-                    organizeLabel: null,
+                    organizeLabel: term.organizeLabel ?? null,
                     createdAt: term.createdAt,
                     updatedAt: term.updatedAt,
                     lastMessageAt: null,
@@ -1040,6 +1049,113 @@ export function SessionTabs({
           ) : null}
         </TabContextMenuShell>
       ) : null}
+
+      {menu && menuTerminal ? (
+        <TabContextMenuShell
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+        >
+          {onRenameTerminal ? (
+            <TabContextItem
+              icon={<Pencil className="size-3.5" />}
+              label="Rename…"
+              onClick={() =>
+                runAction(() => onRenameTerminal(menuTerminal.id))
+              }
+            />
+          ) : null}
+          {onToggleTerminalOrganizeLabel ? (
+            <TabContextItem
+              icon={<Pin className="size-3.5" />}
+              label={
+                menuTerminal.organizeLabel === 'pinned' ? 'Unpin' : 'Pin'
+              }
+              onClick={() =>
+                runAction(() =>
+                  void onToggleTerminalOrganizeLabel(menuTerminal.id, 'pinned')
+                )
+              }
+            />
+          ) : null}
+          {onMoveTerminalToProject && projects ? (
+            <ProjectPicker
+              projects={projects}
+              value={menuTerminal.projectId}
+              noneLabel="No project"
+              trigger={
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="hover:bg-muted flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs [&_svg]:size-3"
+                >
+                  <Folder />
+                  Move to project…
+                </button>
+              }
+              onChange={projectId => {
+                void onMoveTerminalToProject(menuTerminal.id, projectId)
+                setMenu(null)
+              }}
+            />
+          ) : null}
+          <TabContextSeparator />
+          <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
+            Color
+          </div>
+          <TabInlineColorRow
+            value={tabColors[menuTerminal.id] || null}
+            onSelect={color => {
+              setTabColor(menuTerminal.id, color)
+              setMenu(null)
+            }}
+            onClear={() => {
+              setTabColor(menuTerminal.id, null)
+              setMenu(null)
+            }}
+          />
+          {onToggleTerminalOrganizeLabel ? (
+            <>
+              <TabContextSeparator />
+              <TabContextItem
+                icon={<Archive className="size-3.5" />}
+                label={
+                  menuTerminal.organizeLabel === 'archive'
+                    ? 'Unarchive'
+                    : 'Archive'
+                }
+                onClick={() =>
+                  runAction(() =>
+                    void onToggleTerminalOrganizeLabel(
+                      menuTerminal.id,
+                      'archive'
+                    )
+                  )
+                }
+              />
+            </>
+          ) : null}
+          <TabContextSeparator />
+          <TabContextItem
+            icon={<X className="size-3.5" />}
+            label="Close tab"
+            onClick={() =>
+              runAction(() =>
+                onCloseTerminal
+                  ? onCloseTerminal(menuTerminal.id)
+                  : onClose(menuTerminal.id)
+              )
+            }
+          />
+          <TabContextItem
+            icon={<CircleX className="size-3.5" />}
+            label="Close other tabs"
+            disabled={orderedItems.length <= 1}
+            onClick={() => runAction(() => onCloseOthers(menuTerminal.id))}
+          />
+        </TabContextMenuShell>
+      ) : null}
+
       <GroupDissolveDialog
         group={dissolveConfirm}
         chats={

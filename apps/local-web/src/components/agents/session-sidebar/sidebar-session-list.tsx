@@ -241,6 +241,11 @@ export type SidebarSessionListProps = {
     terminalId: string,
     projectId: string | null
   ) => void | Promise<void>
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
 }
 
 export function SidebarSessionList({
@@ -276,7 +281,9 @@ export function SidebarSessionList({
   extraTopSection,
   activeTerminalId,
   onCloseTerminal,
-  onMoveTerminalToProject
+  onMoveTerminalToProject,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel
 }: SidebarSessionListProps) {
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
@@ -467,12 +474,21 @@ export function SidebarSessionList({
                             terminal={item.terminal}
                             active={item.id === activeTerminalId}
                             projects={projects}
+                            colorValue={tabColors[item.id]}
                             onOpen={id => {
                               openSessionTab(id)
                               navigate(`/terminals/${id}`)
                             }}
                             onClose={onCloseTerminal}
                             onMoveToProject={onMoveTerminalToProject}
+                            onRename={onRenameTerminal}
+                            onTogglePin={id =>
+                              onToggleTerminalOrganizeLabel?.(id, 'pinned')
+                            }
+                            onToggleArchive={id =>
+                              onToggleTerminalOrganizeLabel?.(id, 'archive')
+                            }
+                            onSetColor={(id, color) => setTabColor(id, color)}
                           />
                         )
                       }

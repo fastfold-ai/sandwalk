@@ -111,6 +111,11 @@ export type AppShellSidebarProps = {
     terminalId: string,
     projectId: string | null
   ) => void | Promise<void>
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
 }
 
 export function AppShellSidebar({
@@ -170,7 +175,9 @@ export function AppShellSidebar({
   terminals,
   onCloseTerminal,
   activeTerminalId,
-  onMoveTerminalToProject
+  onMoveTerminalToProject,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel
 }: AppShellSidebarProps) {
   const { onSidebarResize } = useSidebarPixelWidth(
     sidebarPanelRef,
@@ -276,6 +283,8 @@ export function AppShellSidebar({
             onCloseTerminal={onCloseTerminal}
             activeTerminalId={activeTerminalId ?? null}
             onMoveTerminalToProject={onMoveTerminalToProject}
+            onRenameTerminal={onRenameTerminal}
+            onToggleTerminalOrganizeLabel={onToggleTerminalOrganizeLabel}
           />
         )}
       </aside>

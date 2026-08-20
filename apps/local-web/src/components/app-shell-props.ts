@@ -300,4 +300,11 @@ export type AppShellProps = {
     terminalId: string,
     projectId: string | null
   ) => void | Promise<void>
+  /** FAS-107 paridad: rename via native prompt (mvp). */
+  onRenameTerminal?: (terminalId: string) => void
+  /** Toggle pin/archive on a terminal (organize_label). */
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
 }
