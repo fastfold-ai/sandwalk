@@ -20,6 +20,12 @@ export type LiveTerminal = {
   container: HTMLDivElement | null
   disposed: boolean
   opened: boolean
+  /** T4: last (cols, rows) sent to the PTY. Deduplicates bursts of
+   *  updatePtySession that would otherwise flood the shell with
+   *  SIGWINCH, which fish/zsh re-render their prompt on and produce
+   *  the "character per line" visual bug. */
+  lastSentCols: number
+  lastSentRows: number
 }
 
 export function useTerminalLive({
@@ -80,7 +86,12 @@ export function useTerminalLive({
         fontFamily:
           '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
         theme: buildTerminalTheme(darkRef.current),
-        convertEol: true,
+        // T4: PTYs always emit `\r\n` correctly — enabling `convertEol`
+        // makes xterm re-convert `\n` to `\r\n`, so any stray LF becomes
+        // `\r\r\n` which stacks the cursor down a line per echo. This
+        // is the root cause of the "one character per line" input bug
+        // when using fish/zsh inside the pane.
+        convertEol: false,
         allowTransparency: false,
         scrollback: 5000,
         smoothScrollDuration: 0
@@ -136,7 +147,11 @@ export function useTerminalLive({
         socket: null,
         container: null,
         disposed: false,
-        opened: false
+        opened: false,
+        // T4: -1/-1 forces the first real send. Any subsequent
+        // updatePtySession call with the same (cols, rows) is skipped.
+        lastSentCols: -1,
+        lastSentRows: -1
       }
       livesRef.current[info.id] = live
 
@@ -146,7 +161,15 @@ export function useTerminalLive({
         }
       })
 
+      // T4: dedupe onResize. xterm dispara este handler durante reflows
+      // internos aunque las dimensiones externas no hayan cambiado —
+      // cada send emite SIGWINCH y fish/zsh re-renderean el prompt,
+      // rompiendo el input visible. Solo enviamos si (cols, rows)
+      // realmente cambió desde el último send.
       live.term.onResize(({ cols, rows }) => {
+        if (cols === live.lastSentCols && rows === live.lastSentRows) return
+        live.lastSentCols = cols
+        live.lastSentRows = rows
         void client.updatePtySession(sessionId, info.id, { cols, rows })
       })
 
@@ -169,7 +192,12 @@ export function useTerminalLive({
         try {
           live.fit.fit()
           const dims = live.fit.proposeDimensions()
-          if (dims) {
+          if (
+            dims &&
+            (dims.cols !== live.lastSentCols || dims.rows !== live.lastSentRows)
+          ) {
+            live.lastSentCols = dims.cols
+            live.lastSentRows = dims.rows
             void client.updatePtySession(sessionId, live.info.id, {
               cols: dims.cols,
               rows: dims.rows
@@ -251,8 +279,11 @@ export function useTerminalLive({
             dims &&
             dims.cols >= 10 &&
             dims.rows >= 3 &&
-            live.socket?.readyState === WebSocket.OPEN
+            live.socket?.readyState === WebSocket.OPEN &&
+            (dims.cols !== live.lastSentCols || dims.rows !== live.lastSentRows)
           ) {
+            live.lastSentCols = dims.cols
+            live.lastSentRows = dims.rows
             void client.updatePtySession(sessionId, live.info.id, {
               cols: dims.cols,
               rows: dims.rows
