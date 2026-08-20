@@ -116,6 +116,8 @@ export function buildSessionSidebarModel(input: {
   openTabIds: string[]
   /** Keep the open chat visible in the tab strip while its project assignment catches up. */
   activeSessionId?: string | null
+  /** FAS-107: terminals of the active project (optional). */
+  terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
 }) {
   const displayedSessions = input.activeProjectId
     ? input.sessions.filter(item => item.projectId === input.activeProjectId)
@@ -131,10 +133,19 @@ export function buildSessionSidebarModel(input: {
   // Pass `input.sessions` (unfiltered) so groupTabItems can resolve foreign
   // chats inside cross-project groups. Standalone chats stay scoped via
   // `displayedSessions`; only group `children` benefit from the wider pool.
+  // FAS-107: same scope filter as chats — terminals of the active
+  // project only. Cross-project terminals aren't shown outside their
+  // home project (parallel to sessions filtering).
+  const displayedTerminals = input.activeProjectId
+    ? (input.terminals ?? []).filter(
+        t => t.projectId === input.activeProjectId
+      )
+    : input.terminals ?? []
   const sections = groupTabItems(
     displayedSessions,
     applicableGroups,
-    input.sessions
+    input.sessions,
+    displayedTerminals
   )
   // `openTabs` mezcla chats y grupos en el orden real de `openTabIds`. Los
   // items que no se pueden resolver (chat en otro scope, grupo aún cargando)

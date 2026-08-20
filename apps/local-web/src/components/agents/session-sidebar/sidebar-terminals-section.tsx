@@ -77,7 +77,7 @@ export function SidebarTerminalsSection({
       {collapsed ? null : (
         <ul className="space-y-px">
           {terminals.map(term => (
-            <TerminalRow
+            <TerminalRowInner
               key={term.id}
               term={term}
               active={term.id === activeId}
@@ -96,7 +96,46 @@ export function SidebarTerminalsSection({
   )
 }
 
-function TerminalRow({
+/**
+ * Terminal row exported for the inline mixed-list renderer in
+ * `sidebar-session-list.tsx`. Keeps a single source of truth for the
+ * row anatomy (icon, activity dot, action menu, delete).
+ */
+export function SidebarTerminalRow({
+  terminal,
+  active,
+  onOpen,
+  onClose,
+  projects,
+  onMoveToProject
+}: {
+  terminal: TerminalSession
+  active: boolean
+  onOpen: (terminalId: string) => void
+  onClose?: (terminalId: string) => void
+  projects: AgentProject[]
+  onMoveToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
+}) {
+  const term = terminal
+  return (
+    <TerminalRowInner
+      term={term}
+      active={active}
+      onOpen={() => {
+        clearTerminalActivity(term.id)
+        onOpen(term.id)
+      }}
+      onClose={onClose}
+      projects={projects}
+      onMoveToProject={onMoveToProject}
+    />
+  )
+}
+
+function TerminalRowInner({
   term,
   active,
   onOpen,

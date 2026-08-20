@@ -55,13 +55,13 @@ export function buildDefaultTree(chatIds: string[]): PaneNode {
     return { type: 'chat', chatId: '' }
   }
   if (chatIds.length === 1) {
-    return { type: 'chat', chatId: chatIds[0] }
+    return idToLeaf(chatIds[0])
   }
   return {
     type: 'branch',
     direction: 'horizontal',
     ratios: equalRatios(chatIds.length),
-    children: chatIds.map(id => ({ type: 'chat', chatId: id }) as PaneNode)
+    children: chatIds.map(idToLeaf)
   }
 }
 
@@ -80,6 +80,19 @@ export function buildDefaultTreeFromRefs(refs: WorkspaceItemRef[]): PaneNode {
 function refToLeaf(ref: WorkspaceItemRef): PaneNode {
   if (ref.kind === 'chat') return { type: 'chat', chatId: ref.id }
   return { type: 'terminal', terminalId: ref.id }
+}
+
+/**
+ * Build a leaf from a plain id, inferring the kind from its prefix.
+ * FAS-107: terminals are `term_*`; everything else is treated as a chat.
+ * Used by `buildDefaultTree` / `splitPane` / `reconcileTree` so the tree
+ * always carries the right leaf type — the renderer no longer has to
+ * discriminate chat vs terminal by looking up the id in a live list.
+ */
+function idToLeaf(id: string): PaneNode {
+  return id.startsWith('term_')
+    ? { type: 'terminal', terminalId: id }
+    : { type: 'chat', chatId: id }
 }
 
 export function equalRatios(n: number): number[] {
@@ -123,13 +136,13 @@ export function splitPane(
   newChatId: string,
   side: 'before' | 'after' = 'after'
 ): PaneNode {
-  return splitPaneWithRef(
-    tree,
-    targetChatId,
-    direction,
-    { kind: 'chat', id: newChatId },
-    side
-  )
+  // FAS-107: infer the kind from the id prefix so a `term_*` insertion
+  // becomes a terminal leaf (not a chat leaf that would then crash the
+  // renderer when looked up as a session).
+  const newRef: WorkspaceItemRef = newChatId.startsWith('term_')
+    ? { kind: 'terminal', id: newChatId }
+    : { kind: 'chat', id: newChatId }
+  return splitPaneWithRef(tree, targetChatId, direction, newRef, side)
 }
 
 /**
@@ -300,14 +313,32 @@ export function setBranchRatios(
  */
 export function reconcileTree(tree: PaneNode, chatIds: string[]): PaneNode {
   const known = new Set(chatIds)
-  let current: PaneNode | null = pruneUnknownChats(tree, known)
+  // FAS-107: use the item-based prune so a terminal leaf whose id lives
+  // in `chatIds` is preserved instead of dropped as an "unknown chat".
+  let current: PaneNode | null = pruneUnknownItemIds(tree, known)
   if (current === null) return buildDefaultTree(chatIds)
-  const existing = new Set(extractChatIds(current))
+  const existing = new Set(
+    extractItemRefs(current).map(ref => ref.id)
+  )
   const missing = chatIds.filter(id => !existing.has(id))
-  for (const chatId of missing) {
-    current = appendLeafAtRoot(current, { type: 'chat', chatId })
+  for (const id of missing) {
+    // Infer the leaf kind from the id prefix so a `term_*` id is added
+    // as a terminal leaf, never as a chat pointing at a nonexistent chat.
+    current = appendLeafAtRoot(current, idToLeaf(id))
   }
   return current
+}
+
+function pruneUnknownItemIds(
+  tree: PaneNode,
+  knownIds: Set<string>
+): PaneNode | null {
+  if (isLeafPane(tree)) {
+    const id = leafItemId(tree)
+    if (!id) return null
+    return knownIds.has(id) ? tree : null
+  }
+  return pruneBranch(tree, node => pruneUnknownItemIds(node, knownIds))
 }
 
 /** Mixed-type variant of `reconcileTree` (FAS-107). */

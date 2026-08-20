@@ -756,7 +756,8 @@ export default function App() {
     tabGroups: tabGroupsStore.allTabGroups,
     activeProjectId: context.activeProjectId,
     openTabIds: cleanedOpenTabIds,
-    activeSessionId: route.sessionId
+    activeSessionId: route.sessionId,
+    terminals: terminalsLive.terminals
   })
   const orderedVisibleSessionIds = useMemo(
     () => visibleSessionIds(sections, ui.collapsedSidebarSections),

@@ -365,21 +365,9 @@ export function AgentSessionSidebar({
         activeGroupChildId={activeGroupChildId}
         setTabGroupActiveChat={setTabGroupActiveChat}
         unreadOnly={unreadOnly}
-        extraTopSection={
-          terminals && terminals.length > 0 ? (
-            <SidebarTerminalsSection
-              terminals={terminals}
-              activeId={activeTerminalId ?? null}
-              openTerminal={terminalId => {
-                openSessionTab(terminalId)
-                navigate(`/terminals/${terminalId}`)
-              }}
-              onCloseTerminal={onCloseTerminal}
-              projects={projects}
-              onMoveToProject={onMoveTerminalToProject}
-            />
-          ) : null
-        }
+        activeTerminalId={activeTerminalId ?? null}
+        onCloseTerminal={onCloseTerminal}
+        onMoveTerminalToProject={onMoveTerminalToProject}
       />
       <div className="relative shrink-0 p-2">
         <SidebarBatchBar

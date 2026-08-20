@@ -4,7 +4,8 @@ import type {
   AgentSession,
   AgentTodo,
   PendingHitlApproval,
-  SessionGroup
+  SessionGroup,
+  TerminalSession
 } from '@sandwalk/agent-ui-core'
 
 import type { TranscriptTool } from '@/components/agents/ToolCard'
@@ -210,6 +211,14 @@ export type TabItem =
       children: AgentSession[]
       lastActivity: number
     }
+  | {
+      // FAS-107: terminals interleave with chats in the sidebar sections
+      // (Today / Yesterday / …) instead of living in a separate strip.
+      kind: 'terminal'
+      id: string
+      terminal: TerminalSession
+      lastActivity: number
+    }
 
 export type TabItemSection = {
   id: string
@@ -235,7 +244,9 @@ export function groupTabItems(
    * list (cross-project splits). Falls back to `sessions` when omitted so
    * existing callers stay unchanged.
    */
-  sessionsForGroupChildren?: AgentSession[]
+  sessionsForGroupChildren?: AgentSession[],
+  /** FAS-107: terminals get interleaved into the same date buckets. */
+  terminals: TerminalSession[] = []
 ): TabItemSection[] {
   const now = new Date()
   const today = new Date(
@@ -282,12 +293,22 @@ export function groupTabItems(
     }
   })
 
-  const all = [...chatItems, ...groupItems]
+  // FAS-107: terminals as first-class items in the same fluid list.
+  const terminalItems: TabItem[] = terminals.map(term => ({
+    kind: 'terminal' as const,
+    id: term.id,
+    terminal: term,
+    lastActivity: new Date(term.updatedAt).getTime()
+  }))
+
+  const all = [...chatItems, ...groupItems, ...terminalItems]
 
   const isPinned = (item: TabItem) =>
     item.kind === 'chat'
       ? item.session.organizeLabel === 'pinned'
-      : item.group.pinned
+      : item.kind === 'group'
+        ? item.group.pinned
+        : false
   const isArchived = (item: TabItem) =>
     item.kind === 'chat' && item.session.organizeLabel === 'archive'
   // Los grupos no tienen "archived" — solo chats pueden estar archivados.

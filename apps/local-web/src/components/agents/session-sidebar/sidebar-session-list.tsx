@@ -175,6 +175,8 @@ function SidebarMarqueeTitle({ text }: { text: string }) {
   )
 }
 
+import { SidebarTerminalRow } from './sidebar-terminals-section'
+
 type SessionSection = TabItemSection
 
 export type SidebarSessionListProps = {
@@ -229,13 +231,16 @@ export type SidebarSessionListProps = {
    */
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   unreadOnly?: boolean
-  /**
-   * FAS-107 GF6: extra sections rendered at the TOP of the list (before
-   * Today / Yesterday / …). Used for Terminals so they read as part of
-   * the same fluid list instead of a separate strip at the bottom of the
-   * sidebar.
-   */
+  /** @deprecated FAS-107 pre-mix: terminals now interleave into the
+   * regular date buckets (Today / Yesterday / …) via `groupTabItems`. */
   extraTopSection?: React.ReactNode
+  /** FAS-107 GF6/GF8: terminal rendering hooks used by inline rows. */
+  activeTerminalId?: string | null
+  onCloseTerminal?: (terminalId: string) => void
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
 }
 
 export function SidebarSessionList({
@@ -268,7 +273,10 @@ export function SidebarSessionList({
   activeGroupChildId,
   setTabGroupActiveChat,
   unreadOnly = false,
-  extraTopSection
+  extraTopSection,
+  activeTerminalId,
+  onCloseTerminal,
+  onMoveTerminalToProject
 }: SidebarSessionListProps) {
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
@@ -449,6 +457,22 @@ export function SidebarSessionList({
                               }
                               navigate(`/agents/${item.group.id}`)
                             }}
+                          />
+                        )
+                      }
+                      if (item.kind === 'terminal') {
+                        return (
+                          <SidebarTerminalRow
+                            key={item.id}
+                            terminal={item.terminal}
+                            active={item.id === activeTerminalId}
+                            projects={projects}
+                            onOpen={id => {
+                              openSessionTab(id)
+                              navigate(`/terminals/${id}`)
+                            }}
+                            onClose={onCloseTerminal}
+                            onMoveToProject={onMoveTerminalToProject}
                           />
                         )
                       }
