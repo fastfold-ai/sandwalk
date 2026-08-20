@@ -250,65 +250,72 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   // FAS-107: terminals for the active project. Used by the split
   // picker's "New terminal" card and by the tab strip (when the caller
   // decides to render terminal chips).
-  const { terminals, refresh: refreshTerminals } = useAppTerminals(
-    client,
-    activeProjectId
-  )
+  const {
+    terminals,
+    refresh: refreshTerminals,
+    addOptimistic: addTerminalOptimistic,
+    removeOptimistic: removeTerminalOptimistic
+  } = useAppTerminals(client, activeProjectId)
 
-  const handlePickTerminal = useCallback(async () => {
-    if (!activeGroup) return
+  /**
+   * Creates a terminal and returns its id. The caller (ChatTilingContainer
+   * via SplitPicker) is responsible for actually splicing the id into the
+   * group — this keeps a single source of truth for the pending-vs-not
+   * branching and the picker-reset side effect, both of which already
+   * live in the container's `handlePicked` flow.
+   *
+   * Returns `null` on failure so the caller can no-op (leaves the picker
+   * open for retry).
+   */
+  const handlePickTerminal = useCallback(async (): Promise<string | null> => {
+    if (!activeGroup) return null
     try {
       const term = await client.createTerminal({
         projectId: activeProjectId,
         originChatId: activeGroup.activeChatId,
         workspacePath: session?.workspacePath ?? null
       })
+      // Optimistic insert so the renderer's `terminals?.find(t => t.id
+      // === chatId)` detects the new id BEFORE the background refresh
+      // completes. Without this the first render after the pending group
+      // promotes would fall into ChatLeaf.
+      addTerminalOptimistic(term)
       refreshTerminals()
-      // Fold the new terminal into the split as the picker's partner
-      // pane. We reuse `onAddChatToSplit` because the tab-groups store
-      // treats it as an "add id" op — the id happens to point to a
-      // terminal now, and the tiling tree recognises it as long as the
-      // caller passes the terminals list through.
-      onAddChatToSplit(term.id)
+      return term.id
     } catch (err) {
       console.error('createTerminal failed', err)
+      return null
     }
   }, [
     activeGroup,
     client,
     activeProjectId,
     session?.workspacePath,
-    refreshTerminals,
-    onAddChatToSplit
+    addTerminalOptimistic,
+    refreshTerminals
   ])
 
-  const handlePickNewChat = useCallback(async () => {
-    if (!activeGroup) return
+  const handlePickNewChat = useCallback(async (): Promise<string | null> => {
+    if (!activeGroup) return null
     try {
       const created = await client.createSession({
         title: null,
         workspacePath: null,
         projectId: activeProjectId ?? null
       })
-      if (activeGroup.isPending) {
-        onPickSplitPartner(created.id)
-      } else {
-        onAddChatToSplit(created.id)
-      }
+      return created.id
     } catch (err) {
       console.error('createSession failed', err)
+      return null
     }
-  }, [
-    activeGroup,
-    client,
-    activeProjectId,
-    onPickSplitPartner,
-    onAddChatToSplit
-  ])
+  }, [activeGroup, client, activeProjectId])
 
   const handleCloseTerminal = useCallback(
     async (terminalId: string) => {
       try {
+        // Remove from local state immediately so the pane collapses
+        // without waiting for the refresh round-trip.
+        removeTerminalOptimistic(terminalId)
         await client.deleteTerminal(terminalId)
         refreshTerminals()
         onRemoveChatFromSplit(terminalId)
@@ -316,7 +323,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         console.error('deleteTerminal failed', err)
       }
     },
-    [client, refreshTerminals, onRemoveChatFromSplit]
+    [client, removeTerminalOptimistic, refreshTerminals, onRemoveChatFromSplit]
   )
 
   const isNarrow = useIsNarrowWindow(1280)

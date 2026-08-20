@@ -71,10 +71,16 @@ export type ChatTilingContainerProps = {
     onPickPartner: (chatId: string) => void
     onCancelPending: () => void
     onAddChat: (chatId: string) => void
-    /** Optional (FAS-107): create a blank new chat as the split partner. */
-    onPickNewChat?: () => void
-    /** Optional (FAS-107): create a new terminal as the split partner. */
-    onPickTerminal?: () => void
+    /**
+     * Create a blank new chat and return its id. The container feeds the
+     * id back through the shared `handlePicked` flow (promote pending /
+     * add-to-group + close picker + update tree), so the caller stays
+     * uninvolved with layout side effects. Return `null` on failure to
+     * keep the picker open for retry.
+     */
+    onPickNewChat?: () => Promise<string | null>
+    /** Same contract as `onPickNewChat` but for terminals (FAS-107). */
+    onPickTerminal?: () => Promise<string | null>
   }
   onLayoutChange: (fingerprint: string, tree: PaneNode) => void
   onCloseChat: (chatId: string) => void
@@ -754,6 +760,8 @@ function PickerLeaf({
     return () => window.removeEventListener('keydown', handler)
   }, [onCancel])
   if (!pickerContext) return null
+  const ctxOnPickTerminal = pickerContext.onPickTerminal
+  const ctxOnPickNewChat = pickerContext.onPickNewChat
   return (
     <SplitPicker
       client={pickerContext.client}
@@ -763,8 +771,27 @@ function PickerLeaf({
       allTabGroups={pickerContext.allTabGroups}
       cachedSessions={sessions}
       onPickChat={onPick}
-      onPickNewChat={pickerContext.onPickNewChat ?? (() => onCancel())}
-      onPickTerminal={pickerContext.onPickTerminal ?? (() => onCancel())}
+      onPickNewChat={async () => {
+        // Delegate to the app (creates the chat, does optimistic
+        // state updates), then feed the id into the shared handlePicked
+        // flow so pending/add + tree update + picker reset stay in one
+        // place. If the app returned null (create failed), leave the
+        // picker open so the user can retry.
+        if (!ctxOnPickNewChat) {
+          onCancel()
+          return
+        }
+        const id = await ctxOnPickNewChat()
+        if (id) onPick(id)
+      }}
+      onPickTerminal={async () => {
+        if (!ctxOnPickTerminal) {
+          onCancel()
+          return
+        }
+        const id = await ctxOnPickTerminal()
+        if (id) onPick(id)
+      }}
       onCancel={onCancel}
     />
   )

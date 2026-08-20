@@ -48,5 +48,21 @@ export function useAppTerminals(
     void load()
   }, [load])
 
-  return { terminals, loading, error, refresh }
+  /**
+   * Optimistic insert used right after `client.createTerminal(...)` so
+   * the renderer can detect the id as a terminal (and pick TerminalLeaf
+   * instead of ChatLeaf) BEFORE the background `refresh()` fetch lands.
+   */
+  const addOptimistic = useCallback((term: TerminalSession) => {
+    setTerminals(prev => {
+      if (prev.some(t => t.id === term.id)) return prev
+      return [term, ...prev]
+    })
+  }, [])
+
+  const removeOptimistic = useCallback((terminalId: string) => {
+    setTerminals(prev => prev.filter(t => t.id !== terminalId))
+  }, [])
+
+  return { terminals, loading, error, refresh, addOptimistic, removeOptimistic }
 }
