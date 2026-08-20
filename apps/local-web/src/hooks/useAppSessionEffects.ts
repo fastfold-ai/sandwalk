@@ -233,6 +233,13 @@ export function useAppSessionEffects({
       setWorkspaceFiles([])
       return
     }
+    // S1: si el id activo es un terminal, no hay filesystem que listar
+    // (terminales viven en su propio endpoint). El request devolvería 404
+    // y ensuciaría la consola.
+    if (listId.startsWith('term_')) {
+      setWorkspaceFiles([])
+      return
+    }
     let cancelled = false
     void client
       .listFiles(listId)

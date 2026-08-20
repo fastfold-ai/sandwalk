@@ -34,11 +34,14 @@ export function useSessionSandboxStream({
     // Group ids arrive here only via defensive paths; the group's child
     // chats each own their own sandbox stream. Opening a WS to
     // /sessions/grp_*/sandbox/stream 404s and burns reconnect budget.
+    // S2: `term_*` ids también deben skipearse — terminales no tienen
+    // sandbox (viven en su propio endpoint /v1/terminals/:id).
     if (
       !sessionId ||
       !health ||
       isDraftAgentSessionId(sessionId) ||
-      isSessionGroupId(sessionId)
+      isSessionGroupId(sessionId) ||
+      sessionId.startsWith('term_')
     ) {
       setSessionSandboxStatus(null)
       setSessionSandboxPhase('idle')

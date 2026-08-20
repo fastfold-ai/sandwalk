@@ -135,6 +135,10 @@ export function useWorkspacePanelState({
   }, [])
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
+    // S1: terminals no tienen filesystem propio (no son sesiones de chat).
+    // Sin este guard el hook dispara `listFiles(term_...)` que 404 en el
+    // backend y ensucia la consola con decenas de errores.
+    if (sessionId.startsWith('term_')) return
     if (!options?.silent) setRefreshing(true)
     try {
       const next = await client.listFiles(sessionId)

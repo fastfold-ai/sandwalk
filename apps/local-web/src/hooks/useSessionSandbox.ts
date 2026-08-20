@@ -73,6 +73,12 @@ export function useSessionSandbox({
         setSessionSandboxStatus(null)
         return null
       }
+      // S2: terminals no tienen sandbox (viven en /v1/terminals/:id).
+      // Pedirlo devuelve 404 y ensucia la consola.
+      if (id.startsWith('term_')) {
+        setSessionSandboxStatus(null)
+        return null
+      }
       if (isDraftAgentSessionId(id)) {
         try {
           const settings = await client.getSandboxSettings()
