@@ -5,6 +5,7 @@ import type {
   AgentSession,
   SessionGroup
 } from '@sandwalk/agent-ui-core'
+import { MessageSquare, SquareTerminal } from 'lucide-react'
 import {
   type ComponentProps,
   type Dispatch,
@@ -725,6 +726,40 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             />
           ) : (
           <main className="relative flex h-full min-w-0 flex-col">
+            {isDraft ? (
+              // FAS-107 GF4: mini switcher at the top of a fresh draft
+              // pane so the user can start as Agent (default) or spawn a
+              // new Terminal from the same place.
+              <div className="border-border/40 flex shrink-0 items-center justify-center gap-1 border-b px-2 py-1">
+                <button
+                  type="button"
+                  className="text-foreground border-sky-500 inline-flex h-7 items-center gap-1.5 rounded-md border-b-2 px-3 text-[12px] font-medium"
+                  aria-current="page"
+                >
+                  <MessageSquare className="size-3.5 text-sky-500" />
+                  <span>Agent</span>
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground hover:border-orange-500/50 inline-flex h-7 items-center gap-1.5 rounded-md border-b-2 border-transparent px-3 text-[12px]"
+                  onClick={async () => {
+                    try {
+                      const term = await client.createTerminal({
+                        projectId: activeProjectId ?? null
+                      })
+                      addTerminalOptimistic(term)
+                      openSessionTab(term.id)
+                      navigate(`/terminals/${term.id}`)
+                    } catch (err) {
+                      console.error('draft → terminal failed', err)
+                    }
+                  }}
+                >
+                  <SquareTerminal className="size-3.5 text-orange-500" />
+                  <span>Terminal</span>
+                </button>
+              </div>
+            ) : null}
             <SessionChatBody
             client={client}
             navigate={navigate}

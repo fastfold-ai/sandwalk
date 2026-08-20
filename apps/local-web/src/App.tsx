@@ -91,6 +91,19 @@ export default function App() {
     [bootstrap.client, terminalsLive]
   )
 
+  const handleMoveTerminalToProject = useCallback(
+    async (terminalId: string, projectId: string | null) => {
+      if (!bootstrap.client) return
+      try {
+        await bootstrap.client.updateTerminal(terminalId, { projectId })
+        terminalsLive.refresh()
+      } catch (err) {
+        console.error('updateTerminal (move) failed', err)
+      }
+    },
+    [bootstrap.client, terminalsLive]
+  )
+
   // FAS-107 GF10: `⌘⇧T` opens a new terminal in the active project and
   // navigates to it. Handled at the shell so it works from any page.
   // Declared AFTER `bootstrap` so `bootstrap.client` isn't in TDZ.
@@ -852,6 +865,7 @@ export default function App() {
         terminals={terminalsLive.terminals}
         onCloseTerminal={handleDeleteTerminalGlobal}
         activeTerminalId={route.terminalId ?? null}
+        onMoveTerminalToProject={handleMoveTerminalToProject}
         {...buildAppShellProps({
           ui,
           route,

@@ -1,7 +1,20 @@
-import type { TerminalSession } from '@sandwalk/agent-ui-core'
-import { ChevronDown, SquareTerminal, X } from 'lucide-react'
+import type {
+  AgentProject,
+  TerminalSession
+} from '@sandwalk/agent-ui-core'
+import { ChevronDown, Folder, MoreHorizontal, SquareTerminal, X } from 'lucide-react'
 import { useState } from 'react'
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import {
   clearTerminalActivity,
   useTerminalHasActivity
@@ -18,12 +31,20 @@ export function SidebarTerminalsSection({
   terminals,
   activeId,
   openTerminal,
-  onCloseTerminal
+  onCloseTerminal,
+  projects,
+  onMoveToProject
 }: {
   terminals: TerminalSession[]
   activeId: string | null
   openTerminal: (terminalId: string) => void
   onCloseTerminal?: (terminalId: string) => void
+  /** FAS-107 GF8: projects list for the "Move to project" sub-menu. */
+  projects?: AgentProject[]
+  onMoveToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
 }) {
   const [collapsed, setCollapsed] = useState(false)
   if (terminals.length === 0) return null
@@ -65,6 +86,8 @@ export function SidebarTerminalsSection({
                 openTerminal(term.id)
               }}
               onClose={onCloseTerminal}
+              projects={projects ?? []}
+              onMoveToProject={onMoveToProject}
             />
           ))}
         </ul>
@@ -77,21 +100,26 @@ function TerminalRow({
   term,
   active,
   onOpen,
-  onClose
+  onClose,
+  projects,
+  onMoveToProject
 }: {
   term: TerminalSession
   active: boolean
   onOpen: () => void
   onClose?: (terminalId: string) => void
+  projects: AgentProject[]
+  onMoveToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
 }) {
   const hasActivity = useTerminalHasActivity(term.id)
   return (
     <li>
       <div
         className={cn(
-          // Match the visual anatomy of a chat row so the user reads
-          // this as the same list, just with a terminal glyph.
-          'hover:bg-sidebar-accent/45 group grid grid-cols-[minmax(0,1fr)_2rem] items-center rounded-md px-2 py-1.5',
+          'hover:bg-sidebar-accent/45 group grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-md px-2 py-1.5',
           active && 'bg-sidebar-accent/55'
         )}
       >
@@ -113,7 +141,63 @@ function TerminalRow({
             {term.title}
           </span>
         </button>
-        <div className="flex items-center justify-end">
+        <div className="flex items-center gap-0.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={`Actions for ${term.title}`}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted hidden shrink-0 rounded p-0.5 group-hover:inline-flex"
+                onClick={e => e.stopPropagation()}
+              >
+                <MoreHorizontal className="size-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="min-w-[200px]"
+              onCloseAutoFocus={e => e.preventDefault()}
+            >
+              {onMoveToProject ? (
+                <>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <Folder className="mr-2 size-3.5" />
+                      <span>Move to project</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="min-w-[180px]">
+                      <DropdownMenuItem
+                        onSelect={() => void onMoveToProject(term.id, null)}
+                      >
+                        <span>No project</span>
+                      </DropdownMenuItem>
+                      {projects.length > 0 ? (
+                        <DropdownMenuSeparator />
+                      ) : null}
+                      {projects.map(p => (
+                        <DropdownMenuItem
+                          key={p.id}
+                          onSelect={() => void onMoveToProject(term.id, p.id)}
+                        >
+                          <span className="truncate">{p.name}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  {onClose ? <DropdownMenuSeparator /> : null}
+                </>
+              ) : null}
+              {onClose ? (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => onClose(term.id)}
+                >
+                  <X className="mr-2 size-3.5" />
+                  <span>Delete terminal</span>
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {onClose ? (
             <button
               type="button"

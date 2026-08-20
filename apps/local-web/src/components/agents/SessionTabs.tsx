@@ -432,6 +432,16 @@ export function SessionTabs({
   }
 
   const openContextMenu = (id: string, event: React.MouseEvent) => {
+    // FAS-107 GF7: terminals get a minimal right-click menu (delete only).
+    // Rename / pin / color / export don't apply — we skip the chat menu
+    // entirely instead of half-rendering it with broken items.
+    if (id.startsWith('term_') && onCloseTerminal) {
+      const confirmed = window.confirm(
+        'Delete this terminal? The shell will be killed.'
+      )
+      if (confirmed) onCloseTerminal(id)
+      return
+    }
     setMenu({ sessionId: id, x: event.clientX, y: event.clientY })
   }
 

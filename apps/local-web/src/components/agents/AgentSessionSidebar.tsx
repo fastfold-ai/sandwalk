@@ -104,6 +104,10 @@ type AgentSessionSidebarProps = {
   onCloseTerminal?: (terminalId: string) => void
   /** Active terminal id when the current URL is `/terminals/:id`. */
   activeTerminalId?: string | null
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
 }
 
 export function AgentSessionSidebar({
@@ -158,7 +162,8 @@ export function AgentSessionSidebar({
   onRefreshUser,
   terminals,
   onCloseTerminal,
-  activeTerminalId
+  activeTerminalId,
+  onMoveTerminalToProject
 }: AgentSessionSidebarProps) {
   const location = useLocation()
   const attentionIds = useSessionAttentionIds()
@@ -370,6 +375,8 @@ export function AgentSessionSidebar({
                 navigate(`/terminals/${terminalId}`)
               }}
               onCloseTerminal={onCloseTerminal}
+              projects={projects}
+              onMoveToProject={onMoveTerminalToProject}
             />
           ) : null
         }

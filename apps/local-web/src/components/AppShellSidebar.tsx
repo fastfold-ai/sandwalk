@@ -107,6 +107,10 @@ export type AppShellSidebarProps = {
   terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
   onCloseTerminal?: (terminalId: string) => void
   activeTerminalId?: string | null
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
 }
 
 export function AppShellSidebar({
@@ -165,7 +169,8 @@ export function AppShellSidebar({
   setDeleteTarget,
   terminals,
   onCloseTerminal,
-  activeTerminalId
+  activeTerminalId,
+  onMoveTerminalToProject
 }: AppShellSidebarProps) {
   const { onSidebarResize } = useSidebarPixelWidth(
     sidebarPanelRef,
@@ -270,6 +275,7 @@ export function AppShellSidebar({
             terminals={terminals}
             onCloseTerminal={onCloseTerminal}
             activeTerminalId={activeTerminalId ?? null}
+            onMoveTerminalToProject={onMoveTerminalToProject}
           />
         )}
       </aside>

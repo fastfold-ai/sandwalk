@@ -295,4 +295,9 @@ export type AppShellProps = {
   terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
   onCloseTerminal?: (terminalId: string) => void
   activeTerminalId?: string | null
+  /** FAS-107 GF8: move a terminal between projects (or no project). */
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
 }
