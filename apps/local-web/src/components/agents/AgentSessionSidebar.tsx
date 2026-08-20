@@ -79,6 +79,7 @@ type AgentSessionSidebarProps = {
   onRenameTabGroup?: (group: SessionGroup) => void
   onDissolveTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
+  onSetTabGroupPinned?: (groupId: string, pinned: boolean) => void
   onGoToChatProject?: (chat: AgentSession) => void
   activeGroupChildId?: string | null
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
@@ -149,6 +150,7 @@ export function AgentSessionSidebar({
   onRenameTabGroup,
   onDissolveTabGroup,
   onSetTabGroupColor,
+  onSetTabGroupPinned,
   onGoToChatProject,
   activeGroupChildId,
   setTabGroupActiveChat,
@@ -367,6 +369,7 @@ export function AgentSessionSidebar({
         onRenameTabGroup={onRenameTabGroup}
         onDissolveTabGroup={onDissolveTabGroup}
         onSetTabGroupColor={onSetTabGroupColor}
+        onSetTabGroupPinned={onSetTabGroupPinned}
         activeProjectId={activeProjectId}
         onGoToChatProject={onGoToChatProject}
         activeGroupChildId={activeGroupChildId}

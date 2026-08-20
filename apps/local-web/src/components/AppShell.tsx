@@ -69,6 +69,7 @@ export function AppShell(props: AppShellProps) {
           onGoToChatProject={props.onGoToChatProject}
           onDissolveTabGroup={props.dissolveTabGroup}
           onSetTabGroupColor={props.setTabGroupColor}
+          onSetTabGroupPinned={props.setTabGroupPinned}
           activeGroupChildId={props.activeGroup?.activeChatId ?? null}
           setTabGroupActiveChat={props.setTabGroupActiveChat}
           setCollapsedSidebarSections={props.setCollapsedSidebarSections}

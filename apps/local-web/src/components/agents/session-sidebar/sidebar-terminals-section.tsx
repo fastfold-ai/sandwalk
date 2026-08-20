@@ -17,6 +17,8 @@ import {
 } from '@/lib/terminal-attention'
 import { cn } from '@/lib/utils'
 
+import { UnreadDot } from './sidebar-session-list'
+
 /**
  * FAS-107 GF6: terminals of the active project as a section INSIDE the
  * regular sidebar list (styled identically to Today / Yesterday / …).
@@ -188,7 +190,8 @@ function TerminalRowInner({
     <li>
       <div
         className={cn(
-          'hover:bg-sidebar-accent/45 group grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-md px-2 py-1.5',
+          // Q6: mismo grid + padding que la fila de chat para igualar alto.
+          'hover:bg-sidebar-accent/45 group grid grid-cols-[minmax(0,1fr)_2rem] items-center rounded-md px-2 py-1.5',
           active && 'bg-sidebar-accent/55'
         )}
         onContextMenu={event => {
@@ -203,15 +206,18 @@ function TerminalRowInner({
           className="flex min-w-0 items-center gap-1.5 text-left"
           onClick={onOpen}
         >
-          <span className="relative shrink-0">
-            <SquareTerminal className="size-3.5 text-orange-500" />
-            {hasActivity && !active ? (
-              <span
-                aria-label="New output"
-                className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-orange-500 shadow-[0_0_0_1px_var(--background)]"
-              />
-            ) : null}
-          </span>
+          {/* Q7: pin PRIMERO, blanco absoluto — mismo tratamiento que
+              en la fila chat de la sección Pinned. Sólo se renderiza
+              cuando el terminal está pinneado (y por tanto aparece en
+              la sección Pinned del sidebar). */}
+          {isPinned ? (
+            <Pin
+              aria-label="Pinned"
+              className="text-white size-3 shrink-0"
+              fill="currentColor"
+            />
+          ) : null}
+          <SquareTerminal className="size-3.5 shrink-0 text-orange-500" />
           {colorValue ? (
             <span
               aria-hidden
@@ -222,21 +228,23 @@ function TerminalRowInner({
           <span className="text-foreground/90 min-w-0 truncate text-[13px]">
             {term.title}
           </span>
-          {isPinned ? (
-            <Pin
-              aria-label="Pinned"
-              className="text-muted-foreground/60 size-3 shrink-0"
-            />
-          ) : null}
         </button>
-        <div className="relative flex items-center gap-0.5">
+        {/* Q4: slot derecho unificado con la fila chat (h-6 w-8). El
+            UnreadDot vive acá y hover-swap con el ⋯ — nunca overlay
+            sobre el ícono del tipo. */}
+        <div className="relative h-6 w-8 justify-self-end">
+          {hasActivity && !active && !menuOpen ? (
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-end pr-0.5 group-hover:opacity-0">
+              <UnreadDot />
+            </span>
+          ) : null}
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
               <button
                 type="button"
                 aria-label={`Actions for ${term.title}`}
                 className={cn(
-                  'text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded p-0.5 transition-opacity',
+                  'text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5 transition-opacity',
                   menuOpen
                     ? 'opacity-100'
                     : 'opacity-0 group-hover:opacity-100'

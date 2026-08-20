@@ -64,7 +64,7 @@ import {
 } from '@/lib/sidebar-unread-filter'
 import { cn } from '@/lib/utils'
 
-function UnreadDot({ className }: { className?: string }) {
+export function UnreadDot({ className }: { className?: string }) {
   return (
     <span
       className={cn('size-2 shrink-0 rounded-full', className)}
@@ -222,6 +222,7 @@ export type SidebarSessionListProps = {
   onRenameTabGroup?: (group: import('@sandwalk/agent-ui-core').SessionGroup) => void
   onDissolveTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
+  onSetTabGroupPinned?: (groupId: string, pinned: boolean) => void
   /**
    * Proyecto activo en el shell. Sirve para clasificar los chats hijos
    * de un split como "nativos" (mismo proyecto) o "invitados" (otro).
@@ -285,6 +286,7 @@ export function SidebarSessionList({
   onRenameTabGroup,
   onDissolveTabGroup,
   onSetTabGroupColor,
+  onSetTabGroupPinned,
   activeProjectId,
   onGoToChatProject,
   activeGroupChildId,
@@ -442,6 +444,7 @@ export function SidebarSessionList({
                             onRenameGroup={onRenameTabGroup}
                             onDissolveGroup={onDissolveTabGroup}
                             onSetGroupColor={onSetTabGroupColor}
+                            onSetGroupPinned={onSetTabGroupPinned}
                             activeProjectId={activeProjectId}
                             onGoToChatProject={onGoToChatProject}
                             projects={projects}
@@ -644,13 +647,22 @@ export function SidebarSessionList({
                                   })
                                 }}
                               >
+                              {/* Q5: pin PRIMERO (antes del source icon)
+                                  y en blanco absoluto para que se lea
+                                  a la izquierda como tag del chat, no
+                                  al lado del status. Sólo aparece cuando
+                                  el chat está pinneado (por lo tanto en
+                                  la sección Pinned). */}
+                              {chat.organizeLabel === 'pinned' ? (
+                                <Pin
+                                  className="text-white size-3 shrink-0"
+                                  fill="currentColor"
+                                />
+                              ) : null}
                               <SessionSourceIcon
                                 source={chat.source}
                                 label={chat.sourceLabel}
                               />
-                              {chat.organizeLabel === 'pinned' ? (
-                                <Pin className="text-muted-foreground/70 size-3 shrink-0" />
-                              ) : null}
                               {tabColor ? (
                                 <span
                                   className="size-2 shrink-0 rounded-full border border-black/10"
@@ -830,6 +842,7 @@ function SidebarGroupItem({
   onToggleTerminalOrganizeLabel,
   onMoveTerminalToProject,
   onSetGroupColor,
+  onSetGroupPinned,
   activeProjectId,
   onGoToChatProject,
   projects,
@@ -865,6 +878,7 @@ function SidebarGroupItem({
     projectId: string | null
   ) => void | Promise<void>
   onSetGroupColor?: (groupId: string, color: string | null) => void
+  onSetGroupPinned?: (groupId: string, pinned: boolean) => void
   activeProjectId: string | null
   onGoToChatProject?: (chat: AgentSession) => void
   projects: AgentProject[]
@@ -1005,6 +1019,25 @@ function SidebarGroupItem({
                   }}
                 >
                   Rename…
+                </button>
+                <div className="border-border/60 my-1 border-t" />
+              </>
+            ) : null}
+            {/* FAS-107 Q8: pinear splits — mismo comportamiento que chats
+                y terminales (van al cluster pinneado del strip y a la
+                sección Pinned del sidebar). */}
+            {onSetGroupPinned ? (
+              <>
+                <button
+                  type="button"
+                  className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onSetGroupPinned(group.id, !group.pinned)
+                  }}
+                >
+                  <Pin className="size-3.5" />
+                  {group.pinned ? 'Unpin' : 'Pin'}
                 </button>
                 <div className="border-border/60 my-1 border-t" />
               </>

@@ -19,6 +19,16 @@ type TerminalPanelProps = {
   startupNonce?: number
   onClose?: () => void
   className?: string
+  /**
+   * FAS-107 Q3: when true, hide the internal tab-bar + "New terminal"
+   * button. The panel then behaves as a single-shell viewport, which is
+   * what terminal-as-first-class needs (each terminal instance owns its
+   * own PTY; sub-tabs are legacy from the pre-FAS-107 side-panel).
+   *
+   * Default is false to preserve the multi-shell tool-window usage
+   * (WorkspacePanel side-panel, integrations, onboarding).
+   */
+  singleShell?: boolean
 }
 
 export function TerminalPanel({
@@ -29,7 +39,8 @@ export function TerminalPanel({
   startupCommand = null,
   startupNonce = 0,
   onClose,
-  className
+  className,
+  singleShell = false
 }: TerminalPanelProps) {
   const lastStartupNonceRef = useRef<number>(-1)
 
@@ -129,25 +140,32 @@ export function TerminalPanel({
         className
       )}
     >
-      <TerminalTabBar
-        tabs={tabs}
-        activeId={activeId}
-        tabColors={tabColors}
-        renameId={renameId}
-        renameValue={renameValue}
-        renameInputRef={renameInputRef}
-        renameIgnoreBlurRef={renameIgnoreBlurRef}
-        onSelectTab={setActiveId}
-        onCloseTab={closeTab}
-        onBeginRename={beginRename}
-        onRenameValueChange={setRenameValue}
-        onSubmitRename={() => void submitRename()}
-        onCancelRename={cancelRename}
-        onCommitRenameFromBlur={commitRenameFromBlur}
-        onTabContextMenu={(id, x, y) => setTabMenu({ id, x, y })}
-        onCreateTab={() => void createTab()}
-        onClose={onClose}
-      />
+      {/* FAS-107 Q3: single-shell mode hides the internal tab bar. The
+          rename / context menu / delete actions viven ahora en el
+          header del panel del split (TerminalSplitPanelHeader) o en
+          el sidebar row. Los sub-tabs sólo aplican al legacy multi-
+          shell mode. */}
+      {singleShell ? null : (
+        <TerminalTabBar
+          tabs={tabs}
+          activeId={activeId}
+          tabColors={tabColors}
+          renameId={renameId}
+          renameValue={renameValue}
+          renameInputRef={renameInputRef}
+          renameIgnoreBlurRef={renameIgnoreBlurRef}
+          onSelectTab={setActiveId}
+          onCloseTab={closeTab}
+          onBeginRename={beginRename}
+          onRenameValueChange={setRenameValue}
+          onSubmitRename={() => void submitRename()}
+          onCancelRename={cancelRename}
+          onCommitRenameFromBlur={commitRenameFromBlur}
+          onTabContextMenu={(id, x, y) => setTabMenu({ id, x, y })}
+          onCreateTab={() => void createTab()}
+          onClose={onClose}
+        />
+      )}
 
       <TerminalViewport
         booting={booting}

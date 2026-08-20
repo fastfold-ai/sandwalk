@@ -134,6 +134,7 @@ export function TerminalLeaf({
           sessionId={terminalId}
           visible
           autoCreateOnEmpty
+          singleShell
           className="border-t-0"
         />
       </div>

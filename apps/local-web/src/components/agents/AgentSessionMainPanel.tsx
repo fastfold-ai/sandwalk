@@ -747,6 +747,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 sessionId={terminalId}
                 visible
                 autoCreateOnEmpty
+                singleShell
               />
             </main>
           ) : activeGroup ? (
