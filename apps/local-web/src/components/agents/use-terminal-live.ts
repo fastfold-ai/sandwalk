@@ -161,12 +161,22 @@ export function useTerminalLive({
         }
       })
 
-      // T4: dedupe onResize. xterm dispara este handler durante reflows
-      // internos aunque las dimensiones externas no hayan cambiado —
-      // cada send emite SIGWINCH y fish/zsh re-renderean el prompt,
-      // rompiendo el input visible. Solo enviamos si (cols, rows)
-      // realmente cambió desde el último send.
+      // T4: dedupe + sanity clamp del onResize automático de xterm.
+      //
+      // Dos protecciones:
+      //  (a) Ignorar valores sospechosos. Bug conocido de FitAddon
+      //      (xterm.js issue #5320, #4338, #4841): `proposeDimensions()`
+      //      puede devolver `cols=1` intermitentemente cuando el CSS
+      //      del contenedor cambia en el mismo frame que el keypress
+      //      (Ink/React TUI de Claude Code dispara re-render en cada
+      //      tecla). Enviar `cols=1` al PTY hace que Claude re-layoutee
+      //      con 1 columna — cada carácter en su propia línea.
+      //  (b) Deduplicar (cols, rows) contra `lastSentCols/Rows` — xterm
+      //      dispara onResize en reflows internos que no cambian el
+      //      tamaño externo. Cada envío emite SIGWINCH y fish/zsh
+      //      re-renderean el prompt, dañando el input.
       live.term.onResize(({ cols, rows }) => {
+        if (cols < 10 || rows < 3) return
         if (cols === live.lastSentCols && rows === live.lastSentRows) return
         live.lastSentCols = cols
         live.lastSentRows = rows
@@ -190,18 +200,25 @@ export function useTerminalLive({
       socket.addEventListener('open', () => {
         if (live.disposed) return
         try {
-          live.fit.fit()
+          // T4: NO llamar `fit.fit()` directamente — su cálculo interno
+          // puede devolver cols=1 (bug conocido de FitAddon, xterm.js
+          // #5320) y aplicarlo al terminal antes de que podamos
+          // interceptar. En su lugar: propose primero, validar, y solo
+          // aplicar `term.resize` si las dimensiones son razonables.
           const dims = live.fit.proposeDimensions()
-          if (
-            dims &&
-            (dims.cols !== live.lastSentCols || dims.rows !== live.lastSentRows)
-          ) {
-            live.lastSentCols = dims.cols
-            live.lastSentRows = dims.rows
-            void client.updatePtySession(sessionId, live.info.id, {
-              cols: dims.cols,
-              rows: dims.rows
-            })
+          if (dims && dims.cols >= 10 && dims.rows >= 3) {
+            live.term.resize(dims.cols, dims.rows)
+            if (
+              dims.cols !== live.lastSentCols ||
+              dims.rows !== live.lastSentRows
+            ) {
+              live.lastSentCols = dims.cols
+              live.lastSentRows = dims.rows
+              void client.updatePtySession(sessionId, live.info.id, {
+                cols: dims.cols,
+                rows: dims.rows
+              })
+            }
           }
         } catch {
           // ignore fit failures
@@ -261,11 +278,16 @@ export function useTerminalLive({
           // resuelto — pasa cuando el terminal se monta como pane dentro
           // de un split), NO fittear con cols=1. El ResizeObserver que
           // vive en TerminalPanel dispara mountActive de nuevo apenas el
-          // host cambie de tamaño. Enviar cols=1 al PTY hace que el shell
-          // escriba cada carácter en una línea nueva y el buffer queda
-          // así aunque el fit posterior corrija.
+          // host cambie de tamaño.
           if (host.clientWidth < 10 || host.clientHeight < 10) return
-          live.fit.fit()
+          // T4: propose + validar ANTES de aplicar. `fit.fit()` puede
+          // aplicar cols=1 al buffer local si `proposeDimensions()`
+          // devuelve mal (xterm.js #5320). Usar el propose y aplicar
+          // via `term.resize()` solo cuando las dims son razonables.
+          const dims = live.fit.proposeDimensions()
+          if (dims && dims.cols >= 10 && dims.rows >= 3) {
+            live.term.resize(dims.cols, dims.rows)
+          }
           const active = document.activeElement
           const focusOutside =
             active instanceof HTMLElement &&
@@ -274,7 +296,6 @@ export function useTerminalLive({
           if (!renameIdRef.current && !focusOutside) {
             live.term.focus()
           }
-          const dims = live.fit.proposeDimensions()
           if (
             dims &&
             dims.cols >= 10 &&
