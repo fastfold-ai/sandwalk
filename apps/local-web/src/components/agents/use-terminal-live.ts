@@ -229,6 +229,14 @@ export function useTerminalLive({
       ensureSocket(live)
       requestAnimationFrame(() => {
         try {
+          // R1 fix: si el host todavía no tiene tamaño (layout aún no
+          // resuelto — pasa cuando el terminal se monta como pane dentro
+          // de un split), NO fittear con cols=1. El ResizeObserver que
+          // vive en TerminalPanel dispara mountActive de nuevo apenas el
+          // host cambie de tamaño. Enviar cols=1 al PTY hace que el shell
+          // escriba cada carácter en una línea nueva y el buffer queda
+          // así aunque el fit posterior corrija.
+          if (host.clientWidth < 10 || host.clientHeight < 10) return
           live.fit.fit()
           const active = document.activeElement
           const focusOutside =
@@ -239,7 +247,12 @@ export function useTerminalLive({
             live.term.focus()
           }
           const dims = live.fit.proposeDimensions()
-          if (dims && live.socket?.readyState === WebSocket.OPEN) {
+          if (
+            dims &&
+            dims.cols >= 10 &&
+            dims.rows >= 3 &&
+            live.socket?.readyState === WebSocket.OPEN
+          ) {
             void client.updatePtySession(sessionId, live.info.id, {
               cols: dims.cols,
               rows: dims.rows

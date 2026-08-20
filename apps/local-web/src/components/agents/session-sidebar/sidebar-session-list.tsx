@@ -564,6 +564,20 @@ export function SidebarSessionList({
                             }}
                           >
                             <div className="flex min-w-0 items-center gap-1.5">
+                              {/* R3+R4: pin A LA IZQUIERDA DEL TODO, antes
+                                  del checkbox de selección. Vive fuera del
+                                  button clickable para que quede visualmente
+                                  alineado con el pin del terminal (que en
+                                  su fila también va como primer elemento
+                                  del row). Blanco absoluto con fill para
+                                  máxima legibilidad en la sección Pinned. */}
+                              {chat.organizeLabel === 'pinned' ? (
+                                <Pin
+                                  aria-label="Pinned"
+                                  className="text-white size-3 shrink-0"
+                                  fill="currentColor"
+                                />
+                              ) : null}
                               <button
                                 type="button"
                                 className={cn(
@@ -647,18 +661,6 @@ export function SidebarSessionList({
                                   })
                                 }}
                               >
-                              {/* Q5: pin PRIMERO (antes del source icon)
-                                  y en blanco absoluto para que se lea
-                                  a la izquierda como tag del chat, no
-                                  al lado del status. Sólo aparece cuando
-                                  el chat está pinneado (por lo tanto en
-                                  la sección Pinned). */}
-                              {chat.organizeLabel === 'pinned' ? (
-                                <Pin
-                                  className="text-white size-3 shrink-0"
-                                  fill="currentColor"
-                                />
-                              ) : null}
                               <SessionSourceIcon
                                 source={chat.source}
                                 label={chat.sourceLabel}

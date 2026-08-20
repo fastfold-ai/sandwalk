@@ -137,7 +137,11 @@
 .dark
   .sandwalk-chrome-tabs
   .chrome-tab:not([data-active='true']):hover {
-  --tab-fill: color-mix(in srgb, hsl(var(--muted)) 70%, #fff);
+  /* R2: `#fff` puro producía un flash blanco al hacer click en el tab
+     (transición hover → active de 120ms mostraba el fill claro pleno
+     antes de que el hover-shape se apagara). Usamos `hsl(var(--foreground))`
+     que respeta el tema y suaviza el efecto. */
+  --tab-fill: color-mix(in srgb, hsl(var(--muted)) 92%, hsl(var(--foreground)));
 }
 
 /* Two shapes stacked in the background; only one is visible per state.
