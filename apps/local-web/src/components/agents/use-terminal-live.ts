@@ -28,6 +28,18 @@ export type LiveTerminal = {
   lastSentRows: number
 }
 
+/**
+ * V1: xterm instances viven a nivel de módulo, no dentro del componente
+ * React. Sobreviven al unmount del `TerminalPanel` — cambiar de tab,
+ * de split, o de layout NO destruye el buffer del terminal. Patrón
+ * canónico usado por VSCode, GitHub Codespaces y Warp.
+ *
+ * Se limpian SOLO cuando el usuario cierra el terminal explícitamente
+ * (via `closeTab`/`disposeLive`), no cuando React desmonta el árbol.
+ */
+const GLOBAL_LIVES: Record<string, LiveTerminal> = {}
+const GLOBAL_HOSTS: Record<string, HTMLDivElement | null> = {}
+
 export function useTerminalLive({
   client,
   sessionId,
@@ -37,8 +49,13 @@ export function useTerminalLive({
   sessionId: string
   renameIdRef: RefObject<string | null>
 }) {
-  const hostsRef = useRef<Record<string, HTMLDivElement | null>>({})
-  const livesRef = useRef<Record<string, LiveTerminal>>({})
+  // V1: hostsRef y livesRef apuntan a los mismos objetos module-level
+  // en todos los re-mounts, así los xterm instances persisten. Los divs
+  // host se re-crean con cada mount, pero la referencia se sobrescribe
+  // desde los `ref` callbacks — el xterm se re-parenta al nuevo host
+  // en `mountActive` cuando detecta que `live.container !== host`.
+  const hostsRef = useRef(GLOBAL_HOSTS)
+  const livesRef = useRef(GLOBAL_LIVES)
   const darkRef = useRef(isDocumentDark())
 
   useEffect(() => {
@@ -55,6 +72,10 @@ export function useTerminalLive({
     return watchTerminalTheme(apply)
   }, [])
 
+  // V1: `disposeLive` sólo se llama cuando el usuario cierra un
+  // terminal explícitamente (closeTab / deleteTerminal). El unmount
+  // del componente NO dispara este cleanup — el xterm sobrevive en
+  // el map global hasta que el user decide cerrarlo.
   const disposeLive = useCallback((ptyId: string) => {
     const live = livesRef.current[ptyId]
     if (!live || live.disposed) return
@@ -70,6 +91,7 @@ export function useTerminalLive({
       // ignore
     }
     delete livesRef.current[ptyId]
+    delete hostsRef.current[ptyId]
   }, [])
 
   const connectLive = useCallback(
@@ -270,6 +292,20 @@ export function useTerminalLive({
         live.term.open(host)
         live.container = host
         live.opened = true
+      } else if (live.container !== host) {
+        // V1: el xterm ya estaba abierto en otro host (el componente
+        // React se desmontó y volvió a montar, o cambió de layout).
+        // Re-parentamos el elemento DOM del xterm al nuevo host — el
+        // buffer y el scrollback quedan intactos porque el `Terminal`
+        // instance nunca se destruyó.
+        host.replaceChildren()
+        const el = live.term.element
+        if (el) {
+          host.appendChild(el)
+        } else {
+          live.term.open(host)
+        }
+        live.container = host
       }
       ensureSocket(live)
       requestAnimationFrame(() => {

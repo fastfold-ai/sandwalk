@@ -50,7 +50,6 @@ export function useTerminalPanelTabs({
     livesRef,
     connectLive,
     disposeLive,
-    disposeAll,
     mountActive,
     sendCommandToLive
   } = useTerminalLive({ client, sessionId, renameIdRef })
@@ -220,10 +219,16 @@ export function useTerminalPanelTabs({
     })()
 
     return () => {
+      // V1: NO llamar `disposeAll()` acá. Antes esto destruía los
+      // xterm instances cada vez que React desmontaba el componente
+      // (cambio de tab, cambio de split, cualquier remount), perdiendo
+      // el buffer completo del scrollback. Ahora los xterm viven en
+      // un map module-level y sobreviven al unmount — sólo se dispose
+      // cuando el usuario cierra el terminal explícitamente via
+      // `closeTab`. Patrón canónico: VSCode, Codespaces, Warp.
       cancelled = true
-      disposeAll()
     }
-  }, [autoCreateOnEmpty, client, connectLive, createTab, disposeAll, sessionId])
+  }, [autoCreateOnEmpty, client, connectLive, createTab, sessionId])
 
   return {
     tabs,
