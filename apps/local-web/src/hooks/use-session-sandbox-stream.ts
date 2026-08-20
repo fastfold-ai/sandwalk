@@ -129,10 +129,19 @@ export function useSessionSandboxStream({
       }
     }
 
+    // T3: retrasar el connect() con setTimeout(0) para que si React
+    // StrictMode desmonta el effect inmediatamente (double-invoke en
+    // dev), `cancelled` se marca ANTES de intentar abrir el WS. Sin
+    // esto el browser logea "WebSocket closed before established" en
+    // cada mount/unmount de dev — ruido inútil.
     refresh()
-    connect()
+    const startTimer = window.setTimeout(() => {
+      if (cancelled) return
+      connect()
+    }, 0)
     return () => {
       cancelled = true
+      window.clearTimeout(startTimer)
       if (reconnectTimer != null) window.clearTimeout(reconnectTimer)
       try {
         socket?.close()

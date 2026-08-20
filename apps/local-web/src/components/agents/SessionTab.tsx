@@ -261,6 +261,17 @@ export function SessionTab({
     >
       <TabBackground width={tabWidth} />
       <div className="chrome-tab-content">
+        {/* T2: pin PRIMERO — antes de cualquier icon del tipo — para
+            leerse como tag del tab. Aplica a chat, terminal y grupo
+            por igual. Paridad con R3/R5 en la fila del sidebar. Blanco
+            absoluto con fill=currentColor para máxima legibilidad. */}
+        {pinned ? (
+          <Pin
+            className="text-white size-3 shrink-0"
+            fill="currentColor"
+            aria-hidden
+          />
+        ) : null}
         {isGroup ? (
           <>
             <Columns2
@@ -290,9 +301,6 @@ export function SessionTab({
             <SessionSourceIcon source={tab.source} label={tab.sourceLabel} />
           </>
         )}
-        {pinned ? (
-          <Pin className="text-muted-foreground size-3 shrink-0" aria-hidden />
-        ) : null}
         {unread ? (
           <span
             className="size-2 shrink-0 rounded-full"

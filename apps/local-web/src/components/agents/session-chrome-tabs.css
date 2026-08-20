@@ -167,6 +167,18 @@
   opacity: 1;
 }
 
+/* T1: cuando el tab pasa a active, el hover-shape debe desaparecer
+   INSTANTÁNEO — sin la transición de 120ms — para que no se vea
+   superpuesto con el active-shape haciendo fade-in. Sin esto, el
+   click sobre un tab (aunque sea el activo por hover previo) muestra
+   un "flash" de hover mientras los dos shapes coexisten. */
+.sandwalk-chrome-tabs
+  .chrome-tab[data-active='true']
+  .chrome-tab-hover-shape {
+  opacity: 0;
+  transition: none;
+}
+
 .sandwalk-chrome-tabs .chrome-tab .chrome-tab-active-shape {
   opacity: 0;
   transition: opacity 0.12s ease;
