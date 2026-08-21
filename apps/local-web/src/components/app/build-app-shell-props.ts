@@ -53,6 +53,9 @@ type AppShellBridgeInput = {
   showChatSkeleton: boolean
   tabGroupsStore: ReturnType<typeof useAppTabGroups>
   closeTabGroup: (groupId: string) => void
+  /** X1: wrapper del store que además navega si el user estaba viendo
+   *  el split que se disuelve — sin esto la ruta queda muerta. */
+  dissolveTabGroup: (groupId: string) => void
   renameGroupTarget: AppShellProps['renameGroupTarget']
   renameGroupValue: AppShellProps['renameGroupValue']
   setRenameGroupTarget: AppShellProps['setRenameGroupTarget']
@@ -289,7 +292,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     confirmBatchDelete: input.actions.confirmBatchDelete,
     tabGroups: input.tabGroupsStore.allTabGroups,
     createTabGroup: input.tabGroupsStore.createGroup,
-    dissolveTabGroup: input.tabGroupsStore.dissolveGroup,
+    dissolveTabGroup: input.dissolveTabGroup,
     closeTabGroup: input.closeTabGroup,
     addChatToGroup: input.tabGroupsStore.addToGroup,
     removeChatFromGroup: input.tabGroupsStore.removeFromGroup,

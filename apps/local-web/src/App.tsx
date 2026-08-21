@@ -506,7 +506,43 @@ export default function App() {
       const nextSize = tabGroupsStore.removeFromGroup(groupId, chatId)
       if (nextSize >= 0 && nextSize < 2) {
         tabGroupsStore.dissolveGroup(groupId)
-        if (survivor) navigate(`/agents/${survivor}`)
+        if (survivor) {
+          navigate(
+            survivor.startsWith('term_')
+              ? `/terminals/${survivor}`
+              : `/agents/${survivor}`
+          )
+        }
+      }
+    },
+    [route.sessionId, tabGroupsStore, navigate]
+  )
+
+  /*
+   * X1: "Delete Split View" desde el menú del chip del strip o del sidebar.
+   * Antes esto llamaba `tabGroupsStore.dissolveGroup` directo — el grupo
+   * desaparecía pero la ruta seguía en `/agents/grp_xxx`, quedando en
+   * pantalla vacía porque el id ya no existía.
+   *
+   * Ahora: tomamos el `activeChatId` del grupo (lo que el user tenía en
+   * foco dentro del split) ANTES de disolver, corremos el dissolve, y si
+   * la ruta actual apuntaba a ese mismo grupo, navegamos al ítem activo
+   * como tab suelto — a `/agents/:id` si es chat, a `/terminals/:id` si
+   * empieza con `term_`. El user sigue viendo la misma cosa, solo que
+   * ya no adentro del split.
+   */
+  const handleDissolveTabGroup = useCallback(
+    (groupId: string) => {
+      const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
+      const activeChild = group?.activeChatId ?? group?.chatIds[0] ?? null
+      const wasViewingThisGroup = route.sessionId === groupId
+      tabGroupsStore.dissolveGroup(groupId)
+      if (wasViewingThisGroup && activeChild) {
+        navigate(
+          activeChild.startsWith('term_')
+            ? `/terminals/${activeChild}`
+            : `/agents/${activeChild}`
+        )
       }
     },
     [route.sessionId, tabGroupsStore, navigate]
@@ -969,6 +1005,7 @@ export default function App() {
           onAddChatToSplit: handleAddChatToSplit,
           onRemoveChatFromSplit: handleRemoveChatFromSplit,
           closeTabGroup: handleCloseTabGroup,
+          dissolveTabGroup: handleDissolveTabGroup,
           renameGroupTarget,
           renameGroupValue,
           setRenameGroupTarget,
