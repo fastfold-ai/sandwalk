@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import { useTerminalLayer } from './terminal-layer-registry'
 
 /**
- * FAS-107 W1: contenedor absoluto donde el portal renderea los
+ * FAS-107 W1/W2: contenedor absoluto donde el portal renderea los
  * `TerminalPortalHost`.
  *
  * Vive dentro del área "main" de la app, cubre todo el viewport del
@@ -13,9 +13,12 @@ import { useTerminalLayer } from './terminal-layer-registry'
  * terminal atraviesan el layer y llegan al chat / sidebar / lo que
  * esté debajo.
  *
- * z-index: 0 (o sin z-index explícito) — el layer se pinta ENCIMA del
- * contenido main (que renderea antes en el árbol) pero DEBAJO de
- * cualquier menú/dropdown que use portal Radix (z-50+).
+ * z-index: 30 — por ENCIMA del contenido normal del main (chat,
+ * splits, headers, panels) pero por DEBAJO de cualquier menú/dropdown
+ * Radix (z-50+). Si estuviera en z-0, el content div que va después
+ * en el DOM lo taparía completamente (bug W2). En modo mac-glass el
+ * sandwalk-shell-main crea contexto de apilamiento con z-index:2 —
+ * el layer necesita valor alto para pintarse ARRIBA de sus siblings.
  */
 export function TerminalLayerRoot() {
   const registry = useTerminalLayer()
@@ -35,7 +38,7 @@ export function TerminalLayerRoot() {
     <div
       ref={nodeRef}
       aria-hidden
-      className="pointer-events-none absolute inset-0 z-0"
+      className="pointer-events-none absolute inset-0 z-30"
     />
   )
 }
