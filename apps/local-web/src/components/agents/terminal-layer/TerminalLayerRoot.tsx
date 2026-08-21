@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 
 import { useTerminalLayer } from './terminal-layer-registry'
 
@@ -24,10 +24,12 @@ export function TerminalLayerRoot() {
   const registry = useTerminalLayer()
   const nodeRef = useRef<HTMLDivElement | null>(null)
 
-  useEffect(() => {
-    // Registra el nodo raíz una vez montado — los `TerminalPortalHost`
-    // consumen `getLayerRoot()` en su primer render para elegir dónde
-    // hacer `createPortal`.
+  // W3: `useLayoutEffect` corre ANTES del paint y ANTES de los
+  // `useEffect` normales. Así el layerRoot queda registrado antes de
+  // que los `TerminalPortalHost` que viven como siblings intenten
+  // consultarlo — sin esto los hosts terminaban con `layerRoot=null`
+  // durante todo su primer commit y su xterm nunca se montaba.
+  useLayoutEffect(() => {
     registry.setLayerRoot(nodeRef.current)
     return () => {
       registry.setLayerRoot(null)

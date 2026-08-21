@@ -50,7 +50,14 @@ export function TerminalPortalHost({
   const registry = useTerminalLayer()
   const layerRoot = registry.getLayerRoot()
 
+  // W3: el host DIV se guarda como state (no useRef) para que el
+  // `useEffect` que monta el xterm pueda depender del nodo real y
+  // re-ejecutarse cuando el div aparezca (segundo tick, después de
+  // que llegó el layerRoot). Antes tenía deps [] y corría con host=null
+  // → el xterm nunca se montaba.
+  const [hostNode, setHostNode] = useState<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
+  hostRef.current = hostNode
   const termRef = useRef<XTerm | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
@@ -133,9 +140,13 @@ export function TerminalPortalHost({
     }
   }
 
-  // Montar xterm una vez.
+  // W3: montar xterm cuando el `hostNode` esté disponible. Antes esto
+  // dependía de `[]` y corría en el primer commit, momento en el que
+  // `layerRoot` aún era null → el portal no rendereaba el div → el
+  // host estaba en null → xterm nunca se montaba. Ahora depende del
+  // nodo real, que puede aparecer en el segundo tick.
   useEffect(() => {
-    const host = hostRef.current
+    const host = hostNode
     if (!host || termRef.current) return
 
     const term = new XTerm({
@@ -301,16 +312,18 @@ export function TerminalPortalHost({
       socketRef.current = null
       ptyRef.current = null
     }
-    // Deliberadamente NO dependemos de otros valores — el xterm y el
-    // WS viven una sola vez por instancia del componente.
+    // Deps: [hostNode] — el effect corre cuando el div del portal
+    // aparece por primera vez (después de que layerRoot llegó). Los
+    // otros valores (client, terminalId, registry) son estables por
+    // instancia — no hace falta re-crear el xterm si cambian.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [hostNode])
 
   if (!layerRoot) return null
 
   return createPortal(
     <div
-      ref={hostRef}
+      ref={setHostNode}
       data-terminal-portal-host={terminalId}
       // Oculto por default hasta que applyPosition corra la primera vez.
       style={{ display: 'none' }}
