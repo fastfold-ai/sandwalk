@@ -291,20 +291,13 @@ export function useTerminalLive({
         live.term.open(host)
         live.container = host
         live.opened = true
-      } else if (live.container !== host) {
-        // V1: el xterm ya estaba abierto en otro host (el componente
-        // React se desmontó y volvió a montar). Usamos la API oficial
-        // `Terminal.open(newParent)` que xterm.js documenta como
-        // idempotente — mueve el terminal al nuevo parent y maneja
-        // internamente el DOM sin romper la reconciliación de React.
-        //
-        // Antes usábamos `host.appendChild(term.element)` a mano, pero
-        // eso movía el nodo DOM a espaldas de React. Cuando React
-        // reconciliaba el árbol veía inconsistencia y "corregía"
-        // borrando siblings — el chat del split desaparecía.
-        live.term.open(host)
-        live.container = host
       }
+      // FAS-107 W1: NO se re-parenta cuando `live.container !== host`.
+      // Los terminales first-class ahora viven en un portal (ver
+      // terminal-layer/) — su host DOM nunca cambia mientras el terminal
+      // existe. Este hook queda para uso legacy multi-shell (workspace
+      // side-panel, integrations, onboarding) donde el remount sí puede
+      // pasar pero es aceptable perder el buffer.
       ensureSocket(live)
       requestAnimationFrame(() => {
         try {

@@ -2,7 +2,7 @@ import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentProject, TerminalSession } from '@sandwalk/agent-ui-core'
 import { type MouseEvent, useCallback } from 'react'
 
-import { TerminalPanel } from '@/components/agents/TerminalPanel'
+import { TerminalPlaceholder } from '@/components/agents/terminal-layer'
 import { TerminalSplitPanelHeader } from '@/components/agents/TerminalSplitPanelHeader'
 import { cn } from '@/lib/utils'
 
@@ -57,7 +57,10 @@ export function TerminalLeaf({
   terminalId,
   focused,
   focusPanel,
-  client,
+  // FAS-107 W1: `client` ya no se consume acá — el xterm vive en el
+  // portal host (ver terminal-layer/). Prefixed con `_` para señalar
+  // que la prop se mantiene en la firma sólo por compat con callers.
+  client: _client,
   terminals,
   onSplit,
   onClose,
@@ -128,14 +131,14 @@ export function TerminalLeaf({
         onSplitUp={id => onSplit(id, 'vertical', 'before')}
         onSplitDown={id => onSplit(id, 'vertical', 'after')}
       />
+      {/* FAS-107 W1: el xterm ya no vive acá. Vive en un layer flotante
+          (via portal) que se posiciona sobre este placeholder. Así el
+          buffer sobrevive a cambios de tab/split sin conflicto entre
+          React reconcile y xterm DOM mutations. Ver terminal-layer/. */}
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-        <TerminalPanel
-          client={client}
-          sessionId={terminalId}
-          visible
-          autoCreateOnEmpty
-          singleShell
-          className="border-t-0"
+        <TerminalPlaceholder
+          terminalId={terminalId}
+          onFocus={focusPanel}
         />
       </div>
     </div>

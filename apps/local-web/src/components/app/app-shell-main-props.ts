@@ -67,6 +67,9 @@ export type AppShellMainProps = {
   isDashboardMcp: boolean
   isDashboardSpecialists: boolean
   client: LocalAgentClient
+  /** FAS-107 W1: terminales conocidos — se usan para montar los
+   *  `TerminalPortalHost` que sobreviven a cambios de layout. */
+  terminals: import('@sandwalk/agent-ui-core').TerminalSession[]
   navigate: NavigateFunction
   location: Location
   dashboardSection: DashboardSection

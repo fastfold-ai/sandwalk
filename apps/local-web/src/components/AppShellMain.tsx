@@ -3,6 +3,11 @@ import { skillChipToken } from '@/components/agents/composer-parts'
 import { DashboardMainViews } from '@/components/agents/DashboardMainViews'
 import { SitesView } from '@/components/agents/SitesView'
 import {
+  TerminalHostsProvider,
+  TerminalLayerProvider,
+  TerminalLayerRoot
+} from '@/components/agents/terminal-layer'
+import {
   AppShellMainDragStrip,
   AppShellTitleBar
 } from '@/components/app/app-shell-main-chrome'
@@ -56,7 +61,16 @@ export function AppShellMain(props: AppShellMainProps) {
       minSize={40}
       className="min-w-0"
     >
+      <TerminalLayerProvider>
       <div className="sandwalk-shell-main relative flex h-full min-w-0 flex-col bg-background">
+        {/* FAS-107 W1: layer donde viven todos los xterm first-class
+            (via createPortal). Ver terminal-layer/README para el patrón
+            completo. */}
+        <TerminalLayerRoot />
+        <TerminalHostsProvider
+          client={props.client}
+          terminals={props.terminals}
+        />
         {/*
          * Layout-neutral drag hit target. Only mount when there's no
          * visible drag strip already covering the top: when the collapsed
@@ -191,6 +205,7 @@ export function AppShellMain(props: AppShellMainProps) {
         )}
         </div>
       </div>
+      </TerminalLayerProvider>
     </ResizablePanel>
   )
 }

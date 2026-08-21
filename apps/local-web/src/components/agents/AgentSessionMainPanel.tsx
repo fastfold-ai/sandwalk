@@ -24,6 +24,7 @@ import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { ChatTilingContainer } from '@/components/agents/ChatTilingContainer'
 import { fileChipToken } from '@/components/agents/composer-parts'
 import { useSessionSiteAutoPreview } from '@/components/agents/sites/use-session-site-auto-preview'
+import { TerminalPlaceholder } from '@/components/agents/terminal-layer'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
@@ -737,18 +738,13 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           className="min-w-0"
         >
           {terminalId ? (
-            // FAS-107 GF3: Terminal-as-main-pane. When the URL is
-            // `/terminals/:id`, the whole main slot is one terminal —
-            // no composer, no transcript, no Files sidebar. Header
-            // stays minimal (Fase GF-header-simplificado).
+            // FAS-107 GF3 + W1: Terminal-as-main-pane. Ruta
+            // `/terminals/:id` — el main slot entero es un terminal. El
+            // xterm vive en el portal layer (ver terminal-layer/) y el
+            // TerminalPlaceholder solo reserva el hueco donde el layer
+            // se posiciona.
             <main className="relative flex h-full min-w-0 flex-col">
-              <TerminalPanel
-                client={client}
-                sessionId={terminalId}
-                visible
-                autoCreateOnEmpty
-                singleShell
-              />
+              <TerminalPlaceholder terminalId={terminalId} />
             </main>
           ) : activeGroup ? (
             <ChatTilingContainer
