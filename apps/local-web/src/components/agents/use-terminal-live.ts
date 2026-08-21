@@ -288,7 +288,6 @@ export function useTerminalLive({
       const live = livesRef.current[ptyId]
       if (!host || !live || live.disposed) return
       if (!live.opened) {
-        host.replaceChildren()
         live.term.open(host)
         live.container = host
         live.opened = true
@@ -298,7 +297,12 @@ export function useTerminalLive({
         // Re-parentamos el elemento DOM del xterm al nuevo host — el
         // buffer y el scrollback quedan intactos porque el `Terminal`
         // instance nunca se destruyó.
-        host.replaceChildren()
+        //
+        // OJO: NO usamos `host.replaceChildren()` acá. Si por algún
+        // race el `host` apuntara a un div que contiene otro pane
+        // (ej. el chat), replaceChildren lo mataría. `appendChild`
+        // sobre un nodo que ya está en el DOM lo MUEVE — no borra
+        // nada ajeno.
         const el = live.term.element
         if (el) {
           host.appendChild(el)
