@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 
+import { ProjectMetaHover } from '@/components/agents/ChatSplitPanelHeader'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import { TabInlineColorRow } from '@/components/agents/tab-context-menu'
@@ -83,6 +84,12 @@ export function TerminalSplitPanelHeader({
   const color = terminal ? tabColors[terminal.id] ?? null : null
   const isPinned = terminal?.organizeLabel === 'pinned'
   const isArchived = terminal?.organizeLabel === 'archive'
+  // X2 Fix 2: chip del proyecto visible + popover con la ficha, igual al
+  // header del chat. Antes el terminal no mostraba el proyecto asignado en
+  // el header del split, rompiendo paridad.
+  const project = terminal?.projectId
+    ? projects.find(p => p.id === terminal.projectId) || null
+    : null
 
   return (
     <div
@@ -108,9 +115,10 @@ export function TerminalSplitPanelHeader({
             aria-hidden
           />
         ) : null}
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-          {title}
-        </span>
+        <div className="flex min-w-0 flex-1 flex-col leading-tight">
+          <span className="truncate text-[13px] font-medium">{title}</span>
+          <ProjectMetaHover project={project} />
+        </div>
         {isPinned ? (
           <Pin
             aria-label="Pinned"

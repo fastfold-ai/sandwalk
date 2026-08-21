@@ -464,7 +464,11 @@ export function ChatSplitPanelHeader({
  * tiene configurado. Cuando el chat no tiene proyecto asociado, se
  * muestra un fallback discreto con su propia explicación.
  */
-function ProjectMetaHover({ project }: { project: AgentProject | null }) {
+export function ProjectMetaHover({
+  project
+}: {
+  project: AgentProject | null
+}) {
   /*
    * Popover con hover-para-abrir + click-para-pinnear.
    *

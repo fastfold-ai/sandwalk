@@ -1,4 +1,4 @@
-import type { SessionGroup } from '@sandwalk/agent-ui-core'
+import type { SessionGroup, TerminalSession } from '@sandwalk/agent-ui-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -119,17 +119,30 @@ export default function App() {
     [bootstrap.client, terminalsLive]
   )
 
+  // X2 Fix 1: dialog Radix para renombrar terminal (antes window.prompt,
+  // roto en Tauri Mac). Estado + submit + dispatcher que abre el dialog.
+  const [renameTerminalTarget, setRenameTerminalTarget] =
+    useState<TerminalSession | null>(null)
+  const [renameTerminalValue, setRenameTerminalValue] = useState('')
+
+  const submitRenameTerminal = useCallback(async () => {
+    const target = renameTerminalTarget
+    if (!target) return
+    const cleaned = renameTerminalValue.trim()
+    if (!cleaned) return
+    setRenameTerminalTarget(null)
+    setRenameTerminalValue('')
+    await handleRenameTerminal(target.id, cleaned)
+  }, [renameTerminalTarget, renameTerminalValue, handleRenameTerminal])
+
   const promptRenameTerminal = useCallback(
     (terminalId: string) => {
       const current = terminalsLive.terminals.find(t => t.id === terminalId)
-      const next = window.prompt(
-        'Rename terminal:',
-        current?.title ?? ''
-      )
-      if (next === null) return
-      void handleRenameTerminal(terminalId, next)
+      if (!current) return
+      setRenameTerminalTarget(current)
+      setRenameTerminalValue(current.title ?? '')
     },
-    [terminalsLive.terminals, handleRenameTerminal]
+    [terminalsLive.terminals]
   )
 
   const handleToggleTerminalOrganizeLabel = useCallback(
@@ -1011,6 +1024,11 @@ export default function App() {
           setRenameGroupTarget,
           setRenameGroupValue,
           submitRenameGroup,
+          renameTerminalTarget,
+          renameTerminalValue,
+          setRenameTerminalTarget,
+          setRenameTerminalValue,
+          submitRenameTerminal,
           selectedChatIds,
           toggleSelectChat,
           clearSelectChats,

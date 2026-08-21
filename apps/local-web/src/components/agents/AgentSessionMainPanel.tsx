@@ -774,7 +774,13 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
               }}
               terminals={terminals}
               terminalClient={client}
-              onCloseTerminal={handleCloseTerminal}
+              // X2 Fix 3+4: dentro de un split, "Close pane" y el
+              // context-menu del pane deben SACAR el terminal del split
+              // (no borrarlo). Antes se pasaba `handleCloseTerminal` que
+              // llama `deleteTerminal` → el terminal desaparecía del disco.
+              // `onRemoveChatFromSplit` acepta term_ ids y auto-disuelve
+              // si el grupo queda con <2 items.
+              onCloseTerminal={terminalId => onRemoveChatFromSplit(terminalId)}
               onRenameTerminal={handleRenameTerminal}
               onToggleTerminalOrganizeLabel={handleToggleTerminalOrganizeLabel}
               onMoveTerminalToProject={handleMoveTerminalToProjectLocal}

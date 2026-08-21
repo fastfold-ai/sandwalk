@@ -248,6 +248,15 @@ export type AppShellProps = {
   setRenameGroupTarget: Dispatch<SetStateAction<SessionGroup | null>>
   setRenameGroupValue: Dispatch<SetStateAction<string>>
   submitRenameGroup: () => void
+  renameTerminalTarget:
+    | import('@sandwalk/agent-ui-core').TerminalSession
+    | null
+  renameTerminalValue: string
+  setRenameTerminalTarget: Dispatch<
+    SetStateAction<import('@sandwalk/agent-ui-core').TerminalSession | null>
+  >
+  setRenameTerminalValue: Dispatch<SetStateAction<string>>
+  submitRenameTerminal: () => Promise<void>
   deleteTarget: AgentSession | null
   confirmDelete: () => Promise<void>
   batchDeletePending: boolean

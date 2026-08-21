@@ -313,6 +313,11 @@ export function AppShell(props: AppShellProps) {
         setRenameGroupTarget={props.setRenameGroupTarget}
         setRenameGroupValue={props.setRenameGroupValue}
         submitRenameGroup={props.submitRenameGroup}
+        renameTerminalTarget={props.renameTerminalTarget}
+        renameTerminalValue={props.renameTerminalValue}
+        setRenameTerminalTarget={props.setRenameTerminalTarget}
+        setRenameTerminalValue={props.setRenameTerminalValue}
+        submitRenameTerminal={props.submitRenameTerminal}
         deleteTarget={props.deleteTarget}
         setDeleteTarget={props.setDeleteTarget}
         confirmDelete={props.confirmDelete}

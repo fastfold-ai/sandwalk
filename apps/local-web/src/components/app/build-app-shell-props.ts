@@ -61,6 +61,11 @@ type AppShellBridgeInput = {
   setRenameGroupTarget: AppShellProps['setRenameGroupTarget']
   setRenameGroupValue: AppShellProps['setRenameGroupValue']
   submitRenameGroup: AppShellProps['submitRenameGroup']
+  renameTerminalTarget: AppShellProps['renameTerminalTarget']
+  renameTerminalValue: AppShellProps['renameTerminalValue']
+  setRenameTerminalTarget: AppShellProps['setRenameTerminalTarget']
+  setRenameTerminalValue: AppShellProps['setRenameTerminalValue']
+  submitRenameTerminal: AppShellProps['submitRenameTerminal']
   activeGroup: AppShellProps['activeGroup']
   perSessionBaseArgs: AppShellProps['perSessionBaseArgs']
   allSessions: AppShellProps['allSessions']
@@ -286,6 +291,11 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     setRenameGroupTarget: input.setRenameGroupTarget,
     setRenameGroupValue: input.setRenameGroupValue,
     submitRenameGroup: input.submitRenameGroup,
+    renameTerminalTarget: input.renameTerminalTarget,
+    renameTerminalValue: input.renameTerminalValue,
+    setRenameTerminalTarget: input.setRenameTerminalTarget,
+    setRenameTerminalValue: input.setRenameTerminalValue,
+    submitRenameTerminal: input.submitRenameTerminal,
     deleteTarget: input.actions.deleteTarget,
     confirmDelete: input.actions.confirmDelete,
     batchDeletePending: input.actions.batchDeletePending,
