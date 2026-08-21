@@ -293,22 +293,16 @@ export function useTerminalLive({
         live.opened = true
       } else if (live.container !== host) {
         // V1: el xterm ya estaba abierto en otro host (el componente
-        // React se desmontó y volvió a montar, o cambió de layout).
-        // Re-parentamos el elemento DOM del xterm al nuevo host — el
-        // buffer y el scrollback quedan intactos porque el `Terminal`
-        // instance nunca se destruyó.
+        // React se desmontó y volvió a montar). Usamos la API oficial
+        // `Terminal.open(newParent)` que xterm.js documenta como
+        // idempotente — mueve el terminal al nuevo parent y maneja
+        // internamente el DOM sin romper la reconciliación de React.
         //
-        // OJO: NO usamos `host.replaceChildren()` acá. Si por algún
-        // race el `host` apuntara a un div que contiene otro pane
-        // (ej. el chat), replaceChildren lo mataría. `appendChild`
-        // sobre un nodo que ya está en el DOM lo MUEVE — no borra
-        // nada ajeno.
-        const el = live.term.element
-        if (el) {
-          host.appendChild(el)
-        } else {
-          live.term.open(host)
-        }
+        // Antes usábamos `host.appendChild(term.element)` a mano, pero
+        // eso movía el nodo DOM a espaldas de React. Cuando React
+        // reconciliaba el árbol veía inconsistencia y "corregía"
+        // borrando siblings — el chat del split desaparecía.
+        live.term.open(host)
         live.container = host
       }
       ensureSocket(live)
