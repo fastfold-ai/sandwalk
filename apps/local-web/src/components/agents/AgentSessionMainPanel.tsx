@@ -149,6 +149,9 @@ export type AgentSessionMainPanelProps = {
   onCancelPendingSplit: () => void
   onAddChatToSplit: (chatId: string) => void
   onRemoveChatFromSplit: (chatId: string) => void
+  /** X2 Fix 1: dispatcher del rename dialog del shell. El strip y el
+   *  ChatTilingContainer lo llaman en vez de un `window.prompt` local. */
+  promptRenameTerminal: (terminalId: string) => void
   dissolveTabGroup: (groupId: string) => void
   renameTabGroup: (group: SessionGroup) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
@@ -256,6 +259,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     onCancelPendingSplit,
     onAddChatToSplit,
     onRemoveChatFromSplit,
+    promptRenameTerminal,
     dissolveTabGroup,
     renameTabGroup,
     setTabGroupColor,
@@ -345,28 +349,11 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     [client, removeTerminalOptimistic, refreshTerminals, onRemoveChatFromSplit]
   )
 
-  // FAS-107 GF-PARITY-5: parity with chat actions. `handleRename/Toggle/Move`
-  // are local mirrors of the shell-level handlers (which drive the sidebar
-  // row menu) so the tab-chip context menu can run without prop-drilling
-  // across the shell.
-  const handleRenameTerminal = useCallback(
-    (terminalId: string) => {
-      const current = terminals.find(t => t.id === terminalId)
-      const next = window.prompt('Rename terminal:', current?.title ?? '')
-      if (next === null) return
-      const cleaned = next.trim()
-      if (!cleaned) return
-      void (async () => {
-        try {
-          await client.updateTerminal(terminalId, { title: cleaned })
-          refreshTerminals()
-        } catch (err) {
-          console.error('updateTerminal (rename) failed', err)
-        }
-      })()
-    },
-    [client, refreshTerminals, terminals]
-  )
+  // X2 Fix 1: el rename desde el strip (tab-chip) y desde el header
+  // del split delega al mismo dispatcher que el sidebar — abre el dialog
+  // Radix del shell en vez de un `window.prompt` local (roto en Tauri Mac).
+  // Ver `promptRenameTerminal` en App.tsx.
+  const handleRenameTerminal = promptRenameTerminal
 
   const handleToggleTerminalOrganizeLabel = useCallback(
     async (terminalId: string, label: 'pinned' | 'archive') => {

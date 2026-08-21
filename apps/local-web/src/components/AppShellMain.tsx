@@ -201,6 +201,7 @@ export function AppShellMain(props: AppShellMainProps) {
             toggleSelectChat={props.toggleSelectChat}
             clearSelectChats={props.clearSelectChats}
             createSplitFromSelection={props.createSplitFromSelection}
+            promptRenameTerminal={props.promptRenameTerminal}
           />
         )}
         </div>

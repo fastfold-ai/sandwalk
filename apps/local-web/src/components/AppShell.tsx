@@ -104,6 +104,7 @@ export function AppShell(props: AppShellProps) {
           setSidebarCollapsed={props.setSidebarCollapsed}
           showSessionTabs={props.showSessionTabs}
           terminals={props.terminals ?? []}
+          promptRenameTerminal={props.onRenameTerminal ?? (() => {})}
           isHome={props.isHome}
           isLibrary={props.isLibrary}
           isSites={props.isSites}

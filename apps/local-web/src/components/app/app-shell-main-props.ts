@@ -70,6 +70,11 @@ export type AppShellMainProps = {
   /** FAS-107 W1: terminales conocidos — se usan para montar los
    *  `TerminalPortalHost` que sobreviven a cambios de layout. */
   terminals: import('@sandwalk/agent-ui-core').TerminalSession[]
+  /** X2 Fix 1 (parte 2): abre el dialog de rename del shell para un
+   *  terminal. Se pasa al `AgentSessionMainPanel` para que el strip
+   *  y otros disparadores locales usen la MISMA vía (dialog), en vez
+   *  de un `window.prompt` duplicado que en Tauri Mac no muestra nada. */
+  promptRenameTerminal: (terminalId: string) => void
   navigate: NavigateFunction
   location: Location
   dashboardSection: DashboardSection
