@@ -252,7 +252,11 @@ export function useAppTabGroups(
       })
       setOpenTabIds(current => {
         const idx = current.indexOf(groupId)
-        if (idx < 0) return [...current, ...nativesInThisScope]
+        // X4.4-hotfix: si el grupo NO estaba en el strip (dissolve
+        // desde el sidebar), NO abrimos sus hijos como tabs sueltos.
+        // Antes se agregaban al final "magicamente" — sorpresa fea.
+        // Sólo re-abrimos cuando el chip del grupo estaba visible.
+        if (idx < 0) return current
         return [
           ...current.slice(0, idx),
           ...nativesInThisScope,

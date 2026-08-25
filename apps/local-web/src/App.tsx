@@ -498,7 +498,7 @@ export default function App() {
     if (!group || !group.isPending) return
     const sourceId = group.chatIds[0]
     tabGroupsStore.dissolveGroup(groupId)
-    if (sourceId) navigate(`/agents/${sourceId}`)
+    if (sourceId) navigate(sessionRoutePath(sourceId))
   }, [route.sessionId, tabGroupsStore, navigate])
 
   /*

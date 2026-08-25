@@ -5,7 +5,7 @@ import {
   writeLastSessionByScope,
   writeRecentProjectIds
 } from '@/lib/app-storage'
-import { DRAFT_AGENT_SESSION_ID } from '@/lib/draft-agent'
+import { DRAFT_AGENT_SESSION_ID, sessionRoutePath } from '@/lib/draft-agent'
 import { useTerminalsStore } from '@/lib/terminals-store'
 
 import type { UseSessionActionsArgs } from './useSessionActionsTypes'
@@ -126,7 +126,13 @@ export function useSessionActionsTabs({
       return
     }
 
-    navigate(`/agents/${neighbor}`)
+    // X4.4-hotfix: usar `sessionRoutePath` para elegir `/terminals/:id`
+    // vs `/agents/:id` según el prefijo del neighbor. Antes se navegaba
+    // siempre a `/agents/${neighbor}` — cuando el neighbor era un
+    // terminal, la ruta era inválida (X3 Fase 6a bloquea `term_*` en
+    // `/agents/`) → el active nunca cambiaba al vecino y el terminal
+    // parecía "no cerrarse" del strip.
+    navigate(sessionRoutePath(neighbor))
   }
 
   const closeOtherSessionTabs = (keepId: string) => {
@@ -150,7 +156,7 @@ export function useSessionActionsTabs({
           pinnedChatIds.has(id)
       )
     )
-    if (activeTabId !== keepId) navigate(`/agents/${keepId}`)
+    if (activeTabId !== keepId) navigate(sessionRoutePath(keepId))
   }
 
   const reorderSessionTabs = (orderedIds: string[]) => {
