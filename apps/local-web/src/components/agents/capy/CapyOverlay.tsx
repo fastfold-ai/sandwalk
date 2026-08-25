@@ -67,7 +67,7 @@ export function CapyOverlay({
 }) {
   const { state, persist } = useCapyWindow()
   const enabled = Boolean(health)
-  const capy = useCapySession({ client, health, enabled })
+  const capy = useCapySession({ client, enabled })
   const [unreadCount, setUnreadCount] = useState(0)
   const [dropActive, setDropActive] = useState(false)
   const wasRunning = useRef(false)

@@ -1,9 +1,10 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { AgentSession } from '@sandwalk/agent-ui-core'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { ChatTranscript } from '@/components/agents/ChatTranscript'
 import { buildConversationTimeline } from '@/components/agents/transcript'
+import { useChatScroll } from '@/hooks/useChatScroll'
 import type { SessionChatState } from '@/lib/sessions'
 
 export function CapyChat({
@@ -23,8 +24,6 @@ export function CapyChat({
   ) => void
   onStop: () => void
 }) {
-  const chatScrollRef = useRef<HTMLDivElement | null>(null)
-  const chatEndRef = useRef<HTMLDivElement | null>(null)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
 
   const conversationTimeline = useMemo(
@@ -55,10 +54,17 @@ export function CapyChat({
     [chat.activeRunId, chat.tools]
   )
 
+  const scroll = useChatScroll({
+    sessionId: session?.id ?? 'capy',
+    messagesLoaded: chat.messagesLoaded,
+    messagesLength: chat.messages.length,
+    conversationTimelineLength: conversationTimeline.length
+  })
+
   return (
     <ChatTranscript
-      chatScrollRef={chatScrollRef}
-      chatEndRef={chatEndRef}
+      chatScrollRef={scroll.chatScrollRef}
+      chatEndRef={scroll.chatEndRef}
       conversationTimeline={conversationTimeline}
       expandedToolRunKeys={chat.expandedToolRunKeys}
       sessionId={session?.id ?? null}
@@ -87,8 +93,8 @@ export function CapyChat({
         chat.activeRunId ? chat.todosByRunId[chat.activeRunId] || [] : []
       }
       liveDelta={chat.liveDelta}
-      showScrollToBottom={false}
-      onScrollToBottom={() => undefined}
+      showScrollToBottom={scroll.showScrollToBottom}
+      onScrollToBottom={scroll.scrollChatToBottom}
       mentionChats={chats}
     />
   )

@@ -59,3 +59,8 @@ def test_static_ui_serves_spa_and_keeps_api(tmp_path: Path, monkeypatch):
         spa = client.get("/dashboard/skills")
         assert spa.status_code == 200
         assert "Sandwalk UI" in spa.text
+
+        missing_api = client.get("/v1/this-route-is-not-registered")
+        assert missing_api.status_code == 404
+        assert missing_api.headers["content-type"].startswith("application/json")
+        assert "Not Found" in missing_api.json()["detail"]

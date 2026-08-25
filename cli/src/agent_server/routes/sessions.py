@@ -33,6 +33,7 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
     async def list_sessions(
         project_id: str | None = Query(default=None, alias="projectId"),
         ids: str | None = Query(default=None),
+        source: str | None = Query(default=None),
     ) -> SessionList:
         # `?ids=a,b,c` fetches metadata for a specific set (bulk lookup for
         # cross-project split groups). When present it overrides projectId
@@ -42,6 +43,9 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
             return SessionList(
                 data=await asyncio.to_thread(store.list_sessions_by_ids, id_list)
             )
+        if (source or "").strip().lower() == "capy":
+            found = await asyncio.to_thread(store.get_session_by_source, "capy")
+            return SessionList(data=[found] if found else [])
         return SessionList(
             data=await asyncio.to_thread(store.list_sessions, project_id=project_id)
         )

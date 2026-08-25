@@ -99,8 +99,27 @@ const SESSION_COOKIE = 'sandwalk_session'
 
 const sessionTokensByUrl = new Map<string, string>()
 
+const LOCAL_API_BASE = 'http://127.0.0.1:8787'
+const LOCAL_UI_DEV_ORIGIN =
+  /^(https?:\/\/((127\.0\.0\.1|localhost):(1420|5173|8969)|tauri\.localhost)|tauri:)/i
+
 function normalizeClientBaseUrl(url: string): string {
-  return url.replace(/\/+$/, '')
+  const trimmed = url.replace(/\/+$/, '')
+  if (!trimmed || LOCAL_UI_DEV_ORIGIN.test(trimmed)) {
+    return LOCAL_API_BASE
+  }
+  return trimmed
+}
+
+function isHtmlBody(text: string) {
+  return text.trimStart().startsWith('<')
+}
+
+function shouldRetryLocalApi(url: string) {
+  if (url.startsWith(`${LOCAL_API_BASE}/`)) return false
+  if (typeof window === 'undefined') return LOCAL_UI_DEV_ORIGIN.test(url)
+  const port = window.location.port
+  return port === '1420' || port === '8969' || port === '5173'
 }
 
 export function rememberSessionToken(baseUrl: string, token: string) {
@@ -116,6 +135,23 @@ export function clearSessionToken(baseUrl: string) {
 
 export function readSessionToken(baseUrl: string): string | undefined {
   return sessionTokensByUrl.get(normalizeClientBaseUrl(baseUrl))
+}
+
+function parseApiJson<T>(text: string, request: string): T {
+  const trimmed = text.trimStart()
+  if (trimmed.startsWith('<')) {
+    throw new Error(
+      `FastFold Agent API returned a web page instead of JSON [${request}]. Restart the Sandwalk agent.`
+    )
+  }
+  try {
+    return JSON.parse(text) as T
+  } catch (cause) {
+    const hint = cause instanceof Error ? cause.message : 'invalid JSON'
+    throw new Error(
+      `FastFold Agent API returned invalid JSON (${hint}) [${request}]`
+    )
+  }
 }
 
 export type BenchSuiteCard = {
@@ -408,26 +444,33 @@ export class LocalAgentClient
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const url = `${this.baseUrl}/v1${path}`
-    const response = await fetch(url, {
-      ...init,
-      credentials: 'include',
-      headers: this.headers(init.headers)
-    })
+    const headers = this.headers(init.headers)
+    const fetchOnce = (base: string) =>
+      fetch(`${base}/v1${path}`, {
+        ...init,
+        credentials: 'include',
+        headers
+      })
+    const firstUrl = `${this.baseUrl}/v1${path}`
+    let url = firstUrl
+    let response = await fetchOnce(this.baseUrl)
+    let text = response.status === 204 ? '' : await response.text()
+    if (isHtmlBody(text) && shouldRetryLocalApi(url)) {
+      url = `${LOCAL_API_BASE}/v1${path}`
+      response = await fetchOnce(LOCAL_API_BASE)
+      text = response.status === 204 ? '' : await response.text()
+    }
     if (!response.ok) {
-      const detail = await response.text()
       throw new Error(
         `FastFold Agent API ${response.status}: ${
-          detail || response.statusText
+          text || response.statusText
         } [${init.method || 'GET'} ${url}]`
       )
     }
-    if (response.status === 204) {
+    if (response.status === 204 || !text) {
       return undefined as T
     }
-    const text = await response.text()
-    if (!text) return undefined as T
-    return JSON.parse(text) as T
+    return parseApiJson<T>(text, `${init.method || 'GET'} ${url}`)
   }
 
   private normalizeValidateMcp(
@@ -861,8 +904,25 @@ export class LocalAgentClient
     return result.revision
   }
 
+  getSession(sessionId: string, signal?: AbortSignal): Promise<AgentSession> {
+    return this.request<AgentSession>(
+      `/sessions/${encodeURIComponent(sessionId)}`,
+      { signal }
+    )
+  }
+
   async getCapySession(signal?: AbortSignal): Promise<AgentSession> {
-    return this.request<AgentSession>('/capy/session', { signal })
+    try {
+      return await this.request<AgentSession>('/capy/session', { signal })
+    } catch (cause) {
+      const listed = await this.request<{ data: AgentSession[] }>(
+        '/sessions?source=capy',
+        { signal }
+      )
+      const found = listed.data.find(item => item.source === 'capy')
+      if (found) return found
+      throw cause
+    }
   }
 
   async resetCapySession(signal?: AbortSignal): Promise<AgentSession> {

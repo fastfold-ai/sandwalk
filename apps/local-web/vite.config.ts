@@ -9,6 +9,13 @@ const pkg = JSON.parse(
 ) as { version?: string }
 
 const tauri = Boolean(process.env.TAURI_ENV_PLATFORM || process.env.TAURI_PLATFORM)
+const apiProxy = {
+  '/v1': {
+    target: process.env.SANDWALK_API_URL || 'http://127.0.0.1:8787',
+    changeOrigin: true,
+    ws: true
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -23,12 +30,15 @@ export default defineConfig({
     host: '127.0.0.1',
     // Menubar Vite uses 8969; Tauri `beforeDevCommand` uses 1420.
     port: Number(process.env.VITE_PORT || (tauri ? 1420 : 8969)),
-    strictPort: true
+    strictPort: true,
+    // Same-origin /v1/* would otherwise return index.html (JSON parse '<').
+    proxy: apiProxy
   },
   preview: {
     host: '127.0.0.1',
     port: 8969,
-    strictPort: true
+    strictPort: true,
+    proxy: apiProxy
   },
   envPrefix: ['VITE_', 'TAURI_'],
   resolve: {

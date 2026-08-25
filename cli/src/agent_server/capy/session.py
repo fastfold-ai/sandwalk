@@ -7,9 +7,9 @@ from agent_server.models import AgentSession
 
 
 def get_or_create_capy_session(store, service) -> AgentSession:
-    for session in store.list_sessions(include_hidden=True):
-        if is_capy_session(session):
-            return session
+    existing = store.get_session_by_source(CAPY_SOURCE)
+    if existing is not None and is_capy_session(existing):
+        return existing
     return service.create_session(
         title=CAPY_TITLE,
         workspace_path=None,
