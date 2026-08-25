@@ -68,6 +68,7 @@ export function AppShell(props: AppShellProps) {
           onRenameTabGroup={props.onRenameTabGroup}
           onGoToChatProject={props.onGoToChatProject}
           onDissolveTabGroup={props.dissolveTabGroup}
+          onCloseTabGroup={props.closeTabGroup}
           onSetTabGroupColor={props.setTabGroupColor}
           onSetTabGroupPinned={props.setTabGroupPinned}
           activeGroupChildId={props.activeGroup?.activeChatId ?? null}
@@ -280,6 +281,7 @@ export function AppShell(props: AppShellProps) {
           dissolveTabGroup={props.dissolveTabGroup}
           renameTabGroup={props.onRenameTabGroup}
           setTabGroupColor={props.setTabGroupColor}
+          setTabGroupPinned={props.setTabGroupPinned}
           closeTabGroup={props.closeTabGroup}
           selectedChatIds={props.selectedChatIds}
           toggleSelectChat={props.toggleSelectChat}

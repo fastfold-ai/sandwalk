@@ -244,6 +244,8 @@ export type AppShellMainProps = {
   dissolveTabGroup: (groupId: string) => void
   renameTabGroup: (group: SessionGroup) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
+  /** X4.2b: pin/unpin del grupo (asimetría §3.2). */
+  setTabGroupPinned: (groupId: string, pinned: boolean) => void
   closeTabGroup: (groupId: string) => void
   selectedChatIds: Set<string>
   toggleSelectChat: (id: string) => void

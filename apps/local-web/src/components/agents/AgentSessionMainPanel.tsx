@@ -169,6 +169,8 @@ export type AgentSessionMainPanelProps = {
   dissolveTabGroup: (groupId: string) => void
   renameTabGroup: (group: SessionGroup) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
+  /** X4.2b: pin/unpin del grupo. */
+  setTabGroupPinned: (groupId: string, pinned: boolean) => void
   closeTabGroup: (groupId: string) => void
   selectedChatIds: Set<string>
   toggleSelectChat: (id: string) => void
@@ -280,6 +282,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     dissolveTabGroup,
     renameTabGroup,
     setTabGroupColor,
+    setTabGroupPinned,
     closeTabGroup,
     selectedChatIds,
     toggleSelectChat,
@@ -685,6 +688,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         onDissolveGroup={dissolveTabGroup}
         onRenameGroup={renameTabGroup}
         onSetGroupColor={setTabGroupColor}
+        onSetGroupPinned={setTabGroupPinned}
         onCloseGroup={closeTabGroup}
         selectedChatIds={selectedChatIds}
         onToggleSelectChat={toggleSelectChat}

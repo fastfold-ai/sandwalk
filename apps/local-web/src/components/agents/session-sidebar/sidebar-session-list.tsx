@@ -221,6 +221,8 @@ export type SidebarSessionListProps = {
   onSelectTabGroup?: (groupId: string) => void
   onRenameTabGroup?: (group: import('@sandwalk/agent-ui-core').SessionGroup) => void
   onDissolveTabGroup?: (groupId: string) => void
+  /** X4.2b: cerrar el chip del grupo del strip desde el menú del sidebar. */
+  onCloseTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
   onSetTabGroupPinned?: (groupId: string, pinned: boolean) => void
   /**
@@ -285,6 +287,7 @@ export function SidebarSessionList({
   onSelectTabGroup,
   onRenameTabGroup,
   onDissolveTabGroup,
+  onCloseTabGroup,
   onSetTabGroupColor,
   onSetTabGroupPinned,
   activeProjectId,
@@ -443,6 +446,7 @@ export function SidebarSessionList({
                             onSelectGroup={onSelectTabGroup}
                             onRenameGroup={onRenameTabGroup}
                             onDissolveGroup={onDissolveTabGroup}
+                            onCloseGroup={onCloseTabGroup}
                             onSetGroupColor={onSetTabGroupColor}
                             onSetGroupPinned={onSetTabGroupPinned}
                             activeProjectId={activeProjectId}
@@ -837,6 +841,7 @@ function SidebarGroupItem({
   onSelectGroup,
   onRenameGroup,
   onDissolveGroup,
+  onCloseGroup,
   onSelectChat,
   onSelectTerminal,
   onCloseTerminal,
@@ -866,6 +871,9 @@ function SidebarGroupItem({
   onSelectGroup?: (groupId: string) => void
   onRenameGroup?: (group: import('@sandwalk/agent-ui-core').SessionGroup) => void
   onDissolveGroup?: (groupId: string) => void
+  /** X4.2b: cerrar el chip del grupo del strip (asimetría §3.2). El
+   *  grupo sigue existiendo, solo desaparece del strip. */
+  onCloseGroup?: (groupId: string) => void
   onSelectChat: (chatId: string) => void
   /** FAS-107: click a terminal child of the split → open its solo route. */
   onSelectTerminal: (terminalId: string) => void
@@ -1056,8 +1064,20 @@ function SidebarGroupItem({
                 />
               </div>
             ) : null}
-            {onSetGroupColor && onDissolveGroup ? (
+            {(onSetGroupColor || onDissolveGroup || onCloseGroup) ? (
               <div className="border-border/60 my-1 border-t" />
+            ) : null}
+            {onCloseGroup ? (
+              <button
+                type="button"
+                className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onCloseGroup(group.id)
+                }}
+              >
+                Close tab
+              </button>
             ) : null}
             {onDissolveGroup ? (
               <button

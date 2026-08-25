@@ -113,6 +113,7 @@ export function SessionTabs({
   onDissolveGroup,
   onRenameGroup,
   onSetGroupColor,
+  onSetGroupPinned,
   onCloseGroup,
   selectedChatIds,
   onToggleSelectChat,
@@ -157,6 +158,12 @@ export function SessionTabs({
   onDissolveGroup?: (groupId: string) => void
   onRenameGroup?: (group: SessionGroup) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
+  /**
+   * FAS-107 X4.2b: pin/unpin del grupo. Antes el store tenía la acción
+   * (`useAppTabGroups.setGroupPinned`) pero ninguna superficie la
+   * exponía — asimetría §3.2 con chats y terminales.
+   */
+  onSetGroupPinned?: (groupId: string, pinned: boolean) => void
   onCloseGroup?: (groupId: string) => void
   selectedChatIds?: Set<string>
   onToggleSelectChat?: (id: string) => void
@@ -1024,9 +1031,18 @@ export function SessionTabs({
                 label="Rename…"
                 onClick={() => runAction(() => onRenameGroup(menuGroup))}
               />
-              <TabContextSeparator />
             </>
           ) : null}
+          {onSetGroupPinned ? (
+            <TabContextItem
+              icon={<Pin className="size-3.5" />}
+              label={menuGroup.pinned ? 'Unpin' : 'Pin'}
+              onClick={() =>
+                runAction(() => onSetGroupPinned(menuGroup.id, !menuGroup.pinned))
+              }
+            />
+          ) : null}
+          {onRenameGroup || onSetGroupPinned ? <TabContextSeparator /> : null}
           {onSetGroupColor ? (
             <>
               <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
