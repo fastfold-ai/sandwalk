@@ -22,6 +22,13 @@ import { createContext, useContext, useMemo, useRef, useState } from 'react'
 export type PlaceholderEntry = {
   node: HTMLDivElement
   onFocus: () => void
+  /**
+   * FAS-107 X4.2: contextmenu del xterm. El `TerminalPortalHost` lo
+   * llama cuando el user hace click derecho sobre el layer flotante,
+   * para reenviar el evento al ancestor React del pane (que vive en
+   * otro árbol React que el portal).
+   */
+  onContextMenu?: (event: MouseEvent) => void
 }
 
 export type TerminalLayerRegistry = {

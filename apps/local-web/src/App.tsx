@@ -35,6 +35,7 @@ import { notifyMissedCompletions } from '@/lib/browser-notifications'
 import { applyCapyOpenSplit } from '@/lib/capy-ui'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
+import { useTerminalsStore } from '@/lib/terminals-store'
 import { recoverUnreadFromSessions } from '@/lib/session-attention'
 import { visibleSessionIds } from '@/lib/sessions'
 
@@ -109,6 +110,11 @@ export default function App() {
       if (!bootstrap.client) return
       const cleaned = nextTitle.trim()
       if (!cleaned) return
+      // FAS-107 X4.2: patch optimista al store singleton para
+      // actualización instantánea del UI. Antes esperábamos el
+      // round-trip del backend + un refresh (~400ms de lag visible).
+      // El refresh queda como reconciliación de fondo.
+      useTerminalsStore.getState().patch(terminalId, { title: cleaned })
       try {
         await bootstrap.client.updateTerminal(terminalId, { title: cleaned })
         terminalsLive.refresh()

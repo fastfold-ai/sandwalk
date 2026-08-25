@@ -16,22 +16,39 @@ import {
 import { useTerminalLayer } from './terminal-layer-registry'
 
 /**
- * FAS-107 W1: renderea el xterm de UN terminal en el layer flotante.
+ * FAS-107 X4.2 · Terminal portal host reescrito con ciclo de vida
+ * separado — patrón VSCode `_attached`.
  *
- * Este componente vive fuera del árbol de layout (via `createPortal`
- * al `TerminalLayerRoot`). El xterm se monta una única vez y se
- * mantiene mientras exista el terminal — no se destruye cuando el
- * usuario cambia de tab / split / vista.
+ * Cambios arquitectónicos vs X3:
  *
- * Sincronización con el `TerminalPlaceholder`:
- *   - Consulta el registry para saber si hay un placeholder para
- *     este `terminalId`.
- *   - Si lo hay: calcula `getBoundingClientRect()` del placeholder y
- *     aplica `position: fixed; top/left/width/height` para calzar.
- *   - Si no lo hay: `display: none`.
- *   - `ResizeObserver` sobre el placeholder + listener de scroll +
- *     resize de window para re-posicionar en cada cambio, debounced
- *     con `requestAnimationFrame`.
+ * Antes: un solo `useEffect` con dep `[hostNode]` creaba el xterm y
+ * también hacía cleanup con `term.dispose()`. Cada vez que el hostNode
+ * cambiaba (por re-render del portal, cambio de layerRoot), el cleanup
+ * destruía el xterm y el buffer se perdía.
+ *
+ * Ahora dos efectos con responsabilidades separadas:
+ *
+ * 1. `useEffect(..., [])` (deps vacías) — se ejecuta UNA sola vez al
+ *    mount del componente. Crea el xterm, la conexión WS, los
+ *    listeners globales (resize, scroll, visibility, theme). Cleanup
+ *    solo en unmount real (cuando el terminal se elimina del store
+ *    Zustand — decisión explícita del user, no cambio de tab).
+ *
+ * 2. `useEffect(..., [hostNode])` — attach del xterm al div del portal.
+ *    Primera vez: `term.open(hostNode)`. Siguientes: `hostNode.appendChild(term.element)`.
+ *    Sin dispose en cleanup — el xterm sobrevive al cambio de host.
+ *
+ * Este es el patrón oficial de xterm.js (issues #4978, #1323): `open()`
+ * una sola vez, el buffer vive en `term.element`, moverlo lo preserva.
+ *
+ * Cubre además:
+ * - Reconexión WS con backoff exponencial (Fix 3 de Capa 1).
+ * - `document.visibilitychange` verifica el WS al volver de background
+ *   (Fix 4 de Capa 1).
+ * - Guard duro del `fit.proposeDimensions` cuando devuelve dimensiones
+ *   inválidas (Fix 5 de Capa 1).
+ * - Propagación del `contextmenu` al placeholder via registry
+ *   (X3 Fase 5 reintroducida como responsabilidad interna).
  */
 
 type PtyInfo = {
@@ -39,6 +56,13 @@ type PtyInfo = {
   session_id: string
   title: string
 }
+
+/** Cap del backoff en ms. Después de este techo se mantiene constante. */
+const RECONNECT_CAP_MS = 30_000
+/** Base del backoff en ms. Primer retry ~500ms. */
+const RECONNECT_BASE_MS = 500
+/** Máximo de intentos antes de dejar la conexión "muerta" sin reintentar. */
+const RECONNECT_MAX_ATTEMPTS = 12
 
 export function TerminalPortalHost({
   client,
@@ -50,11 +74,6 @@ export function TerminalPortalHost({
   const registry = useTerminalLayer()
   const layerRoot = registry.getLayerRoot()
 
-  // W3: el host DIV se guarda como state (no useRef) para que el
-  // `useEffect` que monta el xterm pueda depender del nodo real y
-  // re-ejecutarse cuando el div aparezca (segundo tick, después de
-  // que llegó el layerRoot). Antes tenía deps [] y corría con host=null
-  // → el xterm nunca se montaba.
   const [hostNode, setHostNode] = useState<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   hostRef.current = hostNode
@@ -62,16 +81,16 @@ export function TerminalPortalHost({
   const fitRef = useRef<FitAddon | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
   const ptyRef = useRef<PtyInfo | null>(null)
+  const attachedRef = useRef(false)
   const lastDimsRef = useRef<{ cols: number; rows: number }>({
     cols: -1,
     rows: -1
   })
-  // `layerVersion` fuerza un re-render cuando el placeholder cambia.
-  // Solo lo usamos para gatillar reconciliación (React ejecuta de nuevo
-  // el `createPortal` con el layerRoot fresco).
   const [, setLayerVersion] = useState(0)
 
-  // Suscribirse a cambios del placeholder: muestra/oculta y re-posiciona.
+  // Suscripción al registry: cuando el placeholder cambia
+  // (registrado/desregistrado), forzamos re-render para que el portal
+  // se re-renderee con el layerRoot fresco y disparamos re-posicionamiento.
   useEffect(() => {
     const listener = () => {
       setLayerVersion(v => v + 1)
@@ -79,12 +98,10 @@ export function TerminalPortalHost({
     }
     const unsub = registry.subscribe(terminalId, listener)
     return unsub
-    // schedulePosition se declara abajo — la ref indirecta funciona
-    // porque el listener se resuelve en tiempo de invocación.
+    // schedulePosition se resuelve en tiempo de invocación.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registry, terminalId])
 
-  // Posicionamiento debounced con rAF.
   const rafRef = useRef<number | null>(null)
   const schedulePosition = () => {
     if (rafRef.current != null) return
@@ -114,40 +131,38 @@ export function TerminalPortalHost({
     host.style.width = `${rect.width}px`
     host.style.height = `${rect.height}px`
     host.style.pointerEvents = 'auto'
-    // Refit xterm al nuevo tamaño y notificar al PTY.
     const fit = fitRef.current
     const term = termRef.current
     if (!fit || !term) return
     try {
       const dims = fit.proposeDimensions()
-      if (dims && dims.cols >= 10 && dims.rows >= 3) {
-        term.resize(dims.cols, dims.rows)
-        if (
-          (dims.cols !== lastDimsRef.current.cols ||
-            dims.rows !== lastDimsRef.current.rows) &&
-          socketRef.current?.readyState === WebSocket.OPEN &&
-          ptyRef.current
-        ) {
-          lastDimsRef.current = { cols: dims.cols, rows: dims.rows }
-          void client.updatePtySession(terminalId, ptyRef.current.id, {
-            cols: dims.cols,
-            rows: dims.rows
-          })
-        }
+      // Guard duro: fit puede devolver dimensiones degeneradas durante
+      // transiciones de layout. Si es el caso, no propagamos al PTY.
+      if (!dims || dims.cols < 10 || dims.rows < 3) return
+      term.resize(dims.cols, dims.rows)
+      if (
+        (dims.cols !== lastDimsRef.current.cols ||
+          dims.rows !== lastDimsRef.current.rows) &&
+        socketRef.current?.readyState === WebSocket.OPEN &&
+        ptyRef.current
+      ) {
+        lastDimsRef.current = { cols: dims.cols, rows: dims.rows }
+        void client.updatePtySession(terminalId, ptyRef.current.id, {
+          cols: dims.cols,
+          rows: dims.rows
+        })
       }
     } catch {
       // ignore — cualquier miscálculo del fit se corrige en el siguiente frame
     }
   }
 
-  // W3: montar xterm cuando el `hostNode` esté disponible. Antes esto
-  // dependía de `[]` y corría en el primer commit, momento en el que
-  // `layerRoot` aún era null → el portal no rendereaba el div → el
-  // host estaba en null → xterm nunca se montaba. Ahora depende del
-  // nodo real, que puede aparecer en el segundo tick.
+  // Effect 1 · Crear xterm + WS + listeners globales. Corre UNA vez al
+  // mount del componente. El componente solo se desmonta cuando el
+  // terminal deja de existir en el store Zustand (por acción explícita
+  // del usuario). Cambios de tab/split/vista NO desmontan este efecto.
   useEffect(() => {
-    const host = hostNode
-    if (!host || termRef.current) return
+    if (termRef.current) return
 
     const term = new XTerm({
       cursorBlink: true,
@@ -158,8 +173,6 @@ export function TerminalPortalHost({
       fontFamily:
         '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
       theme: buildTerminalTheme(isDocumentDark()),
-      // El PTY ya emite CRLF — no convertir localmente para evitar
-      // el bug de "un caracter por línea" que veníamos peleando.
       convertEol: false,
       allowTransparency: false,
       scrollback: 5000,
@@ -167,16 +180,13 @@ export function TerminalPortalHost({
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
-    term.open(host)
     termRef.current = term
     fitRef.current = fit
 
-    // Reflejo de theme dark/light.
     const stopThemeWatch = watchTerminalTheme(() => {
       term.options.theme = buildTerminalTheme(isDocumentDark())
     })
 
-    // Enviar keystrokes al backend via WS.
     term.onData(data => {
       if (socketRef.current?.readyState === WebSocket.OPEN) {
         socketRef.current.send(data)
@@ -203,22 +213,29 @@ export function TerminalPortalHost({
       }
     })
 
-    // Crear/reusar PTY del backend.
+    // ---- Conexión WS con reconexión automática ----
     let cancelled = false
-    ;(async () => {
+    let reconnectAttempts = 0
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+    const connectWebSocket = async () => {
+      if (cancelled) return
       try {
-        const existing = await client.listPtySessions(terminalId)
-        if (cancelled) return
-        const info =
-          existing[0] ??
-          (await client.createPtySession(terminalId))
-        if (cancelled) return
-        ptyRef.current = info as PtyInfo
+        if (!ptyRef.current) {
+          const existing = await client.listPtySessions(terminalId)
+          if (cancelled) return
+          const info = existing[0] ?? (await client.createPtySession(terminalId))
+          if (cancelled) return
+          ptyRef.current = info as PtyInfo
+        }
+        const info = ptyRef.current
         const ws = new WebSocket(client.ptyConnectUrl(terminalId, info.id))
         ws.binaryType = 'arraybuffer'
         socketRef.current = ws
+
         ws.onopen = () => {
           if (cancelled) return
+          reconnectAttempts = 0
           try {
             const dims = fit.proposeDimensions()
             if (dims && dims.cols >= 10 && dims.rows >= 3) {
@@ -233,6 +250,7 @@ export function TerminalPortalHost({
             // ignore fit failure
           }
         }
+
         ws.onmessage = event => {
           if (typeof event.data === 'string') {
             term.write(event.data)
@@ -245,29 +263,44 @@ export function TerminalPortalHost({
             markTerminalActivity(terminalId)
           }
         }
+
         ws.onclose = () => {
           if (cancelled) return
-          term.writeln('\r\n\x1b[90m[terminal disconnected]\x1b[0m')
+          if (reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
+            term.writeln(
+              '\r\n\x1b[90m[terminal disconnected — max reconnect attempts reached]\x1b[0m'
+            )
+            return
+          }
+          const delay = Math.min(
+            RECONNECT_BASE_MS * 2 ** reconnectAttempts +
+              Math.floor(Math.random() * 200),
+            RECONNECT_CAP_MS
+          )
+          reconnectAttempts += 1
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null
+            void connectWebSocket()
+          }, delay)
+        }
+
+        ws.onerror = () => {
+          // El WS cerrará solo y disparará onclose → reconexión con backoff.
         }
       } catch (err) {
         if (!cancelled) {
-          console.error('TerminalPortalHost boot failed', err)
+          console.error('TerminalPortalHost connect failed', err)
         }
       }
-    })()
+    }
 
-    // Reposicionamiento en window resize + scroll.
+    void connectWebSocket()
+
+    // ---- Listeners de posicionamiento ----
     const onWindow = () => schedulePosition()
     window.addEventListener('resize', onWindow)
     window.addEventListener('scroll', onWindow, { capture: true })
 
-    // FAS-107 X3 Fase 7: un solo `ResizeObserver` por sesión. Antes se
-    // hacía `observer.disconnect()` + `registerObserver()` en cada
-    // notify del registry — sin razón real (el observer sigue apuntando
-    // al mismo nodo si el placeholder no cambió). Ese ciclo dejaba
-    // ventanas cortas sin observer activo, y cuando el user
-    // redimensionaba el split justo en ese frame, el xterm quedaba
-    // desalineado hasta el próximo scroll/resize de window.
     const observer = new ResizeObserver(() => schedulePosition())
     let observedNode: HTMLDivElement | null = null
     const syncObserverTarget = () => {
@@ -284,24 +317,40 @@ export function TerminalPortalHost({
       schedulePosition()
     })
 
-    // Foco: cuando el user clickea el host, avisar al placeholder para
-    // que el split actualice su activeChatId.
-    const onMouseDown = () => {
-      const entry = registry.getPlaceholder(terminalId)
-      entry?.onFocus()
+    // ---- Visibility change: verificar WS al volver del background ----
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      const ws = socketRef.current
+      // Si el WS está cerrado o cerrando, disparar reconexión inmediata
+      // (sin esperar al backoff pendiente).
+      if (
+        !ws ||
+        ws.readyState === WebSocket.CLOSED ||
+        ws.readyState === WebSocket.CLOSING
+      ) {
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer)
+          reconnectTimer = null
+        }
+        reconnectAttempts = 0
+        void connectWebSocket()
+      }
+      schedulePosition()
     }
-    host.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('visibilitychange', onVisibilityChange)
 
-    // Posición inicial.
-    schedulePosition()
-
+    // Cleanup en unmount real (el terminal se eliminó del store).
     return () => {
       cancelled = true
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
       unsubObserver()
       observer.disconnect()
       window.removeEventListener('resize', onWindow)
       window.removeEventListener('scroll', onWindow, { capture: true })
-      host.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       stopThemeWatch()
       if (rafRef.current != null) {
         window.cancelAnimationFrame(rafRef.current)
@@ -321,11 +370,53 @@ export function TerminalPortalHost({
       fitRef.current = null
       socketRef.current = null
       ptyRef.current = null
+      attachedRef.current = false
     }
-    // Deps: [hostNode] — el effect corre cuando el div del portal
-    // aparece por primera vez (después de que layerRoot llegó). Los
-    // otros valores (client, terminalId, registry) son estables por
-    // instancia — no hace falta re-crear el xterm si cambian.
+    // Deps vacías: el efecto corre una sola vez al mount del componente.
+    // client, terminalId, registry son estables por instancia. El
+    // hostNode NO debe estar aquí — su cambio no debe destruir el xterm.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Effect 2 · Attach del xterm al hostNode. Patrón VSCode `_attached`:
+  // primera vez `term.open()`, siguientes `appendChild`. Nunca dispose.
+  useEffect(() => {
+    const host = hostNode
+    const term = termRef.current
+    if (!host || !term) return
+
+    if (!attachedRef.current) {
+      term.open(host)
+      attachedRef.current = true
+    } else if (term.element && term.element.parentElement !== host) {
+      // Reparent: el buffer vive en term.element; moverlo lo preserva.
+      host.appendChild(term.element)
+    }
+
+    // Reposicionamiento inicial post-attach.
+    schedulePosition()
+
+    // ---- Foco + contextmenu del layer ----
+    const onMouseDown = () => {
+      const entry = registry.getPlaceholder(terminalId)
+      entry?.onFocus()
+    }
+    const onContextMenu = (event: MouseEvent) => {
+      const entry = registry.getPlaceholder(terminalId)
+      if (entry?.onContextMenu) {
+        event.preventDefault()
+        event.stopPropagation()
+        entry.onContextMenu(event)
+      }
+    }
+    host.addEventListener('mousedown', onMouseDown)
+    host.addEventListener('contextmenu', onContextMenu)
+
+    return () => {
+      host.removeEventListener('mousedown', onMouseDown)
+      host.removeEventListener('contextmenu', onContextMenu)
+      // NO dispose del xterm. El buffer sobrevive al cambio de host.
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hostNode])
 
@@ -335,7 +426,6 @@ export function TerminalPortalHost({
     <div
       ref={setHostNode}
       data-terminal-portal-host={terminalId}
-      // Oculto por default hasta que applyPosition corra la primera vez.
       style={{ display: 'none' }}
     />,
     layerRoot

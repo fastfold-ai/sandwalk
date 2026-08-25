@@ -74,9 +74,9 @@ export function TerminalLeaf({
   const terminal = terminals.find(t => t.id === terminalId) ?? null
 
   const onContextMenu = useCallback(
-    (event: MouseEvent) => {
+    (event: MouseEvent | globalThis.MouseEvent) => {
       event.preventDefault()
-      event.stopPropagation()
+      if ('stopPropagation' in event) event.stopPropagation()
       const handlers: PaneContextMenuHandlers = {
         onSplitLeft: () => onSplit(terminalId, 'horizontal', 'before'),
         onSplitRight: () => onSplit(terminalId, 'horizontal', 'after'),
@@ -139,6 +139,7 @@ export function TerminalLeaf({
         <TerminalPlaceholder
           terminalId={terminalId}
           onFocus={focusPanel}
+          onContextMenu={onContextMenu}
         />
       </div>
     </div>
