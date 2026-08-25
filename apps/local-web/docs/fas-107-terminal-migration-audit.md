@@ -341,7 +341,104 @@ Cada fase termina con:
 
 ---
 
-## 8 · Fuentes
+## 8 · Persistencia y solidez del terminal (segundo bloque de trabajo)
+
+Después de aplicar X3 (barrido cross-superficie), el usuario reportó cuatro síntomas nuevos que están fuera del alcance del barrido y forman un bloque de trabajo aparte. Este bloque se divide en **dos capas** independientes que se pueden ejecutar por separado.
+
+### 8.1 · Síntomas reportados
+
+1. **Buffer del terminal desaparece al navegar entre tabs.** El "cuaderno" del xterm (comandos + output visibles) se pierde cuando el usuario cambia de tab. Al volver, el terminal aparece vacío.
+2. **El rename del terminal no se refleja de inmediato.** Después de renombrar, el título viejo persiste hasta que el `refresh()` del backend completa.
+3. **El botón X del chip del terminal en el strip no cierra el terminal.** Reportado en runtime, no reproducido todavía en dev.
+4. **Después de un rato largo, el buffer se muestra "cortado".** Solo se ve un trozo del output, la vista queda truncada de forma inesperada.
+
+### 8.2 · Causas raíz identificadas
+
+**Síntoma 1 (buffer desaparece):**
+El `useEffect` del `TerminalPortalHost` (`terminal-layer/TerminalPortalHost.tsx:148`) depende de `[hostNode]`. Su cleanup llama `term.dispose()`. Cuando el `hostNode` cambia (por re-render del portal, cambio transitorio de `layerRoot` a null, o remount del div), el cleanup destruye el xterm y el buffer se pierde.
+
+Patrón confirmado en el research (§4.1): VSCode usa `Terminal.open()` una sola vez y luego `newContainer.appendChild(term.element)` para mover el buffer sin destruir. Nuestro código actual dispose+recrea.
+
+**Síntoma 2 (rename lento):**
+`handleRenameTerminal` (`App.tsx`) hace `await client.updateTerminal(...)` seguido de `refresh()`. Ambos son round-trips al backend. No hay patch optimista al store singleton, así que el UI muestra el nombre viejo durante ~400ms.
+
+**Síntoma 3 (X del tab):**
+Cadena de props verificada correcta. Requiere reproducción en runtime para confirmar el fallo.
+
+**Síntoma 4 (buffer cortado):**
+Sospecha: `fit.proposeDimensions()` devuelve un tamaño degenerado en algún tick, o el `ResizeObserver` recibe un rect con dimensiones inválidas y el reflow trunca el buffer. Requiere reproducción con condiciones específicas (rato largo, background/foreground, resize).
+
+### 8.3 · Capa 1 · Funcionamiento básico "mientras la app está abierta"
+
+Cubre los síntomas 1, 2 y parte del 4. El norte es: **mientras Sandwalk esté abierto (foreground o background), el terminal se comporta como Warp — navegar, minimizar, cambiar de app y volver funciona sin perder nada.**
+
+**Fix 1 · No destruir el xterm al navegar.**
+Separar el `useEffect` del `TerminalPortalHost` en dos:
+- Uno con deps `[]` que crea el xterm + WebSocket una sola vez y solo hace `dispose()` cuando el componente se desmonta de verdad (el terminal fue eliminado del store).
+- Otro con deps `[hostNode]` que hace `term.open(hostNode)` la primera vez y `newHost.appendChild(term.element)` las siguientes. Patrón VSCode `_attached`.
+
+**Fix 2 · Rename optimista.**
+Después del `await client.updateTerminal(...)`, llamar `patchTerminal(id, { title })` al store. El UI se actualiza sin esperar al refresh.
+
+**Fix 3 · Reconexión automática de la conexión backend↔frontend.**
+El WebSocket local puede caerse por timeout después de mucho tiempo con la app en background. Detectar `ws.onclose` y reintentar cada 2 segundos con backoff. Al reconectar, seguir escribiendo al mismo xterm (buffer preservado).
+
+**Fix 4 · Detectar visibility change.**
+Cuando Sandwalk vuelve del background (Page Visibility API `document.visibilitychange` → visible), verificar que el WebSocket esté conectado. Si no lo está, forzar reconexión.
+
+**Fix 5 · Sanidad del `fit.proposeDimensions()`.**
+Cuando devuelve un tamaño con `cols < 10` o `rows < 3`, no propagar al PTY. Esperar al siguiente frame. Log para diagnóstico si persiste. Cubre el síntoma 4 parcialmente.
+
+**Fix 6 · Diagnóstico del síntoma 3.**
+Agregar un log temporal en el chip X del strip y en `handleDeleteTerminalGlobal` para confirmar si el handler dispara. Si dispara pero no borra, es un bug del optimistic remove; si no dispara, es la cadena de props.
+
+**Alcance:** este es el bloque que arregla los bugs que hoy molestan a diario. Debe ir primero.
+
+### 8.4 · Capa 2 · Persistir al cerrar y reabrir (paridad con Warp)
+
+Cubre el caso "cerrar Sandwalk con Cmd+Q y reabrir mantiene el output visible de los terminales".
+
+**Investigación clave (§8.5):** Warp NO mantiene los procesos vivos al cerrar. Los shells mueren. Antes de cerrar, Warp guarda el "cuaderno" (buffer serializado) a disco en SQLite. Al reabrir, dibuja el cuaderno en un xterm nuevo con un shell nuevo. Es "serialize-and-replay", no un daemon vivo.
+
+VSCode hace lo mismo con `terminal.integrated.enablePersistentSessions` (feature "Process Revive"). Único approach que sí mantiene procesos vivos es tmux o Wave Terminal (daemon separado del GUI). Ambos requieren rediseño mayor.
+
+**Plan para Sandwalk (equivalente Warp):**
+
+**Paso 1 · Al cerrar Sandwalk (`RunEvent::ExitRequested` en Rust)**, antes de matar el backend Python:
+- Para cada terminal activo, serializar el buffer del xterm con `SerializeAddon` de xterm.js.
+- Guardar cada snapshot en disco (JSON o binario) en `~/Library/Application Support/<bundle-id>/terminals/<terminalId>.snapshot`.
+- Registrar cwd, env vars conocidos (opt-in) y último comando (opcional, para posible "replay" futuro).
+
+**Paso 2 · Al reabrir Sandwalk:**
+- Cuando el `TerminalPortalHost` monta el xterm para un `terminalId` que tiene snapshot, leer el archivo y hacer `term.write(snapshotString)` antes de conectar el WebSocket.
+- El PTY arranca nuevo, vacío, listo para el próximo comando. El buffer viejo se ve intacto.
+
+**Trade-offs:**
+- Pro: paridad visual con Warp. El usuario no siente que "perdió" nada al cerrar.
+- Contra: los comandos long-running (`npm start`, `docker run`) no siguen corriendo. Igual que Warp.
+- Costo: espacio en disco por terminal (unos MB con `scrollback: 5000`).
+- Complejidad principal: coreografía del `ExitRequested` (guardar antes de matar).
+
+**Alcance:** este bloque toca backend Python + integración Tauri Rust. Es un PR aparte. **NO se planifica todavía.** Se retoma cuando Capa 1 esté cerrada y el usuario confirme que el funcionamiento básico está sólido.
+
+### 8.5 · Referentes de persistencia terminal (research)
+
+| App | Restaura output al reabrir | Mantiene procesos vivos | Cómo lo hace |
+|---|---|---|---|
+| **Warp** | Sí (automático) | No | SQLite en disco, dibuja snapshot al reabrir con shell nuevo |
+| **iTerm2** | Sí (opt-in) | No | Buffer a disco en clean quit. Con integración tmux sí mantiene procesos |
+| **VSCode** | Sí (`enablePersistentSessions`) | No (Process Revive) | Serializa buffer + relanza shell |
+| **Hyper** | No built-in | No | Feature request abierta desde 2018 |
+| **Wave Terminal** | Sí | Sí | Go backend como daemon separado del Electron |
+| **Zed** | No | No | RFC abierto, workaround = tmux |
+
+**Conclusión:** el único approach que mantiene procesos vivos requiere un daemon separado del GUI. En Sandwalk hoy el backend Python vive dentro del proceso Tauri; Cmd+Q los mata a los dos. Cambiar eso implicaría rediseñar el ciclo de vida de la app (instalador, updater, macOS Login Items). Es un proyecto propio, fuera de este documento.
+
+El approach factible es el de Warp/VSCode: serialize-and-replay. Cubre el 80% del beneficio percibido con esfuerzo bajo-medio.
+
+---
+
+## 9 · Fuentes
 
 **Portal terminals y xterm.js:**
 - [React · createPortal](https://react.dev/reference/react-dom/createPortal)
@@ -366,3 +463,13 @@ Cada fase termina con:
 - [Tauri #5500 · prevent_exit loop](https://github.com/tauri-apps/tauri/issues/5500) · [#9198 · ExitRequested macOS](https://github.com/tauri-apps/tauri/issues/9198)
 - [Cursedfunction · Persisting Window State on macOS](https://cursedfunction.io/blog/persisting-tauri-window-state/)
 - [Spacedrive](https://github.com/spacedriveapp/spacedrive) · [Reor](https://github.com/reorproject/reor) (referentes Tauri v2)
+
+**Persistencia terminal (Capa 2, futura):**
+- [Warp · Session Restoration](https://docs.warp.dev/terminal/sessions/session-restoration/) · [Warp #9416 · keep sessions alive](https://github.com/warpdotdev/warp/issues/9416) · [Warp #10583 · replay on restore](https://github.com/warpdotdev/warp/issues/10583)
+- [iTerm2 · Session Restoration](https://iterm2.com/documentation-restoration.html) · [iTerm2 · Why no content](https://iterm2.com/why_no_content.html)
+- [VSCode · Terminal Advanced](https://code.visualstudio.com/docs/terminal/advanced) · [João Moreno · Persistent terminal sessions](https://medium.com/@joaomoreno/persistent-terminal-sessions-in-vs-code-8fc469ed6b41)
+- [xterm.js SerializeAddon (npm)](https://www.npmjs.com/package/@xterm/addon-serialize) · [source](https://github.com/xtermjs/xterm.js/tree/master/addons/addon-serialize) · [#595 · save/restore state](https://github.com/xtermjs/xterm.js/issues/595)
+- [Superset · Persistent Terminal Daemon for Electron](https://superset.sh/blog/terminal-daemon-deep-dive)
+- [Wave Terminal · Block System](https://deepwiki.com/wavetermdev/waveterm/3.2-block-system) · [Block Controllers](https://deepwiki.com/wavetermdev/waveterm/7.1-block-controller)
+- [Zed RFC #50584 · persistent terminal](https://github.com/zed-industries/zed/discussions/50584)
+- [Daniel Cosenza · How terminal multiplexers keep sessions alive](https://danielcosenza.com/posts/sh-terminal-multiplexer-internals/)
