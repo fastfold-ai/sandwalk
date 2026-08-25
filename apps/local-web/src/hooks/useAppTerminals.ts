@@ -1,38 +1,58 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { TerminalSession } from '@sandwalk/agent-ui-core'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useSyncExternalStore } from 'react'
+
+import {
+  addTerminalOptimistic as storeAddOptimistic,
+  getTerminalsSnapshot,
+  removeTerminal as storeRemove,
+  setTerminalsAll,
+  setTerminalsError,
+  setTerminalsLoading,
+  subscribeTerminalsStore
+} from '@/lib/terminals-store'
 
 /**
- * Fetch and cache terminals for a project (FAS-107).
+ * FAS-107 X3 Fase 1 · Fetch + cache de terminales para el scope activo.
  *
- * Peer of the sessions loader — the sidebar and split picker call this
- * to enumerate terminals alongside chats. Refetches on `projectId`
- * change and exposes a manual `refresh()` for post-mutation reloads.
+ * Este hook ya NO mantiene state local — es un wrapper del store
+ * singleton (`terminals-store.ts`). Cualquier consumidor lee la misma
+ * lista, y las mutaciones optimistas se propagan a todo el árbol al
+ * instante.
+ *
+ * Antes teníamos dos instancias de este hook (App.tsx y
+ * AgentSessionMainPanel) con state local independiente → optimistic
+ * insert en una copia no llegaba a la otra → `TerminalHostsProvider`
+ * no montaba xterm para el terminal recién creado.
+ *
+ * API pública sin cambios: `{ terminals, loading, error, refresh,
+ * addOptimistic, removeOptimistic }`. Los consumidores existentes no
+ * necesitan modificaciones.
  */
 export function useAppTerminals(
   client: LocalAgentClient | null,
   projectId: string | null | undefined
 ) {
-  const [terminals, setTerminals] = useState<TerminalSession[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const snapshot = useSyncExternalStore(
+    subscribeTerminalsStore,
+    getTerminalsSnapshot
+  )
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
       if (!client) return
-      setLoading(true)
-      setError(null)
+      setTerminalsLoading(true)
+      setTerminalsError(null)
       try {
         const rows = await client.listTerminals({
           projectId: projectId ?? null,
           signal
         })
-        if (!signal?.aborted) setTerminals(rows)
+        if (!signal?.aborted) setTerminalsAll(rows)
       } catch (err) {
         if (signal?.aborted) return
-        setError((err as Error).message)
+        setTerminalsError((err as Error).message)
       } finally {
-        if (!signal?.aborted) setLoading(false)
+        if (!signal?.aborted) setTerminalsLoading(false)
       }
     },
     [client, projectId]
@@ -48,21 +68,16 @@ export function useAppTerminals(
     void load()
   }, [load])
 
-  /**
-   * Optimistic insert used right after `client.createTerminal(...)` so
-   * the renderer can detect the id as a terminal (and pick TerminalLeaf
-   * instead of ChatLeaf) BEFORE the background `refresh()` fetch lands.
-   */
-  const addOptimistic = useCallback((term: TerminalSession) => {
-    setTerminals(prev => {
-      if (prev.some(t => t.id === term.id)) return prev
-      return [term, ...prev]
-    })
-  }, [])
+  // Wrappers de compat con la API previa. Delegan al store.
+  const addOptimistic = useCallback(storeAddOptimistic, [])
+  const removeOptimistic = useCallback(storeRemove, [])
 
-  const removeOptimistic = useCallback((terminalId: string) => {
-    setTerminals(prev => prev.filter(t => t.id !== terminalId))
-  }, [])
-
-  return { terminals, loading, error, refresh, addOptimistic, removeOptimistic }
+  return {
+    terminals: snapshot.terminals,
+    loading: snapshot.loading,
+    error: snapshot.error,
+    refresh,
+    addOptimistic,
+    removeOptimistic
+  }
 }
