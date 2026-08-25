@@ -35,14 +35,18 @@ export function TabContextMenuShell({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
-    const onScroll = () => onClose()
+    // X4.4-hotfix (bug A/C): antes había un listener de `scroll` con
+    // capture:true que cerraba el menú en cualquier scroll de cualquier
+    // elemento. Cuando el agente hacía streaming, el chat auto-scrollea
+    // para seguir el output → el menú context se cerraba solo cada vez
+    // que el user intentaba abrirlo mientras el agente escribía.
+    // Los menús context estándar no se cierran por scroll de contenido;
+    // se cierran por click fuera o Escape. Suficiente.
     window.addEventListener('click', close, true)
     window.addEventListener('keydown', onKey)
-    window.addEventListener('scroll', onScroll, true)
     return () => {
       window.removeEventListener('click', close, true)
       window.removeEventListener('keydown', onKey)
-      window.removeEventListener('scroll', onScroll, true)
     }
   }, [onClose])
 

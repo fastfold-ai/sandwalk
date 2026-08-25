@@ -391,6 +391,40 @@ export default function App() {
    * `last_message_at`; se limpia solo cuando el chat recibe actividad real
    * que iguala o supera el boost. Ver `lib/chat-date-boost.ts`.
    */
+  /**
+   * FAS-107 X4.4-hotfix (bug D): entrar a un grupo suelta el pin
+   * individual del item. Rationale: al pinear un chat/terminal, el user
+   * pinea ese ítem específico. Al meterlo a un grupo pasa a ser hijo de
+   * otra entidad, y el pin del grupo (si se activa) es lo que ordena.
+   * Mantener el pin viejo genera confusión (aparece pineado dentro del
+   * grupo Y como suelto al disolver).
+   */
+  const unpinItemIfPinned = useCallback(
+    async (id: string) => {
+      if (!bootstrap.client) return
+      try {
+        if (id.startsWith('term_')) {
+          const term = terminalsLive.terminals.find(t => t.id === id)
+          if (term?.organizeLabel !== 'pinned') return
+          await bootstrap.client.updateTerminal(id, { organizeLabel: '' })
+          useTerminalsStore.getState().patch(id, { organizeLabel: null })
+        } else {
+          const chat = bootstrap.sessions.find(s => s.id === id)
+          if (chat?.organizeLabel !== 'pinned') return
+          await bootstrap.client.updateSession(id, { organizeLabel: null })
+          bootstrap.setSessions(current =>
+            current.map(s =>
+              s.id === id ? { ...s, organizeLabel: null } : s
+            )
+          )
+        }
+      } catch (err) {
+        console.error('unpinItemIfPinned failed', err)
+      }
+    },
+    [bootstrap, terminalsLive.terminals]
+  )
+
   const createSplitGroup = useCallback(
     (chatIds: string[]): string | null => {
       const groupId = tabGroupsStore.createGroup(chatIds)
@@ -402,9 +436,11 @@ export default function App() {
           chatIds.includes(s.id) ? { ...s, lastMessageAt: now } : s
         )
       )
+      // X4.4-hotfix bug D: despinar ítems al confirmar el split.
+      for (const id of chatIds) void unpinItemIfPinned(id)
       return groupId
     },
-    [tabGroupsStore, bootstrap]
+    [tabGroupsStore, bootstrap, unpinItemIfPinned]
   )
 
   useEffect(() => {
@@ -487,8 +523,13 @@ export default function App() {
         )
       )
       tabGroupsStore.promotePendingGroup(groupId, partnerId)
+      // X4.4-hotfix bug D: al confirmar el split, despinar ambos ítems.
+      // El sourceId estaba dentro del pending group (efímero, sin
+      // despinar) y ahora se confirma junto con el partner.
+      void unpinItemIfPinned(sourceId)
+      void unpinItemIfPinned(partnerId)
     },
-    [route.sessionId, tabGroupsStore, bootstrap]
+    [route.sessionId, tabGroupsStore, bootstrap, unpinItemIfPinned]
   )
 
   const handleCancelPendingSplit = useCallback(() => {
@@ -620,8 +661,11 @@ export default function App() {
       )
       tabGroupsStore.addToGroup(groupId, chatId)
       tabGroupsStore.setGroupActiveChat(groupId, chatId)
+      // X4.4-hotfix bug D: al agregar un item a un split existente,
+      // despinar el ítem (mismo criterio que crear split).
+      void unpinItemIfPinned(chatId)
     },
-    [route.sessionId, tabGroupsStore, bootstrap]
+    [route.sessionId, tabGroupsStore, bootstrap, unpinItemIfPinned]
   )
 
   /*
