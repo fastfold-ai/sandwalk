@@ -605,10 +605,43 @@ Recomendación: unit + component con Vitest cubren el 80%. E2E se difiere hasta 
 | **X4.0** | Zustand store singleton con selectores atómicos. Migrar `useAppTerminals` como fachada del store nuevo. Flag `useNewImplementation` para strangler fig | ~2 horas | Todo lo demás |
 | **X4.1** | Setup Vitest + RTL + `vitest-websocket-mock` + `@xterm/headless`. Copiar setup de `dannysmith/tauri-template`. Tests base del store (crear, borrar, patch, optimistic) | ~1 día | X4.2 sin regresiones |
 | **X4.2** | `TerminalCore` (tres capas), `TerminalService` con acciones, `<TerminalSession>` con `attachToElement`. Multi-surface con `react-reverse-portal`. `useTerminalActions()` | ~2-3 días | Convivencia sólida |
+| **X4.2b** | `useGroupActions()` como hook único de acciones de grupos. Refactor menús del strip y sidebar para consumirlo. Cierra las 3 asimetrías §3.2 por diseño | ~1 día | Simetría chat/terminal/grupo |
 | **X4.3** | Aplicar los 6 fixes de Capa 1 (replay-then-connect, heartbeat, visibility, guards de fit) como responsabilidades del `TerminalCore` | ~1 día | Comportamiento tipo Warp |
 | **X4.4** (futuro) | Persistir buffer al cerrar/reabrir (Capa 2) usando `SerializeAddon` + `RunEvent::ExitRequested` en Rust | ~2 días | Paridad Warp completa |
 
 **Referente arquitectónico principal a copiar:** Wave Terminal block system (`ViewModel` reactivo por bloque + `globalStore`), sustituyendo Jotai por Zustand. Adaptación 1:1 al patrón de tres capas de VSCode/Windows Terminal.
+
+### 9.9 · X4.2b · `useGroupActions()` — análisis y diseño
+
+Las 3 asimetrías detectadas en §3.2 comparten la **misma causa raíz que motivó el X4** para terminales: prop drilling largo desde `App.tsx` hasta los menús + handlers dispersos + asimetría entre superficies porque cada una recibe una selección distinta de props.
+
+La solución arquitectónica es el paralelo de `useTerminalActions()`: un hook único `useGroupActions()` que expone todas las acciones del grupo consumibles desde cualquier superficie sin drilling.
+
+**Acciones del grupo (`useAppTabGroups` ya las tiene, solo falta unificar la fachada):**
+
+| Acción | Store | Conectada strip | Conectada sidebar | Post X4.2b |
+|---|---|---|---|---|
+| `rename(id, name)` | ✓ | ✓ | ✓ | ✓ |
+| `setColor(id, color)` | ✓ | ✓ | ✓ | ✓ |
+| `setPinned(id, pinned)` | ✓ | **✗** | **✗** | ✓ |
+| `dissolve(id)` | ✓ | ✓ | ✓ | ✓ |
+| `closeTab(id)` | ✓ | ✓ | **✗** | ✓ |
+| `moveToProject(id, projectId)` | (add) | ✗ | ✗ | ✓ |
+
+**Beneficios secundarios:**
+- Futuras acciones (`archive`, `duplicate`) aparecen en todas las superficies sin drilling.
+- Tests del store cubren las acciones. Los menús solo testean "click dispara acción" (component test simple).
+- Un solo lugar canónico donde documentar "qué se puede hacer con un grupo".
+
+**Validación de simetría (chat + terminal + grupo con el mismo patrón):**
+
+| Item | Hook | Acciones expuestas |
+|---|---|---|
+| Chat | `useChatActions()` (existe parcial) | rename, delete, move, pin, archive, color |
+| Terminal | `useTerminalActions()` (X4.2) | rename, delete, moveToProject, pin, archive, color, close, removeFromSplit |
+| Grupo | `useGroupActions()` (X4.2b) | rename, setColor, setPinned, dissolve, closeTab, moveToProject |
+
+Con esta anexión el sistema queda simétrico entre los tres tipos de items. La convivencia se resuelve por arquitectura, no por parches puntuales.
 
 **Portal terminals y xterm.js:**
 - [React · createPortal](https://react.dev/reference/react-dom/createPortal)
