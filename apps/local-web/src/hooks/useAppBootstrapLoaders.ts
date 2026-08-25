@@ -79,6 +79,11 @@ export function useAppBootstrapLoaders({
   setChatBySessionId
 }: UseAppBootstrapLoadersArgs) {
   const [sessions, setSessions] = useState<AgentSession[]>([])
+  // FAS-107 Fase 4: flag para distinguir "aún cargando" vs "cargó vacío".
+  // Sin este flag, los cleanups de openTabIds usaban `sessions.length === 0`
+  // como guard, que en un proyecto legítimamente vacío bloqueaba el barrido
+  // y dejaba chips huérfanos vivos.
+  const [sessionsInitialLoadDone, setSessionsInitialLoadDone] = useState(false)
   const [projects, setProjects] = useState<AgentProject[]>([])
   const [sessionPreviews, setSessionPreviews] = useState<
     Record<string, string>
@@ -193,6 +198,10 @@ export function useAppBootstrapLoaders({
       setChatBySessionId(current =>
         mergeRunActiveFromSessions(current, nextSessions)
       )
+      // FAS-107 Fase 4: primera carga completa. A partir de ahora los
+      // cleanups pueden distinguir "sessions vacío porque cargó vacío"
+      // de "sessions vacío porque aún no cargó".
+      setSessionsInitialLoadDone(true)
       // Previews load lazily from Home via loadSessionPreviews.
     },
     [client, setChatBySessionId]
@@ -465,6 +474,7 @@ export function useAppBootstrapLoaders({
   return {
     sessions,
     setSessions,
+    sessionsInitialLoadDone,
     projects,
     sessionPreviews,
     loadSessionPreviews,

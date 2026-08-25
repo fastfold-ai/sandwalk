@@ -60,6 +60,13 @@ type UseAppSessionEffectsArgs = {
    * caía al primer render porque no matcheaba ninguna sesión existente.
    */
   terminals?: TerminalSession[]
+  /**
+   * FAS-107 Fase 4: `true` cuando `loadSessions` completó al menos una
+   * vez (con éxito o vacío). Los cleanups de `openTabIds` lo consultan
+   * para NO abortar en un proyecto legítimamente vacío. Antes usaban
+   * `sessions.length === 0` como guard, y eso dejaba huérfanos vivos.
+   */
+  sessionsInitialLoadDone?: boolean
 }
 
 export function useAppSessionEffects({
@@ -88,7 +95,8 @@ export function useAppSessionEffects({
   setComposerFiles,
   chatIsInsideAnyGroup,
   tabGroups = [],
-  terminals = []
+  terminals = [],
+  sessionsInitialLoadDone = false
 }: UseAppSessionEffectsArgs) {
   useEffect(() => {
     setIntegrationValues({})
@@ -127,9 +135,11 @@ export function useAppSessionEffects({
   }, [sessionId])
 
   useEffect(() => {
-    // Wait until sessions are loaded — otherwise every persisted tab looks
-    // "unknown" and gets wiped on reload.
-    if (!activeProjectId || sessions.length === 0) return
+    // FAS-107 Fase 4: esperamos a que la primera carga de sessions haya
+    // terminado. Antes usábamos `sessions.length === 0` que era ambiguo
+    // (aún cargando vs cargó vacío) y en un proyecto legítimamente vacío
+    // bloqueaba el cleanup y dejaba chips huérfanos vivos.
+    if (!activeProjectId || !sessionsInitialLoadDone) return
     setOpenTabsByProject(current => {
       const ids = current[activeProjectId]
       if (!ids || ids.length === 0) return current
@@ -181,7 +191,9 @@ export function useAppSessionEffects({
   }, [projectScopeId])
 
   useEffect(() => {
-    if (sessions.length === 0) return
+    // FAS-107 Fase 4: mismo guard que arriba. Antes `sessions.length === 0`
+    // era el gate y en un proyecto vacío nunca corría el cleanup global.
+    if (!sessionsInitialLoadDone) return
     const existing = new Set(sessions.map(item => item.id))
     const validGroupIds = new Set(tabGroups.map(g => g.id))
     // FAS-107 P1: terminales son first-class; sus ids también son válidos

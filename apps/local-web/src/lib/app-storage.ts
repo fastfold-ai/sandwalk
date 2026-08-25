@@ -290,7 +290,13 @@ function looksLikePaneNode(value: unknown): boolean {
 
 export function writeTabGroups(groups: SessionGroup[]) {
   try {
-    localStorage.setItem(TAB_GROUPS_STORAGE_KEY, JSON.stringify(groups))
+    // FAS-107 Fase 4: los pending groups son estado UI efímero (mientras
+    // el picker está abierto). Nunca los persistimos — si el user cierra
+    // la app antes de confirmar el partner, el pending muere y el chat
+    // de origen vuelve a ser tab suelto natural. Complementa el filtro
+    // defensivo en `readTabGroups`.
+    const persistable = groups.filter(g => !g.isPending)
+    localStorage.setItem(TAB_GROUPS_STORAGE_KEY, JSON.stringify(persistable))
   } catch {
     // ignore storage failures
   }

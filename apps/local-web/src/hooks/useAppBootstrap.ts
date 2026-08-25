@@ -161,6 +161,7 @@ export function useAppBootstrap({
     setError: connectBundle.setError,
     sessions: loaders.sessions,
     setSessions: loaders.setSessions,
+    sessionsInitialLoadDone: loaders.sessionsInitialLoadDone,
     projects: loaders.projects,
     sessionPreviews: loaders.sessionPreviews,
     loadSessionPreviews: loaders.loadSessionPreviews,

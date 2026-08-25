@@ -783,7 +783,8 @@ export default function App() {
     setComposerFiles: layer.chat.setComposerFiles,
     chatIsInsideAnyGroup: chatIsInsideAnyGroupMemo,
     tabGroups: tabGroupsStore.allTabGroups,
-    terminals: terminalsLive.terminals
+    terminals: terminalsLive.terminals,
+    sessionsInitialLoadDone: bootstrap.sessionsInitialLoadDone
   })
 
   // Bench sessions are omitted from the global list (sidebar noise). When a
