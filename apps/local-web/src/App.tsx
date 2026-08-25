@@ -520,6 +520,12 @@ export default function App() {
       if (nextSize >= 0 && nextSize < 2) {
         tabGroupsStore.dissolveGroup(groupId)
         if (survivor) {
+          // FAS-107 X3 Fase 2: garantizar que el survivor esté en
+          // openTabIds antes de navegar. `dissolveGroup` re-inserta
+          // solo los "nativos" del scope (chats con projectId matching),
+          // y los terminales quedan afuera porque su mapa de projectId
+          // vive en otro store. Llamarlo acá cubre ambos tipos.
+          openSessionTabRef.current?.(survivor)
           navigate(
             survivor.startsWith('term_')
               ? `/terminals/${survivor}`
@@ -551,6 +557,8 @@ export default function App() {
       const wasViewingThisGroup = route.sessionId === groupId
       tabGroupsStore.dissolveGroup(groupId)
       if (wasViewingThisGroup && activeChild) {
+        // FAS-107 X3 Fase 2: mismo motivo que en handleRemoveChatFromSplit.
+        openSessionTabRef.current?.(activeChild)
         navigate(
           activeChild.startsWith('term_')
             ? `/terminals/${activeChild}`

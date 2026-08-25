@@ -304,6 +304,11 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
       // promotes would fall into ChatLeaf.
       addTerminalOptimistic(term)
       refreshTerminals()
+      // FAS-107 X3 Fase 2: registrar el terminal como tab abierto para
+      // que sobreviva a la disolución del split. Antes NO se registraba
+      // → si el user removía el otro item del split, el terminal quedaba
+      // huérfano (survivor invisible en strip y sidebar).
+      openSessionTab(term.id)
       return term.id
     } catch (err) {
       console.error('createTerminal failed', err)
@@ -315,7 +320,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     activeProjectId,
     session?.workspacePath,
     addTerminalOptimistic,
-    refreshTerminals
+    refreshTerminals,
+    openSessionTab
   ])
 
   const handlePickNewChat = useCallback(async (): Promise<string | null> => {
