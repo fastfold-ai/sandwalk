@@ -152,7 +152,18 @@ export function useAppSessionEffects({
         if (id.startsWith('grp_')) {
           const group = tabGroups.find(g => g.id === id)
           if (!group) return false
+          // X4.4-hotfix: los terminales dentro del grupo también deben
+          // contar a la hora de decidir si el grupo pertenece al scope.
+          // Antes solo miraba `sessions.find(chatId)` y descartaba
+          // grupos con solo terminales o con terminales del proyecto
+          // activo — el chip del grupo desaparecía del strip.
           return group.chatIds.some(chatId => {
+            if (chatId.startsWith('term_')) {
+              const term = terminals.find(t => t.id === chatId)
+              return Boolean(
+                term && (term.projectId ?? null) === activeProjectId
+              )
+            }
             const chat = sessions.find(s => s.id === chatId)
             return Boolean(chat && chat.projectId === activeProjectId)
           })

@@ -11,6 +11,7 @@ import {
 } from 'react'
 
 import { writeTabGroups } from '@/lib/app-storage'
+import { useTerminalsStore } from '@/lib/terminals-store'
 
 /**
  * Store hook para split-view groups. A partir de la migración
@@ -69,12 +70,16 @@ function nextAutoGroupName(existingGroups: SessionGroup[]): string {
 function groupBelongsToScope(
   group: SessionGroup,
   activeProjectId: string | null,
-  chatProjectById: Map<string, string | null>
+  chatProjectById: Map<string, string | null>,
+  terminalProjectById: Map<string, string | null>
 ): boolean {
   if (activeProjectId === null) return true
-  return group.chatIds.some(
-    chatId => chatProjectById.get(chatId) === activeProjectId
-  )
+  return group.chatIds.some(chatId => {
+    if (chatId.startsWith('term_')) {
+      return terminalProjectById.get(chatId) === activeProjectId
+    }
+    return chatProjectById.get(chatId) === activeProjectId
+  })
 }
 
 export function useAppTabGroups(
@@ -90,13 +95,30 @@ export function useAppTabGroups(
     return map
   }, [sessions])
 
+  // FAS-107 X4.4-hotfix: sub al store singleton de terminales para
+  // resolver `projectId` cuando un grupo contiene `term_*`. Antes se
+  // resolvía solo con `sessions` → un grupo con solo terminales o con
+  // un terminal + chats de otros proyectos daba resultados incorrectos
+  // en `groupBelongsToScope` y en `dissolveGroup`.
+  const terminals = useTerminalsStore(state => state.terminals)
+  const terminalProjectById = useMemo(() => {
+    const map = new Map<string, string | null>()
+    for (const t of terminals) map.set(t.id, t.projectId ?? null)
+    return map
+  }, [terminals])
+
   // Grupos visibles en el proyecto activo (por regla multi-proyecto).
   const tabGroups = useMemo(
     () =>
       allTabGroups.filter(g =>
-        groupBelongsToScope(g, activeProjectId, chatProjectById)
+        groupBelongsToScope(
+          g,
+          activeProjectId,
+          chatProjectById,
+          terminalProjectById
+        )
       ),
-    [allTabGroups, activeProjectId, chatProjectById]
+    [allTabGroups, activeProjectId, chatProjectById, terminalProjectById]
   )
 
   const patchGroups = useCallback(
@@ -212,8 +234,20 @@ export function useAppTabGroups(
       const group = allTabGroups.find(g => g.id === groupId)
       if (!group) return
       patchGroups(current => current.filter(g => g.id !== groupId))
+      // FAS-107 X4.4-hotfix: `chatProjectById` solo mapea `sessions`
+      // (chats). Los `term_*` en `group.chatIds` no aparecen ahí →
+      // antes se filtraban fuera de `nativesInThisScope` → al dissolve,
+      // el terminal survivor NO se reinsertaba en `openTabIds` →
+      // desaparecía del strip aunque siguiera vivo en el sidebar.
+      // Ahora resolvemos el projectId de los terminales del store
+      // singleton Zustand.
+      const terminals = useTerminalsStore.getState().terminals
       const nativesInThisScope = group.chatIds.filter(chatId => {
         if (activeProjectId === null) return true
+        if (chatId.startsWith('term_')) {
+          const term = terminals.find(t => t.id === chatId)
+          return term ? (term.projectId ?? null) === activeProjectId : false
+        }
         return chatProjectById.get(chatId) === activeProjectId
       })
       setOpenTabIds(current => {
