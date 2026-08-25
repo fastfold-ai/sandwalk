@@ -34,7 +34,7 @@ import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { notifyMissedCompletions } from '@/lib/browser-notifications'
 import { applyCapyOpenSplit } from '@/lib/capy-ui'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
-import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
 import { recoverUnreadFromSessions } from '@/lib/session-attention'
 import { visibleSessionIds } from '@/lib/sessions'
 
@@ -526,11 +526,7 @@ export default function App() {
           // y los terminales quedan afuera porque su mapa de projectId
           // vive en otro store. Llamarlo acá cubre ambos tipos.
           openSessionTabRef.current?.(survivor)
-          navigate(
-            survivor.startsWith('term_')
-              ? `/terminals/${survivor}`
-              : `/agents/${survivor}`
-          )
+          navigate(sessionRoutePath(survivor))
         }
       }
     },
@@ -559,11 +555,7 @@ export default function App() {
       if (wasViewingThisGroup && activeChild) {
         // FAS-107 X3 Fase 2: mismo motivo que en handleRemoveChatFromSplit.
         openSessionTabRef.current?.(activeChild)
-        navigate(
-          activeChild.startsWith('term_')
-            ? `/terminals/${activeChild}`
-            : `/agents/${activeChild}`
-        )
+        navigate(sessionRoutePath(activeChild))
       }
     },
     [route.sessionId, tabGroupsStore, navigate]

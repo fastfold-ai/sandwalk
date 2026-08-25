@@ -1161,6 +1161,16 @@ export function SessionTabs({
               />
             </>
           ) : null}
+          {onSplitWith ? (
+            <>
+              <TabContextSeparator />
+              <TabContextItem
+                icon={<Columns2 className="size-3.5" />}
+                label="Create split view"
+                onClick={() => runAction(() => onSplitWith(menuTerminal.id))}
+              />
+            </>
+          ) : null}
           <TabContextSeparator />
           <TabContextItem
             icon={<X className="size-3.5" />}
