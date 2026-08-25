@@ -305,6 +305,8 @@ export type AppShellProps = {
   /** FAS-107 GF6: terminals of the active project (shared source of truth). */
   terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
   onCloseTerminal?: (terminalId: string) => void
+  /** X4.4: sacar terminal del split (no destructivo) desde el sidebar. */
+  onRemoveTerminalFromSplit?: (terminalId: string) => void
   activeTerminalId?: string | null
   /** FAS-107 GF8: move a terminal between projects (or no project). */
   onMoveTerminalToProject?: (

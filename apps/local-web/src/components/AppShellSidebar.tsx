@@ -108,6 +108,8 @@ export type AppShellSidebarProps = {
   /** FAS-107 GF6: terminals of the active project. */
   terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
   onCloseTerminal?: (terminalId: string) => void
+  /** X4.4: sacar terminal del split (no destructivo) desde el sidebar. */
+  onRemoveTerminalFromSplit?: (terminalId: string) => void
   activeTerminalId?: string | null
   onMoveTerminalToProject?: (
     terminalId: string,
@@ -178,6 +180,7 @@ export function AppShellSidebar({
   setDeleteTarget,
   terminals,
   onCloseTerminal,
+  onRemoveTerminalFromSplit,
   activeTerminalId,
   onMoveTerminalToProject,
   onRenameTerminal,
@@ -287,6 +290,7 @@ export function AppShellSidebar({
             onRefreshUser={refreshCloudUserName}
             terminals={terminals}
             onCloseTerminal={onCloseTerminal}
+            onRemoveTerminalFromSplit={onRemoveTerminalFromSplit}
             activeTerminalId={activeTerminalId ?? null}
             onMoveTerminalToProject={onMoveTerminalToProject}
             onRenameTerminal={onRenameTerminal}

@@ -515,6 +515,43 @@ export default function App() {
    * (no tiene sentido un split con 1 sólo chat) y navegamos al que
    * queda.
    */
+  /*
+   * FAS-107 X4.4: sacar un terminal del split desde el sidebar SIN
+   * borrarlo del disco. Antes el sidebar mostraba "Delete" que llamaba
+   * `handleDeleteTerminalGlobal` (destructivo real), asimetría vs los
+   * chats que sí distinguían "Remove from split" del delete real.
+   *
+   * Busca en qué grupo vive el terminal (a diferencia de
+   * `handleRemoveChatFromSplit`, que depende de `route.sessionId` porque
+   * se dispara desde dentro del split activo — este handler puede
+   * dispararse desde el sidebar viendo cualquier grupo).
+   */
+  const handleRemoveTerminalFromSplit = useCallback(
+    (terminalId: string) => {
+      const group = tabGroupsStore.allTabGroups.find(g =>
+        g.chatIds.includes(terminalId)
+      )
+      if (!group) return
+      const survivor = group.chatIds.find(id => id !== terminalId) ?? null
+      const nextSize = tabGroupsStore.removeFromGroup(group.id, terminalId)
+      if (nextSize >= 0 && nextSize < 2) {
+        tabGroupsStore.dissolveGroup(group.id)
+        if (survivor) {
+          openSessionTabRef.current?.(survivor)
+          // Solo navegar si el user estaba viendo ese grupo específicamente.
+          if (route.sessionId === group.id) {
+            navigate(sessionRoutePath(survivor))
+          }
+        }
+      }
+      // El terminal survivor (o el terminal que se quita si el grupo
+      // tenía >2) ya queda en openTabIds via `removeFromGroup`. NO se
+      // llama `deleteTerminal` — el terminal sigue vivo.
+      openSessionTabRef.current?.(terminalId)
+    },
+    [route.sessionId, tabGroupsStore, navigate]
+  )
+
   const handleRemoveChatFromSplit = useCallback(
     (chatId: string) => {
       const groupId = route.sessionId
@@ -982,6 +1019,7 @@ export default function App() {
       <AppShellConnected
         terminals={terminalsLive.terminals}
         onCloseTerminal={handleDeleteTerminalGlobal}
+        onRemoveTerminalFromSplit={handleRemoveTerminalFromSplit}
         activeTerminalId={route.terminalId ?? null}
         onMoveTerminalToProject={handleMoveTerminalToProject}
         onRenameTerminal={promptRenameTerminal}

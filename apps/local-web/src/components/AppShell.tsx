@@ -86,6 +86,7 @@ export function AppShell(props: AppShellProps) {
           setDeleteTarget={props.setDeleteTarget}
           terminals={props.terminals}
           onCloseTerminal={props.onCloseTerminal}
+          onRemoveTerminalFromSplit={props.onRemoveTerminalFromSplit}
           activeTerminalId={props.activeTerminalId}
           onMoveTerminalToProject={props.onMoveTerminalToProject}
           onRenameTerminal={props.onRenameTerminal}

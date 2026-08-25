@@ -104,6 +104,7 @@ type AgentSessionSidebarProps = {
   terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
   /** Deletes the terminal (kill the shell + remove row). */
   onCloseTerminal?: (terminalId: string) => void
+  onRemoveTerminalFromSplit?: (terminalId: string) => void
   /** Active terminal id when the current URL is `/terminals/:id`. */
   activeTerminalId?: string | null
   onMoveTerminalToProject?: (
@@ -171,6 +172,7 @@ export function AgentSessionSidebar({
   onRefreshUser,
   terminals,
   onCloseTerminal,
+  onRemoveTerminalFromSplit,
   activeTerminalId,
   onMoveTerminalToProject,
   onRenameTerminal,
@@ -380,6 +382,7 @@ export function AgentSessionSidebar({
         unreadOnly={unreadOnly}
         activeTerminalId={activeTerminalId ?? null}
         onCloseTerminal={onCloseTerminal}
+        onRemoveTerminalFromSplit={onRemoveTerminalFromSplit}
         onMoveTerminalToProject={onMoveTerminalToProject}
         onRenameTerminal={onRenameTerminal}
         onToggleTerminalOrganizeLabel={onToggleTerminalOrganizeLabel}

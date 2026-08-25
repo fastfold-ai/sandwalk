@@ -252,6 +252,7 @@ export type SidebarSessionListProps = {
   /** FAS-107 GF6/GF8: terminal rendering hooks used by inline rows. */
   activeTerminalId?: string | null
   onCloseTerminal?: (terminalId: string) => void
+  onRemoveTerminalFromSplit?: (terminalId: string) => void
   onMoveTerminalToProject?: (
     terminalId: string,
     projectId: string | null
@@ -298,6 +299,7 @@ export function SidebarSessionList({
   extraTopSection,
   activeTerminalId,
   onCloseTerminal,
+  onRemoveTerminalFromSplit,
   onMoveTerminalToProject,
   onRenameTerminal,
   onToggleTerminalOrganizeLabel
@@ -480,6 +482,7 @@ export function SidebarSessionList({
                               navigate(`/agents/${item.group.id}`)
                             }}
                             onCloseTerminal={onCloseTerminal}
+                            onRemoveTerminalFromSplit={onRemoveTerminalFromSplit}
                             onRenameTerminal={onRenameTerminal}
                             onToggleTerminalOrganizeLabel={
                               onToggleTerminalOrganizeLabel
@@ -845,6 +848,7 @@ function SidebarGroupItem({
   onSelectChat,
   onSelectTerminal,
   onCloseTerminal,
+  onRemoveTerminalFromSplit,
   onRenameTerminal,
   onToggleTerminalOrganizeLabel,
   onMoveTerminalToProject,
@@ -878,6 +882,7 @@ function SidebarGroupItem({
   /** FAS-107: click a terminal child of the split → open its solo route. */
   onSelectTerminal: (terminalId: string) => void
   onCloseTerminal?: (terminalId: string) => void
+  onRemoveTerminalFromSplit?: (terminalId: string) => void
   onRenameTerminal?: (terminalId: string) => void
   onToggleTerminalOrganizeLabel?: (
     terminalId: string,
@@ -1146,7 +1151,14 @@ function SidebarGroupItem({
                   }
                   onMoveToProject={onMoveTerminalToProject}
                   onSetColor={color => setTabColor(term.id, color)}
-                  onDelete={onCloseTerminal}
+                  // X4.4: en el sidebar, viendo un terminal DENTRO de
+                  // un split, la acción "Delete" hoy sacaba el
+                  // terminal del disco (destructivo real). Ahora usa
+                  // el handler no destructivo que solo lo quita del
+                  // split — mismo patrón que los chats en la misma
+                  // posición (SplitChildActionsMenu distingue delete
+                  // real de remove-from-split).
+                  onDelete={onRemoveTerminalFromSplit ?? onCloseTerminal}
                 />
               )
             }
