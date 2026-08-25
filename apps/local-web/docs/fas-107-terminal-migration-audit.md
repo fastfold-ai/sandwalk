@@ -286,6 +286,17 @@ Ambos fuera del alcance de este barrido.
 
 **Decisión abierta:** ¿migrar los context menus del strip y sidebar a **native Tauri Menu API**? Trade-offs en la tabla anterior. Estimación: esfuerzo Medium. Beneficio de accesibilidad y dark mode automático. Riesgo bajo (es nativo, no hay quirks de WKWebView).
 
+### Fase 6b · Migración a native Tauri Menu API — DIFERIDA
+
+**Estado:** aprobada por el usuario pero diferida al cierre del barrido X3. Motivo:
+
+- Requiere setup en Rust (`main.rs` con `Menu` builder), IPC JS↔Rust, y probablemente refactor de cada superficie de menú.
+- Solo se puede validar en la app Tauri bundled (dev usa WKWebView pero puede diferir en el behavior del menu nativo).
+- Los bugs urgentes del usuario ya están cubiertos por Fases 1-5, 6a, 7.
+- Beneficio (A11y, dark mode automático, cmd-shortcuts) es de calidad, no de desbloqueo.
+
+Se retoma como conversación aparte con research específico del setup Tauri v2 y validación de dónde se prueba.
+
 ### Fase 7 · Solidez visual del layer
 
 **Objetivo:** el terminal se ve "sólido", sin saltos.
