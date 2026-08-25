@@ -438,7 +438,177 @@ El approach factible es el de Warp/VSCode: serialize-and-replay. Cubre el 80% de
 
 ---
 
-## 9 · Fuentes
+## 9 · X4 · Replanteo arquitectónico (rediseño profesional)
+
+Después de intentar aplicar la Capa 1 con parches puntuales, se identificó un **bug arquitectónico en la Fase 1 del X3** que obliga a replantear el enfoque. La documentación previa (§8.3) queda superada por este §9.
+
+### 9.1 · Bug arquitectónico identificado
+
+En `lib/terminals-store.ts` (creado en X3 Fase 1) el snapshot devuelve siempre la misma referencia porque el objeto se muta en el sitio:
+
+```
+export function getTerminalsSnapshot(): TerminalsState {
+  return state   // ← misma referencia aunque state.terminals cambie
+}
+```
+
+React `useSyncExternalStore` compara referencias con `Object.is`. Al ser siempre la misma, **React no re-renderea hasta que otra cosa lo obliga** (ejemplo: cambio de tab). Explica directamente el síntoma reportado del "X del chip no cierra inmediato pero al cambiar de tab sí".
+
+Es un bug de implementación del store manual, no un parche menor. La solución correcta es reemplazar el patrón por una librería probada que garantice re-render por diseño.
+
+### 9.2 · Diagnóstico honesto de X3
+
+Fase 1 del X3 fue una implementación mediocre: evitar Zustand "para ahorrar dependencia" fue un atajo que introdujo el bug crítico anterior. El resto del X3 (Fases 2, 3, 4, 5, 6a, 7) sigue siendo válido y no se toca.
+
+### 9.3 · Estrategias de rediseño
+
+Cuatro estrategias, ordenadas de más fundacional a más superficial. Cada una habilita la siguiente.
+
+**Estrategia 1 · Store con Zustand**
+Reemplazar `terminals-store.ts` manual por un store Zustand. Elimina el bug de la referencia por diseño; cada action genera un objeto nuevo, los suscriptores se enteran garantizado. Selectores atómicos por componente.
+- Toca solo `lib/terminals-store.ts` y `useAppTerminals.ts`.
+- Habilitante para todo lo demás.
+
+**Estrategia 2 · Componente `<TerminalSession>` que engloba el ciclo completo**
+Hoy el ciclo del terminal está fragmentado en 5+ archivos y 6 handlers (`TerminalHostsProvider`, `TerminalPortalHost`, `TerminalPlaceholder`, `TerminalLeaf`, `TerminalSplitPanelHeader`, `AgentSessionMainPanel`, `App.tsx`). Cada superficie (strip, sidebar, split, ruta directa) monta y desmonta piezas distintas. La convivencia falla por diseño.
+
+Rediseño:
+- Un solo `<TerminalSession terminalId={id}>` que engloba el ciclo completo: crear, conectar WebSocket, dibujar, reconectar si se cae, dispose solo cuando el terminal se elimina de verdad.
+- Envoltorios (`<TerminalStrip>`, `<TerminalSidebar>`, `<TerminalInSplit>`) solo posicionan y decoran. No tocan el ciclo de vida.
+- Hook `useTerminalActions()` único que expone `{ rename, delete, moveToProject, togglePin, close }`. Cero prop drilling.
+
+**Estrategia 3 · Command bus para acciones (en observación)**
+Alternativa a props: los menús emiten `terminal.close(id)`, el sistema los ejecuta. Menos props, menos races. Riesgo: paradigma nuevo. Se evalúa después de Estrategia 2; si `useTerminalActions()` limpia el drilling, no hace falta.
+
+**Estrategia 4 · Tests como red de seguridad**
+Antes de mover una línea de Estrategia 2:
+- Unit tests del store (crear, borrar, patch, optimistic).
+- Component tests de `<TerminalSession>` con WebSocket mockeado.
+- E2E con Playwright para flujos strip/sidebar/split/ruta directa.
+
+Sin tests, cualquier rediseño arriesga regresiones. Son prerequisito, no complemento.
+
+### 9.4 · Plan de trabajo X4
+
+| Fase | Qué | Tiempo estimado | Habilita |
+|---|---|---|---|
+| **X4.0** | Estrategia 1: migrar store a Zustand | ~1 hora | Todo lo demás |
+| **X4.1** | Estrategia 4: setup Playwright + tests base del terminal | ~1 día | X4.2 sin regresiones |
+| **X4.2** | Estrategia 2: `<TerminalSession>` monolítico + `useTerminalActions()` | ~2-3 días | Convivencia sólida |
+| **X4.3** | Aplicar los 6 fixes de Capa 1 sobre la nueva arquitectura | ~1 día | Comportamiento tipo Warp |
+| **X4.4** (futuro) | Capa 2: persistir buffer al cerrar/reabrir | ~2 días | Paridad Warp completa |
+
+Estrategia 3 pendiente de evaluación después de X4.2.
+
+### 9.5 · Validación: los 6 fixes de Capa 1 sobre X4.2
+
+Al terminar X4.2, los 6 fixes se aplican sobre la nueva arquitectura:
+
+| Fix | Cómo se aplica sobre `<TerminalSession>` |
+|---|---|
+| 1 · No destruir xterm al navegar | El componente `<TerminalSession>` monta xterm una vez, expone `attachToElement(node)` para moverlo entre placeholders. Dispose solo en unmount real. Patrón VSCode `_attached` embebido |
+| 2 · Rename optimista | Zustand action `patchTerminal(id, {title})` emite nuevo snapshot; todos los suscriptores actualizan sin refresh |
+| 3 · Reconexión automática WS | El componente maneja `ws.onclose` con backoff exponencial. Estado interno `connected: boolean` expuesto |
+| 4 · Detectar visibility change | `useEffect` interno con `document.visibilitychange`. Al volver a visible, verifica WS y reconecta |
+| 5 · Sanidad de `fit.proposeDimensions` | Guard interno: si `cols < 10 || rows < 3`, se pospone al siguiente frame |
+| 6 · X del chip que no cierra | Resuelto by design por Estrategia 1 (Zustand): `removeTerminal(id)` emite snapshot nuevo, el chip re-renderea inmediato |
+
+Por diseño, cada fix es una responsabilidad interna del `<TerminalSession>` en vez de código dispersado por 5 archivos.
+
+### 9.6 · Conclusiones del research consolidado
+
+Dos investigaciones paralelas contra fuentes reales (VSCode, Warp, Wave Terminal, Hyper, Tabby, Windows Terminal, xterm.js, Tauri v2 docs, apps Tauri productivas) validan y refinan el plan.
+
+#### 9.6.1 · Arquitectura del `<TerminalSession>` — tres capas explícitas
+
+Consenso de VSCode `TerminalInstance`, Wave `ViewModel`, Tabby `BaseTerminalTabComponent` y Windows Terminal `ControlCore/Interactivity/Control` (PR #9820):
+
+- **`TerminalCore`** (sin React): dueño del WebSocket, PTY, instancia `xterm.Terminal`, `SerializeAddon`. Métodos: `attachToElement(el)`, `detach()`, `dispose()`, `focus()`, `resize(cols, rows)`, `sendData(s)`, `write(bytes)`. Eventos: `onData`, `onExit`, `onTitleChange`, `onDimensionsChanged`, `onConnectionState`.
+- **`TerminalInteractivity`**: keybinds, focus, `ResizeObserver`, selection.
+- **`TerminalView`** (componente React puro): renderea el placeholder, llama `attachToElement(ref)` cuando el ref cambia, expone estado visual (active/inactive/loading/error).
+
+La instancia `TerminalCore` vive **fuera del árbol React**, en un `TerminalService` global keyed by `terminalId`. React monta y desmonta `TerminalView`; la sesión sobrevive.
+
+#### 9.6.2 · Multi-surface: `react-reverse-portal`
+
+Un solo `<InPortal>` por terminal montado una vez al top del árbol de `AppShellMain`. Cada surface (strip, sidebar, split, ruta `/terminals/:id`) pinta `<OutPortal node={portalNodes[id]} />`. Solo una surface renderea el terminal por vez — regla explícita del sistema, no accidente.
+
+Esto reemplaza el `TerminalPortalHost` + `TerminalPlaceholder` + `TerminalHostsProvider` actual con un único componente. Menos code, menos races.
+
+#### 9.6.3 · Command hub, no event bus
+
+VSCode usa `ITerminalService` como command hub inyectado, no pub/sub abstracto. En React 2026 el equivalente es un **Zustand store con acciones tipadas** (`terminalService.close(id)`, `.rename(id, name)`, etc). Los menús llaman al servicio directamente. Cero event bus.
+
+**Estrategia 3 (command bus) descartada oficialmente.** Se reemplaza por acciones del store.
+
+#### 9.6.4 · Stack de state (Tauri v2 confirmado)
+
+- **Zustand v5** con selectores atómicos. Sin `useShallow` para selectores simples (una prop a la vez). `subscribeWithSelector` solo para stream del PTY (imperativo, fuera de React).
+- **`persist` middleware** para preferencias UI puras (tamaño de fuente, tema del terminal).
+- **`@tauri-store/zustand`** para state que el backend Python DEBE leer. No hay caso claro hoy en el terminal.
+- **Sin TanStack Query** en el terminal. Válido para invocaciones costosas del backend (listados grandes) fuera del scope de terminales.
+- **Sin Redux DevTools middleware**: WKWebView no soporta extensiones. Alternativa: panel dev custom o `redux-logger`.
+
+#### 9.6.5 · Reconexión WebSocket — patrón `replay-then-connect`
+
+Confirmado por VSCode y xterm.js community:
+
+1. Server mantiene el PTY vivo.
+2. Cliente reconecta al WebSocket.
+3. Server envía snapshot del buffer (`SerializeAddon.serialize()`).
+4. Cliente hace `terminal.write(snapshot)`.
+5. **Después** engancha el stream vivo.
+
+Backoff: `min(500ms * 2^n + jitter, 30s)`, cap 12 intentos. Heartbeat cada 25s, 3 pongs perdidos → reconectar. **Obligatorio** porque WKWebView cierra WebSockets silenciosamente al pasar a background (Apple forum #716118).
+
+#### 9.6.6 · Background/foreground
+
+`document.visibilitychange` con:
+- `hidden`: NO cerrar el WS (backend local, no vale la pena). Solo pausar timers de UI puros.
+- `visible`: forzar ping inmediato. Si no hay pong en 3s, reconectar.
+
+En Sandwalk el backend Python vive dentro del proceso Tauri, así que la única causa real de reconexión es HMR del frontend en dev o crash puntual del WS. El PTY sobrevive mientras el proceso Tauri viva.
+
+#### 9.6.7 · Testing stack
+
+- **Vitest + React Testing Library** (copiar setup de [`dannysmith/tauri-template`](https://github.com/dannysmith/tauri-template)). `environment: 'jsdom'`, mock de `@tauri-apps/api/core`.
+- **`vitest-websocket-mock`** para tests del `TerminalCore` con WS.
+- **`@xterm/headless`** para tests del parser/buffer sin DOM.
+- **E2E**: `@wdio/tauri-service` con provider embedded (`tauri-plugin-wdio-webdriver`) es la vía oficial en docs Tauri v2. **Playwright estándar NO funciona en Tauri Mac** (WKWebView no expone CDP). Alternativa: `srsholmes/tauri-playwright` menos maduro.
+
+Recomendación: unit + component con Vitest cubren el 80%. E2E se difiere hasta que un caso lo pida.
+
+#### 9.6.8 · Migración: Strangler Fig con feature flag
+
+`useTerminalStore.getState().useNewImplementation` como flag. Un hook fachada elige entre el store viejo (X3 Fase 1) y el nuevo (X4.0 Zustand). Ambos corren en paralelo hasta que el nuevo pase todos los tests. Rollback instantáneo por flag. Patrón consolidado en Excalidraw y VSCode migrations.
+
+### 9.7 · Validación contra los 9 síntomas reportados
+
+| # | Síntoma | Cubierto en X4 por... | Estado |
+|---|---|---|---|
+| A | Menús contextuales no salen (strip + sidebar) | X3 Fase 5 (ya aplicada) | Cubierto |
+| B | Terminal no aparece, espacio negro vacío | X4.0 (Zustand snapshot inmutable) + X4.2 (`<TerminalSession>` con `TerminalService` global) | **Resuelto por diseño** |
+| C | Terminal aparece mal, sin solidez visual | X4.2 (`TerminalCore` + `attachToElement`) + X4.3 (heartbeat + guards de fit) | Cubierto |
+| D | Chip "Hi" no cierra ni abre | X3 Fase 4 (ya aplicada) | Cubierto |
+| E | Buffer del terminal desaparece al navegar | X4.2 (react-reverse-portal + `dispose()` solo en delete real) | **Resuelto por diseño** |
+| F | Rename no actualiza inmediato | X4.0 (Zustand action emite snapshot nuevo) | **Resuelto por diseño** |
+| G | X del chip no cierra inmediato | X4.0 (Zustand snapshot inmutable) | **Resuelto por diseño** |
+| H | Buffer cortado después de rato largo | X4.3 (guard de fit + heartbeat) | Cubierto |
+| I | Errores al cargar terminal | X4.2 (`TerminalCore` con replay-then-connect + backoff) | Cubierto — requiere repro para logs específicos |
+
+**4 síntomas se resuelven por diseño arquitectónico** (B, E, F, G) — no como parches, sino porque la arquitectura correcta los hace imposibles. **5 se cubren activamente** con fixes que ya son responsabilidad interna del `<TerminalSession>`.
+
+### 9.8 · Plan de trabajo actualizado
+
+| Fase | Qué | Tiempo estimado | Habilita |
+|---|---|---|---|
+| **X4.0** | Zustand store singleton con selectores atómicos. Migrar `useAppTerminals` como fachada del store nuevo. Flag `useNewImplementation` para strangler fig | ~2 horas | Todo lo demás |
+| **X4.1** | Setup Vitest + RTL + `vitest-websocket-mock` + `@xterm/headless`. Copiar setup de `dannysmith/tauri-template`. Tests base del store (crear, borrar, patch, optimistic) | ~1 día | X4.2 sin regresiones |
+| **X4.2** | `TerminalCore` (tres capas), `TerminalService` con acciones, `<TerminalSession>` con `attachToElement`. Multi-surface con `react-reverse-portal`. `useTerminalActions()` | ~2-3 días | Convivencia sólida |
+| **X4.3** | Aplicar los 6 fixes de Capa 1 (replay-then-connect, heartbeat, visibility, guards de fit) como responsabilidades del `TerminalCore` | ~1 día | Comportamiento tipo Warp |
+| **X4.4** (futuro) | Persistir buffer al cerrar/reabrir (Capa 2) usando `SerializeAddon` + `RunEvent::ExitRequested` en Rust | ~2 días | Paridad Warp completa |
+
+**Referente arquitectónico principal a copiar:** Wave Terminal block system (`ViewModel` reactivo por bloque + `globalStore`), sustituyendo Jotai por Zustand. Adaptación 1:1 al patrón de tres capas de VSCode/Windows Terminal.
 
 **Portal terminals y xterm.js:**
 - [React · createPortal](https://react.dev/reference/react-dom/createPortal)
@@ -473,3 +643,23 @@ El approach factible es el de Warp/VSCode: serialize-and-replay. Cubre el 80% de
 - [Wave Terminal · Block System](https://deepwiki.com/wavetermdev/waveterm/3.2-block-system) · [Block Controllers](https://deepwiki.com/wavetermdev/waveterm/7.1-block-controller)
 - [Zed RFC #50584 · persistent terminal](https://github.com/zed-industries/zed/discussions/50584)
 - [Daniel Cosenza · How terminal multiplexers keep sessions alive](https://danielcosenza.com/posts/sh-terminal-multiplexer-internals/)
+
+**X4 · Rediseño arquitectónico (research 2026):**
+- [VSCode · terminalInstance.ts](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts) · [DeepWiki Terminal](https://deepwiki.com/microsoft/vscode/6-integrated-terminal) · [UI & Layout](https://deepwiki.com/microsoft/vscode/6.6-terminal-ui-and-layout)
+- [Windows Terminal · PR #9820 · ControlCore split](https://github.com/microsoft/terminal/pull/9820)
+- [Wave Terminal · Block System](https://deepwiki.com/wavetermdev/waveterm/3.2-block-system) · [Block Types & Views](https://deepwiki.com/wavetermdev/waveterm/4-core-functionality)
+- [Tabby · baseTerminalTab.component.ts](https://github.com/Eugeny/tabby/blob/43cd3318dac4a47bd31862f9428fe98f07714c59/tabby-terminal/src/api/baseTerminalTab.component.ts) · [Terminal Engine](https://deepwiki.com/Eugeny/tabby/3.1-terminal-engine)
+- [react-reverse-portal](https://github.com/httptoolkit/react-reverse-portal) · [DEV article](https://dev.to/pimterry/react-reverse-portals-3jdb)
+- [xterm.js reconnect issue #677](https://github.com/xtermjs/xterm.js/issues/677) · [replay discussion #4869](https://github.com/xtermjs/xterm.js/discussions/4869) · [xterm-headless](https://github.com/microsoft/vscode/wiki/Working-with-xterm.js/448aa7d1d72f4bf86074d13e686bdd852f9b4157)
+- [Cloudflare PTY replay pattern](https://developers.cloudflare.com/sandbox/concepts/terminal)
+- [Zustand + Tauri: @tauri-store/zustand](https://www.npmjs.com/package/@tauri-store/zustand)
+- [dannysmith/tauri-template · Vitest setup](https://github.com/dannysmith/tauri-template)
+- [Vitest en Tauri (Yonatan Kra)](https://yonatankra.com/how-to-setup-vitest-in-a-tauri-project/)
+- [Tauri v2 docs · WebdriverIO](https://v2.tauri.app/develop/tests/webdriver/example/webdriverio/) · [WDIO Tauri platform](https://webdriver.io/docs/desktop-testing/tauri/platform-support/)
+- [tauri-playwright (WKWebView native)](https://github.com/srsholmes/tauri-playwright)
+- [vitest-websocket-mock](https://www.npmjs.com/package/vitest-websocket-mock)
+- [WebSocket reconnection strategies (dev.to)](https://dev.to/hexshift/robust-websocket-reconnection-strategies-in-javascript-with-exponential-backoff-40n1) · [heartbeat guide](https://websocket.org/guides/heartbeat/)
+- [WKWebView WS en background (Apple forum #716118)](https://developer.apple.com/forums/thread/716118) · [socket.io #2924](https://github.com/socketio/socket.io/issues/2924)
+- [tkdodo · working with Zustand](https://tkdodo.eu/blog/working-with-zustand) · [Zustand selectors DeepWiki](https://deepwiki.com/pmndrs/zustand/2.3-selectors-and-re-rendering)
+- [Strangler Fig migration (Steve Kinney)](https://stevekinney.com/courses/enterprise-ui/strangler-fig-introduction)
+- [Excalidraw discussion #8121](https://github.com/excalidraw/excalidraw/discussions/8121) · [Linear reverse-engineered](https://github.com/wzhudev/reverse-linear-sync-engine)
