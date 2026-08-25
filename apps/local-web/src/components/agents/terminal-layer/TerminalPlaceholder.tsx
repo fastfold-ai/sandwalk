@@ -20,35 +20,23 @@ import { useTerminalLayer } from './terminal-layer-registry'
 export function TerminalPlaceholder({
   terminalId,
   onFocus,
-  onContextMenu,
   className
 }: {
   terminalId: string
   onFocus?: () => void
-  /**
-   * FAS-107 X3 Fase 5: se dispara cuando el user hace click derecho
-   * sobre el xterm flotante. El `TerminalPortalHost` reenvía el evento
-   * hasta acá vía el registry, para que el ancestro React (el pane del
-   * split) pueda pintar el menú contextual sin depender de la
-   * propagación DOM que el portal rompe.
-   */
-  onContextMenu?: (event: MouseEvent) => void
   className?: string
 }) {
   const registry = useTerminalLayer()
   const nodeRef = useRef<HTMLDivElement | null>(null)
   const onFocusRef = useRef(onFocus)
   onFocusRef.current = onFocus
-  const onContextMenuRef = useRef(onContextMenu)
-  onContextMenuRef.current = onContextMenu
 
   useEffect(() => {
     const node = nodeRef.current
     if (!node) return
     const unregister = registry.registerPlaceholder(terminalId, {
       node,
-      onFocus: () => onFocusRef.current?.(),
-      onContextMenu: event => onContextMenuRef.current?.(event)
+      onFocus: () => onFocusRef.current?.()
     })
     return unregister
   }, [registry, terminalId])

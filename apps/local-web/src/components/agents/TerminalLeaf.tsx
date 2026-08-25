@@ -74,12 +74,9 @@ export function TerminalLeaf({
   const terminal = terminals.find(t => t.id === terminalId) ?? null
 
   const onContextMenu = useCallback(
-    (event: MouseEvent | globalThis.MouseEvent) => {
+    (event: MouseEvent) => {
       event.preventDefault()
-      // El wrapper React necesita stopPropagation para no burbujear a
-      // ancestros que también manejan contextmenu; para el evento nativo
-      // que viene del portal-host, stopPropagation es un no-op del DOM.
-      if ('stopPropagation' in event) event.stopPropagation()
+      event.stopPropagation()
       const handlers: PaneContextMenuHandlers = {
         onSplitLeft: () => onSplit(terminalId, 'horizontal', 'before'),
         onSplitRight: () => onSplit(terminalId, 'horizontal', 'after'),
@@ -142,7 +139,6 @@ export function TerminalLeaf({
         <TerminalPlaceholder
           terminalId={terminalId}
           onFocus={focusPanel}
-          onContextMenu={onContextMenu}
         />
       </div>
     </div>

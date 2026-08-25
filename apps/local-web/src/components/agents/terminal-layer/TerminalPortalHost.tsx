@@ -292,21 +292,6 @@ export function TerminalPortalHost({
     }
     host.addEventListener('mousedown', onMouseDown)
 
-    // FAS-107 X3 Fase 5: contextmenu del xterm. React porta los eventos
-    // por el árbol de componentes, no por el árbol DOM; sin embargo el
-    // `TerminalLeaf` que ata `onContextMenu` no es ancestro React del
-    // portal (el portal cuelga de `AppShellMain`). Reenviamos el evento
-    // al placeholder para que su ancestor React lo maneje.
-    const onContextMenu = (event: MouseEvent) => {
-      const entry = registry.getPlaceholder(terminalId)
-      if (entry?.onContextMenu) {
-        event.preventDefault()
-        event.stopPropagation()
-        entry.onContextMenu(event)
-      }
-    }
-    host.addEventListener('contextmenu', onContextMenu)
-
     // Posición inicial.
     schedulePosition()
 
@@ -317,7 +302,6 @@ export function TerminalPortalHost({
       window.removeEventListener('resize', onWindow)
       window.removeEventListener('scroll', onWindow, { capture: true })
       host.removeEventListener('mousedown', onMouseDown)
-      host.removeEventListener('contextmenu', onContextMenu)
       stopThemeWatch()
       if (rafRef.current != null) {
         window.cancelAnimationFrame(rafRef.current)
