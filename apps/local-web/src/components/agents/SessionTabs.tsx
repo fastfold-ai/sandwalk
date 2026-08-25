@@ -555,11 +555,15 @@ export function SessionTabs({
                       unread={false}
                       draggable={draggable}
                       onSelect={onSelect}
-                      onClose={
-                        onCloseTerminal
-                          ? () => onCloseTerminal(term.id)
-                          : onClose
-                      }
+                      // X4.4-hotfix: la X del chip del terminal en el
+                      // strip usaba `onCloseTerminal` = destructor real
+                      // (borraba el terminal del disco → desaparecía
+                      // del sidebar también). Los chats en la misma
+                      // posición usan `onClose` = `closeSessionTab`
+                      // (no destructivo, solo quita del strip). Ahora
+                      // el terminal sigue el mismo patrón — la acción
+                      // destructiva vive solo en el "Delete" del sidebar.
+                      onClose={onClose}
                       onContextMenu={openContextMenu}
                       selected={selectedChatIds?.has(term.id) ?? false}
                       variant="terminal"
@@ -882,13 +886,13 @@ export function SessionTabs({
                                   event.stopPropagation()
                                   if (item.kind === 'group') {
                                     onCloseGroup?.(item.id)
-                                  } else if (item.kind === 'terminal') {
-                                    if (onCloseTerminal) {
-                                      onCloseTerminal(item.id)
-                                    } else {
-                                      onClose(item.id)
-                                    }
                                   } else {
+                                    // X4.4-hotfix: chats Y terminales
+                                    // usan el mismo `onClose` (no
+                                    // destructivo, solo quita del
+                                    // strip). Antes los terminales
+                                    // caían en `onCloseTerminal` que
+                                    // los borraba del disco.
                                     onClose(item.id)
                                   }
                                 }}
@@ -1191,13 +1195,10 @@ export function SessionTabs({
           <TabContextItem
             icon={<X className="size-3.5" />}
             label="Close tab"
-            onClick={() =>
-              runAction(() =>
-                onCloseTerminal
-                  ? onCloseTerminal(menuTerminal.id)
-                  : onClose(menuTerminal.id)
-              )
-            }
+            // X4.4-hotfix: paridad con la X del chip. Close tab quita
+            // el terminal del strip, NO lo borra del disco. El delete
+            // real vive en el sidebar como "Delete".
+            onClick={() => runAction(() => onClose(menuTerminal.id))}
           />
           <TabContextItem
             icon={<CircleX className="size-3.5" />}
