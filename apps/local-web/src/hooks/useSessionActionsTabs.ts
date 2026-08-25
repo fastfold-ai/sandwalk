@@ -6,6 +6,7 @@ import {
   writeRecentProjectIds
 } from '@/lib/app-storage'
 import { DRAFT_AGENT_SESSION_ID } from '@/lib/draft-agent'
+import { useTerminalsStore } from '@/lib/terminals-store'
 
 import type { UseSessionActionsArgs } from './useSessionActionsTypes'
 
@@ -49,6 +50,17 @@ export function useSessionActionsTabs({
       // por-scope (el filtrado real por proyecto de un grupo se hace más
       // arriba en el `buildSessionSidebarModel`).
       if (tabId.startsWith('grp_')) return true
+      // FAS-107 X4.4-hotfix: los `term_*` viven en el store Zustand,
+      // no en `sessions`. Sin este chequeo, cerrar cualquier tab dentro
+      // de un proyecto barría TODOS los terminales del strip.
+      if (tabId.startsWith('term_')) {
+        const term = useTerminalsStore
+          .getState()
+          .terminals.find(t => t.id === tabId)
+        if (!term) return false
+        if (!scopeProjectId) return true
+        return (term.projectId ?? null) === scopeProjectId
+      }
       const item = sessions.find(session => session.id === tabId)
       if (!item) return false
       if (!scopeProjectId) return true
