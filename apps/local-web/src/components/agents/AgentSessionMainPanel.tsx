@@ -152,6 +152,19 @@ export type AgentSessionMainPanelProps = {
   /** X2 Fix 1: dispatcher del rename dialog del shell. El strip y el
    *  ChatTilingContainer lo llaman en vez de un `window.prompt` local. */
   promptRenameTerminal: (terminalId: string) => void
+  /** X3 Fase 3: handlers del shell (fuente única). Antes había copias
+   *  locales que hacían casi lo mismo pero con divergencias sutiles
+   *  (por ejemplo el close local llamaba `onRemoveChatFromSplit`
+   *  además de `deleteTerminal`, produciendo doble efecto). */
+  deleteTerminalPermanently: (terminalId: string) => Promise<void>
+  toggleTerminalOrganizeLabel: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => Promise<void>
+  moveTerminalToProject: (
+    terminalId: string,
+    projectId: string | null
+  ) => Promise<void>
   dissolveTabGroup: (groupId: string) => void
   renameTabGroup: (group: SessionGroup) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
@@ -260,6 +273,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     onAddChatToSplit,
     onRemoveChatFromSplit,
     promptRenameTerminal,
+    deleteTerminalPermanently,
+    toggleTerminalOrganizeLabel,
+    moveTerminalToProject,
     dissolveTabGroup,
     renameTabGroup,
     setTabGroupColor,
@@ -339,55 +355,15 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     }
   }, [activeGroup, client, activeProjectId])
 
-  const handleCloseTerminal = useCallback(
-    async (terminalId: string) => {
-      try {
-        // Remove from local state immediately so the pane collapses
-        // without waiting for the refresh round-trip.
-        removeTerminalOptimistic(terminalId)
-        await client.deleteTerminal(terminalId)
-        refreshTerminals()
-        onRemoveChatFromSplit(terminalId)
-      } catch (err) {
-        console.error('deleteTerminal failed', err)
-      }
-    },
-    [client, removeTerminalOptimistic, refreshTerminals, onRemoveChatFromSplit]
-  )
-
-  // X2 Fix 1: el rename desde el strip (tab-chip) y desde el header
-  // del split delega al mismo dispatcher que el sidebar — abre el dialog
-  // Radix del shell en vez de un `window.prompt` local (roto en Tauri Mac).
-  // Ver `promptRenameTerminal` en App.tsx.
+  // FAS-107 X3 Fase 3: los handlers locales se reemplazaron por
+  // aliases al dispatcher del shell (fuente única). El close local
+  // hacía además `onRemoveChatFromSplit` — ese cleanup ya lo cubre
+  // `pruneChatFromGroups` que corre cuando el terminal desaparece del
+  // store. Rename ya delegaba desde X2 Fix 1.
+  const handleCloseTerminal = deleteTerminalPermanently
   const handleRenameTerminal = promptRenameTerminal
-
-  const handleToggleTerminalOrganizeLabel = useCallback(
-    async (terminalId: string, label: 'pinned' | 'archive') => {
-      const current = terminals.find(t => t.id === terminalId)
-      // Empty string = clear (the backend maps `"" -> None` so the column
-      // becomes NULL). Explicit label = set. Toggles between the label and null.
-      const nextLabel: string = current?.organizeLabel === label ? '' : label
-      try {
-        await client.updateTerminal(terminalId, { organizeLabel: nextLabel })
-        refreshTerminals()
-      } catch (err) {
-        console.error('updateTerminal (organize) failed', err)
-      }
-    },
-    [client, refreshTerminals, terminals]
-  )
-
-  const handleMoveTerminalToProjectLocal = useCallback(
-    async (terminalId: string, projectId: string | null) => {
-      try {
-        await client.updateTerminal(terminalId, { projectId })
-        refreshTerminals()
-      } catch (err) {
-        console.error('updateTerminal (move) failed', err)
-      }
-    },
-    [client, refreshTerminals]
-  )
+  const handleToggleTerminalOrganizeLabel = toggleTerminalOrganizeLabel
+  const handleMoveTerminalToProjectLocal = moveTerminalToProject
 
   const isNarrow = useIsNarrowWindow(1280)
   // En split view con ventana angosta, el side panel deja de ser una columna

@@ -202,6 +202,9 @@ export function AppShellMain(props: AppShellMainProps) {
             clearSelectChats={props.clearSelectChats}
             createSplitFromSelection={props.createSplitFromSelection}
             promptRenameTerminal={props.promptRenameTerminal}
+            deleteTerminalPermanently={props.deleteTerminalPermanently}
+            toggleTerminalOrganizeLabel={props.toggleTerminalOrganizeLabel}
+            moveTerminalToProject={props.moveTerminalToProject}
           />
         )}
         </div>

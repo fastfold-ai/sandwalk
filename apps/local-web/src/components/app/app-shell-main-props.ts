@@ -75,6 +75,17 @@ export type AppShellMainProps = {
    *  y otros disparadores locales usen la MISMA vía (dialog), en vez
    *  de un `window.prompt` duplicado que en Tauri Mac no muestra nada. */
   promptRenameTerminal: (terminalId: string) => void
+  /** X3 Fase 3: handlers del shell — fuente única para acciones de
+   *  terminal desde cualquier superficie (strip / sidebar / pane header). */
+  deleteTerminalPermanently: (terminalId: string) => Promise<void>
+  toggleTerminalOrganizeLabel: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => Promise<void>
+  moveTerminalToProject: (
+    terminalId: string,
+    projectId: string | null
+  ) => Promise<void>
   navigate: NavigateFunction
   location: Location
   dashboardSection: DashboardSection
