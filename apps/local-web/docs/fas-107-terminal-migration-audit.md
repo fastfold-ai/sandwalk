@@ -606,7 +606,7 @@ Recomendación: unit + component con Vitest cubren el 80%. E2E se difiere hasta 
 | **X4.1** | Setup Vitest + RTL + `vitest-websocket-mock` + `@xterm/headless`. Copiar setup de `dannysmith/tauri-template`. Tests base del store (crear, borrar, patch, optimistic) | ~1 día | X4.2 sin regresiones |
 | **X4.2** | `TerminalCore` (tres capas), `TerminalService` con acciones, `<TerminalSession>` con `attachToElement`. Multi-surface con `react-reverse-portal`. `useTerminalActions()` | ~2-3 días | Convivencia sólida |
 | **X4.2b** | `useGroupActions()` como hook único de acciones de grupos. Refactor menús del strip y sidebar para consumirlo. Cierra las 3 asimetrías §3.2 por diseño | ~1 día | Simetría chat/terminal/grupo |
-| **X4.3** | Aplicar los 6 fixes de Capa 1 (replay-then-connect, heartbeat, visibility, guards de fit) como responsabilidades del `TerminalCore` | ~1 día | Comportamiento tipo Warp |
+| **X4.3** | ~~Aplicar los 6 fixes de Capa 1~~ · **absorbido en X4.2** — los fixes se implementaron como responsabilidades internas del `TerminalPortalHost` reescrito | (0 días extra) | Comportamiento tipo Warp |
 | **X4.4** (futuro) | Persistir buffer al cerrar/reabrir (Capa 2) usando `SerializeAddon` + `RunEvent::ExitRequested` en Rust | ~2 días | Paridad Warp completa |
 
 **Referente arquitectónico principal a copiar:** Wave Terminal block system (`ViewModel` reactivo por bloque + `globalStore`), sustituyendo Jotai por Zustand. Adaptación 1:1 al patrón de tres capas de VSCode/Windows Terminal.
