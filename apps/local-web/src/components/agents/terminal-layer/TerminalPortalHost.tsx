@@ -261,16 +261,26 @@ export function TerminalPortalHost({
     window.addEventListener('resize', onWindow)
     window.addEventListener('scroll', onWindow, { capture: true })
 
-    // ResizeObserver del placeholder — sigue cambios de layout local.
+    // FAS-107 X3 Fase 7: un solo `ResizeObserver` por sesión. Antes se
+    // hacía `observer.disconnect()` + `registerObserver()` en cada
+    // notify del registry — sin razón real (el observer sigue apuntando
+    // al mismo nodo si el placeholder no cambió). Ese ciclo dejaba
+    // ventanas cortas sin observer activo, y cuando el user
+    // redimensionaba el split justo en ese frame, el xterm quedaba
+    // desalineado hasta el próximo scroll/resize de window.
     const observer = new ResizeObserver(() => schedulePosition())
-    const registerObserver = () => {
+    let observedNode: HTMLDivElement | null = null
+    const syncObserverTarget = () => {
       const entry = registry.getPlaceholder(terminalId)
-      if (entry) observer.observe(entry.node)
+      const nextNode = entry?.node ?? null
+      if (nextNode === observedNode) return
+      if (observedNode) observer.unobserve(observedNode)
+      if (nextNode) observer.observe(nextNode)
+      observedNode = nextNode
     }
-    registerObserver()
+    syncObserverTarget()
     const unsubObserver = registry.subscribe(terminalId, () => {
-      observer.disconnect()
-      registerObserver()
+      syncObserverTarget()
       schedulePosition()
     })
 

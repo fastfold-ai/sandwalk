@@ -26,6 +26,7 @@ import { fileChipToken } from '@/components/agents/composer-parts'
 import { useSessionSiteAutoPreview } from '@/components/agents/sites/use-session-site-auto-preview'
 import { TerminalPlaceholder } from '@/components/agents/terminal-layer'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
+import { TerminalSplitPanelHeader } from '@/components/agents/TerminalSplitPanelHeader'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import { WorkspacePanel } from '@/components/agents/WorkspacePanel'
@@ -712,8 +713,31 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             // xterm vive en el portal layer (ver terminal-layer/) y el
             // TerminalPlaceholder solo reserva el hueco donde el layer
             // se posiciona.
+            //
+            // X3 Fase 7: header con paridad al del pane del split
+            // (rename / move to project / pin / color / archive /
+            // split). `focused` fijo en true porque un terminal solo
+            // siempre tiene el foco de su ruta.
             <main className="relative flex h-full min-w-0 flex-col">
-              <TerminalPlaceholder terminalId={terminalId} />
+              <TerminalSplitPanelHeader
+                terminal={
+                  terminals.find(t => t.id === terminalId) ?? null
+                }
+                focused
+                onFocusPanel={() => {}}
+                projects={projects}
+                onRename={handleRenameTerminal}
+                onTogglePin={id =>
+                  void handleToggleTerminalOrganizeLabel(id, 'pinned')
+                }
+                onToggleArchive={id =>
+                  void handleToggleTerminalOrganizeLabel(id, 'archive')
+                }
+                onMoveToProject={handleMoveTerminalToProjectLocal}
+              />
+              <div className="min-h-0 min-w-0 flex-1">
+                <TerminalPlaceholder terminalId={terminalId} />
+              </div>
             </main>
           ) : activeGroup ? (
             <ChatTilingContainer
