@@ -285,6 +285,8 @@ function looksLikePaneNode(value: unknown): boolean {
   const v = value as {
     type?: string
     chatId?: string
+    terminalId?: string
+    ref?: { id?: unknown; kind?: unknown }
     direction?: string
     ratios?: unknown
     children?: unknown[]
@@ -296,6 +298,20 @@ function looksLikePaneNode(value: unknown): boolean {
     // Duplicated string on purpose to avoid a UI → storage import.
     if (v.chatId === '__picker__') return false
     return true
+  }
+  // FAS-107: el árbol acepta hojas `terminal` y `ref` desde que se agregó
+  // soporte para terminales en el split. Sin este check el validador
+  // rechazaba cualquier árbol con un terminal y `sanitizeLayout`
+  // devolvía `undefined`, tirando toda la topología persistida.
+  if (v.type === 'terminal') {
+    return typeof v.terminalId === 'string' && v.terminalId.length > 0
+  }
+  if (v.type === 'ref') {
+    return (
+      !!v.ref &&
+      typeof v.ref.id === 'string' &&
+      (v.ref.kind === 'chat' || v.ref.kind === 'terminal')
+    )
   }
   if (v.type !== 'branch') return false
   if (v.direction !== 'horizontal' && v.direction !== 'vertical') return false
