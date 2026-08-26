@@ -184,12 +184,24 @@ export function readTabGroups(): SessionGroup[] {
       if (Array.isArray(parsed)) {
         return parsed
           .filter(
-            (item): item is SessionGroup =>
+            (item): item is SessionGroup & { chatIds?: string[] } =>
               !!item &&
               typeof item === 'object' &&
               typeof (item as SessionGroup).id === 'string' &&
-              Array.isArray((item as SessionGroup).chatIds)
+              // Aceptar `itemIds` (nuevo, X5.2) o `chatIds` (legacy).
+              (Array.isArray((item as SessionGroup).itemIds) ||
+                Array.isArray(
+                  (item as { chatIds?: unknown }).chatIds
+                ))
           )
+          // FAS-107 X5.2 · migración: promover `chatIds` legacy a `itemIds`
+          // al leer del localStorage. Datos guardados antes del rename
+          // siguen funcionando.
+          .map(g => {
+            if (Array.isArray(g.itemIds)) return g
+            const legacy = (g as unknown as { chatIds: string[] }).chatIds
+            return { ...g, itemIds: legacy }
+          })
           // Los pending groups son estado UI efímero (mientras el usuario
           // arma el split desde el picker). No los persistimos entre
           // sesiones — al recargar se descartan y el chat de origen
@@ -217,12 +229,22 @@ export function readTabGroups(): SessionGroup[] {
         if (
           !item ||
           typeof item !== 'object' ||
-          typeof (item as SessionGroup).id !== 'string' ||
-          !Array.isArray((item as SessionGroup).chatIds)
+          typeof (item as SessionGroup).id !== 'string'
         ) {
           continue
         }
-        const g = item as SessionGroup
+        const withItemIds = item as SessionGroup
+        const withLegacy = item as { chatIds?: unknown }
+        // X5.2: aceptar `itemIds` (nuevo) o `chatIds` (legacy).
+        const hasItemIds = Array.isArray(withItemIds.itemIds)
+        const hasChatIds = Array.isArray(withLegacy.chatIds)
+        if (!hasItemIds && !hasChatIds) continue
+        const g: SessionGroup = hasItemIds
+          ? withItemIds
+          : {
+              ...(item as SessionGroup),
+              itemIds: withLegacy.chatIds as string[]
+            }
         if (seen.has(g.id)) continue
         seen.add(g.id)
         flat.push(g)

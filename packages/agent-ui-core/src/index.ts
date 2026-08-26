@@ -675,14 +675,21 @@ export type SessionGroup = {
   color: string | null
   pinned: boolean
   /**
-   * Legacy: chat-only members. FAS-107 introduces `items` for mixed
-   * chat+terminal groups; readers migrate on the fly. New writes should
-   * fill both fields for one release, then drop `chatIds`.
+   * FAS-107 X5.2: renombrado de `chatIds` a `itemIds`. Guarda ids de
+   * chats Y terminales (posiblemente más tipos en el futuro). El nombre
+   * anterior engañaba — cada consumidor asumía "solo chats" y escribía
+   * código que olvidaba terminales, patrón que produjo 5+ bugs.
+   *
+   * Migración de datos: `readTabGroups` en `app-storage.ts` promueve
+   * `chatIds` legacy a `itemIds` al leer del localStorage.
+   *
+   * TODO futuro (X5.3): reemplazar por `items: WorkspaceItemRef[]`
+   * con tipo discriminado explícito (`{ kind, id }`).
    */
-  chatIds: string[]
-  /** Typed members (FAS-107). Contains a superset of `chatIds`. */
+  itemIds: string[]
+  /** Typed members (FAS-107). Contains a superset of `itemIds`. */
   items?: WorkspaceItemRef[]
-  /** Which chat inside the split has focus (composer visible, side panel bound). */
+  /** Which item (chat/terminal) inside the split has focus. */
   activeChatId: string
   /**
    * Pending group: recién creado desde "Create split view", todavía sólo

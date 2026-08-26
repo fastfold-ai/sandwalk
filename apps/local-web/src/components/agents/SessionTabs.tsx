@@ -599,7 +599,7 @@ export function SessionTabs({
                     selected={selectedChatIds?.has(group.id) ?? false}
                     variant="group"
                     groupCount={
-                      group.isPending ? undefined : group.chatIds.length
+                      group.isPending ? undefined : group.itemIds.length
                     }
                   />
                 )
@@ -861,9 +861,9 @@ export function SessionTabs({
                             {item.kind === 'group' && !item.group.isPending ? (
                               <span
                                 className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
-                                aria-label={`${item.group.chatIds.length} chats`}
+                                aria-label={`${item.group.itemIds.length} chats`}
                               >
-                                {item.group.chatIds.length}
+                                {item.group.itemIds.length}
                               </span>
                             ) : null}
                             <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
@@ -1213,7 +1213,7 @@ export function SessionTabs({
         group={dissolveConfirm}
         chats={
           dissolveConfirm
-            ? tabs.filter(t => dissolveConfirm.chatIds.includes(t.id))
+            ? tabs.filter(t => dissolveConfirm.itemIds.includes(t.id))
             : []
         }
         onCancel={() => setDissolveConfirm(null)}

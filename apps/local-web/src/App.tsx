@@ -278,7 +278,7 @@ export default function App() {
   // sometimes re-added a tab in the same batch it was being closed.
   const chatIsInsideAnyGroupMemo = useCallback(
     (chatId: string) =>
-      tabGroupsStore.allTabGroups.some(g => g.chatIds.includes(chatId)),
+      tabGroupsStore.allTabGroups.some(g => g.itemIds.includes(chatId)),
     [tabGroupsStore.allTabGroups]
   )
 
@@ -481,7 +481,7 @@ export default function App() {
     client: bootstrap.client,
     health: bootstrap.health,
     pinnedSessionIds: [
-      ...(activeGroup?.chatIds ?? []),
+      ...(activeGroup?.itemIds ?? []),
       ...(capySessionId ? [capySessionId] : [])
     ]
   })
@@ -520,7 +520,7 @@ export default function App() {
       if (!groupId || !groupId.startsWith('grp_')) return
       const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
       if (!group || !group.isPending) return
-      const sourceId = group.chatIds[0]
+      const sourceId = group.itemIds[0]
       if (sourceId === partnerId) return
       // Boost the partner's date as if the split had been created with
       // both chats from the start — this way the incoming chat also
@@ -547,7 +547,7 @@ export default function App() {
     if (!groupId || !groupId.startsWith('grp_')) return
     const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
     if (!group || !group.isPending) return
-    const sourceId = group.chatIds[0]
+    const sourceId = group.itemIds[0]
     tabGroupsStore.dissolveGroup(groupId)
     if (sourceId) navigate(sessionRoutePath(sourceId))
   }, [route.sessionId, tabGroupsStore, navigate])
@@ -580,10 +580,10 @@ export default function App() {
   const handleRemoveTerminalFromSplit = useCallback(
     (terminalId: string) => {
       const group = tabGroupsStore.allTabGroups.find(g =>
-        g.chatIds.includes(terminalId)
+        g.itemIds.includes(terminalId)
       )
       if (!group) return
-      const survivor = group.chatIds.find(id => id !== terminalId) ?? null
+      const survivor = group.itemIds.find(id => id !== terminalId) ?? null
       const nextSize = tabGroupsStore.removeFromGroup(group.id, terminalId)
       if (nextSize >= 0 && nextSize < 2) {
         tabGroupsStore.dissolveGroup(group.id)
@@ -609,7 +609,7 @@ export default function App() {
       if (!groupId || !groupId.startsWith('grp_')) return
       const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
       if (!group) return
-      const survivor = group.chatIds.find(id => id !== chatId) ?? null
+      const survivor = group.itemIds.find(id => id !== chatId) ?? null
       const nextSize = tabGroupsStore.removeFromGroup(groupId, chatId)
       if (nextSize >= 0 && nextSize < 2) {
         tabGroupsStore.dissolveGroup(groupId)
@@ -643,7 +643,7 @@ export default function App() {
   const handleDissolveTabGroup = useCallback(
     (groupId: string) => {
       const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
-      const activeChild = group?.activeChatId ?? group?.chatIds[0] ?? null
+      const activeChild = group?.activeChatId ?? group?.itemIds[0] ?? null
       const wasViewingThisGroup = route.sessionId === groupId
       tabGroupsStore.dissolveGroup(groupId)
       if (wasViewingThisGroup && activeChild) {
@@ -661,7 +661,7 @@ export default function App() {
       if (!groupId || !groupId.startsWith('grp_')) return
       const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
       if (!group || group.isPending) return
-      if (group.chatIds.includes(chatId)) return
+      if (group.itemIds.includes(chatId)) return
       const now = new Date().toISOString()
       setChatDateBoosts([chatId], now)
       bootstrap.setSessions(current =>
@@ -906,7 +906,7 @@ export default function App() {
   const chatsInsideGroupIds = useMemo(() => {
     const set = new Set<string>()
     for (const g of tabGroupsStore.allTabGroups) {
-      for (const id of g.chatIds) set.add(id)
+      for (const id of g.itemIds) set.add(id)
     }
     return set
   }, [tabGroupsStore.allTabGroups])

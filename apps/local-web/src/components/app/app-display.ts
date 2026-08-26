@@ -128,7 +128,7 @@ export function buildSessionSidebarModel(input: {
   // si acaso quedaron grupos con chats de otros scopes al vuelo.
   const displayedIds = new Set(displayedSessions.map(item => item.id))
   const applicableGroups = input.tabGroups.filter(g =>
-    g.chatIds.some(id => displayedIds.has(id))
+    g.itemIds.some(id => displayedIds.has(id))
   )
   // Pass `input.sessions` (unfiltered) so groupTabItems can resolve foreign
   // chats inside cross-project groups. Standalone chats stay scoped via
@@ -165,7 +165,7 @@ export function buildSessionSidebarModel(input: {
     .map<TabItem | null>(id => {
       const group = groupsById.get(id)
       if (group) {
-        const children = group.chatIds
+        const children = group.itemIds
           .map(cid => sessionsById.get(cid))
           .filter((s): s is AgentSession => Boolean(s))
         return {

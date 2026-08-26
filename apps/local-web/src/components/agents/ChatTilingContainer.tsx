@@ -133,7 +133,7 @@ export function ChatTilingContainer({
   onToggleTerminalOrganizeLabel,
   onMoveTerminalToProject
 }: ChatTilingContainerProps) {
-  const chatIds = group.chatIds
+  const chatIds = group.itemIds
   const activeChatId = group.activeChatId
   const isPending = Boolean(group.isPending)
   const fingerprint = useMonitorFingerprint()

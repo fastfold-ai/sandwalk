@@ -274,12 +274,12 @@ export function groupTabItems(
   const terminalsById = new Map<string, TerminalSession>()
   for (const term of terminals) terminalsById.set(term.id, term)
 
-  // FAS-107: `group.chatIds` may include `term_*` ids (splits accept both).
+  // FAS-107: `group.itemIds` may include `term_*` ids (splits accept both).
   // The set below excludes ANY member id — chat OR terminal — from the
   // flat list so a split-member is only rendered once (as a child of its
   // group), never doubled as a solo row.
   const memberIdsInGroups = new Set<string>()
-  for (const g of groups) for (const id of g.chatIds) memberIdsInGroups.add(id)
+  for (const g of groups) for (const id of g.itemIds) memberIdsInGroups.add(id)
 
   const chatItems: TabItem[] = sessions
     .filter(item => !memberIdsInGroups.has(item.id))
@@ -294,7 +294,7 @@ export function groupTabItems(
     // Mixed hydration: `chatIds` holds `session_*` and `term_*` ids in
     // the order the user arranged the panes. Look each id up in both
     // pools and keep the original order.
-    const children: GroupChild[] = group.chatIds.flatMap(id => {
+    const children: GroupChild[] = group.itemIds.flatMap(id => {
       const session = groupChildrenById.get(id)
       if (session) return [{ kind: 'chat' as const, id, session }]
       const term = terminalsById.get(id)

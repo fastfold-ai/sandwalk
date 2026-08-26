@@ -927,7 +927,7 @@ function SidebarGroupItem({
   // El name es siempre no-vacío ahora (auto "Group N" al crear, o custom
   // tras rename). El badge con la cuenta de chats vive aparte, al lado.
   const label = group.name || `Group`
-  const memberCount = group.chatIds.length
+  const memberCount = group.itemIds.length
   const groupActive = group.id === activeId
   // Any child (chat or terminal) with focus lights up the group chip.
   const activeInside = groupChildren.some(child => child.id === activeId)

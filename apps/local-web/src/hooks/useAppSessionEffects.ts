@@ -157,7 +157,7 @@ export function useAppSessionEffects({
           // Antes solo miraba `sessions.find(chatId)` y descartaba
           // grupos con solo terminales o con terminales del proyecto
           // activo — el chip del grupo desaparecía del strip.
-          return group.chatIds.some(chatId => {
+          return group.itemIds.some(chatId => {
             if (chatId.startsWith('term_')) {
               const term = terminals.find(t => t.id === chatId)
               return Boolean(
