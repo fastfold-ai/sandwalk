@@ -3527,4 +3527,48 @@ export class LocalAgentClient
     if (this.apiKey) url.searchParams.set('token', this.apiKey)
     return url.toString()
   }
+
+  /**
+   * FAS-107 X4 Capa 2: leer el snapshot del buffer del PTY guardado en
+   * disco. Se llama justo antes de conectar el WS al remount del
+   * terminal — el string se pinta al xterm con `term.write(...)` y
+   * después arranca el stream vivo. Devuelve `null` si no hay snapshot.
+   */
+  async getPtySnapshot(
+    sessionId: string,
+    ptyId: string,
+    signal?: AbortSignal
+  ): Promise<string | null> {
+    const response = await this.request<{ data: string | null }>(
+      `/sessions/${encodeURIComponent(sessionId)}/pty/${encodeURIComponent(
+        ptyId
+      )}/snapshot`,
+      { method: 'GET', signal }
+    )
+    return response.data ?? null
+  }
+
+  /**
+   * FAS-107 X4 Capa 2: guardar el snapshot serializado del buffer.
+   * Idempotente. Llamado throttled cada ~30s y forzado al
+   * `RunEvent::ExitRequested` de Tauri.
+   */
+  async putPtySnapshot(
+    sessionId: string,
+    ptyId: string,
+    data: string,
+    signal?: AbortSignal
+  ): Promise<void> {
+    await this.request(
+      `/sessions/${encodeURIComponent(sessionId)}/pty/${encodeURIComponent(
+        ptyId
+      )}/snapshot`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ data }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
 }

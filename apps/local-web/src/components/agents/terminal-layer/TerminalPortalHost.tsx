@@ -1,7 +1,9 @@
 import '@xterm/xterm/css/xterm.css'
 
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import { listen } from '@tauri-apps/api/event'
 import { FitAddon } from '@xterm/addon-fit'
+import { SerializeAddon } from '@xterm/addon-serialize'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -63,6 +65,15 @@ const RECONNECT_CAP_MS = 30_000
 const RECONNECT_BASE_MS = 500
 /** Máximo de intentos antes de dejar la conexión "muerta" sin reintentar. */
 const RECONNECT_MAX_ATTEMPTS = 12
+/**
+ * FAS-107 X4 Capa 2 · intervalo de guardado throttled del snapshot.
+ * Cada 30s se serializa el buffer visible y se manda al backend. Así
+ * un crash de Sandwalk pierde ~30s de output máximo. Al Cmd+Q se
+ * fuerza un último guardado (Rust emite el evento).
+ */
+const SNAPSHOT_SAVE_INTERVAL_MS = 30_000
+/** Evento que Rust emite al `RunEvent::ExitRequested` para forzar save. */
+const SNAPSHOT_FORCE_SAVE_EVENT = 'sandwalk:force-save-snapshots'
 
 export function TerminalPortalHost({
   client,
@@ -79,9 +90,17 @@ export function TerminalPortalHost({
   hostRef.current = hostNode
   const termRef = useRef<XTerm | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
+  const serializeRef = useRef<SerializeAddon | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
   const ptyRef = useRef<PtyInfo | null>(null)
   const attachedRef = useRef(false)
+  /**
+   * FAS-107 X4 Capa 2 · marca si ya hidratamos el buffer con el
+   * snapshot persistido. Solo aplica al PRIMER connect del ciclo de
+   * vida del componente. Las reconexiones (WS timeout, etc.) NO deben
+   * re-hidratar — el buffer ya está en memoria.
+   */
+  const hydratedRef = useRef(false)
   const lastDimsRef = useRef<{ cols: number; rows: number }>({
     cols: -1,
     rows: -1
@@ -180,8 +199,13 @@ export function TerminalPortalHost({
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
+    // FAS-107 X4 Capa 2 · SerializeAddon persiste el buffer visible +
+    // metadata (cursor, modos, colores) para restaurarlo al reabrir.
+    const serialize = new SerializeAddon()
+    term.loadAddon(serialize)
     termRef.current = term
     fitRef.current = fit
+    serializeRef.current = serialize
 
     const stopThemeWatch = watchTerminalTheme(() => {
       term.options.theme = buildTerminalTheme(isDocumentDark())
@@ -229,6 +253,20 @@ export function TerminalPortalHost({
           ptyRef.current = info as PtyInfo
         }
         const info = ptyRef.current
+        // FAS-107 X4 Capa 2 · restaurar buffer persistido ANTES de
+        // conectar el WS. Solo la primera vez (`hydratedRef`), no en
+        // reconexiones — el buffer ya vive en el xterm en memoria.
+        if (!hydratedRef.current) {
+          hydratedRef.current = true
+          try {
+            const snapshot = await client.getPtySnapshot(terminalId, info.id)
+            if (!cancelled && snapshot) {
+              term.write(snapshot)
+            }
+          } catch {
+            // Fallo silencioso: el snapshot es "nice to have", no crítico.
+          }
+        }
         const ws = new WebSocket(client.ptyConnectUrl(terminalId, info.id))
         ws.binaryType = 'arraybuffer'
         socketRef.current = ws
@@ -339,6 +377,32 @@ export function TerminalPortalHost({
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
 
+    // ---- FAS-107 X4 Capa 2 · Snapshot throttled + force-save on quit ----
+    const saveSnapshot = async (): Promise<void> => {
+      const serialize = serializeRef.current
+      const pty = ptyRef.current
+      if (!serialize || !pty || cancelled) return
+      try {
+        const data = serialize.serialize()
+        await client.putPtySnapshot(terminalId, pty.id, data)
+      } catch {
+        // fallo silencioso — el snapshot es best-effort
+      }
+    }
+    const snapshotInterval = setInterval(() => {
+      void saveSnapshot()
+    }, SNAPSHOT_SAVE_INTERVAL_MS)
+    // Cuando Rust emite `sandwalk:force-save-snapshots` (al Cmd+Q),
+    // guardamos ya. Los eventos Tauri viajan por su propio canal (no
+    // por `window.addEventListener`), así que suscribimos con `listen`.
+    let unlistenForceSave: (() => void) | null = null
+    void listen(SNAPSHOT_FORCE_SAVE_EVENT, () => {
+      void saveSnapshot()
+    }).then(unlisten => {
+      if (cancelled) unlisten()
+      else unlistenForceSave = unlisten
+    })
+
     // Cleanup en unmount real (el terminal se eliminó del store).
     return () => {
       cancelled = true
@@ -351,6 +415,8 @@ export function TerminalPortalHost({
       window.removeEventListener('resize', onWindow)
       window.removeEventListener('scroll', onWindow, { capture: true })
       document.removeEventListener('visibilitychange', onVisibilityChange)
+      clearInterval(snapshotInterval)
+      unlistenForceSave?.()
       stopThemeWatch()
       if (rafRef.current != null) {
         window.cancelAnimationFrame(rafRef.current)
@@ -368,9 +434,11 @@ export function TerminalPortalHost({
       }
       termRef.current = null
       fitRef.current = null
+      serializeRef.current = null
       socketRef.current = null
       ptyRef.current = null
       attachedRef.current = false
+      hydratedRef.current = false
     }
     // Deps vacías: el efecto corre una sola vez al mount del componente.
     // client, terminalId, registry son estables por instancia. El

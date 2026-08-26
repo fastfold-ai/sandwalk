@@ -933,5 +933,19 @@ pub fn run() {
             if let tauri::RunEvent::Reopen { .. } = event {
                 focus_main_window(app_handle);
             }
+            // FAS-107 X4 Capa 2 · al Cmd+Q, avisar al frontend para que
+            // serialice cada xterm y haga PUT del snapshot al backend
+            // ANTES de que el proceso Python muera. Damos ~600ms de
+            // ventana (los PUTs son locales, no red). Sin esto, el user
+            // pierde el output visible al reabrir Sandwalk.
+            //
+            // El evento `sandwalk:force-save-snapshots` lo escucha cada
+            // `TerminalPortalHost` y dispara su `saveSnapshot()`. El
+            // resultado es best-effort: si falla no bloqueamos el
+            // shutdown.
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                let _ = app_handle.emit("sandwalk:force-save-snapshots", ());
+                std::thread::sleep(std::time::Duration::from_millis(600));
+            }
         });
 }
