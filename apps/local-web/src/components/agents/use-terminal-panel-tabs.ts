@@ -193,6 +193,16 @@ export function useTerminalPanelTabs({
   }, [submitRename, tabs])
 
   useEffect(() => {
+    // FAS-107 X5.3 · guard: `listPtySessions` solo aplica a sesiones
+    // reales (chats o terminales). Los grupos (`grp_*`) son
+    // contenedores del strip, no sesiones del backend — pedirle su pty
+    // devuelve 404 y ensucia la consola. Es el patrón raíz de X4.4
+    // (consumidor no reconoce tipo). El fix real vendrá cuando este
+    // hook consuma un `StripItem` tipado; por ahora prefix-guard.
+    if (sessionId.startsWith('grp_')) {
+      setBooting(false)
+      return
+    }
     let cancelled = false
     setBooting(true)
     setStatus(null)

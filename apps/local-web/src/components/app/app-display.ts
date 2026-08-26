@@ -7,6 +7,7 @@ import type {
 import { slugifyIntegrationRoute } from '@/components/agents/dashboard-main-view-helpers'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { groupTabItems, type TabItem } from '@/lib/sessions'
+import { assertNever } from '@/lib/strip-item'
 
 export function resolveSelectedIntegrationKey(
   decodedIntegrationRouteName: string | null,
@@ -200,16 +201,22 @@ export function buildSessionSidebarModel(input: {
     .filter(item => {
       if (!input.activeProjectId) return true
       if (item.id === input.activeSessionId) return true
-      if (item.kind === 'chat') {
-        return item.session.projectId === input.activeProjectId
+      // FAS-107 X5.3 · exhaustive switch con `assertNever`. Si en el
+      // futuro agregamos un `kind` a `TabItem` (nota, canvas, mcp),
+      // TypeScript señala este bloque en compile time — no puede haber
+      // "consumidor olvidó tipo X" que compile con éxito.
+      switch (item.kind) {
+        case 'chat':
+          return item.session.projectId === input.activeProjectId
+        case 'terminal':
+          return (item.terminal.projectId ?? null) === input.activeProjectId
+        case 'group':
+          return item.children.some(
+            s => s.projectId === input.activeProjectId
+          )
+        default:
+          return assertNever(item)
       }
-      if (item.kind === 'terminal') {
-        return (item.terminal.projectId ?? null) === input.activeProjectId
-      }
-      // Grupos: aplican si al menos uno de sus chats pertenece al scope.
-      return item.children.some(
-        s => s.projectId === input.activeProjectId
-      )
     })
   return { displayedSessions, sections, openTabs }
 }
