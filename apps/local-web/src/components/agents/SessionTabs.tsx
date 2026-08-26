@@ -929,7 +929,7 @@ export function SessionTabs({
         >
           <TabContextItem
             icon={<Pencil className="size-3.5" />}
-            label="Rename…"
+            label="Rename chat…"
             onClick={() => runAction(() => onRename(menuSession))}
           />
           <TabContextItem
@@ -976,7 +976,7 @@ export function SessionTabs({
           <TabContextSeparator />
           <TabContextItem
             icon={<Download className="size-3.5" />}
-            label="Export session"
+            label="Export transcript"
             onClick={() => runAction(() => onExport(menuSession))}
           />
           <TabContextItem
@@ -1032,7 +1032,7 @@ export function SessionTabs({
             <>
               <TabContextItem
                 icon={<Pencil className="size-3.5" />}
-                label="Rename…"
+                label="Rename split…"
                 onClick={() => runAction(() => onRenameGroup(menuGroup))}
               />
             </>
@@ -1105,7 +1105,7 @@ export function SessionTabs({
           {onRenameTerminal ? (
             <TabContextItem
               icon={<Pencil className="size-3.5" />}
-              label="Rename…"
+              label="Rename terminal…"
               onClick={() =>
                 runAction(() => onRenameTerminal(menuTerminal.id))
               }

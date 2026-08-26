@@ -100,6 +100,7 @@ export type SessionMainHeaderProps = {
   onDissolveGroup?: (groupId: string) => void
   onRenameGroup?: (group: SessionGroup) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
+  onSetGroupPinned?: (groupId: string, pinned: boolean) => void
   onCloseGroup?: (groupId: string) => void
   /**
    * Cuando la ruta activa apunta a un grupo, el shell oculta su fila de
@@ -171,6 +172,7 @@ export function SessionMainHeader({
   onDissolveGroup,
   onRenameGroup,
   onSetGroupColor,
+  onSetGroupPinned,
   onCloseGroup,
   selectedChatIds,
   onToggleSelectChat,
@@ -379,6 +381,7 @@ export function SessionMainHeader({
           onDissolveGroup={onDissolveGroup}
           onRenameGroup={onRenameGroup}
           onSetGroupColor={onSetGroupColor}
+          onSetGroupPinned={onSetGroupPinned}
           onCloseGroup={onCloseGroup}
           selectedChatIds={selectedChatIds}
           onToggleSelectChat={onToggleSelectChat}

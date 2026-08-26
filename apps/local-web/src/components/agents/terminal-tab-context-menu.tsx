@@ -31,7 +31,7 @@ export function TerminalTabContextMenu({
     <TabContextMenuShell x={menu.x} y={menu.y} onClose={onClose}>
       <TabContextItem
         icon={<Pencil className="size-3.5" />}
-        label="Rename…"
+        label="Rename terminal…"
         onClick={() => {
           const tab = tabs.find(item => item.id === menu.id)
           onClose()

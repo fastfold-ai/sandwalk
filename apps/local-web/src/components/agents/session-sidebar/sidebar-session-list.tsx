@@ -42,6 +42,7 @@ import { GroupDissolveDialog } from '@/components/agents/SessionTabs'
 import { TabInlineColorRow } from '@/components/agents/tab-context-menu'
 import {
   Popover,
+  PopoverAnchor,
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
@@ -577,18 +578,27 @@ export function SidebarSessionList({
                                   alineado con el pin del terminal (que en
                                   su fila también va como primer elemento
                                   del row). Blanco absoluto con fill para
-                                  máxima legibilidad en la sección Pinned. */}
+                                  máxima legibilidad en la sección Pinned.
+                                  FAS-107: pin en slot uniforme `size-4`
+                                  con `place-items-center` para alineación
+                                  vertical con las filas de terminal y
+                                  group split. */}
                               {chat.organizeLabel === 'pinned' ? (
-                                <Pin
-                                  aria-label="Pinned"
-                                  className="text-white size-3 shrink-0"
-                                  fill="currentColor"
-                                />
+                                <span
+                                  aria-hidden
+                                  className="grid size-4 shrink-0 place-items-center"
+                                >
+                                  <Pin
+                                    aria-label="Pinned"
+                                    className="text-white size-3"
+                                    fill="currentColor"
+                                  />
+                                </span>
                               ) : null}
                               <button
                                 type="button"
                                 className={cn(
-                                  'grid size-3.5 shrink-0 place-items-center',
+                                  'grid size-4 shrink-0 place-items-center',
                                   (isSelected || selecting) &&
                                     'rounded-[4px] border',
                                   isSelected
@@ -954,30 +964,33 @@ function SidebarGroupItem({
           setMenuOpen(true)
         }}
       >
-        <div className="flex min-w-0 items-center gap-1">
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground -ml-1 grid size-4 shrink-0 place-items-center rounded"
-            aria-expanded={expanded}
-            aria-label={expanded ? 'Collapse group' : 'Expand group'}
-            onClick={event => {
-              event.stopPropagation()
-              setExpanded(v => !v)
-            }}
-          >
-            <ChevronDown
-              className={cn(
-                'size-3.5 transition-transform',
-                !expanded && '-rotate-90'
-              )}
-            />
-          </button>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {/* FAS-107: pin en slot uniforme `size-4` con
+              `place-items-center` para alineación vertical con las
+              filas de chat y terminal en la sección Pinned. */}
+          {group.pinned ? (
+            <span
+              aria-hidden
+              className="grid size-4 shrink-0 place-items-center"
+            >
+              <Pin
+                aria-label="Pinned"
+                className="text-white size-3"
+                fill="currentColor"
+              />
+            </span>
+          ) : null}
           <button
             type="button"
             className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
             onClick={() => onSelectGroup?.(group.id)}
           >
-            <Columns2 className="size-3.5 shrink-0" aria-hidden />
+            <span
+              aria-hidden
+              className="grid size-4 shrink-0 place-items-center"
+            >
+              <Columns2 className="size-3.5" />
+            </span>
             {/*
               Badge de conteo solo cuando el split ya está armado.
               Mientras está pending (1 chat + picker abierto), no lo
@@ -1008,20 +1021,31 @@ function SidebarGroupItem({
               <UnreadDot />
             </span>
           ) : null}
+        {/* FAS-107: chevron a la derecha, siempre visible. Click izquierdo
+            expande/colapsa el split. El menú de acciones ya no vive detrás
+            de un ellipsis — se abre con click derecho sobre todo el chip
+            (ver `onContextMenu` del contenedor). El chevron sirve además
+            como ancla del `Popover` para posicionar el menú. */}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverTrigger asChild>
+          <PopoverAnchor asChild>
             <button
               type="button"
-              aria-label={`Options for ${label}`}
-              className={cn(
-                'text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5 transition-opacity',
-                menuOpen ? 'opacity-100' : 'opacity-0 group-hover/gr:opacity-100'
-              )}
-              onClick={event => event.stopPropagation()}
+              aria-expanded={expanded}
+              aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
+              className="text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5"
+              onClick={event => {
+                event.stopPropagation()
+                setExpanded(v => !v)
+              }}
             >
-              <MoreHorizontal className="size-3.5" />
+              <ChevronDown
+                className={cn(
+                  'size-3.5 transition-transform',
+                  !expanded && '-rotate-90'
+                )}
+              />
             </button>
-          </PopoverTrigger>
+          </PopoverAnchor>
           <PopoverContent align="end" className="w-52 p-1">
             {onRenameGroup ? (
               <>
@@ -1033,7 +1057,7 @@ function SidebarGroupItem({
                     onRenameGroup(group)
                   }}
                 >
-                  Rename…
+                  Rename split…
                 </button>
                 <div className="border-border/60 my-1 border-t" />
               </>
@@ -1093,7 +1117,8 @@ function SidebarGroupItem({
                   setDissolveConfirmOpen(true)
                 }}
               >
-                Dissolve
+                <Trash2 className="size-3.5" />
+                Delete Split View
               </button>
             ) : null}
           </PopoverContent>
@@ -1346,7 +1371,7 @@ function SplitChildActionsMenu({
         }}
       >
         <Pencil className="size-3.5" />
-        Rename…
+        Rename chat…
       </button>
       {isNative ? (
         <ProjectPicker

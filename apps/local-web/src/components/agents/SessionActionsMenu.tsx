@@ -48,7 +48,7 @@ export function SessionActionsMenu({
         onClick={onRename}
       >
         <Pencil className="h-3.5 w-3.5" />
-        Rename
+        Rename chat…
       </button>
       <ProjectPicker
         projects={projects}

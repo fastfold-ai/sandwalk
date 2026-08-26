@@ -157,7 +157,7 @@ export function TerminalSplitPanelHeader({
                     onSelect={() => onRename(terminal.id)}
                   >
                     <Pencil className="size-3.5" />
-                    Rename…
+                    Rename terminal…
                   </DropdownMenuItem>
                 ) : null}
                 {onMoveToProject && projects.length > 0 ? (

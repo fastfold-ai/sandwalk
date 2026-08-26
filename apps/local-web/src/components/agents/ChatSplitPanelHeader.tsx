@@ -315,7 +315,7 @@ export function ChatSplitPanelHeader({
                     onSelect={() => onRename(session)}
                   >
                     <Pencil className="size-3.5" />
-                    Rename…
+                    Rename chat…
                   </DropdownMenuItem>
                 ) : null}
                 {onMoveToProject && projects.length > 0 ? (

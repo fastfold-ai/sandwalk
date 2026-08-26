@@ -209,15 +209,28 @@ function TerminalRowInner({
           {/* Q7: pin PRIMERO, blanco absoluto — mismo tratamiento que
               en la fila chat de la sección Pinned. Sólo se renderiza
               cuando el terminal está pinneado (y por tanto aparece en
-              la sección Pinned del sidebar). */}
+              la sección Pinned del sidebar).
+              FAS-107: pin e icono de tipo viven en slots uniformes
+              `size-4` con `place-items-center` para garantizar
+              alineación vertical con las filas de chat y group split. */}
           {isPinned ? (
-            <Pin
-              aria-label="Pinned"
-              className="text-white size-3 shrink-0"
-              fill="currentColor"
-            />
+            <span
+              aria-hidden
+              className="grid size-4 shrink-0 place-items-center"
+            >
+              <Pin
+                aria-label="Pinned"
+                className="text-white size-3"
+                fill="currentColor"
+              />
+            </span>
           ) : null}
-          <SquareTerminal className="size-3.5 shrink-0 text-orange-500" />
+          <span
+            aria-hidden
+            className="grid size-4 shrink-0 place-items-center"
+          >
+            <SquareTerminal className="size-3.5 text-orange-500" />
+          </span>
           {colorValue ? (
             <span
               aria-hidden
