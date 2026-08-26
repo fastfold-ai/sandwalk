@@ -260,7 +260,15 @@ export default function App() {
   // What the strip renders as active — always the URL id, so closing a
   // group chip compares `id === stripSessionId` correctly instead of
   // matching against the resolved child chat id.
-  const stripSessionId = route.sessionId
+  //
+  // FAS-107 X4.4-hotfix: incluir `route.terminalId` como fuente. Antes
+  // `stripSessionId = route.sessionId` era `null` en `/terminals/:id`
+  // (los terminales viven en una ruta separada). Consecuencia: cerrar
+  // el chip del último terminal calculaba `activeTabId = null`, no
+  // hacía match con el `term_id` cerrado, y `closeSessionTab` saltaba
+  // el navigate a draft. El chip desaparecía del strip pero la ruta
+  // quedaba en `/terminals/:id` — el terminal parecía "no cerrarse".
+  const stripSessionId = route.sessionId ?? route.terminalId ?? null
 
   // Stable membership check for session effects. Was an inline arrow
   // that changed identity every render, which re-fired
