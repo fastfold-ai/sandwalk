@@ -149,7 +149,7 @@ export function useAppTabGroups(
         name,
         color: overrides?.color ?? null,
         pinned: overrides?.pinned ?? false,
-        chatIds,
+        itemIds: chatIds,
         activeChatId: overrides?.activeChatId ?? chatIds[0],
         isPending: overrides?.isPending
       }
@@ -201,17 +201,17 @@ export function useAppTabGroups(
         // Sacar partnerChatId de cualquier otro grupo donde viva.
         const scrubbed = current.map(g =>
           g.id !== groupId && g.itemIds.includes(partnerChatId)
-            ? { ...g, chatIds: g.itemIds.filter(id => id !== partnerChatId) }
+            ? { ...g, itemIds: g.itemIds.filter(id => id !== partnerChatId) }
             : g
         )
         return scrubbed.map(g => {
           if (g.id !== groupId) return g
-          const nextChatIds = g.itemIds.includes(partnerChatId)
+          const nextItemIds = g.itemIds.includes(partnerChatId)
             ? g.itemIds
             : [...g.itemIds, partnerChatId]
           return {
             ...g,
-            chatIds: nextChatIds,
+            itemIds: nextItemIds,
             isPending: false
           }
         })
@@ -282,12 +282,12 @@ export function useAppTabGroups(
           g.id === groupId
             ? g
             : g.itemIds.includes(chatId)
-              ? { ...g, chatIds: g.itemIds.filter(c => c !== chatId) }
+              ? { ...g, itemIds: g.itemIds.filter(c => c !== chatId) }
               : g
         )
         return scrubbed.map(g =>
           g.id === groupId && !g.itemIds.includes(chatId)
-            ? { ...g, chatIds: [...g.itemIds, chatId] }
+            ? { ...g, itemIds: [...g.itemIds, chatId] }
             : g
         )
       })
@@ -308,7 +308,7 @@ export function useAppTabGroups(
       patchGroups(current =>
         current.map(g =>
           g.id === groupId
-            ? { ...g, chatIds: nextIds, activeChatId: nextActive }
+            ? { ...g, itemIds: nextIds, activeChatId: nextActive }
             : g
         )
       )
@@ -379,7 +379,7 @@ export function useAppTabGroups(
           ) {
             return g
           }
-          return { ...g, chatIds: orderedChatIds }
+          return { ...g, itemIds: orderedChatIds }
         })
       )
     },
@@ -450,7 +450,7 @@ export function useAppTabGroups(
           }
           next.push({
             ...g,
-            chatIds: nextChatIds,
+            itemIds: nextChatIds,
             activeChatId:
               g.activeChatId === chatId ? nextChatIds[0] : g.activeChatId
           })
