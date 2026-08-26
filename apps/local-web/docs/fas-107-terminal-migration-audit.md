@@ -696,3 +696,98 @@ Con esta anexión el sistema queda simétrico entre los tres tipos de items. La 
 - [tkdodo · working with Zustand](https://tkdodo.eu/blog/working-with-zustand) · [Zustand selectors DeepWiki](https://deepwiki.com/pmndrs/zustand/2.3-selectors-and-re-rendering)
 - [Strangler Fig migration (Steve Kinney)](https://stevekinney.com/courses/enterprise-ui/strangler-fig-introduction)
 - [Excalidraw discussion #8121](https://github.com/excalidraw/excalidraw/discussions/8121) · [Linear reverse-engineered](https://github.com/wzhudev/reverse-linear-sync-engine)
+
+---
+
+## 10 · X5 · Consolidación arquitectónica (bloque futuro)
+
+### 10.1 · Patrón raíz de los bugs de "convivencia strip/sidebar"
+
+Durante la jornada X4.4 (10 hotfixes) emergió un patrón único que explica el 80% de los bugs:
+
+**Código que asume "los IDs del strip son homogéneos" cuando en realidad son polimórficos:** `chat_*`, `term_*`, `grp_*`.
+
+Ejemplos concretos que se arreglaron:
+- `deleteSession` filtraba `openTabIds` borrando `grp_*` y `term_*`.
+- `closeSessionTab.tabIsInScope` no reconocía terminales.
+- `groupBelongsToScope` mapeaba solo chats.
+- `dissolveGroup.nativesInThisScope` no incluía terminales en el filtro por scope.
+- `openTabs` de `buildSessionSidebarModel` solo resolvía chats y grupos.
+- `stripSessionId = route.sessionId` no incluía `route.terminalId`.
+- `chatProjectById` en `useAppTabGroups` solo incluía sessions.
+
+Cada consumidor hace su propio switch por prefijo (`if (id.startsWith('term_'))`). No hay una abstracción única. **Basta que un solo lugar se olvide de un caso para tener un bug.**
+
+### 10.2 · Propuestas de consolidación
+
+Ordenadas de mayor impacto a menor:
+
+| # | Propuesta | Costo | Bugs futuros que cierra |
+|---|---|---|---|
+| **X5.1** | Hook `useStripActive()` que consolida "qué está activo" leyendo `route.sessionId` + `route.terminalId` + `activeGroup` en un solo lugar | ~2h | "el active del strip no reconoce tipo X" |
+| **X5.2** | Rename `SessionGroup.chatIds` → `itemIds`. El nombre engaña: guarda terminales también | ~2h | "consumidor olvida terminales en grupos" |
+| **X5.3** | Tipo `StripItem` discriminado + `resolveStripItem(id): StripItem \| null`. Un solo lugar donde vive la lógica id → tipo → projectId | ~1 día | "algún filtro no reconoce el tipo X" |
+| **X5.4** | Tests de invariantes de convivencia | ~1 día | Regresiones futuras |
+| **X5.5** *(futuro)* | Hook `useItemActions(id)` genérico. Devuelve las acciones tipadas aplicables sin importar el tipo | ~2 días | Asimetrías de acciones entre superficies |
+| **X5.6** *(muy futuro)* | Ruta unificada `/items/:id` | ~3 días | Toda la clase de bugs de rutas |
+
+### 10.3 · Plan sugerido
+
+**X5.1 → X5.4** son de bajo riesgo, alto beneficio a largo plazo. ~3 días con red de tests.
+
+**X5.5 y X5.6** se hacen si aparecen más bugs de asimetría o si se agregan tipos nuevos al strip (notas, canvas, mcp servers).
+
+### 10.4 · Contra las exigencias del usuario
+
+X5.1-X5.4 son coherentes con "sin código basura", "camino profesional" y "convivencia sana". Eliminan el patrón "cada consumidor debe acordarse de reconocer cada tipo" y lo reemplazan por un contrato tipado. La convivencia deja de depender de disciplina individual y pasa a ser garantía del sistema.
+
+### 10.5 · Conclusiones del research (referentes y patrones)
+
+**Referente arquitectónico principal a copiar:** VSCode (`EditorInput` + Registry pattern) para separación workbench/input, con la disciplina de union discriminada de Excalidraw para el shape.
+
+**Decisiones concretas:**
+
+1. **Discriminated union pura** (`kind: 'chat' | 'terminal' | 'group'`). Ids planos, prefijo solo para debug. Referente: Excalidraw `ExcalidrawElement`.
+2. **`assertNever` en todo switch por `kind`**. Regla de repo. Al agregar un tipo nuevo (`note`, `canvas`, `mcp`), TypeScript rompe el build en todos los sitios que no lo contemplen. Es exactamente lo que faltó en los 10 hotfixes de hoy.
+3. **Registry mínimo para comportamiento** (renderer, actions, icon, label). Estilo Obsidian `registerView`. Union es el "qué", registry es el "cómo se opera".
+4. **Ruta unificada `/item/[id]`**. Referente: Notion/Figma. Loader resuelve `id → StripItem`, componente hace `registry[item.kind].render(item)`.
+5. **`fast-check` para invariantes de convivencia**: resolver total, registry cubre todos los `kind`, acciones aplicables por tipo.
+6. **Hook único `useItem(id)`** con TanStack Query devolviendo `StripItem` discriminada.
+
+**Prefix-based ids NO son el patrón en apps grandes.** Ninguno de VSCode / Linear / Notion / Figma / Excalidraw los usa como discriminador semántico. El campo `kind`/`type`/`__class` es fuente única.
+
+### 10.6 · Capacidades que habilita X5
+
+Casos de uso concretos que se abren DESPUÉS de X5.1-X5.4:
+
+| Feature | Costo dado X5 | Impacto UX |
+|---|---|---|
+| **Cmd+K palette unificado** (buscar chats + terminales + splits en un solo lugar) | S | Alto — transforma percepción "3 features" en "un workspace" |
+| **Bulk operations cross-type** (seleccionar N items heterogéneos, aplicar acción común) | S | Alto — flujos de organización rápidos |
+| **Filtros unificados** ("todo lo pinneado", "todo del proyecto X") | S | Medio |
+| **Duplicate item** (clonar chat/terminal con su config) | S | Medio |
+| **`note` items** (markdown pegado al proyecto) | M | Alto — nueva superficie del producto |
+| **Drag & drop entre tipos** (arrastrar chat sobre terminal para armar split) | M | Medio |
+| **Undo/redo global** con middleware en command bus | M | Alto — pattern estándar de apps profesionales |
+| **`file` items** (archivos del workspace como tab con preview) | M | Alto |
+| **Workspace export/import** JSON completo | M | Medio |
+| **Nested groups** (folders de folders en el sidebar) | L | Medio |
+| **`canvas` items** (Excalidraw embebido con chats/terminales dentro) | L | Muy alto — feature aspiracional |
+| **Multi-window sync** con Automerge sobre `StripItem[]` | L | Alto si aparece multi-machine |
+
+**Next big feature más probable:** Cmd+K palette unificado. Es el que más cambia la percepción del producto (Warp / Linear / Raycast lo usan como carta de presentación), es esfuerzo S dado X5, y es lo que Antonio ha pedido implícitamente al hablar de "convivencia sana entre elementos".
+
+### 10.7 · Fuentes del research X5
+
+- [VSCode Registry Pattern](https://mintlify.wiki/microsoft/vscode/api/platform/registry) · [Contribution Points](https://code.visualstudio.com/api/references/contribution-points) · [Custom Editors](https://code.visualstudio.com/api/extension-guides/custom-editors)
+- [Excalidraw types.ts](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/element/src/types.ts) · [Architecture DeepWiki](https://deepwiki.com/almarales/excalidraw/1.2-architecture-overview)
+- [Notion data model](https://www.notion.com/blog/data-model-behind-notion) · [Block reference](https://developers.notion.com/reference/block)
+- [Figma Node types](https://developers.figma.com/docs/plugins/api/nodes) · [Widget API](https://developers.figma.com/docs/widgets/api/api-reference)
+- [Reverse-engineering Linear Sync Engine](https://github.com/wzhudev/reverse-linear-sync-engine)
+- [Obsidian Views · registerView](https://docs.obsidian.md/Plugins/User+interface/Views)
+- [Discriminated unions + exhaustiveness (FullStory)](https://www.fullstory.com/blog/discriminated-unions-and-exhaustiveness-checking-in-typescript/)
+- [Branded types (Learning TypeScript)](https://www.learningtypescript.com/articles/branded-types)
+- [fast-check](https://github.com/dubzzz/fast-check) · [property-based invariants](https://medium.com/@hadiyolworld007/typescript-fast-check-property-tests-prove-invariants-without-a-mock-jungle-15ac4401d09d)
+- [TanStack Query · discriminated union PR](https://github.com/TanStack/query/pull/1108)
+- [phryneas · registry vs union](https://phryneas.de/redux-typescript-no-discriminating-union)
+- [cmdk pattern](https://uxpatterns.dev/patterns/advanced/command-palette)
