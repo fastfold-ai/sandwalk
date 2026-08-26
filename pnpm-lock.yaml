@@ -73,6 +73,9 @@ importers:
       '@sandwalk/agent-ui-core':
         specifier: workspace:*
         version: link:../../packages/agent-ui-core
+      '@tauri-apps/api':
+        specifier: ^2.11.1
+        version: 2.11.1
       '@tauri-apps/plugin-dialog':
         specifier: ^2.7.2
         version: 2.7.2
