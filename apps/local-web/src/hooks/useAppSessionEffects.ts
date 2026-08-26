@@ -259,7 +259,9 @@ export function useAppSessionEffects({
     // S1: si el id activo es un terminal, no hay filesystem que listar
     // (terminales viven en su propio endpoint). El request devolvería 404
     // y ensuciaría la consola.
-    if (listId.startsWith('term_')) {
+    // X4.4-hotfix: los grupos (`grp_*`) tampoco tienen filesystem propio.
+    // Son contenedores de tabs, no sesiones reales del backend.
+    if (listId.startsWith('term_') || listId.startsWith('grp_')) {
       setWorkspaceFiles([])
       return
     }
