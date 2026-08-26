@@ -321,12 +321,37 @@ export function SessionMainHeader({
           onCloseOthers={closeOtherSessionTabs}
           onReorder={reorderSessionTabs}
           onRename={openRenameDialog}
-          onTogglePin={item =>
+          onTogglePin={item => {
+            const willPin = item.organizeLabel !== 'pinned'
             void updateSession(item, {
-              organizeLabel:
-                item.organizeLabel === 'pinned' ? null : 'pinned'
+              organizeLabel: willPin ? 'pinned' : null
             })
-          }
+            // Al pinear un tab, moverlo al FINAL del cluster de pinneds
+            // en el orden del strip. Sin esto, aparecía a la izquierda
+            // del cluster de pinneds cuando el `openTabIds` ya lo tenía
+            // antes que otros pinneds. Chrome/VSCode ponen el nuevo pin
+            // al final del cluster de pinneds.
+            if (willPin && openTabIds && openTabs && reorderSessionTabs) {
+              const otherPinnedIds = new Set(
+                openTabs
+                  .filter(
+                    tab => tab.organizeLabel === 'pinned' && tab.id !== item.id
+                  )
+                  .map(tab => tab.id)
+              )
+              const otherPinnedInStrip = openTabIds.filter(id =>
+                otherPinnedIds.has(id)
+              )
+              const notPinnedInStrip = openTabIds.filter(
+                id => !otherPinnedIds.has(id) && id !== item.id
+              )
+              reorderSessionTabs([
+                ...otherPinnedInStrip,
+                item.id,
+                ...notPinnedInStrip
+              ])
+            }
+          }}
           onExport={item => void exportTranscript(item)}
           onInspect={item => navigate(`/agents/${item.id}?inspect=1`)}
           onArchive={item =>
