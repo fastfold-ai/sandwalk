@@ -153,6 +153,14 @@ export function buildSessionSidebarModel(input: {
   // activo aunque el filtro de proyecto lo excluiría.
   const sessionsById = new Map(input.sessions.map(s => [s.id, s]))
   const groupsById = new Map(input.tabGroups.map(g => [g.id, g]))
+  // FAS-107 X4.4-hotfix: reconocer terminales en `openTabs`. Antes solo
+  // se resolvían chats y grupos → cuando la strip tenía SOLO terminales,
+  // `openTabs.length` daba 0 y `computeShowSessionTabs` retornaba false
+  // → aparecía "New Chat" en franja negra arriba mientras el chip del
+  // terminal seguía visible por otra vía. Cruce visual feo.
+  const terminalsById = new Map(
+    (input.terminals ?? []).map(t => [t.id, t])
+  )
   const openTabs: TabItem[] = input.openTabIds
     .map<TabItem | null>(id => {
       const group = groupsById.get(id)
@@ -165,6 +173,15 @@ export function buildSessionSidebarModel(input: {
           id: group.id,
           group,
           children,
+          lastActivity: 0
+        }
+      }
+      const terminal = terminalsById.get(id)
+      if (terminal) {
+        return {
+          kind: 'terminal',
+          id: terminal.id,
+          terminal,
           lastActivity: 0
         }
       }
@@ -185,6 +202,9 @@ export function buildSessionSidebarModel(input: {
       if (item.id === input.activeSessionId) return true
       if (item.kind === 'chat') {
         return item.session.projectId === input.activeProjectId
+      }
+      if (item.kind === 'terminal') {
+        return (item.terminal.projectId ?? null) === input.activeProjectId
       }
       // Grupos: aplican si al menos uno de sus chats pertenece al scope.
       return item.children.some(
