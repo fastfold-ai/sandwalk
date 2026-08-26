@@ -123,17 +123,6 @@ export function buildSessionSidebarModel(input: {
   const displayedSessions = input.activeProjectId
     ? input.sessions.filter(item => item.projectId === input.activeProjectId)
     : input.sessions
-  // Grupos que aplican al scope actual: al menos uno de sus chatIds vive en
-  // `displayedSessions`. Los grupos son por-scope-de-proyecto ya en el store
-  // (`useAppTabGroups` usa `projectTabsKey`), esta segunda vuelta filtra por
-  // si acaso quedaron grupos con chats de otros scopes al vuelo.
-  const displayedIds = new Set(displayedSessions.map(item => item.id))
-  const applicableGroups = input.tabGroups.filter(g =>
-    g.itemIds.some(id => displayedIds.has(id))
-  )
-  // Pass `input.sessions` (unfiltered) so groupTabItems can resolve foreign
-  // chats inside cross-project groups. Standalone chats stay scoped via
-  // `displayedSessions`; only group `children` benefit from the wider pool.
   // FAS-107: same scope filter as chats — terminals of the active
   // project only. Cross-project terminals aren't shown outside their
   // home project (parallel to sessions filtering).
@@ -142,6 +131,24 @@ export function buildSessionSidebarModel(input: {
         t => t.projectId === input.activeProjectId
       )
     : input.terminals ?? []
+  // Grupos que aplican al scope actual: al menos uno de sus itemIds vive en
+  // `displayedSessions` o `displayedTerminals`. Los grupos son
+  // por-scope-de-proyecto ya en el store (`useAppTabGroups` usa
+  // `projectTabsKey`), esta segunda vuelta filtra por si acaso quedaron
+  // grupos con items de otros scopes al vuelo.
+  // FAS-107: el Set incluye terminales — antes solo se poblaba con chat
+  // IDs y un group compuesto solo por terminales (sin chats de agente)
+  // fallaba el `.some(...)` → chip invisible en sidebar aunque el mismo
+  // group sí apareciera en el strip.
+  const displayedIds = new Set<string>()
+  for (const item of displayedSessions) displayedIds.add(item.id)
+  for (const term of displayedTerminals) displayedIds.add(term.id)
+  const applicableGroups = input.tabGroups.filter(g =>
+    g.itemIds.some(id => displayedIds.has(id))
+  )
+  // Pass `input.sessions` (unfiltered) so groupTabItems can resolve foreign
+  // chats inside cross-project groups. Standalone chats stay scoped via
+  // `displayedSessions`; only group `children` benefit from the wider pool.
   const sections = groupTabItems(
     displayedSessions,
     applicableGroups,
