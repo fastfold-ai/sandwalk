@@ -275,9 +275,14 @@ export function ChatTilingContainer({
         pickerRequest.side
       )
       commitTree(nextTree)
+      // X4.4 · autofocus al pane recién agregado. Antes el active del
+      // grupo se quedaba en el pane original y el user tenía que hacer
+      // click sobre el nuevo para escribir. Comparalo con `handleClose`
+      // que ya llama `onFocusChat(nextFocus)` al cerrar un pane.
+      onFocusChat(pickedChatId)
       setPickerRequest(null)
     },
-    [pickerRequest, pickerContext, isPending, baseTree, commitTree]
+    [pickerRequest, pickerContext, isPending, baseTree, commitTree, onFocusChat]
   )
 
   const handleCancelPicker = useCallback(() => {
