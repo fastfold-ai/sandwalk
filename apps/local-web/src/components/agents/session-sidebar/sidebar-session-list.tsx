@@ -47,6 +47,12 @@ import {
   PopoverTrigger
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { navigateToSession } from '@/lib/navigate-session'
 import {
@@ -1027,25 +1033,36 @@ function SidebarGroupItem({
             (ver `onContextMenu` del contenedor). El chevron sirve además
             como ancla del `Popover` para posicionar el menú. */}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverAnchor asChild>
-            <button
-              type="button"
-              aria-expanded={expanded}
-              aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
-              className="text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5"
-              onClick={event => {
-                event.stopPropagation()
-                setExpanded(v => !v)
-              }}
-            >
-              <ChevronDown
-                className={cn(
-                  'size-3.5 transition-transform',
-                  !expanded && '-rotate-90'
-                )}
-              />
-            </button>
-          </PopoverAnchor>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverAnchor asChild>
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    aria-label={
+                      expanded ? `Collapse ${label}` : `Expand ${label}`
+                    }
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5"
+                    onClick={event => {
+                      event.stopPropagation()
+                      setExpanded(v => !v)
+                    }}
+                  >
+                    <ChevronDown
+                      className={cn(
+                        'size-3.5 transition-transform',
+                        !expanded && '-rotate-90'
+                      )}
+                    />
+                  </button>
+                </PopoverAnchor>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {expanded ? 'Collapse split' : 'Expand split'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <PopoverContent align="end" className="w-52 p-1">
             {onRenameGroup ? (
               <>
