@@ -35,6 +35,7 @@ import { notifyMissedCompletions } from '@/lib/browser-notifications'
 import { applyCapyOpenSplit } from '@/lib/capy-ui'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
+import { resolveStripActiveId } from '@/lib/strip-active'
 import { useTerminalsStore } from '@/lib/terminals-store'
 import { recoverUnreadFromSessions } from '@/lib/session-attention'
 import { visibleSessionIds } from '@/lib/sessions'
@@ -257,18 +258,19 @@ export default function App() {
   const effectiveSessionId = activeGroup
     ? activeGroup.activeChatId
     : route.sessionId
-  // What the strip renders as active — always the URL id, so closing a
-  // group chip compares `id === stripSessionId` correctly instead of
-  // matching against the resolved child chat id.
+  // What the strip renders as active — el id del chip resaltado en el
+  // strip (chat, terminal o grupo).
   //
-  // FAS-107 X4.4-hotfix: incluir `route.terminalId` como fuente. Antes
-  // `stripSessionId = route.sessionId` era `null` en `/terminals/:id`
-  // (los terminales viven en una ruta separada). Consecuencia: cerrar
-  // el chip del último terminal calculaba `activeTabId = null`, no
-  // hacía match con el `term_id` cerrado, y `closeSessionTab` saltaba
-  // el navigate a draft. El chip desaparecía del strip pero la ruta
-  // quedaba en `/terminals/:id` — el terminal parecía "no cerrarse".
-  const stripSessionId = route.sessionId ?? route.terminalId ?? null
+  // FAS-107 X5.1: consolidado en `resolveStripActiveId`. Antes esto era
+  // `route.sessionId ?? route.terminalId ?? null` inline en varios
+  // sitios y era fácil olvidarse de un tipo (hotfix `8f38fa9` corrigió
+  // uno de esos olvidos). Ahora la lógica vive en un solo lugar; si en
+  // el futuro agregamos un tipo nuevo (`note`, `canvas`, `mcp`), se
+  // toca `lib/strip-active.ts` y punto.
+  const stripSessionId = resolveStripActiveId(
+    { sessionId: route.sessionId, terminalId: route.terminalId },
+    null
+  )
 
   // Stable membership check for session effects. Was an inline arrow
   // that changed identity every render, which re-fired
