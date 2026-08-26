@@ -6,10 +6,26 @@ import asyncio
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket
+from pydantic import BaseModel
 
 from agent_server.app_deps import AppDeps
 from agent_server.auth_settings import SESSION_COOKIE, key_matches, request_is_authenticated
 from agent_server.models import CreatePtyRequest, PtySessionInfo, PtySessionList, UpdatePtyRequest
+from agent_server.pty_manager.snapshot_store import (
+    delete_snapshot,
+    read_snapshot,
+    write_snapshot,
+)
+
+
+class PtySnapshotPayload(BaseModel):
+    """FAS-107 X4 Capa 2 · serialized xterm buffer body."""
+
+    data: str
+
+
+class PtySnapshotResponse(BaseModel):
+    data: str | None
 
 # Terminals opened outside an agent chat (draft home) — cwd is the user home.
 HOST_TERMINAL_SESSION_ID = "host"
@@ -113,6 +129,44 @@ def register_pty_routes(app: FastAPI, deps: AppDeps) -> None:
         deleted = await pty_manager.remove(session_id, pty_id)
         if not deleted:
             raise HTTPException(status_code=404, detail="Terminal not found.")
+        # FAS-107 X4 Capa 2: al eliminar el PTY, borrar su snapshot para
+        # que no quede huérfano en disco.
+        delete_snapshot(session_id, pty_id)
+
+    @app.get(
+        "/v1/sessions/{session_id}/pty/{pty_id}/snapshot",
+        response_model=PtySnapshotResponse,
+    )
+    async def get_pty_snapshot(session_id: str, pty_id: str) -> PtySnapshotResponse:
+        """Return the persisted xterm buffer snapshot, or `null` if none.
+
+        FAS-107 X4 Capa 2 · used by `TerminalPortalHost` when a terminal
+        remounts (Cmd+Q → reopen). The frontend calls this BEFORE
+        connecting the WebSocket, writes the snapshot into the xterm
+        instance with `term.write(...)`, then starts the live stream —
+        the user sees the buffer exactly as they left it.
+        """
+        await _require_agent_session(session_id)
+        return PtySnapshotResponse(data=read_snapshot(session_id, pty_id))
+
+    @app.put(
+        "/v1/sessions/{session_id}/pty/{pty_id}/snapshot",
+        status_code=204,
+    )
+    async def put_pty_snapshot(
+        session_id: str,
+        pty_id: str,
+        payload: PtySnapshotPayload,
+    ) -> None:
+        """Persist a serialized xterm buffer snapshot to disk.
+
+        FAS-107 X4 Capa 2 · called by the frontend periodically (every
+        ~30s) and again on `RunEvent::ExitRequested` (Tauri emits an
+        event that the web layer catches). The payload is opaque to the
+        backend — it's whatever `SerializeAddon.serialize()` produced.
+        """
+        await _require_agent_session(session_id)
+        write_snapshot(session_id, pty_id, payload.data)
 
     @app.websocket("/v1/sessions/{session_id}/pty/{pty_id}/connect")
     async def connect_pty_session(
