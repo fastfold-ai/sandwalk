@@ -8,7 +8,7 @@ import signal
 from typing import Any
 
 from agent_server.pty_manager.shell_env import set_winsize
-from agent_server.pty_manager.types import BUFFER_LIMIT, PtySession
+from agent_server.pty_manager.types import BUFFER_LIMIT, OUTPUT_LOG_LIMIT, PtySession
 
 
 class PtyIOMixin:
@@ -92,6 +92,13 @@ class PtyIOMixin:
                             except Exception:
                                 pass
                     return
+                # FAS-107 X4 Capa 2 · toda salida del PTY se graba al
+                # `output_log` (ring buffer) — independiente de si hay
+                # subscribers activos. Es el "cuaderno visual" que
+                # sobrevive el Cmd+Q + reopen.
+                session.output_log.extend(data)
+                if len(session.output_log) > OUTPUT_LOG_LIMIT:
+                    session.output_log = session.output_log[-OUTPUT_LOG_LIMIT:]
                 if session.subscribers:
                     stale: list[Any] = []
                     for ws in list(session.subscribers):

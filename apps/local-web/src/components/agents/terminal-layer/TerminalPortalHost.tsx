@@ -3,7 +3,6 @@ import '@xterm/xterm/css/xterm.css'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { listen } from '@tauri-apps/api/event'
 import { FitAddon } from '@xterm/addon-fit'
-import { SerializeAddon } from '@xterm/addon-serialize'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -90,7 +89,6 @@ export function TerminalPortalHost({
   hostRef.current = hostNode
   const termRef = useRef<XTerm | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
-  const serializeRef = useRef<SerializeAddon | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
   const ptyRef = useRef<PtyInfo | null>(null)
   const attachedRef = useRef(false)
@@ -199,13 +197,8 @@ export function TerminalPortalHost({
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
-    // FAS-107 X4 Capa 2 · SerializeAddon persiste el buffer visible +
-    // metadata (cursor, modos, colores) para restaurarlo al reabrir.
-    const serialize = new SerializeAddon()
-    term.loadAddon(serialize)
     termRef.current = term
     fitRef.current = fit
-    serializeRef.current = serialize
 
     const stopThemeWatch = watchTerminalTheme(() => {
       term.options.theme = buildTerminalTheme(isDocumentDark())
@@ -256,12 +249,30 @@ export function TerminalPortalHost({
         // FAS-107 X4 Capa 2 · restaurar buffer persistido ANTES de
         // conectar el WS. Solo la primera vez (`hydratedRef`), no en
         // reconexiones — el buffer ya vive en el xterm en memoria.
+        //
+        // Approach VSCode/Wave (raw byte replay + dims correctas):
+        // 1. Resize xterm a las dims ACTUALES del cliente (fit).
+        // 2. Escribir los bytes crudos del PTY viejo.
+        // 3. Xterm procesa cada byte con las dims actuales y aplica su
+        //    reflow interno — el layout se ve correcto al 100% aunque
+        //    la ventana haya cambiado de tamaño entre cerrar y reabrir.
         if (!hydratedRef.current) {
           hydratedRef.current = true
           try {
-            const snapshot = await client.getPtySnapshot(terminalId, info.id)
-            if (!cancelled && snapshot) {
-              term.write(snapshot)
+            // Fit primero para que el resize del xterm ocurra con las
+            // dims reales del contenedor. Si el fit falla, seguimos con
+            // las dims default (mejor eso que nada).
+            try {
+              const dims = fit.proposeDimensions()
+              if (dims && dims.cols >= 10 && dims.rows >= 3) {
+                term.resize(dims.cols, dims.rows)
+              }
+            } catch {
+              // ignore fit failure
+            }
+            const bytes = await client.getSessionSnapshot(terminalId)
+            if (!cancelled && bytes && bytes.length > 0) {
+              term.write(bytes)
             }
           } catch {
             // Fallo silencioso: el snapshot es "nice to have", no crítico.
@@ -377,27 +388,29 @@ export function TerminalPortalHost({
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
 
-    // ---- FAS-107 X4 Capa 2 · Snapshot throttled + force-save on quit ----
-    const saveSnapshot = async (): Promise<void> => {
-      const serialize = serializeRef.current
-      const pty = ptyRef.current
-      if (!serialize || !pty || cancelled) return
+    // ---- FAS-107 X4 Capa 2 · Snapshot throttled + force-flush on quit ----
+    // El backend absorbe cada byte del PTY en su propio `output_log`
+    // (ver `PtySession.output_log`), así que el frontend NO tiene que
+    // serializar. Solo necesita pedirle al backend que flush ese log
+    // a disco periódicamente (por si Sandwalk crashea) y al Cmd+Q
+    // (para que el disco tenga el estado final antes de que el
+    // proceso Python muera).
+    const flushSnapshot = async (): Promise<void> => {
+      if (cancelled) return
       try {
-        const data = serialize.serialize()
-        await client.putPtySnapshot(terminalId, pty.id, data)
+        await client.flushSessionSnapshot(terminalId)
       } catch {
         // fallo silencioso — el snapshot es best-effort
       }
     }
     const snapshotInterval = setInterval(() => {
-      void saveSnapshot()
+      void flushSnapshot()
     }, SNAPSHOT_SAVE_INTERVAL_MS)
     // Cuando Rust emite `sandwalk:force-save-snapshots` (al Cmd+Q),
-    // guardamos ya. Los eventos Tauri viajan por su propio canal (no
-    // por `window.addEventListener`), así que suscribimos con `listen`.
+    // pedimos flush inmediato al backend.
     let unlistenForceSave: (() => void) | null = null
     void listen(SNAPSHOT_FORCE_SAVE_EVENT, () => {
-      void saveSnapshot()
+      void flushSnapshot()
     }).then(unlisten => {
       if (cancelled) unlisten()
       else unlistenForceSave = unlisten
@@ -434,7 +447,6 @@ export function TerminalPortalHost({
       }
       termRef.current = null
       fitRef.current = null
-      serializeRef.current = null
       socketRef.current = null
       ptyRef.current = null
       attachedRef.current = false

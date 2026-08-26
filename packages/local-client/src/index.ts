@@ -3529,46 +3529,47 @@ export class LocalAgentClient
   }
 
   /**
-   * FAS-107 X4 Capa 2: leer el snapshot del buffer del PTY guardado en
-   * disco. Se llama justo antes de conectar el WS al remount del
-   * terminal — el string se pinta al xterm con `term.write(...)` y
-   * después arranca el stream vivo. Devuelve `null` si no hay snapshot.
+   * FAS-107 X4 Capa 2 · devuelve el "cuaderno visual" del terminal
+   * como bytes crudos (Uint8Array). El backend absorbió cada byte que
+   * el PTY escupió; ahora lo replay al xterm nuevo. El frontend hace
+   * `xterm.resize(currentCols, currentRows)` y después `xterm.write(bytes)`
+   * — xterm procesa cada byte con las dims actuales y aplica su reflow
+   * interno correctamente, evitando el layout roto que producía el
+   * approach anterior con `SerializeAddon`.
+   *
+   * Devuelve `null` si no hay snapshot (primer uso del terminal).
    */
-  async getPtySnapshot(
+  async getSessionSnapshot(
     sessionId: string,
-    ptyId: string,
     signal?: AbortSignal
-  ): Promise<string | null> {
+  ): Promise<Uint8Array | null> {
     const response = await this.request<{ data: string | null }>(
-      `/sessions/${encodeURIComponent(sessionId)}/pty/${encodeURIComponent(
-        ptyId
-      )}/snapshot`,
+      `/sessions/${encodeURIComponent(sessionId)}/snapshot`,
       { method: 'GET', signal }
     )
-    return response.data ?? null
+    if (!response.data) return null
+    // decode base64 → Uint8Array
+    const binary = atob(response.data)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+    return bytes
   }
 
   /**
-   * FAS-107 X4 Capa 2: guardar el snapshot serializado del buffer.
-   * Idempotente. Llamado throttled cada ~30s y forzado al
-   * `RunEvent::ExitRequested` de Tauri.
+   * FAS-107 X4 Capa 2 · fuerza al backend a persistir el `output_log`
+   * actual del PTY vivo al disco. Llamado por el frontend al recibir
+   * el evento Tauri `sandwalk:force-save-snapshots` (Cmd+Q). Es
+   * best-effort — si no hay PTY vivo, no-op.
    */
-  async putPtySnapshot(
+  async flushSessionSnapshot(
     sessionId: string,
-    ptyId: string,
-    data: string,
     signal?: AbortSignal
   ): Promise<void> {
     await this.request(
-      `/sessions/${encodeURIComponent(sessionId)}/pty/${encodeURIComponent(
-        ptyId
-      )}/snapshot`,
-      {
-        method: 'PUT',
-        body: JSON.stringify({ data }),
-        headers: { 'content-type': 'application/json' },
-        signal
-      }
+      `/sessions/${encodeURIComponent(sessionId)}/snapshot/flush`,
+      { method: 'POST', signal }
     )
   }
 }
