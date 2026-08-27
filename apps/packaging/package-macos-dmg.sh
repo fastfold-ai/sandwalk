@@ -55,6 +55,10 @@ if [[ "${CODESIGN_IDENTITY}" != "-" ]]; then
   export APPLE_SIGNING_IDENTITY="${CODESIGN_IDENTITY}"
 fi
 echo "==> Apple codesign identity: ${CODESIGN_IDENTITY}"
+if [[ "${REQUIRE_NOTARIZE:-0}" == "1" && "${CODESIGN_IDENTITY}" == "-" ]]; then
+  echo "error: REQUIRE_NOTARIZE=1 needs a Developer ID Application identity in the keychain or CODESIGN_IDENTITY" >&2
+  exit 1
+fi
 
 TAURI_BUNDLE=""
 if [[ "${SKIP_TAURI:-0}" != "1" ]]; then
@@ -209,11 +213,14 @@ if [[ "${INSTALL:-0}" == "1" ]]; then
   echo "    open \"${DEST}\""
 fi
 
-cp -f "${DMG_PATH}" "${DMG_LATEST_PATH}"
-
 if [[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then
   bash "${SCRIPT_DIR}/notarize-macos.sh" "${DMG_PATH}"
+elif [[ "${REQUIRE_NOTARIZE:-0}" == "1" ]]; then
+  echo "error: REQUIRE_NOTARIZE=1 but APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID are not all set" >&2
+  exit 1
 fi
+
+cp -f "${DMG_PATH}" "${DMG_LATEST_PATH}"
 
 # --- 5. Updater archive (nested app = UI + helper + agent-runtime) ----------
 UPDATER_TAR="${OUT_DIR}/Sandwalk.app.tar.gz"

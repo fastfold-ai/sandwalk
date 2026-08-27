@@ -196,7 +196,7 @@ Settings → Secrets and variables → Actions:
 Existing updater secrets stay as-is (`TAURI_SIGNING_PRIVATE_KEY`, …).
 Apple notarization does **not** replace minisign.
 
-Until these secrets exist, **Release Desktop** still builds an ad-hoc DMG.
+**Release Desktop** requires these secrets and fails if signing or notarization is skipped.
 
 ## 9. Release pipeline
 

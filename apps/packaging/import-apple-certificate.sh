@@ -26,11 +26,15 @@ trap cleanup EXIT
 
 echo "${APPLE_CERTIFICATE}" | base64 --decode > "${P12_PATH}"
 
+G2_CA="${TMP_DIR}/DeveloperIDG2CA.cer"
+curl -fsSL "https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer" -o "${G2_CA}"
+
 if [[ ! -f "${KEYCHAIN_PATH}" ]]; then
   security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
 fi
 security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
 security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+security import "${G2_CA}" -k "${KEYCHAIN_PATH}" || true
 security import "${P12_PATH}" \
   -k "${KEYCHAIN_PATH}" \
   -P "${APPLE_CERTIFICATE_PASSWORD}" \
@@ -40,6 +44,7 @@ security import "${P12_PATH}" \
 security set-key-partition-list -S apple-tool:,apple:,codesign: \
   -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}" >/dev/null
 security list-keychain -d user -s "${KEYCHAIN_PATH}" $(security list-keychain -d user | tr -d '"')
+security default-keychain -s "${KEYCHAIN_PATH}"
 
 echo "Imported Developer ID certificate into ${KEYCHAIN_PATH}"
 security find-identity -v -p codesigning "${KEYCHAIN_PATH}"

@@ -124,8 +124,9 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: bash ./apps/packaging/import-apple-certificate.sh
 
-      - name: Package DMG (Developer ID + notarize when secrets are set)
+      - name: Package DMG (Developer ID + notarize)
         env:
+          REQUIRE_NOTARIZE: "1"
           CODESIGN_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}

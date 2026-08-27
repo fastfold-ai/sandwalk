@@ -16,6 +16,11 @@ fi
 : "${APPLE_APP_SPECIFIC_PASSWORD:?APPLE_APP_SPECIFIC_PASSWORD is required}"
 : "${APPLE_TEAM_ID:?APPLE_TEAM_ID is required}"
 
+if [[ -n "${CODESIGN_IDENTITY:-}" && "${CODESIGN_IDENTITY}" != "-" ]]; then
+  echo "==> Codesign DMG (identity: ${CODESIGN_IDENTITY})..."
+  codesign --force --sign "${CODESIGN_IDENTITY}" --timestamp "${DMG_PATH}"
+fi
+
 echo "==> Notarizing ${DMG_PATH}..."
 xcrun notarytool submit "${DMG_PATH}" \
   --apple-id "${APPLE_ID}" \
