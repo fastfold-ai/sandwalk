@@ -388,12 +388,90 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
             "NVIDIA Nemotron 3 Ultra free tier via OpenRouter",
         ),
     ],
+    "bedrock": [
+        (
+            "us.anthropic.claude-sonnet-4-6",
+            "Claude Sonnet 4.6",
+            "Anthropic Sonnet via Amazon Bedrock (cross-region inference profile)",
+        ),
+        (
+            "us.amazon.nova-pro-v1:0",
+            "Nova Pro",
+            "Amazon Nova Pro via Bedrock",
+        ),
+        (
+            "us.amazon.nova-lite-v1:0",
+            "Nova Lite",
+            "Amazon Nova Lite via Bedrock — faster / cheaper",
+        ),
+    ],
+    "cerebras": [
+        (
+            "gpt-oss-120b",
+            "GPT-OSS 120B",
+            "Open GPT-OSS 120B on Cerebras public endpoints",
+        ),
+        (
+            "gemma-4-31b",
+            "Gemma 4 31B",
+            "Google Gemma 4 31B on Cerebras public endpoints",
+        ),
+    ],
+    "groq": [
+        (
+            "llama-3.3-70b-versatile",
+            "Llama 3.3 70B",
+            "Meta Llama 3.3 70B on Groq LPU",
+        ),
+        (
+            "openai/gpt-oss-120b",
+            "GPT-OSS 120B",
+            "Open GPT-OSS 120B on Groq",
+        ),
+        (
+            "qwen/qwen3-32b",
+            "Qwen 3 32B",
+            "Alibaba Qwen 3 32B on Groq",
+        ),
+        (
+            "meta-llama/llama-4-scout-17b-16e-instruct",
+            "Llama 4 Scout",
+            "Meta Llama 4 Scout — vision-capable on Groq",
+        ),
+        (
+            "llama-3.1-8b-instant",
+            "Llama 3.1 8B Instant",
+            "Fast small Llama on Groq",
+        ),
+    ],
+    "fireworks": [
+        (
+            "accounts/fireworks/models/llama-v3p3-70b-instruct",
+            "Llama 3.3 70B",
+            "Meta Llama 3.3 70B Instruct on Fireworks",
+        ),
+        (
+            "accounts/fireworks/models/qwen3-235b-a22b",
+            "Qwen 3 235B",
+            "Alibaba Qwen 3 235B on Fireworks",
+        ),
+        (
+            "accounts/fireworks/models/kimi-k2-instruct",
+            "Kimi K2",
+            "Moonshot Kimi K2 Instruct on Fireworks",
+        ),
+        (
+            "accounts/fireworks/models/llama-v3p1-8b-instruct",
+            "Llama 3.1 8B",
+            "Fast small Llama on Fireworks",
+        ),
+    ],
 }
 
 # Bump when the default-enabled set changes so existing configs get migrated once.
 # Also bump when curated OpenRouter models become default-enabled so prior
 # discovery-seeded hides are cleared (see Config._migrate_catalog_defaults).
-CATALOG_DEFAULTS_VERSION = 12
+CATALOG_DEFAULTS_VERSION = 15
 
 # Models present in the catalog but hidden by default. Users can re-enable them
 # from Dashboard → Models; toggling simply removes them from the hidden list.

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 export const INTEGRATION_ICONS: Record<
   string,
-  { src: string; invertInDark?: boolean }
+  { src: string; srcDark?: string; invertInDark?: boolean }
 > = {
   'fastfold-cloud': { src: '/ff_simbol_color.svg' },
   boltz: { src: '/pipelines/boltzgen.svg', invertInDark: true },
@@ -23,6 +23,10 @@ export const INTEGRATION_ICONS: Record<
   qwen: { src: '/qwen.svg' },
   together: { src: '/together.svg' },
   openrouter: { src: '/models/openrouter-color.svg' },
+  cerebras: { src: '/cerebras-color.png', srcDark: '/cerebras-light.png' },
+  groq: { src: '/groq.png' },
+  fireworks: { src: '/fireworks.png' },
+  bedrock: { src: '/aws.png' },
   'ibm-rxn': { src: '/ibm.png' },
   lens: { src: '/lens.png' },
   sendgrid: { src: '/sendgrid.png' },
@@ -55,17 +59,24 @@ export function IntegrationIcon({
   const imageClass = size === 'lg' ? 'size-9' : 'size-6'
   const fallbackClass = size === 'lg' ? 'size-9' : 'size-6'
   if (icon) {
-    return (
-      <img
-        src={icon.src}
-        alt=""
-        className={cn(
-          imageClass,
-          'shrink-0 rounded object-contain',
-          icon.invertInDark && 'dark:invert'
-        )}
-      />
+    const imgClass = cn(
+      imageClass,
+      'shrink-0 rounded object-contain',
+      icon.invertInDark && 'dark:invert'
     )
+    if (icon.srcDark) {
+      return (
+        <>
+          <img src={icon.src} alt="" className={cn(imgClass, 'dark:hidden')} />
+          <img
+            src={icon.srcDark}
+            alt=""
+            className={cn(imgClass, 'hidden dark:block')}
+          />
+        </>
+      )
+    }
+    return <img src={icon.src} alt="" className={imgClass} />
   }
   return (
     <span

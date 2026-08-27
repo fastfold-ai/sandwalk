@@ -60,26 +60,13 @@ class DeepAgentsRunMixin:
             self.session.config.get("llm.provider", "anthropic") or "anthropic"
         ).strip().lower()
 
-        if provider not in (
-            "anthropic",
-            "openai",
-            "xai",
-            "google",
-            "moonshot",
-            "nvidia",
-            "opencode",
-            "deepseek",
-            "minimax",
-            "mistral",
-            "qwen",
-            "together",
-            "openrouter",
-        ):
+        from agent.config import VALID_LLM_PROVIDERS
+
+        if provider not in VALID_LLM_PROVIDERS:
+            valid = "', '".join(sorted(VALID_LLM_PROVIDERS))
             return self._make_error_result(
                 query,
-                f"Unsupported llm.provider '{provider}'. Use 'anthropic', 'openai', "
-                "'xai', 'google', 'moonshot', 'nvidia', 'opencode', 'deepseek', "
-                "'minimax', 'mistral', 'qwen', 'together', or 'openrouter' "
+                f"Unsupported llm.provider '{provider}'. Use '{valid}' "
                 "(OpenAI-compatible endpoints via llm.openai_base_url).",
                 0.0,
             )

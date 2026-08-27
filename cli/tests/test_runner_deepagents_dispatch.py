@@ -68,6 +68,16 @@ class TestRunAsyncDispatch:
         result = _run(runner._run_async("q"))
         assert "Unsupported llm.provider 'cohere'" in result.summary
 
+    def test_bedrock_routes_to_deepagents(self):
+        runner = _mk_runner("bedrock")
+        sentinel = object()
+
+        async def fake(query, context, progress_callback):
+            return sentinel
+
+        runner._run_async_deepagents = fake
+        assert _run(runner._run_async("q")) is sentinel
+
 
 class TestPlanPreview:
     def test_extract_plan_preview_steps_parses_mixed_formats(self):

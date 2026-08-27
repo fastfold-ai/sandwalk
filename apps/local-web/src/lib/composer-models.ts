@@ -56,7 +56,11 @@ const CLOUD_PROVIDER_LABELS: Record<string, string> = {
   mistral: 'Mistral',
   qwen: 'Qwen Cloud',
   together: 'Together AI',
-  openrouter: 'OpenRouter'
+  openrouter: 'OpenRouter',
+  cerebras: 'Cerebras',
+  groq: 'Groq',
+  fireworks: 'Fireworks',
+  bedrock: 'Bedrock'
 }
 
 /** Drop redundant “· via Provider” suffixes — provider shows under the name. */

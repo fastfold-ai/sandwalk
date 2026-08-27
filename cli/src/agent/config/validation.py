@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from .api_keys import API_KEYS
 from .defaults import DEFAULTS
 
 # Custom (non-catalog) MCP servers store OAuth/headers/health under dynamic keys
@@ -19,8 +20,8 @@ _CUSTOM_MCP_KEY_RE = re.compile(
 
 
 def _is_known_config_key(key: str) -> bool:
-    """True when *key* is a static DEFAULTS entry or a known dynamic MCP key."""
-    if key in DEFAULTS:
+    """True when *key* is a static DEFAULTS / API_KEYS entry or a known dynamic MCP key."""
+    if key in DEFAULTS or key in API_KEYS:
         return True
     return bool(_CUSTOM_MCP_KEY_RE.match(key))
 

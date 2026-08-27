@@ -26,6 +26,10 @@ VALID_LLM_PROVIDERS = frozenset(
         "qwen",
         "together",
         "openrouter",
+        "bedrock",
+        "cerebras",
+        "groq",
+        "fireworks",
     }
 )
 

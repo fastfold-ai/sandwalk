@@ -68,6 +68,10 @@ def test_agent_server_health_and_session_contract(tmp_path: Path, monkeypatch):
             "qwen",
             "together",
             "openrouter",
+            "cerebras",
+            "groq",
+            "fireworks",
+            "bedrock",
             "tavily",
         }.issubset(
             integration_keys

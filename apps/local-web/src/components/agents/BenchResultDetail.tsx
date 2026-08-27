@@ -40,6 +40,10 @@ function prettyProvider(id: string): string {
   if (key === 'lm_studio' || key === 'lmstudio') return 'LM Studio'
   if (key === 'ds4') return 'DS4'
   if (key === 'openrouter') return 'OpenRouter'
+  if (key === 'cerebras') return 'Cerebras'
+  if (key === 'groq') return 'Groq'
+  if (key === 'fireworks') return 'Fireworks AI'
+  if (key === 'bedrock') return 'Amazon Bedrock'
   if (key === 'deepseek') return 'DeepSeek'
   return raw.charAt(0).toUpperCase() + raw.slice(1)
 }

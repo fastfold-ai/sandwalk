@@ -71,10 +71,16 @@ def _setup_persist_provider_choice(cfg, selection: dict, args: dict) -> None:
             "qwen",
             "together",
             "openrouter",
+            "cerebras",
+            "groq",
+            "fireworks",
         ):
             from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
             cfg.set(OPENAI_COMPATIBLE_PROVIDERS[prov]["config_key"], key)
+        elif prov == "bedrock":
+            if not str(cfg.get("llm.aws_region") or "").strip():
+                cfg.set("llm.aws_region", "us-east-1")
 
     active_setup_provider = (
         args["default_provider"] if args["default_provider"] in selected_providers else selected_providers[0]
@@ -117,10 +123,17 @@ def _apply_default_model(cfg, active_setup_provider, selected_providers, resolve
             "qwen": "qwen",
             "together": "",
             "openrouter": "",
+            "cerebras": "",
+            "groq": "",
+            "fireworks": "",
         }
         prefix = prefixes.get(active_setup_provider, "")
         if default_model and (not prefix or not current_model.startswith(prefix)):
             cfg.set("llm.model", default_model)
+    if active_setup_provider == "bedrock":
+        current_model = str(cfg.get("llm.model") or "").strip().lower()
+        if "anthropic." not in current_model and "amazon.nova" not in current_model:
+            cfg.set("llm.model", "us.anthropic.claude-sonnet-4-6")
     if active_setup_provider == "openai":
         current_model = str(cfg.get("llm.model") or "").strip()
         from agent.config import Config as _Cfg
@@ -162,6 +175,14 @@ def _setup_print_provider_summary(selected_providers: list[str], cloud_key: str 
             if p == "together"
             else "OpenRouter"
             if p == "openrouter"
+            else "Cerebras"
+            if p == "cerebras"
+            else "Groq"
+            if p == "groq"
+            else "Fireworks AI"
+            if p == "fireworks"
+            else "Amazon Bedrock"
+            if p == "bedrock"
             else "Anthropic"
         )
         for p in selected_providers
