@@ -72,13 +72,11 @@ export function useCapySession({
 
   const send = async (
     content: string,
-    options?: { source?: 'voice' | 'text'; speakHint?: string }
+    options?: { source?: 'voice' | 'text' }
   ) => {
     const text = content.trim()
     if (!text) return
-    const outbound = options?.speakHint
-      ? `${text}\n\n${options.speakHint}`
-      : text
+    const outbound = text
     let current: AgentSession
     try {
       current = await ensureSession()

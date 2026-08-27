@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  applyVoiceHint,
+  cleanSpeechText,
   completedSentences,
   pronounceForSpeech,
-  speakableText,
-  voiceReplyHint
+  speakableText
 } from './speakable-text'
 
 describe('speakableText', () => {
@@ -51,9 +50,10 @@ describe('completedSentences', () => {
   })
 })
 
-describe('voiceReplyHint', () => {
-  it('asks Capy to speak in the selected language', () => {
-    expect(voiceReplyHint('Spanish')).toMatch(/Spanish/)
-    expect(applyVoiceHint('Hi', 'English')).toContain(voiceReplyHint('English'))
+describe('cleanSpeechText', () => {
+  it('keeps the full reply instead of a short spoken summary', () => {
+    expect(cleanSpeechText('One. Two. Three. Four.')).toBe(
+      'One. Two. Three. Four.'
+    )
   })
 })

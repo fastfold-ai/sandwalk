@@ -72,34 +72,87 @@ def ready_path(dest: Path) -> Path:
 
 
 class _JsonTqdm:
+    """tqdm stand-in. huggingface_hub calls update/refresh/close on this."""
+
     def __init__(self, *args, **kwargs):
+        iterable = args[0] if args else kwargs.get("iterable")
+        self.iterable = iterable
         self.n = 0
         self.total = int(kwargs.get("total") or 0)
+        self.desc = kwargs.get("desc") or ""
+        self.disable = bool(kwargs.get("disable"))
         self._last = 0
 
-    def update(self, n=1):
-        self.n += int(n or 0)
+    def _emit(self, force=False):
+        if self.disable:
+            return
         step = max(self.total // 80, 1_000_000) if self.total else 1_000_000
-        if self.n - self._last >= step or (self.total and self.n >= self.total):
-            self._last = self.n
-            emit(
-                {
-                    "phase": "download",
-                    "downloaded": self.n,
-                    "total": self.total,
-                    "message": "Downloading model files…",
-                }
-            )
-
-    def close(self):
+        if not force and self.n - self._last < step and not (
+            self.total and self.n >= self.total
+        ):
+            return
+        self._last = self.n
         emit(
             {
                 "phase": "download",
                 "downloaded": self.n,
-                "total": self.total or self.n,
+                "total": self.total,
                 "message": "Downloading model files…",
             }
         )
+
+    def update(self, n=1):
+        self.n += int(n or 0)
+        self._emit()
+        return True
+
+    def refresh(self, *args, **kwargs):
+        self._emit(force=True)
+        return None
+
+    def close(self):
+        self._emit(force=True)
+        return None
+
+    def clear(self, *args, **kwargs):
+        return None
+
+    def reset(self, total=None):
+        if total is not None:
+            self.total = int(total or 0)
+        self.n = 0
+        self._last = 0
+        return None
+
+    def display(self, *args, **kwargs):
+        self._emit(force=True)
+        return None
+
+    def set_description(self, desc=None, *args, **kwargs):
+        self.desc = desc or ""
+        return None
+
+    def set_description_str(self, desc=None, *args, **kwargs):
+        return self.set_description(desc)
+
+    def set_postfix(self, *args, **kwargs):
+        return None
+
+    def set_postfix_str(self, *args, **kwargs):
+        return None
+
+    def write(self, *args, **kwargs):
+        return None
+
+    def unpause(self):
+        return None
+
+    def __iter__(self):
+        if self.iterable is None:
+            return iter(())
+        for item in self.iterable:
+            yield item
+            self.update(1)
 
     def __enter__(self):
         return self
@@ -107,11 +160,8 @@ class _JsonTqdm:
     def __exit__(self, *_args):
         self.close()
 
-    def set_description(self, *_args, **_kwargs):
-        return None
-
-    def set_postfix(self, *_args, **_kwargs):
-        return None
+    def __bool__(self):
+        return True
 
 
 def install(model_id: str, dest: Path) -> None:
@@ -151,7 +201,7 @@ def install(model_id: str, dest: Path) -> None:
 
 def qwen_speaker(voice: str) -> str:
     name = voice.removeprefix("qwen_") if voice.startswith("qwen_") else voice
-    return name.replace("_", " ") or "Ryan"
+    return name or "Ryan"
 
 
 def qwen_language(lang: str, speaker: str) -> str:

@@ -114,4 +114,12 @@ export type ComposerProps = {
   /** When true, file drops anywhere in the window go to this composer. */
   captureWindowDrops?: boolean
   onDropActiveChange?: (active: boolean) => void
+  /** Capy hands-free owns this composer mic so it cannot stick in Listening. */
+  capyVoice?: {
+    recording: boolean
+    transcribing: boolean
+    levels: number[]
+    toggle: () => void
+    cancel: () => void
+  } | null
 }

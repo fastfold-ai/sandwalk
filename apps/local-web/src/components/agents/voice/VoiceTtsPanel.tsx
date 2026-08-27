@@ -1,5 +1,5 @@
 import { Loader2, Volume2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   formatBytes,
@@ -11,9 +11,10 @@ import { Slider } from '@/components/ui/slider'
 import {
   DEFAULT_CAPY_VOICE,
   DEFAULT_CAPY_VOICE_SPEED,
+  languageCodeFromVoice,
+  pickCapyVoice,
   previewPhrase,
   readCapySpeakAll,
-  readCapyVoice,
   readCapyVoiceAuto,
   readCapyVoiceSpeed,
   voiceForDetectedText,
@@ -68,6 +69,7 @@ export function VoiceTtsPanel() {
   const [testPrompt, setTestPrompt] = useState(previewPhrase('en'))
   const [voiceAuto, setVoiceAuto] = useState(true)
   const [busyModel, setBusyModel] = useState<string | null>(null)
+  const lastEngineRef = useRef<string | null>(null)
 
   const publish = (next: TtsStatus) => {
     setStatus(next)
@@ -76,7 +78,6 @@ export function VoiceTtsPanel() {
 
   useEffect(() => {
     setSpeakAll(readCapySpeakAll())
-    setVoice(readCapyVoice())
     setSpeed(readCapyVoiceSpeed())
     setVoiceAuto(readCapyVoiceAuto())
     if (!desktop) {
@@ -122,11 +123,19 @@ export function VoiceTtsPanel() {
   useEffect(() => {
     const voices = status?.voices || []
     if (!voices.length) return
-    if (voices.some(item => item.id === voice)) return
-    const next = voices[0].id
+    const engine = status?.active_model || null
+    const next = pickCapyVoice(voices, engine || undefined)
+    const engineChanged = lastEngineRef.current !== engine
+    lastEngineRef.current = engine
+    if (next === voice && !engineChanged) return
     setVoice(next)
-    writeCapyVoice(next)
-    setTestPrompt(previewPhrase(voices[0].language_code || 'en'))
+    writeCapyVoice(next, engine || undefined)
+    if (engineChanged || next !== voice) {
+      const language =
+        voices.find(item => item.id === next)?.language_code ||
+        languageCodeFromVoice(next)
+      setTestPrompt(previewPhrase(language))
+    }
   }, [status?.voices, status?.active_model, voice])
 
   const download = async (modelId: string) => {
@@ -205,7 +214,7 @@ export function VoiceTtsPanel() {
     const next = voiceForDetectedText(text, voice, status?.voices)
     if (next !== voice) {
       setVoice(next)
-      writeCapyVoice(next)
+      writeCapyVoice(next, status?.active_model)
     }
     if (persistPrompt) setTestPrompt(text)
     return next
@@ -452,7 +461,7 @@ export function VoiceTtsPanel() {
             onChange={event => {
               const next = event.target.value
               setVoice(next)
-              writeCapyVoice(next)
+              writeCapyVoice(next, status?.active_model)
               writeCapyVoiceAuto(false)
               setVoiceAuto(false)
               const nextLang =
@@ -466,7 +475,7 @@ export function VoiceTtsPanel() {
               <optgroup key={group} label={group}>
                 {voices.map(item => (
                   <option key={item.id} value={item.id}>
-                    {item.label} · {item.language}
+                    {item.label}
                   </option>
                 ))}
               </optgroup>

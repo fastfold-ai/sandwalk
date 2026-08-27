@@ -89,7 +89,8 @@ export function Composer({
   mentionChats,
   placeholder,
   captureWindowDrops = false,
-  onDropActiveChange
+  onDropActiveChange,
+  capyVoice = null
 }: ComposerProps) {
   const [auraTick, setAuraTick] = useState(0)
   const atMenuRef = useRef<ComposerAtMenuHandle | null>(null)
@@ -169,11 +170,29 @@ export function Composer({
     draftState.hashOpen
   )
 
-  const voice = useComposerVoice({
+  const composerVoice = useComposerVoice({
     draft: draftState.draft,
     commitDraft: draftState.commitDraft,
-    focusInput: draftState.focusActiveComposerInput
+    focusInput: draftState.focusActiveComposerInput,
+    enabled: !capyVoice
   })
+  const voice = capyVoice
+    ? {
+        showMic: composerVoice.showMic,
+        ready: composerVoice.ready,
+        recording: capyVoice.recording,
+        transcribing: capyVoice.transcribing,
+        active: capyVoice.recording || capyVoice.transcribing,
+        busy: capyVoice.transcribing ? 'Transcribing…' : null,
+        error: null,
+        levels: capyVoice.levels,
+        recordingTime: '',
+        fromVoice: false,
+        clearFromVoice: () => undefined,
+        toggle: capyVoice.toggle,
+        cancel: capyVoice.cancel
+      }
+    : composerVoice
 
   const selectedSpecialist =
     specialists.find(item => item.id === selectedSpecialistId) || null
