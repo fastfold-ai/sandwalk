@@ -70,9 +70,15 @@ export function useCapySession({
     })
   }, [session?.id, enabled])
 
-  const send = async (content: string) => {
+  const send = async (
+    content: string,
+    options?: { source?: 'voice' | 'text'; speakHint?: string }
+  ) => {
     const text = content.trim()
     if (!text) return
+    const outbound = options?.speakHint
+      ? `${text}\n\n${options.speakHint}`
+      : text
     let current: AgentSession
     try {
       current = await ensureSession()
@@ -88,7 +94,7 @@ export function useCapySession({
           id: `local-${Date.now()}`,
           sessionId: current.id,
           role: 'user',
-          content: text,
+          content: outbound,
           createdAt: new Date().toISOString()
         }
       ],
@@ -97,7 +103,7 @@ export function useCapySession({
       liveDelta: ''
     }))
     try {
-      await client.sendMessage(current.id, text)
+      await client.sendMessage(current.id, outbound)
     } catch (cause) {
       toast.error(sendErrorMessage(cause))
       setChat(prev => ({ ...prev, runActive: false }))

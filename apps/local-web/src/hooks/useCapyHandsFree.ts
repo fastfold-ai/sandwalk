@@ -9,6 +9,7 @@ import { isTauri } from '@/lib/desktop'
 import {
   cancelDictation,
   getDictationStatus,
+  publishVoiceInputChanged,
   startDictation,
   stopDictation,
   voiceReady
@@ -66,6 +67,7 @@ export function useCapyHandsFree({
     try {
       const next = await startDictation()
       if (!next?.recording) return
+      publishVoiceInputChanged(next)
       recordingRef.current = true
       setRecording(true)
     } catch {

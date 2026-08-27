@@ -100,4 +100,28 @@ describe('useCapySession', () => {
     })
     expect(result.current.chat.composer).toBe('Hi')
   })
+
+  it('appends a spoken-reply hint on voice turns', async () => {
+    const sendMessage = vi.fn().mockResolvedValue({ runId: 'r1' })
+    const client = {
+      getCapySession: vi.fn().mockResolvedValue(session()),
+      listMessages: vi.fn().mockResolvedValue([]),
+      sendMessage,
+      interrupt: vi.fn(),
+      resetCapySession: vi.fn()
+    }
+    const { result } = renderHook(() =>
+      useCapySession({ client: client as never, enabled: true })
+    )
+    await waitFor(() => {
+      expect(result.current.session?.id).toBe('capy-1')
+    })
+    await act(async () => {
+      await result.current.send('Hi', {
+        source: 'voice',
+        speakHint: '(Voice: answer in English in 1-2 short spoken sentences. No markdown, lists, or tool narration.)'
+      })
+    })
+    expect(String(sendMessage.mock.calls[0]?.[1])).toMatch(/Voice: answer in English/)
+  })
 })

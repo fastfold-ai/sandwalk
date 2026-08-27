@@ -10,6 +10,7 @@ import {
   getDictationStatus,
   startDictation,
   stopDictation,
+  publishVoiceInputChanged,
   VOICE_INPUT_CHANGED,
   voiceReady
 } from '@/lib/desktop-voice'
@@ -30,6 +31,7 @@ export function useComposerVoice({
   const [error, setError] = useState<string | null>(null)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [levels, setLevels] = useState<number[]>([])
+  const [fromVoice, setFromVoice] = useState(false)
 
   useEffect(() => {
     if (!desktop) return
@@ -115,6 +117,7 @@ export function useComposerVoice({
         }
         if (transcript.trim()) {
           commitDraft(appendTranscript(draft, transcript))
+          setFromVoice(true)
         }
         const status = await getDictationStatus()
         if (status) setDictation(status)
@@ -133,6 +136,7 @@ export function useComposerVoice({
       if (!next?.recording) {
         throw new Error('Could not start the microphone.')
       }
+      publishVoiceInputChanged(next)
       setDictation(next)
     } catch (voiceError) {
       setError(
@@ -157,6 +161,8 @@ export function useComposerVoice({
     error,
     levels,
     recordingTime,
+    fromVoice,
+    clearFromVoice: () => setFromVoice(false),
     toggle,
     cancel
   }

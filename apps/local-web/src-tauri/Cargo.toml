@@ -25,6 +25,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 dirs = "5"
 base64 = "0.22"
 sandwalk-stt = { path = "../stt" }
+sandwalk-tts = { path = "../tts" }
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
