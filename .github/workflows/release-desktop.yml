@@ -1,9 +1,8 @@
 # Build + publish Sandwalk macOS desktop (DMG + Tauri updater artifacts).
 #
-# Today: ad-hoc Apple codesign (`CODESIGN_IDENTITY=-`) + automated minisign
-# updater signing via `TAURI_SIGNING_PRIVATE_KEY` secret.
-# Later: set CODESIGN_IDENTITY / Apple secrets and enable the notarize step
-# (see apps/packaging/README.md → "Apple Developer ID / notarization").
+# Apple Developer ID + notarization when APPLE_CERTIFICATE is set
+# (see apps/packaging/APPLE-SIGNING.md). Falls back to ad-hoc codesign.
+# Updater minisign uses TAURI_SIGNING_PRIVATE_KEY.
 
 name: Release Desktop
 
@@ -119,10 +118,18 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Package DMG (ad-hoc codesign + updater minisign)
+      - name: Import Apple Developer ID
         env:
-          # Self-sign Apple binaries for now. Swap for Developer ID later.
-          CODESIGN_IDENTITY: "-"
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: bash ./apps/packaging/import-apple-certificate.sh
+
+      - name: Package DMG (Developer ID + notarize when secrets are set)
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           UPDATER_DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.tag }}/Sandwalk.app.tar.gz
@@ -167,7 +174,7 @@ jobs:
             - Connect **Anthropic, OpenAI, Gemini, Grok, local models** (Ollama, Unsloth, oMLX, llama.cpp, LM Studio), skills, and MCPs.
             - Run compute **locally or on Modal / Lambda / Fastfold Cloud**.
 
-            macOS builds are **ad-hoc signed** until Apple Developer ID + notarization are enabled (right-click → Open the first time). In-app updates use `latest.json` + `Sandwalk.app.tar.gz`.
+            macOS builds are signed with **Developer ID Application** and notarized when Apple secrets are configured. In-app updates use `latest.json` + `Sandwalk.app.tar.gz`.
         env:
           # A classic PAT (repo scope) as RELEASE_GITHUB_TOKEN publishes as you,
           # not github-actions[bot].

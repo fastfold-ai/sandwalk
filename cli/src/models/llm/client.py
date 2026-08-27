@@ -29,6 +29,9 @@ class LLMClient:
         "qwen": "qwen3.7-plus",
         "together": "zai-org/GLM-5.2",
         "openrouter": "anthropic/claude-sonnet-5",
+        "cerebras": "gpt-oss-120b",
+        "groq": "llama-3.3-70b-versatile",
+        "fireworks": "accounts/fireworks/models/llama-v3p3-70b-instruct",
     }
 
     # First-party OpenAI-compatible providers: fixed base URL + env fallback.
@@ -50,6 +53,9 @@ class LLMClient:
         ),
         "together": ("https://api.together.xyz/v1", "TOGETHER_API_KEY"),
         "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
+        "cerebras": ("https://api.cerebras.ai/v1", "CEREBRAS_API_KEY"),
+        "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY"),
+        "fireworks": ("https://api.fireworks.ai/inference/v1", "FIREWORKS_API_KEY"),
     }
 
     def __init__(self, provider: str = "openai", model: str = None,

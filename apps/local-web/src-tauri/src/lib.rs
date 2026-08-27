@@ -5,6 +5,7 @@
 //! `~/Library/Application Support/Sandwalk/control.json`.
 
 mod dictation;
+mod tts;
 mod lan_scan;
 mod multi_window;
 #[cfg(target_os = "macos")]
@@ -877,12 +878,22 @@ pub fn run() {
             dictation::verify_dictation_model,
             dictation::mark_dictation_test_passed,
             dictation::delete_dictation_model,
+            dictation::set_active_dictation_model,
             dictation::dictation_level,
+            tts::get_tts_status,
+            tts::download_tts_model,
+            tts::cancel_tts_model_download,
+            tts::verify_tts_model,
+            tts::delete_tts_model,
+            tts::set_active_tts_model,
+            tts::cancel_tts,
+            tts::speak_tts,
             #[cfg(target_os = "macos")]
             notification_click::sandwalk_notify,
         ])
         .setup(|app| {
             dictation::manage_dictation(app);
+            tts::manage_tts(app);
             ensure_server_helper();
             #[cfg(target_os = "macos")]
             notification_click::install_delegate(app.handle().clone());

@@ -124,25 +124,27 @@ pnpm exec tauri signer generate --ci -p "" -w src-tauri/.updater-key
 # Put the .pub contents into src-tauri/tauri.conf.json → plugins.updater.pubkey
 ```
 
-## Signing (today vs Apple later)
-
-### Today — self-sign (default)
+## Signing
 
 | Layer | What |
 |-------|------|
-| **Apple codesign** | Ad-hoc (`CODESIGN_IDENTITY=-`). Users may need right-click → Open once. |
-| **Updater (minisign)** | Automated via `TAURI_SIGNING_PRIVATE_KEY` (local `.updater-key` or CI secret). |
+| **Apple codesign** | First **Developer ID Application** identity in the keychain, or `CODESIGN_IDENTITY`. Falls back to ad-hoc (`-`). |
+| **Notarization** | When `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` are set, the DMG is submitted and stapled. |
+| **Updater (minisign)** | `TAURI_SIGNING_PRIVATE_KEY` (local `.updater-key` or CI secret). Unrelated to Apple. |
 
 ```bash
-# Local package (ad-hoc Apple + auto minisign if key file exists)
+# Uses Developer ID from Keychain when present
 ./apps/packaging/package-macos-dmg.sh
 
-# Explicit identity (still ad-hoc unless you pass a real Developer ID name)
+# Force ad-hoc
 CODESIGN_IDENTITY=- ./apps/packaging/package-macos-dmg.sh
 ```
 
-CI: [`.github/workflows/release-desktop.yml`](../../.github/workflows/release-desktop.yml)  
-(`workflow_dispatch` → builds DMG + updater artifacts → GitHub Release).
+Step-by-step certificate, local QA, `.p12` export, and GitHub secrets:
+[APPLE-SIGNING.md](./APPLE-SIGNING.md).
+
+CI: [`.github/workflows/release-desktop.yml`](../../.github/workflows/release-desktop.yml)
+(`workflow_dispatch` → signed DMG + updater artifacts → GitHub Release).
 
 **Repo secrets:**
 
@@ -151,47 +153,12 @@ CI: [`.github/workflows/release-desktop.yml`](../../.github/workflows/release-de
 | `TAURI_SIGNING_PRIVATE_KEY` | Full contents of `apps/local-web/src-tauri/.updater-key` |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Empty if the key was generated with `-p ""` |
 | `RELEASE_GITHUB_TOKEN` | Optional classic PAT (`repo` scope) so the GitHub Release is attributed to you, not `github-actions`. |
-
-Do **not** commit the private key. The public key already lives in
-`apps/local-web/src-tauri/tauri.conf.json` → `plugins.updater.pubkey`.
-
-### Later — Apple Developer ID + notarization
-
-When the Apple Developer Program membership is active:
-
-1. Create a **Developer ID Application** certificate in Apple Developer → Certificates.
-2. Export it as a `.p12` and add CI secrets (typical names):
-
-| Secret | Purpose |
-|--------|---------|
-| `APPLE_CERTIFICATE` | Base64 of the `.p12` |
+| `APPLE_CERTIFICATE` | Base64 of the Developer ID `.p12` |
 | `APPLE_CERTIFICATE_PASSWORD` | `.p12` password |
+| `APPLE_SIGNING_IDENTITY` | `Developer ID Application: Fastfold AI Labs, Corp (SG5Y53G9MJ)` |
 | `APPLE_ID` | Apple ID email |
 | `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password |
-| `APPLE_TEAM_ID` | 10-character Team ID |
+| `APPLE_TEAM_ID` | `SG5Y53G9MJ` |
 
-3. In the release workflow / package step, set:
-
-```bash
-CODESIGN_IDENTITY="Developer ID Application: Fastfold AI Labs (TEAMID)"
-```
-
-4. After assemble + codesign, notarize and staple (outline for when ready):
-
-```bash
-# Submit DMG (or .app.zip) to Apple
-xcrun notarytool submit apps/packaging/dist/Sandwalk-*-macos-arm64.dmg \
-  --apple-id "$APPLE_ID" \
-  --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-  --team-id "$APPLE_TEAM_ID" \
-  --wait
-
-# Staple ticket onto the DMG
-xcrun stapler staple apps/packaging/dist/Sandwalk-*-macos-arm64.dmg
-```
-
-5. Keep **minisign** updater signing as-is — Apple notarization does not replace it.
-   Notarization satisfies Gatekeeper; minisign authenticates the Tauri update channel.
-
-Until then, ship draft/pre-releases with ad-hoc codesign and document “right-click → Open”
-for dogfood installs.
+Do **not** commit the updater private key or the `.p12`. The minisign public key already
+lives in `apps/local-web/src-tauri/tauri.conf.json` → `plugins.updater.pubkey`.

@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import {
   LLM_API_KEY_COPY,
   LLM_API_KEY_ORDER,
+  bedrockFieldValue,
   primaryMaskedPreview,
   qwenEndpointValue
 } from './models-view-utils'
@@ -186,6 +187,22 @@ export function ModelsApiKeysSection({
     onEndpointDraftChange('qwen', qwenEndpointValue(activeIntegration))
   }, [activeIntegration, endpointDrafts, onEndpointDraftChange])
 
+  useEffect(() => {
+    if (!activeIntegration || activeIntegration.key !== 'bedrock') return
+    if (!Object.prototype.hasOwnProperty.call(endpointDrafts, 'bedrock_region')) {
+      onEndpointDraftChange(
+        'bedrock_region',
+        bedrockFieldValue(activeIntegration, 'AWS_REGION') || 'us-east-1'
+      )
+    }
+    if (!Object.prototype.hasOwnProperty.call(endpointDrafts, 'bedrock_profile')) {
+      onEndpointDraftChange(
+        'bedrock_profile',
+        bedrockFieldValue(activeIntegration, 'AWS_PROFILE')
+      )
+    }
+  }, [activeIntegration, endpointDrafts, onEndpointDraftChange])
+
   const activeCopy = activeIntegration
     ? providerCopy(activeIntegration.key)
     : null
@@ -197,9 +214,10 @@ export function ModelsApiKeysSection({
       ? (endpointDrafts.qwen ?? qwenEndpointValue(activeIntegration))
       : ''
   const busy = pendingAction !== null
+  const isBedrock = activeIntegration?.key === 'bedrock'
   const canTest = Boolean(
     activeIntegration &&
-      (activeIntegration.configured || activeDraft.trim())
+      (isBedrock || activeIntegration.configured || activeDraft.trim())
   )
 
   const runTest = async () => {
@@ -215,7 +233,11 @@ export function ModelsApiKeysSection({
         return
       }
       // Draft key or Qwen endpoint change → Save path persists then probes.
-      if (activeDraft.trim() || activeIntegration.key === 'qwen') {
+      if (
+        activeDraft.trim() ||
+        activeIntegration.key === 'qwen' ||
+        activeIntegration.key === 'bedrock'
+      ) {
         const result = await onSaveProviderKey(activeIntegration)
         if (result) setTestResult(result)
         return
@@ -352,10 +374,16 @@ export function ModelsApiKeysSection({
                     </span>
                     <span className="text-muted-foreground text-xs font-normal">
                       {cloudStatusFor(activeIntegration) === 'connected'
-                        ? 'Secret saved'
+                        ? isBedrock
+                          ? 'IAM connected'
+                          : 'Secret saved'
                         : cloudStatusFor(activeIntegration) === 'unreachable'
-                          ? 'Key saved · unreachable'
-                          : 'Not set'}
+                          ? isBedrock
+                            ? 'IAM unreachable'
+                            : 'Key saved · unreachable'
+                          : isBedrock
+                            ? 'Uses AWS CLI / IAM'
+                            : 'Not set'}
                     </span>
                   </span>
                 </DialogTitle>
@@ -366,6 +394,130 @@ export function ModelsApiKeysSection({
                   {activeCopy?.description || activeIntegration.description}
                 </p>
 
+                {isBedrock ? (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="bedrock-region"
+                        className="text-muted-foreground text-xs font-medium"
+                      >
+                        AWS region
+                      </label>
+                      <Input
+                        id="bedrock-region"
+                        value={endpointDrafts.bedrock_region ?? 'us-east-1'}
+                        autoComplete="off"
+                        spellCheck={false}
+                        onChange={event =>
+                          onEndpointDraftChange(
+                            'bedrock_region',
+                            event.target.value
+                          )
+                        }
+                        placeholder="us-east-1"
+                        className="bg-muted/40 font-mono text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="bedrock-profile"
+                        className="text-muted-foreground text-xs font-medium"
+                      >
+                        AWS profile
+                      </label>
+                      <Input
+                        id="bedrock-profile"
+                        value={endpointDrafts.bedrock_profile ?? ''}
+                        autoComplete="off"
+                        spellCheck={false}
+                        onChange={event =>
+                          onEndpointDraftChange(
+                            'bedrock_profile',
+                            event.target.value
+                          )
+                        }
+                        placeholder="default (or leave blank)"
+                        className="bg-muted/40 font-mono text-sm"
+                      />
+                    </div>
+                    <ol className="text-muted-foreground list-decimal space-y-1 pl-4 text-xs leading-relaxed">
+                      <li>
+                        Attach{' '}
+                        <code className="text-foreground">bedrock:InvokeModel</code>,{' '}
+                        <code className="text-foreground">
+                          InvokeModelWithResponseStream
+                        </code>
+                        ,{' '}
+                        <code className="text-foreground">
+                          ListFoundationModels
+                        </code>
+                        , and{' '}
+                        <code className="text-foreground">
+                          ListInferenceProfiles
+                        </code>
+                        .
+                      </li>
+                      <li>
+                        Run <code className="text-foreground">aws configure</code>{' '}
+                        or <code className="text-foreground">aws configure sso</code>{' '}
+                        then <code className="text-foreground">aws sso login</code>.
+                      </li>
+                      <li>
+                        Check with{' '}
+                        <code className="text-foreground">
+                          aws sts get-caller-identity
+                        </code>
+                        , then Test here.
+                      </li>
+                    </ol>
+                    <details className="rounded-lg border px-3 py-2">
+                      <summary className="cursor-pointer text-sm font-medium">
+                        Access keys (optional)
+                      </summary>
+                      <div className="mt-3 space-y-2">
+                        <Input
+                          type="text"
+                          value={activeDraft}
+                          autoComplete="off"
+                          onChange={event =>
+                            onKeyDraftChange(
+                              activeIntegration.key,
+                              event.target.value
+                            )
+                          }
+                          placeholder="AWS_ACCESS_KEY_ID"
+                          className="bg-muted/40 font-mono text-sm"
+                        />
+                        <Input
+                          type="password"
+                          value={endpointDrafts.bedrock_secret ?? ''}
+                          autoComplete="off"
+                          onChange={event =>
+                            onEndpointDraftChange(
+                              'bedrock_secret',
+                              event.target.value
+                            )
+                          }
+                          placeholder="AWS_SECRET_ACCESS_KEY"
+                          className="bg-muted/40 font-mono text-sm"
+                        />
+                        <Input
+                          type="password"
+                          value={endpointDrafts.bedrock_token ?? ''}
+                          autoComplete="off"
+                          onChange={event =>
+                            onEndpointDraftChange(
+                              'bedrock_token',
+                              event.target.value
+                            )
+                          }
+                          placeholder="AWS_SESSION_TOKEN (optional)"
+                          className="bg-muted/40 font-mono text-sm"
+                        />
+                      </div>
+                    </details>
+                  </div>
+                ) : (
                 <div className="relative">
                   <Input
                     type={
@@ -438,6 +590,7 @@ export function ModelsApiKeysSection({
                     </button>
                   </div>
                 </div>
+                )}
 
                 {activeIntegration.key === 'qwen' ? (
                   <div className="space-y-1.5">
@@ -466,7 +619,7 @@ export function ModelsApiKeysSection({
                   </div>
                 ) : null}
 
-                {activeIntegration.setupUrl ? (
+                {activeIntegration.setupUrl && !isBedrock ? (
                   <p className="text-muted-foreground text-sm">
                     No key yet?{' '}
                     <button
@@ -537,7 +690,7 @@ export function ModelsApiKeysSection({
                     Cancel
                   </Button>
                   <Button
-                    disabled={busy || !activeDraft.trim()}
+                    disabled={busy || (!isBedrock && !activeDraft.trim())}
                     onClick={() => void runSave()}
                   >
                     {pendingAction === 'save' ? (

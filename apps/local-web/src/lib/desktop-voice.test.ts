@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   appendTranscript,
   browserDictationStatus,
+  downloadDictationModel,
   getDictationStatus,
   startDictation,
   voiceReady
@@ -56,6 +57,7 @@ describe('desktop-voice soft-fail outside Tauri', () => {
   it('returns unsupported browser status', () => {
     const status = browserDictationStatus()
     expect(status.supported).toBe(false)
+    expect(status.active_model).toBe('multi')
     expect(status.compatibility_reason).toMatch(/desktop app/i)
   })
 
@@ -86,5 +88,17 @@ describe('desktop-voice invoke wrappers', () => {
     }
     await expect(getDictationStatus()).resolves.toEqual(status)
     expect(invoke).toHaveBeenCalledWith('get_dictation_status', undefined)
+  })
+
+  it('downloadDictationModel invokes the Tauri command with no model id', async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      ...browserDictationStatus(),
+      supported: true
+    })
+    ;(globalThis as { __TAURI__?: unknown }).__TAURI__ = {
+      core: { invoke }
+    }
+    await downloadDictationModel()
+    expect(invoke).toHaveBeenCalledWith('download_dictation_model', undefined)
   })
 })

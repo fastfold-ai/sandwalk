@@ -6,6 +6,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from fastapi.testclient import TestClient
+
+from agent_server.app import create_app
 from agent_server.capy import CAPY_EXCLUDED_DEEPAGENTS_TOOLS, bind_capy_deps, is_capy_session
 from agent_server.capy.extract import extract_session
 from agent_server.capy.session import get_or_create_capy_session
@@ -27,6 +30,23 @@ def test_capy_session_hidden_from_sidebar(tmp_path: Path, monkeypatch):
     assert capy.id not in ids
     again = get_or_create_capy_session(store, svc)
     assert again.id == capy.id
+
+
+def test_capy_session_http_returns_json(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("agent_server.service.CONFIG_DIR", tmp_path / "cfg")
+    app = create_app(store_path=tmp_path / "agent.db", allowed_hosts=["testserver"])
+    with TestClient(app) as client:
+        first = client.get("/v1/capy/session")
+        assert first.status_code == 200
+        assert first.headers["content-type"].startswith("application/json")
+        body = first.json()
+        assert body["source"] == "capy"
+        assert body["id"]
+        second = client.get("/v1/capy/session")
+        assert second.json()["id"] == body["id"]
+        listed = client.get("/v1/sessions?source=capy")
+        assert listed.status_code == 200
+        assert listed.json()["data"][0]["id"] == body["id"]
 
 
 def test_capy_run_context_skips_mcp_and_skills(tmp_path: Path, monkeypatch):

@@ -187,7 +187,9 @@ export function Composer({
     setAuraTick(tick => tick + 1)
     draftState.clearDraftAfterSend()
     clearAttachments()
-    onSend(payload)
+    const source = voice.fromVoice ? 'voice' : 'text'
+    voice.clearFromVoice()
+    onSend(payload, { source })
   }
 
   const hasDraft = Boolean(draftState.draft.trim()) || hasReadyAttachments

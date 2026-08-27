@@ -67,6 +67,22 @@ class SessionQueryMixin:
             ).fetchone()
         return session_from_row(row) if row else None
 
+    def get_session_by_source(self, source: str) -> AgentSession | None:
+        normalized = (source or "").strip().lower()
+        if not normalized:
+            return None
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM sessions
+                WHERE source = ?
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 1
+                """,
+                (normalized,),
+            ).fetchone()
+        return session_from_row(row) if row else None
+
     def list_sessions_by_ids(self, ids: list[str]) -> list[AgentSession]:
         """Bulk metadata fetch for a specific set of session ids.
 

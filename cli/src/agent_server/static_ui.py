@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 logger = logging.getLogger("agent_server.static_ui")
@@ -44,9 +44,15 @@ def mount_static_ui(app: FastAPI, dist: Path) -> None:
     async def ui_index() -> FileResponse:
         return FileResponse(dist / "index.html")
 
-    @app.get("/{full_path:path}")
-    async def ui_spa(full_path: str) -> FileResponse:
-        # /v1/* and other API routes are registered first and win matching.
+    @app.get("/{full_path:path}", response_model=None)
+    async def ui_spa(full_path: str) -> FileResponse | JSONResponse:
+        # Never serve the dashboard for API URLs. A missing /v1/* route must
+        # stay JSON so the UI does not JSON.parse("<!doctype html>…").
+        if full_path == "v1" or full_path.startswith("v1/"):
+            return JSONResponse(
+                status_code=404,
+                content={"detail": f"Not Found: /{full_path}"},
+            )
         candidate = (dist / full_path).resolve()
         try:
             candidate.relative_to(dist.resolve())

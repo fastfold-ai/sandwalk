@@ -169,6 +169,29 @@ PROVIDER_METADATA = {
             "OpenRouter multi-provider gateway — attributed to sandwalk.sh rankings."
         ),
     },
+    "cerebras": {
+        "name": "Cerebras",
+        "category": "AI Models",
+        "description": "Cerebras Cloud wafer-scale inference (LangChain ChatCerebras).",
+    },
+    "groq": {
+        "name": "Groq",
+        "category": "AI Models",
+        "description": "Groq LPU inference for open models (LangChain ChatGroq).",
+    },
+    "fireworks": {
+        "name": "Fireworks AI",
+        "category": "AI Models",
+        "description": "Fireworks AI hosted models (LangChain ChatFireworks).",
+    },
+    "bedrock": {
+        "name": "Amazon Bedrock",
+        "category": "AI Models",
+        "description": (
+            "Amazon Bedrock via IAM / AWS CLI profile (LangChain Converse). "
+            "Optional access keys for CI machines without the AWS CLI."
+        ),
+    },
     "tavily": {
         "name": "Tavily",
         "category": "MCP",

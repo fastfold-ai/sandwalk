@@ -50,6 +50,10 @@ def _resolve_all_provider_keys(
             "qwen",
             "together",
             "openrouter",
+            "cerebras",
+            "groq",
+            "fireworks",
+            "bedrock",
         ):
             cli_key_for_provider = None
         elif prov == "openai_compatible":

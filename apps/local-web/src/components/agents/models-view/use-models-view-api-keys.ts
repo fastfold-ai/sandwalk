@@ -69,7 +69,7 @@ export function useModelsViewApiKeys({
       return result
     }
     // Qwen auth failures are often wrong endpoint/plan — never wipe the key.
-    if (key !== 'qwen' && isInvalidKeyMessage(result.message)) {
+    if (key !== 'qwen' && key !== 'bedrock' && isInvalidKeyMessage(result.message)) {
       try {
         await forgetProviderKey(key)
       } catch {
@@ -98,7 +98,17 @@ export function useModelsViewApiKeys({
       // Empty string clears to Auto-detect on the server.
       values.QWEN_BASE_URL = endpointDrafts[integration.key] ?? ''
     }
-    if (!value && !integration.configured) {
+    if (integration.key === 'bedrock') {
+      values.AWS_REGION =
+        endpointDrafts.bedrock_region?.trim() || 'us-east-1'
+      values.AWS_PROFILE = endpointDrafts.bedrock_profile ?? ''
+      const secret = (endpointDrafts.bedrock_secret || '').trim()
+      const token = (endpointDrafts.bedrock_token || '').trim()
+      if (value) values.AWS_ACCESS_KEY_ID = value
+      if (secret) values.AWS_SECRET_ACCESS_KEY = secret
+      if (token) values.AWS_SESSION_TOKEN = token
+    }
+    if (integration.key !== 'bedrock' && !value && !integration.configured) {
       const message = `Enter a ${integration.name} API key to save.`
       setError(message)
       return { ok: false, message }

@@ -129,6 +129,79 @@ def _provider_discovered_items(
                     **_reasoning_fields(cfg, provider, model_id),
                 )
             )
+    items.extend(_bedrock_discovered_items(cfg, hidden, known_ids, enabled_only=enabled_only))
+    return items
+
+
+def _bedrock_seen_models(cfg: Config) -> set[str]:
+    raw = cfg.get("llm.bedrock_seen_models", [])
+    if not isinstance(raw, list):
+        return set()
+    return {str(item).strip() for item in raw if str(item or "").strip()}
+
+
+def _seed_bedrock_discovered_hidden(
+    cfg: Config, discovered: list[str], known_ids: set[str]
+) -> set[str]:
+    """Default-disable newly discovered Bedrock ids (opt-in), like OpenRouter."""
+    seen = _bedrock_seen_models(cfg)
+    fresh = [
+        model_id
+        for model_id in discovered
+        if model_id not in known_ids and model_id not in seen
+    ]
+    if not fresh:
+        return set(cfg.hidden_models())
+
+    hidden = set(cfg.hidden_models())
+    hidden.update(fresh)
+    seen.update(fresh)
+    cfg.set("llm.hidden_models", sorted(hidden))
+    cfg.set("llm.bedrock_seen_models", sorted(seen))
+    try:
+        cfg.save()
+    except Exception:  # noqa: BLE001 — listing must still return models
+        pass
+    return hidden
+
+
+def _bedrock_discovered_items(
+    cfg: Config, hidden: set[str], known_ids: set[str], *, enabled_only: bool
+) -> list[AgentModel]:
+    from agent.model_catalog.bedrock import discover_bedrock_model_ids
+
+    items: list[AgentModel] = []
+    try:
+        discovered = discover_bedrock_model_ids(cfg)
+    except Exception:  # noqa: BLE001 — IAM may be absent; static catalog still shows
+        return items
+    if not discovered:
+        return items
+    active_hidden = _seed_bedrock_discovered_hidden(cfg, discovered, known_ids)
+    hidden.clear()
+    hidden.update(active_hidden)
+    for model_id in discovered:
+        if model_id in known_ids:
+            continue
+        known_ids.add(model_id)
+        enabled = not cfg.is_model_hidden(model_id, "bedrock")
+        if enabled_only and not enabled:
+            continue
+        items.append(
+            AgentModel(
+                id=model_id,
+                label=format_discovered_model_label(model_id),
+                description="Amazon Bedrock (discovered)",
+                provider="bedrock",
+                source="cloud",
+                profile_id=None,
+                backend=None,
+                enabled=enabled,
+                health=None,
+                context_window=context_window_for_model(model_id),
+                **_reasoning_fields(cfg, "bedrock", model_id),
+            )
+        )
     return items
 
 

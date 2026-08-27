@@ -1,6 +1,6 @@
 //! Local Whisper dictation — Tauri commands over the `sandwalk-stt` crate.
 
-use sandwalk_stt::{Dictation, DownloadProgress};
+use sandwalk_stt::{Dictation, DownloadProgress, SttModelStatus};
 use serde::Serialize;
 use std::process::Command;
 use std::sync::Arc;
@@ -15,6 +15,8 @@ pub struct VoiceInputStatus {
     pub download_in_progress: bool,
     pub model_name: &'static str,
     pub model_bytes: u64,
+    pub active_model: String,
+    pub models: Vec<SttModelStatus>,
     pub supported: bool,
     pub device_summary: String,
     pub compatibility_reason: Option<String>,
@@ -31,6 +33,8 @@ fn voice_input_status(dictation: &Dictation) -> VoiceInputStatus {
         download_in_progress: status.download_in_progress,
         model_name: status.model_name,
         model_bytes: status.model_bytes,
+        active_model: status.active_model,
+        models: status.models,
         supported,
         device_summary,
         compatibility_reason,
@@ -217,6 +221,14 @@ pub fn delete_dictation_model(
     state: State<Arc<Dictation>>,
 ) -> Result<VoiceInputStatus, String> {
     state.delete_default_model()?;
+    Ok(voice_input_status(&state))
+}
+
+#[tauri::command]
+pub fn set_active_dictation_model(
+    state: State<Arc<Dictation>>,
+) -> Result<VoiceInputStatus, String> {
+    state.set_active_model(sandwalk_stt::DEFAULT_MODEL_ID)?;
     Ok(voice_input_status(&state))
 }
 
