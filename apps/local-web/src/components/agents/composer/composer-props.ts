@@ -53,7 +53,7 @@ export type ComposerProps = {
   onLiveDraftChange?: (value: string) => void
   onSkillChipsChange: (skills: string[]) => void
   onFileChipsChange?: (files: string[]) => void
-  onSend: (value: string) => void
+  onSend: (value: string, meta?: { source: 'voice' | 'text' }) => void
   onStop: () => void
   /** Upload files into the session workspace; returns paths used for send. */
   onUpload: (

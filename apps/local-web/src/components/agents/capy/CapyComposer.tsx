@@ -57,7 +57,7 @@ export function CapyComposer({
   runtimeSettings: RuntimeSettings | null
   tokenUsage: { inputTokens: number; outputTokens: number }
   onChange: (value: string) => void
-  onSend: (value: string) => void
+  onSend: (value: string, meta?: { source: 'voice' | 'text' }) => void
   onStop: () => void
   onSessionUpdated: (session: AgentSession) => void
   onMessagesReloaded: () => void

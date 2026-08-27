@@ -17,7 +17,15 @@ import { CapyChat } from '@/components/agents/capy/CapyChat'
 import { CapyComposer } from '@/components/agents/capy/CapyComposer'
 import { useCapyHandsFree } from '@/hooks/useCapyHandsFree'
 import { useCapySession } from '@/hooks/useCapySession'
+import { useCapyVoiceReply } from '@/hooks/useCapyVoiceReply'
 import { useCapyWindow } from '@/hooks/useCapyWindow'
+import {
+  languageForVoice,
+  readCapySpeakAll,
+  readCapyVoice
+} from '@/lib/capy-voice'
+import { voiceReplyHint } from '@/lib/speakable-text'
+import { getTtsStatus } from '@/lib/desktop-voice'
 import { CAPY_MIN_HEIGHT, CAPY_MIN_WIDTH, formatCapyUnreadBadge } from '@/lib/capy-ui'
 import type { ComposerModelOption } from '@/lib/composer-models'
 import { isDraftAgentSessionId, isReservedAgentRouteId } from '@/lib/draft-agent'
@@ -70,11 +78,33 @@ export function CapyOverlay({
   const capy = useCapySession({ client, enabled })
   const [unreadCount, setUnreadCount] = useState(0)
   const [dropActive, setDropActive] = useState(false)
+  const [speakTurn, setSpeakTurn] = useState(false)
   const wasRunning = useRef(false)
+
+  const sendCapy = async (text: string, source: 'voice' | 'text') => {
+    const speakAll = readCapySpeakAll()
+    const shouldSpeak = source === 'voice' || speakAll
+    setSpeakTurn(shouldSpeak)
+    let speakHint: string | undefined
+    if (shouldSpeak) {
+      const status = await getTtsStatus().catch(() => null)
+      const language = languageForVoice(readCapyVoice(), status?.voices || [])
+      speakHint = voiceReplyHint(language)
+    }
+    await capy.send(text, { source, speakHint })
+  }
+
   const handsFree = useCapyHandsFree({
     enabled: Boolean(health),
-    send: text => capy.send(text),
+    send: text => sendCapy(text, 'voice'),
     runActive: capy.chat.runActive
+  })
+  useCapyVoiceReply({
+    enabled: Boolean(health),
+    liveDelta: capy.chat.liveDelta,
+    runActive: capy.chat.runActive,
+    speakTurn,
+    recording: handsFree.recording
   })
   const drag = useRef<{ dx: number; dy: number } | null>(null)
   const dragged = useRef(false)
@@ -438,9 +468,9 @@ export function CapyOverlay({
           captureWindowDrops
           onDropActiveChange={setDropActive}
           onChange={next => capy.setChat(prev => ({ ...prev, composer: next }))}
-          onSend={text => {
+          onSend={(text, meta) => {
             if (!text.trim()) return
-            void capy.send(text)
+            void sendCapy(text, meta?.source || 'text')
           }}
           onStop={() => void capy.stop()}
           onSessionUpdated={next => capy.setSession(next)}

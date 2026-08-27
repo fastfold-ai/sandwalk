@@ -1,6 +1,6 @@
 //! Local Whisper dictation — Tauri commands over the `sandwalk-stt` crate.
 
-use sandwalk_stt::{Dictation, DownloadProgress};
+use sandwalk_stt::{Dictation, DownloadProgress, SttModelStatus};
 use serde::Serialize;
 use std::process::Command;
 use std::sync::Arc;
@@ -15,6 +15,8 @@ pub struct VoiceInputStatus {
     pub download_in_progress: bool,
     pub model_name: &'static str,
     pub model_bytes: u64,
+    pub active_model: String,
+    pub models: Vec<SttModelStatus>,
     pub supported: bool,
     pub device_summary: String,
     pub compatibility_reason: Option<String>,
@@ -31,6 +33,8 @@ fn voice_input_status(dictation: &Dictation) -> VoiceInputStatus {
         download_in_progress: status.download_in_progress,
         model_name: status.model_name,
         model_bytes: status.model_bytes,
+        active_model: status.active_model,
+        models: status.models,
         supported,
         device_summary,
         compatibility_reason,
@@ -174,10 +178,12 @@ pub fn cancel_dictation(state: State<Arc<Dictation>>) {
 pub async fn download_dictation_model(
     app: AppHandle,
     state: State<'_, Arc<Dictation>>,
+    model_id: Option<String>,
 ) -> Result<VoiceInputStatus, String> {
     let dictation = state.inner().clone();
+    let model_id = model_id.unwrap_or_else(|| "en".to_owned());
     tauri::async_runtime::spawn_blocking(move || {
-        dictation.install_default_model_with_progress(|progress: DownloadProgress| {
+        dictation.install_model_with_progress(&model_id, |progress: DownloadProgress| {
             let _ = app.emit("dictation-download-progress", progress);
         })?;
         Ok::<VoiceInputStatus, String>(voice_input_status(&dictation))
@@ -194,10 +200,15 @@ pub fn cancel_dictation_model_download(state: State<Arc<Dictation>>) {
 #[tauri::command]
 pub async fn verify_dictation_model(
     state: State<'_, Arc<Dictation>>,
+    model_id: Option<String>,
 ) -> Result<VoiceInputStatus, String> {
     let dictation = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        dictation.verify_default_model()?;
+        if let Some(model_id) = model_id {
+            dictation.verify_model(&model_id)?;
+        } else {
+            dictation.verify_default_model()?;
+        }
         Ok::<VoiceInputStatus, String>(voice_input_status(&dictation))
     })
     .await
@@ -215,8 +226,22 @@ pub fn mark_dictation_test_passed(
 #[tauri::command]
 pub fn delete_dictation_model(
     state: State<Arc<Dictation>>,
+    model_id: Option<String>,
 ) -> Result<VoiceInputStatus, String> {
-    state.delete_default_model()?;
+    if let Some(model_id) = model_id {
+        state.delete_model(&model_id)?;
+    } else {
+        state.delete_default_model()?;
+    }
+    Ok(voice_input_status(&state))
+}
+
+#[tauri::command]
+pub fn set_active_dictation_model(
+    state: State<Arc<Dictation>>,
+    model_id: String,
+) -> Result<VoiceInputStatus, String> {
+    state.set_active_model(&model_id)?;
     Ok(voice_input_status(&state))
 }
 

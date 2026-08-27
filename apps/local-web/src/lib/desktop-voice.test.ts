@@ -56,6 +56,7 @@ describe('desktop-voice soft-fail outside Tauri', () => {
   it('returns unsupported browser status', () => {
     const status = browserDictationStatus()
     expect(status.supported).toBe(false)
+    expect(status.active_model).toBe('en')
     expect(status.compatibility_reason).toMatch(/desktop app/i)
   })
 

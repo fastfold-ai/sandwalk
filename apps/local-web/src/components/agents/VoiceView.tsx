@@ -1,16 +1,15 @@
-import { ChevronDown, HardDrive, Mic, Monitor } from 'lucide-react'
+import { HardDrive, Mic, Monitor } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { VoiceLevelBars } from '@/components/agents/composer/VoiceLevelBars'
 import { DesktopOnlyCallout } from '@/components/agents/DesktopOnlyCallout'
-import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
-import { Button } from '@/components/ui/button'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
+  formatBytes,
+  StatusBadge,
+  SttModelCard
+} from '@/components/agents/voice/VoiceModelCards'
+import { VoiceTtsPanel } from '@/components/agents/voice/VoiceTtsPanel'
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { isTauri } from '@/lib/desktop'
 import {
@@ -25,56 +24,39 @@ import {
   listenDictationDownloadProgress,
   markDictationTestPassed,
   publishVoiceInputChanged,
+  setActiveDictationModel,
   startDictation,
   stopDictation,
+  type SttModelStatus,
   verifyDictationModel,
   voiceReady
 } from '@/lib/desktop-voice'
-import { cn } from '@/lib/utils'
-
-const OPENAI_ICON = INTEGRATION_ICONS.openai
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KiB`
-  return `${(bytes / (1024 * 1024)).toFixed(0)} MiB`
-}
 
 function voiceError(error: unknown) {
   if (error instanceof Error) return error.message
   return String(error)
 }
 
-function StatusBadge({
-  tone,
-  label
-}: {
-  tone: 'neutral' | 'ok' | 'warn' | 'bad'
-  label: string
-}) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium',
-        tone === 'neutral' && 'bg-muted text-muted-foreground',
-        tone === 'ok' && 'bg-sky-500/12 text-sky-700 dark:text-sky-300',
-        tone === 'warn' && 'bg-amber-500/12 text-amber-700 dark:text-amber-300',
-        tone === 'bad' && 'bg-destructive/10 text-destructive'
-      )}
-    >
-      <span
-        className={cn(
-          'size-1.5 shrink-0 rounded-full',
-          tone === 'neutral' && 'bg-muted-foreground/50',
-          tone === 'ok' && 'bg-sky-500',
-          tone === 'warn' && 'bg-amber-500',
-          tone === 'bad' && 'bg-destructive'
-        )}
-        aria-hidden
-      />
-      {label}
-    </span>
-  )
+function fallbackSttModels(status: DictationStatus): SttModelStatus[] {
+  if (status.models?.length) return status.models
+  return [
+    {
+      id: 'en',
+      model_name: status.model_name,
+      model_bytes: status.model_bytes,
+      model_installed: status.model_installed,
+      model_verified: status.model_verified,
+      test_passed: status.test_passed
+    },
+    {
+      id: 'multi',
+      model_name: 'Whisper Base Multilingual (local)',
+      model_bytes: 147_951_465,
+      model_installed: false,
+      model_verified: false,
+      test_passed: false
+    }
+  ]
 }
 
 export function VoiceView() {
@@ -89,6 +71,7 @@ export function VoiceView() {
   const [error, setError] = useState<string | null>(null)
   const [testTranscript, setTestTranscript] = useState('')
   const [levels, setLevels] = useState<number[]>([])
+  const [busyModel, setBusyModel] = useState<string | null>(null)
 
   const publish = (next: DictationStatus) => {
     setStatus(next)
@@ -143,21 +126,26 @@ export function VoiceView() {
     return () => window.clearInterval(timer)
   }, [status?.recording])
 
-  const download = async () => {
+  const download = async (modelId: string) => {
     setError(null)
+    setBusyModel(modelId)
     setProgress({
       downloaded_bytes: 0,
-      total_bytes: status?.model_bytes || 0
+      total_bytes:
+        status?.models.find(model => model.id === modelId)?.model_bytes ||
+        status?.model_bytes ||
+        0
     })
     setPhase('downloading')
     try {
-      publish(await downloadDictationModel())
+      publish(await downloadDictationModel(modelId))
     } catch (downloadError) {
       setError(voiceError(downloadError))
       const latest = await getDictationStatus()
       if (latest) publish(latest)
     } finally {
       setPhase('idle')
+      setBusyModel(null)
     }
   }
 
@@ -165,17 +153,17 @@ export function VoiceView() {
     await cancelDictationModelDownload().catch(() => undefined)
   }
 
-  const repair = async () => {
+  const repair = async (modelId: string) => {
     setError(null)
     try {
-      publish(await deleteDictationModel())
-      await download()
+      publish(await deleteDictationModel(modelId))
+      await download(modelId)
     } catch (repairError) {
       setError(voiceError(repairError))
     }
   }
 
-  const remove = async () => {
+  const remove = async (modelId: string) => {
     if (
       !window.confirm(
         'Remove the speech model? You’ll need to install it again before using the mic.'
@@ -185,11 +173,20 @@ export function VoiceView() {
     }
     setError(null)
     try {
-      publish(await deleteDictationModel())
+      publish(await deleteDictationModel(modelId))
       setTestTranscript('')
       setProgress(null)
     } catch (deleteError) {
       setError(voiceError(deleteError))
+    }
+  }
+
+  const useModel = async (modelId: string) => {
+    setError(null)
+    try {
+      publish(await setActiveDictationModel(modelId))
+    } catch (activeError) {
+      setError(voiceError(activeError))
     }
   }
 
@@ -228,7 +225,7 @@ export function VoiceView() {
     Math.round(((progress?.downloaded_bytes || 0) / progressTotal) * 100)
   )
   const ready = voiceReady(status)
-  const modelBytes = status?.model_bytes || 147_964_211
+  const sttModels = status ? fallbackSttModels(status) : []
 
   return (
     <ScrollArea className="flex-1">
@@ -257,7 +254,8 @@ export function VoiceView() {
               <div>
                 <h3 className="text-base font-semibold">Speech to text</h3>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  STT models — we’ll add more here over time.
+                  English is the default. Install multilingual Whisper for
+                  non-English dictation.
                 </p>
               </div>
               {status?.compatibility_reason ? (
@@ -266,101 +264,29 @@ export function VoiceView() {
                 </p>
               ) : null}
 
-              <div className="max-w-lg">
-                <div className="flex items-center gap-3 rounded-xl border px-3 py-3">
-                  <span className="bg-muted/50 grid size-9 shrink-0 place-items-center rounded-lg">
-                    {OPENAI_ICON ? (
-                      <img
-                        src={OPENAI_ICON.src}
-                        alt=""
-                        className={cn(
-                          'size-6 object-contain',
-                          OPENAI_ICON.invertInDark && 'dark:invert'
-                        )}
-                      />
-                    ) : (
-                      <Monitor className="size-4" />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">
-                      Whisper Base · English
-                    </div>
-                    <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5">
-                      {status ? (
-                        <StatusBadge
-                          tone={status.supported ? 'ok' : 'bad'}
-                          label={
-                            status.supported ? 'Supported' : 'Unsupported'
-                          }
-                        />
-                      ) : null}
-                      {status?.model_verified ? (
-                        <StatusBadge tone="ok" label="Ready" />
-                      ) : null}
-                      <span className="text-muted-foreground truncate text-xs">
-                        {status?.model_verified
-                          ? formatBytes(modelBytes)
-                          : `OpenAI · local · ${formatBytes(modelBytes)}`}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center">
-                    {status?.model_verified ? (
-                      <div className="flex items-stretch">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-r-none border-r-0"
-                          onClick={() => void repair()}
-                        >
-                          Re-download
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-l-none px-2"
-                              aria-label="More model actions"
-                            >
-                              <ChevronDown className="size-3.5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => void remove()}
-                            >
-                              Remove
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    ) : downloading ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void cancelDownload()}
-                      >
-                        Cancel
-                      </Button>
-                    ) : phase === 'verifying' ? (
-                      <StatusBadge tone="warn" label="Checking…" />
-                    ) : (
-                      <Button
-                        size="sm"
-                        disabled={!status?.supported}
-                        onClick={() => void download()}
-                      >
-                        Install
-                      </Button>
-                    )}
-                  </div>
-                </div>
+              <div className="max-w-lg space-y-2">
+                {sttModels.map(model => (
+                  <SttModelCard
+                    key={model.id}
+                    model={model}
+                    active={status?.active_model === model.id}
+                    supported={Boolean(status?.supported)}
+                    downloading={
+                      downloading &&
+                      (busyModel === model.id ||
+                        (!busyModel && status?.active_model === model.id))
+                    }
+                    verifying={phase === 'verifying' && status?.active_model === model.id}
+                    onInstall={() => void download(model.id)}
+                    onCancel={() => void cancelDownload()}
+                    onRepair={() => void repair(model.id)}
+                    onRemove={() => void remove(model.id)}
+                    onUse={() => void useModel(model.id)}
+                  />
+                ))}
 
                 {downloading ? (
-                  <div className="mt-2 rounded-xl border px-3 py-3">
+                  <div className="rounded-xl border px-3 py-3">
                     <div className="bg-muted h-2 overflow-hidden rounded-full">
                       <div
                         className="bg-foreground/80 h-full transition-all"
@@ -380,6 +306,8 @@ export function VoiceView() {
                 ) : null}
               </div>
             </section>
+
+            <VoiceTtsPanel />
 
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
