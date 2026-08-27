@@ -124,7 +124,9 @@ export function voiceReady(status: DictationStatus | null | undefined): boolean 
   )
 }
 
-export function voiceTtsReady(status: TtsStatus | null | undefined): boolean {
+export function voiceTtsReady(
+  status: TtsStatus | null | undefined
+): status is TtsStatus {
   return Boolean(status?.supported && status.model_verified)
 }
 

@@ -16,6 +16,15 @@ const OPENAI_ICON = INTEGRATION_ICONS.openai
 const compactBtn =
   'h-6 gap-1 px-2 text-[11px] [&_svg]:size-3'
 
+function voiceCardClass(active: boolean) {
+  return cn(
+    'flex h-full items-start gap-2 rounded-xl border px-3 py-3 transition-colors',
+    active
+      ? 'border-sky-500/70 bg-sky-500/8 ring-2 ring-sky-500/25'
+      : 'hover:bg-muted/40'
+  )
+}
+
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KiB`
@@ -78,7 +87,7 @@ export function SttModelCard({
   onUse?: () => void
 }) {
   return (
-    <div className="hover:bg-muted/40 flex h-full items-start gap-2 rounded-xl border px-3 py-3 transition-colors">
+    <div className={voiceCardClass(active)} aria-current={active ? 'true' : undefined}>
       <span className="bg-muted/50 grid size-9 shrink-0 place-items-center rounded-lg">
         {OPENAI_ICON ? (
           <img
@@ -97,6 +106,11 @@ export function SttModelCard({
         <div className="truncate text-sm font-medium">
           Whisper Base · Multilingual
         </div>
+        {active ? (
+          <p className="text-sky-700 dark:text-sky-300 mt-0.5 text-[11px] font-medium">
+            Selected
+          </p>
+        ) : null}
         <p className="text-muted-foreground mt-0.5 truncate text-xs">
           OpenAI · local · {formatBytes(model.model_bytes)}
         </p>
@@ -140,12 +154,17 @@ export function TtsQualityCard({
   onUse: () => void
 }) {
   return (
-    <div className="hover:bg-muted/40 flex h-full items-start gap-2 rounded-xl border px-3 py-3 transition-colors">
+    <div className={voiceCardClass(active)} aria-current={active ? 'true' : undefined}>
       <span className="bg-muted/50 grid size-9 shrink-0 place-items-center rounded-lg">
         <Volume2 className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{model.name}</div>
+        {active ? (
+          <p className="text-sky-700 dark:text-sky-300 mt-0.5 text-[11px] font-medium">
+            Selected
+          </p>
+        ) : null}
         <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
           {model.quality} · {formatBytes(model.model_bytes)}
         </p>
