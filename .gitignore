@@ -6,6 +6,9 @@ build/
 .env
 .env.local
 
+# Local-only notes / drafts / private docs (never committed).
+.local/
+
 # Python
 __pycache__/
 *.pyc
