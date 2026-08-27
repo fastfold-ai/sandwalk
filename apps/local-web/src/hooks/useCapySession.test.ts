@@ -117,7 +117,7 @@ describe('useCapySession', () => {
       expect(result.current.session?.id).toBe('capy-1')
     })
     await act(async () => {
-      await result.current.send('Hola, ¿cómo estás?', { source: 'voice' })
+      await result.current.send('Hola, ¿cómo estás?')
     })
     expect(sendMessage.mock.calls[0]?.[1]).toBe('Hola, ¿cómo estás?')
   })

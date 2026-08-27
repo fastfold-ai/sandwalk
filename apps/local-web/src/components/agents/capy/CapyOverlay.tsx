@@ -80,7 +80,7 @@ export function CapyOverlay({
   const sendCapy = async (text: string, source: 'voice' | 'text') => {
     const speakAll = readCapySpeakAll()
     setSpeakTurn(source === 'voice' || speakAll)
-    await capy.send(text, { source })
+    await capy.send(text)
   }
 
   const handsFree = useCapyHandsFree({

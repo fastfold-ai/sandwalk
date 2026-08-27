@@ -70,10 +70,7 @@ export function useCapySession({
     })
   }, [session?.id, enabled])
 
-  const send = async (
-    content: string,
-    options?: { source?: 'voice' | 'text' }
-  ) => {
+  const send = async (content: string) => {
     const text = content.trim()
     if (!text) return
     const outbound = text
