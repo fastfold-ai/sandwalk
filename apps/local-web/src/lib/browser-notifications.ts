@@ -61,10 +61,18 @@ async function ensureClickHandlerRegistered(): Promise<void> {
     // evento `sandwalk://notification-click` con el `tag` como payload.
     const { listen } = await import('@tauri-apps/api/event')
     await listen<string>('sandwalk://notification-click', event => {
+      // TEMP DEBUG FAS-107 (fase 1g/1h): trazar el flujo del click en
+      // banner. Quitar tras validar el deep link end-to-end.
+      // eslint-disable-next-line no-console
+      console.log('[FAS-107 click event]', event.payload)
       const tag = typeof event.payload === 'string' ? event.payload : null
       const id = extractItemIdFromTag(tag)
+      // eslint-disable-next-line no-console
+      console.log(`[FAS-107 extracted id] tag=${tag} id=${id}`)
       if (id) openItem(id)
     })
+    // eslint-disable-next-line no-console
+    console.log('[FAS-107 click listener registered]')
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[FAS-107 notification click listen failed]', err)

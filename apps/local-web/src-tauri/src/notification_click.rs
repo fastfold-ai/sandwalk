@@ -22,6 +22,7 @@
 
 #![cfg(target_os = "macos")]
 
+use std::io::Write;
 use std::sync::OnceLock;
 
 use block2::RcBlock;
@@ -37,6 +38,44 @@ use objc2_user_notifications::{
 use tauri::{AppHandle, Emitter};
 
 pub const NOTIFICATION_CLICK_EVENT: &str = "sandwalk://notification-click";
+
+/// Escribe una línea al log de deep link: `~/Library/Logs/Sandwalk/deep-link.log`.
+/// Útil en release build donde `eprintln!` se pierde. Antonio abre el
+/// archivo con TextEdit y ve paso a paso el flujo (delegate registrado,
+/// notif enviada, click recibido, tag extraído).
+fn log_line(msg: &str) {
+    eprintln!("{msg}");
+    if let Some(home) = dirs::home_dir() {
+        let dir = home.join("Library/Logs/Sandwalk");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("deep-link.log");
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            let _ = writeln!(
+                file,
+                "[{}] {}",
+                chrono_now(),
+                msg
+            );
+        }
+    }
+}
+
+/// Timestamp corto (`HH:MM:SS`) sin dep externo — usa `SystemTime` de std.
+fn chrono_now() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let h = (secs / 3600) % 24;
+    let m = (secs / 60) % 60;
+    let s = secs % 60;
+    format!("{h:02}:{m:02}:{s:02}")
+}
 
 // Guardamos el `AppHandle` en un OnceLock para que el delegate (que vive
 // como singleton en el runtime de macOS) pueda emitir eventos al
@@ -63,7 +102,7 @@ define_class!(
             response: &UNNotificationResponse,
             completion_handler: &block2::Block<dyn Fn()>,
         ) {
-            eprintln!("[sandwalk] delegate did_receive_response fired");
+            log_line("[sandwalk] delegate did_receive_response fired");
             let notification: Retained<UNNotification> = response.notification();
             let request = notification.request();
             let content = request.content();
@@ -76,11 +115,25 @@ define_class!(
                 let ns_ptr: *const AnyObject = &*obj;
                 let ns_str: &NSString = unsafe { &*(ns_ptr as *const NSString) };
                 let tag = ns_str.to_string();
+                log_line(&format!("[sandwalk] delegate tag={:?}", tag));
                 if !tag.is_empty() {
                     if let Some(handle) = APP_HANDLE.get() {
-                        let _ = handle.emit(NOTIFICATION_CLICK_EVENT, tag);
+                        match handle.emit(NOTIFICATION_CLICK_EVENT, tag.clone()) {
+                            Ok(_) => log_line(&format!(
+                                "[sandwalk] delegate emitted event tag={:?}",
+                                tag
+                            )),
+                            Err(err) => log_line(&format!(
+                                "[sandwalk] delegate emit ERROR: {}",
+                                err
+                            )),
+                        }
+                    } else {
+                        log_line("[sandwalk] delegate APP_HANDLE not set");
                     }
                 }
+            } else {
+                log_line("[sandwalk] delegate userInfo has no 'tag' key");
             }
             completion_handler.call(());
         }
@@ -122,7 +175,7 @@ pub fn install_delegate(app_handle: AppHandle) {
         let proto: &ProtocolObject<dyn UNUserNotificationCenterDelegate> =
             ProtocolObject::from_ref(&*delegate);
         center.setDelegate(Some(proto));
-        eprintln!("[sandwalk] UN delegate installed");
+        log_line("[sandwalk] UN delegate installed");
         // `setDelegate:` guarda una `weak` reference. Retenemos el
         // delegate para toda la vida del proceso con `mem::forget` —
         // `Retained<MainThreadOnly>` no implementa `Send + Sync` así
@@ -147,10 +200,10 @@ fn ensure_authorization_requested() {
             | UNAuthorizationOptions::Sound
             | UNAuthorizationOptions::Badge;
         let completion = RcBlock::new(|granted: Bool, _err: *mut NSError| {
-            eprintln!(
+            log_line(&format!(
                 "[sandwalk] UN authorization granted = {}",
                 granted.as_bool()
-            );
+            ));
         });
         center.requestAuthorizationWithOptions_completionHandler(options, &completion);
     }
@@ -165,7 +218,10 @@ pub fn sandwalk_notify(
     body: Option<String>,
     tag: Option<String>,
 ) -> Result<(), String> {
-    eprintln!("[sandwalk] sandwalk_notify title={:?} tag={:?}", title, tag);
+    log_line(&format!(
+        "[sandwalk] sandwalk_notify title={:?} tag={:?}",
+        title, tag
+    ));
     ensure_authorization_requested();
     unsafe {
         let center = UNUserNotificationCenter::currentNotificationCenter();

@@ -820,8 +820,16 @@ export default function App() {
   useEffect(() => {
     setItemOpener((itemId: string) => {
       const location = resolveItemLocation(itemId, allTabGroupsRef.current)
+      // TEMP DEBUG FAS-107: qué destino resuelve para el itemId del click.
+      // eslint-disable-next-line no-console
+      console.log(
+        `[FAS-107 opener] itemId=${itemId} kind=${location.kind} routePath=${location.routePath}` +
+          (location.kind === 'split-child'
+            ? ` groupId=${location.groupId} activeChatId=${location.activeChatId}`
+            : '')
+      )
       if (location.kind === 'split-child') {
-        tabGroupsStore.setTabGroupActiveChat(
+        tabGroupsStore.setGroupActiveChat(
           location.groupId,
           location.activeChatId
         )
@@ -831,7 +839,7 @@ export default function App() {
     return () => {
       setItemOpener(() => {})
     }
-  }, [navigate, tabGroupsStore.setTabGroupActiveChat])
+  }, [navigate, tabGroupsStore.setGroupActiveChat])
 
   const { showChatSkeleton } = useAppShellEffects({
     locationPathname: location.pathname,

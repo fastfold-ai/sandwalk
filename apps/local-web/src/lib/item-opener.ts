@@ -17,5 +17,10 @@ export function setItemOpener(fn: (itemId: string) => void): void {
 }
 
 export function openItem(itemId: string): void {
+  // TEMP DEBUG FAS-107: ver si openItem se dispara y si el opener está
+  // registrado (App.tsx setItemOpener corre en useEffect). Quitar tras
+  // validar deep link.
+  // eslint-disable-next-line no-console
+  console.log(`[FAS-107 openItem] itemId=${itemId} hasOpener=${opener != null}`)
   opener?.(itemId)
 }

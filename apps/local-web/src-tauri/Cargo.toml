@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # macos-private-api: transparent window + liquid glass (NSGlassEffectView / vibrancy)
-tauri = { version = "2", features = ["macos-private-api", "image-png"] }
+tauri = { version = "2", features = ["macos-private-api", "image-png", "devtools"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-liquid-glass = "0.1"
 tauri-plugin-notification = "2"
