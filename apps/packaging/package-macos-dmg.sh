@@ -178,7 +178,12 @@ sign_bundle() {
   codesign "${args[@]}" "${bundle}"
 }
 
-# Nested helper first, then the outer client (do not use --deep).
+# Innermost first: SwiftPM bundles → helper app → outer client (do not use --deep).
+shopt -s nullglob
+for nested in "${HELPER_STAGE}/Contents/MacOS/"*.bundle "${HELPER_STAGE}/Contents/Frameworks/"*.framework; do
+  sign_bundle "${nested}" ""
+done
+shopt -u nullglob
 sign_bundle "${HELPER_STAGE}" "${HELPER_ENTS}"
 sign_bundle "${APP_STAGE}" "${CLIENT_ENTS}"
 codesign --verify --strict "${HELPER_STAGE}"

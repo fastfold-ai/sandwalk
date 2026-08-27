@@ -36,6 +36,10 @@ cp "${ROOT}/Resources/Info.plist" "${APP_OUT}/Contents/Info.plist"
 BUNDLE_SRC="$(dirname "${BIN}")/Sandwalk_SandwalkCore.bundle"
 if [[ -d "${BUNDLE_SRC}" ]]; then
   cp -R "${BUNDLE_SRC}" "${APP_OUT}/Contents/MacOS/"
+  # SwiftPM dumps a flat *.bundle (pngs only). Developer ID requires a real bundle.
+  bash "${ROOT}/scripts/ensure-resource-bundle.sh" \
+    "${APP_OUT}/Contents/MacOS/Sandwalk_SandwalkCore.bundle" \
+    "ai.fastfold.sandwalk-server.SandwalkCore"
 fi
 
 echo "==> Generating AppIcon.icns..."
@@ -69,6 +73,12 @@ if [[ "${IDENTITY}" != "-" ]]; then
     SIGN_ARGS+=(--entitlements "${ENTITLEMENTS}")
   fi
 fi
+# Sign nested SwiftPM resource bundles before the .app (Developer ID rejects unsigned children).
+shopt -s nullglob
+for nested in "${APP_OUT}/Contents/MacOS/"*.bundle "${APP_OUT}/Contents/Frameworks/"*.framework; do
+  codesign "${SIGN_ARGS[@]}" "${nested}"
+done
+shopt -u nullglob
 codesign "${SIGN_ARGS[@]}" "${APP_OUT}"
 xattr -dr com.apple.quarantine "${APP_OUT}" 2>/dev/null || true
 
