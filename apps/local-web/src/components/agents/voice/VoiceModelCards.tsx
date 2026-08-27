@@ -1,4 +1,4 @@
-import { ChevronDown, Monitor } from 'lucide-react'
+import { ChevronDown, Monitor, Volume2 } from 'lucide-react'
 
 import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import { Button } from '@/components/ui/button'
@@ -8,10 +8,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import type { SttModelStatus } from '@/lib/desktop-voice'
+import type { SttModelStatus, TtsModelStatus } from '@/lib/desktop-voice'
 import { cn } from '@/lib/utils'
 
 const OPENAI_ICON = INTEGRATION_ICONS.openai
+
+const compactBtn =
+  'h-6 gap-1 px-2 text-[11px] [&_svg]:size-3'
 
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -72,10 +75,10 @@ export function SttModelCard({
   onCancel: () => void
   onRepair: () => void
   onRemove: () => void
-  onUse: () => void
+  onUse?: () => void
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border px-3 py-3">
+    <div className="hover:bg-muted/40 flex h-full items-start gap-2 rounded-xl border px-3 py-3 transition-colors">
       <span className="bg-muted/50 grid size-9 shrink-0 place-items-center rounded-lg">
         {OPENAI_ICON ? (
           <img
@@ -92,72 +95,166 @@ export function SttModelCard({
       </span>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">
-          {model.id === 'multi'
-            ? 'Whisper Base · Multilingual'
-            : 'Whisper Base · English'}
+          Whisper Base · Multilingual
         </div>
-        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5">
-          {supported ? (
-            <StatusBadge tone="ok" label="Supported" />
-          ) : (
-            <StatusBadge tone="bad" label="Unsupported" />
-          )}
-          {model.model_verified ? <StatusBadge tone="ok" label="Ready" /> : null}
-          {active ? <StatusBadge tone="ok" label="In use" /> : null}
-          <span className="text-muted-foreground truncate text-xs">
-            OpenAI · local · {formatBytes(model.model_bytes)}
-          </span>
+        <p className="text-muted-foreground mt-0.5 truncate text-xs">
+          OpenAI · local · {formatBytes(model.model_bytes)}
+        </p>
+      </div>
+      <VoiceCardActions
+        verified={model.model_verified}
+        active={active}
+        supported={supported}
+        downloading={downloading}
+        verifying={verifying}
+        moreLabel="More model actions"
+        onUse={onUse}
+        onInstall={onInstall}
+        onCancel={onCancel}
+        onRepair={onRepair}
+        onRemove={onRemove}
+      />
+    </div>
+  )
+}
+
+export function TtsQualityCard({
+  model,
+  active,
+  supported,
+  downloading,
+  onInstall,
+  onCancel,
+  onRepair,
+  onRemove,
+  onUse
+}: {
+  model: TtsModelStatus
+  active: boolean
+  supported: boolean
+  downloading: boolean
+  onInstall: () => void
+  onCancel: () => void
+  onRepair: () => void
+  onRemove: () => void
+  onUse: () => void
+}) {
+  return (
+    <div className="hover:bg-muted/40 flex h-full items-start gap-2 rounded-xl border px-3 py-3 transition-colors">
+      <span className="bg-muted/50 grid size-9 shrink-0 place-items-center rounded-lg">
+        <Volume2 className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{model.name}</div>
+        <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
+          {model.quality} · {formatBytes(model.model_bytes)}
+        </p>
+      </div>
+      <VoiceCardActions
+        verified={model.model_verified}
+        active={active}
+        supported={supported}
+        downloading={downloading}
+        moreLabel="More Capy voice actions"
+        onUse={onUse}
+        onInstall={onInstall}
+        onCancel={onCancel}
+        onRepair={onRepair}
+        onRemove={onRemove}
+      />
+    </div>
+  )
+}
+
+function VoiceCardActions({
+  verified,
+  active,
+  supported,
+  downloading,
+  verifying,
+  moreLabel,
+  onUse,
+  onInstall,
+  onCancel,
+  onRepair,
+  onRemove
+}: {
+  verified: boolean
+  active: boolean
+  supported: boolean
+  downloading: boolean
+  verifying?: boolean
+  moreLabel: string
+  onUse?: () => void
+  onInstall: () => void
+  onCancel: () => void
+  onRepair: () => void
+  onRemove: () => void
+}) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-start justify-end gap-1">
+      {onUse && verified && !active ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className={compactBtn}
+          onClick={onUse}
+        >
+          Use this
+        </Button>
+      ) : null}
+      {verified ? (
+        <div className="flex items-stretch">
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(compactBtn, 'rounded-r-none border-r-0')}
+            onClick={onRepair}
+          >
+            Re-download
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(compactBtn, 'rounded-l-none px-1.5')}
+                aria-label={moreLabel}
+              >
+                <ChevronDown />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={onRemove}
+              >
+                Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {model.model_verified && !active ? (
-          <Button variant="outline" size="sm" onClick={onUse}>
-            Use this
-          </Button>
-        ) : null}
-        {model.model_verified ? (
-          <div className="flex items-stretch">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-r-none border-r-0"
-              onClick={onRepair}
-            >
-              Re-download
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="rounded-l-none px-2"
-                  aria-label="More model actions"
-                >
-                  <ChevronDown className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={onRemove}
-                >
-                  Remove
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ) : downloading ? (
-          <Button variant="outline" size="sm" onClick={onCancel}>
-            Cancel
-          </Button>
-        ) : verifying ? (
-          <StatusBadge tone="warn" label="Checking…" />
-        ) : (
-          <Button size="sm" disabled={!supported} onClick={onInstall}>
-            Install
-          </Button>
-        )}
-      </div>
+      ) : downloading ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className={compactBtn}
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+      ) : verifying ? (
+        <StatusBadge tone="warn" label="Checking…" />
+      ) : (
+        <Button
+          size="sm"
+          className={compactBtn}
+          disabled={!supported}
+          onClick={onInstall}
+        >
+          Install
+        </Button>
+      )}
     </div>
   )
 }

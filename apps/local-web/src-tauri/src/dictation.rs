@@ -178,12 +178,10 @@ pub fn cancel_dictation(state: State<Arc<Dictation>>) {
 pub async fn download_dictation_model(
     app: AppHandle,
     state: State<'_, Arc<Dictation>>,
-    model_id: Option<String>,
 ) -> Result<VoiceInputStatus, String> {
     let dictation = state.inner().clone();
-    let model_id = model_id.unwrap_or_else(|| "en".to_owned());
     tauri::async_runtime::spawn_blocking(move || {
-        dictation.install_model_with_progress(&model_id, |progress: DownloadProgress| {
+        dictation.install_default_model_with_progress(|progress: DownloadProgress| {
             let _ = app.emit("dictation-download-progress", progress);
         })?;
         Ok::<VoiceInputStatus, String>(voice_input_status(&dictation))
@@ -200,15 +198,10 @@ pub fn cancel_dictation_model_download(state: State<Arc<Dictation>>) {
 #[tauri::command]
 pub async fn verify_dictation_model(
     state: State<'_, Arc<Dictation>>,
-    model_id: Option<String>,
 ) -> Result<VoiceInputStatus, String> {
     let dictation = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        if let Some(model_id) = model_id {
-            dictation.verify_model(&model_id)?;
-        } else {
-            dictation.verify_default_model()?;
-        }
+        dictation.verify_default_model()?;
         Ok::<VoiceInputStatus, String>(voice_input_status(&dictation))
     })
     .await
@@ -226,22 +219,16 @@ pub fn mark_dictation_test_passed(
 #[tauri::command]
 pub fn delete_dictation_model(
     state: State<Arc<Dictation>>,
-    model_id: Option<String>,
 ) -> Result<VoiceInputStatus, String> {
-    if let Some(model_id) = model_id {
-        state.delete_model(&model_id)?;
-    } else {
-        state.delete_default_model()?;
-    }
+    state.delete_default_model()?;
     Ok(voice_input_status(&state))
 }
 
 #[tauri::command]
 pub fn set_active_dictation_model(
     state: State<Arc<Dictation>>,
-    model_id: String,
 ) -> Result<VoiceInputStatus, String> {
-    state.set_active_model(&model_id)?;
+    state.set_active_model(sandwalk_stt::DEFAULT_MODEL_ID)?;
     Ok(voice_input_status(&state))
 }
 

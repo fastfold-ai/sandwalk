@@ -99,7 +99,7 @@ export function CapyOverlay({
     send: text => sendCapy(text, 'voice'),
     runActive: capy.chat.runActive
   })
-  useCapyVoiceReply({
+  const voiceReply = useCapyVoiceReply({
     enabled: Boolean(health),
     liveDelta: capy.chat.liveDelta,
     runActive: capy.chat.runActive,
@@ -267,7 +267,8 @@ export function CapyOverlay({
   }
 
   if (state.minimized) {
-    const working = capy.chat.runActive || handsFree.transcribing
+    const working =
+      capy.chat.runActive || handsFree.transcribing || Boolean(voiceReply.speakStatus)
     const unreadLabel = formatCapyUnreadBadge(unreadCount)
     return (
       <div
@@ -297,9 +298,10 @@ export function CapyOverlay({
                 : 'Open Capy. Double-tap Control for hands-free voice.'
           }
           title={
-            working
+            voiceReply.speakStatus ||
+            (working
               ? 'Capy is working'
-              : 'Double-tap Control to talk to Capy'
+              : 'Double-tap Control to talk to Capy')
           }
         >
           <img
@@ -392,6 +394,11 @@ export function CapyOverlay({
         <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center gap-1.5">
           <img src={capyLogo} alt="" className="size-5 rounded-full object-cover" />
           <div className="text-sm font-medium">Capy</div>
+          {voiceReply.speakStatus ? (
+            <span className="text-muted-foreground max-w-[14rem] truncate text-[11px] font-normal">
+              {voiceReply.speakStatus}
+            </span>
+          ) : null}
         </div>
         <div
           className="z-10 ml-auto flex shrink-0 items-center"

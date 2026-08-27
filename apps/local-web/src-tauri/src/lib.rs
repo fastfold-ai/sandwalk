@@ -883,6 +883,7 @@ pub fn run() {
             tts::cancel_tts_model_download,
             tts::verify_tts_model,
             tts::delete_tts_model,
+            tts::set_active_tts_model,
             tts::cancel_tts,
             tts::speak_tts,
         ])

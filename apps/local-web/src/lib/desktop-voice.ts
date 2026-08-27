@@ -37,12 +37,24 @@ export type TtsVoiceInfo = {
   language_code: string
 }
 
+export type TtsModelStatus = {
+  id: string
+  name: string
+  quality: string
+  model_bytes: number
+  model_installed: boolean
+  model_verified: boolean
+  supported: boolean
+}
+
 export type TtsStatus = {
   model_installed: boolean
   model_verified: boolean
   download_in_progress: boolean
   model_name: string
   model_bytes: number
+  active_model: string
+  models: TtsModelStatus[]
   voice_count: number
   voices_installed: number
   voices: TtsVoiceInfo[]
@@ -57,10 +69,17 @@ export type SpeechAudio = {
 export type DictationDownloadProgress = {
   downloaded_bytes: number
   total_bytes: number
+  message?: string
 }
 
 export const VOICE_INPUT_CHANGED = 'sandwalk:voice-input-changed'
 export const TTS_CHANGED = 'sandwalk:tts-changed'
+export const TTS_SPEAK_PROGRESS = 'sandwalk:tts-speak-progress'
+
+export type TtsSpeakProgress = {
+  phase: string
+  message: string
+}
 
 type TauriGlobal = {
   core?: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> }
@@ -138,44 +157,42 @@ export const stopDictation = () => invokeStrict<string>('stop_dictation')
 
 export const cancelDictation = () => invokeStrict<void>('cancel_dictation')
 
-export const downloadDictationModel = (modelId = 'en') =>
-  invokeStrict<DictationStatus>('download_dictation_model', {
-    model_id: modelId
-  })
+export const downloadDictationModel = () =>
+  invokeStrict<DictationStatus>('download_dictation_model')
 
 export const cancelDictationModelDownload = () =>
   invokeStrict<void>('cancel_dictation_model_download')
 
-export const verifyDictationModel = (modelId?: string) =>
-  invokeStrict<DictationStatus>(
-    'verify_dictation_model',
-    modelId ? { model_id: modelId } : undefined
-  )
+export const verifyDictationModel = () =>
+  invokeStrict<DictationStatus>('verify_dictation_model')
 
 export const markDictationTestPassed = () =>
   invokeStrict<DictationStatus>('mark_dictation_test_passed')
 
-export const deleteDictationModel = (modelId?: string) =>
-  invokeStrict<DictationStatus>(
-    'delete_dictation_model',
-    modelId ? { model_id: modelId } : undefined
-  )
+export const deleteDictationModel = () =>
+  invokeStrict<DictationStatus>('delete_dictation_model')
 
-export const setActiveDictationModel = (modelId: string) =>
-  invokeStrict<DictationStatus>('set_active_dictation_model', {
-    model_id: modelId
-  })
+export const setActiveDictationModel = () =>
+  invokeStrict<DictationStatus>('set_active_dictation_model')
 
 export const getTtsStatus = () => invoke<TtsStatus>('get_tts_status')
 
-export const downloadTtsModel = () => invokeStrict<TtsStatus>('download_tts_model')
+export const downloadTtsModel = (modelId = 'fp32') =>
+  invokeStrict<TtsStatus>('download_tts_model', { modelId })
 
 export const cancelTtsModelDownload = () =>
   invokeStrict<void>('cancel_tts_model_download')
 
 export const verifyTtsModel = () => invokeStrict<TtsStatus>('verify_tts_model')
 
-export const deleteTtsModel = () => invokeStrict<TtsStatus>('delete_tts_model')
+export const deleteTtsModel = (modelId?: string) =>
+  invokeStrict<TtsStatus>(
+    'delete_tts_model',
+    modelId ? { modelId } : undefined
+  )
+
+export const setActiveTtsModel = (modelId: string) =>
+  invokeStrict<TtsStatus>('set_active_tts_model', { modelId })
 
 export const cancelTts = () => invokeStrict<void>('cancel_tts')
 
@@ -202,37 +219,76 @@ export async function listenTtsDownloadProgress(
   })
 }
 
-let playback: { ctx: AudioContext; source: AudioBufferSourceNode } | null =
-  null
+export async function listenTtsSpeakProgress(
+  handler: (progress: TtsSpeakProgress) => void
+): Promise<() => void> {
+  const listen = tauri()?.event?.listen
+  if (!listen) return () => {}
+  return listen('tts-speak-progress', event => {
+    const next = event.payload as TtsSpeakProgress
+    handler(next)
+    window.dispatchEvent(new CustomEvent(TTS_SPEAK_PROGRESS, { detail: next }))
+  })
+}
+
+let playback: {
+  ctx: AudioContext
+  source: AudioBufferSourceNode
+  finish: () => void
+} | null = null
 
 export function stopTtsPlayback() {
-  playback?.source.stop()
-  void playback?.ctx.close()
+  const current = playback
   playback = null
+  try {
+    current?.source.stop()
+  } catch {
+    // Already stopped.
+  }
+  void current?.ctx.close()
+  current?.finish()
 }
 
 export async function playTtsAudio(audio: SpeechAudio): Promise<void> {
   stopTtsPlayback()
   if (!audio.samples.length) return
   const ctx = new AudioContext({ sampleRate: audio.sample_rate })
+  if (ctx.state === 'suspended') {
+    await ctx.resume().catch(() => undefined)
+  }
   const buffer = ctx.createBuffer(1, audio.samples.length, audio.sample_rate)
   buffer.copyToChannel(Float32Array.from(audio.samples), 0)
   const source = ctx.createBufferSource()
   source.buffer = buffer
   source.connect(ctx.destination)
-  playback = { ctx, source }
+  const durationMs = Math.ceil((audio.samples.length / audio.sample_rate) * 1000) + 400
   await new Promise<void>((resolve, reject) => {
-    source.onended = () => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
       if (playback?.source === source) {
-        void ctx.close()
         playback = null
+        void ctx.close()
       }
       resolve()
     }
+    const timer = window.setTimeout(finish, durationMs)
+    playback = { ctx, source, finish }
+    source.onended = finish
     try {
       source.start()
     } catch (error) {
-      reject(error)
+      window.clearTimeout(timer)
+      if (playback?.source === source) {
+        playback = null
+        void ctx.close()
+      }
+      if (!settled) {
+        settled = true
+        reject(error)
+      }
     }
   })
 }
@@ -245,9 +301,9 @@ export function browserDictationStatus(): DictationStatus {
     model_verified: false,
     test_passed: false,
     download_in_progress: false,
-    model_name: 'Whisper Base English (local)',
-    model_bytes: 147_964_211,
-    active_model: 'en',
+    model_name: 'Whisper Base Multilingual (local)',
+    model_bytes: 147_951_465,
+    active_model: 'multi',
     models: [],
     supported: false,
     device_summary: 'Browser',
@@ -262,8 +318,10 @@ export function browserTtsStatus(): TtsStatus {
     model_installed: false,
     model_verified: false,
     download_in_progress: false,
-    model_name: 'Kokoro 82M (local)',
-    model_bytes: 86_033_585,
+    model_name: 'Kokoro 82M · Best',
+    model_bytes: 325_532_232,
+    active_model: 'fp32',
+    models: [],
     voice_count: 0,
     voices_installed: 0,
     voices: [],

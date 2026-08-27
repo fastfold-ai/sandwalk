@@ -1,4 +1,4 @@
-import { HardDrive, Mic, Monitor } from 'lucide-react'
+import { Mic } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { VoiceLevelBars } from '@/components/agents/composer/VoiceLevelBars'
@@ -24,7 +24,6 @@ import {
   listenDictationDownloadProgress,
   markDictationTestPassed,
   publishVoiceInputChanged,
-  setActiveDictationModel,
   startDictation,
   stopDictation,
   type SttModelStatus,
@@ -38,23 +37,16 @@ function voiceError(error: unknown) {
 }
 
 function fallbackSttModels(status: DictationStatus): SttModelStatus[] {
-  if (status.models?.length) return status.models
+  const models = (status.models || []).filter(model => model.id !== 'en')
+  if (models.length) return models
   return [
     {
-      id: 'en',
-      model_name: status.model_name,
-      model_bytes: status.model_bytes,
+      id: 'multi',
+      model_name: status.model_name || 'Whisper Base Multilingual (local)',
+      model_bytes: status.model_bytes || 147_951_465,
       model_installed: status.model_installed,
       model_verified: status.model_verified,
       test_passed: status.test_passed
-    },
-    {
-      id: 'multi',
-      model_name: 'Whisper Base Multilingual (local)',
-      model_bytes: 147_951_465,
-      model_installed: false,
-      model_verified: false,
-      test_passed: false
     }
   ]
 }
@@ -71,8 +63,6 @@ export function VoiceView() {
   const [error, setError] = useState<string | null>(null)
   const [testTranscript, setTestTranscript] = useState('')
   const [levels, setLevels] = useState<number[]>([])
-  const [busyModel, setBusyModel] = useState<string | null>(null)
-
   const publish = (next: DictationStatus) => {
     setStatus(next)
     publishVoiceInputChanged(next)
@@ -126,26 +116,21 @@ export function VoiceView() {
     return () => window.clearInterval(timer)
   }, [status?.recording])
 
-  const download = async (modelId: string) => {
+  const download = async () => {
     setError(null)
-    setBusyModel(modelId)
     setProgress({
       downloaded_bytes: 0,
-      total_bytes:
-        status?.models.find(model => model.id === modelId)?.model_bytes ||
-        status?.model_bytes ||
-        0
+      total_bytes: status?.model_bytes || 147_951_465
     })
     setPhase('downloading')
     try {
-      publish(await downloadDictationModel(modelId))
+      publish(await downloadDictationModel())
     } catch (downloadError) {
       setError(voiceError(downloadError))
       const latest = await getDictationStatus()
       if (latest) publish(latest)
     } finally {
       setPhase('idle')
-      setBusyModel(null)
     }
   }
 
@@ -153,17 +138,17 @@ export function VoiceView() {
     await cancelDictationModelDownload().catch(() => undefined)
   }
 
-  const repair = async (modelId: string) => {
+  const repair = async () => {
     setError(null)
     try {
-      publish(await deleteDictationModel(modelId))
-      await download(modelId)
+      publish(await deleteDictationModel())
+      await download()
     } catch (repairError) {
       setError(voiceError(repairError))
     }
   }
 
-  const remove = async (modelId: string) => {
+  const remove = async () => {
     if (
       !window.confirm(
         'Remove the speech model? You’ll need to install it again before using the mic.'
@@ -173,20 +158,11 @@ export function VoiceView() {
     }
     setError(null)
     try {
-      publish(await deleteDictationModel(modelId))
+      publish(await deleteDictationModel())
       setTestTranscript('')
       setProgress(null)
     } catch (deleteError) {
       setError(voiceError(deleteError))
-    }
-  }
-
-  const useModel = async (modelId: string) => {
-    setError(null)
-    try {
-      publish(await setActiveDictationModel(modelId))
-    } catch (activeError) {
-      setError(voiceError(activeError))
     }
   }
 
@@ -254,8 +230,7 @@ export function VoiceView() {
               <div>
                 <h3 className="text-base font-semibold">Speech to text</h3>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  English is the default. Install multilingual Whisper for
-                  non-English dictation.
+                  One local Whisper model for English and other languages.
                 </p>
               </div>
               {status?.compatibility_reason ? (
@@ -264,26 +239,23 @@ export function VoiceView() {
                 </p>
               ) : null}
 
-              <div className="max-w-lg space-y-2">
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {sttModels.map(model => (
                   <SttModelCard
                     key={model.id}
                     model={model}
-                    active={status?.active_model === model.id}
+                    active={Boolean(model.model_verified)}
                     supported={Boolean(status?.supported)}
-                    downloading={
-                      downloading &&
-                      (busyModel === model.id ||
-                        (!busyModel && status?.active_model === model.id))
-                    }
-                    verifying={phase === 'verifying' && status?.active_model === model.id}
-                    onInstall={() => void download(model.id)}
+                    downloading={downloading}
+                    verifying={phase === 'verifying'}
+                    onInstall={() => void download()}
                     onCancel={() => void cancelDownload()}
-                    onRepair={() => void repair(model.id)}
-                    onRemove={() => void remove(model.id)}
-                    onUse={() => void useModel(model.id)}
+                    onRepair={() => void repair()}
+                    onRemove={() => void remove()}
                   />
                 ))}
+                </div>
 
                 {downloading ? (
                   <div className="rounded-xl border px-3 py-3">
@@ -364,36 +336,6 @@ export function VoiceView() {
                   {testTranscript}
                 </p>
               ) : null}
-            </section>
-
-            <section className="text-muted-foreground space-y-3 text-xs">
-              <div className="flex flex-wrap items-center gap-2">
-                <Monitor className="size-3.5 shrink-0" />
-                <span>{status?.device_summary || 'This machine'}</span>
-              </div>
-              <dl className="grid max-w-lg grid-cols-2 gap-x-6 gap-y-2">
-                <div>
-                  <dt className="text-foreground/70 font-medium">macOS</dt>
-                  <dd>12+ · Apple Silicon</dd>
-                </div>
-                <div>
-                  <dt className="text-foreground/70 font-medium">Windows</dt>
-                  <dd>10 22H2 / 11 · x64</dd>
-                </div>
-                <div>
-                  <dt className="text-foreground/70 font-medium">Memory</dt>
-                  <dd>8 GB recommended</dd>
-                </div>
-                <div>
-                  <dt className="text-foreground/70 font-medium">CPU</dt>
-                  <dd>4 cores recommended</dd>
-                </div>
-              </dl>
-              <p className="flex items-center gap-2">
-                <HardDrive className="size-3.5 shrink-0" />
-                Models saved in Sandwalk app data{' '}
-                <code className="font-mono text-[11px]">models/</code>
-              </p>
             </section>
           </>
         )}

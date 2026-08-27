@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   cancelTts,
   getTtsStatus,
+  listenTtsSpeakProgress,
   playTtsAudio,
   speakTts,
   stopTtsPlayback,
@@ -12,10 +13,17 @@ import {
 } from '@/lib/desktop-voice'
 import {
   completedSentences,
+  speakableBudget,
   speakableText,
   splitSentences
 } from '@/lib/speakable-text'
-import { readCapyVoice, readCapyVoiceSpeed } from '@/lib/capy-voice'
+import {
+  detectSpeechLanguage,
+  readCapyVoice,
+  readCapyVoiceAuto,
+  readCapyVoiceSpeed,
+  voiceForDetectedText
+} from '@/lib/capy-voice'
 
 export function useCapyVoiceReply({
   enabled,
@@ -34,6 +42,23 @@ export function useCapyVoiceReply({
   const turnRef = useRef(false)
   const speakingRef = useRef(false)
   const lastDeltaRef = useRef('')
+  const [speakStatus, setSpeakStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    let stop = () => {}
+    void listenTtsSpeakProgress(next => {
+      if (!active || next.phase === 'spoke') return
+      setSpeakStatus(next.message)
+    }).then(unlisten => {
+      stop = unlisten
+    })
+    return () => {
+      active = false
+      stop()
+      setSpeakStatus(null)
+    }
+  }, [])
 
   useEffect(() => {
     const stop = () => {
@@ -66,31 +91,38 @@ export function useCapyVoiceReply({
     const readySentences = runActive
       ? completedSentences(source)
       : splitSentences(source)
-    const pending = readySentences.slice(spokenRef.current, 2)
+    const lang = detectSpeechLanguage(source)
+    const budget = speakableBudget(lang)
+    const pending = readySentences.slice(spokenRef.current, budget.sentences)
     if (!pending.length) return
-    const text = speakableText(pending.join(' '), pending.length)
+    const raw = pending.join(lang === 'zh' || lang === 'ja' ? '' : ' ')
+    const text = speakableText(raw, budget.sentences, budget.chars, lang)
     if (!text) {
       spokenRef.current += pending.length
       return
     }
     speakingRef.current = true
+    setSpeakStatus('Loading model into memory…')
     void (async () => {
       try {
         const status = await getTtsStatus()
         if (!voiceTtsReady(status)) return
-        const audio = await speakTts(
-          text,
-          readCapyVoice(),
-          readCapyVoiceSpeed()
-        )
+        const voice = readCapyVoiceAuto()
+          ? voiceForDetectedText(raw, readCapyVoice(), status.voices)
+          : readCapyVoice()
+        const audio = await speakTts(text, voice, readCapyVoiceSpeed())
+        setSpeakStatus('Playing…')
         await playTtsAudio(audio)
         spokenRef.current += pending.length
       } catch {
         // Stay silent if TTS is missing or the user barged in.
       } finally {
         speakingRef.current = false
+        setSpeakStatus(null)
         if (!runActive) turnRef.current = false
       }
     })()
   }, [enabled, liveDelta, recording, runActive])
+
+  return { speakStatus }
 }

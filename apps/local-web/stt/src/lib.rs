@@ -26,16 +26,17 @@ use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextPar
 
 mod models;
 pub use models::{
-    stt_model, stt_model_or_en, SttModelSpec, EN_MODEL_ID, MULTI_MODEL_ID, STT_MODELS,
+    stt_model, stt_model_or_en, SttModelSpec, DEFAULT_MODEL_ID, EN_MODEL_ID, MULTI_MODEL_ID,
+    STT_MODELS,
 };
 
-/// A reasonably fast English model for short Sandwalk prompts (~142 MB).
-pub const DEFAULT_MODEL_FILE: &str = "ggml-base.en.bin";
+/// Multilingual Whisper Base (~141 MB). Covers English and other languages.
+pub const DEFAULT_MODEL_FILE: &str = "ggml-base.bin";
 pub const DEFAULT_MODEL_URL: &str =
-    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
-pub const DEFAULT_MODEL_BYTES: u64 = 147_964_211;
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin";
+pub const DEFAULT_MODEL_BYTES: u64 = 147_951_465;
 pub const DEFAULT_MODEL_SHA256: &str =
-    "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002";
+    "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe";
 const WHISPER_SAMPLE_RATE: u32 = 16_000;
 const ACTIVE_MODEL_FILE: &str = "stt-active";
 
@@ -197,7 +198,7 @@ impl Dictation {
     /// Downloads the default model atomically. Hosts should call this only after an explicit
     /// user action because it is a sizeable download.
     pub fn install_default_model(&self) -> Result<(), String> {
-        self.install_model_with_progress(EN_MODEL_ID, |_| {})
+        self.install_model_with_progress(DEFAULT_MODEL_ID, |_| {})
     }
 
     pub fn install_model_with_progress(
@@ -205,7 +206,9 @@ impl Dictation {
         model_id: &str,
         on_progress: impl FnMut(DownloadProgress),
     ) -> Result<(), String> {
-        self.install_spec_with_progress(stt_model_or_en(model_id), on_progress)
+        let spec = stt_model(model_id)
+            .ok_or_else(|| format!("Unknown speech model: {model_id}"))?;
+        self.install_spec_with_progress(spec, on_progress)
     }
 
     /// Downloads and verifies the default English model atomically, reporting byte progress.
@@ -213,7 +216,7 @@ impl Dictation {
         &self,
         on_progress: impl FnMut(DownloadProgress),
     ) -> Result<(), String> {
-        self.install_model_with_progress(EN_MODEL_ID, on_progress)
+        self.install_model_with_progress(DEFAULT_MODEL_ID, on_progress)
     }
 
     fn install_spec_with_progress(
@@ -342,7 +345,7 @@ impl Dictation {
     }
 
     pub fn delete_default_model(&self) -> Result<(), String> {
-        self.delete_model(EN_MODEL_ID)
+        self.delete_model(DEFAULT_MODEL_ID)
     }
 
     pub fn delete_model(&self, model_id: &str) -> Result<(), String> {
@@ -360,9 +363,6 @@ impl Dictation {
                 fs::remove_file(&path)
                     .map_err(|e| format!("Could not remove {}: {e}", path.display()))?;
             }
-        }
-        if self.active_model_id() == spec.id && spec.id != EN_MODEL_ID {
-            let _ = self.set_active_model(EN_MODEL_ID);
         }
         Ok(())
     }
@@ -518,7 +518,7 @@ fn read_active_model(model_dir: &Path) -> String {
         .ok()
         .map(|value| value.trim().to_owned())
         .filter(|value| stt_model(value).is_some())
-        .unwrap_or_else(|| EN_MODEL_ID.to_owned())
+        .unwrap_or_else(|| DEFAULT_MODEL_ID.to_owned())
 }
 
 fn capture_worker(
@@ -742,8 +742,8 @@ mod tests {
     };
 
     use super::{
-        resample_mono, write_verification_marker, Dictation, EN_MODEL_ID, STT_MODELS,
-        DEFAULT_MODEL_BYTES, DEFAULT_MODEL_FILE,
+        resample_mono, write_verification_marker, Dictation, STT_MODELS, DEFAULT_MODEL_BYTES,
+        DEFAULT_MODEL_FILE,
     };
 
     #[test]
@@ -759,14 +759,15 @@ mod tests {
     }
 
     #[test]
-    fn default_model_size_matches_the_published_base_english_artifact() {
-        assert_eq!(DEFAULT_MODEL_BYTES, 147_964_211);
-        assert_eq!(STT_MODELS[1].id, "multi");
-        assert_eq!(STT_MODELS[1].bytes, 147_951_465);
+    fn default_model_size_matches_the_published_base_multilingual_artifact() {
+        assert_eq!(DEFAULT_MODEL_BYTES, 147_951_465);
+        assert_eq!(STT_MODELS.len(), 1);
+        assert_eq!(STT_MODELS[0].id, "multi");
+        assert_eq!(STT_MODELS[0].bytes, 147_951_465);
     }
 
     #[test]
-    fn active_model_defaults_to_english_and_can_switch() {
+    fn active_model_defaults_to_multilingual() {
         let unique = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -774,10 +775,8 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("ocw-stt-active-{unique}"));
         fs::create_dir_all(&dir).unwrap();
         let dictation = Dictation::new(&dir);
-        assert_eq!(dictation.status().active_model, EN_MODEL_ID);
-        dictation.set_active_model("multi").unwrap();
         assert_eq!(dictation.status().active_model, "multi");
-        assert_eq!(dictation.status().models.len(), 2);
+        assert_eq!(dictation.status().models.len(), 1);
         drop(dictation);
         fs::remove_dir_all(dir).unwrap();
     }
@@ -805,7 +804,7 @@ mod tests {
         assert!(dictation.status().test_passed);
         dictation.delete_default_model().unwrap();
         assert!(!dictation.status().model_installed);
-        assert_eq!(dictation.status().active_model, EN_MODEL_ID);
+        assert_eq!(dictation.status().active_model, "multi");
         drop(dictation);
         fs::remove_dir_all(dir).unwrap();
     }
