@@ -166,6 +166,33 @@ OPENAI_COMPATIBLE_PROVIDERS: dict[str, dict[str, str]] = {
         # (see catalog_discovery._seed_openrouter_discovered_hidden).
         "discover_models": "true",
     },
+    "cerebras": {
+        "base_url": "https://api.cerebras.ai/v1",
+        "config_key": "llm.cerebras_api_key",
+        "env_var": "CEREBRAS_API_KEY",
+        "label": "Cerebras",
+        "signup_url": "https://cloud.cerebras.ai",
+        "default_model": "gpt-oss-120b",
+        "discover_models": "true",
+    },
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "config_key": "llm.groq_api_key",
+        "env_var": "GROQ_API_KEY",
+        "label": "Groq",
+        "signup_url": "https://console.groq.com/keys",
+        "default_model": "llama-3.3-70b-versatile",
+        "discover_models": "true",
+    },
+    "fireworks": {
+        "base_url": "https://api.fireworks.ai/inference/v1",
+        "config_key": "llm.fireworks_api_key",
+        "env_var": "FIREWORKS_API_KEY",
+        "label": "Fireworks AI",
+        "signup_url": "https://fireworks.ai/account/api-keys",
+        "default_model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+        "discover_models": "true",
+    },
 }
 
 OPENAI_PROFILE_DEFAULTS = {

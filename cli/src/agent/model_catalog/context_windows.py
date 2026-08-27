@@ -112,12 +112,25 @@ def context_window_for_model(model_id: str) -> int | None:
         if exact is not None:
             return exact
     # ``qwen/qwen3.7-max`` → also try ``qwen3.7-max``.
+    # Bedrock ``us.anthropic.claude-sonnet-4-6`` → ``claude-sonnet-4-6``.
+    from agent.model_catalog.bedrock import bedrock_bare_model_id
+
+    bedrock_bare = bedrock_bare_model_id(lowered)
     bare = lowered.rsplit("/", 1)[-1]
+    if bedrock_bare and bedrock_bare != lowered and bedrock_bare != bare:
+        exact = _EXACT_CONTEXT_WINDOWS.get(bedrock_bare)
+        if exact is not None:
+            return exact
     if bare != lowered:
         exact = _EXACT_CONTEXT_WINDOWS.get(bare)
         if exact is not None:
             return exact
-    candidates = (lowered,) if bare == lowered else (lowered, bare)
+    extra = tuple(
+        item
+        for item in (bare, bedrock_bare)
+        if item and item != lowered
+    )
+    candidates = (lowered, *extra)
     best: int | None = None
     best_len = -1
     for candidate in candidates:

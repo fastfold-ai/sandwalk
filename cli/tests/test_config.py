@@ -744,6 +744,22 @@ class TestValidateConfig:
         issues = _validate_config({"agent.typo_key": True})
         assert any("Unknown config key" in i and "typo_key" in i for i in issues)
 
+    def test_new_cloud_provider_keys_are_known(self):
+        """Bedrock / Cerebras / Groq / Fireworks must not warn as typos."""
+        issues = _validate_config({
+            "llm.aws_region": "us-east-1",
+            "llm.aws_profile": "sandwalk-bedrock",
+            "llm.aws_access_key_id": None,
+            "llm.aws_secret_access_key": None,
+            "llm.aws_session_token": None,
+            "llm.bedrock_seen_models": [],
+            "llm.bedrock_verified": False,
+            "llm.cerebras_api_key": "csk-test",
+            "llm.groq_api_key": "gsk-test",
+            "llm.fireworks_api_key": "fw-test",
+        })
+        assert not any("Unknown config key" in issue for issue in issues)
+
     def test_integration_update_timestamps_are_known(self):
         issues = _validate_config({
             "integrations.updated_at": {

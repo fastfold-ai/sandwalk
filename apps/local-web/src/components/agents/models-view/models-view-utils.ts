@@ -59,7 +59,11 @@ export const CLOUD_PROVIDERS = [
   { value: 'mistral', label: 'Mistral' },
   { value: 'qwen', label: 'Qwen Cloud' },
   { value: 'together', label: 'Together AI' },
-  { value: 'openrouter', label: 'OpenRouter' }
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'cerebras', label: 'Cerebras' },
+  { value: 'groq', label: 'Groq' },
+  { value: 'fireworks', label: 'Fireworks AI' },
+  { value: 'bedrock', label: 'Amazon Bedrock' }
 ] as const
 
 export const MODEL_LIST_PREVIEW_LIMIT = 10
@@ -189,7 +193,11 @@ export const LLM_API_KEY_ORDER = [
   'mistral',
   'qwen',
   'together',
-  'openrouter'
+  'openrouter',
+  'cerebras',
+  'groq',
+  'fireworks',
+  'bedrock'
 ] as const
 
 export const LLM_API_KEY_COPY: Record<
@@ -299,6 +307,35 @@ export const LLM_API_KEY_COPY: Record<
       'Route many providers through OpenRouter. Sandwalk attributes usage to sandwalk.sh.',
     hostLabel: 'openrouter.ai',
     placeholderUnset: 'Enter your OpenRouter API Key'
+  },
+  cerebras: {
+    cardTitle: 'Cerebras',
+    title: 'Cerebras API Key',
+    description: 'Wafer-scale inference for GPT-OSS and Gemma on Cerebras Cloud.',
+    hostLabel: 'cloud.cerebras.ai',
+    placeholderUnset: 'Enter your Cerebras API Key'
+  },
+  groq: {
+    cardTitle: 'Groq',
+    title: 'Groq API Key',
+    description: 'Groq LPU inference for open models (Llama, Qwen, GPT-OSS).',
+    hostLabel: 'console.groq.com',
+    placeholderUnset: 'Enter your Groq API Key'
+  },
+  fireworks: {
+    cardTitle: 'Fireworks AI',
+    title: 'Fireworks AI API Key',
+    description: 'Hosted open and proprietary models via Fireworks inference.',
+    hostLabel: 'fireworks.ai',
+    placeholderUnset: 'Enter your Fireworks API Key'
+  },
+  bedrock: {
+    cardTitle: 'Amazon Bedrock',
+    title: 'Amazon Bedrock (IAM)',
+    description:
+      'Uses your AWS CLI / IAM identity by default. Set a region and optional profile, then Test. Access keys are optional.',
+    hostLabel: 'docs.aws.amazon.com',
+    placeholderUnset: 'Optional access key ID'
   }
 }
 
@@ -318,6 +355,14 @@ export function primaryMaskedPreview(integration: IntegrationSummary) {
 
 export function qwenEndpointValue(integration: IntegrationSummary) {
   const field = integration.fields.find(item => item.envVar === 'QWEN_BASE_URL')
+  return (field?.maskedPreview || '').trim()
+}
+
+export function bedrockFieldValue(
+  integration: IntegrationSummary,
+  envVar: string
+) {
+  const field = integration.fields.find(item => item.envVar === envVar)
   return (field?.maskedPreview || '').trim()
 }
 

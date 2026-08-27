@@ -63,6 +63,15 @@ def model_supports_reasoning_effort(
     # OpenRouter — unified ``reasoning.effort`` for models that advertise it.
     if provider_norm == "openrouter":
         return openrouter_model_supports_reasoning(value)
+    if provider_norm == "bedrock":
+        from agent.model_catalog.bedrock import bedrock_bare_model_id
+
+        bare = bedrock_bare_model_id(value)
+        if "claude" in bare or bare.startswith("claude"):
+            return anthropic_model_supports_effort(bare)
+        if "nova" in bare:
+            return True
+        return False
     # Local / compatible profiles: Unsloth via ``compatible_backend``.
     if provider_norm in {"local", "compatible", "openai-compatible"}:
         return compatible_profile_supports_thinking(compatible_backend)

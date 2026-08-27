@@ -186,6 +186,8 @@ def _meta_multimodal(model_id: str) -> set[ModalityKind]:
     value = model_id.lower()
     if "muse-spark" in value:
         return {"image", "file", "audio", "video"}
+    if "llama-4-scout" in value or "llama4-scout" in value:
+        return {"image"}
     return set()
 
 
@@ -327,6 +329,8 @@ def allowlist_modalities(
         return _mistral_multimodal(value)
     if provider_norm == "qwen":
         return _qwen_multimodal(value)
+    if provider_norm in {"bedrock", "groq", "cerebras", "fireworks"}:
+        return _gateway_multimodal(value)
     # DeepSeek / MiniMax curated text flagships — no native image injection.
     # DeepSeek V4 (Pro/Flash) is text-only on api.deepseek.com and OpenRouter
     # (``input_modalities: ["text"]``; Anthropic-compat marks image unsupported).

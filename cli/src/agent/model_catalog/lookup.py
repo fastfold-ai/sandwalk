@@ -118,6 +118,8 @@ def catalog_provider_for_model(model_id: str | None) -> str | None:
         return "mistral"
     if lower.startswith("qwen"):
         return "qwen"
+    if lower.startswith("accounts/fireworks/"):
+        return "fireworks"
     if lower.startswith(
         (
             "thinkingmachines/",

@@ -133,6 +133,10 @@ export function useModelsViewData({
       qwen: 'Qwen Cloud',
       together: 'Together AI',
       openrouter: 'OpenRouter',
+      cerebras: 'Cerebras',
+      groq: 'Groq',
+      fireworks: 'Fireworks AI',
+      bedrock: 'Amazon Bedrock',
       local: 'Local'
     }
     return Array.from(counts.entries())

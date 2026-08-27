@@ -26,6 +26,10 @@ const PROVIDER_ORDER = [
   'qwen',
   'together',
   'openrouter',
+  'cerebras',
+  'groq',
+  'fireworks',
+  'bedrock',
   'local'
 ] as const
 
@@ -43,6 +47,10 @@ const PROVIDER_LABELS: Record<string, string> = {
   qwen: 'Qwen Cloud',
   together: 'Together AI',
   openrouter: 'OpenRouter',
+  cerebras: 'Cerebras',
+  groq: 'Groq',
+  fireworks: 'Fireworks AI',
+  bedrock: 'Amazon Bedrock',
   local: 'Local'
 }
 

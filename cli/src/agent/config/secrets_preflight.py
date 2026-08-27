@@ -59,6 +59,9 @@ class SecretsPreflightMixin:
                 f"Valid providers: {valid}. Set it with: sandwalk config set llm.provider <provider>"
             )
 
+        if provider == "bedrock":
+            return None
+
         provider_key = self.llm_api_key(provider)
         if provider_key:
             if provider == "openai" and str(provider_key).startswith("sk-ant-"):
@@ -133,5 +136,6 @@ class SecretsPreflightMixin:
         labels = {
             "anthropic": "Anthropic",
             "openai": "OpenAI",
+            "bedrock": "Amazon Bedrock",
         }
         return f"{labels.get(provider, provider)} · {model}"
