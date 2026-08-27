@@ -204,6 +204,9 @@ class MutateMixin:
             removed_keys = [config_key for config_key, _ in entries]
             for config_key, _ in entries:
                 config.unset(config_key)
+            if key == "bedrock":
+                config.unset("llm.bedrock_verified")
+                config.set("llm.aws_region", "us-east-1")
             self._clear_updated(config, removed_keys)
             # Not set up ⇒ that provider's models must be off in the list.
             from agent_server.models_service.mutate import disable_models_for_provider
@@ -256,7 +259,7 @@ class MutateMixin:
         provider = self.get(key)
         if provider is None:
             raise KeyError(key)
-        if not provider.configured:
+        if not provider.configured and key != "bedrock":
             return ValidateIntegrationResponse(
                 ok=False,
                 configured=False,
@@ -265,6 +268,7 @@ class MutateMixin:
             )
 
         # LLM providers: 1-token chat probe (GET /models is not trusted).
+        # Bedrock tests the IAM / profile chain even when no access keys are set.
         if supports_llm_key_probe(key):
             result = probe_llm_api_key(
                 key,
@@ -288,6 +292,9 @@ class MutateMixin:
                         )
 
                         if enable_models_for_provider(config, key):
+                            dirty = True
+                        if key == "bedrock":
+                            config.set("llm.bedrock_verified", True)
                             dirty = True
                     if dirty:
                         config.save()

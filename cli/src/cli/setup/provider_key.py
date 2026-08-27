@@ -68,6 +68,9 @@ def _resolve_provider_key(
         "qwen",
         "together",
         "openrouter",
+        "cerebras",
+        "groq",
+        "fireworks",
     ):
         from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
@@ -80,6 +83,31 @@ def _resolve_provider_key(
         def prompt_fn():
             return _prompt_provider_api_key(label, signup_url)
         default_compat_key = None
+    elif provider == "bedrock":
+        console.print("\n  [cyan]Amazon Bedrock setup[/cyan]")
+        console.print(
+            "  Uses IAM / the AWS CLI credential chain (no Bedrock API key).\n"
+            "  1. Attach bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream,\n"
+            "     bedrock:ListFoundationModels, and bedrock:ListInferenceProfiles.\n"
+            "  2. Run `aws configure` or `aws configure sso` then `aws sso login`.\n"
+            "  3. Test with `aws sts get-caller-identity`."
+        )
+        try:
+            region = input("  AWS region [us-east-1]: ").strip() or "us-east-1"
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n  [dim]Setup cancelled.[/dim]")
+            raise typer.Exit()
+        try:
+            profile = input("  AWS profile (blank = default chain): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n  [dim]Setup cancelled.[/dim]")
+            raise typer.Exit()
+        cfg.set("llm.aws_region", region)
+        if profile:
+            cfg.set("llm.aws_profile", profile)
+        else:
+            cfg.unset("llm.aws_profile")
+        return "iam"
     else:
         existing_key = cfg.llm_api_key("anthropic")
         env_var_name = "ANTHROPIC_API_KEY"

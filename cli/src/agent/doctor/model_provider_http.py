@@ -55,6 +55,9 @@ _PROBE_MODELS = {
     "together": "zai-org/GLM-5.2",
     # OpenRouter free-tier ping; curated catalog default is Claude Sonnet.
     "openrouter": "openai/gpt-4o-mini",
+    "cerebras": "gemma-4-31b",
+    "groq": "llama-3.1-8b-instant",
+    "fireworks": "accounts/fireworks/models/llama-v3p1-8b-instruct",
 }
 
 # Models vary by Qwen plan; try a few cheap/common ids per endpoint.
@@ -285,11 +288,57 @@ def probe_anthropic_messages(
     )
 
 
+def probe_bedrock_iam(*, label: str | None = None) -> ModelsProbeResult:
+    """Validate the IAM / profile / access-key chain via ListFoundationModels."""
+    from agent.config import Config
+    from agent.config.bedrock_auth import bedrock_boto3_client, bedrock_region
+
+    name = label or "Amazon Bedrock"
+    cfg = Config.load()
+    region = bedrock_region(cfg)
+    try:
+        client = bedrock_boto3_client("bedrock", cfg)
+        response = client.list_foundation_models(byOutputModality="TEXT")
+        count = len(response.get("modelSummaries") or [])
+        return ModelsProbeResult(
+            ok=True,
+            message=f"{name} IAM works in {region} ({count} text models listed).",
+            model_count=count,
+        )
+    except Exception as exc:  # noqa: BLE001 — surface AWS errors as probe text
+        text = f"{exc.__class__.__name__}: {exc}"
+        lowered = text.lower()
+        if "nocredentials" in lowered or "unable to locate credentials" in lowered:
+            return ModelsProbeResult(
+                ok=False,
+                message=(
+                    "No AWS credentials. Run `aws configure` or `aws sso login`, "
+                    "set AWS_PROFILE, or paste access keys."
+                ),
+            )
+        if "accessdenied" in lowered or "not authorized" in lowered:
+            return ModelsProbeResult(
+                ok=False,
+                message=(
+                    "Access denied. Attach bedrock:ListFoundationModels, "
+                    "bedrock:ListInferenceProfiles, and bedrock:InvokeModel "
+                    "to this IAM identity."
+                ),
+            )
+        return ModelsProbeResult(
+            ok=False,
+            message=f"{name} probe failed ({exc.__class__.__name__}).",
+        )
+
+
 def supports_llm_key_probe(provider_key: str) -> bool:
     """True when ``provider_key`` has a live auth probe we can run."""
     from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
-    return provider_key in ("anthropic", "openai") or provider_key in OPENAI_COMPATIBLE_PROVIDERS
+    return (
+        provider_key in ("anthropic", "openai", "bedrock")
+        or provider_key in OPENAI_COMPATIBLE_PROVIDERS
+    )
 
 
 def _probe_model_for(provider_key: str) -> str:
@@ -313,6 +362,8 @@ def probe_llm_api_key(
 
     key = (api_key or "").strip()
     name = label or provider_key
+    if provider_key == "bedrock":
+        return probe_bedrock_iam(label=name)
     if not key:
         return ModelsProbeResult(
             ok=False,
@@ -468,6 +519,9 @@ CHAT_PROBE_PROVIDERS = frozenset(
         "qwen",
         "together",
         "openrouter",
+        "cerebras",
+        "groq",
+        "fireworks",
     }
 )
 

@@ -45,6 +45,16 @@ def _prompt_setup_providers_text(options: list[str]) -> list[str]:
         "or": "openrouter",
         "openrouter": "openrouter",
         "open-router": "openrouter",
+        "cb": "cerebras",
+        "cerebras": "cerebras",
+        "gq": "groq",
+        "groq": "groq",
+        "fw": "fireworks",
+        "fireworks": "fireworks",
+        "fireworks-ai": "fireworks",
+        "bedrock": "bedrock",
+        "aws": "bedrock",
+        "amazon": "bedrock",
         "k": "openai_compatible",
         "compatible": "openai_compatible",
         "openai-compatible": "openai_compatible",
@@ -59,7 +69,8 @@ def _prompt_setup_providers_text(options: list[str]) -> list[str]:
             "  [dim]Options:[/dim] anthropic (a), openai (o), xai (x), google (g), "
             "kimi/moonshot (m), nvidia (n), opencode (oc), deepseek (ds), "
             "minimax (mm), mistral (mi), qwen (qw), together (tg), "
-            "openrouter (or), openai_compatible (k), all"
+            "openrouter (or), cerebras (cb), groq (gq), fireworks (fw), "
+            "bedrock/aws, openai_compatible (k), all"
         )
         try:
             raw = input("  Providers: ").strip().lower()

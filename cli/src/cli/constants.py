@@ -22,6 +22,10 @@ SETUP_PROVIDER_ORDER = (
     "qwen",
     "together",
     "openrouter",
+    "cerebras",
+    "groq",
+    "fireworks",
+    "bedrock",
     "openai_compatible",
 )
 UV_INSTALL_FLAVORS = frozenset({"all", "win_build"})

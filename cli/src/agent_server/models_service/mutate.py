@@ -77,6 +77,9 @@ def _cloud_provider_key_present(cfg: Config, provider: str) -> bool:
             or cfg._normalized_secret(cfg.get("llm.api_key"))
             or cfg._normalized_secret(os.environ.get("ANTHROPIC_API_KEY"))
         )
+    if provider == "bedrock":
+        # IAM default — do not hide the static Bedrock gallery for missing keys.
+        return True
     return bool(cfg.llm_api_key(provider))
 
 

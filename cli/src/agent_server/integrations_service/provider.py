@@ -158,6 +158,10 @@ class ProviderMixin:
         configured_fields = [field for field in fields if field.configured]
         # Endpoint / non-secret companions must not mark the provider "connected".
         secret_configured = [field for field in configured_fields if field.is_secret]
+        profile_configured = any(
+            field.env_var == "AWS_PROFILE" and field.configured for field in fields
+        )
+        bedrock_verified = bool(config.get("llm.bedrock_verified")) if key == "bedrock" else False
         if key == "fastfold-cloud":
             # Slack Relay Agent needs the FastFold key — surface that on the unlock.
             key_ready = bool(secret_configured or configured_fields)
@@ -190,7 +194,10 @@ class ProviderMixin:
             category=str(metadata.get("category") or category_for(first_config_key)),
             description=str(metadata.get("description") or first_info["description"]),
             env_var=secret_field.env_var,
-            configured=bool(secret_configured),
+            configured=(
+                bool(secret_configured)
+                or (key == "bedrock" and (profile_configured or bedrock_verified))
+            ),
             source=primary.source,
             masked_preview=primary.masked_preview,
             setup_url=str(first_info.get("url") or "") or None,

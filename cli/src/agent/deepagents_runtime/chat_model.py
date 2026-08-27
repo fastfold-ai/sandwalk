@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from agent.deepagents_runtime.chat_model_anthropic import build_anthropic_chat_model
+from agent.deepagents_runtime.chat_model_bedrock import build_bedrock_chat_model
+from agent.deepagents_runtime.chat_model_cerebras import build_cerebras_chat_model
 from agent.deepagents_runtime.chat_model_compatible import build_compatible_chat_model
+from agent.deepagents_runtime.chat_model_fireworks import build_fireworks_chat_model
 from agent.deepagents_runtime.chat_model_google import build_google_chat_model
+from agent.deepagents_runtime.chat_model_groq import build_groq_chat_model
 from agent.deepagents_runtime.chat_model_moonshot import build_moonshot_chat_model
 from agent.deepagents_runtime.chat_model_openai import build_openai_chat_model
 from agent.deepagents_runtime.chat_model_openrouter import build_openrouter_chat_model
@@ -41,8 +45,9 @@ def build_chat_model(config, *, streaming: bool = True):
 
     Supports ``anthropic``, ``openai`` (including OpenAI-compatible local
     endpoints), ``google`` via the native Google GenAI SDK, ``moonshot`` via
-    ChatMoonshot, ``openrouter`` via ChatOpenRouter, and other first-party
-    OpenAI-compatible providers (xAI, NVIDIA, OpenCode Zen).
+    ChatMoonshot, ``openrouter`` via ChatOpenRouter, ``cerebras`` via
+    ChatCerebras, ``groq`` via ChatGroq, ``fireworks`` via ChatFireworks,
+    and other first-party OpenAI-compatible providers (xAI, NVIDIA, OpenCode Zen).
     """
     provider = str(config.get("llm.provider", "openai") or "openai").strip().lower()
     temperature = float(config.get("llm.temperature", 0.1))
@@ -57,6 +62,14 @@ def build_chat_model(config, *, streaming: bool = True):
         return build_moonshot_chat_model(config, temperature=temperature)
     if provider == "openrouter":
         return build_openrouter_chat_model(config, temperature=temperature)
+    if provider == "bedrock":
+        return build_bedrock_chat_model(config, temperature=temperature)
+    if provider == "cerebras":
+        return build_cerebras_chat_model(config, temperature=temperature)
+    if provider == "groq":
+        return build_groq_chat_model(config, temperature=temperature)
+    if provider == "fireworks":
+        return build_fireworks_chat_model(config, temperature=temperature)
     return build_compatible_chat_model(config, provider, temperature=temperature)
 
 
