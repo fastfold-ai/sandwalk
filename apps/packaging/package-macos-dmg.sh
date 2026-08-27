@@ -14,8 +14,11 @@
 #   SKIP_AGENT_RUNTIME=1   skip embedding CPython + sandwalk into the helper
 #   INSTALL=1              also copy assembled app to ~/Applications
 #   OUT_DIR=...            output directory (default: apps/packaging/dist)
-#   CODESIGN_IDENTITY=-    codesign identity (default `-` = ad-hoc / self-sign).
-#                          Later: "Developer ID Application: …" from Keychain.
+#   CODESIGN_IDENTITY      codesign identity. Unset = first Developer ID
+#                          Application in the keychain, else `-` (ad-hoc).
+#   APPLE_SIGNING_IDENTITY same as CODESIGN_IDENTITY (Tauri env name).
+#   APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID
+#                          when set, notarize + staple the DMG after build.
 #   TAURI_SIGNING_PRIVATE_KEY / _PATH / _PASSWORD — minisign key for updater
 set -euo pipefail
 
@@ -44,6 +47,14 @@ KEY_PATH="${TAURI_SIGNING_PRIVATE_KEY_PATH:-${LOCAL_WEB}/src-tauri/.updater-key}
 if [[ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" && -f "${KEY_PATH}" ]]; then
   export TAURI_SIGNING_PRIVATE_KEY_PATH="${KEY_PATH}"
 fi
+
+# Resolve Apple identity before Tauri build so the .app is Developer ID signed.
+CODESIGN_IDENTITY="$(bash "${SCRIPT_DIR}/macos-codesign-identity.sh")"
+export CODESIGN_IDENTITY
+if [[ "${CODESIGN_IDENTITY}" != "-" ]]; then
+  export APPLE_SIGNING_IDENTITY="${CODESIGN_IDENTITY}"
+fi
+echo "==> Apple codesign identity: ${CODESIGN_IDENTITY}"
 
 TAURI_BUNDLE=""
 if [[ "${SKIP_TAURI:-0}" != "1" ]]; then
@@ -88,6 +99,7 @@ echo "    client: ${TAURI_BUNDLE}"
 echo "==> Building Sandwalk Server helper..."
 cd "${MAC_APP}"
 CONFIG="${CONFIG}" SKIP_INSTALL=1 APP_NAME="Sandwalk Server.app" \
+  CODESIGN_IDENTITY="${CODESIGN_IDENTITY}" \
   ./scripts/package-app.sh
 HELPER_APP="${MAC_APP}/.build/Sandwalk Server.app"
 if [[ ! -d "${HELPER_APP}" ]]; then
@@ -144,21 +156,29 @@ mkdir -p "${APP_STAGE}/Contents/Helpers"
 rm -rf "${APP_STAGE}/Contents/Helpers/Sandwalk Server.app"
 cp -R "${HELPER_APP}" "${APP_STAGE}/Contents/Helpers/Sandwalk Server.app"
 
-CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
-echo "==> Codesign (identity: ${CODESIGN_IDENTITY})..."
-# Ad-hoc (`-`) is the default until Apple Developer ID + notarization are wired.
-# With a Developer ID identity, also pass hardened runtime when ready for notary.
-CODESIGN_EXTRA=()
-if [[ "${CODESIGN_IDENTITY}" != "-" ]]; then
-  CODESIGN_EXTRA+=(--options runtime --timestamp)
-fi
-# Bash 3.2 + `set -u` treats an empty array as unbound (`CODESIGN_EXTRA[@]`).
-codesign --force --deep --sign "${CODESIGN_IDENTITY}" \
-  ${CODESIGN_EXTRA[@]+"${CODESIGN_EXTRA[@]}"} \
-  "${APP_STAGE}/Contents/Helpers/Sandwalk Server.app" 2>/dev/null || true
-codesign --force --deep --sign "${CODESIGN_IDENTITY}" \
-  ${CODESIGN_EXTRA[@]+"${CODESIGN_EXTRA[@]}"} \
-  "${APP_STAGE}" 2>/dev/null || true
+echo "==> Codesign nested app (identity: ${CODESIGN_IDENTITY})..."
+CLIENT_ENTS="${LOCAL_WEB}/src-tauri/entitlements.plist"
+HELPER_ENTS="${MAC_APP}/Resources/entitlements.plist"
+HELPER_STAGE="${APP_STAGE}/Contents/Helpers/Sandwalk Server.app"
+
+sign_bundle() {
+  local bundle="$1"
+  local ents="$2"
+  local args=(--force --sign "${CODESIGN_IDENTITY}")
+  if [[ "${CODESIGN_IDENTITY}" != "-" ]]; then
+    args+=(--options runtime --timestamp)
+    if [[ -f "${ents}" ]]; then
+      args+=(--entitlements "${ents}")
+    fi
+  fi
+  codesign "${args[@]}" "${bundle}"
+}
+
+# Nested helper first, then the outer client (do not use --deep).
+sign_bundle "${HELPER_STAGE}" "${HELPER_ENTS}"
+sign_bundle "${APP_STAGE}" "${CLIENT_ENTS}"
+codesign --verify --strict "${HELPER_STAGE}"
+codesign --verify --strict "${APP_STAGE}"
 xattr -dr com.apple.quarantine "${APP_STAGE}" 2>/dev/null || true
 
 ln -sf /Applications "${STAGE}/Applications"
@@ -190,6 +210,10 @@ if [[ "${INSTALL:-0}" == "1" ]]; then
 fi
 
 cp -f "${DMG_PATH}" "${DMG_LATEST_PATH}"
+
+if [[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then
+  bash "${SCRIPT_DIR}/notarize-macos.sh" "${DMG_PATH}"
+fi
 
 # --- 5. Updater archive (nested app = UI + helper + agent-runtime) ----------
 UPDATER_TAR="${OUT_DIR}/Sandwalk.app.tar.gz"

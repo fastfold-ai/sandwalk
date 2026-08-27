@@ -7,6 +7,8 @@
   <string>© 2026 Fastfold AI Labs. All rights reserved.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Sandwalk records only while you use the composer microphone to turn your spoken prompt into editable text. Audio is transcribed locally and is not uploaded.</string>
+  <key>NSUserNotificationsUsageDescription</key>
+  <string>Sandwalk sends notifications when an agent run finishes, a terminal command completes, or a run needs your approval so you can jump back to the right chat or pane.</string>
   <key>NSLocalNetworkUsageDescription</key>
   <string>Sandwalk scans your local network for other Sandwalk agent servers on ports 8787, 8789, and 8790 so you can open a remote window without typing the URL.</string>
   <key>NSBonjourServices</key>

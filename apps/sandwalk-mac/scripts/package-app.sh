@@ -59,8 +59,17 @@ rm -rf "${ICONSET}"
 
 printf 'APPL????' > "${APP_OUT}/Contents/PkgInfo"
 
-echo "==> Ad-hoc sign..."
-codesign --force --deep --sign - "${APP_OUT}" 2>/dev/null || true
+IDENTITY="${CODESIGN_IDENTITY:-${APPLE_SIGNING_IDENTITY:--}}"
+ENTITLEMENTS="${ROOT}/Resources/entitlements.plist"
+echo "==> Codesign helper (identity: ${IDENTITY})..."
+SIGN_ARGS=(--force --sign "${IDENTITY}")
+if [[ "${IDENTITY}" != "-" ]]; then
+  SIGN_ARGS+=(--options runtime --timestamp)
+  if [[ -f "${ENTITLEMENTS}" ]]; then
+    SIGN_ARGS+=(--entitlements "${ENTITLEMENTS}")
+  fi
+fi
+codesign "${SIGN_ARGS[@]}" "${APP_OUT}"
 xattr -dr com.apple.quarantine "${APP_OUT}" 2>/dev/null || true
 
 if [[ "${SKIP_INSTALL}" == "1" ]]; then
