@@ -40,10 +40,14 @@ function keepUnreadItem(
   item: TabItem,
   attentionIds: ReadonlySet<string>
 ): TabItem | null {
-  if (item.kind === 'chat') {
+  // FAS-107: `TabItem` puede ser `chat`, `terminal` o `group`. Antes el
+  // else-branch asumía `group` y hacía `item.children.filter(...)`, pero
+  // los terminales sueltos también entran a este filtro y no tienen
+  // `children` → TypeError al activar el filtro Unread del sidebar.
+  if (item.kind === 'chat' || item.kind === 'terminal') {
     return attentionIds.has(item.id) ? item : null
   }
-  const children = item.children.filter(chat => attentionIds.has(chat.id))
+  const children = item.children.filter(child => attentionIds.has(child.id))
   if (children.length === 0) return null
   return { ...item, children }
 }

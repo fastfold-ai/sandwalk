@@ -1,51 +1,51 @@
 /**
- * FAS-107 GF9: activity indicator for terminals.
+ * FAS-107 · Fase 1a · thin wrapper sobre `session-attention.ts`.
  *
- * Tracks which terminals have received output while unfocused. Consumers
- * (sidebar row, tab chip) subscribe and render a small orange dot.
- * The PTY WebSocket handler marks activity on message; the terminal
- * clears its own entry when it becomes the active pane.
+ * Antes vivía como un bus paralelo con su propio Set y listeners:
+ * chats disparaban dot azul via `session-attention` (Dock badge +
+ * filtro Bell), terminales disparaban dot naranja via este módulo
+ * sin tocar Dock ni filtro. El usuario tenía "dos colas de atención"
+ * con semántica distinta.
  *
- * Deliberately dependency-free (no Zustand, no context) — the state is
- * process-scoped and read/written from many independent files.
+ * Ahora los terminales viven en el MISMO bus que los chats: un solo
+ * Set, un solo color de dot (azul), Dock badge y filtro Unread los
+ * cuentan/listan juntos. Splits reciben la señal si cualquier hijo
+ * (chat o terminal) está en attention.
+ *
+ * Los símbolos originales se conservan por compatibilidad —
+ * cualquier caller sigue funcionando sin cambios, pero por debajo
+ * llama al bus unificado.
  */
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 
-const activity = new Set<string>()
-const listeners = new Set<() => void>()
-
-function emit(): void {
-  for (const listener of listeners) listener()
-}
+import {
+  clearSessionAttention,
+  getAttentionSessionIds,
+  markSessionAttention,
+  SESSION_ATTENTION_CHANGE_EVENT
+} from '@/lib/session-attention'
 
 export function markTerminalActivity(terminalId: string): void {
-  if (activity.has(terminalId)) return
-  activity.add(terminalId)
-  emit()
+  markSessionAttention(terminalId)
 }
 
 export function clearTerminalActivity(terminalId: string): void {
-  if (!activity.has(terminalId)) return
-  activity.delete(terminalId)
-  emit()
+  clearSessionAttention(terminalId)
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
-  }
-}
-
-const EMPTY = new Set<string>()
-
-function getSnapshot(): ReadonlySet<string> {
-  return activity.size === 0 ? EMPTY : activity
-}
-
-/** True when this terminal has unseen output. */
+/** True when this terminal has unseen output (unificado con chats). */
 export function useTerminalHasActivity(terminalId: string): boolean {
-  const set = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-  return set.has(terminalId)
+  const [has, setHas] = useState<boolean>(() =>
+    getAttentionSessionIds().has(terminalId)
+  )
+  useEffect(() => {
+    const onChange = () => setHas(getAttentionSessionIds().has(terminalId))
+    onChange()
+    window.addEventListener(SESSION_ATTENTION_CHANGE_EVENT, onChange)
+    return () => {
+      window.removeEventListener(SESSION_ATTENTION_CHANGE_EVENT, onChange)
+    }
+  }, [terminalId])
+  return has
 }

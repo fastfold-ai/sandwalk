@@ -35,6 +35,9 @@ import { notifyMissedCompletions } from '@/lib/browser-notifications'
 import { applyCapyOpenSplit } from '@/lib/capy-ui'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
+import { setFocusedItemId } from '@/lib/focused-item'
+import { setItemOpener } from '@/lib/item-opener'
+import { resolveItemLocation } from '@/lib/resolve-item-location'
 import { resolveStripActiveId } from '@/lib/strip-active'
 import { useTerminalsStore } from '@/lib/terminals-store'
 import { recoverUnreadFromSessions } from '@/lib/session-attention'
@@ -802,6 +805,33 @@ export default function App() {
   // Route wins. Draft materialization uses a separate ref inside session CRUD
   // so /agents/new never "sticks" to a previous real session id.
   ui.sessionIdRef.current = effectiveSessionId
+  // FAS-107 · Fix pre-fase1: expone el ítem con foco visible a módulos
+  // sin acceso al store (p. ej. `TerminalPortalHost` — vive en un layer
+  // portal aparte y no puede consultar tab groups). Cuando el usuario
+  // está en un split, `effectiveSessionId` YA es el `activeChatId` del
+  // group; si no, es la ruta directa.
+  setFocusedItemId(effectiveSessionId ?? null)
+  // FAS-107 · Fase 1f: bridge global para "abrir un ítem por id" desde
+  // el handler de click de notif nativas macOS (y cualquier otro
+  // módulo fuera del árbol React). El resolver decide si es standalone
+  // (navegar directo) o hijo de split (navegar al group + setear
+  // activeChatId del pane, así el chat/terminal queda visible dentro
+  // del split de una).
+  useEffect(() => {
+    setItemOpener((itemId: string) => {
+      const location = resolveItemLocation(itemId, allTabGroupsRef.current)
+      if (location.kind === 'split-child') {
+        tabGroupsStore.setTabGroupActiveChat(
+          location.groupId,
+          location.activeChatId
+        )
+      }
+      navigate(location.routePath)
+    })
+    return () => {
+      setItemOpener(() => {})
+    }
+  }, [navigate, tabGroupsStore.setTabGroupActiveChat])
 
   const { showChatSkeleton } = useAppShellEffects({
     locationPathname: location.pathname,

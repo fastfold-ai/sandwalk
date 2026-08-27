@@ -7,7 +7,14 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import {
+  notifyTerminalCommandFinished,
+  notifyTerminalCustom
+} from '@/lib/browser-notifications'
+import { getFocusedItemId } from '@/lib/focused-item'
+import { getTerminalLongRunningThresholdMs } from '@/lib/notification-settings'
 import { markTerminalActivity } from '@/lib/terminal-attention'
+import { useTerminalsStore } from '@/lib/terminals-store'
 import {
   buildTerminalTheme,
   isDocumentDark,
@@ -103,6 +110,58 @@ export function TerminalPortalHost({
     cols: -1,
     rows: -1
   })
+  // FAS-107 · Fase 1c · ref al handler de eventos PTY del WS. Vive como
+  // ref porque el `ws.onmessage` se registra una sola vez y no debe
+  // re-crearse cada render. El body del handler se asigna abajo y
+  // consulta el store de terminales en el momento (título puede cambiar
+  // por rename) y el settings del umbral (puede cambiar en runtime).
+  const handlePtyEventRef = useRef<((event: unknown) => void) | null>(null)
+  handlePtyEventRef.current = (raw: unknown) => {
+    if (!raw || typeof raw !== 'object') return
+    const event = raw as {
+      kind?: string
+      exitCode?: number | null
+      durationMs?: number | null
+      title?: string
+      body?: string
+    }
+    const terminal = useTerminalsStore
+      .getState()
+      .terminals.find(t => t.id === terminalId)
+    const terminalTitle = terminal?.title ?? null
+    const viewing = getFocusedItemId() === terminalId
+    if (event.kind === 'command.finished') {
+      // Los comandos cortos NO gritan por notificación nativa — pero sí
+      // marcan attention si el usuario no estaba mirando ese pane, para
+      // que el chip azul en el sidebar cuente la actividad.
+      if (!viewing) markTerminalActivity(terminalId)
+      const threshold = getTerminalLongRunningThresholdMs()
+      const durationMs = event.durationMs ?? 0
+      const failed = event.exitCode !== 0 && event.exitCode !== null
+      // Los fallos siempre notifican (aunque sean cortos). Éxitos solo
+      // si superan el umbral configurado.
+      if (!failed && durationMs < threshold) return
+      notifyTerminalCommandFinished({
+        terminalId,
+        terminalTitle,
+        exitCode: event.exitCode ?? null,
+        durationMs: event.durationMs ?? null,
+        viewingTerminal: viewing
+      })
+      return
+    }
+    if (event.kind === 'notify') {
+      // OSC 9 / OSC 777 son intención explícita — pasan sin gate.
+      if (!viewing) markTerminalActivity(terminalId)
+      notifyTerminalCustom({
+        terminalId,
+        terminalTitle,
+        title: event.title ?? null,
+        body: event.body ?? null
+      })
+    }
+    // 'command.started' es solo timing en el backend, no requiere acción.
+  }
   const [, setLayerVersion] = useState(0)
 
   // Suscripción al registry: cuando el placeholder cambia
@@ -302,13 +361,32 @@ export function TerminalPortalHost({
 
         ws.onmessage = event => {
           if (typeof event.data === 'string') {
-            term.write(event.data)
-          } else {
-            term.write(new Uint8Array(event.data as ArrayBuffer))
+            // FAS-107 · Fase 1c · frames de texto vienen exclusivamente
+            // del dispatcher del backend (io_mixin.py `_dispatch_pty_events`)
+            // y transportan eventos estructurados — NO son output para
+            // xterm. Si el parse falla, tolerar en silencio (no debe
+            // crashear el WS del terminal).
+            try {
+              const frame = JSON.parse(event.data) as {
+                type?: string
+                event?: unknown
+              }
+              if (frame.type === 'pty.event' && frame.event) {
+                handlePtyEventRef.current?.(frame.event)
+              }
+            } catch {
+              // ignore malformed text frames
+            }
+            return
           }
-          const path =
-            typeof window !== 'undefined' ? window.location.pathname : ''
-          if (!path.endsWith(`/terminals/${terminalId}`)) {
+          term.write(new Uint8Array(event.data as ArrayBuffer))
+          // FAS-107 · Fix pre-fase1: antes se comparaba con
+          // `window.location.pathname` — falla cuando el terminal
+          // vive dentro de un group split (la URL apunta al group,
+          // no al terminal). Ahora consulta `getFocusedItemId()` que
+          // App.tsx sincroniza con `effectiveSessionId` (activeChatId
+          // del split, o route.sessionId si no hay split).
+          if (getFocusedItemId() !== terminalId) {
             markTerminalActivity(terminalId)
           }
         }

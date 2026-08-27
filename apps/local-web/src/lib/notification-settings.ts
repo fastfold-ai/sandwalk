@@ -4,6 +4,10 @@ export type NotifyCompletionMode = 'never' | 'unfocused' | 'always'
 
 const COMPLETION_STORAGE_KEY = 'sandwalk.notify-completion'
 const APPROVAL_STORAGE_KEY = 'sandwalk.notify-approval'
+const TERMINAL_LONG_RUNNING_MS_KEY = 'sandwalk.notify-terminal-long-running-ms'
+
+/** Default umbral: solo notifica al terminar un comando que duró >= 20s. */
+export const DEFAULT_TERMINAL_LONG_RUNNING_MS = 20000
 
 export const NOTIFY_COMPLETION_CHANGE_EVENT = 'sandwalk:notify-completion-change'
 export const NOTIFY_APPROVAL_CHANGE_EVENT = 'sandwalk:notify-approval-change'
@@ -72,4 +76,31 @@ export function applyNotifyApproval(enabled: boolean) {
       detail: enabled
     })
   )
+}
+
+/**
+ * FAS-107 · Fase 1c · umbral (ms) para notificar "comando terminó".
+ * Solo se dispara notificación nativa si `durationMs >= threshold`. Los
+ * comandos cortos siguen marcando attention (dot azul en el sidebar)
+ * pero no interrumpen con OS notification.
+ */
+export function getTerminalLongRunningThresholdMs(): number {
+  try {
+    const raw = localStorage.getItem(TERMINAL_LONG_RUNNING_MS_KEY)
+    if (raw) {
+      const parsed = Number.parseInt(raw, 10)
+      if (Number.isFinite(parsed) && parsed >= 0) return parsed
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_TERMINAL_LONG_RUNNING_MS
+}
+
+export function applyTerminalLongRunningThresholdMs(ms: number): void {
+  try {
+    localStorage.setItem(TERMINAL_LONG_RUNNING_MS_KEY, String(Math.max(0, ms)))
+  } catch {
+    // ignore
+  }
 }

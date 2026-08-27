@@ -6,6 +6,8 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
+from agent_server.pty_manager.osc_parser import OscParser
+
 BUFFER_LIMIT = 2 * 1024 * 1024
 # FAS-107 X4 Capa 2 · log de output persistente para restore visual.
 # Guarda los últimos ~2MB de bytes crudos del PTY (independiente de si
@@ -52,3 +54,13 @@ class PtySession:
     output_log: bytearray = field(default_factory=bytearray)
     subscribers: set[Any] = field(default_factory=set)
     reader_task: asyncio.Task[None] | None = None
+    # FAS-107 · Fase 1b · shell integration OSC 133.
+    # `osc_parser` acumula bytes que puedan ser parte de una secuencia
+    # OSC en curso (los OSC pueden llegar partidos entre chunks). Devuelve
+    # eventos estructurados sin mutar el stream — los bytes originales
+    # siguen yendo a xterm como siempre.
+    # `command_started_at` guarda el `time.monotonic()` del último OSC
+    # 133 C para calcular la duración cuando llega el 133 D del siguiente
+    # prompt.
+    osc_parser: OscParser = field(default_factory=OscParser)
+    command_started_at: float | None = None

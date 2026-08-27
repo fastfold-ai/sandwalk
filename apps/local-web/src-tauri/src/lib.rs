@@ -7,6 +7,8 @@
 mod dictation;
 mod lan_scan;
 mod multi_window;
+#[cfg(target_os = "macos")]
+mod notification_click;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -876,10 +878,14 @@ pub fn run() {
             dictation::mark_dictation_test_passed,
             dictation::delete_dictation_model,
             dictation::dictation_level,
+            #[cfg(target_os = "macos")]
+            notification_click::sandwalk_notify,
         ])
         .setup(|app| {
             dictation::manage_dictation(app);
             ensure_server_helper();
+            #[cfg(target_os = "macos")]
+            notification_click::install_delegate(app.handle().clone());
             let cold_route = initial_desktop_route();
             let api_base = control_plane_api_base();
             #[cfg(target_os = "macos")]

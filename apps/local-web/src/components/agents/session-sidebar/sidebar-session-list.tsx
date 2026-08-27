@@ -947,12 +947,14 @@ function SidebarGroupItem({
   const groupActive = group.id === activeId
   // Any child (chat or terminal) with focus lights up the group chip.
   const activeInside = groupChildren.some(child => child.id === activeId)
-  // Unread only applies to chats — terminals don't participate in the
-  // attention system.
+  // FAS-107 · Fase 1a · attention unificado: cualquier hijo (chat o
+  // terminal) con atención pendiente enciende el dot azul del grupo.
+  // Antes se filtraba solo `chat` porque los terminales vivían en un
+  // bus paralelo; hoy comparten el mismo Set.
   const chatChildren = groupChildren.flatMap(child =>
     child.kind === 'chat' ? [child.session] : []
   )
-  const groupUnread = chatChildren.some(chat => attentionIds.has(chat.id))
+  const groupUnread = groupChildren.some(child => attentionIds.has(child.id))
 
   return (
     <li>
