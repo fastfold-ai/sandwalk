@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { isTauri } from '@/lib/desktop'
@@ -8,9 +8,13 @@ import {
   type DictationStatus,
   getDictationLevel,
   getDictationStatus,
+  getVoiceInputOwner,
+  isCapyOwnedVoiceInput,
   startDictation,
   stopDictation,
   publishVoiceInputChanged,
+  usableVoiceTranscript,
+  type VoiceInputChangedDetail,
   VOICE_INPUT_CHANGED,
   voiceReady
 } from '@/lib/desktop-voice'
@@ -18,11 +22,13 @@ import {
 export function useComposerVoice({
   draft,
   commitDraft,
-  focusInput
+  focusInput,
+  enabled = true
 }: {
   draft: string
   commitDraft: (value: string) => void
   focusInput: () => void
+  enabled?: boolean
 }) {
   const navigate = useNavigate()
   const desktop = isTauri()
@@ -32,24 +38,45 @@ export function useComposerVoice({
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [levels, setLevels] = useState<number[]>([])
   const [fromVoice, setFromVoice] = useState(false)
+  const ownedRef = useRef(false)
 
   useEffect(() => {
-    if (!desktop) return
+    if (!desktop || !enabled) return
+    const adopt = (status: DictationStatus, recording: boolean) => {
+      setDictation({ ...status, recording })
+    }
     const refresh = (event?: Event) => {
-      const supplied = (event as CustomEvent<DictationStatus> | undefined)
+      const supplied = (event as CustomEvent<VoiceInputChangedDetail> | undefined)
         ?.detail
+      const owner = supplied?.owner ?? getVoiceInputOwner()
+      if (isCapyOwnedVoiceInput(supplied, owner)) {
+        ownedRef.current = false
+        if (supplied) adopt(supplied, false)
+        else {
+          setDictation(current =>
+            current ? { ...current, recording: false } : current
+          )
+        }
+        return
+      }
       if (supplied) {
-        setDictation(supplied)
+        adopt(supplied, Boolean(supplied.recording && ownedRef.current))
         return
       }
       void getDictationStatus().then(status => {
-        if (status) setDictation(status)
+        if (!status) return
+        const currentOwner = getVoiceInputOwner()
+        if (isCapyOwnedVoiceInput(undefined, currentOwner)) {
+          adopt(status, false)
+          return
+        }
+        adopt(status, Boolean(status.recording && ownedRef.current))
       })
     }
     refresh()
     window.addEventListener(VOICE_INPUT_CHANGED, refresh)
     return () => window.removeEventListener(VOICE_INPUT_CHANGED, refresh)
-  }, [desktop])
+  }, [desktop, enabled])
 
   useEffect(() => {
     if (!dictation?.recording) {
@@ -81,9 +108,13 @@ export function useComposerVoice({
   const cancel = useCallback(async () => {
     setError(null)
     setBusy(null)
+    ownedRef.current = false
     await cancelDictation().catch(() => undefined)
     const status = await getDictationStatus()
-    if (status) setDictation(status)
+    if (status) {
+      publishVoiceInputChanged(status, 'composer')
+      setDictation({ ...status, recording: false })
+    }
   }, [])
 
   useEffect(() => {
@@ -106,21 +137,26 @@ export function useComposerVoice({
   ).padStart(2, '0')}`
 
   const toggle = async () => {
-    if (!desktop || busy) return
+    if (!desktop || !enabled || busy) return
     setError(null)
     try {
       if (recording) {
         setBusy('Transcribing…')
+        ownedRef.current = false
         const transcript = await stopDictation()
         if (transcript === null) {
           throw new Error('Could not transcribe your recording.')
         }
-        if (transcript.trim()) {
-          commitDraft(appendTranscript(draft, transcript))
+        const spoken = usableVoiceTranscript(transcript ?? '')
+        if (spoken) {
+          commitDraft(appendTranscript(draft, spoken))
           setFromVoice(true)
         }
         const status = await getDictationStatus()
-        if (status) setDictation(status)
+        if (status) {
+          publishVoiceInputChanged(status, 'composer')
+          setDictation(status)
+        }
         focusInput()
         return
       }
@@ -136,7 +172,8 @@ export function useComposerVoice({
       if (!next?.recording) {
         throw new Error('Could not start the microphone.')
       }
-      publishVoiceInputChanged(next)
+      ownedRef.current = true
+      publishVoiceInputChanged(next, 'composer')
       setDictation(next)
     } catch (voiceError) {
       setError(

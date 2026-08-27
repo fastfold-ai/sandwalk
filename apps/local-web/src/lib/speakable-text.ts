@@ -14,16 +14,8 @@ export function speakableBudget(languageCode = 'en'): {
   return { sentences: 2, chars: 280 }
 }
 
-export function speakableText(
-  raw: string,
-  maxSentences?: number,
-  maxChars?: number,
-  languageCode = 'en'
-): string {
-  const budget = speakableBudget(languageCode)
-  maxSentences ??= budget.sentences
-  maxChars ??= budget.chars
-  const cleaned = pronounceForSpeech(
+export function cleanSpeechText(raw: string, languageCode = 'en'): string {
+  return pronounceForSpeech(
     raw
       .replace(FENCE, ' ')
       .replace(INLINE_CODE, '$1')
@@ -34,6 +26,18 @@ export function speakableText(
       .trim(),
     languageCode
   )
+}
+
+export function speakableText(
+  raw: string,
+  maxSentences?: number,
+  maxChars?: number,
+  languageCode = 'en'
+): string {
+  const budget = speakableBudget(languageCode)
+  maxSentences ??= budget.sentences
+  maxChars ??= budget.chars
+  const cleaned = cleanSpeechText(raw, languageCode)
   if (!cleaned) return ''
   const sentences = splitSentences(cleaned)
   let out = ''
@@ -65,14 +69,6 @@ export function completedSentences(delta: string): string[] {
   return sentences.slice(0, -1)
 }
 
-export function voiceReplyHint(language: string): string {
-  const longer = /chinese|mandarin|japanese|中文|日本語/i.test(language)
-  const length = longer
-    ? '3-5 spoken sentences'
-    : '1-2 short spoken sentences'
-  return `(Voice: answer in ${language} in ${length}. No markdown, lists, or tool narration.)`
-}
-
 /** Spoken form so Kokoro says the name, not C-A-P-Y. */
 export function spokenCapyName(languageCode = 'en'): string {
   switch (languageCode) {
@@ -93,8 +89,3 @@ export function pronounceForSpeech(text: string, languageCode = 'en'): string {
   return text.replace(/\bCapp?y\b/gi, spoken)
 }
 
-export function applyVoiceHint(text: string, language: string): string {
-  const hint = voiceReplyHint(language)
-  if (text.includes(hint)) return text
-  return `${text.trim()}\n\n${hint}`
-}

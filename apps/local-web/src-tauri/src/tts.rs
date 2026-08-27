@@ -130,7 +130,7 @@ pub async fn speak_tts(
 ) -> Result<SpeechAudio, String> {
     let engine = state.inner().clone();
     let voice = voice.unwrap_or_else(|| sandwalk_tts::DEFAULT_VOICE.to_owned());
-    let speed = speed.unwrap_or(1.0);
+    let speed = speed.unwrap_or(2.0);
     tauri::async_runtime::spawn_blocking(move || {
         engine.speak_with_progress(&text, &voice, speed, |phase, message| {
             let _ = app.emit(

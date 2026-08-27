@@ -1,9 +1,38 @@
 export const CAPY_SPEAK_ALL_KEY = 'sandwalk:capy-speak-all'
 export const CAPY_VOICE_KEY = 'sandwalk:capy-voice'
+export const CAPY_VOICE_BY_ENGINE_KEY = 'sandwalk:capy-voice-by-engine'
 export const CAPY_VOICE_SPEED_KEY = 'sandwalk:capy-voice-speed'
 export const CAPY_VOICE_AUTO_KEY = 'sandwalk:capy-voice-auto'
 export const DEFAULT_CAPY_VOICE = 'af_heart'
-export const DEFAULT_CAPY_VOICE_SPEED = 1
+export const DEFAULT_CAPY_VOICE_SPEED = 2
+
+const LANGUAGE_NAME_BY_CODE: Record<string, string> = {
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  pt: 'Portuguese',
+  zh: 'Chinese',
+  ja: 'Japanese',
+  ko: 'Korean',
+  hi: 'Hindi',
+  ar: 'Arabic',
+  nl: 'Dutch',
+  pl: 'Polish',
+  ru: 'Russian',
+  tr: 'Turkish',
+  sv: 'Swedish',
+  da: 'Danish',
+  fi: 'Finnish',
+  no: 'Norwegian',
+  el: 'Greek',
+  he: 'Hebrew',
+  ms: 'Malay',
+  sw: 'Swahili'
+}
+
+type VoiceChoice = { id: string; language_code: string }
 
 export const DEFAULT_VOICE_BY_LANGUAGE: Record<string, string> = {
   en: 'af_heart',
@@ -24,12 +53,47 @@ export function writeCapySpeakAll(value: boolean) {
   window.localStorage.setItem(CAPY_SPEAK_ALL_KEY, value ? '1' : '0')
 }
 
+function readVoiceByEngine(): Record<string, string> {
+  try {
+    const raw = window.localStorage.getItem(CAPY_VOICE_BY_ENGINE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const next: Record<string, string> = {}
+    for (const [engine, voice] of Object.entries(parsed)) {
+      if (typeof voice === 'string' && voice) next[engine] = voice
+    }
+    return next
+  } catch {
+    return {}
+  }
+}
+
 export function readCapyVoice(): string {
   return window.localStorage.getItem(CAPY_VOICE_KEY) || DEFAULT_CAPY_VOICE
 }
 
-export function writeCapyVoice(voice: string) {
+export function writeCapyVoice(voice: string, engine?: string) {
   window.localStorage.setItem(CAPY_VOICE_KEY, voice)
+  if (!engine) return
+  const map = readVoiceByEngine()
+  map[engine] = voice
+  window.localStorage.setItem(CAPY_VOICE_BY_ENGINE_KEY, JSON.stringify(map))
+}
+
+export function resolveCapyVoice(stored: string, voices: VoiceChoice[]): string {
+  if (!voices.length) return stored || DEFAULT_CAPY_VOICE
+  if (voices.some(voice => voice.id === stored)) return stored
+  const language = languageCodeFromVoice(stored)
+  return (
+    voices.find(voice => voice.language_code === language)?.id || voices[0].id
+  )
+}
+
+export function pickCapyVoice(voices: VoiceChoice[], engine?: string): string {
+  const stored =
+    (engine && readVoiceByEngine()[engine]) || readCapyVoice()
+  return resolveCapyVoice(stored, voices)
 }
 
 export function readCapyVoiceSpeed(): number {
@@ -45,7 +109,7 @@ export function writeCapyVoiceSpeed(speed: number) {
 }
 
 export function readCapyVoiceAuto(): boolean {
-  return window.localStorage.getItem(CAPY_VOICE_AUTO_KEY) !== '0'
+  return window.localStorage.getItem(CAPY_VOICE_AUTO_KEY) === '1'
 }
 
 export function writeCapyVoiceAuto(value: boolean) {
@@ -55,7 +119,10 @@ export function writeCapyVoiceAuto(value: boolean) {
 export function languageCodeFromVoice(voiceId: string): string {
   if (voiceId.startsWith('cb_')) return voiceId.slice(3) || 'en'
   if (voiceId.startsWith('qwen_')) {
-    return voiceId === 'qwen_Ryan' || voiceId === 'qwen_Aiden' ? 'en' : 'zh'
+    if (voiceId === 'qwen_Ryan' || voiceId === 'qwen_Aiden') return 'en'
+    if (voiceId === 'qwen_Ono_Anna') return 'ja'
+    if (voiceId === 'qwen_Sohee') return 'ko'
+    return 'zh'
   }
   switch (voiceId.charAt(0)) {
     case 'e':
@@ -84,14 +151,17 @@ export function defaultVoiceForLanguage(languageCode: string): string {
 export function detectSpeechLanguage(text: string): string {
   let han = 0
   let kana = 0
+  let hangul = 0
   let devanagari = 0
   for (const char of text) {
     const code = char.codePointAt(0) || 0
     if (code >= 0x3040 && code <= 0x30ff) kana += 1
+    else if (code >= 0xac00 && code <= 0xd7af) hangul += 1
     else if (code >= 0x4e00 && code <= 0x9fff) han += 1
     else if (code >= 0x0900 && code <= 0x097f) devanagari += 1
   }
   if (kana > 0) return 'ja'
+  if (hangul > 1) return 'ko'
   if (devanagari > 1) return 'hi'
   if (han > 1) return 'zh'
   const lower = text.toLowerCase()
@@ -124,11 +194,18 @@ export function voiceForDetectedText(
   return defaultVoiceForLanguage(language)
 }
 
+export function languageNameFromCode(languageCode: string): string {
+  return LANGUAGE_NAME_BY_CODE[languageCode] || 'English'
+}
+
 export function languageForVoice(
   voiceId: string,
   voices: Array<{ id: string; language: string }>
 ): string {
-  return voices.find(voice => voice.id === voiceId)?.language || 'English'
+  return (
+    voices.find(voice => voice.id === voiceId)?.language ||
+    languageNameFromCode(languageCodeFromVoice(voiceId))
+  )
 }
 
 export function shouldSpeakCapyReply(voiceTurn: boolean, speakAll: boolean) {
@@ -149,6 +226,8 @@ export function previewPhrase(languageCode: string): string {
       return 'Olá, eu sou o Capy. Posso abrir chats, rodar o Doctor e responder curto.'
     case 'ja':
       return 'こんにちは、キャピーです。チャットを始めて、短く返事できます。'
+    case 'ko':
+      return '안녕하세요, 캐피예요. 채팅을 열고 짧게 답할 수 있어요.'
     case 'zh':
       return '你好，我是 Capy。我可以开新对话，并短短回答你。'
     default:
