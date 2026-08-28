@@ -26,10 +26,14 @@ COPY pyproject.toml README.md uv.lock ./
 COPY src/ src/
 
 # Locked extras — never `pip install ".[all]"` (ResolutionTooDeep).
-RUN extras=""; \
-    IFS=','; \
-    for extra in ${EXTRAS}; do extras="$extras --extra $extra"; done; \
-    uv sync --frozen --no-dev --no-cache $extras
+# Do not build `--extra` flags in a comma-IFS loop: dash then passes the
+# whole string as one argument (`unexpected argument ' --extra chemistry…'`).
+RUN if [ "$EXTRAS" = "all" ]; then \
+      uv sync --frozen --no-dev --no-cache --extra all; \
+    else \
+      uv sync --frozen --no-dev --no-cache \
+        --extra chemistry --extra biology --extra api; \
+    fi
 
 # Persistent config, sessions, skills, and downloaded datasets
 RUN mkdir -p /root/.sandwalk/data
