@@ -2,6 +2,7 @@ import type { AppShellProps } from '@/components/app-shell-props'
 import { AppDialogs } from '@/components/AppDialogs'
 import { AppShellMain } from '@/components/AppShellMain'
 import { AppShellSidebar } from '@/components/AppShellSidebar'
+import { OfflineBanner } from '@/components/app/OfflineBanner'
 import {
   ResizableHandle,
   ResizablePanelGroup
@@ -15,6 +16,13 @@ export type { AppShellProps } from '@/components/app-shell-props'
 export function AppShell(props: AppShellProps) {
   return (
     <>
+      {props.offlineStatus && (
+        <OfflineBanner
+          isOffline={props.offlineStatus.isOffline}
+          message={props.offlineStatus.message}
+          featuresAffected={props.offlineStatus.featuresAffected}
+        />
+      )}
       {/*
         No full-width title bar above the split — the sidebar|main vertical
         divider must run edge-to-edge. Traffic-light clearance

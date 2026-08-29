@@ -39,6 +39,16 @@ from agent_server.store import AgentStore
 
 logger = logging.getLogger("agent_server.connectors")
 
+# Offline mode: skip Slack connectors entirely to avoid noisy connection errors.
+# This is checked in start() to short-circuit the entire startup sequence.
+def _is_slack_skipped() -> bool:
+    """Return True if Slack connectors should be skipped due to offline mode."""
+    try:
+        from agent_server.offline_mode import is_offline
+        return is_offline()
+    except ImportError:
+        return False
+
 # Progress feedback on the mention itself, rather than a message in the channel.
 WORKING_REACTION = "eyes"
 DONE_REACTION = "white_check_mark"
@@ -167,8 +177,17 @@ class ConnectorService:
     # --- lifecycle ------------------------------------------------------
 
     async def start(self) -> None:
-        """Bring up adapters for every enabled workspace. Never raises."""
+        """Bring up adapters for every enabled workspace. Never raises.
+
+        Skips entirely when offline to avoid noisy connection errors.
+        """
         if self._started:
+            return
+        # Short-circuit when offline — Slack connectors can't function without
+        # network, and their reconnection loops spam the logs.
+        if _is_slack_skipped():
+            logger.info("Skipping Slack connector startup (offline mode)")
+            self._started = True
             return
         self._started = True
         for workspace in self.store.list_slack_workspaces():

@@ -42,6 +42,11 @@ SUBCOMMANDS = {
 
 def entry():
     """Package entry point."""
+    # Support --offline flag: set env var before importing the app
+    if "--offline" in sys.argv:
+        os.environ["SANDWALK_FORCE_OFFLINE"] = "1"
+        # Remove --offline from args so the app doesn't see it as a subcommand
+        sys.argv = [sys.argv[0]] + [a for a in sys.argv[1:] if a != "--offline"]
     # Dev ergonomics: when invoked from the repo root (or a subdir), prefer the
     # live source tree so `uv run sandwalk ...` reflects local edits immediately.
     current_pkg_init = Path(__file__).resolve().parent / "__init__.py"
