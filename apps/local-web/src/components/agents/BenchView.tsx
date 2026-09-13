@@ -6,7 +6,7 @@ import type {
   LocalAgentClient
 } from '@sandwalk/agent-local-client'
 import type { RuntimeSettings, Specialist } from '@sandwalk/agent-ui-core'
-import { Check, Copy, Download, Gauge, Loader, Pause, Play, Terminal, Trash2, X } from 'lucide-react'
+import { Check, Copy, Download, ExternalLink, Gauge, Loader, Pause, Play, ScrollText, Terminal, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
@@ -17,6 +17,7 @@ import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelP
 import { ComposerSpecialistPicker } from '@/components/agents/composer/ComposerSpecialistPicker'
 import { composerModelOptionKey } from '@/components/agents/composer/useComposerModelPickerNav'
 import { Button } from '@/components/ui/button'
+import { isTauri, openDesktopServerSettings } from '@/lib/desktop'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,6 +79,63 @@ function jobSuitesLabel(
     .map(id => suiteDisplayName(id, suites))
     .filter(Boolean)
     .join(', ')
+}
+
+function formatInstallApiError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    try {
+      const parsed = JSON.parse(raw.slice(start, end + 1)) as {
+        detail?: unknown
+        message?: string
+      }
+      const detail = parsed.detail
+      if (typeof detail === 'string' && detail.trim()) return detail.trim()
+      if (detail && typeof detail === 'object') {
+        const msg = (detail as { message?: unknown }).message
+        if (typeof msg === 'string' && msg.trim()) return msg.trim()
+      }
+      if (typeof parsed.message === 'string' && parsed.message.trim()) {
+        return parsed.message.trim()
+      }
+    } catch {
+      /* keep raw */
+    }
+  }
+  return raw.replace(/^FastFold Agent API \d+:\s*/i, '').split(' [')[0] || raw
+}
+
+function openServerLogs() {
+  if (isTauri()) {
+    void openDesktopServerSettings()
+    const link = document.createElement('a')
+    link.href = 'sandwalk://settings/logs'
+    link.click()
+  }
+}
+
+function BenchLogsHint() {
+  return (
+    <p className="text-destructive/90 text-xs">
+      {isTauri() ? (
+        <button
+          type="button"
+          className="hover:text-destructive inline-flex items-center gap-1 underline-offset-2 hover:underline"
+          onClick={openServerLogs}
+        >
+          <ScrollText className="size-3" />
+          Open Sandwalk Settings → Logs
+        </button>
+      ) : (
+        <>
+          Check the terminal running{' '}
+          <span className="font-mono">sandwalk serve</span>.
+        </>
+      )}
+    </p>
+  )
 }
 
 function installButtonLabel(card: BenchSuiteCard, installing: boolean): string {
@@ -295,6 +353,11 @@ export function BenchView({
   const stacking = busy
   const showProgress = busy
   const installsInFlight = suites.some(card => card.installing)
+  const catalogInstallError = suites.find(card => card.installError)?.installError
+
+  useEffect(() => {
+    if (catalogInstallError) setError(catalogInstallError)
+  }, [catalogInstallError])
 
   // While a run is active (or we are watching a result), poll the live queue.
   useEffect(() => {
@@ -386,14 +449,13 @@ export function BenchView({
       await loadCatalog()
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : `Unable to install ${card.title}`
+        formatInstallApiError(err) || `Unable to install ${card.title}`
+      setError(message)
       const needsToken =
         card.requiresHfToken ||
         /hugging face|hf_token|needsHfToken/i.test(message)
       if (needsToken) {
         openHuggingFaceIntegration()
-      } else {
-        setError(message)
       }
     } finally {
       setStartingInstallId(null)
@@ -821,8 +883,9 @@ export function BenchView({
         </div>
 
         {error ? (
-          <div className="border-destructive/40 text-destructive rounded-md border px-3 py-2 text-sm">
-            {error}
+          <div className="border-destructive/40 text-destructive space-y-1.5 rounded-md border px-3 py-2 text-sm">
+            <p>{error}</p>
+            <BenchLogsHint />
           </div>
         ) : null}
 
@@ -1006,6 +1069,22 @@ export function BenchView({
                             {installButtonLabel(card, installing)}
                           </span>
                         </Button>
+                        {card.installError ? (
+                          <div className="border-destructive/30 bg-destructive/5 text-destructive mt-2 space-y-1 rounded-md border px-2.5 py-2 text-[11px] leading-snug">
+                            <p>{card.installError}</p>
+                            <BenchLogsHint />
+                            {card.requiresHfToken ? (
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                                onClick={openHuggingFaceIntegration}
+                              >
+                                <ExternalLink className="size-3" />
+                                Hugging Face
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                     {card.installed && !installing ? (

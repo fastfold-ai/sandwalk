@@ -65,7 +65,7 @@ import { buildZipStore } from '@/lib/zip-store'
 import { toast } from 'sonner'
 
 const ROW_GRID =
-  'grid grid-cols-[20px_minmax(0,1fr)_10.75rem_6.25rem_4.75rem_10.5rem_2rem] items-center gap-x-3'
+  'grid grid-cols-[24px_minmax(0,1fr)_10.75rem_6.25rem_4.75rem_10.5rem_2rem] items-center gap-x-3'
 
 const PACK_DISPLAY_TITLES: Record<string, string> = {
   'bio-capybara-full': 'Bio-Capybara-full',
@@ -1254,9 +1254,9 @@ function ResultRowView({
           title={
             queued
               ? undefined
-              : 'Click to select · Shift-click a range'
+              : 'Select · Shift-click a range'
           }
-          className="flex size-5 shrink-0 items-center justify-center"
+          className="group flex size-6 shrink-0 items-center justify-center"
           onClick={event => {
             event.stopPropagation()
             onToggleSelect({
@@ -1268,32 +1268,44 @@ function ResultRowView({
         >
           <span
             className={cn(
-              'flex size-4 items-center justify-center rounded-[4px]',
+              'flex size-5 items-center justify-center rounded-[5px] transition-transform duration-150 ease-out',
+              !queued &&
+                'group-hover:scale-110 group-hover:ring-2 group-hover:ring-primary/45 group-hover:ring-offset-1 group-hover:ring-offset-background',
               picked
                 ? 'bg-primary text-primary-foreground'
                 : queued
                   ? 'bg-muted text-muted-foreground'
                   : running
-                    ? 'bg-sky-500/15 text-sky-600'
+                    ? 'bg-sky-500/15 text-sky-600 group-hover:bg-primary/15 group-hover:text-primary'
                     : paused
-                      ? 'bg-muted text-muted-foreground'
+                      ? 'bg-muted text-muted-foreground group-hover:bg-primary/15 group-hover:text-primary'
                       : pct >= 70
-                        ? 'bg-emerald-500/15 text-emerald-600'
+                        ? 'bg-emerald-500/15 text-emerald-600 group-hover:bg-primary/15 group-hover:text-primary'
                         : pct >= 40
-                          ? 'bg-amber-500/15 text-amber-600'
-                          : 'bg-red-500/15 text-red-600'
+                          ? 'bg-amber-500/15 text-amber-600 group-hover:bg-primary/15 group-hover:text-primary'
+                          : 'bg-red-500/15 text-red-600 group-hover:bg-primary/15 group-hover:text-primary'
             )}
           >
             {picked ? (
-              <Check className="size-2.5" strokeWidth={3} />
+              <Check className="size-3" strokeWidth={2.75} />
             ) : queued ? (
-              <Clock className="size-2.5" />
-            ) : running ? (
-              <Loader className="size-2.5 animate-spin" />
-            ) : paused ? (
-              <Pause className="size-2.5" />
+              <Clock className="size-3" />
             ) : (
-              <Target className="size-2.5" />
+              <>
+                <span className="flex group-hover:hidden">
+                  {running ? (
+                    <Loader className="size-3 animate-spin" />
+                  ) : paused ? (
+                    <Pause className="size-3" />
+                  ) : (
+                    <Target className="size-3" />
+                  )}
+                </span>
+                <span
+                  aria-hidden
+                  className="hidden size-3 rounded-[3px] border-2 border-current group-hover:block"
+                />
+              </>
             )}
           </span>
         </button>
