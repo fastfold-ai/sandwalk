@@ -26,6 +26,7 @@ from agent_server.integrations_service import IntegrationsService
 from agent_server.library import LibraryService
 from agent_server.mcp_service import McpService
 from agent_server.models_service import ModelsService
+from agent_server.offline_mode import init_offline_mode, start_offline_periodic_checks
 from agent_server.pty_manager import PtyManager
 from agent_server.routes import register_all_routes
 from agent_server.routes.auth import register_auth_middleware
@@ -39,7 +40,6 @@ from agent_server.skills_service import SkillsService
 from agent_server.specialists_service import SpecialistsService
 from agent_server.store import AgentStore
 from agent_server.tools_service import ToolsService
-from agent_server.offline_mode import init_offline_mode, start_offline_periodic_checks
 
 # Cheap fingerprint poll. Full online backups only run when the live DB
 # changed and at least BACKUP_MIN_INTERVAL_SECONDS have passed — so idle

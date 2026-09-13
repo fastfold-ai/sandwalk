@@ -21,7 +21,7 @@ import asyncio
 import logging
 import os
 import socket
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger("agent_server.offline_mode")
@@ -86,7 +86,7 @@ def is_offline() -> bool:
     if _offline_checks_disabled():
         return False
     # Re-check if it's been more than 30 seconds since last probe
-    if _last_check_time is None or (datetime.now(timezone.utc) - _last_check_time) > timedelta(seconds=30):
+    if _last_check_time is None or (datetime.now(UTC) - _last_check_time) > timedelta(seconds=30):
         _check_network_health()
     return _offline
 
@@ -147,14 +147,14 @@ def _check_network_health() -> None:
     if _force_offline():
         _offline = True
         _offline_reason = "force_offline"
-        _last_check_time = datetime.now(timezone.utc)
+        _last_check_time = datetime.now(UTC)
         _last_check_targets = _probe_targets
         return
 
     if _offline_checks_disabled():
         _offline = False
         _offline_reason = None
-        _last_check_time = datetime.now(timezone.utc)
+        _last_check_time = datetime.now(UTC)
         _last_check_targets = []
         return
 
@@ -174,7 +174,7 @@ def _check_network_health() -> None:
         except Exception:
             failed_targets.append(host)
 
-    _last_check_time = datetime.now(timezone.utc)
+    _last_check_time = datetime.now(UTC)
     _last_check_targets = _probe_targets
 
     # We're offline if majority of targets fail
@@ -216,7 +216,7 @@ def force_offline(force: bool = True, reason: str | None = None) -> None:
     if force:
         _offline = True
         _offline_reason = reason or "force_offline"
-        _last_check_time = datetime.now(timezone.utc)
+        _last_check_time = datetime.now(UTC)
     else:
         _offline = False
         _offline_reason = None
