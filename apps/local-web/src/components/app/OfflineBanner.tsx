@@ -1,4 +1,4 @@
-import { AlertCircle, WifiOff, Wifi } from 'lucide-react'
+import { WifiOff } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
