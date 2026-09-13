@@ -78,10 +78,33 @@ def list_checkpoints() -> list[dict[str, Any]]:
     return out
 
 
+_RESUMABLE_STATUSES = frozenset({"paused", "running", "interrupted"})
+
+
+def is_resumable_checkpoint(row: dict[str, Any] | None) -> bool:
+    """True when a checkpoint still has work (or was mid-run when the process died)."""
+    if not row or not row.get("run_id"):
+        return False
+    status = str(row.get("status") or "").strip().lower()
+    if status == "cancelled":
+        return False
+    if status in _RESUMABLE_STATUSES:
+        return True
+    remaining = row.get("remaining_question_ids") or []
+    return bool(remaining)
+
+
+def checkpoint_resume_status(row: dict[str, Any] | None) -> str | None:
+    """List/queue status for a leftover checkpoint, or None if it is not resumable."""
+    if not is_resumable_checkpoint(row):
+        return None
+    status = str((row or {}).get("status") or "").strip().lower()
+    return "paused" if status == "paused" else "interrupted"
+
+
 def find_resumable_checkpoint() -> dict[str, Any] | None:
     """Newest checkpoint that can be resumed after a restart."""
     for row in list_checkpoints():
-        status = str(row.get("status") or "")
-        if status in {"paused", "running", "interrupted"}:
+        if is_resumable_checkpoint(row):
             return row
     return None

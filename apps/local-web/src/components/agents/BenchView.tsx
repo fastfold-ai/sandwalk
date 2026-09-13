@@ -251,6 +251,17 @@ export function BenchView({
     void loadStatus()
   }, [loadCatalog, loadStatus])
 
+  // Detail unmounts the list UI but this view stays mounted. Refresh when
+  // coming back so a retry started on the detail page is not still Interrupted.
+  const prevDetailRunId = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevDetailRunId.current
+    prevDetailRunId.current = detailRunId
+    if (prev && !detailRunId) {
+      void loadStatus()
+    }
+  }, [detailRunId, loadStatus])
+
   const inflightJobs: BenchQueueItem[] = active?.inflight?.length
     ? active.inflight
     : active?.running && active.currentRunId
@@ -285,10 +296,9 @@ export function BenchView({
   const showProgress = busy
   const installsInFlight = suites.some(card => card.installing)
 
-  // While a run is active, poll live queue often and results a bit slower
-  // so finished stacks land in the same list.
+  // While a run is active (or we are watching a result), poll the live queue.
   useEffect(() => {
-    if (!stacking) return
+    if (!stacking && !detailRunId) return
     const activeTimer = window.setInterval(() => {
       void loadActive()
     }, 1500)
@@ -299,7 +309,7 @@ export function BenchView({
       window.clearInterval(activeTimer)
       window.clearInterval(resultsTimer)
     }
-  }, [stacking, loadActive, loadResults])
+  }, [stacking, detailRunId, loadActive, loadResults])
 
   // Poll catalog while a background dataset install is running (survives navigation).
   useEffect(() => {
@@ -490,13 +500,30 @@ export function BenchView({
     }
   }
 
+  const retryFailedJob = async (runId: string) => {
+    setResumingId(runId)
+    try {
+      await client.retryFailedBenchRun(runId)
+      await loadStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to retry failed questions')
+    } finally {
+      setResumingId(null)
+    }
+  }
+
   const resumeJob = async (runId: string) => {
     setResumingId(runId)
     try {
       await client.resumeBenchRun(runId)
       await loadStatus()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to resume bench')
+      const message = err instanceof Error ? err.message : 'Unable to resume bench'
+      if (/nothing left to resume/i.test(message)) {
+        await loadStatus()
+      } else {
+        setError(message)
+      }
     } finally {
       setResumingId(null)
     }
@@ -1045,6 +1072,7 @@ export function BenchView({
             busy={busy}
             resumingId={resumingId}
             onResume={runId => void resumeJob(runId)}
+            onRetryFailed={runId => void retryFailedJob(runId)}
             onPause={runId => void pauseJob(runId)}
             onCancel={runId => void cancelJob(runId)}
           />

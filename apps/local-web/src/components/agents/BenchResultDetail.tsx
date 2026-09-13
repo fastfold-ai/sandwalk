@@ -3,7 +3,7 @@ import type {
   BenchSuiteCard,
   LocalAgentClient
 } from '@sandwalk/agent-local-client'
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, ExternalLink, Loader, Pencil, Play, Target, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, ExternalLink, Loader, Pencil, Play, RotateCcw, Target, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -12,6 +12,7 @@ import { formatTokenCount } from '@/components/agents/usage-overview-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { benchExportFilename } from '@/lib/bench-export-name'
 import { cn } from '@/lib/utils'
 
 const PACK_DISPLAY_TITLES: Record<string, string> = {
@@ -50,6 +51,8 @@ function prettyProvider(id: string): string {
 
 type BenchQuestion = {
   id?: string
+  question_id?: string
+  questionId?: string
   correct?: boolean
   expected?: string
   predicted?: string
@@ -75,6 +78,25 @@ type BenchQuestion = {
   tools_seen?: string[]
   toolsSeen?: string[]
   heuristics?: Record<string, boolean>
+  skipped?: boolean
+  terminal?: boolean
+}
+
+function isRetryableFailure(q: BenchQuestion): boolean {
+  if (q.skipped || q.terminal) return true
+  const mode = String(q.eval_mode || q.evalMode || '')
+  if (mode === 'error') return true
+  const err = String(q.judge?.error || '').trim()
+  if (err) return true
+  const blob = `${err} ${q.raw_response || q.rawResponse || ''} ${q.predicted || ''}`.toLowerCase()
+  return (
+    blob.includes('rate limit') ||
+    blob.includes('429') ||
+    blob.includes('overloaded') ||
+    blob.includes('stalled') ||
+    blob.includes('timed out') ||
+    blob.includes('nodename nor servname')
+  )
 }
 
 function pctClass(pct: number) {
@@ -490,6 +512,10 @@ export function BenchResultDetail({
   }, [client, runId])
 
   const questions = useMemo(() => asQuestions(detail), [detail])
+  const failedCount = useMemo(
+    () => questions.filter(isRetryableFailure).length,
+    [questions]
+  )
   const categories = useMemo(() => categoryScores(detail), [detail])
   const environment = useMemo(() => asEnvironment(detail), [detail])
   const filtered = useMemo(() => {
@@ -575,14 +601,38 @@ export function BenchResultDetail({
     }
   }
 
+  const retryFailed = async (questionIds?: string[]) => {
+    setResuming(true)
+    try {
+      await client.retryFailedBenchRun(
+        runId,
+        questionIds?.length ? { questionIds } : undefined
+      )
+      setLiveStatus('running')
+      if (!questionIds?.length && !running) {
+        navigate('/dashboard/bench')
+        return
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to retry failed questions')
+    } finally {
+      setResuming(false)
+    }
+  }
+
   const resumeRun = async () => {
     setResuming(true)
     try {
       await client.resumeBenchRun(runId)
       navigate('/dashboard/bench')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to resume bench')
-      setResuming(false)
+      const message = err instanceof Error ? err.message : 'Unable to resume bench'
+      if (/nothing left to resume/i.test(message)) {
+        navigate('/dashboard/bench')
+      } else {
+        setError(message)
+        setResuming(false)
+      }
     }
   }
 
@@ -627,6 +677,22 @@ export function BenchResultDetail({
               Resume
             </Button>
           ) : null}
+          {failedCount > 0 ? (
+            <Button
+              type="button"
+              size="sm"
+              variant={paused ? 'outline' : 'default'}
+              disabled={resuming}
+              onClick={() => void retryFailed()}
+            >
+              {resuming ? (
+                <Loader className="size-3.5 animate-spin" />
+              ) : (
+                <RotateCcw className="size-3.5" />
+              )}
+              Retry failed ({failedCount})
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
@@ -656,7 +722,7 @@ export function BenchResultDetail({
                 const url = URL.createObjectURL(file.blob)
                 const a = document.createElement('a')
                 a.href = url
-                a.download = file.filename
+                a.download = benchExportFilename(modelId, benchmark)
                 a.click()
                 URL.revokeObjectURL(url)
               })
@@ -893,6 +959,9 @@ export function BenchResultDetail({
                 <div className="space-y-2">
                   {visible.map((q, index) => {
                     const qid = String(q.id ?? index)
+                    const benchQid = String(
+                      q.questionId || q.question_id || q.category || ''
+                    ).trim()
                     const open = openId === qid
                     const sessionId = q.sessionId || q.session_id
                     const evalMode = q.evalMode || q.eval_mode || '—'
@@ -911,10 +980,11 @@ export function BenchResultDetail({
                         key={qid}
                         className="border-border/70 overflow-hidden rounded-md border"
                       >
+                        <div className="flex items-start gap-1">
                         <button
                           type="button"
                           onClick={() => setOpenId(open ? null : qid)}
-                          className="hover:bg-muted/30 flex w-full items-start gap-3 px-3 py-3 text-left transition-colors"
+                          className="hover:bg-muted/30 flex min-w-0 flex-1 items-start gap-3 px-3 py-3 text-left transition-colors"
                         >
                           <span
                             className={cn(
@@ -972,6 +1042,20 @@ export function BenchResultDetail({
                             <ChevronRight className="text-muted-foreground mt-1 size-4 shrink-0" />
                           )}
                         </button>
+                        {benchQid ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="mt-2 mr-2 shrink-0"
+                            disabled={resuming}
+                            onClick={() => void retryFailed([benchQid])}
+                          >
+                            <RotateCcw className="size-3.5" />
+                            Retry
+                          </Button>
+                        ) : null}
+                        </div>
 
                         {open ? (
                           <div className="border-border/60 space-y-3 border-t px-3 py-3 text-xs">

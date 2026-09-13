@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
@@ -11,6 +12,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from agent_server.app_deps import AppDeps
 from agent_server.bench_service import (
     apply_live_status,
+    attach_usage_and_resume,
     bootstrap_resumable,
     cancel_run,
     clear_results,
@@ -48,6 +50,7 @@ from agent_server.models.bench import (
     BenchResultList,
     BenchResultSummary,
     BenchResumeResponse,
+    BenchRetryFailedRequest,
     BenchRunPatchRequest,
     BenchSpawnRequest,
     BenchSpawnResponse,
@@ -55,6 +58,12 @@ from agent_server.models.bench import (
     BenchSuiteList,
     BenchUninstallResponse,
 )
+
+
+def _safe_export_part(value: str) -> str:
+    cleaned = re.sub(r"[^\w.+-]+", "-", value)
+    cleaned = re.sub(r"-+", "-", cleaned).strip("-")
+    return cleaned or "file"
 
 
 def _packs_payload(store: object) -> tuple[list[BenchSuiteCard], int, str | None]:
@@ -158,7 +167,12 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
         )
         ids = [str(row.get("run_id") or "") for row in page["data"] if row.get("run_id")]
         tokens = await asyncio.to_thread(deps.store.lifetime_tokens_by_run, ids)
-        rows = list(page["data"])
+        rows = await asyncio.to_thread(
+            attach_usage_and_resume,
+            list(page["data"]),
+            stores=[deps.store, deps.worker_store()],
+            run_tokens=tokens,
+        )
         if usage_sort:
             reverse = sort_key == "usage_desc"
 
@@ -179,6 +193,11 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
                 benchmark=str(r.get("benchmark") or ""),
                 accuracy=float(r.get("accuracy") or 0),
                 correct=int(r.get("correct") or 0),
+                answered=(
+                    int(r["answered"])
+                    if r.get("answered") not in (None, "")
+                    else None
+                ),
                 total=int(r.get("total") or 0),
                 time_s=float(r.get("time_s") or 0),
                 thinking_used=bool(r.get("thinking_used")),
@@ -204,6 +223,8 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
                     if r.get("lifetime_tokens") not in (None, "")
                     else tokens.get(str(r.get("run_id") or ""))
                 ),
+                resumable=bool(r.get("resumable")),
+                failed_count=int(r.get("failed_count") or 0),
             )
             for r in rows
         ]
@@ -236,7 +257,13 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
         rid = str(live.get("run_id") or run_id)
         if live.get("lifetime_tokens") in (None, ""):
             tokens = await asyncio.to_thread(deps.store.lifetime_tokens_by_run, [rid])
-            live = {**live, "lifetime_tokens": tokens.get(rid)}
+            attached = await asyncio.to_thread(
+                attach_usage_and_resume,
+                [live],
+                stores=[deps.store, deps.worker_store()],
+                run_tokens=tokens,
+            )
+            live = attached[0] if attached else {**live, "lifetime_tokens": tokens.get(rid)}
         return live
 
     @app.patch("/v1/bench/runs/{run_id}")
@@ -254,9 +281,9 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
         if path is None:
             raise HTTPException(status_code=404, detail="Run not found.")
         row = await asyncio.to_thread(get_result, run_id) or {}
-        model = str(row.get("model_id") or "model").replace("/", "_")
-        bench = str(row.get("benchmark") or "bench").replace(":", "_").replace("/", "_")
-        filename = f"{model}_{bench}.json"
+        model = str(row.get("model_id") or "model").rsplit("/", 1)[-1]
+        bench = str(row.get("benchmark") or "bench")
+        filename = f"{_safe_export_part(model)}_{_safe_export_part(bench)}.json"
         return FileResponse(path, filename=filename, media_type="application/json")
 
     @app.post("/v1/bench/runs/{run_id}/cancel", response_model=BenchCancelResponse)
@@ -275,6 +302,23 @@ def register_bench_routes(app: FastAPI, deps: AppDeps) -> None:
     async def bench_resume(run_id: str) -> BenchResumeResponse:
         try:
             rid = await asyncio.to_thread(resume_run, deps, run_id if run_id != "active" else None)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return BenchResumeResponse(ok=True, run_id=rid)
+
+    @app.post("/v1/bench/runs/{run_id}/retry-failed", response_model=BenchResumeResponse)
+    async def bench_retry_failed(
+        run_id: str, body: BenchRetryFailedRequest | None = None
+    ) -> BenchResumeResponse:
+        wanted = list((body.question_ids if body else None) or [])
+        try:
+            rid = await asyncio.to_thread(
+                resume_run,
+                deps,
+                run_id if run_id != "active" else None,
+                retry_failed=True,
+                question_ids=wanted or None,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return BenchResumeResponse(ok=True, run_id=rid)

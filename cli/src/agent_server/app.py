@@ -277,6 +277,7 @@ def create_app(
             "cookie",
             "x-sandwalk-client",
         ],
+        expose_headers=["content-disposition"],
     )
 
     register_all_routes(app, deps)

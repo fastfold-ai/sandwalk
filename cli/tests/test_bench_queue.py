@@ -27,6 +27,7 @@ def queue_env(monkeypatch):
     monkeypatch.setattr(qr, "list_checkpoints", lambda: [])
     monkeypatch.setattr(qr, "get_result", lambda _rid: None)
     monkeypatch.setattr(qr, "save_result", lambda _row: None)
+    monkeypatch.setattr(qr, "build_resume_checkpoint", lambda _rid, **_kw: None)
     yield
     with qr._state.lock:
         qr._state.cancel_ids.update(qr._state.inflight)
@@ -155,7 +156,7 @@ def test_resume_allowed_while_another_run_is_active(queue_env, monkeypatch):
     release = threading.Event()
     qr._job_hook = _block_until_stop(started, release)
     deps = MagicMock()
-    qr.enqueue(deps, _req(model="m1", parallel_runs=2))
+    qr.enqueue(deps, _req(model="m1"))
     assert started.wait(2)
     ckpt = {
         "run_id": "paused-1",
@@ -168,9 +169,37 @@ def test_resume_allowed_while_another_run_is_active(queue_env, monkeypatch):
     rid = qr.resume_run(deps, "paused-1")
     assert rid == "paused-1"
     status = qr.get_active_status()
-    live = [row.run_id for row in [*status.inflight, *status.queue]]
-    assert "paused-1" in live
+    inflight = {row.run_id for row in status.inflight}
+    assert "paused-1" in inflight
+    assert status.queue == []
+    assert status.parallel_runs >= 2
     assert "paused-1" not in {row.run_id for row in status.paused}
+    release.set()
+    _join_jobs()
+
+
+def test_resume_rebuilds_checkpoint_from_partial_result(queue_env, monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+    qr._job_hook = _block_until_stop(started, release)
+    monkeypatch.setattr(
+        qr,
+        "build_resume_checkpoint",
+        lambda rid, **_kw: {
+            "run_id": rid,
+            "status": "interrupted",
+            "suite_id": "mmlu",
+            "model_id": "m1",
+            "completed_question_ids": ["q1"],
+        }
+        if rid == "partial-1"
+        else None,
+    )
+    rid = qr.resume_run(MagicMock(), "partial-1")
+    assert rid == "partial-1"
+    assert started.wait(2)
+    live = {row.run_id for row in qr.get_active_status().inflight}
+    assert "partial-1" in live
     release.set()
     _join_jobs()
 
@@ -237,6 +266,92 @@ def test_inflight_status_stamps_stable_started_at(queue_env, monkeypatch):
     assert second.started_at == first.started_at
     release.set()
     _join_jobs()
+
+
+def test_retry_while_inflight_queues_more_questions(queue_env, monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+    qr._job_hook = _block_until_stop(started, release)
+    monkeypatch.setattr(
+        qr,
+        "build_retry_failed_checkpoint",
+        lambda rid, **kw: {
+            "run_id": rid,
+            "status": "interrupted",
+            "suite_id": "mmlu",
+            "model_id": "m1",
+            "force_retry": True,
+            "remaining_question_ids": list(kw.get("question_ids") or ["q1"]),
+        },
+    )
+    assert qr.resume_run(MagicMock(), "live-1", retry_failed=True, question_ids=["q1"])
+    assert started.wait(2)
+    assert qr.resume_run(MagicMock(), "live-1", retry_failed=True, question_ids=["q2"]) == "live-1"
+    from agent_server.bench_service.retry_extra import take_extra_retry
+
+    assert take_extra_retry("live-1") == ["q2"]
+    release.set()
+    _join_jobs()
+
+
+def test_retry_failed_enqueues(queue_env, monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+    qr._job_hook = _block_until_stop(started, release)
+    monkeypatch.setattr(
+        qr,
+        "build_retry_failed_checkpoint",
+        lambda rid, **_kw: {
+            "run_id": rid,
+            "status": "interrupted",
+            "suite_id": "bixbench-verified-50",
+            "model_id": "m1",
+            "force_retry": True,
+            "remaining_question_ids": ["bix-24-q2"],
+            "completed_question_ids": ["q1"],
+        },
+    )
+    rid = qr.resume_run(MagicMock(), "retry-1", retry_failed=True)
+    assert rid == "retry-1"
+    assert started.wait(2)
+    live = {row.run_id for row in qr.get_active_status().inflight}
+    assert "retry-1" in live
+    release.set()
+    _join_jobs()
+
+
+def test_resume_finished_run_retries_failed(queue_env, monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+    qr._job_hook = _block_until_stop(started, release)
+    monkeypatch.setattr(
+        qr,
+        "build_retry_failed_checkpoint",
+        lambda rid, **_kw: {
+            "run_id": rid,
+            "status": "interrupted",
+            "suite_id": "mmlu",
+            "model_id": "m1",
+            "force_retry": True,
+            "remaining_question_ids": ["q-fail"],
+        },
+    )
+    monkeypatch.setattr(
+        qr, "get_result", lambda rid: {"run_id": rid, "status": "completed"}
+    )
+    assert qr.resume_run(MagicMock(), "done-1") == "done-1"
+    assert started.wait(2)
+    release.set()
+    _join_jobs()
+
+
+def test_resume_finished_run_is_noop(queue_env, monkeypatch):
+    monkeypatch.setattr(
+        qr, "get_result", lambda rid: {"run_id": rid, "status": "completed"}
+    )
+    monkeypatch.setattr(qr, "build_retry_failed_checkpoint", lambda _rid, **_kw: None)
+    assert qr.resume_run(MagicMock(), "done-1") == "done-1"
+    assert qr.get_active_status().inflight == []
 
 
 def test_resume_inflight_uses_checkpoint_elapsed(queue_env, monkeypatch):

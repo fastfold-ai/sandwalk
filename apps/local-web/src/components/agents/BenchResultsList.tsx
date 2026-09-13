@@ -23,6 +23,7 @@ import {
   Pause,
   Play,
   RefreshCw,
+  RotateCcw,
   Search,
   Tag,
   Target,
@@ -56,17 +57,15 @@ import {
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@/components/ui/tooltip'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { formatModelEffortBadge } from '@/lib/composer-models'
 import { cn } from '@/lib/utils'
+import { benchExportFilename } from '@/lib/bench-export-name'
+import { buildZipStore } from '@/lib/zip-store'
+import { toast } from 'sonner'
 
 const ROW_GRID =
-  'grid grid-cols-[28px_minmax(0,1fr)_10.75rem_6.25rem_4.75rem_10.5rem_2rem] items-center gap-x-3'
+  'grid grid-cols-[20px_minmax(0,1fr)_10.75rem_6.25rem_4.75rem_10.5rem_2rem] items-center gap-x-3'
 
 const PACK_DISPLAY_TITLES: Record<string, string> = {
   'bio-capybara-full': 'Bio-Capybara-full',
@@ -217,6 +216,16 @@ function isCompleted(status?: string | null): boolean {
   return !value || value === 'completed'
 }
 
+function canResumeRow(row: ResultRow): boolean {
+  const status = (row.status || '').toLowerCase()
+  // Finished runs can still have Retry failed — that is not "interrupted".
+  return status === 'paused' || status === 'interrupted'
+}
+
+function canSelectRow(row: ResultRow): boolean {
+  return (row.status || '').toLowerCase() !== 'queued'
+}
+
 function jobBarPct(progress?: BenchProgress | null): number {
   if (!progress?.benchTotal || progress.benchTotal <= 0) return 0
   return Math.min(
@@ -250,6 +259,7 @@ function queueItemToRow(
     name: existing?.name,
     provider: job.provider || existing?.provider || null,
     lifetimeTokens: existing?.lifetimeTokens,
+    failedCount: existing?.failedCount,
     lastProgress: progress ?? null
   }
 }
@@ -274,15 +284,10 @@ function mergeResultRows(
   for (const job of inflight) push(job, 'running')
   for (const job of queued) push(job, 'queued')
   for (const job of paused) push(job, 'paused')
-  const rest = results
-    .filter(row => !seen.has(row.runId))
-    .map(row => {
-      const status = (row.status || '').toLowerCase()
-      if (status === 'running' || status === 'queued') {
-        return { ...row, status: 'interrupted' }
-      }
-      return row
-    })
+  // Trust the API for stored rows. Remapping leftover `running` → interrupted
+  // here raced the live overlay and showed Interrupted while the detail page
+  // (which polls /active itself) still said Running.
+  const rest = results.filter(row => !seen.has(row.runId))
   return [...live, ...rest]
 }
 
@@ -383,6 +388,7 @@ export function BenchResultsList({
   busy,
   resumingId,
   onResume,
+  onRetryFailed,
   onPause,
   onCancel
 }: {
@@ -394,6 +400,7 @@ export function BenchResultsList({
   busy: boolean
   resumingId: string | null
   onResume: (runId: string) => void
+  onRetryFailed: (runId: string) => void
   onPause: (runId: string) => void
   onCancel: (runId: string) => void
 }) {
@@ -415,8 +422,10 @@ export function BenchResultsList({
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [compareSelection, setCompareSelection] = useState<string[]>([])
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [batchBusy, setBatchBusy] = useState(false)
   const debounceRef = useRef<number | null>(null)
+  const lastSelectRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (debounceRef.current != null) window.clearTimeout(debounceRef.current)
@@ -503,21 +512,135 @@ export function BenchResultsList({
   const shownTotal = total + liveExtra
   const nowMs = useNow(listRows.some(row => (row.status || '').toLowerCase() === 'running'))
 
-  const toggleCompare = (runId: string, completed: boolean) => {
-    if (!completed) return
-    setCompareSelection(current => {
-      if (current.includes(runId)) return current.filter(id => id !== runId)
-      if (current.length >= 2) return [current[1], runId]
-      return [...current, runId]
-    })
+  const selectableRows = listRows.filter(canSelectRow)
+  const selectedRows = listRows.filter(row => selectedIds.includes(row.runId))
+
+  const toggleSelected = (
+    runId: string,
+    selectable: boolean,
+    opts?: { shift?: boolean; additive?: boolean }
+  ) => {
+    if (!selectable) return
+    const ids = selectableRows.map(row => row.runId)
+    if (opts?.shift && lastSelectRef.current) {
+      const from = ids.indexOf(lastSelectRef.current)
+      const to = ids.indexOf(runId)
+      if (from >= 0 && to >= 0) {
+        const [lo, hi] = from < to ? [from, to] : [to, from]
+        const range = ids.slice(lo, hi + 1)
+        setSelectedIds(current => {
+          const next = new Set(opts.additive ? current : [])
+          for (const id of range) next.add(id)
+          return [...next]
+        })
+        lastSelectRef.current = runId
+        return
+      }
+    }
+    setSelectedIds(current =>
+      current.includes(runId)
+        ? current.filter(id => id !== runId)
+        : [...current, runId]
+    )
+    lastSelectRef.current = runId
   }
 
   const openCompare = () => {
-    if (compareSelection.length !== 2) return
-    const [a, b] = compareSelection
-    navigate(
-      `/dashboard/bench/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
-    )
+    if (selectedIds.length < 2) return
+    const query = selectedIds
+      .map(id => `id=${encodeURIComponent(id)}`)
+      .join('&')
+    navigate(`/dashboard/bench/compare?${query}`)
+  }
+
+  const triggerDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const downloadSelectedZip = async () => {
+    const ids = selectedIds
+    if (!ids.length) return
+    setBatchBusy(true)
+    try {
+      const files = []
+      for (const id of ids) {
+        const row = selectedRows.find(item => item.runId === id)
+        const file = await client.downloadBenchExport(id)
+        files.push({
+          name: benchExportFilename(row?.modelId, row?.benchmark),
+          data: new Uint8Array(await file.blob.arrayBuffer())
+        })
+      }
+      triggerDownload(
+        buildZipStore(files),
+        `bench-results-${ids.length}.zip`
+      )
+      toast.success(`Downloaded ${ids.length} result${ids.length === 1 ? '' : 's'}`)
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Unable to download results'
+      )
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const retrySelected = async () => {
+    const ids = selectedRows
+      .filter(row => {
+        const status = (row.status || '').toLowerCase()
+        return status !== 'running' && status !== 'queued'
+      })
+      .map(row => row.runId)
+    if (!ids.length) return
+    setBatchBusy(true)
+    try {
+      for (const id of ids) onRetryFailed(id)
+      toast.success(`Retry queued for ${ids.length} run${ids.length === 1 ? '' : 's'}`)
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const resumeSelected = () => {
+    const ids = selectedRows.filter(canResumeRow).map(row => row.runId)
+    for (const id of ids) onResume(id)
+  }
+
+  const pauseSelected = () => {
+    const ids = selectedRows
+      .filter(row => (row.status || '').toLowerCase() === 'running')
+      .map(row => row.runId)
+    for (const id of ids) onPause(id)
+  }
+
+  const removeSelected = async () => {
+    const ids = [...selectedIds]
+    if (!ids.length) return
+    setBatchBusy(true)
+    try {
+      for (const id of ids) {
+        const row = selectedRows.find(item => item.runId === id)
+        const status = (row?.status || '').toLowerCase()
+        if (status === 'running' || status === 'queued' || status === 'paused') {
+          onCancel(id)
+        } else {
+          await client.deleteBenchResult(id)
+        }
+      }
+      setSelectedIds([])
+      void fetchPage(null, false)
+      toast.success(`Removed ${ids.length} run${ids.length === 1 ? '' : 's'}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to remove runs')
+    } finally {
+      setBatchBusy(false)
+    }
   }
 
   const selectedSuite = suites.find(
@@ -596,8 +719,9 @@ export function BenchResultsList({
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[12rem] max-w-[220px] flex-1">
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+        <div className="relative min-w-32 max-w-44 flex-1">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
             value={query}
@@ -823,38 +947,91 @@ export function BenchResultsList({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {compareSelection.length ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => setCompareSelection([])}
-            >
-              Clear selection
-            </Button>
+        </div>
+        <div className="flex shrink-0 items-center justify-end gap-1.5">
+          {selectedIds.length ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={batchBusy}
+                  className="tabular-nums"
+                >
+                  {batchBusy ? (
+                    <Loader className="size-3.5 animate-spin" />
+                  ) : (
+                    <MoreHorizontal className="size-3.5" />
+                  )}
+                  {selectedIds.length}
+                  <ChevronDown className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  disabled={!selectedIds.length}
+                  onSelect={() => void downloadSelectedZip()}
+                >
+                  <Download className="size-3.5" />
+                  Download zip
+                </DropdownMenuItem>
+                {selectedRows.some(
+                  row =>
+                    (row.status || '').toLowerCase() !== 'running' &&
+                    (row.status || '').toLowerCase() !== 'queued'
+                ) ? (
+                  <DropdownMenuItem onSelect={() => void retrySelected()}>
+                    <RotateCcw className="size-3.5" />
+                    Retry failed
+                  </DropdownMenuItem>
+                ) : null}
+                {selectedRows.some(canResumeRow) ? (
+                  <DropdownMenuItem onSelect={resumeSelected}>
+                    <Play className="size-3.5" />
+                    Resume
+                  </DropdownMenuItem>
+                ) : null}
+                {selectedRows.some(
+                  row => (row.status || '').toLowerCase() === 'running'
+                ) ? (
+                  <DropdownMenuItem onSelect={pauseSelected}>
+                    <Pause className="size-3.5" />
+                    Pause
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuItem onSelect={() => setSelectedIds([])}>
+                  Clear selection
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-red-600"
+                  onSelect={() => void removeSelected()}
+                >
+                  <Trash2 className="size-3.5" />
+                  Remove
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
           <Button
             type="button"
             size="sm"
             variant="outline"
             disabled={loading}
+            aria-label="Refresh"
             onClick={() => void fetchPage(null, false)}
           >
             <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
-            Refresh
           </Button>
           <Button
             type="button"
             size="sm"
-            disabled={compareSelection.length !== 2}
+            disabled={selectedIds.length < 2}
             onClick={openCompare}
           >
             <Columns2 className="size-3.5" />
             Compare
-            {compareSelection.length === 2
-              ? ''
-              : ` · ${compareSelection.length}/2`}
           </Button>
         </div>
       </div>
@@ -882,10 +1059,13 @@ export function BenchResultsList({
             row={row}
             nowMs={nowMs}
             suites={suites}
-            picked={compareSelection.includes(row.runId)}
+            picked={selectedIds.includes(row.runId)}
             resuming={resumingId === row.runId}
-            onToggleCompare={() => toggleCompare(row.runId, isCompleted(row.status))}
+            onToggleSelect={(opts) =>
+              toggleSelected(row.runId, canSelectRow(row), opts)
+            }
             onResume={() => onResume(row.runId)}
+            onRetryFailed={() => onRetryFailed(row.runId)}
             onPause={() => onPause(row.runId)}
             onRemove={() => {
               const statusKey = (row.status || '').toLowerCase()
@@ -894,7 +1074,7 @@ export function BenchResultsList({
                 statusKey === 'queued' ||
                 statusKey === 'paused'
               const done = () => {
-                setCompareSelection(current =>
+                setSelectedIds(current =>
                   current.filter(id => id !== row.runId)
                 )
                 void fetchPage(null, false)
@@ -916,7 +1096,7 @@ export function BenchResultsList({
                 const url = URL.createObjectURL(file.blob)
                 const a = document.createElement('a')
                 a.href = url
-                a.download = file.filename
+                a.download = benchExportFilename(row.modelId, row.benchmark)
                 a.click()
                 URL.revokeObjectURL(url)
               })
@@ -975,8 +1155,9 @@ function ResultRowView({
   suites,
   picked,
   resuming,
-  onToggleCompare,
+  onToggleSelect,
   onResume,
+  onRetryFailed,
   onPause,
   onRemove,
   onOpen,
@@ -988,8 +1169,9 @@ function ResultRowView({
   suites: BenchSuiteCard[]
   picked: boolean
   resuming: boolean
-  onToggleCompare: () => void
+  onToggleSelect: (opts?: { shift?: boolean; additive?: boolean }) => void
   onResume: () => void
+  onRetryFailed: () => void
   onPause: () => void
   onRemove: () => void
   onOpen: () => void
@@ -997,10 +1179,10 @@ function ResultRowView({
   onOpenProject?: () => void
 }) {
   const statusKey = (row.status || '').toLowerCase()
-  const paused = statusKey === 'paused' || statusKey === 'interrupted'
+  const paused = canResumeRow(row)
   const running = statusKey === 'running'
   const queued = statusKey === 'queued'
-  const completed = isCompleted(statusKey)
+  const completed = isCompleted(statusKey) && !paused
   const pct = Math.round((row.accuracy || 0) * 1000) / 10
   const title = row.name?.trim() || suiteTitle(row.benchmark, suites) || 'Untitled run'
   const provider = providerLabel(row)
@@ -1008,7 +1190,7 @@ function ResultRowView({
     ? 'Queued'
     : statusKey === 'paused'
       ? 'Paused'
-      : statusKey === 'interrupted'
+      : paused
         ? 'Interrupted'
         : running
           ? 'Running'
@@ -1016,13 +1198,16 @@ function ResultRowView({
             ? `${pct.toFixed(1)}%`
             : 'Running'
   const barPct = jobBarPct(row.lastProgress)
-  const graded = row.lastProgress?.benchCurrent ?? row.correct ?? 0
+  const graded = row.lastProgress?.benchCurrent ?? 0
   const total = row.lastProgress?.benchTotal ?? row.total ?? 0
   const inFlight = row.lastProgress?.inFlight || 0
-  const progressLabel = total
-    ? `${graded}/${total}`
-    : running || paused
-      ? '0/0'
+  const done = graded || row.answered || 0
+  const progressLabel = running || paused || queued
+    ? total
+      ? `${done}/${total}`
+      : '0/0'
+    : completed && row.total
+      ? `${row.correct ?? 0}/${row.total}`
       : ''
 
   return (
@@ -1034,8 +1219,17 @@ function ResultRowView({
         queued ? undefined : 'cursor-pointer',
         picked ? 'bg-primary/[0.04]' : 'hover:bg-muted/30'
       )}
-      onClick={() => {
-        if (!queued) onOpen()
+      onClick={event => {
+        if (queued) return
+        if (event.shiftKey || event.metaKey || event.ctrlKey) {
+          event.preventDefault()
+          onToggleSelect({
+            shift: event.shiftKey,
+            additive: event.metaKey || event.ctrlKey || event.shiftKey
+          })
+          return
+        }
+        onOpen()
       }}
       onKeyDown={event => {
         if (queued) return
@@ -1046,130 +1240,63 @@ function ResultRowView({
       }}
     >
       <div className={ROW_GRID}>
-        {running || paused ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label={running ? 'Pause' : 'Resume'}
-                disabled={paused && resuming}
-                className="group relative size-7 shrink-0"
-                onClick={event => {
-                  event.stopPropagation()
-                  if (running) onPause()
-                  else onResume()
-                }}
-                onPointerDown={event => event.stopPropagation()}
-              >
-                <span
-                  className={cn(
-                    'relative block size-7 overflow-hidden rounded-md',
-                    running
-                      ? 'bg-sky-500/15 text-sky-600'
-                      : 'bg-muted text-muted-foreground'
-                  )}
-                >
-                  {paused && resuming ? (
-                    <Loader className="absolute inset-0 m-auto size-3.5 animate-spin" />
-                  ) : (
-                    <>
-                      <span
-                        className={cn(
-                          'absolute inset-0 flex items-center justify-center transition-opacity duration-150',
-                          'group-hover:opacity-0 group-focus-visible:opacity-0'
-                        )}
-                      >
-                        {running ? (
-                          <Loader className="size-3.5 animate-spin" />
-                        ) : (
-                          <Pause className="size-3.5" />
-                        )}
-                      </span>
-                      <span
-                        className={cn(
-                          'absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150',
-                          'group-hover:opacity-100 group-focus-visible:opacity-100'
-                        )}
-                      >
-                        {running ? (
-                          <Pause className="size-3.5" />
-                        ) : (
-                          <Play className="size-3.5 translate-x-px" />
-                        )}
-                      </span>
-                    </>
-                  )}
-                </span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent
-              side="right"
-              sideOffset={8}
-              avoidCollisions={false}
-              className="animate-none"
-            >
-              {running ? 'Pause' : resuming ? 'Resuming…' : 'Resume'}
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <button
-            type="button"
-            disabled={!completed}
-            aria-label={
-              completed
-                ? picked
-                  ? 'Deselect for compare'
-                  : 'Select for compare'
-                : 'Only completed runs can be compared'
-            }
-            aria-pressed={picked}
-            title={
-              completed
-                ? picked
-                  ? 'Selected for compare'
-                  : 'Select to compare'
-                : 'Compare is available after the run finishes'
-            }
-            className="relative size-7 shrink-0"
-            onClick={event => {
-              event.stopPropagation()
-              onToggleCompare()
-            }}
-            onPointerDown={event => event.stopPropagation()}
-          >
-            <span
-              className={cn(
-                'flex size-7 items-center justify-center rounded-md',
-                queued
+        <button
+          type="button"
+          disabled={queued}
+          aria-label={
+            queued
+              ? 'Queued runs cannot be selected'
+              : picked
+                ? 'Deselect run'
+                : 'Select run'
+          }
+          aria-pressed={picked}
+          title={
+            queued
+              ? undefined
+              : 'Click to select · Shift-click a range'
+          }
+          className="flex size-5 shrink-0 items-center justify-center"
+          onClick={event => {
+            event.stopPropagation()
+            onToggleSelect({
+              shift: event.shiftKey,
+              additive: event.metaKey || event.ctrlKey || event.shiftKey
+            })
+          }}
+          onPointerDown={event => event.stopPropagation()}
+        >
+          <span
+            className={cn(
+              'flex size-4 items-center justify-center rounded-[4px]',
+              picked
+                ? 'bg-primary text-primary-foreground'
+                : queued
                   ? 'bg-muted text-muted-foreground'
-                  : pct >= 70
-                    ? 'bg-emerald-500/15 text-emerald-600'
-                    : pct >= 40
-                      ? 'bg-amber-500/15 text-amber-600'
-                      : 'bg-red-500/15 text-red-600',
-                !completed && 'opacity-60'
-              )}
-            >
-              {queued ? (
-                <Clock className="size-3.5" />
-              ) : (
-                <Target className="size-3.5" />
-              )}
-            </span>
-            {completed ? (
-              <span
-                className={cn(
-                  'absolute inset-0 m-auto flex size-3.5 items-center justify-center rounded-full border',
-                  picked
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border/80 bg-background/95 opacity-0 hover:opacity-100'
-                )}
-              >
-                {picked ? <Check className="size-2.5" strokeWidth={3} /> : null}
-              </span>
-            ) : null}
-          </button>
-        )}
+                  : running
+                    ? 'bg-sky-500/15 text-sky-600'
+                    : paused
+                      ? 'bg-muted text-muted-foreground'
+                      : pct >= 70
+                        ? 'bg-emerald-500/15 text-emerald-600'
+                        : pct >= 40
+                          ? 'bg-amber-500/15 text-amber-600'
+                          : 'bg-red-500/15 text-red-600'
+            )}
+          >
+            {picked ? (
+              <Check className="size-2.5" strokeWidth={3} />
+            ) : queued ? (
+              <Clock className="size-2.5" />
+            ) : running ? (
+              <Loader className="size-2.5 animate-spin" />
+            ) : paused ? (
+              <Pause className="size-2.5" />
+            ) : (
+              <Target className="size-2.5" />
+            )}
+          </span>
+        </button>
         <div className="min-w-0">
           <span className="block truncate text-sm font-medium" title={title}>
             {title}
@@ -1272,6 +1399,17 @@ function ResultRowView({
             <DropdownMenuContent align="end">
               {!queued ? (
                 <DropdownMenuItem onClick={onOpen}>View details</DropdownMenuItem>
+              ) : null}
+              {!running && !queued ? (
+                <DropdownMenuItem disabled={resuming} onClick={onRetryFailed}>
+                  {resuming ? (
+                    <Loader className="size-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-3.5" />
+                  )}
+                  Retry failed
+                  {(row.failedCount || 0) > 0 ? ` (${row.failedCount})` : ''}
+                </DropdownMenuItem>
               ) : null}
               {onOpenProject ? (
                 <DropdownMenuItem onClick={onOpenProject}>

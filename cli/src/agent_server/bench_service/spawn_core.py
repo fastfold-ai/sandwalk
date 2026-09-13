@@ -6,6 +6,7 @@ import logging
 import shutil
 import threading
 import time
+from datetime import datetime
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -34,6 +35,10 @@ from agent_server.settings_service import SettingsService
 logger = logging.getLogger(__name__)
 
 CHECKPOINT_EVERY = 10
+# Hard cap per question. A hung provider/tool used to sit here for an hour.
+CELL_WAIT_S = 25 * 60
+# No new events / messages — treat as stalled (disconnect or wedged tool).
+CELL_STALL_S = 8 * 60
 StopCheck = Callable[[], str | None]
 
 
@@ -128,13 +133,23 @@ def run_agent_suite(
         str(x)
         for x in ((resume_checkpoint or {}).get("completed_question_ids") or [])
     }
+    remaining_ids = {
+        str(x)
+        for x in ((resume_checkpoint or {}).get("remaining_question_ids") or [])
+        if str(x).strip()
+    }
     question_rows: list[dict[str, Any]] = []
     if resume_checkpoint and prior and isinstance(prior.get("questions"), list):
-        question_rows = list(prior["questions"])
+        question_rows = [
+            row
+            for row in prior["questions"]
+            if str(row.get("question_id") or "") not in remaining_ids
+        ]
         for row in question_rows:
             qid = row.get("question_id")
             if qid:
                 completed_ids.add(str(qid))
+    completed_ids -= remaining_ids
 
     if resume_checkpoint and resume_checkpoint.get("environment"):
         environment = dict(resume_checkpoint["environment"])
@@ -158,10 +173,81 @@ def run_agent_suite(
     )
     workers_store = deps.worker_store()
     workers_svc = deps.worker_service()
-    if project_id:
-        project = workers_store.get_project(project_id)
-        if project is None:
-            project_id = None
+    force_retry = bool((resume_checkpoint or {}).get("force_retry"))
+    if resume_checkpoint and not force_retry:
+        from agent_server.bench_service.results_store import (
+            _exhausted_questions_from_stores,
+            _terminal_question_ids,
+        )
+
+        skip_retry = _exhausted_questions_from_stores(
+            project_id or (prior or {}).get("project_id"),
+            [workers_store, deps.store],
+        )
+        skip_retry.update(_terminal_question_ids(prior))
+        if skip_retry:
+            remaining_ids -= skip_retry
+            completed_ids |= skip_retry
+            known = {
+                str(row.get("question_id") or "")
+                for row in question_rows
+                if row.get("question_id")
+            }
+            for qid in sorted(skip_retry):
+                if qid in known:
+                    continue
+                question_rows.append(
+                    _failed_cell_row(
+                        type(
+                            "Cell",
+                            (),
+                            {
+                                "question_id": qid,
+                                "prompt": qid,
+                            },
+                        )(),
+                        index=len(question_rows),
+                        error=(
+                            "Skipped — earlier attempts stalled or were "
+                            "interrupted. Not retried so the suite can finish."
+                        ),
+                    )
+                )
+
+    def _project_on(store: Any, pid: str | None):
+        if not pid or store is None:
+            return None
+        try:
+            return store.get_project(pid)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _pid_from_prior() -> str | None:
+        for item in (prior or {}).get("questions") or []:
+            if not isinstance(item, dict):
+                continue
+            sid = item.get("session_id") or item.get("sessionId")
+            if not sid:
+                continue
+            for store in (workers_store, deps.store):
+                try:
+                    session = store.get_session(str(sid))
+                except Exception:  # noqa: BLE001
+                    session = None
+                pid = getattr(session, "project_id", None) if session is not None else None
+                if pid:
+                    return str(pid)
+        return None
+
+    project = _project_on(workers_store, project_id) or _project_on(deps.store, project_id)
+    if project is None:
+        recovered = _pid_from_prior()
+        if recovered:
+            project_id = recovered
+            project = _project_on(workers_store, project_id) or _project_on(
+                deps.store, project_id
+            )
+    # Keep a recovered id even if this process uses a different store file.
     if not project_id:
         from agent_server.bench_service.catalog import pack_display_title
 
@@ -182,7 +268,11 @@ def run_agent_suite(
         )
         project_id = project.id
     else:
-        project = workers_store.get_project(project_id)
+        project = (
+            project
+            or _project_on(workers_store, project_id)
+            or _project_on(deps.store, project_id)
+        )
 
     pending = [
         (idx, cell)
@@ -333,15 +423,33 @@ def run_agent_suite(
                     stop_reason = stop_reason or "pause"
                     return None
                 raise
-            _wait_until_settled(deps, sid, stop_check=_reason, timeout_s=3600)
+            wait_outcome = _wait_until_settled(
+                deps, sid, stop_check=_reason, timeout_s=CELL_WAIT_S
+            )
             reason = _reason()
-            if reason:
-                stop_reason = reason
+            if reason or wait_outcome == "stopped":
+                stop_reason = reason or "pause"
                 try:
                     workers_svc.interrupt(sid)
                 except Exception:  # noqa: BLE001
                     pass
                 return None
+            if wait_outcome in {"timeout", "stalled"}:
+                logger.warning("bench cell %s %s", cell.question_id, wait_outcome)
+                try:
+                    workers_svc.interrupt(sid)
+                except Exception:  # noqa: BLE001
+                    pass
+                return _failed_cell_row(
+                    cell,
+                    index=idx,
+                    error=(
+                        "Cell stalled — no model progress "
+                        "(provider disconnect or wedged tool). Skipped so the suite can finish."
+                        if wait_outcome == "stalled"
+                        else "Cell timed out waiting for the model. Skipped so the suite can finish."
+                    ),
+                )
             return _grade_session(
                 deps,
                 session_id=sid,
@@ -362,10 +470,33 @@ def run_agent_suite(
     work: list[tuple[int, Any]] = list(pending)
     work_lock = threading.Lock()
 
+    def _ingest_extra() -> None:
+        from agent_server.bench_service.retry_extra import take_extra_retry
+
+        extras = take_extra_retry(run_id)
+        if not extras:
+            return
+        by_qid = {str(cell.question_id): (idx, cell) for idx, cell in enumerate(cells)}
+        with work_lock, merge_lock:
+            queued = {str(cell.question_id) for _, cell in work}
+            for qid in extras:
+                pair = by_qid.get(qid)
+                if pair is None or qid in queued:
+                    continue
+                completed_ids.discard(qid)
+                question_rows[:] = [
+                    row
+                    for row in question_rows
+                    if str(row.get("question_id") or "") != qid
+                ]
+                work.append(pair)
+                queued.add(qid)
+
     def _claim() -> tuple[int, Any] | None:
         reason = _reason()
         if reason:
             return None
+        _ingest_extra()
         with work_lock:
             if not work:
                 return None
@@ -820,6 +951,55 @@ def _copy_bix_capsule(source: dict[str, Any], workspace: Path) -> bool:
     return False
 
 
+def _iso_epoch(raw: Any) -> float:
+    if raw in (None, ""):
+        return 0.0
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    text = str(raw).replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(text).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def _session_activity_epoch(store: Any, session: Any) -> float:
+    latest = max(
+        _iso_epoch(getattr(session, "last_message_at", None)),
+        _iso_epoch(getattr(session, "updated_at", None)),
+    )
+    list_events = getattr(store, "list_events", None)
+    if list_events is None:
+        return latest
+    try:
+        events = list_events(getattr(session, "id", "") or "")
+    except Exception:  # noqa: BLE001
+        return latest
+    for event in events[-30:]:
+        latest = max(latest, _iso_epoch(getattr(event, "timestamp", None)))
+    return latest
+
+
+def _failed_cell_row(cell: Any, *, index: int, error: str) -> dict[str, Any]:
+    return {
+        "id": str(index),
+        "correct": False,
+        "expected": "",
+        "predicted": "",
+        "question": str(getattr(cell, "prompt", ""))[:2000],
+        "raw_response": "",
+        "category": str(cell.question_id),
+        "question_id": str(cell.question_id),
+        "time_s": 0,
+        "session_id": None,
+        "eval_mode": "error",
+        "judge": {"error": error},
+        "terminal": True,
+        "tools_seen": [],
+        "heuristics": {},
+    }
+
+
 def _wait_until_settled(
     deps: AppDeps,
     session_id: str,
@@ -827,10 +1007,25 @@ def _wait_until_settled(
     cancel_check: Callable[[], bool] | None = None,
     stop_check: StopCheck | None = None,
     timeout_s: float,
-) -> None:
-    deadline = time.time() + timeout_s
+    stall_s: float = CELL_STALL_S,
+    now: Callable[[], float] | None = None,
+    sleeper: Callable[[float], None] | None = None,
+) -> str:
+    """Block until the cell run finishes, or fail it so the suite can continue.
+
+    Returns ``settled``, ``stopped``, ``timeout``, or ``stalled``.
+    A stall is no new session/events activity — typical after a dropped
+    provider stream or a wedged ``run_python``. Offline windows do not
+    count toward the stall timer.
+    """
+    clock = now or time.time
+    sleep = sleeper or time.sleep
+    started = clock()
+    deadline = started + max(30.0, float(timeout_s))
+    stall_limit = max(30.0, float(stall_s))
     saw_running = False
-    while time.time() < deadline:
+    last_activity = started
+    while clock() < deadline:
         reason = stop_check() if stop_check else None
         if reason is None and cancel_check and cancel_check():
             reason = "cancel"
@@ -839,25 +1034,47 @@ def _wait_until_settled(
                 deps.worker_service().interrupt(session_id)
             except Exception:  # noqa: BLE001
                 pass
-            return
+            return "stopped"
         session = deps.worker_store().get_session(session_id)
         if session is None:
-            return
+            return "settled"
         status = session.status
         if status in {"running", "awaiting_approval"}:
             saw_running = True
         if saw_running and status in {"idle", "error", "interrupted"}:
-            return
+            return "settled"
         if not saw_running and status == "idle":
-            # wait a bit for status to flip to running
-            time.sleep(0.5)
+            sleep(0.5)
             session = deps.worker_store().get_session(session_id)
             if session and session.status == "idle":
-                # maybe finished very fast
                 msgs = deps.worker_store().list_messages(session_id)
                 if any(m.role == "assistant" for m in msgs):
-                    return
-        time.sleep(1.0)
+                    return "settled"
+        activity = _session_activity_epoch(deps.worker_store(), session)
+        if activity > last_activity:
+            last_activity = activity
+        offline = False
+        try:
+            from agent_server.offline_mode import is_offline
+
+            offline = bool(is_offline())
+        except Exception:  # noqa: BLE001
+            offline = False
+        if offline:
+            last_activity = clock()
+        elif saw_running and clock() - last_activity >= stall_limit:
+            logger.warning("bench session %s stalled (%.0fs quiet)", session_id, stall_limit)
+            try:
+                deps.worker_service().interrupt(session_id)
+            except Exception:  # noqa: BLE001
+                pass
+            return "stalled"
+        sleep(1.0)
+    try:
+        deps.worker_service().interrupt(session_id)
+    except Exception:  # noqa: BLE001
+        pass
+    return "timeout"
 
 
 def _grade_session(deps: AppDeps, *, session_id: str, cell: Any, index: int) -> dict[str, Any]:
