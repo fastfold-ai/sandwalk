@@ -16,13 +16,6 @@ export type { AppShellProps } from '@/components/app-shell-props'
 export function AppShell(props: AppShellProps) {
   return (
     <>
-      {props.offlineStatus && (
-        <OfflineBanner
-          isOffline={props.offlineStatus.isOffline}
-          message={props.offlineStatus.message}
-          featuresAffected={props.offlineStatus.featuresAffected}
-        />
-      )}
       {/*
         No full-width title bar above the split — the sidebar|main vertical
         divider must run edge-to-edge. Traffic-light clearance
@@ -277,6 +270,14 @@ export function AppShell(props: AppShellProps) {
           createSplitFromSelection={props.createSplitFromSelection}
         />
         </ResizablePanelGroup>
+        {props.offlineStatus && (
+          <OfflineBanner
+            isOffline={props.offlineStatus.isOffline}
+            justOnline={props.offlineStatus.justOnline}
+            message={props.offlineStatus.message}
+            featuresAffected={props.offlineStatus.featuresAffected}
+          />
+        )}
       </div>
 
       <AppDialogs

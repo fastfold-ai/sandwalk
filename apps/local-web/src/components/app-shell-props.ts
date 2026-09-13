@@ -34,6 +34,7 @@ import { type parseCatalogSkillId,type SkillsViewMode } from '@/lib/skills-catal
 
 export interface OfflineStatus {
   isOffline: boolean
+  justOnline?: boolean
   message?: string
   featuresAffected?: string[]
 }

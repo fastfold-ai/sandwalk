@@ -21,7 +21,7 @@ import asyncio
 import logging
 import os
 import socket
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 logger = logging.getLogger("agent_server.offline_mode")
@@ -64,12 +64,13 @@ _probe_targets: list[str] = list(_DEFAULT_DNS_PROBE_TARGETS)
 
 def get_offline_state() -> dict[str, Any]:
     """Return the current offline state for API/UI consumption."""
+    forced = _force_offline()
     return {
-        "is_offline": _offline,
-        "reason": _offline_reason,
+        "is_offline": forced or _offline,
+        "reason": "force_offline" if forced else _offline_reason,
         "last_check": _last_check_time.isoformat() if _last_check_time else None,
         "targets_checked": _last_check_targets,
-        "forced": _force_offline(),
+        "forced": forced,
         "manual_override": os.environ.get("SANDWALK_FORCE_OFFLINE"),
     }
 
@@ -85,8 +86,8 @@ def is_offline() -> bool:
         return True
     if _offline_checks_disabled():
         return False
-    # Re-check if it's been more than 30 seconds since last probe
-    if _last_check_time is None or (datetime.now(UTC) - _last_check_time) > timedelta(seconds=30):
+    # Re-check often enough that the UI banner tracks Wi-Fi flips.
+    if _last_check_time is None or (datetime.now(UTC) - _last_check_time) > timedelta(seconds=8):
         _check_network_health()
     return _offline
 
@@ -98,12 +99,17 @@ def get_offline_reason() -> str | None:
 
 def get_ui_status() -> dict[str, Any]:
     """Return status data for the UI offline banner."""
+    is_offline()
     state = get_offline_state()
+    features = _get_affected_features()
     return {
         **state,
-        # Simplified message for UI
+        "isOffline": state["is_offline"],
+        "lastCheck": state["last_check"],
+        "targetsChecked": state["targets_checked"],
         "message": _get_offline_message(),
-        "features_affected": _get_affected_features(),
+        "features_affected": features,
+        "featuresAffected": features,
     }
 
 
@@ -123,7 +129,7 @@ def _get_offline_message() -> str:
 def _get_affected_features() -> list[str]:
     """List features that are degraded due to offline status."""
     features = []
-    if _offline:
+    if _force_offline() or _offline:
         features = [
             "Slack connectors (inbound/outbound messages)",
             "Cloud model catalog",
@@ -139,6 +145,14 @@ def _get_affected_features() -> list[str]:
 # ---------------------------------------------------------------------------
 # Network health detection
 # ---------------------------------------------------------------------------
+
+def _tcp_reachable(host: str, port: int, timeout: float = 1.5) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
 
 def _check_network_health() -> None:
     """Probe DNS for a set of targets. Sets ``_offline`` and ``_offline_reason``."""
@@ -161,41 +175,32 @@ def _check_network_health() -> None:
     successful_targets = []
     failed_targets = []
 
+    # TCP connect, not DNS-only. Cached getaddrinfo still succeeds after Wi-Fi
+    # drops; opening a socket does not.
     for host in _probe_targets:
-        try:
-            # Use a non-blocking DNS lookup
-            result = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
-            if result:
-                successful_targets.append(host)
-            else:
-                failed_targets.append(host)
-        except (socket.gaierror, socket.herror, OSError):
-            failed_targets.append(host)
-        except Exception:
-            failed_targets.append(host)
+        if _tcp_reachable(host, 443):
+            successful_targets.append(host)
+            break
+        failed_targets.append(host)
 
     _last_check_time = datetime.now(UTC)
     _last_check_targets = _probe_targets
 
-    # We're offline if majority of targets fail
-    total = len(_probe_targets)
-    if total == 0:
+    if successful_targets:
         _offline = False
         _offline_reason = None
         return
 
-    failure_rate = len(failed_targets) / total
-
-    if failure_rate >= 0.5:
-        _offline = True
-        if failed_targets:
-            _offline_reason = f"{len(failed_targets)}/{total} targets unreachable ({', '.join(failed_targets[:3])})"
-        else:
-            _offline_reason = "all targets unreachable"
-        logger.info("Offline mode activated: %s", _offline_reason)
+    _offline = True
+    total = len(_probe_targets)
+    if failed_targets:
+        _offline_reason = (
+            f"{len(failed_targets)}/{total} targets unreachable "
+            f"({', '.join(failed_targets[:3])})"
+        )
     else:
-        _offline = False
-        _offline_reason = None
+        _offline_reason = "all targets unreachable"
+    logger.info("Offline mode activated: %s", _offline_reason)
 
 
 async def check_network_health_async() -> bool:
