@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils'
 
 type BenchQuestion = {
   id?: string
+  question_id?: string
+  questionId?: string
   correct?: boolean
   expected?: string
   predicted?: string
@@ -31,7 +33,19 @@ type BenchQuestion = {
   toolsSeen?: string[]
 }
 
-type CompareFilter = 'disagreements' | 'all' | 'a_wrong' | 'b_wrong'
+type CompareFilter = 'disagreements' | 'all' | 'any_wrong'
+
+type RunCol = {
+  id: string
+  letter: string
+  detail: Record<string, unknown>
+  modelId: string
+  bench: string
+  accuracy: number
+  pct: number
+  timeS: number
+  questions: BenchQuestion[]
+}
 
 function asQuestions(detail: Record<string, unknown> | null): BenchQuestion[] {
   const rows = detail?.questions
@@ -43,10 +57,26 @@ function shortModel(modelId: string) {
   return parts[parts.length - 1] || modelId || 'model'
 }
 
+function runLetter(index: number) {
+  return index < 26 ? String.fromCharCode(65 + index) : `R${index + 1}`
+}
+
+function questionKey(q: BenchQuestion, index: number) {
+  return String(q.questionId || q.question_id || q.id || `idx-${index}`)
+}
+
 function pctClass(pct: number) {
   if (pct >= 70) return 'text-emerald-600'
   if (pct >= 40) return 'text-amber-600'
   return 'text-red-600'
+}
+
+function parseCompareIds(params: URLSearchParams): string[] {
+  const listed = params.getAll('id').map(id => id.trim()).filter(Boolean)
+  if (listed.length) return [...new Set(listed)]
+  const a = (params.get('a') || '').trim()
+  const b = (params.get('b') || '').trim()
+  return [a, b].filter(Boolean)
 }
 
 function Verdict({ ok, label }: { ok: boolean | null; label: string }) {
@@ -84,7 +114,7 @@ function SideAnswer({
   const navigate = useNavigate()
   if (!question) {
     return (
-      <div className="border-border/60 min-w-0 flex-1 rounded-md border px-3 py-2">
+      <div className="border-border/60 min-w-[14rem] flex-1 rounded-md border px-3 py-2">
         <p className="text-muted-foreground text-[11px] font-medium">
           {label} · missing
         </p>
@@ -95,7 +125,7 @@ function SideAnswer({
   const raw = question.rawResponse || question.raw_response || ''
   const tools = question.toolsSeen || question.tools_seen || []
   return (
-    <div className="border-border/60 min-w-0 flex-1 space-y-2 rounded-md border px-3 py-2">
+    <div className="border-border/60 min-w-[14rem] flex-1 space-y-2 rounded-md border px-3 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-medium">
           {label}
@@ -149,10 +179,10 @@ export function BenchCompareView({
 }) {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const runA = params.get('a') || ''
-  const runB = params.get('b') || ''
-  const [detailA, setDetailA] = useState<Record<string, unknown> | null>(null)
-  const [detailB, setDetailB] = useState<Record<string, unknown> | null>(null)
+  const runIds = useMemo(() => parseCompareIds(params), [params])
+  const [details, setDetails] = useState<Array<Record<string, unknown> | null>>(
+    []
+  )
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<CompareFilter>('disagreements')
@@ -161,25 +191,24 @@ export function BenchCompareView({
   const PAGE = 40
 
   useEffect(() => {
-    if (!runA || !runB) {
-      setError('Pick two runs to compare.')
+    if (runIds.length < 2) {
+      setError('Pick at least two runs to compare.')
       setLoading(false)
+      setDetails([])
       return
     }
     let cancelled = false
     setLoading(true)
     setError(null)
-    void Promise.all([client.getBenchResult(runA), client.getBenchResult(runB)])
-      .then(([a, b]) => {
+    void Promise.all(runIds.map(id => client.getBenchResult(id)))
+      .then(rows => {
         if (cancelled) return
-        setDetailA(a)
-        setDetailB(b)
+        setDetails(rows)
       })
       .catch(err => {
         if (cancelled) return
         setError(err instanceof Error ? err.message : 'Unable to load runs')
-        setDetailA(null)
-        setDetailB(null)
+        setDetails([])
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -187,97 +216,83 @@ export function BenchCompareView({
     return () => {
       cancelled = true
     }
-  }, [client, runA, runB])
+  }, [client, runIds])
 
-  const modelA = String(detailA?.model_id || detailA?.modelId || 'A')
-  const modelB = String(detailB?.model_id || detailB?.modelId || 'B')
-  const benchA = String(detailA?.benchmark || '')
-  const benchB = String(detailB?.benchmark || '')
-  const accuracyA = Number(detailA?.accuracy ?? 0)
-  const accuracyB = Number(detailB?.accuracy ?? 0)
-  const pctA = Math.round(accuracyA * 1000) / 10
-  const pctB = Math.round(accuracyB * 1000) / 10
-  const delta = Math.round((pctA - pctB) * 10) / 10
-  const timeA = Number(detailA?.time_s ?? detailA?.timeS ?? 0)
-  const timeB = Number(detailB?.time_s ?? detailB?.timeS ?? 0)
+  const cols: RunCol[] = useMemo(
+    () =>
+      runIds.map((id, index) => {
+        const detail = details[index] || {}
+        const modelId = String(detail.model_id || detail.modelId || runLetter(index))
+        const accuracy = Number(detail.accuracy ?? 0)
+        return {
+          id,
+          letter: runLetter(index),
+          detail,
+          modelId,
+          bench: String(detail.benchmark || ''),
+          accuracy,
+          pct: Math.round(accuracy * 1000) / 10,
+          timeS: Number(detail.time_s ?? detail.timeS ?? 0),
+          questions: asQuestions(detail)
+        }
+      }),
+    [details, runIds]
+  )
 
   const rows = useMemo(() => {
-    const qsA = asQuestions(detailA)
-    const qsB = asQuestions(detailB)
-    const byIdB = new Map(
-      qsB.map((q, index) => [String(q.id ?? `idx-${index}`), q] as const)
-    )
-    const usedB = new Set<string>()
-    const joined: Array<{
-      key: string
-      question: string
-      category: string
-      expected: string
-      a: BenchQuestion | null
-      b: BenchQuestion | null
-    }> = []
-
-    qsA.forEach((q, index) => {
-      const key = String(q.id ?? `idx-${index}`)
-      let match = byIdB.get(key) || null
-      let matchKey = key
-      if (!match && qsB[index]) {
-        match = qsB[index]
-        matchKey = String(match.id ?? `idx-${index}`)
-      }
-      if (match) usedB.add(matchKey)
-      joined.push({
+    const keys: string[] = []
+    const seen = new Set<string>()
+    for (const col of cols) {
+      col.questions.forEach((q, index) => {
+        const key = questionKey(q, index)
+        if (seen.has(key)) return
+        seen.add(key)
+        keys.push(key)
+      })
+    }
+    return keys.map(key => {
+      const answers = cols.map(col => {
+        const byId = col.questions.find((q, index) => questionKey(q, index) === key)
+        return byId || null
+      })
+      const first = answers.find(Boolean)
+      return {
         key,
-        question: q.question || match?.question || '—',
-        category: q.category || match?.category || key,
-        expected: q.expected || match?.expected || '—',
-        a: q,
-        b: match
-      })
+        question: first?.question || '—',
+        category: first?.category || key,
+        expected: first?.expected || '—',
+        answers
+      }
     })
-
-    qsB.forEach((q, index) => {
-      const key = String(q.id ?? `idx-${index}`)
-      if (usedB.has(key)) return
-      joined.push({
-        key: `b-${key}`,
-        question: q.question || '—',
-        category: q.category || key,
-        expected: q.expected || '—',
-        a: null,
-        b: q
-      })
-    })
-    return joined
-  }, [detailA, detailB])
+  }, [cols])
 
   const counts = useMemo(() => {
-    let bothPass = 0
-    let bothFail = 0
-    let aOnly = 0
-    let bOnly = 0
+    let agreePass = 0
+    let agreeFail = 0
+    let disagree = 0
+    let anyWrong = 0
     for (const row of rows) {
-      const aOk = row.a?.correct
-      const bOk = row.b?.correct
-      if (aOk == null || bOk == null) continue
-      if (aOk && bOk) bothPass += 1
-      else if (!aOk && !bOk) bothFail += 1
-      else if (aOk && !bOk) aOnly += 1
-      else bOnly += 1
+      const verdicts = row.answers
+        .map(q => q?.correct)
+        .filter((v): v is boolean => v != null)
+      if (!verdicts.length) continue
+      if (verdicts.some(v => !v)) anyWrong += 1
+      const same = verdicts.every(v => v === verdicts[0])
+      if (!same) disagree += 1
+      else if (verdicts[0]) agreePass += 1
+      else agreeFail += 1
     }
-    return { bothPass, bothFail, aOnly, bOnly }
+    return { agreePass, agreeFail, disagree, anyWrong }
   }, [rows])
 
   const filtered = useMemo(() => {
     return rows.filter(row => {
-      const aOk = row.a?.correct
-      const bOk = row.b?.correct
+      const verdicts = row.answers.map(q => q?.correct ?? null)
       if (filter === 'all') return true
-      if (aOk == null || bOk == null) return filter === 'disagreements'
-      if (filter === 'disagreements') return aOk !== bOk
-      if (filter === 'a_wrong') return !aOk
-      if (filter === 'b_wrong') return !bOk
-      return true
+      const known = verdicts.filter((v): v is boolean => v != null)
+      if (filter === 'any_wrong') return known.some(v => !v)
+      if (known.length < 2) return true
+      return !known.every(v => v === known[0])
     })
   }, [filter, rows])
   const visible = useMemo(
@@ -288,14 +303,20 @@ export function BenchCompareView({
   useEffect(() => {
     setVisibleCount(PAGE)
     setOpenId(null)
-  }, [filter, runA, runB])
+  }, [filter, runIds.join(',')])
 
   useEffect(() => {
     document.title = `Compare · Benchmarking · Sandwalk`
   }, [])
 
   const goBack = () => navigate('/dashboard/bench')
-  const sameSuite = Boolean(benchA && benchA === benchB)
+  const benches = [...new Set(cols.map(col => col.bench).filter(Boolean))]
+  const sameSuite = benches.length <= 1
+  const ready =
+    !loading &&
+    details.length === runIds.length &&
+    details.every(row => row != null) &&
+    cols.length >= 2
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -318,38 +339,29 @@ export function BenchCompareView({
             Results
           </button>
           <span className="text-muted-foreground/40">/</span>
-          <span className="text-foreground font-medium">Compare</span>
+          <span className="text-foreground font-medium">
+            Compare · {runIds.length}
+          </span>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {runA ? (
+        <div className="flex max-w-xl flex-wrap items-center justify-end gap-2">
+          {cols.map(col => (
             <Button
+              key={col.id}
               type="button"
               size="sm"
               variant="outline"
               onClick={() =>
-                navigate(`/dashboard/bench/${encodeURIComponent(runA)}`)
+                navigate(`/dashboard/bench/${encodeURIComponent(col.id)}`)
               }
             >
-              Open A
+              Open {col.letter}
             </Button>
-          ) : null}
-          {runB ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                navigate(`/dashboard/bench/${encodeURIComponent(runB)}`)
-              }
-            >
-              Open B
-            </Button>
-          ) : null}
+          ))}
         </div>
       </DetailStickyNav>
 
       <ScrollArea className="flex-1">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 md:px-6">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:px-6">
           {loading ? (
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
               <Loader className="size-4 animate-spin" />
@@ -363,15 +375,17 @@ export function BenchCompareView({
             </div>
           ) : null}
 
-          {!loading && detailA && detailB ? (
+          {ready ? (
             <>
               <header className="space-y-3">
                 <div>
                   <h1 className="text-xl font-semibold tracking-tight">
-                    {sameSuite ? benchA : `${benchA || 'A'} vs ${benchB || 'B'}`}
+                    {sameSuite
+                      ? benches[0] || 'Compare'
+                      : benches.join(' · ')}
                   </h1>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    {shortModel(modelA)} vs {shortModel(modelB)}
+                    {cols.map(col => shortModel(col.modelId)).join(' · ')}
                     {!sameSuite ? (
                       <span className="text-amber-600">
                         {' '}
@@ -381,60 +395,44 @@ export function BenchCompareView({
                   </p>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="border-border/60 rounded-lg border px-4 py-3">
-                    <p className="text-muted-foreground text-xs">A · {shortModel(modelA)}</p>
-                    <p className={cn('mt-1 text-2xl font-semibold tabular-nums', pctClass(pctA))}>
-                      {pctA.toFixed(1)}%
-                    </p>
-                    <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
-                      {Number(detailA.correct ?? 0)}/{Number(detailA.total ?? 0)}
-                      {timeA ? ` · ${timeA}s` : ''}
-                    </p>
-                  </div>
-                  <div className="border-border/60 rounded-lg border px-4 py-3">
-                    <p className="text-muted-foreground text-xs">Δ accuracy</p>
-                    <p
-                      className={cn(
-                        'mt-1 text-2xl font-semibold tabular-nums',
-                        delta > 0
-                          ? 'text-emerald-600'
-                          : delta < 0
-                            ? 'text-red-600'
-                            : 'text-muted-foreground'
-                      )}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {cols.map(col => (
+                    <div
+                      key={col.id}
+                      className="border-border/60 rounded-lg border px-4 py-3"
                     >
-                      {delta > 0 ? '+' : ''}
-                      {delta.toFixed(1)} pp
-                    </p>
-                    <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
-                      time {timeA || '—'}s vs {timeB || '—'}s
-                    </p>
-                  </div>
-                  <div className="border-border/60 rounded-lg border px-4 py-3">
-                    <p className="text-muted-foreground text-xs">B · {shortModel(modelB)}</p>
-                    <p className={cn('mt-1 text-2xl font-semibold tabular-nums', pctClass(pctB))}>
-                      {pctB.toFixed(1)}%
-                    </p>
-                    <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
-                      {Number(detailB.correct ?? 0)}/{Number(detailB.total ?? 0)}
-                      {timeB ? ` · ${timeB}s` : ''}
-                    </p>
-                  </div>
+                      <p className="text-muted-foreground text-xs">
+                        {col.letter} · {shortModel(col.modelId)}
+                      </p>
+                      <p
+                        className={cn(
+                          'mt-1 text-2xl font-semibold tabular-nums',
+                          pctClass(col.pct)
+                        )}
+                      >
+                        {col.pct.toFixed(1)}%
+                      </p>
+                      <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
+                        {Number(col.detail.correct ?? 0)}/
+                        {Number(col.detail.total ?? 0)}
+                        {col.timeS ? ` · ${col.timeS}s` : ''}
+                      </p>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="flex flex-wrap gap-2 text-xs">
                   <span className="bg-muted rounded-md px-2 py-1">
-                    Both pass · {counts.bothPass}
+                    All pass · {counts.agreePass}
                   </span>
-                  <span className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-md px-2 py-1">
-                    A only · {counts.aOnly}
-                  </span>
-                  <span className="bg-sky-500/10 text-sky-700 dark:text-sky-400 rounded-md px-2 py-1">
-                    B only · {counts.bOnly}
+                  <span className="bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-md px-2 py-1">
+                    Disagree · {counts.disagree}
                   </span>
                   <span className="bg-red-500/10 text-red-700 dark:text-red-400 rounded-md px-2 py-1">
-                    Both fail · {counts.bothFail}
+                    All fail · {counts.agreeFail}
+                  </span>
+                  <span className="bg-muted rounded-md px-2 py-1">
+                    Any fail · {counts.anyWrong}
                   </span>
                 </div>
               </header>
@@ -454,8 +452,7 @@ export function BenchCompareView({
                       [
                         ['disagreements', 'Disagreements'],
                         ['all', 'All'],
-                        ['a_wrong', 'A wrong'],
-                        ['b_wrong', 'B wrong']
+                        ['any_wrong', 'Any fail']
                       ] as const
                     ).map(([id, label]) => (
                       <button
@@ -478,9 +475,10 @@ export function BenchCompareView({
                 <div className="space-y-2">
                   {visible.map(row => {
                     const open = openId === row.key
-                    const aOk = row.a?.correct ?? null
-                    const bOk = row.b?.correct ?? null
-                    const disagree = aOk != null && bOk != null && aOk !== bOk
+                    const verdicts = row.answers.map(q => q?.correct ?? null)
+                    const known = verdicts.filter((v): v is boolean => v != null)
+                    const disagree =
+                      known.length >= 2 && !known.every(v => v === known[0])
                     return (
                       <div
                         key={row.key}
@@ -499,8 +497,13 @@ export function BenchCompareView({
                               <span className="text-sm font-medium">
                                 {row.category}
                               </span>
-                              <Verdict ok={aOk} label="A" />
-                              <Verdict ok={bOk} label="B" />
+                              {cols.map((col, index) => (
+                                <Verdict
+                                  key={col.id}
+                                  ok={verdicts[index]}
+                                  label={col.letter}
+                                />
+                              ))}
                             </div>
                             <p className="text-muted-foreground mt-1 line-clamp-2 text-xs leading-relaxed">
                               {row.question}
@@ -519,17 +522,15 @@ export function BenchCompareView({
                           )}
                         </button>
                         {open ? (
-                          <div className="border-border/60 flex flex-col gap-2 border-t px-3 py-3 sm:flex-row">
-                            <SideAnswer
-                              label="A"
-                              question={row.a}
-                              modelId={modelA}
-                            />
-                            <SideAnswer
-                              label="B"
-                              question={row.b}
-                              modelId={modelB}
-                            />
+                          <div className="border-border/60 flex gap-2 overflow-x-auto border-t px-3 py-3">
+                            {cols.map((col, index) => (
+                              <SideAnswer
+                                key={col.id}
+                                label={col.letter}
+                                question={row.answers[index]}
+                                modelId={col.modelId}
+                              />
+                            ))}
                           </div>
                         ) : null}
                       </div>

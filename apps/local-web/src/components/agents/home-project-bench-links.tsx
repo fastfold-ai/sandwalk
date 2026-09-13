@@ -52,10 +52,6 @@ function overlayLiveStatus(
   return rows.map(row => {
     const next = live.get(row.runId)
     if (next) return { ...row, status: next }
-    const status = (row.status || '').toLowerCase()
-    if (status === 'running' || status === 'queued') {
-      return { ...row, status: 'interrupted' }
-    }
     return row
   })
 }

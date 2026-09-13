@@ -2,6 +2,7 @@ import type { SessionGroup } from '@sandwalk/agent-ui-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { OfflineBanner } from '@/components/app/OfflineBanner'
 import { CapyOverlay } from '@/components/agents/capy/CapyOverlay'
 import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { PaneContextMenu } from '@/components/agents/PaneContextMenu'
@@ -30,6 +31,7 @@ import { useDesktopWindowMenu } from '@/hooks/useDesktopWindowMenu'
 import { useEventsMux } from '@/hooks/useEventsMux'
 import { useGlobalSessionEvents } from '@/hooks/useGlobalSessionEvents'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
+import { useOfflineStatus } from '@/hooks/useOfflineStatus'
 import { notifyMissedCompletions } from '@/lib/browser-notifications'
 import { applyCapyOpenSplit } from '@/lib/capy-ui'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
@@ -41,6 +43,8 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   useMacDesktopOverlay()
+  // Poll for offline status to show the banner
+  const { status: offlineStatus } = useOfflineStatus(5000)
   // Reserve the tiling split shortcuts (⌘D / ⇧⌘D / ⌘W) so the WebView
   // never falls back to its default meanings (Add Bookmark, Close Tab)
   // on pages where the ChatTilingContainer isn't mounted (Welcome,
@@ -787,10 +791,16 @@ export default function App() {
   )
   if (gate) {
     return (
-      <>
-        {gate}
+      <div className="flex h-full w-full flex-col">
+        <div className="min-h-0 flex-1">{gate}</div>
+        <OfflineBanner
+          isOffline={offlineStatus.isOffline}
+          justOnline={offlineStatus.justOnline}
+          message={offlineStatus.message}
+          featuresAffected={offlineStatus.featuresAffected}
+        />
         {remoteDialog}
-      </>
+      </div>
     )
   }
 
@@ -798,6 +808,7 @@ export default function App() {
     <>
       <AppShellConnected
         {...buildAppShellProps({
+          offlineStatus,
           ui,
           route,
           bootstrap,

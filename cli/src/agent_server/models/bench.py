@@ -149,6 +149,7 @@ class BenchResultSummary(ApiModel):
     benchmark: str
     accuracy: float
     correct: int
+    answered: int | None = None
     total: int
     time_s: float
     thinking_used: bool = False
@@ -160,6 +161,8 @@ class BenchResultSummary(ApiModel):
     name: str | None = None
     provider: str | None = None
     lifetime_tokens: int | None = None
+    resumable: bool = False
+    failed_count: int = 0
 
 
 class BenchResultList(ApiModel):
@@ -186,6 +189,10 @@ class BenchPauseResponse(ApiModel):
 class BenchResumeResponse(ApiModel):
     ok: bool
     run_id: str | None = None
+
+
+class BenchRetryFailedRequest(ApiModel):
+    question_ids: list[str] = Field(default_factory=list)
 
 
 class BenchResetResponse(ApiModel):

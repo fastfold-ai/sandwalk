@@ -6,6 +6,7 @@ struct LogsSettingsView: View {
     @State private var selectedFile = "server.log"
     @State private var lineLimit = 100
     @State private var logText = ""
+    @State private var search = ""
     @State private var totalLines = 0
     @State private var isLoading = false
     @State private var lastError: String?
@@ -17,6 +18,34 @@ struct LogsSettingsView: View {
         ("server.log", "server.log (API)"),
         ("web.log", "web.log (dashboard)"),
     ]
+
+    private var searchNeedle: String {
+        search.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var displayedText: String {
+        let needle = searchNeedle
+        guard !needle.isEmpty else { return logText }
+        let lines = logText.split(separator: "\n", omittingEmptySubsequences: false)
+        return lines
+            .filter { $0.localizedCaseInsensitiveContains(needle) }
+            .joined(separator: "\n")
+    }
+
+    private var matchCount: Int {
+        guard !searchNeedle.isEmpty else { return 0 }
+        return displayedText
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.isEmpty }
+            .count
+    }
+
+    private var headerSubtitle: String? {
+        if !searchNeedle.isEmpty {
+            return "\(matchCount) match\(matchCount == 1 ? "" : "es") · \(totalLines) lines"
+        }
+        return totalLines > 0 ? "\(totalLines) lines" : nil
+    }
 
     private var lineOptions: [(Int, String)] {
         [
@@ -31,7 +60,7 @@ struct LogsSettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             SettingsSectionHeader(
                 "SERVER LOGS",
-                subtitle: totalLines > 0 ? "\(totalLines) lines" : nil
+                subtitle: headerSubtitle
             )
 
             SettingsListGroup {
@@ -46,7 +75,16 @@ struct LogsSettingsView: View {
                 }
             }
 
-            LogPane(text: logText, isEmpty: logText.isEmpty, isLoading: isLoading)
+            AgentSearchField(text: $search)
+
+            LogPane(
+                text: displayedText,
+                isEmpty: displayedText.isEmpty,
+                isLoading: isLoading,
+                emptyLabel: searchNeedle.isEmpty
+                    ? "No log entries."
+                    : "No lines match “\(searchNeedle)”."
+            )
                 .padding(.horizontal, 14)
                 .padding(.top, 4)
                 .padding(.bottom, 8)
@@ -71,10 +109,15 @@ struct LogsSettingsView: View {
 
                 Button("Copy") {
                     NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(logText, forType: .string)
+                    NSPasteboard.general.setString(displayedText, forType: .string)
                 }
                 .buttonStyle(.sandwalk(.normal))
-                .disabled(logText.isEmpty)
+                .disabled(displayedText.isEmpty)
+
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([logFileURL])
+                }
+                .buttonStyle(.sandwalk(.normal))
 
                 Spacer()
 
@@ -184,6 +227,7 @@ private struct LogPane: View {
     let text: String
     let isEmpty: Bool
     let isLoading: Bool
+    var emptyLabel: String = "No log entries."
 
     @Environment(\.sandwalkTheme) private var theme
 
@@ -195,7 +239,7 @@ private struct LogPane: View {
                 bgColor: NSColor(theme.codeBg)
             )
             if isEmpty && !isLoading {
-                Text("No log entries.")
+                Text(emptyLabel)
                     .font(.sandwalk(12))
                     .foregroundStyle(theme.textTertiary)
             }

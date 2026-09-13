@@ -2,6 +2,7 @@ import type { AppShellProps } from '@/components/app-shell-props'
 import { AppDialogs } from '@/components/AppDialogs'
 import { AppShellMain } from '@/components/AppShellMain'
 import { AppShellSidebar } from '@/components/AppShellSidebar'
+import { OfflineBanner } from '@/components/app/OfflineBanner'
 import {
   ResizableHandle,
   ResizablePanelGroup
@@ -269,6 +270,14 @@ export function AppShell(props: AppShellProps) {
           createSplitFromSelection={props.createSplitFromSelection}
         />
         </ResizablePanelGroup>
+        {props.offlineStatus && (
+          <OfflineBanner
+            isOffline={props.offlineStatus.isOffline}
+            justOnline={props.offlineStatus.justOnline}
+            message={props.offlineStatus.message}
+            featuresAffected={props.offlineStatus.featuresAffected}
+          />
+        )}
       </div>
 
       <AppDialogs

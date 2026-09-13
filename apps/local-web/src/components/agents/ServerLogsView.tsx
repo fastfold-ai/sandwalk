@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 import { DesktopOnlyCallout } from '@/components/agents/DesktopOnlyCallout'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { copyText } from '@/lib/clipboard'
 import { type DesktopLogs,desktopTailLogs, isTauri } from '@/lib/desktop'
@@ -14,6 +15,17 @@ export function ServerLogsView() {
   const [log, setLog] = useState<DesktopLogs | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const displayedText = useMemo(() => {
+    const text = log?.text || ''
+    const needle = search.trim()
+    if (!needle) return text
+    return text
+      .split('\n')
+      .filter(line => line.toLowerCase().includes(needle.toLowerCase()))
+      .join('\n')
+  }, [log?.text, search])
 
   const load = useCallback(async () => {
     if (!desktop) return
@@ -47,7 +59,14 @@ export function ServerLogsView() {
         </div>
 
         {!desktop ? (
-          <DesktopOnlyCallout feature="Live server logs" />
+          <div className="space-y-3">
+            <DesktopOnlyCallout feature="Live server logs" />
+            <p className="text-muted-foreground text-sm">
+              Using the CLI? Watch the terminal where you ran{' '}
+              <span className="font-mono">sandwalk serve</span>, or open
+              Sandwalk Settings → Logs in the menu-bar app.
+            </p>
+          </div>
         ) : (
           <>
             {error ? (
@@ -57,6 +76,12 @@ export function ServerLogsView() {
             ) : null}
 
             <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search logs"
+                className="h-9 max-w-xs"
+              />
               <select
                 className="bg-background rounded-md border px-3 py-2 text-sm"
                 value={name}
@@ -86,10 +111,10 @@ export function ServerLogsView() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={!log?.text}
+                disabled={!displayedText}
                 onClick={() => {
-                  if (!log?.text) return
-                  void copyText(log.text).then(ok => {
+                  if (!displayedText) return
+                  void copyText(displayedText).then(ok => {
                     if (ok) toast.success('Copied')
                     else toast.error('Could not copy — select it manually')
                   })
@@ -105,7 +130,12 @@ export function ServerLogsView() {
             </div>
 
             <pre className="bg-muted/30 max-h-[60vh] overflow-auto rounded-xl border p-4 font-mono text-xs whitespace-pre-wrap">
-              {log?.text || (loading ? 'Loading…' : 'No log output yet.')}
+              {displayedText ||
+                (loading
+                  ? 'Loading…'
+                  : search.trim()
+                    ? 'No lines match this search.'
+                    : 'No log output yet.')}
             </pre>
           </>
         )}

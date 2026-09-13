@@ -17,6 +17,8 @@ from agent_server.bench_service.queue_runner import (
 )
 from agent_server.bench_service.results_store import (
     apply_live_status,
+    attach_usage_and_resume,
+    build_resume_checkpoint,
     clear_results,
     delete_result,
     export_path,
@@ -45,6 +47,8 @@ __all__ = [
     "list_results_page",
     "rename_result",
     "apply_live_status",
+    "attach_usage_and_resume",
+    "build_resume_checkpoint",
     "get_result",
     "result_from_checkpoint",
     "export_path",

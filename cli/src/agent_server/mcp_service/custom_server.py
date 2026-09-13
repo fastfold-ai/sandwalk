@@ -160,12 +160,20 @@ def _custom_oauth_expired(cfg: Config, server_id: str, *, skew_seconds: int = 60
 
 
 def _ensure_fresh_custom_oauth_token(server: Any, cfg: Config) -> str | None:
-    """Refresh custom-server OAuth access token when expired."""
+    """Refresh custom-server OAuth access token when expired.
+
+    Offline mode: skip the refresh (return existing access token if available).
+    The token may be expired but we avoid spamming error logs.
+    """
     from agent_server.mcp_service.auth import _refresh_oauth_access_token
+    from agent_server.offline_mode import should_skip_mcp_oauth_refresh
 
     server_id = str(server.id)
     prefix = f"mcp.custom_{server_id}"
     access = str(cfg.get(custom_oauth_token_key(server_id, "access_token")) or "").strip()
+    # Skip refresh when offline — return whatever we have (may be expired).
+    if should_skip_mcp_oauth_refresh():
+        return access or None
     if not access:
         return None
     if not _custom_oauth_expired(cfg, server_id):
