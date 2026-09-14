@@ -121,6 +121,30 @@ def _provider_error_detail(exc: Exception, *, limit: int = 360) -> str:
     return text
 
 
+def _is_transient_transport_error(exc: BaseException, low: str | None = None) -> bool:
+    """True for dropped TLS / keep-alive failures that are safe to retry once."""
+    blob = (low or "") + " " + " ".join(str(exc).split()).lower()
+    cause = getattr(exc, "__cause__", None) or getattr(exc, "__context__", None)
+    if isinstance(cause, BaseException):
+        blob += " " + " ".join(str(cause).split()).lower()
+    return (
+        isinstance(exc, (ConnectionError, TimeoutError))
+        or "connection error" in blob
+        or "timed out" in blob
+        or "timeout" in blob
+        or "connection refused" in blob
+        or "failed to establish a new connection" in blob
+        or "max retries exceeded" in blob
+        or "temporary failure in name resolution" in blob
+        or "name or service not known" in blob
+        or "bad record mac" in blob
+        or "sslv3_alert" in blob
+        or "ssl:" in blob
+        or "broken pipe" in blob
+        or "connection reset" in blob
+    )
+
+
 def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
     """Map a known model-provider exception to ``(title, friendly_body)``.
 
@@ -235,22 +259,13 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             "`LANGCHAIN_OPENAI_STREAM_CHUNK_TIMEOUT_S`.",
         )
 
-    is_conn = (
-        isinstance(exc, (ConnectionError, TimeoutError))
-        or "connection error" in low
-        or "timed out" in low
-        or "timeout" in low
-        or "connection refused" in low
-        or "failed to establish a new connection" in low
-        or "max retries exceeded" in low
-        or "temporary failure in name resolution" in low
-        or "name or service not known" in low
-    )
+    is_conn = _is_transient_transport_error(exc, low)
     if is_conn:
         return (
             "Connection problem",
             f"{detail}\n"
-            "Could not reach the model provider. Check your network and retry.",
+            "Could not reach the model provider. Check your network and retry "
+            "(TLS keep-alive often drops after Wi-Fi sleep or an API restart).",
         )
 
     is_server_unavailable = status in {500, 502, 503, 504} or "service unavailable" in low

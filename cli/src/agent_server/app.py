@@ -156,6 +156,12 @@ def create_app(
             sync_process_env_from_config()
         except Exception:
             pass
+        try:
+            from agent.deepagents_runtime.llm_http import install_stable_tls_httpx
+
+            install_stable_tls_httpx()
+        except Exception:
+            pass
         sandbox_event_bus.bind_loop(asyncio.get_running_loop())
         session_event_bus.bind_loop(asyncio.get_running_loop())
         from agent_server.bench_service.runtime import (

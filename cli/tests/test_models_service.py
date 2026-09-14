@@ -46,7 +46,9 @@ def test_cloud_catalog_excludes_custom_entry():
     assert "__custom_openai_compatible__" not in ids
     assert "claude-opus-5" in ids
     assert "claude-sonnet-5" in ids
+    assert "claude-fable-5-1" in ids
     assert "gpt-5.5" in ids
+    assert "gpt-6-astra" in ids
 
 
 def test_catalog_defaults_migration(tmp_path, monkeypatch):
@@ -68,6 +70,7 @@ def test_catalog_defaults_migration(tmp_path, monkeypatch):
     # New-generation models remain enabled by default.
     assert "claude-opus-5" not in hidden
     assert "claude-sonnet-5" not in hidden
+    assert "claude-fable-5-1" not in hidden
     assert "claude-opus-4-8" in hidden
     assert "gpt-5.6-sol" not in hidden
     assert "gpt-5.5" not in hidden
@@ -410,6 +413,7 @@ def test_openai_model_requires_responses_api():
     assert openai_model_requires_responses_api("gpt-5.1-codex-mini") is True
     assert openai_model_requires_responses_api("gpt-5.6") is True
     assert openai_model_requires_responses_api("gpt-5.6-sol") is True
+    assert openai_model_requires_responses_api("gpt-6-astra") is True
     assert openai_model_requires_responses_api("gpt-5.6-terra") is True
     assert openai_model_requires_responses_api("gpt-5.5") is True
     assert openai_model_requires_responses_api("gpt-5.4-mini") is True
@@ -427,12 +431,14 @@ def test_model_supports_reasoning_effort():
     )
 
     assert model_supports_reasoning_effort("openai", "gpt-5.6-sol") is True
+    assert model_supports_reasoning_effort("openai", "gpt-6-astra") is True
     assert model_supports_reasoning_effort("openai", "o3-mini") is True
     assert model_supports_reasoning_effort("opencode", "gpt-5.2") is True
     assert model_supports_reasoning_effort("anthropic", "claude-opus-5") is True
     assert model_supports_reasoning_effort("anthropic", "claude-opus-4-8") is True
     assert model_supports_reasoning_effort("anthropic", "claude-sonnet-5") is True
     assert model_supports_reasoning_effort("anthropic", "claude-fable-5") is True
+    assert model_supports_reasoning_effort("anthropic", "claude-fable-5-1") is True
     assert model_supports_reasoning_effort("anthropic", "claude-sonnet-4-6") is True
     assert model_supports_reasoning_effort("anthropic", "claude-haiku-4-5-20251001") is False
     assert model_supports_reasoning_effort("google", "gemini-3.5-flash") is True
@@ -459,6 +465,12 @@ def test_model_supports_reasoning_effort():
     assert (
         model_supports_reasoning_effort(
             "openrouter", "anthropic/claude-haiku-4.5"
+        )
+        is True
+    )
+    assert (
+        model_supports_reasoning_effort(
+            "openrouter", "openai/gpt-6-astra"
         )
         is True
     )
@@ -578,7 +590,16 @@ def test_model_supports_reasoning_effort():
     ) == {"effort": "high"}
     assert effective_openrouter_reasoning(
         effort="high", fast=True, model_id="anthropic/claude-sonnet-5"
-    ) == {"effort": "none"}
+    ) == {"effort": "low"}
+    assert effective_openrouter_reasoning(
+        effort="medium", fast=True, model_id="anthropic/claude-opus-5"
+    ) == {"effort": "low"}
+    assert effective_openrouter_reasoning(
+        effort="medium", fast=False, model_id="openai/gpt-6-astra"
+    ) == {"effort": "medium"}
+    assert effective_openrouter_reasoning(
+        effort="medium", fast=True, model_id="openai/gpt-6-astra"
+    ) == {"effort": "low"}
     assert effective_openrouter_reasoning(
         effort="high", fast=True, model_id="openai/gpt-5.6-terra"
     ) == {"effort": "none"}
@@ -613,6 +634,15 @@ def test_model_supports_reasoning_effort():
     )
 
 
+def test_openrouter_model_omits_temperature():
+    from agent.model_catalog import openrouter_model_omits_temperature
+
+    assert openrouter_model_omits_temperature("openai/gpt-6-astra") is True
+    assert openrouter_model_omits_temperature("openai/gpt-5.6-terra") is True
+    assert openrouter_model_omits_temperature("anthropic/claude-opus-5") is True
+    assert openrouter_model_omits_temperature("openai/gpt-4o-mini") is False
+
+
 def test_anthropic_model_omits_temperature():
     from agent.model_catalog import anthropic_model_omits_temperature
 
@@ -620,6 +650,7 @@ def test_anthropic_model_omits_temperature():
     assert anthropic_model_omits_temperature("claude-opus-4-8") is True
     assert anthropic_model_omits_temperature("claude-sonnet-5") is True
     assert anthropic_model_omits_temperature("claude-fable-5") is True
+    assert anthropic_model_omits_temperature("claude-fable-5-1") is True
     assert anthropic_model_omits_temperature("claude-opus-4-6") is False
     assert anthropic_model_omits_temperature("claude-sonnet-4-6") is False
     assert anthropic_model_omits_temperature("claude-sonnet-4-5-20250929") is False

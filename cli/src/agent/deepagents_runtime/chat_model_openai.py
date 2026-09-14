@@ -34,11 +34,19 @@ def build_openai_chat_model(config, *, temperature: float):
         model_supports_reasoning_effort,
         openai_model_requires_responses_api,
     )
+    from agent.model_catalog.param_heal import apply_effort_floor, get_param_heal
 
     model = config.get("llm.model") or "gpt-5.6-sol"
+    heal = get_param_heal(config.get("llm.param_heals"), "openai", model)
     kwargs = {}
-    # GPT-5 chat models reject a custom temperature; omit it for that family.
-    if not str(model).strip().lower().startswith("gpt-5"):
+    # GPT-5 / GPT-6 reject a custom temperature; learned heals do the same.
+    model_l = str(model).strip().lower()
+    omits_temp = (
+        heal["omit_temperature"]
+        or model_l.startswith("gpt-5")
+        or model_l.startswith("gpt-6")
+    )
+    if not omits_temp:
         kwargs["temperature"] = temperature
     api_key = config.llm_api_key("openai")
     if api_key:
@@ -58,7 +66,12 @@ def build_openai_chat_model(config, *, temperature: float):
     # usage on the final stream chunk so local models don't report 0 tokens.
     kwargs["stream_usage"] = True
     kwargs["stream_chunk_timeout"] = STREAM_CHUNK_TIMEOUT_S
-    if is_openai_cloud and model_supports_reasoning_effort("openai", model):
+    kwargs["max_retries"] = 5
+    if (
+        is_openai_cloud
+        and not heal["omit_reasoning"]
+        and model_supports_reasoning_effort("openai", model)
+    ):
         effort, fast = get_model_reasoning(
             config.get("llm.model_reasoning"),
             "openai",
@@ -66,10 +79,13 @@ def build_openai_chat_model(config, *, temperature: float):
             default_effort=str(config.get("llm.reasoning_effort") or "medium"),
             default_fast=bool(config.get("llm.reasoning_fast", False)),
         )
-        kwargs["reasoning_effort"] = effective_reasoning_effort(
-            effort=effort,
-            fast=fast,
-            model_id=model,
+        kwargs["reasoning_effort"] = apply_effort_floor(
+            effective_reasoning_effort(
+                effort=effort,
+                fast=fast,
+                model_id=model,
+            ),
+            heal,
         )
     elif not is_openai_cloud:
         backend = _active_compatible_backend(config)

@@ -33,8 +33,10 @@ def test_openrouter_catalog_and_lookup():
 
     ids = {row[0] for row in AVAILABLE_MODELS["openrouter"]}
     assert {
+        "anthropic/claude-fable-5.1",
         "anthropic/claude-sonnet-5",
         "anthropic/claude-opus-5",
+        "openai/gpt-6-astra",
         "openai/gpt-5.6-terra",
         "openai/gpt-5.6-luna",
         "openai/gpt-5.6-luna-pro",
@@ -121,12 +123,58 @@ def test_build_openrouter_chat_model_sets_attribution():
         kwargs = mock_cls.call_args.kwargs
         assert kwargs["model"] == "anthropic/claude-sonnet-5"
         assert kwargs["api_key"] == "sk-or-test"
-        assert kwargs["temperature"] == 0.2
+        assert "temperature" not in kwargs
         assert kwargs["app_url"] == "https://sandwalk.sh"
         assert kwargs["app_title"] == "Sandwalk"
         assert kwargs["app_categories"] == ["cli-agent", "personal-agent"]
         assert kwargs["openrouter_provider"] == {"require_parameters": True}
         assert kwargs["reasoning"] == {"effort": "high"}
+
+
+def test_build_openrouter_chat_model_astra_omits_temperature():
+    from agent.deepagents_runtime.chat_model_openrouter import build_openrouter_chat_model
+
+    cfg = MagicMock()
+    cfg.get.side_effect = lambda key, default=None: {
+        "llm.model": "openai/gpt-6-astra",
+        "llm.reasoning_effort": "medium",
+        "llm.reasoning_fast": False,
+        "llm.model_reasoning": None,
+    }.get(key, default)
+    cfg.llm_api_key.return_value = "sk-or-test"
+
+    with patch(
+        "langchain_openrouter.ChatOpenRouter",
+        return_value=MagicMock(name="chat"),
+    ) as mock_cls:
+        build_openrouter_chat_model(cfg, temperature=0.2)
+        kwargs = mock_cls.call_args.kwargs
+        assert kwargs["model"] == "openai/gpt-6-astra"
+        assert "temperature" not in kwargs
+        assert kwargs["reasoning"] == {"effort": "medium"}
+        assert kwargs["openrouter_provider"] == {"require_parameters": True}
+
+
+def test_build_openrouter_chat_model_opus_fast_uses_low_effort():
+    from agent.deepagents_runtime.chat_model_openrouter import build_openrouter_chat_model
+
+    cfg = MagicMock()
+    cfg.get.side_effect = lambda key, default=None: {
+        "llm.model": "anthropic/claude-opus-5",
+        "llm.reasoning_effort": "medium",
+        "llm.reasoning_fast": True,
+        "llm.model_reasoning": None,
+    }.get(key, default)
+    cfg.llm_api_key.return_value = "sk-or-test"
+
+    with patch(
+        "langchain_openrouter.ChatOpenRouter",
+        return_value=MagicMock(name="chat"),
+    ) as mock_cls:
+        build_openrouter_chat_model(cfg, temperature=0.2)
+        kwargs = mock_cls.call_args.kwargs
+        assert "temperature" not in kwargs
+        assert kwargs["reasoning"] == {"effort": "low"}
 
 
 def test_build_openrouter_chat_model_fast_and_gpt5_omit_temperature():

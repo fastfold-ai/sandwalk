@@ -166,6 +166,14 @@ class TestBuildChatModel:
         assert captured["kwargs"]["use_responses_api"] is False
         assert captured["kwargs"]["stream_chunk_timeout"] == 300.0
 
+    def test_openai_gpt6_astra_omits_temperature(self, monkeypatch):
+        captured = self._patch_init(monkeypatch)
+        dr.build_chat_model(_stub_config("openai", model="gpt-6-astra"))
+        assert captured["model_id"] == "openai:gpt-6-astra"
+        assert "temperature" not in captured["kwargs"]
+        assert captured["kwargs"]["use_responses_api"] is True
+        assert captured["kwargs"]["reasoning_effort"] == "medium"
+
     def test_openai_gpt5_omits_temperature(self, monkeypatch):
         captured = self._patch_init(monkeypatch)
         dr.build_chat_model(_stub_config("openai", model="gpt-5-mini"))

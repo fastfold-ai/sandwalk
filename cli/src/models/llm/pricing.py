@@ -9,6 +9,7 @@ MODEL_PRICING = {
     # Anthropic (https://platform.claude.com/docs/en/about-claude/models/overview)
     "claude-opus-5": {"input": 5.00, "output": 25.00},
     "claude-sonnet-5": {"input": 3.00, "output": 15.00},
+    "claude-fable-5-1": {"input": 10.00, "output": 50.00},
     "claude-fable-5": {"input": 10.00, "output": 50.00},
     "claude-sonnet-4-5-20250929": {"input": 3.00, "output": 15.00},
     "claude-haiku-4-5-20251001": {"input": 1.00, "output": 5.00},

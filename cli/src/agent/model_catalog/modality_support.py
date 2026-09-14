@@ -113,6 +113,7 @@ def _openai_cloud_multimodal(model_id: str) -> set[ModalityKind]:
         value.startswith("gpt-4o")
         or value.startswith("gpt-4.1")
         or value.startswith("gpt-5")
+        or value.startswith("gpt-6")
         or value.startswith("o1")
         or value.startswith("o3")
         or value.startswith("o4")
