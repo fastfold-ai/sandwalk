@@ -19,6 +19,9 @@ AUTH_EXEMPT_PATHS = frozenset(
         # Loopback-only (enforced in the route). Lets `sandwalk auth generate`
         # refresh runtime_api_key without knowing the previous Bearer key.
         "/v1/auth/reload",
+        # Offline status — needed by the UI banner before any auth happens.
+        "/v1/system/offline-status",
+        "/v1/system/offline-state",
     }
 )
 

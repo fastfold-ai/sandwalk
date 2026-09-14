@@ -135,6 +135,8 @@ pub const QWEN_VOICES: &[VoiceInfo] = &[
     VoiceInfo { id: "qwen_Uncle_Fu", label: "Uncle Fu", group: "Qwen3 Chinese", language: "Chinese", language_code: "zh" },
     VoiceInfo { id: "qwen_Dylan", label: "Dylan", group: "Qwen3 Chinese", language: "Chinese", language_code: "zh" },
     VoiceInfo { id: "qwen_Eric", label: "Eric", group: "Qwen3 Chinese", language: "Chinese", language_code: "zh" },
+    VoiceInfo { id: "qwen_Ono_Anna", label: "Ono Anna", group: "Qwen3 Japanese", language: "Japanese", language_code: "ja" },
+    VoiceInfo { id: "qwen_Sohee", label: "Sohee", group: "Qwen3 Korean", language: "Korean", language_code: "ko" },
 ];
 
 pub fn voices_for_model(model_id: &str) -> &'static [VoiceInfo] {

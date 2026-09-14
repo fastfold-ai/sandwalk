@@ -15,17 +15,13 @@ import capyLogo from '@/assets/capy-logo.png'
 import '@/components/agents/capy/CapyOverlay.css'
 import { CapyChat } from '@/components/agents/capy/CapyChat'
 import { CapyComposer } from '@/components/agents/capy/CapyComposer'
+import { VoiceLevelBars } from '@/components/agents/composer/VoiceLevelBars'
 import { useCapyHandsFree } from '@/hooks/useCapyHandsFree'
 import { useCapySession } from '@/hooks/useCapySession'
 import { useCapyVoiceReply } from '@/hooks/useCapyVoiceReply'
 import { useCapyWindow } from '@/hooks/useCapyWindow'
-import {
-  languageForVoice,
-  readCapySpeakAll,
-  readCapyVoice
-} from '@/lib/capy-voice'
-import { voiceReplyHint } from '@/lib/speakable-text'
-import { getTtsStatus } from '@/lib/desktop-voice'
+import { readCapySpeakAll } from '@/lib/capy-voice'
+import { usableVoiceTranscript } from '@/lib/desktop-voice'
 import { CAPY_MIN_HEIGHT, CAPY_MIN_WIDTH, formatCapyUnreadBadge } from '@/lib/capy-ui'
 import type { ComposerModelOption } from '@/lib/composer-models'
 import { isDraftAgentSessionId, isReservedAgentRouteId } from '@/lib/draft-agent'
@@ -83,15 +79,8 @@ export function CapyOverlay({
 
   const sendCapy = async (text: string, source: 'voice' | 'text') => {
     const speakAll = readCapySpeakAll()
-    const shouldSpeak = source === 'voice' || speakAll
-    setSpeakTurn(shouldSpeak)
-    let speakHint: string | undefined
-    if (shouldSpeak) {
-      const status = await getTtsStatus().catch(() => null)
-      const language = languageForVoice(readCapyVoice(), status?.voices || [])
-      speakHint = voiceReplyHint(language)
-    }
-    await capy.send(text, { source, speakHint })
+    setSpeakTurn(source === 'voice' || speakAll)
+    await capy.send(text)
   }
 
   const handsFree = useCapyHandsFree({
@@ -99,9 +88,14 @@ export function CapyOverlay({
     send: text => sendCapy(text, 'voice'),
     runActive: capy.chat.runActive
   })
+  const lastAssistant =
+    [...capy.chat.messages]
+      .reverse()
+      .find(message => message.role === 'assistant')?.content || ''
   const voiceReply = useCapyVoiceReply({
     enabled: Boolean(health),
     liveDelta: capy.chat.liveDelta,
+    replyText: lastAssistant,
     runActive: capy.chat.runActive,
     speakTurn,
     recording: handsFree.recording
@@ -267,8 +261,12 @@ export function CapyOverlay({
   }
 
   if (state.minimized) {
+    const listening = handsFree.recording
     const working =
-      capy.chat.runActive || handsFree.transcribing || Boolean(voiceReply.speakStatus)
+      !listening &&
+      (capy.chat.runActive ||
+        handsFree.transcribing ||
+        Boolean(voiceReply.speakStatus))
     const unreadLabel = formatCapyUnreadBadge(unreadCount)
     return (
       <div
@@ -281,8 +279,9 @@ export function CapyOverlay({
           className={cn(
             'relative size-14 cursor-grab rounded-full shadow-[0_12px_40px_-8px_rgba(0,0,0,0.55)] active:cursor-grabbing dark:shadow-[0_16px_48px_-6px_rgba(0,0,0,0.8)]',
             working && 'text-sky-400',
-            handsFree.recording && 'ring-2 ring-red-500 ring-offset-2 ring-offset-background',
+            listening && 'ring-2 ring-red-500 ring-offset-2 ring-offset-background',
             handsFree.transcribing &&
+              !listening &&
               !capy.chat.runActive &&
               'ring-2 ring-amber-400 ring-offset-2 ring-offset-background'
           )}
@@ -291,17 +290,21 @@ export function CapyOverlay({
           tabIndex={0}
           aria-busy={working}
           aria-label={
-            working
-              ? 'Capy is working.'
-              : unreadLabel
-                ? `Open Capy. ${unreadCount} new ${unreadCount === 1 ? 'reply' : 'replies'}.`
-                : 'Open Capy. Double-tap Control for hands-free voice.'
+            listening
+              ? 'Capy is listening. Double-tap Control to send.'
+              : working
+                ? 'Capy is working.'
+                : unreadLabel
+                  ? `Open Capy. ${unreadCount} new ${unreadCount === 1 ? 'reply' : 'replies'}.`
+                  : 'Open Capy. Double-tap Control for hands-free voice.'
           }
           title={
-            voiceReply.speakStatus ||
-            (working
-              ? 'Capy is working'
-              : 'Double-tap Control to talk to Capy')
+            listening
+              ? 'Listening — double-tap Control to send'
+              : voiceReply.speakStatus ||
+                (working
+                  ? 'Capy is working'
+                  : 'Double-tap Control to talk to Capy')
           }
         >
           <img
@@ -312,6 +315,14 @@ export function CapyOverlay({
               working && 'capy-working-hue'
             )}
           />
+          {listening ? (
+            <div className="pointer-events-none absolute inset-x-0 -bottom-5 flex justify-center">
+              <VoiceLevelBars
+                levels={handsFree.levels}
+                className="text-red-400"
+              />
+            </div>
+          ) : null}
           {unreadLabel ? (
             <span className="capy-unread-badge" aria-hidden>
               {unreadLabel}
@@ -476,10 +487,13 @@ export function CapyOverlay({
           onDropActiveChange={setDropActive}
           onChange={next => capy.setChat(prev => ({ ...prev, composer: next }))}
           onSend={(text, meta) => {
-            if (!text.trim()) return
-            void sendCapy(text, meta?.source || 'text')
+            const spoken =
+              meta?.source === 'voice' ? usableVoiceTranscript(text) : text.trim()
+            if (!spoken) return
+            void sendCapy(spoken, meta?.source || 'text')
           }}
           onStop={() => void capy.stop()}
+          capyVoice={handsFree}
           onSessionUpdated={next => capy.setSession(next)}
           onMessagesReloaded={() => {
             if (!capy.session) return

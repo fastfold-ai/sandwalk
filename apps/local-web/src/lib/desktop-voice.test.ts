@@ -5,9 +5,27 @@ import {
   browserDictationStatus,
   downloadDictationModel,
   getDictationStatus,
+  getVoiceInputOwner,
+  isCapyOwnedVoiceInput,
+  publishVoiceInputChanged,
   startDictation,
+  usableVoiceTranscript,
   voiceReady
 } from './desktop-voice'
+
+describe('usableVoiceTranscript', () => {
+  it('drops Whisper blank and special tokens', () => {
+    expect(usableVoiceTranscript('')).toBeNull()
+    expect(usableVoiceTranscript('   ')).toBeNull()
+    expect(usableVoiceTranscript('[BLANK_AUDIO]')).toBeNull()
+    expect(usableVoiceTranscript('[_EOT_]')).toBeNull()
+    expect(usableVoiceTranscript('[_TT_100] [_EOT_]')).toBeNull()
+    expect(usableVoiceTranscript('Hola [_EOT_]')).toBe('Hola')
+    expect(usableVoiceTranscript('Hola, ¿cómo estás?')).toBe(
+      'Hola, ¿cómo estás?'
+    )
+  })
+})
 
 describe('appendTranscript', () => {
   it('returns draft when transcript is empty', () => {
@@ -100,5 +118,24 @@ describe('desktop-voice invoke wrappers', () => {
     }
     await downloadDictationModel()
     expect(invoke).toHaveBeenCalledWith('download_dictation_model', undefined)
+  })
+})
+
+describe('voice input owner', () => {
+  afterEach(() => {
+    publishVoiceInputChanged(browserDictationStatus(), 'composer')
+  })
+
+  it('marks Capy recordings so composers can ignore them', () => {
+    const status = {
+      ...browserDictationStatus(),
+      recording: true
+    }
+    publishVoiceInputChanged(status, 'capy')
+    expect(getVoiceInputOwner()).toBe('capy')
+    expect(
+      isCapyOwnedVoiceInput({ ...status, owner: 'capy' }, 'capy')
+    ).toBe(true)
+    expect(isCapyOwnedVoiceInput({ ...status, owner: 'composer' })).toBe(false)
   })
 })

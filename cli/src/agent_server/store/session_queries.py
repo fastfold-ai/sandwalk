@@ -6,6 +6,28 @@ from agent_server.models import AgentSession
 from agent_server.store.rows import session_from_row
 
 
+def open_bench_question_ids(counts: dict[str, dict[str, int]]) -> list[str]:
+    """Resume a question only while it is live, or after a single interrupt."""
+    leftover: list[str] = []
+    for qid, bucket in counts.items():
+        running = int((bucket or {}).get("running") or 0)
+        interrupted = int((bucket or {}).get("interrupted") or 0)
+        if running > 0 or interrupted == 1:
+            leftover.append(str(qid))
+    return leftover
+
+
+def exhausted_bench_question_ids(counts: dict[str, dict[str, int]]) -> list[str]:
+    """Questions that already stalled/interrupted more than once and are idle."""
+    done: list[str] = []
+    for qid, bucket in counts.items():
+        running = int((bucket or {}).get("running") or 0)
+        interrupted = int((bucket or {}).get("interrupted") or 0)
+        if running == 0 and interrupted >= 2:
+            done.append(str(qid))
+    return done
+
+
 class SessionQueryMixin:
     def sessions_revision(self) -> str:
         """Compact watermark for list polling — one aggregate row, no payloads.
@@ -101,6 +123,52 @@ class SessionQueryMixin:
                 cleaned,
             ).fetchall()
         return [session_from_row(row) for row in rows]
+
+    def bench_question_session_counts(
+        self, project_ids: list[str]
+    ) -> dict[str, dict[str, dict[str, int]]]:
+        """Per-project question id → running/interrupted session counts."""
+        wanted = sorted({str(item).strip() for item in project_ids if str(item).strip()})
+        if not wanted:
+            return {}
+        placeholders = ",".join("?" for _ in wanted)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT project_id, title, status
+                FROM sessions
+                WHERE project_id IN ({placeholders})
+                  AND COALESCE(source, '') = 'bench'
+                  AND status IN ('interrupted', 'running')
+                """,
+                wanted,
+            ).fetchall()
+        out: dict[str, dict[str, dict[str, int]]] = {pid: {} for pid in wanted}
+        for row in rows:
+            pid = str(row["project_id"] or "")
+            title = str(row["title"] or "")
+            qid = title.split(" · ", 1)[0].strip()
+            status = str(row["status"] or "")
+            if not pid or not qid:
+                continue
+            bucket = out.setdefault(pid, {}).setdefault(
+                qid, {"running": 0, "interrupted": 0}
+            )
+            if status == "running":
+                bucket["running"] += 1
+            elif status == "interrupted":
+                bucket["interrupted"] += 1
+        return out
+
+    def interrupted_bench_questions_by_project(
+        self, project_ids: list[str]
+    ) -> dict[str, list[str]]:
+        """Question ids that still need a resume — not exhausted retries."""
+        counts = self.bench_question_session_counts(project_ids)
+        return {
+            pid: open_bench_question_ids(per_qid)
+            for pid, per_qid in counts.items()
+        }
 
     def search_sessions(self, query: str, *, limit: int = 50) -> list[AgentSession]:
         normalized = query.strip()

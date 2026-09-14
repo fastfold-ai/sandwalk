@@ -265,6 +265,7 @@ export type BenchResultSummary = {
   benchmark: string
   accuracy: number
   correct: number
+  answered?: number | null
   total: number
   timeS: number
   thinkingUsed?: boolean
@@ -276,6 +277,8 @@ export type BenchResultSummary = {
   name?: string | null
   provider?: string | null
   lifetimeTokens?: number | null
+  resumable?: boolean
+  failedCount?: number
 }
 
 export type BenchResultPage = {
@@ -678,11 +681,16 @@ export class LocalAgentClient
     }>(`/bench/runs${query ? `?${query}` : ''}`, { signal: opts?.signal })
     return {
       data: (result.data || []).map(row => {
-        const raw = row as BenchResultSummary & { lifetime_tokens?: number }
+        const raw = row as BenchResultSummary & {
+          lifetime_tokens?: number
+          failed_count?: number
+        }
         const tokens = Number(raw.lifetimeTokens ?? raw.lifetime_tokens)
+        const failed = Number(raw.failedCount ?? raw.failed_count)
         return {
           ...raw,
-          lifetimeTokens: Number.isFinite(tokens) ? tokens : null
+          lifetimeTokens: Number.isFinite(tokens) ? tokens : null,
+          failedCount: Number.isFinite(failed) ? failed : 0
         }
       }),
       nextCursor: result.nextCursor ?? null,
@@ -732,6 +740,26 @@ export class LocalAgentClient
     })
   }
 
+  retryFailedBenchRun(
+    runId: string,
+    signalOrIds?: AbortSignal | { questionIds?: string[]; signal?: AbortSignal }
+  ): Promise<{ ok: boolean }> {
+    const opts =
+      signalOrIds && typeof signalOrIds === 'object' && !('aborted' in signalOrIds)
+        ? signalOrIds
+        : { signal: signalOrIds as AbortSignal | undefined }
+    const ids = opts.questionIds?.filter(Boolean) || []
+    return this.request(
+      `/bench/runs/${encodeURIComponent(runId)}/retry-failed`,
+      {
+        method: 'POST',
+        headers: ids.length ? { 'content-type': 'application/json' } : undefined,
+        body: ids.length ? JSON.stringify({ question_ids: ids }) : undefined,
+        signal: opts.signal
+      }
+    )
+  }
+
   deleteBenchResult(
     runId: string,
     signal?: AbortSignal
@@ -767,8 +795,17 @@ export class LocalAgentClient
     }
     const blob = await res.blob()
     const cd = res.headers.get('content-disposition') || ''
-    const match = /filename="?([^"]+)"?/i.exec(cd)
-    return { blob, filename: match?.[1] || `${runId}.json` }
+    const utf = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(cd)
+    const quoted = /filename="([^"]+)"/i.exec(cd)
+    const plain = /filename=([^;]+)/i.exec(cd)
+    const raw = utf?.[1] || quoted?.[1] || plain?.[1] || `${runId}.json`
+    let filename = raw.trim().replace(/^["']|["']$/g, '')
+    try {
+      filename = decodeURIComponent(filename)
+    } catch {
+      /* keep raw */
+    }
+    return { blob, filename }
   }
 
   runDoctor(

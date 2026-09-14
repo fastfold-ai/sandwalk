@@ -54,6 +54,10 @@ def resolve_deepagents_backend(
 ) -> SandboxHandle:
     """Return the deepagents backend for the current config + session.
 
+    Offline mode: when network is unreachable, automatically use the builtin
+    FilesystemBackend instead of trying Modal. This is the primary mechanism
+    that lets bench and agents work fully locally.
+
     Modal mode uses CompositeBackend: Modal for ``/workspace`` + ``execute``,
     local FilesystemBackend for ``/skills/`` (no skills upload).
 
@@ -62,12 +66,17 @@ def resolve_deepagents_backend(
     Start / first message are not blocked.
     """
     from agent.sandbox_backend import _create_or_reuse_modal_sandbox, _seed_modal_workspace
+    from agent_server.offline_mode import should_use_builtin_sandbox
 
-    override = str(backend_override or "").strip().lower()
-    if override in {"builtin", "modal"}:
-        kind = override
+    # Force builtin sandbox when offline — Modal requires network access.
+    if should_use_builtin_sandbox():
+        kind = "builtin"
     else:
-        kind = sandbox_backend_from_config(config)
+        override = str(backend_override or "").strip().lower()
+        if override in {"builtin", "modal"}:
+            kind = override
+        else:
+            kind = sandbox_backend_from_config(config)
     sources = list(skill_source_dirs or [])
     workspace_root = str(Path(workspace_root).expanduser().resolve())
 

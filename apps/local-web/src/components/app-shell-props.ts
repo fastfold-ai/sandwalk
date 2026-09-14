@@ -32,7 +32,15 @@ import type { CreateDraftSession } from '@/lib/draft-agent'
 import { type SessionChatState, type TabItem, type TabItemSection } from '@/lib/sessions'
 import { type parseCatalogSkillId,type SkillsViewMode } from '@/lib/skills-catalog'
 
+export interface OfflineStatus {
+  isOffline: boolean
+  justOnline?: boolean
+  message?: string
+  featuresAffected?: string[]
+}
+
 export type AppShellProps = {
+  offlineStatus: OfflineStatus | null
   sidebarPanelRef: RefObject<ImperativePanelHandle | null>
   isDashboard: boolean
   dashboardSection: DashboardSection

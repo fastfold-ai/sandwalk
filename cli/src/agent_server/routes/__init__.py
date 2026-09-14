@@ -24,6 +24,7 @@ from agent_server.routes.mcp_servers_connect import register_mcp_server_connect_
 from agent_server.routes.mcp_servers_manage import register_mcp_server_manage_routes
 from agent_server.routes.model_profiles import register_model_profile_routes
 from agent_server.routes.models import register_model_routes
+from agent_server.routes.offline_status import register_offline_status_routes
 from agent_server.routes.projects import register_project_routes
 from agent_server.routes.session_events_global import (
     register_session_events_global_routes,
@@ -50,6 +51,7 @@ def register_all_routes(app: FastAPI, deps: AppDeps) -> None:
     """Register every `/v1/*` route on `app`. Auth middleware is wired separately."""
     register_auth_routes(app, deps)
     register_health_routes(app, deps)
+    register_offline_status_routes(app, deps)
     register_mcp_server_routes(app, deps)
     register_mcp_server_manage_routes(app, deps)
     register_mcp_server_connect_routes(app, deps)

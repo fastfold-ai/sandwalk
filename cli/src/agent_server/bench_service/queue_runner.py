@@ -14,13 +14,17 @@ from typing import Any
 
 from agent_server.app_deps import AppDeps
 from agent_server.bench_service.checkpoint import (
+    checkpoint_resume_status,
     delete_checkpoint,
     find_resumable_checkpoint,
+    is_resumable_checkpoint,
     list_checkpoints,
     load_checkpoint,
     save_checkpoint,
 )
 from agent_server.bench_service.results_store import (
+    build_resume_checkpoint,
+    build_retry_failed_checkpoint,
     get_result,
     new_run_id,
     resolve_bench_provider,
@@ -101,6 +105,12 @@ def reset_state_for_tests() -> None:
     _state = BenchQueueState()
     _job_hook = None
     try:
+        from agent_server.bench_service.retry_extra import clear_extra_retry
+
+        clear_extra_retry()
+    except Exception:  # noqa: BLE001
+        pass
+    try:
         from agent_server.bench_service.runtime import _stopping
 
         _stopping.clear()
@@ -121,8 +131,7 @@ def bootstrap_resumable() -> None:
                     save_checkpoint(ckpt)
                 except Exception:  # noqa: BLE001
                     pass
-                status = "interrupted"
-            if status not in {"paused", "interrupted"}:
+            if not is_resumable_checkpoint(ckpt):
                 continue
             rid = str(ckpt.get("run_id") or "")
             if rid:
@@ -377,14 +386,52 @@ def request_bench_shutdown() -> list[threading.Thread]:
         return [thread for thread in _state.job_threads.values() if thread.is_alive()]
 
 
-def resume_run(deps: AppDeps, run_id: str | None = None) -> str | None:
+def resume_run(
+    deps: AppDeps,
+    run_id: str | None = None,
+    *,
+    retry_failed: bool = False,
+    question_ids: list[str] | None = None,
+) -> str | None:
     """Resume a paused/interrupted checkpoint into the live queue."""
     with _state.lock:
         ckpt = None
-        if run_id and run_id != "active":
+        if retry_failed:
+            if not run_id or run_id == "active":
+                raise ValueError("Pick a run to retry failed questions")
+            ckpt = build_retry_failed_checkpoint(run_id, question_ids=question_ids)
+            if ckpt is None:
+                raise ValueError(
+                    "That question is not on this run"
+                    if question_ids
+                    else "No failed questions to retry"
+                )
+        elif run_id and run_id != "active":
             ckpt = _state.paused.get(run_id)
         if ckpt is None and run_id and run_id != "active":
-            ckpt = load_checkpoint(run_id)
+            stores = [deps.store]
+            try:
+                stores.append(deps.worker_store())
+            except Exception:  # noqa: BLE001
+                pass
+            ckpt = build_resume_checkpoint(run_id, stores=stores)
+        if ckpt is None and run_id and run_id != "active":
+            disk = load_checkpoint(run_id)
+            if is_resumable_checkpoint(disk):
+                ckpt = disk
+            if ckpt is None:
+                found = find_resumable_checkpoint()
+                if found and str(found.get("run_id") or "") == run_id:
+                    ckpt = found
+            if ckpt is None:
+                retry = build_retry_failed_checkpoint(run_id)
+                if retry:
+                    ckpt = retry
+                else:
+                    row = get_result(run_id)
+                    if row:
+                        return run_id
+                    raise ValueError("That bench run has nothing left to resume")
         if ckpt is None:
             ckpt = next(iter(_state.paused.values()), None)
         if ckpt is None:
@@ -394,6 +441,13 @@ def resume_run(deps: AppDeps, run_id: str | None = None) -> str | None:
         rid = str(ckpt.get("run_id") or "")
         if not rid:
             raise ValueError("Checkpoint missing run_id")
+        live = rid in _state.inflight or any(job.run_id == rid for job in _state.queue)
+        if live and retry_failed:
+            from agent_server.bench_service.retry_extra import add_extra_retry
+
+            extra = list(question_ids or (ckpt.get("remaining_question_ids") or []))
+            add_extra_retry(rid, extra)
+            return rid
         if rid in _state.inflight:
             raise ValueError("That bench run is already in progress")
         if any(job.run_id == rid for job in _state.queue):
@@ -423,6 +477,11 @@ def resume_run(deps: AppDeps, run_id: str | None = None) -> str | None:
         _state.pause_ids.discard(rid)
         _state.cancel_ids.discard(rid)
         _state.queue.insert(0, job)
+        # Manual resume should not sit behind an already-running stack.
+        needed = len(_state.inflight) + len(_state.queue)
+        _state.max_parallel = min(
+            MAX_PARALLEL_RUNS, max(_state.max_parallel, needed)
+        )
         if not _state.inflight:
             _state.phase = "loading"
     _pump(deps)
@@ -570,8 +629,7 @@ def _disk_paused(*, exclude: set[str]) -> dict[str, dict[str, Any]]:
     """Paused/interrupted checkpoints that are not already queued or running."""
     out: dict[str, dict[str, Any]] = {}
     for ckpt in list_checkpoints():
-        status = str(ckpt.get("status") or "")
-        if status not in {"paused", "interrupted"}:
+        if checkpoint_resume_status(ckpt) is None:
             continue
         rid = str(ckpt.get("run_id") or "")
         if rid and rid not in exclude:

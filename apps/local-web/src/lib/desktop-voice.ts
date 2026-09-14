@@ -73,6 +73,18 @@ export type DictationDownloadProgress = {
 }
 
 export const VOICE_INPUT_CHANGED = 'sandwalk:voice-input-changed'
+
+export type VoiceInputOwner = 'capy' | 'composer'
+
+export type VoiceInputChangedDetail = DictationStatus & {
+  owner?: VoiceInputOwner
+}
+
+let voiceInputOwner: VoiceInputOwner | null = null
+
+export function getVoiceInputOwner(): VoiceInputOwner | null {
+  return voiceInputOwner
+}
 export const TTS_CHANGED = 'sandwalk:tts-changed'
 export const TTS_SPEAK_PROGRESS = 'sandwalk:tts-speak-progress'
 
@@ -130,6 +142,15 @@ export function voiceTtsReady(
   return Boolean(status?.supported && status.model_verified)
 }
 
+export function usableVoiceTranscript(text: string): string | null {
+  const cleaned = text
+    .replace(/\[(?:BLANK_AUDIO|_EOT_|_BEG_|_TT_\d+|INAUDIBLE)\]/gi, ' ')
+    .replace(/\(\s*blank(?:\s+audio)?\s*\)/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return cleaned || null
+}
+
 export function appendTranscript(draft: string, transcript: string): string {
   const next = transcript.trim()
   if (!next) return draft
@@ -137,10 +158,27 @@ export function appendTranscript(draft: string, transcript: string): string {
   return current ? `${current} ${next}` : next
 }
 
-export function publishVoiceInputChanged(status: DictationStatus) {
-  window.dispatchEvent(
-    new CustomEvent(VOICE_INPUT_CHANGED, { detail: status })
-  )
+export function publishVoiceInputChanged(
+  status: DictationStatus,
+  owner?: VoiceInputOwner
+) {
+  if (owner) {
+    voiceInputOwner = status.recording ? owner : null
+  } else if (!status.recording) {
+    voiceInputOwner = null
+  }
+  const detail: VoiceInputChangedDetail = {
+    ...status,
+    owner: owner ?? voiceInputOwner ?? undefined
+  }
+  window.dispatchEvent(new CustomEvent(VOICE_INPUT_CHANGED, { detail }))
+}
+
+export function isCapyOwnedVoiceInput(
+  detail?: VoiceInputChangedDetail | null,
+  owner = voiceInputOwner
+): boolean {
+  return (detail?.owner ?? owner) === 'capy'
 }
 
 export function publishTtsChanged(status: TtsStatus) {

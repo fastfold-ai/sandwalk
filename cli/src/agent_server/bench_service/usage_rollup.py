@@ -57,6 +57,9 @@ def rollup_suite_usage(
     if not run_id or chat_store is None:
         return result
     totals = sum_bench_usage(bench_store, result.get("project_id"))
+    chat_totals = sum_bench_usage(chat_store, result.get("project_id"))
+    if sum(chat_totals.values()) > sum(totals.values()):
+        totals = chat_totals
     if sum(totals.values()) <= 0:
         totals = {
             "input_tokens": _int(result, "input_tokens"),
@@ -64,7 +67,10 @@ def rollup_suite_usage(
             "cache_read_tokens": _int(result, "cache_read_tokens"),
             "cache_creation_tokens": _int(result, "cache_creation_tokens"),
         }
-    lifetime = totals["input_tokens"] + totals["output_tokens"]
+    lifetime = max(
+        totals["input_tokens"] + totals["output_tokens"],
+        _int(result, "lifetime_tokens"),
+    )
     result["input_tokens"] = totals["input_tokens"]
     result["output_tokens"] = totals["output_tokens"]
     result["cache_read_tokens"] = totals["cache_read_tokens"]

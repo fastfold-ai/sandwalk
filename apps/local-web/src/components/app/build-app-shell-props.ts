@@ -15,6 +15,7 @@ import type { useSessionSandbox } from '@/hooks/useSessionSandbox'
 import type { TabItem, TabItemSection } from '@/lib/sessions'
 
 type AppShellBridgeInput = {
+  offlineStatus: AppShellProps['offlineStatus']
   ui: ReturnType<typeof useAppUiState>
   route: ReturnType<typeof useAppRouting>
   bootstrap: ReturnType<typeof useAppBootstrap>
@@ -87,6 +88,7 @@ type AppShellBridgeInput = {
 
 export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
   return {
+    offlineStatus: input.offlineStatus,
     sidebarPanelRef: input.ui.sidebarPanelRef,
     isDashboard: input.route.isDashboard,
     dashboardSection: input.route.dashboardSection,

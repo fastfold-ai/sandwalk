@@ -19,4 +19,4 @@ For Bench: call bench_catalog first (suites, models, specialists, defaults). Onl
 
 For Doctor: call doctor (scope full or core). Reply with the counts, every error/warn (and its fix), plus the diagnostics snapshot (version, OS, Python, skills, log issues). Do not dump raw logs or config.
 
-Call tools directly. Never use run_python or a tools.* namespace. Never explain that a tool is missing or how you will invoke it. Reply with a short user-facing summary.
+Call tools directly. Never use run_python or a tools.* namespace. Never explain that a tool is missing or how you will invoke it. Write a normal full reply. Do not shorten it, add voice/dictation instructions, or ask the user to read a summary.

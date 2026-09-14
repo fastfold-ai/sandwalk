@@ -26,6 +26,7 @@ from agent_server.integrations_service import IntegrationsService
 from agent_server.library import LibraryService
 from agent_server.mcp_service import McpService
 from agent_server.models_service import ModelsService
+from agent_server.offline_mode import init_offline_mode, start_offline_periodic_checks
 from agent_server.pty_manager import PtyManager
 from agent_server.routes import register_all_routes
 from agent_server.routes.auth import register_auth_middleware
@@ -141,6 +142,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        # Initialize offline mode detection before any service starts.
+        # This prevents noisy error logs when the user has no internet.
+        await init_offline_mode()
+        # Start periodic health checks in background
+        offline_task = asyncio.create_task(start_offline_periodic_checks())
         shutdown_event.clear()
         # Re-sync on startup in case config changed while the process was idle,
         # or tests construct the app without going through run_server().
@@ -171,9 +177,18 @@ def create_app(
                 "Bench runtime failed to start; bench will share the API loop"
             )
         # Inbound connectors are best-effort: a Slack outage must not stop the
-        # server from booting.
+        # server from booting. Also skip entirely when offline to avoid noisy
+        # connection errors that spam the logs and waste CPU on retries.
         try:
-            await connector_service.start()
+            from agent_server.offline_mode import is_offline
+            if not is_offline():
+                await connector_service.start()
+            else:
+                import logging
+
+                logging.getLogger("agent_server").info(
+                    "Skipping Slack connectors (offline mode)"
+                )
         except Exception:
             import logging
 
@@ -181,6 +196,10 @@ def create_app(
         backup_task = asyncio.create_task(_keep_backup_fresh(store))
         yield
         shutdown_event.set()
+        # Cancel offline periodic checks
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            offline_task.cancel()
+            await offline_task
         from agent_server.store.event_notifier import EVENT_NOTIFIER
 
         EVENT_NOTIFIER.wake_all()
@@ -277,6 +296,7 @@ def create_app(
             "cookie",
             "x-sandwalk-client",
         ],
+        expose_headers=["content-disposition"],
     )
 
     register_all_routes(app, deps)
