@@ -21,6 +21,9 @@ def openai_reasoning_effort_floor(model_id: str | None) -> str:
         return "none"
     if "pro" in value:
         return "medium"
+    # GPT-6 Astra documents low/medium/high/xhigh/max — not none.
+    if value.startswith("gpt-6") or "astra" in value:
+        return "low"
     # Bare gpt-5-mini / gpt-5-nano (not gpt-5.4-mini / gpt-5.4-nano).
     if value in {"gpt-5-mini", "gpt-5-nano"} or value.startswith(
         ("gpt-5-mini-", "gpt-5-nano-")
@@ -160,11 +163,16 @@ def effective_openrouter_reasoning(
     slug = value.split("/", 1)[-1] if value else ""
     vendor = value.split("/", 1)[0] if "/" in value else ""
 
-    if vendor == "openai" or slug.startswith(("gpt-5", "o1", "o3", "o4")):
+    if vendor == "openai" or slug.startswith(("gpt-5", "gpt-6", "o1", "o3", "o4")):
         level = effective_reasoning_effort(
             effort=effort, fast=fast, model_id=slug
         )
         return {"effort": level}
+
+    if vendor == "anthropic" or slug.startswith("claude-"):
+        # OpenRouter Anthropic rejects ``effort: none``. Fast is ``low``,
+        # same as the native Anthropic client.
+        return {"effort": effective_anthropic_effort(effort=effort, fast=fast)}
 
     if vendor in {"x-ai", "xai"} or slug.startswith("grok-"):
         level = effective_xai_reasoning_effort(

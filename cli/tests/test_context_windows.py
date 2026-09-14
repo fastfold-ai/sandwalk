@@ -9,6 +9,7 @@ def test_anthropic_modern_models_have_1m():
     # 1M context is GA (default, no beta header) on modern Anthropic models.
     assert context_window_for_model("claude-opus-5") == 1_000_000
     assert context_window_for_model("claude-fable-5") == 1_000_000
+    assert context_window_for_model("claude-fable-5-1") == 1_000_000
     assert context_window_for_model("claude-opus-4-8") == 1_000_000
     assert context_window_for_model("claude-sonnet-5") == 1_000_000
     assert context_window_for_model("claude-sonnet-4-6") == 1_000_000
@@ -21,6 +22,7 @@ def test_anthropic_legacy_models_stay_200k():
 
 def test_openai_gpt5_family():
     # GPT-5.6 family (Sol/Terra/Luna) has a 1.05M window; older GPT-5.x 400k.
+    assert context_window_for_model("gpt-6-astra") == 1_050_000
     assert context_window_for_model("gpt-5.6-sol") == 1_050_000
     assert context_window_for_model("gpt-5.6-terra") == 1_050_000
     assert context_window_for_model("gpt-5.5") == 400_000

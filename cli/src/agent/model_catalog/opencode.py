@@ -137,8 +137,8 @@ def openai_model_requires_responses_api(model_id: str) -> bool:
         return False
     if "codex" in value:
         return True
-    # GPT-5 family (incl. 5.4 / 5.5 / 5.6 and -pro/-mini/-nano/-sol/…)
-    if value.startswith("gpt-5"):
+    # GPT-5 / GPT-6 family (incl. 5.4 / 5.5 / 5.6 / Astra and -pro/-mini/-nano/-sol/…)
+    if value.startswith("gpt-5") or value.startswith("gpt-6"):
         # Chat-only / non-reasoning GPT-5 variants stay on chat completions.
         if "chat" in value and "latest" in value:
             return False

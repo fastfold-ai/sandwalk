@@ -41,7 +41,7 @@ def model_supports_reasoning_effort(
     if provider_norm in {"openai", "opencode", ""}:
         if value.startswith("o1") or value.startswith("o3") or value.startswith("o4"):
             return True
-        if value.startswith("gpt-5"):
+        if value.startswith("gpt-5") or value.startswith("gpt-6"):
             # Chat-only / non-reasoning GPT-5 variants stay out.
             if "chat" in value and "latest" in value:
                 return False
@@ -99,11 +99,11 @@ def openrouter_model_supports_reasoning(model_id: str | None) -> bool:
     if not slug:
         return False
 
-    # OpenAI GPT-5 / o-series (not chat-only variants).
+    # OpenAI GPT-5 / GPT-6 / o-series (not chat-only variants).
     if vendor == "openai" or slug.startswith(("gpt-", "o1", "o3", "o4")):
         if slug.startswith(("o1", "o3", "o4")):
             return True
-        if slug.startswith("gpt-5"):
+        if slug.startswith(("gpt-5", "gpt-6")) or "astra" in slug:
             if "chat" in slug and "latest" in slug:
                 return False
             return True
@@ -223,9 +223,18 @@ def model_supports_reasoning_fast(
 
 
 def openrouter_model_omits_temperature(model_id: str | None) -> bool:
-    """GPT-5 via OpenRouter omits temperature from supported_parameters."""
-    _, slug = _openrouter_slug(model_id)
-    return slug.startswith("gpt-5")
+    """Return True when OpenRouter rejects ``temperature`` for this model.
+
+    GPT-5 / GPT-6 / Astra list no ``temperature`` in ``supported_parameters``.
+    Combined with ``provider.require_parameters``, sending it 404s the request.
+    Anthropic Opus/Sonnet 5 on OpenRouter match the native no-sampling rule.
+    """
+    vendor, slug = _openrouter_slug(model_id)
+    if slug.startswith(("gpt-5", "gpt-6", "o1", "o3", "o4")) or "astra" in slug:
+        return True
+    if vendor == "anthropic" or slug.startswith("claude-"):
+        return anthropic_model_omits_temperature(slug)
+    return False
 
 
 def xai_model_supports_reasoning_effort(model_id: str | None) -> bool:

@@ -56,11 +56,13 @@ _PREFIX_CONTEXT_WINDOWS: list[tuple[str, int]] = [
     ("claude-opus-4-6", 1_000_000),
     ("claude-sonnet-5", 1_000_000),
     ("claude-sonnet-4-6", 1_000_000),
+    ("claude-fable-5-1", 1_000_000),
     ("claude-fable-5", 1_000_000),
     ("claude-mythos", 1_000_000),
     # Older Anthropic models (Sonnet 4.5, Haiku 4.5, …) keep the 200k window.
     ("claude-", 200_000),
     # OpenAI — GPT-5.6 family is 1.05M; earlier GPT-5.x are 400k total.
+    ("gpt-6", 1_050_000),
     ("gpt-5.6", 1_050_000),
     ("gpt-5", 400_000),
     # Google Gemini — 1M input window.

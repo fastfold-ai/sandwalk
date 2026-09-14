@@ -23,6 +23,7 @@ def build_openrouter_chat_model(config, *, temperature: float):
         openrouter_model_omits_temperature,
         resolve_catalog_model_id,
     )
+    from agent.model_catalog.param_heal import apply_effort_floor, get_param_heal
 
     meta = OPENAI_COMPATIBLE_PROVIDERS.get("openrouter", {})
     model = resolve_catalog_model_id(
@@ -30,22 +31,27 @@ def build_openrouter_chat_model(config, *, temperature: float):
         or str(meta.get("default_model") or "anthropic/claude-sonnet-5")
     )
 
+    heal = get_param_heal(config.get("llm.param_heals"), "openrouter", model)
     kwargs: dict[str, Any] = {
         "model": model,
         "app_url": OPENROUTER_APP_URL,
         "app_title": OPENROUTER_APP_TITLE,
         "app_categories": list(OPENROUTER_APP_CATEGORIES),
-        # Sandwalk always sends tools — only route to endpoints that accept them.
-        "openrouter_provider": {"require_parameters": True},
-        "max_retries": 2,
+        "max_retries": 5,
     }
-    if not openrouter_model_omits_temperature(model):
+    if not heal["omit_require_parameters"]:
+        # Prefer endpoints that accept tools + the params we actually send.
+        kwargs["openrouter_provider"] = {"require_parameters": True}
+    if not heal["omit_temperature"] and not openrouter_model_omits_temperature(model):
         kwargs["temperature"] = temperature
     api_key = config.llm_api_key("openrouter")
     if api_key:
         kwargs["api_key"] = api_key
 
-    if model_supports_reasoning_effort("openrouter", model):
+    if (
+        not heal["omit_reasoning"]
+        and model_supports_reasoning_effort("openrouter", model)
+    ):
         effort, fast = get_model_reasoning(
             config.get("llm.model_reasoning"),
             "openrouter",
@@ -53,10 +59,12 @@ def build_openrouter_chat_model(config, *, temperature: float):
             default_effort=str(config.get("llm.reasoning_effort") or "medium"),
             default_fast=bool(config.get("llm.reasoning_fast", False)),
         )
-        kwargs["reasoning"] = effective_openrouter_reasoning(
+        reasoning = effective_openrouter_reasoning(
             effort=effort,
             fast=fast,
             model_id=model,
         )
+        reasoning["effort"] = apply_effort_floor(str(reasoning.get("effort") or "medium"), heal)
+        kwargs["reasoning"] = reasoning
 
     return ChatOpenRouter(**kwargs)
