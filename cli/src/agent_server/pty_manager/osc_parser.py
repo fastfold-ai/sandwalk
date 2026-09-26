@@ -29,6 +29,7 @@ Design notes:
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -42,6 +43,13 @@ _BACKSLASH = 0x5C  # part of ST terminator: ESC '\'
 # Runaway sequences (e.g. an OSC 133 D with a broken/huge payload) get
 # dropped silently instead of ballooning memory.
 _MAX_OSC_PAYLOAD = 4096
+
+# FAS-107 · Fase 1j · timeout de sequence hold. Complementa
+# `_MAX_OSC_PAYLOAD`: si el `\x07` o el ST nunca llegan pero los bytes
+# entran de a uno lentamente (no supera el cap de 4KB en horas), el
+# buffer quedaba en RAM indefinido. Con este timeout, si un OSC no
+# cierra en 5s se descarta y el parser vuelve a estado limpio.
+_OSC_HOLD_TIMEOUT_SEC = 5.0
 
 
 PtyEventKind = Literal["command.started", "command.finished", "notify"]
@@ -69,6 +77,10 @@ class OscParser:
     # When True the parser saw ESC inside an OSC payload and is waiting
     # for '\\' to complete the ST terminator.
     _in_st_terminator: bool = False
+    # FAS-107 · Fase 1j · timestamp del OSC introducer (`\e]`). Se
+    # chequea al recibir cada chunk; si excede `_OSC_HOLD_TIMEOUT_SEC`
+    # sin cerrarse, el parser resetea. `None` cuando no hay OSC en curso.
+    _osc_started_at: float | None = None
 
     def feed(self, chunk: bytes) -> list[PtyEvent]:
         """Consume a chunk of raw PTY output and return detected events.
@@ -78,11 +90,22 @@ class OscParser:
         state advances.
         """
         events: list[PtyEvent] = []
+        # Descartar OSC en curso si lleva demasiado tiempo abierto.
+        # Protege contra scripts que emiten `\e]777;` y nunca cierran
+        # con `\x07` — sin este check, el buffer crecería hasta el cap
+        # de 4KB en RAM (posiblemente en múltiples terminales).
+        if (
+            self._in_osc
+            and self._osc_started_at is not None
+            and time.monotonic() - self._osc_started_at > _OSC_HOLD_TIMEOUT_SEC
+        ):
+            self._reset()
         for byte in chunk:
             if not self._in_osc:
                 if self._pending_esc and byte == _OSC_INTRODUCER:
                     self._pending_esc = False
                     self._in_osc = True
+                    self._osc_started_at = time.monotonic()
                     self._buf.clear()
                 elif byte == _ESC:
                     self._pending_esc = True
@@ -126,6 +149,7 @@ class OscParser:
         self._in_osc = False
         self._pending_esc = False
         self._in_st_terminator = False
+        self._osc_started_at = None
 
 
 def _parse_payload(payload: str) -> PtyEvent | None:

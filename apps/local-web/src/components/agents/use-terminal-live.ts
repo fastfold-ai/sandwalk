@@ -26,6 +26,12 @@ export type LiveTerminal = {
    *  the "character per line" visual bug. */
   lastSentCols: number
   lastSentRows: number
+  /** FAS-107 · Fase 1j · pending debounce del `updatePtySession`.
+   *  Reflows de CSS (cambio de pane en split, resize de ventana)
+   *  disparan onResize N veces en pocos ms. Sin debounce, cada uno
+   *  produce un RPC + SIGWINCH; el shell re-renderea su prompt y a
+   *  veces pierde líneas del scrollback (relacionado bug #133). */
+  pendingResize: ReturnType<typeof setTimeout> | null
 }
 
 /**
@@ -80,6 +86,10 @@ export function useTerminalLive({
     const live = livesRef.current[ptyId]
     if (!live || live.disposed) return
     live.disposed = true
+    if (live.pendingResize !== null) {
+      clearTimeout(live.pendingResize)
+      live.pendingResize = null
+    }
     try {
       live.socket?.close()
     } catch {
@@ -173,7 +183,8 @@ export function useTerminalLive({
         // T4: -1/-1 forces the first real send. Any subsequent
         // updatePtySession call with the same (cols, rows) is skipped.
         lastSentCols: -1,
-        lastSentRows: -1
+        lastSentRows: -1,
+        pendingResize: null
       }
       livesRef.current[info.id] = live
 
@@ -202,7 +213,20 @@ export function useTerminalLive({
         if (cols === live.lastSentCols && rows === live.lastSentRows) return
         live.lastSentCols = cols
         live.lastSentRows = rows
-        void client.updatePtySession(sessionId, info.id, { cols, rows })
+        // FAS-107 · Fase 1j · debounce 50ms: reflows CSS disparan
+        // onResize múltiples veces en un mismo frame. Sin coalescer,
+        // el shell recibe SIGWINCH en ráfaga y re-renderea el prompt
+        // varias veces perdiendo scrollback (bug latente relacionado
+        // al task #133). Con debounce, solo el último tamaño estable
+        // llega al PTY.
+        if (live.pendingResize !== null) {
+          clearTimeout(live.pendingResize)
+        }
+        live.pendingResize = setTimeout(() => {
+          live.pendingResize = null
+          if (live.disposed) return
+          void client.updatePtySession(sessionId, info.id, { cols, rows })
+        }, 50)
       })
 
       return live

@@ -13,9 +13,21 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# FAS-107 · Fase 1j · `devtools` de Tauri (Cmd+Option+I dentro de la
+# webview) DEBE ir solo en dev builds. En release firmado, expone
+# tokens, state, paths y superficie de ataque via APIs Tauri. Se
+# activaba con `default = ["devtools"]` por descuido — quedó desde
+# el debug del deep link banners.
+#
+# Uso: `tauri:dev` en `package.json` pasa `--features devtools` para
+# activar en dev. `tauri build` (release) NO lo pasa, por lo tanto
+# queda desactivado en el DMG firmado.
+devtools = ["tauri/devtools"]
+
 [dependencies]
 # macos-private-api: transparent window + liquid glass (NSGlassEffectView / vibrancy)
-tauri = { version = "2", features = ["macos-private-api", "image-png", "devtools"] }
+tauri = { version = "2", features = ["macos-private-api", "image-png"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-liquid-glass = "0.1"
 tauri-plugin-notification = "2"

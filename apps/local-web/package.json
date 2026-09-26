@@ -19,7 +19,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "tauri dev --features devtools",
     "tauri:build": "tauri build",
     "package:dmg": "bash ../packaging/package-macos-dmg.sh",
     "relaunch:mac": "bash ../packaging/relaunch-macos-app.sh"

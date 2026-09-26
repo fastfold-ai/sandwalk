@@ -12,10 +12,11 @@
 
 let opener: ((itemId: string) => void) | null = null
 
-export function setItemOpener(fn: (itemId: string) => void): void {
+export function setItemOpener(fn: ((itemId: string) => void) | null): void {
   opener = fn
 }
 
 export function openItem(itemId: string): void {
-  opener?.(itemId)
+  if (opener === null) return
+  opener(itemId)
 }

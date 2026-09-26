@@ -43,23 +43,32 @@ pub const NOTIFICATION_CLICK_EVENT: &str = "sandwalk://notification-click";
 /// Útil en release build donde `eprintln!` se pierde. Antonio abre el
 /// archivo con TextEdit y ve paso a paso el flujo (delegate registrado,
 /// notif enviada, click recibido, tag extraído).
+///
+/// FAS-107 · Fase 1j: se abre el archivo una sola vez (OnceLock) y se
+/// mantiene abierto en modo append durante la vida del proceso. Antes
+/// se abría y cerraba por cada `log_line`, generando syscalls
+/// sostenidos en ráfagas de notificaciones. `Mutex<File>` sincroniza
+/// escrituras desde el delegate (main thread ObjC) y desde el comando
+/// `sandwalk_notify` (thread del runtime Tauri).
+static LOG_FILE: OnceLock<std::sync::Mutex<Option<std::fs::File>>> = OnceLock::new();
+
 fn log_line(msg: &str) {
     eprintln!("{msg}");
-    if let Some(home) = dirs::home_dir() {
-        let dir = home.join("Library/Logs/Sandwalk");
-        let _ = std::fs::create_dir_all(&dir);
-        let path = dir.join("deep-link.log");
-        if let Ok(mut file) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-        {
-            let _ = writeln!(
-                file,
-                "[{}] {}",
-                chrono_now(),
-                msg
-            );
+    let cell = LOG_FILE.get_or_init(|| {
+        let file = dirs::home_dir().and_then(|home| {
+            let dir = home.join("Library/Logs/Sandwalk");
+            std::fs::create_dir_all(&dir).ok()?;
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dir.join("deep-link.log"))
+                .ok()
+        });
+        std::sync::Mutex::new(file)
+    });
+    if let Ok(mut guard) = cell.lock() {
+        if let Some(file) = guard.as_mut() {
+            let _ = writeln!(file, "[{}] {}", chrono_now(), msg);
         }
     }
 }
@@ -108,13 +117,19 @@ define_class!(
             let content = request.content();
             let user_info: Retained<NSDictionary> = content.userInfo();
             let key = NSString::from_str("tag");
-            let key_obj: &AnyObject = unsafe { std::mem::transmute::<&NSString, &AnyObject>(&*key) };
+            // FAS-107 · Fase 1j: `downcast_ref::<NSString>()` es
+            // seguro — devuelve `None` si el objeto no es NSString.
+            // Antes usábamos `transmute` que crasheaba si el valor
+            // guardado en userInfo cambiaba de tipo (edge case:
+            // notif del sistema legacy sin `tag`, o valor no string).
+            let key_obj: &AnyObject = key.as_ref();
             let tag_obj: Option<Retained<AnyObject>> =
                 unsafe { msg_send![&*user_info, objectForKey: key_obj] };
-            if let Some(obj) = tag_obj {
-                let ns_ptr: *const AnyObject = &*obj;
-                let ns_str: &NSString = unsafe { &*(ns_ptr as *const NSString) };
-                let tag = ns_str.to_string();
+            let tag_str: Option<String> = tag_obj
+                .as_deref()
+                .and_then(|obj| obj.downcast_ref::<NSString>())
+                .map(|ns| ns.to_string());
+            if let Some(tag) = tag_str {
                 log_line(&format!("[sandwalk] delegate tag={:?}", tag));
                 if !tag.is_empty() {
                     if let Some(handle) = APP_HANDLE.get() {
@@ -164,8 +179,41 @@ define_class!(
 static AUTHORIZATION_REQUESTED: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
+/// True cuando el proceso corre dentro de un `.app` bundle con
+/// `CFBundleIdentifier`. En `tauri:dev` el binario suelto vive en
+/// `target/debug/sandwalk-desktop` sin bundle real — llamar a
+/// `UNUserNotificationCenter.currentNotificationCenter()` tira
+/// `bundleProxyForCurrentProcess is nil` y crashea toda la app.
+fn is_bundled() -> bool {
+    // Check por path del executable: solo un `.app` real vive dentro de
+    // `X.app/Contents/MacOS/binary`. En `tauri:dev` el binario está en
+    // `target/debug/sandwalk-desktop` — sin `.app/Contents/MacOS/` en
+    // la ruta. Chequear `bundleIdentifier` no sirve porque Tauri lo
+    // asigna igual en dev.
+    match std::env::current_exe() {
+        Ok(path) => path
+            .to_str()
+            .map(|s| s.contains(".app/Contents/MacOS/"))
+            .unwrap_or(false),
+        Err(_) => false,
+    }
+}
+
 pub fn install_delegate(app_handle: AppHandle) {
     let _ = APP_HANDLE.set(app_handle);
+    // FAS-107 · Fase 1h: en `tauri:dev` (binario suelto sin `.app`
+    // bundleado) `UNUserNotificationCenter` crashea con
+    // `bundleProxyForCurrentProcess is nil`. Solo montamos el delegate
+    // cuando la app corre desde un bundle real (release firmado con
+    // Developer ID). En dev la app arranca sin banners nativos ni
+    // deep link — hay que usar el `.app` en `~/Applications/Sandwalk.app`
+    // para probar esas features.
+    if !is_bundled() {
+        log_line(
+            "[sandwalk] UN delegate skipped (not bundled — use ~/Applications/Sandwalk.app for native notifs)",
+        );
+        return;
+    }
     unsafe {
         let mtm = objc2::MainThreadMarker::new()
             .expect("install_delegate must run on main thread");
@@ -191,6 +239,9 @@ pub fn install_delegate(app_handle: AppHandle) {
 
 fn ensure_authorization_requested() {
     use std::sync::atomic::Ordering;
+    if !is_bundled() {
+        return;
+    }
     if AUTHORIZATION_REQUESTED.swap(true, Ordering::AcqRel) {
         return;
     }
@@ -222,6 +273,13 @@ pub fn sandwalk_notify(
         "[sandwalk] sandwalk_notify title={:?} tag={:?}",
         title, tag
     ));
+    // Ver `install_delegate` — llamar a UNUserNotificationCenter en
+    // dev bare-binary crashea. Devolvemos error controlado en vez de
+    // matar el proceso; el frontend ya cae al plugin oficial cuando
+    // sandwalk_notify falla.
+    if !is_bundled() {
+        return Err("not bundled — UN* unavailable in dev".to_string())
+    }
     ensure_authorization_requested();
     unsafe {
         let center = UNUserNotificationCenter::currentNotificationCenter();

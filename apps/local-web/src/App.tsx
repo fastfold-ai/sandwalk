@@ -833,7 +833,7 @@ export default function App() {
       navigate(location.routePath)
     })
     return () => {
-      setItemOpener(() => {})
+      setItemOpener(null)
     }
   }, [navigate, tabGroupsStore.setGroupActiveChat])
 
