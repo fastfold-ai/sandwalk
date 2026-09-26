@@ -15,7 +15,7 @@ import logging
 import time
 import traceback
 
-from agent.runner_helpers import _classify_llm_error
+from agent.runner_helpers import _classify_llm_error, _is_transient_transport_error
 from agent.types import ExecutionResult
 
 logger = logging.getLogger("runner")
@@ -93,6 +93,8 @@ class DeepAgentsRunMixin:
         query: str,
         context: dict | None = None,
         progress_callback=None,
+        _param_heal_tries: int = 0,
+        _transport_tries: int = 0,
     ) -> ExecutionResult:
         """Execute a query on the deepagents (LangGraph) runtime.
 
@@ -408,6 +410,30 @@ class DeepAgentsRunMixin:
             if thinking_status is not None:
                 thinking_status.stop()
                 thinking_status = None
+            if _transport_tries < 1 and _is_transient_transport_error(e):
+                logger.warning("Retrying turn after transport error: %s", e)
+                return await self._run_async_deepagents(
+                    query,
+                    context,
+                    progress_callback,
+                    _param_heal_tries=_param_heal_tries,
+                    _transport_tries=_transport_tries + 1,
+                )
+            if _param_heal_tries < 3:
+                from agent.model_catalog.param_heal import apply_param_heal_from_error
+
+                if apply_param_heal_from_error(config, e):
+                    logger.warning(
+                        "Retrying turn after param heal (%s/3): %s",
+                        _param_heal_tries + 1,
+                        e,
+                    )
+                    return await self._run_async_deepagents(
+                        query,
+                        context,
+                        progress_callback,
+                        _param_heal_tries=_param_heal_tries + 1,
+                    )
             classified = _classify_llm_error(e)
             if classified is not None:
                 title, body = classified

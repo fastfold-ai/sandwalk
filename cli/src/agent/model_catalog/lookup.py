@@ -7,6 +7,7 @@ from agent.model_catalog.data import AVAILABLE_MODELS, CUSTOM_OPENAI_COMPATIBLE_
 # Stale UI/config ids → current provider API ids.
 CATALOG_MODEL_ALIASES: dict[str, str] = {
     "gemini-3.1-pro": "gemini-3.1-pro-preview",
+    "claude-fable-5.1": "claude-fable-5-1",
 }
 
 
@@ -133,6 +134,7 @@ def catalog_provider_for_model(model_id: str | None) -> str | None:
     if (
         lower.startswith("gpt-4")
         or lower.startswith("gpt-5")
+        or lower.startswith("gpt-6")
         or lower.startswith("o1")
         or lower.startswith("o3")
         or lower.startswith("chatgpt")

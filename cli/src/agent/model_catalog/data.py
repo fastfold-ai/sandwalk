@@ -18,12 +18,17 @@ class CatalogModel(TypedDict):
 AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
     "anthropic": [
         (
+            "claude-fable-5-1",
+            "Fable 5.1",
+            "Latest Fable for long-horizon agents and demanding reasoning (1M context)",
+        ),
+        (
             "claude-opus-5",
             "Opus 5",
             "Powerful model for complex agentic coding and enterprise work (1M context)",
         ),
         ("claude-sonnet-5", "Sonnet 5", "Best combination of speed and intelligence"),
-        ("claude-fable-5", "Fable 5", "Next-generation intelligence for long-running agents"),
+        ("claude-fable-5", "Fable 5", "Previous Fable for long-running agents"),
         ("claude-sonnet-4-6", "Sonnet 4.6", "Fast, balanced Sonnet for most tasks"),
         # Legacy (disabled by default)
         ("claude-opus-4-8", "Opus 4.8", "Previous-generation Opus"),
@@ -32,6 +37,11 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
         ("claude-opus-4-6", "Opus 4.6", "Previous-generation Opus"),
     ],
     "openai": [
+        (
+            "gpt-6-astra",
+            "GPT-6 Astra",
+            "Most capable GPT-6 for hard end-to-end work (1.05M context)",
+        ),
         ("gpt-5.6-sol", "GPT-5.6 Sol", "High-speed frontier model for coding"),
         ("gpt-5.6-terra", "GPT-5.6 Terra", "Balanced GPT-5.6 for general professional work"),
         ("gpt-5.6-luna", "GPT-5.6 Luna", "GPT-5.6 variant for broader agent workloads"),
@@ -207,6 +217,11 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
     # also discovered live (discover_models=true); new discoveries start disabled.
     "openrouter": [
         (
+            "anthropic/claude-fable-5.1",
+            "Claude Fable 5.1",
+            "Anthropic Fable 5.1 via OpenRouter",
+        ),
+        (
             "anthropic/claude-opus-5",
             "Claude Opus 5",
             "Anthropic flagship via OpenRouter",
@@ -220,6 +235,11 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
             "anthropic/claude-haiku-4.5",
             "Claude Haiku 4.5",
             "Anthropic — fast / cheap Claude via OpenRouter",
+        ),
+        (
+            "openai/gpt-6-astra",
+            "GPT-6 Astra",
+            "OpenAI GPT-6 Astra via OpenRouter (1M, no temperature)",
         ),
         (
             "openai/gpt-5.6-terra",
@@ -471,7 +491,7 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
 # Bump when the default-enabled set changes so existing configs get migrated once.
 # Also bump when curated OpenRouter models become default-enabled so prior
 # discovery-seeded hides are cleared (see Config._migrate_catalog_defaults).
-CATALOG_DEFAULTS_VERSION = 15
+CATALOG_DEFAULTS_VERSION = 17
 
 # Models present in the catalog but hidden by default. Users can re-enable them
 # from Dashboard → Models; toggling simply removes them from the hidden list.

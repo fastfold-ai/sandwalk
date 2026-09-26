@@ -21,7 +21,7 @@ def build_anthropic_chat_model(config, *, temperature: float):
     apply_anthropic_empty_thinking_patch()
 
     model = config.get("llm.model") or "claude-sonnet-4-5-20250929"
-    kwargs: dict[str, Any] = {}
+    kwargs: dict[str, Any] = {"max_retries": 5}
     if not anthropic_model_omits_temperature(model):
         kwargs["temperature"] = temperature
     api_key = config.llm_api_key("anthropic")

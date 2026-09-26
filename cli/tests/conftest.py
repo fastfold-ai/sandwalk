@@ -52,7 +52,7 @@ _PROVIDER_KEY_ENV_VARS = (
 )
 if not any(
     os.environ.get(gate, "").strip().lower() in {"1", "true", "yes"}
-    for gate in ("RUN_CLI_NETWORK", "RUN_CLI_E2E", "RUN_MODAL_E2E")
+    for gate in ("RUN_CLI_NETWORK", "RUN_CLI_E2E", "RUN_MODAL_E2E", "RUN_LIVE_MODELS")
 ):
     for _var in _PROVIDER_KEY_ENV_VARS:
         os.environ[_var] = ""
@@ -119,6 +119,11 @@ def _isolate_cli_config(tmp_path, monkeypatch):
     per-test temp dir makes config writes hermetic.
     """
     import agent.config as _cfg
+
+    if _env_flag("RUN_LIVE_MODELS"):
+        # Live matrix needs the developer's real ~/.sandwalk keys.
+        yield
+        return
 
     cfg_dir = tmp_path / "sandwalk-config"
     cfg_dir.mkdir(parents=True, exist_ok=True)

@@ -49,6 +49,9 @@ def build_chat_model(config, *, streaming: bool = True):
     ChatCerebras, ``groq`` via ChatGroq, ``fireworks`` via ChatFireworks,
     and other first-party OpenAI-compatible providers (xAI, NVIDIA, OpenCode Zen).
     """
+    from agent.deepagents_runtime.llm_http import install_stable_tls_httpx
+
+    install_stable_tls_httpx()
     provider = str(config.get("llm.provider", "openai") or "openai").strip().lower()
     temperature = float(config.get("llm.temperature", 0.1))
 

@@ -9,6 +9,8 @@ DEFAULTS_LLM = {
     "llm.reasoning_fast": False,
     # Per-model Effort/Fast: {"openai:gpt-5.6-sol": {"effort": "high", "fast": true}}
     "llm.model_reasoning": {},
+    # Learned per-model request shape: omit temperature / reasoning / require_parameters.
+    "llm.param_heals": {},
     "llm.anthropic_api_key": None,
     "llm.api_key": None,
     "llm.openai_api_key": None,
